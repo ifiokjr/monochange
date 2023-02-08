@@ -9,5 +9,6 @@ keywords = ["cli", "changelog", "releases", "versioning", "monorepo", ]
 repository = "https://github.com/ifiokjr/monochange"
 description = "Manage versions and releases for you multiplatform, multilanguage monorepo"
 rust-version = "1.67.0"
+license = "Unlicense"
 
 [dependencies]
