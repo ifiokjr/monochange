@@ -1,5 +1,5 @@
 name: devenv
-description: "Setup development environment with devenv"
+description: 'Setup development environment with devenv'
 inputs:
   github-token:
     description: Provide a github token
@@ -22,7 +22,7 @@ runs:
 
     - name: import nix store cache
       if: "steps.nix-cache.outputs.cache-hit == 'true'"
-      run: "nix-store --import < /tmp/nixcache"
+      run: 'nix-store --import < /tmp/nixcache'
       shell: bash
 
     - name: enable cachix
@@ -31,7 +31,7 @@ runs:
         name: devenv
 
     - name: install devenv.sh
-      run: nix profile install github:cachix/devenv/v0.5
+      run: nix profile install github:cachix/devenv/v0.5.1
       shell: bash
 
     - name: run devenv in ci

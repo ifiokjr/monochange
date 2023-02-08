@@ -4,7 +4,7 @@
 
 ## Motivation
 
-Managing versions in a multilanguage monorepo is difficult.
+Managing versions in multi-language monorepos is difficult.
 
 - Manage version increments across the monorepo
 - Manage package / crate dependencies even across languages. For example a node package might depend
@@ -20,7 +20,7 @@ To automatically load the environment you should
 [install direnv](https://devenv.sh/automatic-shell-activation/) and then load the `direnv`.
 
 ```bash
-# The security mechanism didn't allow to load the `.envrc`. 
+# The security mechanism didn't allow to load the `.envrc`.
 # Since we trust it, let's allow it execution.
 direnv allow .
 ```
