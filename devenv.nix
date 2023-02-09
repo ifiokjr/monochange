@@ -1,7 +1,7 @@
 { pkgs, ... }:
 
 {
-  packages = [ 
+  packages = [
     pkgs.cargo-all-features
     pkgs.cargo-generate
     pkgs.cargo-insta
@@ -12,6 +12,7 @@
     pkgs.dprint
     pkgs.fnm
     pkgs.git
+    pkgs.mdbook
     pkgs.ripgrep
     pkgs.rust-analyzer
     pkgs.rustup
