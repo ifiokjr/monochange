@@ -2,6 +2,11 @@
 
 > manage versions and releases for you multiplatform, multilanguage monorepo
 
+## Note
+
+⚠️ This liibrary is currently not useable. I'm building in public and the discovering the API in
+daily coding sessions. If you have any suggestions please create a discussion.
+
 ## Motivation
 
 Managing versions in multi-language monorepos is difficult.

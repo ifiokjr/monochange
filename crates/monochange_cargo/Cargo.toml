@@ -1,8 +1,8 @@
 [package]
-name = "monochange"
-version = "0.0.0"
-categories = ["development-tools", "command-line-utilities"]
-documentation = "https://docs.rs/monochange"
+name = "monochange_cargo"
+version = "0.1.0"
+categories = ["development-tools"]
+documentation = "https://docs.rs/monochange_core"
 edition = "2021"
 include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
 keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
@@ -12,4 +12,10 @@ rust-version = "1.67.0"
 description = "Manage versions and releases for you multiplatform, multilanguage monorepo"
 
 [dependencies]
+cargo_metadata = { workspace = true }
 monochange_core = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
