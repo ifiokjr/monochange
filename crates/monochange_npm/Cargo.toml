@@ -1,8 +1,22 @@
 [package]
 name = "monochange_npm"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_core"
+edition = { workspace = true }
+include = { workspace = true }
+keywords = []
+license = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Manage versions and releases for you multiplatform, multilanguage monorepo"
 
 [dependencies]
+doc-comment = { workspace = true }
+monochange_core = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+pretty_assertions = { workspace = true }
+rstest = { workspace = true }

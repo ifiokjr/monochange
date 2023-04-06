@@ -1,3 +1,8 @@
+#![deny(clippy::all)]
+#![forbid(clippy::indexing_slicing)]
+
+doc_comment::doctest!("../readme.md");
+
 use semver::Version;
 
 /// This the plugin API for monochange. Every plugin must implement this trait.
@@ -27,3 +32,6 @@ pub enum VersionRule {
   /// The version is part of a version group. Each group has an id.
   Grouped(String),
 }
+
+#[cfg(test)]
+mod __tests;

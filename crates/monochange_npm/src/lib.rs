@@ -1,14 +1,7 @@
-pub fn add(left: usize, right: usize) -> usize {
-  left + right
-}
+#![deny(clippy::all)]
+#![forbid(clippy::indexing_slicing)]
+
+doc_comment::doctest!("../readme.md");
 
 #[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn it_works() {
-    let result = add(2, 2);
-    assert_eq!(result, 4);
-  }
-}
+mod __tests;

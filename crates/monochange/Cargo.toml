@@ -1,15 +1,24 @@
 [package]
 name = "monochange"
-version = "0.0.0"
-categories = ["development-tools", "command-line-utilities"]
+version = { workspace = true }
+categories = { workspace = true }
 documentation = "https://docs.rs/monochange"
-edition = "2021"
-include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+edition = { workspace = true }
+include = { workspace = true }
 keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
-license = "Unlicense"
-repository = "https://github.com/ifiokjr/monochange"
-rust-version = "1.67.0"
+license = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 description = "Manage versions and releases for you multiplatform, multilanguage monorepo"
 
 [dependencies]
+doc-comment = { workspace = true }
+monochange_cargo = { workspace = true }
 monochange_core = { workspace = true }
+monochange_npm = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+pretty_assertions = { workspace = true }
+rstest = { workspace = true }
