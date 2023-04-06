@@ -4,6 +4,9 @@ inputs:
   github-token:
     description: Provide a github token
     required: true
+  nix-cache:
+    description: The location of the nix cache
+    required: true
 
 runs:
   using: composite
@@ -12,17 +15,18 @@ runs:
       uses: actions/cache@v3
       id: nix-cache
       with:
-        path: /tmp/nixcache
-        key: ${{ runner.os }}-nix-cache
+        path: ${{ inputs.nix-cache }}
+        key: ${{ runner.os }}-nix-cache-${{ hashFiles('**/devenv.nix', '**/devenv.yaml', '**/devenv.lock') }}
+        restore-keys: ${{ runner.os }}-nix-cache-
 
     - name: install nix
-      uses: cachix/install-nix-action@v18
+      uses: cachix/install-nix-action@v20
       with:
         github_access_token: ${{ inputs.github-token }}
 
     - name: import nix store cache
-      if: "steps.nix-cache.outputs.cache-hit == 'true'"
-      run: "nix-store --import < /tmp/nixcache"
+      if: steps.nix-cache.outputs.cache-hit == 'true'
+      run: nix-store --import < ${{ inputs.nix-cache }}
       shell: bash
 
     - name: enable cachix
@@ -31,7 +35,9 @@ runs:
         name: devenv
 
     - name: install devenv.sh
-      run: nix profile install github:cachix/devenv/v0.5.1
+      run: |
+        cachix use devenv
+        nix profile install --accept-flake-config github:cachix/devenv/v0.6.2
       shell: bash
 
     - name: run devenv in ci
@@ -43,6 +49,6 @@ runs:
       shell: bash
 
     - name: export nix store cache
-      if: "steps.nix-cache.outputs.cache-hit != 'true'"
-      run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*')> /tmp/nixcache"
+      if: steps.nix-cache.outputs.cache-hit != 'true'
+      run: nix-store --export $(find /nix/store -maxdepth 1 -name '*-*')> ${{ inputs.nix-cache }}
       shell: bash
