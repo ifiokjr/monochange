@@ -18,6 +18,7 @@ indoc = "2"
 insta = "1"
 lazy_static = "1"
 log = "0.4"
+markdown = "1.0.0-alpha.7"
 napi = "2"
 napi-build = "2"
 napi-derive = "2"
@@ -35,6 +36,7 @@ wasm-bindgen = "0.2"
 wasm-bindgen-test = "0.3"
 
 # Internal crates
+mdtemplate = { path = "./crates/mdtemplate", version = "0.0.0" }
 monochange = { path = "./crates/monochange", version = "0.0.0" }
 monochange_core = { path = "./crates/monochange_core", version = "0.0.0" }
 monochange_cargo = { path = "./crates/monochange_cargo", version = "0.0.0" }

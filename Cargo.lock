@@ -370,6 +370,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d59d8c75012853d2e872fb56bc8a2e53718e2cafe1a4c823143141c6d90c322f"
 
 [[package]]
+name = "markdown"
+version = "1.0.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98de49c677e95e00eaa74c42a0b07ea55e1e0b1ebca5b2cbc7657f288cd714eb"
+dependencies = [
+ "unicode-id",
+]
+
+[[package]]
+name = "mdtemplate"
+version = "0.0.0"
+dependencies = [
+ "doc-comment",
+ "insta",
+ "markdown",
+ "pretty_assertions",
+ "rstest",
+ "thiserror",
+]
+
+[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -644,6 +665,12 @@ dependencies = [
  "quote",
  "syn 2.0.13",
 ]
+
+[[package]]
+name = "unicode-id"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d70b6494226b36008c8366c288d77190b3fad2eb4c10533139c1c1f461127f1a"
 
 [[package]]
 name = "unicode-ident"
