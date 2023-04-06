@@ -1,6 +1,6 @@
-# monochange
+# mdtemplate
 
-> manage versions and releases for you multiplatform, multilanguage monorepo
+> the `mdtemplate`
 
 <br />
 
@@ -13,13 +13,13 @@
 
 ```toml
 [dependencies]
-monochange = "0.0.0"
+mdtemplate = "0.0.0"
 ```
 
-[crate-image]: https://img.shields.io/crates/v/monochange.svg
-[crate-link]: https://crates.io/crates/monochange
-[docs-image]: https://docs.rs/monochange/badge.svg
-[docs-link]: https://docs.rs/monochange/
+[crate-image]: https://img.shields.io/crates/v/mdtemplate.svg
+[crate-link]: https://crates.io/crates/mdtemplate
+[docs-image]: https://docs.rs/mdtemplate/badge.svg
+[docs-link]: https://docs.rs/mdtemplate/
 [ci-status-image]: https://github.com/ifiokjr/monochange/workflows/ci/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions?query=workflow:ci
 [unlicense-image]: https://img.shields.io/badge/license-Unlicence-blue.svg
