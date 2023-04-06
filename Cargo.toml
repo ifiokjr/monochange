@@ -4,34 +4,37 @@ default-members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
+cargo_metadata = "0.15"
 clap = "4"
-colorsys = "0.6"
-console_error_panic_hook = "0.1"
-console_log = "0.2"
-dashmap = "5"
+deno_bindgen = "0.7"
+derive_more = "0.99"
+doc-comment = "0.3"
 enum-ordinalize = "3"
+globset = "0.4"
 heck = "0.4"
+indent_write = "2"
 indexmap = "1"
+indoc = "2"
 insta = "1"
 lazy_static = "1"
-leptos = "0.1"
 log = "0.4"
 napi = "2"
 napi-build = "2"
 napi-derive = "2"
 owo-colors = "*"
-parcel_sourcemap = "2"
+pretty_assertions = "1"
 readonly = "0.2"
 regex = "1"
-serde = "1"
+rstest = "0.17"
 semver = "1"
+serde = "1"
 serde_json = "1"
 thiserror = "1"
-typed-builder = "0.12"
+typed-builder = "0.14"
 wasm-bindgen = "0.2"
 wasm-bindgen-test = "0.3"
-cargo_metadata = "0.15"
 
+# Internal crates
 monochange = { path = "./crates/monochange", version = "0.0.0" }
 monochange_core = { path = "./crates/monochange_core", version = "0.0.0" }
 monochange_cargo = { path = "./crates/monochange_cargo", version = "0.0.0" }
@@ -39,3 +42,15 @@ monochange_npm = { path = "./crates/monochange_npm", version = "0.0.0" }
 
 [profile.release.package.skribble]
 opt-level = "s"
+
+[workspace.package]
+version = "0.0.0"
+homepage = "https://github.com/ifiokjr/monochange"
+repository = "https://github.com/ifiokjr/monochange"
+authors = ["Ifiok Jr. <ifiokotung@gmail.com>"]
+edition = "2021"
+license = "Unlicense"
+rust-version = "1.68.0"
+categories = ["development-tools"]
+readme = "readme.md"
+include = ["src/**/*.rs", "Cargo.toml", "readme.md"]

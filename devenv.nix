@@ -2,63 +2,87 @@
 
 {
   packages = [
-    pkgs.cargo-all-features
-    pkgs.cargo-generate
     pkgs.cargo-insta
-    pkgs.cargo-make
-    pkgs.cargo-workspaces
-    pkgs.cargo-edit
+    pkgs.cargo-nextest
     pkgs.deno
     pkgs.dprint
-    pkgs.fnm
-    pkgs.git
     pkgs.mdbook
-    pkgs.ripgrep
-    pkgs.rust-analyzer
     pkgs.rustup
-    pkgs.trunk
   ];
-
-  difftastic.enable = true;
-  devcontainer.enable = true;
-
 
   # Scripts
 
   scripts."build:all".exec = ''
+    set -e
+    build:cargo
+    build:book
+  '';
+  scripts."build:cargo".exec = ''
+    set -e
     cargo build
   '';
+  scripts."build:book".exec = ''
+    set -e
+    mdbook build docs
+  '';
   scripts."fix:all".exec = ''
-    fix:format
+    set -e
     fix:clippy
+    fix:format
   '';
   scripts."fix:format".exec = ''
+    set -e
     dprint fmt
   '';
   scripts."fix:clippy".exec = ''
+    set -e
     cargo clippy --fix --allow-dirty --allow-staged
   '';
   scripts."lint:all".exec = ''
+    set -e
     lint:format
     lint:clippy
   '';
   scripts."lint:format".exec = ''
+    set -e
     dprint check
   '';
   scripts."lint:clippy".exec = ''
+    set -e
     cargo clippy
   '';
-  scripts."test:snapshot".exec = ''
+  scripts."snapshot:review".exec = ''
+    cargo insta review
+  '';
+  scripts."snapshot:update".exec = ''
+    cargo nextest run
     cargo insta accept
   '';
   scripts."test:all".exec = ''
-    cargo test
+    set -e
+    test:cargo
+    test:docs
+    # test:book
+  '';
+  scripts."test:cargo".exec = ''
+    set -e
+    cargo nextest run
+  '';
+  scripts."test:docs".exec = ''
+    set -e
+    cargo test --doc
+  '';
+  scripts."test:book".exec = ''
+    set -e
+    mdbook test docs --library-path target/debug/deps
   '';
   scripts."setup:helix".exec = ''
+    set -e
     rm -rf .helix
     cp -r setup/editors/helix .helix
   '';
   scripts."setup:vscode".exec = ''
+    set -e
     rm -rf .vscode
     cp -r ./setup/editors/vscode .vscode
   '';
