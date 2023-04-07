@@ -379,7 +379,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdtemplate"
+name = "mdt"
 version = "0.0.0"
 dependencies = [
  "doc-comment",
