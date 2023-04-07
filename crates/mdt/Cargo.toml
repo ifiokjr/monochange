@@ -1,8 +1,8 @@
 [package]
-name = "mdtemplate"
+name = "mdt"
 version = { workspace = true }
 categories = { workspace = true }
-documentation = "https://docs.rs/mdtemplate"
+documentation = "https://docs.rs/mdt"
 edition = { workspace = true }
 include = { workspace = true }
 keywords = ["markdown", "templates"]
@@ -10,7 +10,7 @@ license = { workspace = true }
 readme = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = "Manage template areas in markdown files."
+description = "update markdown content anywhere using comments as template tags"
 
 [dependencies]
 doc-comment = { workspace = true }
