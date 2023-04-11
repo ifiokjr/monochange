@@ -2,6 +2,7 @@
 
 {
   packages = [
+    pkgs.cargo-crev
     pkgs.cargo-insta
     pkgs.cargo-nextest
     pkgs.deno

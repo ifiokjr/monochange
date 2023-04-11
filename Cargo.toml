@@ -19,11 +19,14 @@ insta = "1"
 lazy_static = "1"
 log = "0.4"
 markdown = "1.0.0-alpha.7"
+miette = "5"
+minijinja = "0.31"
 napi = "2"
 napi-build = "2"
 napi-derive = "2"
+nom = "7"
 owo-colors = "*"
-pretty_assertions = "1"
+similar-asserts = "1"
 readonly = "0.2"
 regex = "1"
 rstest = "0.17"
@@ -39,6 +42,7 @@ wasm-bindgen-test = "0.3"
 
 # Internal crates
 mdt = { path = "./crates/mdt", version = "0.0.0" }
+mdt_lsp = { path = "./crates/mdt_lsp", version = "0.0.0" }
 monochange = { path = "./crates/monochange", version = "0.0.0" }
 monochange_core = { path = "./crates/monochange_core", version = "0.0.0" }
 monochange_cargo = { path = "./crates/monochange_cargo", version = "0.0.0" }
