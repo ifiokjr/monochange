@@ -4,8 +4,7 @@
 
 ## Note
 
-⚠️ This liibrary is currently not useable. I'm building in public and the discovering the API in
-daily coding sessions. If you have any suggestions please create a discussion.
+⚠️ This library is not useable. I'm still discovering the API as I build.
 
 ## Motivation
 
