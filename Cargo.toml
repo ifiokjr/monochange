@@ -1,6 +1,6 @@
 [workspace]
-members = ["crates/*"]
-default-members = ["crates/*"]
+members = ["crates/*", "docs"]
+default-members = ["crates/*", "docs"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -47,9 +47,6 @@ monochange = { path = "./crates/monochange", version = "0.0.0" }
 monochange_core = { path = "./crates/monochange_core", version = "0.0.0" }
 monochange_cargo = { path = "./crates/monochange_cargo", version = "0.0.0" }
 monochange_npm = { path = "./crates/monochange_npm", version = "0.0.0" }
-
-[profile.release.package.skribble]
-opt-level = "s"
 
 [workspace.package]
 version = "0.0.0"

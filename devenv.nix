@@ -63,7 +63,6 @@
     set -e
     test:cargo
     test:docs
-    # test:book
   '';
   scripts."test:cargo".exec = ''
     set -e
@@ -72,10 +71,6 @@
   scripts."test:docs".exec = ''
     set -e
     cargo test --doc
-  '';
-  scripts."test:book".exec = ''
-    set -e
-    mdbook test docs --library-path target/debug/deps
   '';
   scripts."setup:helix".exec = ''
     set -e

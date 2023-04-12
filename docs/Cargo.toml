@@ -1,0 +1,12 @@
+[package]
+name = "monochange_book"
+version = { workspace = true }
+edition = { workspace = true }
+publish = false
+
+[dependencies]
+doc-comment = { workspace = true }
+monochange = { workspace = true }
+monochange_cargo = { workspace = true }
+monochange_core = { workspace = true }
+monochange_npm = { workspace = true }
