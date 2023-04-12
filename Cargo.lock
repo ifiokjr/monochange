@@ -384,6 +384,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "monochange_book"
+version = "0.0.0"
+dependencies = [
+ "doc-comment",
+ "monochange",
+ "monochange_cargo",
+ "monochange_core",
+ "monochange_npm",
+]
+
+[[package]]
 name = "monochange_cargo"
 version = "0.0.0"
 dependencies = [
