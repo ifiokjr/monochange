@@ -43,8 +43,6 @@ wasm-bindgen = "0.2"
 wasm-bindgen-test = "0.3"
 
 # Internal crates
-mdt = { path = "./crates/mdt", version = "0.0.0" }
-mdt_lsp = { path = "./crates/mdt_lsp", version = "0.0.0" }
 monochange = { path = "./crates/monochange", version = "0.0.0" }
 monochange_core = { path = "./crates/monochange_core", version = "0.0.0" }
 monochange_cargo = { path = "./crates/monochange_cargo", version = "0.0.0" }
