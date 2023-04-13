@@ -57,10 +57,10 @@ It should:
 
 - support multiple languages
 - automatically bump versions across workspaces
-- understand dependencies between packages, even when cross langauge dependencies (rust ffi in deno)
+- understand dependencies between packages, even when cross language dependencies (rust ffi in deno)
 - implement a way to publish deno packages to `deno.land/x` (creating a seperate repo for each
   package that is automatically updated when publishing)
-- plugin architecture to implement langugage specific publishing
+- plugin architecture to implement language specific publishing
 
 ## Some alternatives
 
