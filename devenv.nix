@@ -2,16 +2,14 @@
 
 {
   packages = [
-    pkgs.cargo-crev
     pkgs.cargo-insta
     pkgs.cargo-nextest
+    pkgs.cargo-udeps
     pkgs.deno
     pkgs.dprint
     pkgs.mdbook
     pkgs.rustup
   ];
-
-  # Scripts
 
   scripts."build:all".exec = ''
     set -e
@@ -50,7 +48,8 @@
   '';
   scripts."lint:clippy".exec = ''
     set -e
-    cargo clippy
+    cargo clippy --all-features
+    cargo check --all-features
   '';
   scripts."snapshot:review".exec = ''
     cargo insta review
@@ -66,11 +65,16 @@
   '';
   scripts."test:cargo".exec = ''
     set -e
-    cargo nextest run
+    cargo nextest run --all-features
   '';
   scripts."test:docs".exec = ''
     set -e
-    cargo test --doc
+    cargo test --doc --all-features
+  '';
+  # This doesn't seem to work so I've used `doc-comment` instead
+  scripts."test:book".exec = ''
+    set -e
+    mdbook test docs --library-path target/debug/deps
   '';
   scripts."setup:helix".exec = ''
     set -e
@@ -83,6 +87,7 @@
     cp -r ./setup/editors/vscode .vscode
   '';
   scripts."setup:ci".exec = ''
+    set -e
     # update GitHub CI Path
     echo "$DEVENV_PROFILE/bin" >> $GITHUB_PATH
     echo "DEVENV_PROFILE=$DEVENV_PROFILE" >> $GITHUB_ENV
