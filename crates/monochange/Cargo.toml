@@ -10,9 +10,14 @@ license = { workspace = true }
 readme = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = "Manage versions and releases for you multiplatform, multilanguage monorepo"
+description = "Manage versions and releases for your multiplatform, multilanguage monorepo"
+
+[[bin]]
+name = "mc"
+path = "src/bin/mc.rs"
 
 [dependencies]
+clap = { workspace = true, features = ["derive"] }
 doc-comment = { workspace = true }
 monochange_cargo = { workspace = true }
 monochange_core = { workspace = true }
@@ -22,3 +27,6 @@ monochange_npm = { workspace = true }
 insta = { workspace = true }
 rstest = { workspace = true }
 similar-asserts = { workspace = true }
+
+[lints]
+workspace = true

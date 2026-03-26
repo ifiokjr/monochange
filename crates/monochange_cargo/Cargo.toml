@@ -2,7 +2,7 @@
 name = "monochange_cargo"
 version = { workspace = true }
 categories = { workspace = true }
-documentation = "https://docs.rs/monochange_core"
+documentation = "https://docs.rs/monochange_cargo"
 edition = { workspace = true }
 include = { workspace = true }
 keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
@@ -10,7 +10,7 @@ license = { workspace = true }
 readme = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = "Manage versions and releases for you multiplatform, multilanguage monorepo"
+description = "Manage versions and releases for your multiplatform, multilanguage monorepo"
 
 [dependencies]
 cargo_metadata = { workspace = true }
@@ -23,3 +23,6 @@ serde = { workspace = true }
 insta = { workspace = true }
 rstest = { workspace = true }
 similar-asserts = { workspace = true }
+
+[lints]
+workspace = true
