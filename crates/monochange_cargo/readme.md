@@ -4,15 +4,13 @@
 
 <br />
 
-[![Crate][crate-image]][crate-link] [![Docs][docs-image]][docs-link]
-[![Status][ci-status-image]][ci-status-link] [![Unlicense][unlicense-image]][unlicense-link]
+[![Crate][crate-image]][crate-link] [![Docs][docs-image]][docs-link] [![Status][ci-status-image]][ci-status-link] [![Unlicense][unlicense-image]][unlicense-link]
 
 <br />
 
 ## Why?
 
-This is a plugin for `monochange` that provides versioning and changelog management for cargo
-workspaces.
+This is a plugin for `monochange` that provides versioning and changelog management for cargo workspaces.
 
 ## Installation
 

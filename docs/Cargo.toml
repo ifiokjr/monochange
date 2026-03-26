@@ -10,3 +10,6 @@ monochange = { workspace = true }
 monochange_cargo = { workspace = true }
 monochange_core = { workspace = true }
 monochange_npm = { workspace = true }
+
+[lints]
+workspace = true
