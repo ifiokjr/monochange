@@ -1,5 +1,6 @@
 /target
 /.helix
+/.bin
 /result
 /.direnv
 # Devenv

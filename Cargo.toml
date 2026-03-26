@@ -1,7 +1,31 @@
 [workspace]
-members = ["crates/*", "docs"]
-default-members = ["crates/*", "docs"]
+members = [
+	"crates/monochange",
+	"crates/monochange_cargo",
+	"crates/monochange_core",
+	"crates/monochange_npm",
+	"docs",
+]
+default-members = [
+	"crates/monochange",
+	"crates/monochange_core",
+	"crates/monochange_cargo",
+	"crates/monochange_npm",
+	"docs",
+]
 resolver = "2"
+
+[workspace.package]
+version = "0.0.0"
+authors = ["Ifiok Jr. <ifiokotung@gmail.com>"]
+categories = ["development-tools"]
+edition = "2021"
+homepage = "https://github.com/ifiokjr/monochange"
+include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+license = "Unlicense"
+readme = "readme.md"
+repository = "https://github.com/ifiokjr/monochange"
+rust-version = "1.86.0"
 
 [workspace.dependencies]
 cargo_metadata = "0.15"
@@ -10,28 +34,62 @@ derive_more = "0.99"
 doc-comment = "0.3"
 insta = "1"
 markdown = "1.0.0-alpha.9"
-similar-asserts = "1"
 rstest = "0.17"
 semver = "1"
 serde = "1"
 serde_json = "1"
+similar-asserts = "1"
 thiserror = "1"
 typed-builder = "0.14"
 
 # Internal crates
 monochange = { path = "./crates/monochange", version = "0.0.0" }
-monochange_core = { path = "./crates/monochange_core", version = "0.0.0" }
 monochange_cargo = { path = "./crates/monochange_cargo", version = "0.0.0" }
+monochange_core = { path = "./crates/monochange_core", version = "0.0.0" }
 monochange_npm = { path = "./crates/monochange_npm", version = "0.0.0" }
 
-[workspace.package]
-version = "0.0.0"
-homepage = "https://github.com/ifiokjr/monochange"
-repository = "https://github.com/ifiokjr/monochange"
-authors = ["Ifiok Jr. <ifiokotung@gmail.com>"]
-edition = "2021"
-license = "Unlicense"
-rust-version = "1.68.0"
-categories = ["development-tools"]
-readme = "readme.md"
-include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+[workspace.metadata.bin]
+cargo-deny = { version = "0.19.0" }
+cargo-insta = { version = "1.46.3" }
+cargo-llvm-cov = { version = "0.8.4" }
+cargo-nextest = { version = "0.9.129" }
+cargo-semver-checks = { version = "0.46.0" }
+cargo-workspaces = { version = "0.4.2" }
+
+[workspace.lints.rust]
+rust_2021_compatibility = { level = "warn", priority = -1 }
+rust_2024_compatibility = { level = "warn", priority = -1 }
+unsafe_code = "deny"
+unstable_features = "deny"
+unused_extern_crates = "warn"
+unused_import_braces = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+unused_qualifications = "warn"
+variant_size_differences = "warn"
+edition_2024_expr_fragment_specifier = "allow"
+
+[workspace.lints.clippy]
+complexity = { level = "warn", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
+blocks_in_conditions = "allow"
+cargo_common_metadata = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+expl_impl_clone_on_copy = "allow"
+items_after_statements = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+no_effect_underscore_binding = "allow"
+tabs-in-doc-comments = "allow"
+too_many_lines = "allow"
+wildcard_dependencies = "deny"
+wildcard_imports = "allow"

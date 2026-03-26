@@ -1,110 +1,221 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 {
-  packages = [
-    pkgs.cargo-insta
-    pkgs.cargo-nextest
-    pkgs.cargo-udeps
-    pkgs.deno
-    pkgs.dprint
-    pkgs.mdbook
-    pkgs.rustup
-  ];
+  packages =
+    with pkgs;
+    [
+      cargo-binstall
+      cargo-run-bin
+      deno
+      dprint
+      mdbook
+      nixfmt
+      rustup
+      shfmt
+    ]
+    ++ lib.optionals stdenv.isDarwin [
+      coreutils
+    ];
 
-  scripts."build:all".exec = ''
+  enterShell = ''
     set -e
-    build:cargo
-    build:book
+    rustup toolchain install nightly --component rustfmt --no-self-update 2>/dev/null || true
+    rustup update stable --no-self-update 2>/dev/null || true
   '';
-  scripts."build:cargo".exec = ''
-    set -e
-    cargo build
-  '';
-  scripts."build:book".exec = ''
-    set -e
-    mdbook build docs
-  '';
-  scripts."fix:all".exec = ''
-    set -e
-    fix:clippy
-    fix:format
-  '';
-  scripts."fix:format".exec = ''
-    set -e
-    dprint fmt
-  '';
-  scripts."fix:clippy".exec = ''
-    set -e
-    cargo clippy --fix --allow-dirty --allow-staged
-  '';
-  scripts."lint:all".exec = ''
-    set -e
-    lint:format
-    lint:clippy
-  '';
-  scripts."lint:format".exec = ''
-    set -e
-    dprint check
-  '';
-  scripts."lint:clippy".exec = ''
-    set -e
-    cargo clippy --all-features
-    cargo check --all-features
-  '';
-  scripts."snapshot:review".exec = ''
-    cargo insta review
-  '';
-  scripts."snapshot:update".exec = ''
-    cargo nextest run
-    cargo insta accept
-  '';
-  scripts."test:all".exec = ''
-    set -e
-    test:cargo
-    test:docs
-  '';
-  scripts."test:cargo".exec = ''
-    set -e
-    cargo nextest run --all-features
-  '';
-  scripts."test:docs".exec = ''
-    set -e
-    cargo test --doc --all-features
-  '';
-  # This doesn't seem to work so I've used `doc-comment` instead
-  scripts."test:book".exec = ''
-    set -e
-    mdbook test docs --library-path target/debug/deps
-  '';
-  scripts."setup:helix".exec = ''
-    set -e
-    rm -rf .helix
-    cp -r setup/editors/helix .helix
-  '';
-  scripts."setup:vscode".exec = ''
-    set -e
-    rm -rf .vscode
-    cp -r ./setup/editors/vscode .vscode
-  '';
-  scripts."setup:ci".exec = ''
-    set -e
-    # update GitHub CI Path
-    echo "$DEVENV_PROFILE/bin" >> $GITHUB_PATH
-    echo "DEVENV_PROFILE=$DEVENV_PROFILE" >> $GITHUB_ENV
 
-    # prepend common compilation lookup paths
-    echo PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-    echo LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
-    echo LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
-    echo C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
+  # disable dotenv since it breaks the variable interpolation supported by `direnv`
+  dotenv.disableHint = true;
 
-    # these provide shell completions / default config options
-    echo XDG_DATA_DIRS=$XDG_DATA_DIRS" >> $GITHUB_ENV
-    echo XDG_CONFIG_DIRS=$XDG_CONFIG_DIRS" >> $GITHUB_ENV
-
-    echo DEVENV_DOTFILE=$DEVENV_DOTFILE" >> $GITHUB_ENV
-    echo DEVENV_PROFILE=$DEVENV_PROFILE" >> $GITHUB_ENV
-    echo DEVENV_ROOT=$DEVENV_ROOT" >> $GITHUB_ENV
-    echo DEVENV_STATE=$DEVENV_STATE" >> $GITHUB_ENV
-  '';
+  scripts = {
+    "monochange" = {
+      exec = ''
+        set -e
+        cargo run --quiet --package monochange --bin monochange -- "$@"
+      '';
+      description = "The `monochange` executable";
+      binary = "bash";
+    };
+    "mc" = {
+      exec = ''
+        set -e
+        cargo run --quiet --package monochange --bin mc -- "$@"
+      '';
+      description = "Alias for the `monochange` executable";
+      binary = "bash";
+    };
+    "install:all" = {
+      exec = ''
+        set -e
+        install:cargo:bin
+      '';
+      description = "Install all packages.";
+      binary = "bash";
+    };
+    "install:cargo:bin" = {
+      exec = ''
+        set -e
+        cargo bin --install
+      '';
+      description = "Install cargo binaries locally.";
+      binary = "bash";
+    };
+    "update:deps" = {
+      exec = ''
+        set -e
+        cargo update
+        devenv update
+      '';
+      description = "Update dependencies.";
+      binary = "bash";
+    };
+    "build:all" = {
+      exec = ''
+        set -e
+        if [ -z "$CI" ]; then
+          echo "Building project locally"
+          cargo build --workspace --all-features
+        else
+          echo "Building in CI"
+          cargo build --workspace --all-features --locked
+        fi
+      '';
+      description = "Build all crates with all features activated.";
+      binary = "bash";
+    };
+    "build:book" = {
+      exec = ''
+        set -e
+        mdbook build docs
+      '';
+      description = "Build the mdbook documentation.";
+      binary = "bash";
+    };
+    "test:all" = {
+      exec = ''
+        set -e
+        cargo nextest run --workspace --all-features --no-tests pass
+        cargo test --doc --workspace --all-features
+      '';
+      description = "Run all tests across the crates.";
+      binary = "bash";
+    };
+    "test:cargo" = {
+      exec = ''
+        set -e
+        cargo nextest run --workspace --all-features --no-tests pass
+      '';
+      description = "Run cargo tests with nextest.";
+      binary = "bash";
+    };
+    "test:docs" = {
+      exec = ''
+        set -e
+        cargo test --doc --workspace --all-features
+      '';
+      description = "Run documentation tests.";
+      binary = "bash";
+    };
+    "coverage:all" = {
+      exec = ''
+        set -e
+        cargo llvm-cov nextest --workspace --all-features --lcov --output-path lcov.info
+      '';
+      description = "Run coverage across the crates.";
+      binary = "bash";
+    };
+    "fix:all" = {
+      exec = ''
+        set -e
+        fix:clippy
+        fix:format
+      '';
+      description = "Fix all autofixable problems.";
+      binary = "bash";
+    };
+    "fix:format" = {
+      exec = ''
+        set -e
+        dprint fmt --config "$DEVENV_ROOT/dprint.json"
+      '';
+      description = "Format files with dprint.";
+      binary = "bash";
+    };
+    "fix:clippy" = {
+      exec = ''
+        set -e
+        cargo clippy --workspace --fix --allow-dirty --allow-staged --all-features --all-targets
+      '';
+      description = "Fix clippy lints for rust.";
+      binary = "bash";
+    };
+    "deny:check" = {
+      exec = ''
+        set -e
+        cargo deny check
+      '';
+      description = "Run cargo-deny checks for security advisories and license compliance.";
+      binary = "bash";
+    };
+    "lint:all" = {
+      exec = ''
+        set -e
+        lint:clippy
+        lint:format
+        deny:check
+      '';
+      description = "Run all checks.";
+      binary = "bash";
+    };
+    "lint:format" = {
+      exec = ''
+        set -e
+        dprint check
+      '';
+      description = "Check that all files are formatted.";
+      binary = "bash";
+    };
+    "lint:clippy" = {
+      exec = ''
+        set -e
+        cargo clippy --workspace --all-features --all-targets
+      '';
+      description = "Check that all rust lints are passing.";
+      binary = "bash";
+    };
+    "snapshot:review" = {
+      exec = ''
+        set -e
+        cargo insta review
+      '';
+      description = "Review insta snapshots.";
+      binary = "bash";
+    };
+    "snapshot:update" = {
+      exec = ''
+        set -e
+        cargo nextest run --workspace --all-features --no-tests pass
+        cargo insta accept
+      '';
+      description = "Update insta snapshots.";
+      binary = "bash";
+    };
+    "setup:helix" = {
+      exec = ''
+        set -e
+        rm -rf .helix
+        cp -r setup/editors/helix .helix
+      '';
+      description = "Setup Helix editor configuration.";
+      binary = "bash";
+    };
+    "setup:vscode" = {
+      exec = ''
+        set -e
+        rm -rf .vscode
+        cp -r ./setup/editors/vscode .vscode
+      '';
+      description = "Setup VS Code workspace configuration.";
+      binary = "bash";
+    };
+  };
 }
