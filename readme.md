@@ -20,7 +20,7 @@ devenv shell
 install:all
 mc workspace discover --root . --format json
 mc changes add --root . --package crates/monochange --bump minor --reason "add release planning"
-mc plan release --root . --changes changes/1234567890-crates-monochange.toml --format json
+mc plan release --root . --changes .changeset/1234567890-crates-monochange.toml --format json
 ```
 
 Example configuration:

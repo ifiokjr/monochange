@@ -39,7 +39,7 @@ mc changes add --root . --package crates/monochange --bump minor --reason "add r
 Plan a release:
 
 ```bash
-mc plan release --root . --changes changes/1234567890-monochange.toml --format json
+mc plan release --root . --changes .changeset/1234567890-crates-monochange.toml --format json
 ```
 
 Validate the repository:

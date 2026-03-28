@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use clap::error::ErrorKind;
 use clap::Arg;
 use clap::ArgAction;
 use clap::ArgMatches;
@@ -73,6 +74,8 @@ struct ChangeEntry {
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	evidence: Vec<String>,
 }
+
+const CHANGESET_DIR: &str = ".changeset";
 
 pub fn build_command(bin_name: &'static str) -> Command {
 	Command::new(bin_name)
@@ -167,9 +170,18 @@ pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<Str
 where
 	I: IntoIterator<Item = OsString>,
 {
-	let matches = build_command(bin_name)
-		.try_get_matches_from(args)
-		.map_err(|error| MonochangeError::Config(error.to_string()))?;
+	let matches = match build_command(bin_name).try_get_matches_from(args) {
+		Ok(matches) => matches,
+		Err(error)
+			if matches!(
+				error.kind(),
+				ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
+			) =>
+		{
+			return Ok(error.to_string());
+		}
+		Err(error) => return Err(MonochangeError::Config(error.to_string())),
+	};
 	execute_matches(&matches)
 }
 
@@ -513,7 +525,7 @@ fn default_change_path(root: &Path, package_refs: &[String]) -> PathBuf {
 	} else {
 		slug
 	};
-	root.join("changes")
+	root.join(CHANGESET_DIR)
 		.join(format!("{timestamp}-{slug}.toml"))
 }
 

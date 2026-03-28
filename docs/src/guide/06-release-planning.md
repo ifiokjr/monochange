@@ -27,7 +27,7 @@ evidence = ["rust-semver:major:public API break detected"]
 Generate a plan:
 
 ```bash
-mc plan release --root . --changes changes.toml --format json
+mc plan release --root . --changes .changeset/my-change.toml --format json
 ```
 
 Planning rules in this milestone:

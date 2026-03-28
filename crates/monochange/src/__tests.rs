@@ -27,6 +27,15 @@ fn cli_parses_workspace_discover_command() {
 }
 
 #[test]
+fn cli_help_returns_success_output() {
+	let output = run_with_args("mc", [OsString::from("mc"), OsString::from("--help")])
+		.unwrap_or_else(|error| panic!("help output: {error}"));
+
+	assert!(output.contains("Usage: mc <COMMAND>"));
+	assert!(output.contains("changes"));
+}
+
+#[test]
 fn discover_workspace_aggregates_packages_from_multiple_ecosystems() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let discovery =
@@ -175,7 +184,7 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 }
 
 #[test]
-fn add_change_file_creates_default_path_under_changes_directory() {
+fn add_change_file_creates_default_path_under_changeset_directory() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let output_path = add_change_file(
 		&fixture_root,
@@ -189,9 +198,73 @@ fn add_change_file_creates_default_path_under_changes_directory() {
 	let content = fs::read_to_string(&output_path)
 		.unwrap_or_else(|error| panic!("read change file: {error}"));
 
-	assert!(output_path.starts_with(fixture_root.join("changes")));
+	assert!(output_path.starts_with(fixture_root.join(".changeset")));
 	assert!(content.contains("package = \"sdk-core\""));
 	fs::remove_file(output_path).unwrap_or_else(|error| panic!("cleanup change file: {error}"));
+}
+
+#[test]
+fn changes_add_supports_evidence_and_round_trips_into_plan_release() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let output_path = tempdir.path().join("major.toml");
+
+	run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("changes"),
+			OsString::from("add"),
+			OsString::from("--root"),
+			fixture_root.clone().into_os_string(),
+			OsString::from("--package"),
+			OsString::from("sdk-core"),
+			OsString::from("--bump"),
+			OsString::from("patch"),
+			OsString::from("--reason"),
+			OsString::from("breaking change"),
+			OsString::from("--evidence"),
+			OsString::from("rust-semver:major:public API break detected"),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+	let content = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read change file: {error}"));
+	let plan = plan_release(&fixture_root, &output_path)
+		.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	assert!(content.contains("evidence = [\"rust-semver:major:public API break detected\"]"));
+	assert!(plan
+		.compatibility_evidence
+		.iter()
+		.any(|assessment| assessment.severity.to_string() == "major"));
+}
+
+#[test]
+fn changes_add_rejects_unknown_package_references() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let error = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("changes"),
+			OsString::from("add"),
+			OsString::from("--root"),
+			fixture_root.into_os_string(),
+			OsString::from("--package"),
+			OsString::from("missing-package"),
+			OsString::from("--reason"),
+			OsString::from("should fail"),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected failure"));
+
+	assert!(error
+		.to_string()
+		.contains("did not match any discovered package"));
 }
 
 #[test]
