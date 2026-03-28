@@ -1,0 +1,44 @@
+[[changes]]
+package = "crates/monochange"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_core"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_cargo"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_npm"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_config"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_deno"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_dart"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_graph"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"
+
+[[changes]]
+package = "crates/monochange_semver"
+bump = "minor"
+reason = "add cross-ecosystem discovery and release planning foundation"

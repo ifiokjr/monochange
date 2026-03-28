@@ -2,44 +2,66 @@
 
 > manage versions and releases for your multiplatform, multilanguage monorepo
 
-## Note
+`monochange` is a Rust workspace for cross-ecosystem package discovery and release planning.
 
-⚠️ This project is still under active development while the API and workflows are being discovered.
+Current milestone capabilities:
 
-## Motivation
+- discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
+- normalize dependency edges across ecosystems
+- coordinate shared version groups from `monochange.toml`
+- compute release plans from explicit change input
+- apply Rust semver evidence when provided
+- ship documentation through the mdBook in `docs/`
 
-Managing versions in multi-language monorepos is difficult.
-
-- coordinate version increments across the monorepo
-- manage cross-language package dependencies
-- automate tagging, changelogs, and release orchestration
-- keep release intent explicit and auditable
-
-## Development
-
-[`devenv`](https://devenv.sh/) provides the reproducible development environment for this project. Follow the [getting started instructions](https://devenv.sh/getting-started/) and then enter the shell.
+## Quick start
 
 ```bash
 devenv shell
 install:all
+mc workspace discover --root . --format json
+mc changes add --root . --package crates/monochange --bump minor --reason "add release planning"
+mc plan release --root . --changes changes/1234567890-crates-monochange.toml --format json
 ```
 
-Useful commands:
+Example configuration:
+
+```toml
+[defaults]
+parent_bump = "patch"
+include_private = false
+
+[[version_groups]]
+name = "sdk"
+members = ["crates/sdk_core", "packages/web-sdk"]
+```
+
+Example change input:
+
+```toml
+[[changes]]
+package = "crates/sdk_core"
+bump = "minor"
+reason = "public API addition"
+```
+
+Rust semver evidence can be attached explicitly:
+
+```toml
+[[changes]]
+package = "crates/sdk_core"
+reason = "breaking API change"
+evidence = ["rust-semver:major:public API break detected"]
+```
+
+## Development
 
 ```bash
 monochange --help
 mc --help
-build:all
-build:book
 lint:all
 test:all
-snapshot:review
-snapshot:update
+build:all
+build:book
 ```
 
-To setup recommended editor configuration:
-
-```bash
-setup:vscode
-setup:helix
-```
+See `docs/` for user-facing guides and `CONTRIBUTING.md` for workflow expectations.

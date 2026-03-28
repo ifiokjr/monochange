@@ -1,0 +1,4 @@
+[[changes]]
+package = "crates/monochange"
+bump = "patch"
+reason = "document discovery, release planning, and contributor workflow"
