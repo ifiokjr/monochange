@@ -1,86 +1,53 @@
 # Contributing to monochange
 
-Thank you for your interest in contributing to monochange. This guide covers the expected development workflow.
+Thank you for contributing.
 
-## Getting Started
+## Development environment
 
-This project uses [devenv](https://devenv.sh/) for a reproducible development environment.
+This repository uses `devenv` for a reproducible shell.
 
 ```sh
-# Enter the dev shell
 devenv shell
-
-# Install cargo-managed tooling used by the repository
 install:all
 ```
 
-## Building and Testing
+## Expected workflow
 
-```sh
-# Build workspace crates and docs
-build:all
-build:book
+1. Create a feature branch from `main`.
+2. Write failing tests first for non-trivial behavior.
+3. Implement the smallest change that makes the tests pass.
+4. Update docs, READMEs, and fixtures when behavior changes.
+5. Run the full local validation suite before opening a PR.
 
-# Preferred test runner
-test:all
-
-# Individual test commands
-test:cargo
-test:docs
-```
-
-## Formatting
-
-Formatting is handled by **dprint**.
-
-```sh
-# Check formatting
-lint:format
-
-# Apply formatting
-fix:format
-```
-
-## Linting
-
-```sh
-# Clippy + formatting + cargo-deny
-lint:all
-
-# Individual checks
-lint:clippy
-deny:check
-```
-
-## CLI Shortcuts
+## Core commands
 
 ```sh
 monochange --help
 mc --help
+mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
+lint:all
+test:all
+build:all
+build:book
 ```
 
-## Pull Request Workflow
+## Product rules
 
-Every change must be submitted via a pull request. Do not commit directly to `main`.
+- Keep `crates/monochange` as the CLI package.
+- Keep `crates/monochange_core` focused on shared domain types.
+- Put adapter-specific manifest behavior in ecosystem crates.
+- Preserve fixture-first validation for discovery and planning behavior.
+- Treat `docs/` as a product surface, not an afterthought.
 
-1. Create a feature branch from `main`.
-2. Write or update tests before implementing non-trivial behavior changes.
-3. Keep documentation in sync with the code.
-4. Run `lint:all`, `test:all`, `build:all`, and `build:book` locally.
-5. Open a pull request and wait for CI to pass before merging.
+## Testing requirements
 
-## Test Requirements
+- Every non-trivial behavior change starts with a failing test.
+- Release-planning logic needs realistic fixture coverage.
+- Cross-ecosystem behavior should remain consistent across Cargo, npm-family, Deno, Dart, and Flutter.
 
-- Every non-trivial behavior change must begin with a failing test.
-- Bug fixes must include a regression test that fails before the fix.
-- Tests should cover edge cases, error paths, and realistic monorepo workflows.
+## Safety and linting constraints
 
-## Safety and Linting Constraints
-
-The repository enforces strict workspace rules:
-
-- `unsafe_code` is denied
-- `unstable_features` is denied
-- `clippy::correctness` is denied
-- `clippy::wildcard_dependencies` is denied
-- `Result::expect` is disallowed in favor of explicit error handling or explicit panic context
+- `unsafe_code` is denied.
+- `unstable_features` is denied.
+- strict clippy and formatting checks stay enabled.
+- explicit panic context is preferred over bare `.expect(...)`.

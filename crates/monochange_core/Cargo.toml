@@ -13,10 +13,10 @@ rust-version = { workspace = true }
 description = "Manage versions and releases for your multiplatform, multilanguage monorepo"
 
 [dependencies]
-cargo_metadata = { workspace = true }
 doc-comment = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

@@ -2,44 +2,79 @@
 
 > manage versions and releases for your multiplatform, multilanguage monorepo
 
-## Note
+`monochange` is a Rust workspace for cross-ecosystem package discovery and release planning.
 
-⚠️ This project is still under active development while the API and workflows are being discovered.
+Current milestone capabilities:
 
-## Motivation
+- discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
+- normalize dependency edges across ecosystems
+- coordinate shared version groups from `monochange.toml`
+- compute release plans from explicit change input
+- prepare synced releases through config-defined workflows
+- apply Rust semver evidence when provided
+- ship documentation through the mdBook in `docs/`
 
-Managing versions in multi-language monorepos is difficult.
-
-- coordinate version increments across the monorepo
-- manage cross-language package dependencies
-- automate tagging, changelogs, and release orchestration
-- keep release intent explicit and auditable
-
-## Development
-
-[`devenv`](https://devenv.sh/) provides the reproducible development environment for this project. Follow the [getting started instructions](https://devenv.sh/getting-started/) and then enter the shell.
+## Quick start
 
 ```bash
 devenv shell
 install:all
+mc workspace discover --root . --format json
+mc changes add --root . --package monochange --bump minor --reason "add release planning"
+mc release --dry-run
+mc release
 ```
 
-Useful commands:
+Example configuration:
+
+```toml
+[defaults]
+parent_bump = "patch"
+include_private = false
+
+[[version_groups]]
+name = "sdk"
+members = ["crates/sdk_core", "packages/web-sdk"]
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+```
+
+Example change input:
+
+```markdown
+---
+sdk_core: minor
+---
+
+#### public API addition
+```
+
+Rust semver evidence can be attached explicitly:
+
+```markdown
+---
+sdk_core: patch
+evidence:
+  sdk_core:
+    - rust-semver:major:public API break detected
+---
+
+#### breaking API change
+```
+
+## Development
 
 ```bash
 monochange --help
 mc --help
-build:all
-build:book
 lint:all
 test:all
-snapshot:review
-snapshot:update
+build:all
+build:book
 ```
 
-To setup recommended editor configuration:
-
-```bash
-setup:vscode
-setup:helix
-```
+See `docs/` for user-facing guides and `CONTRIBUTING.md` for workflow expectations.
