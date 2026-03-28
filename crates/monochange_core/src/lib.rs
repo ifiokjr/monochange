@@ -256,10 +256,17 @@ pub struct EcosystemSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PackageOverride {
+	pub package: String,
+	pub changelog: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
 	pub defaults: WorkspaceDefaults,
 	pub version_groups: Vec<VersionGroupDefinition>,
+	pub package_overrides: Vec<PackageOverride>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,

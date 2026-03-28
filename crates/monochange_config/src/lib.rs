@@ -14,6 +14,7 @@ use monochange_core::ChangeSignal;
 use monochange_core::EcosystemSettings;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PackageOverride;
 use monochange_core::PackageRecord;
 use monochange_core::VersionGroup;
 use monochange_core::VersionGroupDefinition;
@@ -31,6 +32,8 @@ struct RawWorkspaceConfiguration {
 	defaults: RawWorkspaceDefaults,
 	#[serde(default)]
 	version_groups: Vec<VersionGroupDefinition>,
+	#[serde(default)]
+	package_overrides: Vec<PackageOverride>,
 	#[serde(default)]
 	ecosystems: RawEcosystems,
 }
@@ -126,6 +129,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			warn_on_group_mismatch: raw.defaults.warn_on_group_mismatch,
 		},
 		version_groups: raw.version_groups,
+		package_overrides: raw.package_overrides,
 		cargo: raw.ecosystems.cargo,
 		npm: raw.ecosystems.npm,
 		deno: raw.ecosystems.deno,

@@ -44,6 +44,10 @@ members = ["crates/core", "packages/web"]
 [ecosystems.npm]
 enabled = true
 roots = ["packages/*"]
+
+[[package_overrides]]
+package = "crates/core"
+changelog = "crates/core/CHANGELOG.md"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -54,6 +58,19 @@ roots = ["packages/*"]
 	assert!(configuration.defaults.include_private);
 	assert_eq!(configuration.version_groups.len(), 1);
 	assert_eq!(configuration.npm.roots, vec!["packages/*"]);
+	assert_eq!(configuration.package_overrides.len(), 1);
+	let package_override = configuration
+		.package_overrides
+		.first()
+		.unwrap_or_else(|| panic!("expected one package override"));
+	assert_eq!(package_override.package, "crates/core");
+	assert_eq!(
+		package_override
+			.changelog
+			.as_ref()
+			.and_then(|path| path.to_str()),
+		Some("crates/core/CHANGELOG.md")
+	);
 }
 
 #[test]
