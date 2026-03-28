@@ -1,0 +1,5 @@
+name: flutter_app
+version: 1.0.0
+flutter: {}
+dependencies:
+  flutter_shared: ^1.0.0

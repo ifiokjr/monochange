@@ -1,26 +1,18 @@
 # monochange
 
-> the `monochange` cli
+The `monochange` crate provides the end-user CLI.
 
-<br />
-
-[![Crate][crate-image]][crate-link] [![Docs][docs-image]][docs-link] [![Status][ci-status-image]][ci-status-link] [![Unlicense][unlicense-image]][unlicense-link]
-
-<br />
-
-## Installation
+## Commands
 
 ```bash
-cargo install monochange
+mc workspace discover --root . --format json
+mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
+mc plan release --root . --changes .changeset/1234567890-crates-monochange.md --format json
 ```
 
-This package installs the `monochange` CLI and the shorter `mc` alias.
+## Responsibilities
 
-[crate-image]: https://img.shields.io/crates/v/monochange.svg
-[crate-link]: https://crates.io/crates/monochange
-[docs-image]: https://docs.rs/monochange/badge.svg
-[docs-link]: https://docs.rs/monochange/
-[ci-status-image]: https://github.com/ifiokjr/monochange/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/ifiokjr/monochange/actions?query=workflow:ci
-[unlicense-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
-[unlicense-link]: https://opensource.org/license/unlicense
+- aggregate all supported ecosystem adapters
+- load `monochange.toml`
+- resolve change input files
+- render discovery and release-plan output in text or JSON

@@ -1,0 +1,7 @@
+{
+  "name": "npm-web",
+  "version": "1.0.0",
+  "dependencies": {
+    "npm-shared": "^1.0.0"
+  }
+}

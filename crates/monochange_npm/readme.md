@@ -1,23 +1,15 @@
 # monochange_npm
 
-> the `monochange` npm plugin
+npm-family ecosystem support for `monochange`.
 
-<br />
+## Public entry points
 
-[![Crate][crate-image]][crate-link] [![Docs][docs-image]][docs-link] [![Status][ci-status-image]][ci-status-link] [![Unlicense][unlicense-image]][unlicense-link]
+- `discover_npm_packages(root)` discovers npm, pnpm, and Bun workspaces plus standalone packages
+- `NpmAdapter` exposes the shared adapter interface
 
-## Installation
+## Scope
 
-```toml
-[dependencies]
-monochange_npm = "0.0.0"
-```
-
-[crate-image]: https://img.shields.io/crates/v/monochange_npm.svg
-[crate-link]: https://crates.io/crates/monochange_npm
-[docs-image]: https://docs.rs/monochange_npm/badge.svg
-[docs-link]: https://docs.rs/monochange_npm/
-[ci-status-image]: https://github.com/ifiokjr/monochange/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/ifiokjr/monochange/actions?query=workflow:ci
-[unlicense-image]: https://img.shields.io/badge/license-Unlicence-blue.svg
-[unlicense-link]: https://opensource.org/license/unlicense
+- `package.json` workspaces
+- `pnpm-workspace.yaml`
+- Bun lockfile detection
+- normalized dependency extraction

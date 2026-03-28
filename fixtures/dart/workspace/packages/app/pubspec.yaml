@@ -1,0 +1,4 @@
+name: dart_app
+version: 1.0.0
+dependencies:
+  dart_shared: ^1.0.0

@@ -1,0 +1,7 @@
+[package]
+name = "cargo-app"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+cargo-core = { version = "1.0.0", path = "../core" }

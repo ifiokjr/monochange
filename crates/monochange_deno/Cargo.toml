@@ -1,0 +1,31 @@
+[package]
+name = "monochange_deno"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_deno"
+edition = { workspace = true }
+include = { workspace = true }
+keywords = ["cli", "deno", "releases", "versioning", "monorepo"]
+license = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Deno workspace and package discovery for monochange"
+
+[dependencies]
+doc-comment = { workspace = true }
+glob = { workspace = true }
+monochange_core = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+rstest = { workspace = true }
+similar-asserts = { workspace = true }
+
+[lints]
+workspace = true
