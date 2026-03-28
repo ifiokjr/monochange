@@ -1,4 +1,0 @@
-[[changes]]
-package = "crates/monochange"
-bump = "patch"
-reason = "add CLI change-file scaffolding and deploy mdBook docs automatically"

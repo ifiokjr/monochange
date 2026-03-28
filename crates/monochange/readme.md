@@ -7,7 +7,7 @@ The `monochange` crate provides the end-user CLI.
 ```bash
 mc workspace discover --root . --format json
 mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
-mc plan release --root . --changes .changeset/1234567890-crates-monochange.toml --format json
+mc plan release --root . --changes .changeset/1234567890-crates-monochange.md --format json
 ```
 
 ## Responsibilities

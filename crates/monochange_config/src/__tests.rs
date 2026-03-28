@@ -113,14 +113,16 @@ members = ["crates/core", "packages/web"]
 fn load_change_signals_resolves_package_references_and_evidence() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
-		tempdir.path().join("changes.toml"),
-		r#"
-[[changes]]
-package = "crates/core"
-bump = "minor"
-reason = "public API addition"
-evidence = ["rust-semver:major:public API break detected"]
-"#,
+		tempdir.path().join("change.md"),
+		r"---
+crates/core: minor
+evidence:
+  crates/core:
+    - rust-semver:major:public API break detected
+---
+
+#### public API addition
+",
 	)
 	.unwrap_or_else(|error| panic!("changes write: {error}"));
 	let packages = vec![PackageRecord::new(
@@ -132,12 +134,8 @@ evidence = ["rust-semver:major:public API break detected"]
 		PublishState::Public,
 	)];
 
-	let signals = load_change_signals(
-		&tempdir.path().join("changes.toml"),
-		tempdir.path(),
-		&packages,
-	)
-	.unwrap_or_else(|error| panic!("change signals: {error}"));
+	let signals = load_change_signals(&tempdir.path().join("change.md"), tempdir.path(), &packages)
+		.unwrap_or_else(|error| panic!("change signals: {error}"));
 	let signal = signals
 		.first()
 		.unwrap_or_else(|| panic!("expected one change signal"));
@@ -158,15 +156,17 @@ evidence = ["rust-semver:major:public API break detected"]
 fn load_change_signals_rejects_unknown_package_references() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
-		tempdir.path().join("changes.toml"),
-		r#"
-[[changes]]
-package = "missing-package"
-"#,
+		tempdir.path().join("change.md"),
+		r"---
+missing-package: patch
+---
+
+#### unknown package
+",
 	)
 	.unwrap_or_else(|error| panic!("changes write: {error}"));
 
-	let error = load_change_signals(&tempdir.path().join("changes.toml"), tempdir.path(), &[])
+	let error = load_change_signals(&tempdir.path().join("change.md"), tempdir.path(), &[])
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 

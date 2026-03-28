@@ -1,4 +1,0 @@
-[[changes]]
-package = "cargo/sdk-core"
-bump = "minor"
-reason = "public API addition"

@@ -35,7 +35,6 @@ use monochange_graph::build_release_plan;
 use monochange_npm::discover_npm_packages;
 use monochange_semver::collect_assessments;
 use monochange_semver::CompatibilityProvider;
-use serde::Serialize;
 use serde_json::json;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -59,20 +58,6 @@ impl From<ChangeBump> for BumpSeverity {
 			ChangeBump::Major => Self::Major,
 		}
 	}
-}
-
-#[derive(Debug, Serialize)]
-struct ChangeFile {
-	changes: Vec<ChangeEntry>,
-}
-
-#[derive(Debug, Serialize)]
-struct ChangeEntry {
-	package: String,
-	bump: String,
-	reason: String,
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	evidence: Vec<String>,
 }
 
 const CHANGESET_DIR: &str = ".changeset";
@@ -287,20 +272,7 @@ pub fn add_change_file(
 		})?;
 	}
 
-	let change_file = ChangeFile {
-		changes: package_refs
-			.iter()
-			.map(|package| ChangeEntry {
-				package: package.clone(),
-				bump: bump.to_string(),
-				reason: reason.to_string(),
-				evidence: evidence.to_vec(),
-			})
-			.collect(),
-	};
-	let content = toml::to_string(&change_file).map_err(|error| {
-		MonochangeError::Config(format!("failed to serialize change file: {error}"))
-	})?;
+	let content = render_changeset_markdown(package_refs, bump, reason, evidence);
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write {}: {error}",
@@ -526,7 +498,33 @@ fn default_change_path(root: &Path, package_refs: &[String]) -> PathBuf {
 		slug
 	};
 	root.join(CHANGESET_DIR)
-		.join(format!("{timestamp}-{slug}.toml"))
+		.join(format!("{timestamp}-{slug}.md"))
+}
+
+fn render_changeset_markdown(
+	package_refs: &[String],
+	bump: BumpSeverity,
+	reason: &str,
+	evidence: &[String],
+) -> String {
+	let mut lines = vec!["---".to_string()];
+	for package in package_refs {
+		lines.push(format!("{package}: {bump}"));
+	}
+	if !evidence.is_empty() {
+		lines.push("evidence:".to_string());
+		for package in package_refs {
+			lines.push(format!("  {package}:"));
+			for item in evidence {
+				lines.push(format!("    - {item}"));
+			}
+		}
+	}
+	lines.push("---".to_string());
+	lines.push(String::new());
+	lines.push(format!("#### {reason}"));
+	lines.push(String::new());
+	lines.join("\n")
 }
 
 fn format_publish_state(publish_state: monochange_core::PublishState) -> &'static str {

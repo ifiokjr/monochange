@@ -20,6 +20,8 @@ use monochange_core::VersionGroupDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
 use serde::Deserialize;
+use serde_yaml_ng::Mapping;
+use serde_yaml_ng::Value as YamlValue;
 
 const CONFIG_FILE: &str = "monochange.toml";
 
@@ -142,12 +144,16 @@ pub fn load_change_signals(
 			changes_path.display()
 		))
 	})?;
-	let raw = toml::from_str::<RawChangeFile>(&contents).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to parse {}: {error}",
-			changes_path.display()
-		))
-	})?;
+	let raw = if changes_path.extension().and_then(|value| value.to_str()) == Some("md") {
+		parse_markdown_change_file(&contents, changes_path)?
+	} else {
+		toml::from_str::<RawChangeFile>(&contents).map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to parse {}: {error}",
+				changes_path.display()
+			))
+		})?
+	};
 
 	let mut seen_package_ids = BTreeSet::new();
 	let mut signals = Vec::new();
@@ -188,6 +194,119 @@ pub fn resolve_package_reference(
 			matching_package_ids.join(", ")
 		))),
 	}
+}
+
+fn parse_markdown_change_file(
+	contents: &str,
+	changes_path: &Path,
+) -> MonochangeResult<RawChangeFile> {
+	let Some(without_opening) = contents.strip_prefix("---") else {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: missing markdown frontmatter",
+			changes_path.display()
+		)));
+	};
+	let Some((frontmatter, body_with_separator)) = without_opening.split_once("\n---\n") else {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: unterminated markdown frontmatter",
+			changes_path.display()
+		)));
+	};
+	let body = body_with_separator.trim();
+	let mapping = serde_yaml_ng::from_str::<Mapping>(frontmatter).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {} frontmatter: {error}",
+			changes_path.display()
+		))
+	})?;
+	let evidence_mapping = yaml_mapping(&mapping, "evidence");
+	let origin_mapping = yaml_mapping(&mapping, "origin");
+	let reason = markdown_reason(body);
+	let mut changes = Vec::new();
+
+	for (key, value) in &mapping {
+		let Some(package) = key.as_str() else {
+			continue;
+		};
+		if matches!(package, "evidence" | "origin") {
+			continue;
+		}
+		let requested_bump = value
+			.as_str()
+			.and_then(parse_bump_severity)
+			.ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: package `{package}` must map to `patch`, `minor`, or `major`",
+					changes_path.display()
+				))
+			})?;
+		changes.push(RawChangeEntry {
+			package: package.to_string(),
+			bump: Some(requested_bump),
+			reason: reason.clone(),
+			origin: origin_mapping
+				.and_then(|mapping| yaml_string(mapping, package))
+				.unwrap_or_else(default_change_origin),
+			evidence: evidence_mapping
+				.and_then(|mapping| yaml_array_strings(mapping, package))
+				.unwrap_or_default(),
+		});
+	}
+
+	Ok(RawChangeFile { changes })
+}
+
+fn markdown_reason(body: &str) -> Option<String> {
+	let trimmed = body.trim();
+	if trimmed.is_empty() {
+		return None;
+	}
+	for line in trimmed.lines() {
+		let candidate = line.trim();
+		if candidate.is_empty() {
+			continue;
+		}
+		if let Some(stripped) = candidate.strip_prefix('#') {
+			return Some(stripped.trim_start_matches('#').trim().to_string());
+		}
+		return Some(candidate.to_string());
+	}
+	None
+}
+
+fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {
+	match value {
+		"major" => Some(BumpSeverity::Major),
+		"minor" => Some(BumpSeverity::Minor),
+		"patch" => Some(BumpSeverity::Patch),
+		_ => None,
+	}
+}
+
+fn yaml_mapping<'map>(mapping: &'map Mapping, key: &str) -> Option<&'map Mapping> {
+	mapping
+		.get(YamlValue::String(key.to_string()))
+		.and_then(YamlValue::as_mapping)
+}
+
+fn yaml_string(mapping: &Mapping, key: &str) -> Option<String> {
+	mapping
+		.get(YamlValue::String(key.to_string()))
+		.and_then(YamlValue::as_str)
+		.map(ToString::to_string)
+}
+
+fn yaml_array_strings(mapping: &Mapping, key: &str) -> Option<Vec<String>> {
+	mapping
+		.get(YamlValue::String(key.to_string()))
+		.and_then(YamlValue::as_sequence)
+		.map(|items| {
+			items
+				.iter()
+				.filter_map(YamlValue::as_str)
+				.map(ToString::to_string)
+				.collect::<Vec<_>>()
+		})
 }
 
 fn validate_version_groups(version_groups: &[VersionGroupDefinition]) -> MonochangeResult<()> {

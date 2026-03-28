@@ -1,4 +1,0 @@
-[[changes]]
-package = "crates/core"
-bump = "minor"
-reason = "new API surface"

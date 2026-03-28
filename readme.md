@@ -20,7 +20,7 @@ devenv shell
 install:all
 mc workspace discover --root . --format json
 mc changes add --root . --package crates/monochange --bump minor --reason "add release planning"
-mc plan release --root . --changes .changeset/1234567890-crates-monochange.toml --format json
+mc plan release --root . --changes .changeset/1234567890-crates-monochange.md --format json
 ```
 
 Example configuration:
@@ -37,20 +37,25 @@ members = ["crates/sdk_core", "packages/web-sdk"]
 
 Example change input:
 
-```toml
-[[changes]]
-package = "crates/sdk_core"
-bump = "minor"
-reason = "public API addition"
+```markdown
+---
+crates/sdk_core: minor
+---
+
+#### public API addition
 ```
 
 Rust semver evidence can be attached explicitly:
 
-```toml
-[[changes]]
-package = "crates/sdk_core"
-reason = "breaking API change"
-evidence = ["rust-semver:major:public API break detected"]
+```markdown
+---
+crates/sdk_core: patch
+evidence:
+  crates/sdk_core:
+    - rust-semver:major:public API break detected
+---
+
+#### breaking API change
 ```
 
 ## Development

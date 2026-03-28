@@ -8,26 +8,31 @@ mc changes add --root . --package crates/sdk_core --bump minor --reason "public 
 
 Or write one manually:
 
-```toml
-[[changes]]
-package = "crates/sdk_core"
-bump = "minor"
-reason = "public API addition"
+```markdown
+---
+crates/sdk_core: minor
+---
+
+#### public API addition
 ```
 
 Optionally include Rust semver evidence:
 
-```toml
-[[changes]]
-package = "crates/sdk_core"
-reason = "breaking API change"
-evidence = ["rust-semver:major:public API break detected"]
+```markdown
+---
+crates/sdk_core: patch
+evidence:
+  crates/sdk_core:
+    - rust-semver:major:public API break detected
+---
+
+#### breaking API change
 ```
 
 Generate a plan:
 
 ```bash
-mc plan release --root . --changes .changeset/my-change.toml --format json
+mc plan release --root . --changes .changeset/my-change.md --format json
 ```
 
 Planning rules in this milestone:

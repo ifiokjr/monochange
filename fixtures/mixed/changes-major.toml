@@ -1,4 +1,0 @@
-[[changes]]
-package = "cargo/sdk-core"
-reason = "breaking API change"
-evidence = ["rust-semver:major:public API break detected"]

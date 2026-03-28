@@ -99,7 +99,7 @@ fn workspace_discover_json_output_contains_contract_fields() {
 #[test]
 fn plan_release_aggregates_transitive_dependents_and_version_groups() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
-	let plan = plan_release(&fixture_root, &fixture_root.join("changes-minor.toml"))
+	let plan = plan_release(&fixture_root, &fixture_root.join("changes-minor.md"))
 		.unwrap_or_else(|error| panic!("release plan: {error}"));
 
 	let sdk_core = plan
@@ -151,7 +151,7 @@ fn plan_release_aggregates_transitive_dependents_and_version_groups() {
 fn changes_add_writes_a_change_file_via_the_cli() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let output_path = tempdir.path().join("feature.toml");
+	let output_path = tempdir.path().join("feature.md");
 
 	let output = run_with_args(
 		"mc",
@@ -178,9 +178,9 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 		.unwrap_or_else(|error| panic!("read change file: {error}"));
 
 	assert!(output.contains("wrote change file"));
-	assert!(content.contains("package = \"sdk-core\""));
-	assert!(content.contains("package = \"web-sdk\""));
-	assert!(content.contains("bump = \"minor\""));
+	assert!(content.contains("sdk-core: minor"));
+	assert!(content.contains("web-sdk: minor"));
+	assert!(content.contains("#### feature foundation"));
 }
 
 #[test]
@@ -199,7 +199,7 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 		.unwrap_or_else(|error| panic!("read change file: {error}"));
 
 	assert!(output_path.starts_with(fixture_root.join(".changeset")));
-	assert!(content.contains("package = \"sdk-core\""));
+	assert!(content.contains("sdk-core: patch"));
 	fs::remove_file(output_path).unwrap_or_else(|error| panic!("cleanup change file: {error}"));
 }
 
@@ -207,7 +207,7 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 fn changes_add_supports_evidence_and_round_trips_into_plan_release() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let output_path = tempdir.path().join("major.toml");
+	let output_path = tempdir.path().join("major.md");
 
 	run_with_args(
 		"mc",
@@ -235,7 +235,8 @@ fn changes_add_supports_evidence_and_round_trips_into_plan_release() {
 	let plan = plan_release(&fixture_root, &output_path)
 		.unwrap_or_else(|error| panic!("release plan: {error}"));
 
-	assert!(content.contains("evidence = [\"rust-semver:major:public API break detected\"]"));
+	assert!(content.contains("evidence:"));
+	assert!(content.contains("rust-semver:major:public API break detected"));
 	assert!(plan
 		.compatibility_evidence
 		.iter()
@@ -279,7 +280,7 @@ fn plan_release_json_output_contains_compatibility_evidence() {
 			OsString::from("--root"),
 			fixture_root.clone().into_os_string(),
 			OsString::from("--changes"),
-			fixture_root.join("changes-major.toml").into_os_string(),
+			fixture_root.join("changes-major.md").into_os_string(),
 			OsString::from("--format"),
 			OsString::from("json"),
 		],
@@ -360,13 +361,10 @@ fn assert_simple_release_pattern(
 	dependent_manifest_suffix: &str,
 ) {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
-	let changes_path = fixture_root.join("changes.generated.toml");
+	let changes_path = fixture_root.join("changes.generated.md");
 	fs::write(
 		&changes_path,
-		format!(
-			"[[changes]]\npackage = \"{package_reference}\"\nbump = \"minor\"\nreason = \
-			 \"feature\"\n"
-		),
+		format!("---\n{package_reference}: minor\n---\n\n#### feature\n"),
 	)
 	.unwrap_or_else(|error| panic!("generated changes: {error}"));
 
