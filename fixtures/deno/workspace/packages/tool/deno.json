@@ -1,0 +1,7 @@
+{
+  "name": "deno-tool",
+  "version": "1.0.0",
+  "dependencies": {
+    "deno-shared": "workspace:*"
+  }
+}

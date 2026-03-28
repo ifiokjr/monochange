@@ -1,0 +1,31 @@
+[package]
+name = "monochange_dart"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_dart"
+edition = { workspace = true }
+include = { workspace = true }
+keywords = ["cli", "dart", "flutter", "releases", "monorepo"]
+license = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Dart and Flutter workspace discovery for monochange"
+
+[dependencies]
+doc-comment = { workspace = true }
+glob = { workspace = true }
+monochange_core = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+serde_yaml_ng = { workspace = true }
+thiserror = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+rstest = { workspace = true }
+similar-asserts = { workspace = true }
+
+[lints]
+workspace = true

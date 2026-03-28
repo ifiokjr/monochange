@@ -1,0 +1,7 @@
+{
+  "name": "bun-web",
+  "version": "1.0.0",
+  "dependencies": {
+    "bun-shared": "workspace:*"
+  }
+}

@@ -1,0 +1,5 @@
+name: flutter_standalone
+version: 0.1.0
+flutter:
+  uses-material-design: true
+dependencies: {}

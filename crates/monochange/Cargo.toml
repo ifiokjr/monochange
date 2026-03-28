@@ -17,16 +17,26 @@ name = "mc"
 path = "src/bin/mc.rs"
 
 [dependencies]
-clap = { workspace = true, features = ["derive"] }
+clap = { workspace = true }
 doc-comment = { workspace = true }
 monochange_cargo = { workspace = true }
+monochange_config = { workspace = true }
 monochange_core = { workspace = true }
+monochange_dart = { workspace = true }
+monochange_deno = { workspace = true }
+monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
+monochange_semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
 rstest = { workspace = true }
 similar-asserts = { workspace = true }
+tempfile = "3"
 
 [lints]
 workspace = true

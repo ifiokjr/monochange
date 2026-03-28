@@ -1,1 +1,321 @@
+use std::ffi::OsString;
+use std::fs;
+use std::path::Path;
 
+use monochange_core::Ecosystem;
+use tempfile::tempdir;
+
+use crate::add_change_file;
+use crate::build_command;
+use crate::discover_workspace;
+use crate::plan_release;
+use crate::run_with_args;
+
+#[test]
+fn cli_parses_workspace_discover_command() {
+	let matches = build_command("mc")
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("workspace"),
+			OsString::from("discover"),
+			OsString::from("--root"),
+			OsString::from("fixtures/mixed"),
+		])
+		.unwrap_or_else(|error| panic!("matches: {error}"));
+
+	assert_eq!(matches.subcommand_name(), Some("workspace"));
+}
+
+#[test]
+fn discover_workspace_aggregates_packages_from_multiple_ecosystems() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let discovery =
+		discover_workspace(&fixture_root).unwrap_or_else(|error| panic!("discovery: {error}"));
+
+	assert_eq!(discovery.packages.len(), 4);
+	assert!(discovery
+		.packages
+		.iter()
+		.any(|package| package.ecosystem == Ecosystem::Cargo));
+	assert!(discovery
+		.packages
+		.iter()
+		.any(|package| package.ecosystem == Ecosystem::Npm));
+	assert!(discovery
+		.packages
+		.iter()
+		.any(|package| package.ecosystem == Ecosystem::Deno));
+	assert!(discovery
+		.packages
+		.iter()
+		.any(|package| package.ecosystem == Ecosystem::Dart));
+	assert_eq!(discovery.dependencies.len(), 3);
+	assert_eq!(discovery.version_groups.len(), 1);
+	let version_group = discovery
+		.version_groups
+		.first()
+		.unwrap_or_else(|| panic!("expected a version group"));
+	assert_eq!(version_group.members.len(), 2);
+}
+
+#[test]
+fn workspace_discover_json_output_contains_contract_fields() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("workspace"),
+			OsString::from("discover"),
+			OsString::from("--root"),
+			fixture_root.into_os_string(),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("output: {error}"));
+	let parsed: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("json: {error}"));
+
+	assert_eq!(parsed["packages"].as_array().map(Vec::len), Some(4));
+	assert_eq!(parsed["versionGroups"].as_array().map(Vec::len), Some(1));
+	assert_eq!(parsed["dependencies"].as_array().map(Vec::len), Some(3));
+	assert!(parsed["packages"]
+		.as_array()
+		.unwrap_or_else(|| panic!("packages array"))
+		.iter()
+		.all(|package| package.get("manifestPath").is_some()));
+}
+
+#[test]
+fn plan_release_aggregates_transitive_dependents_and_version_groups() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let plan = plan_release(&fixture_root, &fixture_root.join("changes-minor.toml"))
+		.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	let sdk_core = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id.contains("cargo/sdk-core/Cargo.toml"))
+		.unwrap_or_else(|| panic!("expected cargo core decision"));
+	let web_sdk = plan
+		.decisions
+		.iter()
+		.find(|decision| {
+			decision
+				.package_id
+				.contains("packages/web-sdk/package.json")
+		})
+		.unwrap_or_else(|| panic!("expected web sdk decision"));
+	let deno_tool = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id.contains("deno/tool/deno.json"))
+		.unwrap_or_else(|| panic!("expected deno tool decision"));
+	let mobile_sdk = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id.contains("dart/mobile_sdk/pubspec.yaml"))
+		.unwrap_or_else(|| panic!("expected mobile sdk decision"));
+	let version_group = plan
+		.groups
+		.first()
+		.unwrap_or_else(|| panic!("expected version group plan"));
+
+	assert_eq!(sdk_core.recommended_bump.to_string(), "minor");
+	assert_eq!(sdk_core.trigger_type, "direct-change");
+	assert_eq!(web_sdk.recommended_bump.to_string(), "minor");
+	assert_eq!(web_sdk.trigger_type, "version-group-synchronization");
+	assert_eq!(deno_tool.recommended_bump.to_string(), "patch");
+	assert_eq!(mobile_sdk.recommended_bump.to_string(), "patch");
+	assert_eq!(
+		version_group
+			.planned_version
+			.as_ref()
+			.map(ToString::to_string)
+			.as_deref(),
+		Some("1.1.0")
+	);
+}
+
+#[test]
+fn changes_add_writes_a_change_file_via_the_cli() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let output_path = tempdir.path().join("feature.toml");
+
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("changes"),
+			OsString::from("add"),
+			OsString::from("--root"),
+			fixture_root.clone().into_os_string(),
+			OsString::from("--package"),
+			OsString::from("sdk-core"),
+			OsString::from("--package"),
+			OsString::from("web-sdk"),
+			OsString::from("--bump"),
+			OsString::from("minor"),
+			OsString::from("--reason"),
+			OsString::from("feature foundation"),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+	let content = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read change file: {error}"));
+
+	assert!(output.contains("wrote change file"));
+	assert!(content.contains("package = \"sdk-core\""));
+	assert!(content.contains("package = \"web-sdk\""));
+	assert!(content.contains("bump = \"minor\""));
+}
+
+#[test]
+fn add_change_file_creates_default_path_under_changes_directory() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let output_path = add_change_file(
+		&fixture_root,
+		&["sdk-core".to_string()],
+		monochange_core::BumpSeverity::Patch,
+		"default output",
+		&[],
+		None,
+	)
+	.unwrap_or_else(|error| panic!("default change file: {error}"));
+	let content = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read change file: {error}"));
+
+	assert!(output_path.starts_with(fixture_root.join("changes")));
+	assert!(content.contains("package = \"sdk-core\""));
+	fs::remove_file(output_path).unwrap_or_else(|error| panic!("cleanup change file: {error}"));
+}
+
+#[test]
+fn plan_release_json_output_contains_compatibility_evidence() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("plan"),
+			OsString::from("release"),
+			OsString::from("--root"),
+			fixture_root.clone().into_os_string(),
+			OsString::from("--changes"),
+			fixture_root.join("changes-major.toml").into_os_string(),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("plan output: {error}"));
+	let parsed: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("json: {error}"));
+
+	assert_eq!(
+		parsed["compatibilityEvidence"].as_array().map(Vec::len),
+		Some(1)
+	);
+	assert_eq!(
+		parsed["compatibilityEvidence"][0]["severity"].as_str(),
+		Some("major")
+	);
+	assert!(parsed["decisions"]
+		.as_array()
+		.unwrap_or_else(|| panic!("decisions array"))
+		.iter()
+		.any(|decision| decision["bump"].as_str() == Some("major")));
+}
+
+#[test]
+fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
+	assert_simple_release_pattern(
+		"../../fixtures/cargo/workspace",
+		"crates/core",
+		"crates/app/Cargo.toml",
+	);
+	assert_simple_release_pattern(
+		"../../fixtures/npm/workspace",
+		"packages/shared",
+		"packages/web/package.json",
+	);
+	assert_simple_release_pattern(
+		"../../fixtures/deno/workspace",
+		"packages/shared",
+		"packages/tool/deno.json",
+	);
+	assert_simple_release_pattern(
+		"../../fixtures/dart/workspace",
+		"packages/shared",
+		"packages/app/pubspec.yaml",
+	);
+}
+
+#[test]
+fn quickstart_and_docs_reference_the_same_core_commands() {
+	let docs_readme = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/readme.md");
+	let quickstart =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../specs/001-first-step-port/quickstart.md");
+	let docs_content =
+		fs::read_to_string(docs_readme).unwrap_or_else(|error| panic!("docs readme: {error}"));
+	let quickstart_content =
+		fs::read_to_string(quickstart).unwrap_or_else(|error| panic!("quickstart: {error}"));
+
+	for command in [
+		"mc workspace discover --root . --format json",
+		"mc changes add --root . --package",
+		"mc plan release --root . --changes",
+		"lint:all",
+		"test:all",
+		"build:all",
+		"build:book",
+	] {
+		assert!(docs_content.contains(command), "docs missing `{command}`");
+		assert!(
+			quickstart_content.contains(command),
+			"quickstart missing `{command}`"
+		);
+	}
+}
+
+fn assert_simple_release_pattern(
+	relative_fixture_root: &str,
+	package_reference: &str,
+	dependent_manifest_suffix: &str,
+) {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
+	let changes_path = fixture_root.join("changes.generated.toml");
+	fs::write(
+		&changes_path,
+		format!(
+			"[[changes]]\npackage = \"{package_reference}\"\nbump = \"minor\"\nreason = \
+			 \"feature\"\n"
+		),
+	)
+	.unwrap_or_else(|error| panic!("generated changes: {error}"));
+
+	let discovery = discover_workspace(&fixture_root)
+		.unwrap_or_else(|error| panic!("fixture discovery: {error}"));
+	assert_eq!(discovery.packages.len(), 2);
+	assert_eq!(discovery.dependencies.len(), 1);
+
+	let plan = plan_release(&fixture_root, &changes_path)
+		.unwrap_or_else(|error| panic!("fixture release plan: {error}"));
+	let direct = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id.contains(package_reference))
+		.unwrap_or_else(|| panic!("expected direct decision"));
+	let dependent = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id.contains(dependent_manifest_suffix))
+		.unwrap_or_else(|| panic!("expected dependent decision"));
+
+	assert_eq!(direct.recommended_bump.to_string(), "minor");
+	assert_eq!(dependent.recommended_bump.to_string(), "patch");
+	fs::remove_file(changes_path).unwrap_or_else(|error| panic!("remove changes: {error}"));
+}
