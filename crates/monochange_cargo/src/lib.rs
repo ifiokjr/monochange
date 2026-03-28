@@ -93,7 +93,7 @@ pub fn discover_cargo_packages(root: &Path) -> MonochangeResult<AdapterDiscovery
 		}
 
 		if let Some(package) =
-			parse_package_manifest(&manifest_path, manifest_path.parent().unwrap_or(root))?
+			parse_package_manifest(&manifest_path, manifest_path.parent().unwrap_or(root), None)?
 		{
 			packages.push(package);
 		}
@@ -132,6 +132,7 @@ fn discover_workspace_packages(
 	let workspace_root = workspace_manifest
 		.parent()
 		.unwrap_or_else(|| Path::new("."));
+	let workspace_version = workspace_package_version(&parsed);
 	let workspace = parsed
 		.get("workspace")
 		.and_then(Value::as_table)
@@ -167,7 +168,9 @@ fn discover_workspace_packages(
 	let mut packages = Vec::new();
 
 	for manifest_path in member_manifests {
-		if let Some(package) = parse_package_manifest(&manifest_path, workspace_root)? {
+		if let Some(package) =
+			parse_package_manifest(&manifest_path, workspace_root, workspace_version.as_ref())?
+		{
 			packages.push(package);
 		}
 	}
@@ -228,6 +231,7 @@ fn glob_pattern_paths(root: &Path, pattern: &str) -> Vec<PathBuf> {
 fn parse_package_manifest(
 	manifest_path: &Path,
 	workspace_root: &Path,
+	workspace_version: Option<&Version>,
 ) -> MonochangeResult<Option<PackageRecord>> {
 	let contents = fs::read_to_string(manifest_path).map_err(|error| {
 		MonochangeError::Io(format!(
@@ -253,8 +257,7 @@ fn parse_package_manifest(
 	})?;
 	let version = package
 		.get("version")
-		.and_then(Value::as_str)
-		.and_then(|value| Version::parse(value).ok());
+		.and_then(|value| parse_package_version(value, workspace_version));
 	let publish_state = if package.get("publish").and_then(Value::as_bool) == Some(false) {
 		PublishState::Private
 	} else {
@@ -271,6 +274,31 @@ fn parse_package_manifest(
 	);
 	package_record.declared_dependencies = parse_dependencies(&parsed);
 	Ok(Some(package_record))
+}
+
+fn workspace_package_version(parsed: &Value) -> Option<Version> {
+	parsed
+		.get("workspace")
+		.and_then(Value::as_table)
+		.and_then(|workspace| workspace.get("package"))
+		.and_then(Value::as_table)
+		.and_then(|package| package.get("version"))
+		.and_then(Value::as_str)
+		.and_then(|value| Version::parse(value).ok())
+}
+
+fn parse_package_version(value: &Value, workspace_version: Option<&Version>) -> Option<Version> {
+	value
+		.as_str()
+		.and_then(|version| Version::parse(version).ok())
+		.or_else(|| {
+			value
+				.as_table()
+				.and_then(|table| table.get("workspace"))
+				.and_then(Value::as_bool)
+				.filter(|is_workspace| *is_workspace)
+				.and(workspace_version.cloned())
+		})
 }
 
 fn parse_dependencies(parsed: &Value) -> Vec<PackageDependency> {

@@ -262,11 +262,26 @@ pub struct PackageOverride {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum WorkflowStepDefinition {
+	PrepareRelease,
+	Command { command: String },
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct WorkflowDefinition {
+	pub name: String,
+	#[serde(default)]
+	pub steps: Vec<WorkflowStepDefinition>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
 	pub defaults: WorkspaceDefaults,
 	pub version_groups: Vec<VersionGroupDefinition>,
 	pub package_overrides: Vec<PackageOverride>,
+	pub workflows: Vec<WorkflowDefinition>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,

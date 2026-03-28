@@ -184,6 +184,38 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 }
 
 #[test]
+fn changes_add_canonicalizes_package_references_to_package_names() {
+	let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let output_path = tempdir.path().join("repo-change.md");
+
+	run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("changes"),
+			OsString::from("add"),
+			OsString::from("--root"),
+			repo_root.into_os_string(),
+			OsString::from("--package"),
+			OsString::from("crates/monochange"),
+			OsString::from("--bump"),
+			OsString::from("patch"),
+			OsString::from("--reason"),
+			OsString::from("canonical package names"),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+	let content = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read change file: {error}"));
+
+	assert!(content.contains("monochange: patch"));
+	assert!(!content.contains("crates/monochange: patch"));
+}
+
+#[test]
 fn add_change_file_creates_default_path_under_changeset_directory() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let output_path = add_change_file(
@@ -305,6 +337,125 @@ fn plan_release_json_output_contains_compatibility_evidence() {
 }
 
 #[test]
+fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	let workspace_manifest = tempdir.path().join("Cargo.toml");
+	let core_changelog = tempdir.path().join("crates/core/CHANGELOG.md");
+	let original_manifest = fs::read_to_string(&workspace_manifest)
+		.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
+	let original_changelog = fs::read_to_string(&core_changelog)
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--root"),
+			tempdir.path().into(),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+
+	assert!(output.contains("workflow `release` completed (dry-run)"));
+	assert!(output.contains("version: 1.1.0"));
+	assert!(output.contains("workflow-app"));
+	assert!(output.contains("workflow-core"));
+	assert_eq!(
+		fs::read_to_string(&workspace_manifest)
+			.unwrap_or_else(|error| panic!("workspace manifest after dry-run: {error}")),
+		original_manifest
+	);
+	assert_eq!(
+		fs::read_to_string(&core_changelog)
+			.unwrap_or_else(|error| panic!("core changelog after dry-run: {error}")),
+		original_changelog
+	);
+	assert!(tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(
+		tempdir.path(),
+		Some("printf '%s' \"$version\" > release-version.txt"),
+		false,
+	);
+
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--root"),
+			tempdir.path().into(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	let workspace_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
+	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("app changelog: {error}"));
+	let release_version = fs::read_to_string(tempdir.path().join("release-version.txt"))
+		.unwrap_or_else(|error| panic!("release version output: {error}"));
+
+	assert!(output.contains("workflow `release` completed"));
+	assert!(workspace_manifest.contains("version = \"1.1.0\""));
+	assert!(core_changelog.contains("## 1.1.0"));
+	assert!(core_changelog.contains("- add release workflow"));
+	assert!(app_changelog.contains("## 1.1.0"));
+	assert!(app_changelog.contains("version group `sdk`"));
+	assert_eq!(release_version, "1.1.0");
+	assert!(!tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn workflow_release_failures_do_not_delete_changesets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, true);
+
+	let error = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--root"),
+			tempdir.path().into(),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected workflow failure"));
+
+	assert!(error.to_string().contains("failed to create"));
+	assert!(tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn workflow_unknown_commands_suggest_available_workflows() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+
+	let error = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("ship-it"),
+			OsString::from("--root"),
+			tempdir.path().into(),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected workflow suggestion"));
+
+	assert!(error.to_string().contains("available workflows: release"));
+}
+
+#[test]
 fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
 	assert_simple_release_pattern(
 		"../../fixtures/cargo/workspace",
@@ -342,6 +493,8 @@ fn quickstart_and_docs_reference_the_same_core_commands() {
 		"mc workspace discover --root . --format json",
 		"mc changes add --root . --package",
 		"mc plan release --root . --changes",
+		"mc release --dry-run",
+		"mc release",
 		"lint:all",
 		"test:all",
 		"build:all",
@@ -389,4 +542,106 @@ fn assert_simple_release_pattern(
 	assert_eq!(direct.recommended_bump.to_string(), "minor");
 	assert_eq!(dependent.recommended_bump.to_string(), "patch");
 	fs::remove_file(changes_path).unwrap_or_else(|error| panic!("remove changes: {error}"));
+}
+
+fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changelog: bool) {
+	let command_step = command_step.map_or_else(String::new, |command| {
+		let escaped_command = command.replace('\\', "\\\\").replace('"', "\\\"");
+		format!("\n[[workflows.steps]]\ntype = \"Command\"\ncommand = \"{escaped_command}\"\n")
+	});
+	let app_changelog = if failing_changelog {
+		write_file(root.join("blocked"), "not a directory");
+		"blocked/CHANGELOG.md".to_string()
+	} else {
+		"crates/app/CHANGELOG.md".to_string()
+	};
+	write_file(
+		root.join("Cargo.toml"),
+		r#"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+workflow-core = { path = "./crates/core", version = "1.0.0" }
+workflow-app = { path = "./crates/app", version = "1.0.0" }
+"#,
+	);
+	write_file(
+		root.join("crates/core/Cargo.toml"),
+		r#"
+[package]
+name = "workflow-core"
+version = { workspace = true }
+edition = "2021"
+"#,
+	);
+	write_file(
+		root.join("crates/app/Cargo.toml"),
+		r#"
+[package]
+name = "workflow-app"
+version = { workspace = true }
+edition = "2021"
+
+[dependencies]
+workflow-core = { workspace = true }
+"#,
+	);
+	write_file(root.join("crates/core/CHANGELOG.md"), "# Changelog\n");
+	if !failing_changelog {
+		write_file(root.join("crates/app/CHANGELOG.md"), "# Changelog\n");
+	}
+	write_file(
+		root.join("monochange.toml"),
+		&format!(
+			r#"
+[defaults]
+parent_bump = "patch"
+
+[[version_groups]]
+name = "sdk"
+members = ["crates/core", "crates/app"]
+strategy = "shared"
+
+[ecosystems.cargo]
+enabled = true
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+{command_step}
+[[package_overrides]]
+package = "crates/core"
+changelog = "crates/core/CHANGELOG.md"
+
+[[package_overrides]]
+package = "crates/app"
+changelog = "{app_changelog}"
+"#,
+		),
+	);
+	write_file(
+		root.join(".changeset/feature.md"),
+		r"---
+workflow-core: minor
+---
+
+#### add release workflow
+",
+	);
+}
+
+fn write_file(path: impl AsRef<Path>, content: &str) {
+	let path = path.as_ref();
+	if let Some(parent) = path.parent() {
+		fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
+	}
+	fs::write(path, content)
+		.unwrap_or_else(|error| panic!("write file {}: {error}", path.display()));
 }

@@ -18,6 +18,8 @@ use monochange_core::PackageOverride;
 use monochange_core::PackageRecord;
 use monochange_core::VersionGroup;
 use monochange_core::VersionGroupDefinition;
+use monochange_core::WorkflowDefinition;
+use monochange_core::WorkflowStepDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
 use serde::Deserialize;
@@ -25,6 +27,7 @@ use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value as YamlValue;
 
 const CONFIG_FILE: &str = "monochange.toml";
+const RESERVED_WORKFLOW_NAMES: &[&str] = &["workspace", "plan", "changes", "help", "version"];
 
 #[derive(Debug, Deserialize, Default)]
 struct RawWorkspaceConfiguration {
@@ -34,6 +37,8 @@ struct RawWorkspaceConfiguration {
 	version_groups: Vec<VersionGroupDefinition>,
 	#[serde(default)]
 	package_overrides: Vec<PackageOverride>,
+	#[serde(default)]
+	workflows: Vec<WorkflowDefinition>,
 	#[serde(default)]
 	ecosystems: RawEcosystems,
 }
@@ -120,6 +125,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	};
 
 	validate_version_groups(&raw.version_groups)?;
+	validate_workflows(&raw.workflows)?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -130,6 +136,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		},
 		version_groups: raw.version_groups,
 		package_overrides: raw.package_overrides,
+		workflows: raw.workflows,
 		cargo: raw.ecosystems.cargo,
 		npm: raw.ecosystems.npm,
 		deno: raw.ecosystems.deno,
@@ -322,6 +329,42 @@ fn validate_version_groups(version_groups: &[VersionGroupDefinition]) -> Monocha
 				"duplicate version group `{}`",
 				version_group.name
 			)));
+		}
+	}
+
+	Ok(())
+}
+
+fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> {
+	let mut seen_names = BTreeSet::new();
+
+	for workflow in workflows {
+		if !seen_names.insert(workflow.name.clone()) {
+			return Err(MonochangeError::Config(format!(
+				"duplicate workflow `{}`",
+				workflow.name
+			)));
+		}
+		if RESERVED_WORKFLOW_NAMES.contains(&workflow.name.as_str()) {
+			return Err(MonochangeError::Config(format!(
+				"workflow `{}` collides with a reserved built-in command",
+				workflow.name
+			)));
+		}
+		if workflow.steps.is_empty() {
+			return Err(MonochangeError::Config(format!(
+				"workflow `{}` must define at least one step",
+				workflow.name
+			)));
+		}
+		for step in &workflow.steps {
+			if matches!(step, WorkflowStepDefinition::Command { command } if command.trim().is_empty())
+			{
+				return Err(MonochangeError::Config(format!(
+					"workflow `{}` command steps must provide a non-empty command",
+					workflow.name
+				)));
+			}
 		}
 	}
 

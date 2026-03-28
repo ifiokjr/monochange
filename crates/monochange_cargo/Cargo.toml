@@ -27,6 +27,7 @@ walkdir = { workspace = true }
 insta = { workspace = true }
 rstest = { workspace = true }
 similar-asserts = { workspace = true }
+tempfile = "3"
 
 [lints]
 workspace = true

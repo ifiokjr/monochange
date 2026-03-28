@@ -10,6 +10,7 @@ Current milestone capabilities:
 - normalize dependency edges across ecosystems
 - coordinate shared version groups from `monochange.toml`
 - compute release plans from explicit change input
+- prepare synced releases through config-defined workflows
 - apply Rust semver evidence when provided
 - ship documentation through the mdBook in `docs/`
 
@@ -19,8 +20,9 @@ Current milestone capabilities:
 devenv shell
 install:all
 mc workspace discover --root . --format json
-mc changes add --root . --package crates/monochange --bump minor --reason "add release planning"
-mc plan release --root . --changes .changeset/1234567890-crates-monochange.md --format json
+mc changes add --root . --package monochange --bump minor --reason "add release planning"
+mc release --dry-run
+mc release
 ```
 
 Example configuration:
@@ -33,13 +35,19 @@ include_private = false
 [[version_groups]]
 name = "sdk"
 members = ["crates/sdk_core", "packages/web-sdk"]
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
 ```
 
 Example change input:
 
 ```markdown
 ---
-crates/sdk_core: minor
+sdk_core: minor
 ---
 
 #### public API addition
@@ -49,9 +57,9 @@ Rust semver evidence can be attached explicitly:
 
 ```markdown
 ---
-crates/sdk_core: patch
+sdk_core: patch
 evidence:
-  crates/sdk_core:
+  sdk_core:
     - rust-semver:major:public API break detected
 ---
 

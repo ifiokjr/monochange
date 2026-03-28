@@ -21,6 +21,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert!(!configuration.defaults.include_private);
 	assert!(configuration.defaults.warn_on_group_mismatch);
 	assert!(configuration.version_groups.is_empty());
+	assert!(configuration.workflows.is_empty());
 	assert_eq!(configuration.cargo.enabled, None);
 	assert_eq!(configuration.npm.enabled, None);
 	assert_eq!(configuration.deno.enabled, None);
@@ -48,6 +49,16 @@ roots = ["packages/*"]
 [[package_overrides]]
 package = "crates/core"
 changelog = "crates/core/CHANGELOG.md"
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "cargo check --workspace"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -59,6 +70,12 @@ changelog = "crates/core/CHANGELOG.md"
 	assert_eq!(configuration.version_groups.len(), 1);
 	assert_eq!(configuration.npm.roots, vec!["packages/*"]);
 	assert_eq!(configuration.package_overrides.len(), 1);
+	assert_eq!(configuration.workflows.len(), 1);
+	let workflow = configuration
+		.workflows
+		.first()
+		.unwrap_or_else(|| panic!("expected one workflow"));
+	assert_eq!(workflow.name, "release");
 	let package_override = configuration
 		.package_overrides
 		.first()
@@ -167,6 +184,57 @@ evidence:
 		signal.evidence_refs,
 		vec!["rust-semver:major:public API break detected"]
 	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_reserved_workflow_names() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[[workflows]]
+name = "workspace"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(error.to_string().contains("reserved built-in command"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_duplicate_workflows() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "Command"
+command = "cargo check"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(error.to_string().contains("duplicate workflow `release`"));
 }
 
 #[test]

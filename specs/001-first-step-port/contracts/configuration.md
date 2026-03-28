@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the first-step configuration surface for cross-ecosystem workspace discovery and release planning.
+Define the first-step configuration surface for cross-ecosystem workspace discovery, release planning, and workflow-driven release preparation.
 
 ## File Location
 
@@ -29,6 +29,33 @@ Defines packages that always share the same planned version.
 | `name`     | string           | Yes      | Stable group identifier.                                                 |
 | `members`  | array of strings | Yes      | Package identifiers or manifest-relative paths that belong to the group. |
 | `strategy` | string           | No       | Group versioning strategy; defaults to shared version behavior.          |
+
+### `[[workflows]]`
+
+Defines named workflows that can be run as top-level commands such as `mc release`.
+
+| Field   | Type   | Required | Meaning                       |
+| ------- | ------ | -------- | ----------------------------- |
+| `name`  | string | Yes      | Workflow command name.        |
+| `steps` | array  | Yes      | Ordered typed workflow steps. |
+
+### `[[workflows.steps]]`
+
+Built-in typed workflow steps.
+
+| Field     | Type   | Required | Meaning                                                     |
+| --------- | ------ | -------- | ----------------------------------------------------------- |
+| `type`    | string | Yes      | One of `PrepareRelease` or `Command`.                       |
+| `command` | string | No       | Required when `type = "Command"`; shell command to execute. |
+
+### `[[package_overrides]]`
+
+Per-package release behavior overrides.
+
+| Field       | Type   | Required | Meaning                                                 |
+| ----------- | ------ | -------- | ------------------------------------------------------- |
+| `package`   | string | Yes      | Package identifier, manifest-relative path, or name.    |
+| `changelog` | string | No       | Changelog file updated during workflow release prepare. |
 
 ### `[ecosystems.cargo]`
 
@@ -58,6 +85,16 @@ warn_on_group_mismatch = true
 name = "sdk"
 members = ["crates/sdk_core", "packages/web-sdk", "packages/mobile-sdk"]
 
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[package_overrides]]
+package = "crates/sdk_core"
+changelog = "crates/sdk_core/CHANGELOG.md"
+
 [ecosystems.cargo]
 enabled = true
 
@@ -76,7 +113,11 @@ enabled = true
 
 - Unknown top-level sections must produce actionable warnings or errors.
 - Group names must be unique.
+- Workflow names must be unique.
+- Workflow names must not collide with reserved built-in commands.
+- `Command` workflow steps must provide a non-empty `command`.
 - Group members must resolve to discovered packages.
+- Package overrides must resolve deterministically against discovered packages.
 - Ecosystem-specific roots may use supported glob syntax.
 - Excluded paths must remove matching packages from final discovery output.
 - If `parent_bump` is omitted, the default is `patch`.

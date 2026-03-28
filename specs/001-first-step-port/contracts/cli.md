@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the user-facing command contract for workspace discovery and release planning in the first monochange milestone.
+Define the user-facing command contract for workspace discovery, release planning, and workflow-driven release preparation in the first monochange milestone.
 
 ## Command 1: Workspace Discovery
 
@@ -120,6 +120,33 @@ mc plan release --root <path> --changes <path> --format <text|json>
 	]
 }
 ```
+
+## Command 3: Workflow-Driven Release Preparation
+
+```bash
+mc release --root <path> [--dry-run]
+monochange release --root <path> [--dry-run]
+```
+
+### Behavior
+
+- Loads workflows from `monochange.toml` and dispatches them as top-level commands.
+- Treats built-in commands such as `workspace`, `plan`, and `changes` as reserved.
+- Runs the configured `release` workflow steps in order.
+- For `PrepareRelease`, auto-discovers `.changeset/*.md` under the repository root.
+- Resolves change entries by package name.
+- Expands synced version groups so grouped packages share one planned version.
+- Updates versioned manifests and configured per-package changelogs.
+- Deletes consumed changesets only after a fully successful non-dry-run execution.
+- In `--dry-run`, performs planning and rendering only and does not mutate files.
+
+### Text Output Requirements
+
+- Identify the workflow name.
+- Indicate whether execution was a dry-run.
+- Report the prepared version when one shared version is produced.
+- List released packages and changed files when applicable.
+- Show command-step execution summaries when workflow commands run.
 
 ## Non-Goals for this Contract
 

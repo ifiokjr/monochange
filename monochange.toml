@@ -21,6 +21,12 @@ strategy = "shared"
 [ecosystems.cargo]
 enabled = true
 
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
 [[package_overrides]]
 package = "crates/monochange"
 changelog = "crates/monochange/CHANGELOG.md"

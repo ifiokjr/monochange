@@ -33,6 +33,12 @@ enabled = true
 
 [ecosystems.dart]
 enabled = true
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
 ```
 
 ## 2. Verify workspace discovery
@@ -54,14 +60,14 @@ Expected outcome:
 Preferred CLI flow:
 
 ```bash
-mc changes add --root . --package crates/sdk_core --bump minor --reason "public API addition"
+mc changes add --root . --package sdk_core --bump minor --reason "public API addition"
 ```
 
 Equivalent manual file:
 
 ```markdown
 ---
-crates/sdk_core: minor
+sdk_core: minor
 ---
 
 #### public API addition
@@ -71,9 +77,9 @@ For a Rust compatibility escalation example:
 
 ```markdown
 ---
-crates/sdk_core: patch
+sdk_core: patch
 evidence:
-  crates/sdk_core:
+  sdk_core:
     - rust-semver:major:public API break detected
 ---
 
@@ -82,8 +88,17 @@ evidence:
 
 ## 4. Compute a release plan
 
+For raw planner inspection:
+
 ```bash
 mc plan release --root . --changes .changeset/my-change.md --format json
+```
+
+For the primary repository workflow:
+
+```bash
+mc release --dry-run
+mc release
 ```
 
 Expected outcome:
@@ -91,6 +106,8 @@ Expected outcome:
 - directly changed packages receive the requested or inferred increment
 - transitive dependents receive at least the configured parent bump
 - grouped packages share one planned version
+- the workflow updates manifests and package changelogs
+- consumed `.changeset/*.md` files are deleted only after a fully successful prepare run
 - compatibility evidence appears in the output when supplied
 
 ## 5. Run repository validation
