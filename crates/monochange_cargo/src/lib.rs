@@ -1,10 +1,24 @@
 #![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
-//! <!-- {=monochangeCargoCrateDocs|trim|linePrefix:"//! ":true} -->
 //! # `monochange_cargo`
 //!
-//! Cargo ecosystem support for `monochange`.
+//! <!-- {=monochangeCargoCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange_cargo` discovers Cargo packages and surfaces Rust-specific release evidence.
+//!
+//! Reach for this crate when you want to scan Cargo workspaces into normalized `monochange_core` records and optionally feed Rust semver evidence into release planning.
+//!
+//! ## Why use it?
+//!
+//! - discover Cargo workspaces and standalone crates with one adapter
+//! - normalize crate manifests and dependency edges for the shared planner
+//! - attach Rust semver evidence through `RustSemverProvider`
+//!
+//! ## Best for
+//!
+//! - building Cargo-aware discovery flows without the full CLI
+//! - feeding Rust semver evidence into release planning
+//! - converting Cargo workspace structure into shared `monochange_core` records
 //!
 //! ## Public entry points
 //!

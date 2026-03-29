@@ -1,10 +1,24 @@
 #![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
-//! <!-- {=monochangeSemverCrateDocs|trim|linePrefix:"//! ":true} -->
 //! # `monochange_semver`
 //!
-//! Semver and compatibility helpers for `monochange`.
+//! <!-- {=monochangeSemverCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange_semver` merges requested bumps with compatibility evidence.
+//!
+//! Reach for this crate when you need deterministic severity calculations for direct changes, propagated dependent changes, or ecosystem-specific compatibility providers.
+//!
+//! ## Why use it?
+//!
+//! - combine manual change requests with provider-generated compatibility assessments
+//! - share one bump-merging strategy across the workspace
+//! - implement custom `CompatibilityProvider` integrations for ecosystem-specific evidence
+//!
+//! ## Best for
+//!
+//! - computing release severities outside the full planner
+//! - plugging ecosystem-specific compatibility logic into shared planning
+//! - reusing the workspace's bump-merging rules in custom tools
 //!
 //! ## Responsibilities
 //!
