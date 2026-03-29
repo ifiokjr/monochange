@@ -2,17 +2,18 @@
 
 `monochange` is a cross-ecosystem release planner for monorepos.
 
-The first milestone focuses on:
+The current milestone focuses on:
 
 <!-- {=projectMilestoneCapabilities} -->
 
 - discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
 - normalize dependency edges across ecosystems
-- coordinate shared version groups from `monochange.toml`
-- compute release plans from explicit change input
-- run config-defined release workflows from `.changeset/*.md`
-- apply Rust semver evidence when provided
-- publish end-user documentation through the mdBook in `docs/`
+- declare releaseable packages explicitly through `monochange.toml`
+- coordinate shared release identity through named groups
+- plan transitive releases from markdown changesets
+- validate config and changesets with `mc check`
+- prepare releases through config-defined workflows
+- surface Rust semver evidence when provided
 
 <!-- {/projectMilestoneCapabilities} -->
 
@@ -27,9 +28,21 @@ Create a `monochange.toml` file:
 parent_bump = "patch"
 warn_on_group_mismatch = true
 
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk"]
+[package.monochange]
+path = "crates/monochange"
+type = "cargo"
+changelog = "crates/monochange/CHANGELOG.md"
+
+[package.monochange_core]
+path = "crates/monochange_core"
+type = "cargo"
+changelog = "crates/monochange_core/CHANGELOG.md"
+
+[group.workspace]
+packages = ["monochange", "monochange_core"]
+tag = true
+release = true
+version_format = "primary"
 
 [[workflows]]
 name = "release"
@@ -38,9 +51,11 @@ name = "release"
 type = "PrepareRelease"
 ```
 
-This is the smallest config needed to make `mc release` work in the current implementation.
+Validate the repository:
 
-For changelog updates, add `[[package_overrides]]` entries with `changelog` paths. Discovery currently scans all supported ecosystems automatically; the top-level `[ecosystems.*]` settings are parsed today but are not yet used to filter discovery.
+```bash
+mc check --root .
+```
 
 Discover the workspace:
 
@@ -74,7 +89,7 @@ mc release
 
 <!-- {/projectCoreWorkflow} -->
 
-Validate the repository:
+Run the full validation suite:
 
 <!-- {=projectValidationCommands} -->
 
@@ -96,7 +111,7 @@ Discovery output includes:
 
 - normalized package records
 - dependency edges
-- version groups
+- version groups derived from configured groups
 - warnings
 
 <!-- {/projectDiscoveryOutputIncludes} -->

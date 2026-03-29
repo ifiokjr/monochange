@@ -1,22 +1,22 @@
 # Release planning
 
-Create a change input file with the CLI:
+Create a changeset with the CLI:
 
 <!-- {=releaseChangesAddCommand} -->
 
 ```bash
-mc changes add --root . --package sdk_core --bump minor --reason "public API addition"
+mc changes add --root . --package sdk-core --bump minor --reason "public API addition"
 ```
 
 <!-- {/releaseChangesAddCommand} -->
 
-Or write one manually:
+Or write one manually with configured package or group ids:
 
 <!-- {=releaseManualChangesetExample} -->
 
 ```markdown
 ---
-sdk_core: minor
+sdk-core: minor
 ---
 
 #### public API addition
@@ -24,17 +24,25 @@ sdk_core: minor
 
 <!-- {/releaseManualChangesetExample} -->
 
-Optionally include Rust semver evidence and explicit origins in markdown frontmatter:
+Group-targeted changesets are also valid:
+
+```markdown
+---
+sdk: minor
+---
+
+#### coordinated SDK release
+```
+
+Optionally include Rust semver evidence:
 
 <!-- {=releaseEvidenceExample} -->
 
 ```markdown
 ---
-sdk_core: patch
-origin:
-  sdk_core: direct-change
+sdk-core: patch
 evidence:
-  sdk_core:
+  sdk-core:
     - rust-semver:major:public API break detected
 ---
 
@@ -42,6 +50,12 @@ evidence:
 ```
 
 <!-- {/releaseEvidenceExample} -->
+
+Validate before planning:
+
+```bash
+mc check --root .
+```
 
 Generate a plan directly when you want to inspect the raw planner output:
 
@@ -71,6 +85,8 @@ mc release
 
 <!-- {/projectReleaseCommand} -->
 
+The workflow reads `.changeset/*.md`, computes the synced release, updates manifests, updates configured changelogs and versioned files, and deletes consumed changesets only after a successful non-dry-run run.
+
 Planning rules in this milestone:
 
 <!-- {=releasePlanningRules} -->
@@ -79,23 +95,7 @@ Planning rules in this milestone:
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
-- version-group synchronization runs before final output is rendered
+- configured groups synchronize before final output is rendered
+- release targets carry effective `tag`, `release`, and `version_format` metadata
 
 <!-- {/releasePlanningRules} -->
-
-## PrepareRelease workflow behavior
-
-`mc release` only works when your config defines a workflow named `release`.
-
-<!-- {=releaseWorkflowBehavior} -->
-
-Current `PrepareRelease` behavior:
-
-- reads `.changeset/*.md`
-- computes one synchronized release plan from discovered change files
-- updates Cargo package versions and Cargo workspace dependency versions when a release is applied
-- appends changelog sections only for packages configured through `[[package_overrides]]` with `changelog` paths
-- deletes consumed change files only after a successful non-dry-run execution
-- leaves the workspace untouched during `--dry-run`
-
-<!-- {/releaseWorkflowBehavior} -->
