@@ -1,6 +1,7 @@
 use std::fs;
 
 use monochange_core::BumpSeverity;
+use monochange_core::ChangelogDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
@@ -22,6 +23,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert!(!configuration.defaults.include_private);
 	assert!(configuration.defaults.warn_on_group_mismatch);
 	assert_eq!(configuration.defaults.package_type, None);
+	assert_eq!(configuration.defaults.changelog, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
 	assert!(configuration.workflows.is_empty());
@@ -43,6 +45,7 @@ fn load_workspace_configuration_parses_package_group_and_workflow_declarations()
 parent_bump = "minor"
 include_private = true
 package_type = "cargo"
+changelog = "{path}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
@@ -80,17 +83,24 @@ type = "PrepareRelease"
 		configuration.defaults.package_type,
 		Some(monochange_core::PackageType::Cargo)
 	);
+	assert_eq!(
+		configuration.defaults.changelog,
+		Some(ChangelogDefinition::PathPattern(
+			"{path}/CHANGELOG.md".to_string()
+		))
+	);
 	assert_eq!(configuration.packages.len(), 2);
 	assert_eq!(configuration.groups.len(), 1);
 	assert_eq!(configuration.workflows.len(), 1);
 	assert_eq!(configuration.npm.roots, vec!["packages/*"]);
+	let first_package = configuration
+		.packages
+		.first()
+		.unwrap_or_else(|| panic!("expected first package"));
+	assert_eq!(first_package.id, "core");
 	assert_eq!(
-		configuration
-			.packages
-			.first()
-			.unwrap_or_else(|| panic!("expected first package"))
-			.id,
-		"core"
+		first_package.changelog,
+		Some(std::path::PathBuf::from("crates/core/changelog.md"))
 	);
 	assert_eq!(
 		configuration
@@ -125,6 +135,97 @@ path = "crates/core"
 		.first()
 		.unwrap_or_else(|| panic!("expected package"));
 	assert_eq!(package.package_type, monochange_core::PackageType::Cargo);
+}
+
+#[test]
+fn load_workspace_configuration_uses_defaults_changelog_pattern_when_package_changelog_is_omitted()
+{
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+changelog = "{path}/changelog.md"
+
+[package.core]
+path = "crates/core"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.packages
+		.first()
+		.unwrap_or_else(|| panic!("expected package"));
+	assert_eq!(
+		configuration.defaults.changelog,
+		Some(ChangelogDefinition::PathPattern(
+			"{path}/changelog.md".to_string()
+		))
+	);
+	assert_eq!(
+		package.changelog,
+		Some(std::path::PathBuf::from("crates/core/changelog.md"))
+	);
+}
+
+#[test]
+fn load_workspace_configuration_supports_package_changelog_true_false_and_string() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	write_cargo_package(tempdir.path(), "crates/app", "app");
+	write_cargo_package(tempdir.path(), "crates/tool", "tool");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+changelog = false
+
+[package.core]
+path = "crates/core"
+changelog = true
+
+[package.app]
+path = "crates/app"
+changelog = false
+
+[package.tool]
+path = "crates/tool"
+changelog = "docs/tool-release-notes.md"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let core = configuration
+		.package_by_id("core")
+		.unwrap_or_else(|| panic!("expected core package"));
+	let app = configuration
+		.package_by_id("app")
+		.unwrap_or_else(|| panic!("expected app package"));
+	let tool = configuration
+		.package_by_id("tool")
+		.unwrap_or_else(|| panic!("expected tool package"));
+
+	assert_eq!(
+		configuration.defaults.changelog,
+		Some(ChangelogDefinition::Disabled)
+	);
+	assert_eq!(
+		core.changelog,
+		Some(std::path::PathBuf::from("crates/core/CHANGELOG.md"))
+	);
+	assert_eq!(app.changelog, None);
+	assert_eq!(
+		tool.changelog,
+		Some(std::path::PathBuf::from("docs/tool-release-notes.md"))
+	);
 }
 
 #[test]

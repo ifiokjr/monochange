@@ -320,6 +320,13 @@ pub enum VersionedFileDefinition {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ChangelogDefinition {
+	Disabled,
+	PackageDefault,
+	PathPattern(String),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PackageDefinition {
 	pub id: String,
 	pub path: PathBuf,
@@ -348,6 +355,7 @@ pub struct WorkspaceDefaults {
 	pub include_private: bool,
 	pub warn_on_group_mismatch: bool,
 	pub package_type: Option<PackageType>,
+	pub changelog: Option<ChangelogDefinition>,
 }
 
 impl Default for WorkspaceDefaults {
@@ -357,6 +365,7 @@ impl Default for WorkspaceDefaults {
 			include_private: false,
 			warn_on_group_mismatch: true,
 			package_type: None,
+			changelog: None,
 		}
 	}
 }
