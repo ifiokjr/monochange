@@ -508,6 +508,48 @@ fn quickstart_and_docs_reference_the_same_core_commands() {
 	}
 }
 
+#[test]
+fn configuration_guide_calls_out_current_implementation_limits() {
+	let configuration_guide =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/guide/04-configuration.md");
+	let content = fs::read_to_string(configuration_guide)
+		.unwrap_or_else(|error| panic!("configuration guide: {error}"));
+
+	for expected in [
+		"`defaults.include_private`",
+		"`version_groups.strategy`",
+		"`[ecosystems.*].enabled/roots/exclude`",
+		"`package_overrides.changelog`",
+		"`PrepareRelease`",
+		"`Command`",
+	] {
+		assert!(
+			content.contains(expected),
+			"configuration guide missing `{expected}`"
+		);
+	}
+}
+
+#[test]
+fn release_planning_guide_describes_release_workflow_requirements() {
+	let release_guide =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/guide/06-release-planning.md");
+	let content =
+		fs::read_to_string(release_guide).unwrap_or_else(|error| panic!("release guide: {error}"));
+
+	for expected in [
+		"`mc release` only works when your config defines a workflow named `release`.",
+		"`[[package_overrides]]`",
+		"`.changeset/*.md`",
+		"`--dry-run`",
+	] {
+		assert!(
+			content.contains(expected),
+			"release planning guide missing `{expected}`"
+		);
+	}
+}
+
 fn assert_simple_release_pattern(
 	relative_fixture_root: &str,
 	package_reference: &str,

@@ -1,4 +1,6 @@
-# monochange
+<!-- {=monochangeCrateDocs} -->
+
+# `monochange`
 
 The `monochange` crate provides the end-user CLI.
 
@@ -16,3 +18,5 @@ mc plan release --root . --changes .changeset/1234567890-crates-monochange.md --
 - load `monochange.toml`
 - resolve change input files
 - render discovery and release-plan output in text or JSON
+
+<!-- {/monochangeCrateDocs} -->

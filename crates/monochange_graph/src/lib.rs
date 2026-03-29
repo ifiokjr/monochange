@@ -1,7 +1,18 @@
 #![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
-doc_comment::doctest!("../readme.md");
+//! <!-- {=monochangeGraphCrateDocs|trim|linePrefix:"//! ":true} -->
+//! # `monochange_graph`
+//!
+//! Dependency-graph traversal and release propagation for `monochange`.
+//!
+//! ## Responsibilities
+//!
+//! - build reverse dependency views
+//! - propagate release impact across direct and transitive dependents
+//! - synchronize version groups
+//! - calculate planned group versions
+//! <!-- {/monochangeGraphCrateDocs} -->
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;

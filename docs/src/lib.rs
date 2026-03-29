@@ -1,5 +1,16 @@
-doc_comment::doctest!("readme.md");
+doc_comment::doctest!("../../readme.md");
+doc_comment::doctest!("../../CONTRIBUTING.md");
+doc_comment::doctest!("../../crates/monochange/readme.md");
+doc_comment::doctest!("../../crates/monochange_core/readme.md");
+doc_comment::doctest!("../../crates/monochange_cargo/readme.md");
+doc_comment::doctest!("../../crates/monochange_config/readme.md");
+doc_comment::doctest!("../../crates/monochange_graph/readme.md");
+doc_comment::doctest!("../../crates/monochange_npm/readme.md");
+doc_comment::doctest!("../../crates/monochange_deno/readme.md");
+doc_comment::doctest!("../../crates/monochange_dart/readme.md");
+doc_comment::doctest!("../../crates/monochange_semver/readme.md");
 
+doc_comment::doctest!("readme.md");
 doc_comment::doctest!("guide/01-installation.md");
 doc_comment::doctest!("guide/02-setup.md");
 doc_comment::doctest!("guide/03-discovery.md");

@@ -1,4 +1,6 @@
-# monochange_cargo
+<!-- {=monochangeCargoCrateDocs} -->
+
+# `monochange_cargo`
 
 Cargo ecosystem support for `monochange`.
 
@@ -14,3 +16,5 @@ Cargo ecosystem support for `monochange`.
 - crate manifest parsing
 - normalized dependency extraction
 - Rust semver provider integration for release planning
+
+<!-- {/monochangeCargoCrateDocs} -->

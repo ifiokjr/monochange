@@ -1,4 +1,6 @@
-# monochange_deno
+<!-- {=monochangeDenoCrateDocs} -->
+
+# `monochange_deno`
 
 Deno ecosystem support for `monochange`.
 
@@ -12,3 +14,5 @@ Deno ecosystem support for `monochange`.
 - `deno.json` and `deno.jsonc`
 - workspace glob expansion
 - normalized dependency and import extraction
+
+<!-- {/monochangeDenoCrateDocs} -->

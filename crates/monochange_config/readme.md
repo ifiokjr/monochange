@@ -1,10 +1,14 @@
-# monochange_config
+<!-- {=monochangeConfigCrateDocs} -->
+
+# `monochange_config`
 
 Configuration and change-input parsing for `monochange`.
 
 ## Responsibilities
 
 - load `monochange.toml`
-- validate version groups
-- resolve group members against discovered packages
-- parse change-input files and resolve package references
+- validate version groups and workflows
+- resolve package references against discovered packages
+- parse change-input files, evidence, and changelog overrides
+
+<!-- {/monochangeConfigCrateDocs} -->
