@@ -73,6 +73,38 @@ fn transitive_dependents_handles_cycles_without_looping_forever() {
 }
 
 #[test]
+fn build_release_plan_patches_direct_parents_when_a_dependency_changes() {
+	let packages = vec![
+		package("cargo:core", Version::new(1, 0, 0)),
+		package("cargo:app", Version::new(1, 0, 0)),
+	];
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[edge("cargo:app", "cargo:core")],
+		&[],
+		&[ChangeSignal {
+			package_id: "cargo:core".to_string(),
+			requested_bump: Some(BumpSeverity::Minor),
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: Some("feature".to_string()),
+		}],
+		&[],
+		BumpSeverity::Patch,
+	);
+
+	let app = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == "cargo:app")
+		.unwrap_or_else(|| panic!("expected app decision"));
+	assert_eq!(app.recommended_bump, BumpSeverity::Patch);
+	assert_eq!(app.trigger_type, "transitive-dependency");
+	assert_eq!(app.planned_version, Some(Version::new(1, 0, 1)));
+}
+
+#[test]
 fn build_release_plan_propagates_direct_and_transitive_dependency_impact() {
 	let packages = vec![
 		package("cargo:core", Version::new(1, 0, 0)),
