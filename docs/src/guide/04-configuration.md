@@ -12,6 +12,7 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 package_type = "cargo"
+changelog = "{path}/changelog.md"
 ```
 
 <!-- {/configurationDefaultsSnippet} -->
@@ -25,10 +26,10 @@ Declare every release-managed package explicitly.
 ```toml
 [defaults]
 package_type = "cargo"
+changelog = "{path}/changelog.md"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-changelog = "crates/sdk_core/changelog.md"
 versioned_files = ["crates/sdk_core/extra.toml"]
 tag = false
 release = false
@@ -58,6 +59,20 @@ Optional package fields:
 - `tag`
 - `release`
 - `version_format`
+
+`changelog` accepts three forms on packages:
+
+- `true` → use `{path}/CHANGELOG.md`
+- `false` → disable the package changelog
+- `"some/path.md"` → use that exact path
+
+`[defaults].changelog` also accepts three forms:
+
+- `true` → default every package to `{path}/CHANGELOG.md`
+- `false` → default every package to no changelog
+- `"{path}/changelog.md"` or another pattern → replace `{path}` with each package path
+
+A package-level `changelog` value overrides the default for that package.
 
 ## Groups
 
