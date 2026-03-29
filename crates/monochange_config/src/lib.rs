@@ -1,10 +1,31 @@
 #![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
-//! <!-- {=monochangeConfigCrateDocs|trim|linePrefix:"//! ":true} -->
 //! # `monochange_config`
 //!
-//! Configuration and change-input parsing for `monochange`.
+//! <!-- {=monochangeConfigCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange_config` parses and validates the inputs that drive planning and release workflows.
+//!
+//! Reach for this crate when you need to load `monochange.toml`, resolve package references, or turn `.changeset/*.md` files into validated change signals for the planner.
+//!
+//! ## Why use it?
+//!
+//! - centralize config parsing and validation rules in one place
+//! - resolve package references against discovered workspace packages
+//! - keep workflow definitions, version groups, and change files aligned with the planner's expectations
+//!
+//! ## Best for
+//!
+//! - validating configuration before handing it to planning code
+//! - parsing and resolving change files in custom automation
+//! - keeping package-reference rules consistent across tools
+//!
+//! ## Public entry points
+//!
+//! - `load_workspace_configuration(root)` loads and validates `monochange.toml`
+//! - `load_change_signals(root, changes_dir, packages)` parses markdown change files into change signals
+//! - `resolve_package_reference(reference, workspace_root, packages)` maps package names, ids, and paths to discovered packages
+//! - `apply_version_groups(packages, configuration)` attaches configured version groups to discovered packages
 //!
 //! ## Responsibilities
 //!

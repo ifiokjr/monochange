@@ -1,16 +1,31 @@
 #![deny(clippy::all)]
 
-//! <!-- {=monochangeCrateDocs|trim|linePrefix:"//! ":true} -->
 //! # `monochange`
 //!
-//! The `monochange` crate provides the end-user CLI.
+//! <!-- {=monochangeCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange` is the top-level entry point for the workspace.
 //!
-//! ## Commands
+//! Reach for this crate when you want one API and CLI surface that can discover packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, turn explicit change files into a release plan, and run configured release workflows from that plan.
+//!
+//! ## Why use it?
+//!
+//! - coordinate one release workflow across several package ecosystems
+//! - expose discovery and release planning as either CLI commands or library calls
+//! - connect configuration loading, package discovery, graph propagation, and semver evidence in one place
+//!
+//! ## Best for
+//!
+//! - shipping the `mc` CLI in CI or local release tooling
+//! - embedding the full end-to-end planner instead of wiring the lower-level crates together yourself
+//! - rendering discovery or release-plan output in text or JSON
+//!
+//! ## Key commands
 //!
 //! ```bash
 //! mc workspace discover --root . --format json
 //! mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
 //! mc plan release --root . --changes .changeset/1234567890-crates-monochange.md --format json
+//! mc release --dry-run
 //! ```
 //!
 //! ## Responsibilities
@@ -19,6 +34,7 @@
 //! - load `monochange.toml`
 //! - resolve change input files
 //! - render discovery and release-plan output in text or JSON
+//! - execute configured release workflows
 //! <!-- {/monochangeCrateDocs} -->
 
 use std::collections::BTreeMap;
