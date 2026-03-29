@@ -171,26 +171,25 @@ mc check --root .
 ```toml
 [defaults]
 parent_bump = "patch"
+package_type = "cargo"
 
 [package.monochange]
 path = "crates/monochange"
-type = "cargo"
-changelog = "crates/monochange/CHANGELOG.md"
+changelog = "crates/monochange/changelog.md"
 versioned_files = ["Cargo.toml"]
 
 [package.monochange_core]
 path = "crates/monochange_core"
-type = "cargo"
-changelog = "crates/monochange_core/CHANGELOG.md"
+changelog = "crates/monochange_core/changelog.md"
 
 [package."npm:@scope/name"]
 path = "packages/web-sdk"
 type = "npm"
-changelog = "packages/web-sdk/CHANGELOG.md"
+changelog = "packages/web-sdk/changelog.md"
 
-[group.workspace]
+[group.main]
 packages = ["monochange", "monochange_core", "npm:@scope/name"]
-changelog = "CHANGELOG.md"
+changelog = "changelog.md"
 versioned_files = [
 	"Cargo.toml",
 	{ path = "Cargo.lock", dependency = "monochange_core" },
@@ -255,7 +254,7 @@ That means:
 - group ids are unique
 - package ids and group ids share one global namespace
 - every package declares `path`
-- every package declares `type`
+- every package declares `type`, unless `[defaults].package_type` is set
 - `type` is supported
 - package path exists
 - expected manifest for package type exists
@@ -293,7 +292,7 @@ Unknown package in group:
 │                                      ╰── this package was not declared
 │
 help: declare it first under `[package.monochange_semver]`
-help: or fix the typo in `group.workspace.packages`
+help: or fix the typo in `group.main.packages`
 ```
 
 Group/member overlap in changeset:
@@ -332,7 +331,7 @@ Replace with:
 
 ```toml
 [[version_groups]]
-name = "monochange-workspace"
+name = "main"
 members = [
 	"crates/monochange",
 	"crates/monochange_core",
@@ -340,23 +339,24 @@ members = [
 
 [[package_overrides]]
 package = "crates/monochange"
-changelog = "crates/monochange/CHANGELOG.md"
+changelog = "crates/monochange/changelog.md"
 ```
 
 #### After
 
 ```toml
+[defaults]
+package_type = "cargo"
+
 [package.monochange]
 path = "crates/monochange"
-type = "cargo"
-changelog = "crates/monochange/CHANGELOG.md"
+changelog = "crates/monochange/changelog.md"
 
 [package.monochange_core]
 path = "crates/monochange_core"
-type = "cargo"
-changelog = "crates/monochange_core/CHANGELOG.md"
+changelog = "crates/monochange_core/changelog.md"
 
-[group.monochange-workspace]
+[group.main]
 packages = ["monochange", "monochange_core"]
 ```
 

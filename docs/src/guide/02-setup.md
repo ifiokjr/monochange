@@ -8,11 +8,11 @@ Add a `monochange.toml` file at the repository root.
 [defaults]
 parent_bump = "patch"
 warn_on_group_mismatch = true
+package_type = "cargo"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-type = "cargo"
-changelog = "crates/sdk_core/CHANGELOG.md"
+changelog = "crates/sdk_core/changelog.md"
 
 [package.web-sdk]
 path = "packages/web-sdk"

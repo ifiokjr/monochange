@@ -17,10 +17,10 @@ Validate that monochange can discover a mixed-ecosystem repository, calculate tr
 parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
+package_type = "cargo"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-type = "cargo"
 
 [package.web-sdk]
 path = "packages/web-sdk"

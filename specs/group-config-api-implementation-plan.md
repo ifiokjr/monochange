@@ -132,7 +132,7 @@ Config validation should enforce:
 - group ids are unique
 - package and group ids share one namespace
 - every package declares `path`
-- every package declares `type`
+- every package declares `type`, unless `[defaults].package_type` is set
 - package path exists
 - expected manifest for package `type` exists
 - package paths are unique
