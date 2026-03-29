@@ -21,6 +21,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.parent_bump, BumpSeverity::Patch);
 	assert!(!configuration.defaults.include_private);
 	assert!(configuration.defaults.warn_on_group_mismatch);
+	assert_eq!(configuration.defaults.package_type, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
 	assert!(configuration.workflows.is_empty());
@@ -41,11 +42,11 @@ fn load_workspace_configuration_parses_package_group_and_workflow_declarations()
 [defaults]
 parent_bump = "minor"
 include_private = true
+package_type = "cargo"
 
 [package.core]
 path = "crates/core"
-type = "cargo"
-changelog = "crates/core/CHANGELOG.md"
+changelog = "crates/core/changelog.md"
 tag = true
 release = true
 
@@ -55,7 +56,7 @@ type = "npm"
 
 [group.sdk]
 packages = ["core", "npm:web"]
-changelog = "CHANGELOG.md"
+changelog = "changelog.md"
 version_format = "primary"
 
 [ecosystems.npm]
@@ -75,6 +76,10 @@ type = "PrepareRelease"
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert_eq!(configuration.defaults.parent_bump, BumpSeverity::Minor);
 	assert!(configuration.defaults.include_private);
+	assert_eq!(
+		configuration.defaults.package_type,
+		Some(monochange_core::PackageType::Cargo)
+	);
 	assert_eq!(configuration.packages.len(), 2);
 	assert_eq!(configuration.groups.len(), 1);
 	assert_eq!(configuration.workflows.len(), 1);
@@ -95,6 +100,53 @@ type = "PrepareRelease"
 			.packages,
 		vec!["core", "npm:web"]
 	);
+}
+
+#[test]
+fn load_workspace_configuration_uses_defaults_package_type_when_type_is_omitted() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.packages
+		.first()
+		.unwrap_or_else(|| panic!("expected package"));
+	assert_eq!(package.package_type, monochange_core::PackageType::Cargo);
+}
+
+#[test]
+fn load_workspace_configuration_requires_package_type_without_default() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("must declare `type` or set `[defaults].package_type`"));
+	assert!(rendered.contains("single-ecosystem repository"));
 }
 
 #[test]
@@ -224,9 +276,11 @@ fn load_workspace_configuration_rejects_unknown_versioned_file_dependencies() {
 	fs::write(
 		tempdir.path().join("monochange.toml"),
 		r#"
+[defaults]
+package_type = "cargo"
+
 [package.core]
 path = "crates/core"
-type = "cargo"
 versioned_files = [{ path = "Cargo.lock", dependency = "missing" }]
 "#,
 	)

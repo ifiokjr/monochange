@@ -347,6 +347,7 @@ pub struct WorkspaceDefaults {
 	pub parent_bump: BumpSeverity,
 	pub include_private: bool,
 	pub warn_on_group_mismatch: bool,
+	pub package_type: Option<PackageType>,
 }
 
 impl Default for WorkspaceDefaults {
@@ -355,6 +356,7 @@ impl Default for WorkspaceDefaults {
 			parent_bump: BumpSeverity::Patch,
 			include_private: false,
 			warn_on_group_mismatch: true,
+			package_type: None,
 		}
 	}
 }

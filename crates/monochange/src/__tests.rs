@@ -446,7 +446,7 @@ fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
 	let workspace_manifest = tempdir.path().join("Cargo.toml");
-	let core_changelog = tempdir.path().join("crates/core/CHANGELOG.md");
+	let core_changelog = tempdir.path().join("crates/core/changelog.md");
 	let original_manifest = fs::read_to_string(&workspace_manifest)
 		.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
 	let original_changelog = fs::read_to_string(&core_changelog)
@@ -502,11 +502,11 @@ fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
 	.unwrap_or_else(|error| panic!("workflow output: {error}"));
 	let workspace_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
 		.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
-	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/CHANGELOG.md"))
+	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/changelog.md"))
 		.unwrap_or_else(|error| panic!("core changelog: {error}"));
-	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/CHANGELOG.md"))
+	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/changelog.md"))
 		.unwrap_or_else(|error| panic!("app changelog: {error}"));
-	let group_changelog = fs::read_to_string(tempdir.path().join("CHANGELOG.md"))
+	let group_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 	let group_versioned_file = fs::read_to_string(tempdir.path().join("group.toml"))
 		.unwrap_or_else(|error| panic!("group versioned file: {error}"));
@@ -714,9 +714,9 @@ fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changel
 	});
 	let app_changelog = if failing_changelog {
 		write_file(root.join("blocked"), "not a directory");
-		"blocked/CHANGELOG.md".to_string()
+		"blocked/changelog.md".to_string()
 	} else {
-		"crates/app/CHANGELOG.md".to_string()
+		"crates/app/changelog.md".to_string()
 	};
 	write_file(
 		root.join("Cargo.toml"),
@@ -754,11 +754,11 @@ edition = "2021"
 workflow-core = { workspace = true }
 "#,
 	);
-	write_file(root.join("crates/core/CHANGELOG.md"), "# Changelog\n");
+	write_file(root.join("crates/core/changelog.md"), "# Changelog\n");
 	if !failing_changelog {
-		write_file(root.join("crates/app/CHANGELOG.md"), "# Changelog\n");
+		write_file(root.join("crates/app/changelog.md"), "# Changelog\n");
 	}
-	write_file(root.join("CHANGELOG.md"), "# Changelog\n");
+	write_file(root.join("changelog.md"), "# Changelog\n");
 	write_file(
 		root.join("group.toml"),
 		"[workspace.package]\nversion = \"1.0.0\"\n[workspace.dependencies]\nworkflow-core = { version = \"1.0.0\" }\n",
@@ -777,7 +777,7 @@ parent_bump = "patch"
 [package.core]
 path = "crates/core"
 type = "cargo"
-changelog = "crates/core/CHANGELOG.md"
+changelog = "crates/core/changelog.md"
 versioned_files = ["crates/core/extra.toml"]
 
 [package.app]
@@ -787,7 +787,7 @@ changelog = "{app_changelog}"
 
 [group.sdk]
 packages = ["core", "app"]
-changelog = "CHANGELOG.md"
+changelog = "changelog.md"
 versioned_files = ["group.toml"]
 tag = true
 release = true

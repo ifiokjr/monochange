@@ -2,53 +2,45 @@
 parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
+package_type = "cargo"
 
 [package.monochange]
 path = "crates/monochange"
-type = "cargo"
-changelog = "crates/monochange/CHANGELOG.md"
+changelog = "crates/monochange/changelog.md"
 
 [package.monochange_core]
 path = "crates/monochange_core"
-type = "cargo"
-changelog = "crates/monochange_core/CHANGELOG.md"
+changelog = "crates/monochange_core/changelog.md"
 
 [package.monochange_cargo]
 path = "crates/monochange_cargo"
-type = "cargo"
-changelog = "crates/monochange_cargo/CHANGELOG.md"
+changelog = "crates/monochange_cargo/changelog.md"
 
 [package.monochange_npm]
 path = "crates/monochange_npm"
-type = "cargo"
-changelog = "crates/monochange_npm/CHANGELOG.md"
+changelog = "crates/monochange_npm/changelog.md"
 
 [package.monochange_config]
 path = "crates/monochange_config"
-type = "cargo"
-changelog = "crates/monochange_config/CHANGELOG.md"
+changelog = "crates/monochange_config/changelog.md"
 
 [package.monochange_deno]
 path = "crates/monochange_deno"
-type = "cargo"
-changelog = "crates/monochange_deno/CHANGELOG.md"
+changelog = "crates/monochange_deno/changelog.md"
 
 [package.monochange_dart]
 path = "crates/monochange_dart"
-type = "cargo"
-changelog = "crates/monochange_dart/CHANGELOG.md"
+changelog = "crates/monochange_dart/changelog.md"
 
 [package.monochange_graph]
 path = "crates/monochange_graph"
-type = "cargo"
-changelog = "crates/monochange_graph/CHANGELOG.md"
+changelog = "crates/monochange_graph/changelog.md"
 
 [package.monochange_semver]
 path = "crates/monochange_semver"
-type = "cargo"
-changelog = "crates/monochange_semver/CHANGELOG.md"
+changelog = "crates/monochange_semver/changelog.md"
 
-[group.monochange-workspace]
+[group.main]
 packages = [
 	"monochange",
 	"monochange_core",
@@ -60,7 +52,6 @@ packages = [
 	"monochange_graph",
 	"monochange_semver",
 ]
-changelog = "CHANGELOG.md"
 tag = true
 release = true
 version_format = "primary"

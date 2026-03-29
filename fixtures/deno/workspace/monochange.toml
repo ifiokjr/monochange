@@ -1,13 +1,12 @@
 [defaults]
 parent_bump = "patch"
+package_type = "deno"
 
 [package.shared]
 path = "packages/shared"
-type = "deno"
 
 [package.tool]
 path = "packages/tool"
-type = "deno"
 
 [ecosystems.deno]
 enabled = true
