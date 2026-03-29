@@ -1,4 +1,6 @@
-# monochange_dart
+<!-- {=monochangeDartCrateDocs} -->
+
+# `monochange_dart`
 
 Dart and Flutter ecosystem support for `monochange`.
 
@@ -13,3 +15,5 @@ Dart and Flutter ecosystem support for `monochange`.
 - Dart package parsing
 - Flutter package detection
 - normalized dependency extraction
+
+<!-- {/monochangeDartCrateDocs} -->

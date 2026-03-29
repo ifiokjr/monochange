@@ -1,5 +1,13 @@
-{ pkgs, lib, ... }:
+{
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
 
+let
+  extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
+in
 {
   packages =
     with pkgs;
@@ -8,6 +16,7 @@
       cargo-run-bin
       deno
       dprint
+      extra.mdt
       mdbook
       nixfmt
       rustup
@@ -21,6 +30,8 @@
     set -e
     rustup toolchain install nightly --component rustfmt --no-self-update 2>/dev/null || true
     rustup update stable --no-self-update 2>/dev/null || true
+
+    export PATH="$DEVENV_ROOT/scripts:$PATH"
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
@@ -93,8 +104,8 @@
     "test:all" = {
       exec = ''
         set -e
-        cargo nextest run --workspace --all-features --no-tests pass
-        cargo test --doc --workspace --all-features
+        test:cargo
+        test:docs
       '';
       description = "Run all tests across the crates.";
       binary = "bash";
@@ -127,6 +138,7 @@
       exec = ''
         set -e
         fix:clippy
+        docs:update
         fix:format
       '';
       description = "Fix all autofixable problems.";
@@ -162,6 +174,7 @@
         lint:clippy
         lint:format
         deny:check
+        docs:check
       '';
       description = "Run all checks.";
       binary = "bash";
@@ -180,6 +193,22 @@
         cargo clippy --workspace --all-features --all-targets
       '';
       description = "Check that all rust lints are passing.";
+      binary = "bash";
+    };
+    "docs:check" = {
+      exec = ''
+        set -e
+        mdt check
+      '';
+      description = "Check that shared documentation blocks are synchronized.";
+      binary = "bash";
+    };
+    "docs:update" = {
+      exec = ''
+        set -e
+        mdt update
+      '';
+      description = "Update shared documentation blocks across markdown and source files.";
       binary = "bash";
     };
     "snapshot:review" = {

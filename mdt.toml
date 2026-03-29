@@ -1,0 +1,10 @@
+[templates]
+paths = [".templates"]
+
+[padding]
+before = 0
+after = 0
+
+[exclude]
+patterns = ["docs/book/"]
+markdown_codeblocks = true

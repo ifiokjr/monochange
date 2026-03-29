@@ -18,7 +18,6 @@ path = "src/bin/mc.rs"
 
 [dependencies]
 clap = { workspace = true }
-doc-comment = { workspace = true }
 monochange_cargo = { workspace = true }
 monochange_config = { workspace = true }
 monochange_core = { workspace = true }

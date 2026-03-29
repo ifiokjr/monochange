@@ -4,21 +4,33 @@
 
 ## Repository development
 
+<!-- {=repoDevEnvironmentSetupCode} -->
+
 ```bash
 devenv shell
 install:all
 ```
 
+<!-- {/repoDevEnvironmentSetupCode} -->
+
 Useful commands:
+
+<!-- {=repoCommonDevelopmentCommands} -->
 
 ```bash
 monochange --help
 mc --help
+docs:check
+docs:update
+docs:verify
+docs:doctor
 lint:all
 test:all
 build:all
 build:book
 ```
+
+<!-- {/repoCommonDevelopmentCommands} -->
 
 ## CLI names
 

@@ -1,4 +1,6 @@
-# monochange_npm
+<!-- {=monochangeNpmCrateDocs} -->
+
+# `monochange_npm`
 
 npm-family ecosystem support for `monochange`.
 
@@ -13,3 +15,5 @@ npm-family ecosystem support for `monochange`.
 - `pnpm-workspace.yaml`
 - Bun lockfile detection
 - normalized dependency extraction
+
+<!-- {/monochangeNpmCrateDocs} -->

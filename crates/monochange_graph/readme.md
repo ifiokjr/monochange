@@ -1,4 +1,6 @@
-# monochange_graph
+<!-- {=monochangeGraphCrateDocs} -->
+
+# `monochange_graph`
 
 Dependency-graph traversal and release propagation for `monochange`.
 
@@ -8,3 +10,5 @@ Dependency-graph traversal and release propagation for `monochange`.
 - propagate release impact across direct and transitive dependents
 - synchronize version groups
 - calculate planned group versions
+
+<!-- {/monochangeGraphCrateDocs} -->
