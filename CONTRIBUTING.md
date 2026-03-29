@@ -51,6 +51,7 @@ mc check --root .
 mc changes add --root . --package monochange --bump patch --reason "describe the change"
 lint:all
 test:all
+coverage:all
 build:all
 build:book
 ```
