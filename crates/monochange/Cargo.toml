@@ -33,6 +33,7 @@ toml = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
+insta-cmd = { workspace = true }
 rstest = { workspace = true }
 similar-asserts = { workspace = true }
 tempfile = "3"
