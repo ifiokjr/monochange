@@ -3,20 +3,67 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 
-[[version_groups]]
-name = "monochange-workspace"
-members = [
-	"crates/monochange",
-	"crates/monochange_core",
-	"crates/monochange_cargo",
-	"crates/monochange_npm",
-	"crates/monochange_config",
-	"crates/monochange_deno",
-	"crates/monochange_dart",
-	"crates/monochange_graph",
-	"crates/monochange_semver",
+[package.monochange]
+path = "crates/monochange"
+type = "cargo"
+changelog = "crates/monochange/CHANGELOG.md"
+
+[package.monochange_core]
+path = "crates/monochange_core"
+type = "cargo"
+changelog = "crates/monochange_core/CHANGELOG.md"
+
+[package.monochange_cargo]
+path = "crates/monochange_cargo"
+type = "cargo"
+changelog = "crates/monochange_cargo/CHANGELOG.md"
+
+[package.monochange_npm]
+path = "crates/monochange_npm"
+type = "cargo"
+changelog = "crates/monochange_npm/CHANGELOG.md"
+
+[package.monochange_config]
+path = "crates/monochange_config"
+type = "cargo"
+changelog = "crates/monochange_config/CHANGELOG.md"
+
+[package.monochange_deno]
+path = "crates/monochange_deno"
+type = "cargo"
+changelog = "crates/monochange_deno/CHANGELOG.md"
+
+[package.monochange_dart]
+path = "crates/monochange_dart"
+type = "cargo"
+changelog = "crates/monochange_dart/CHANGELOG.md"
+
+[package.monochange_graph]
+path = "crates/monochange_graph"
+type = "cargo"
+changelog = "crates/monochange_graph/CHANGELOG.md"
+
+[package.monochange_semver]
+path = "crates/monochange_semver"
+type = "cargo"
+changelog = "crates/monochange_semver/CHANGELOG.md"
+
+[group.monochange-workspace]
+packages = [
+	"monochange",
+	"monochange_core",
+	"monochange_cargo",
+	"monochange_npm",
+	"monochange_config",
+	"monochange_deno",
+	"monochange_dart",
+	"monochange_graph",
+	"monochange_semver",
 ]
-strategy = "shared"
+changelog = "CHANGELOG.md"
+tag = true
+release = true
+version_format = "primary"
 
 [ecosystems.cargo]
 enabled = true
@@ -26,39 +73,3 @@ name = "release"
 
 [[workflows.steps]]
 type = "PrepareRelease"
-
-[[package_overrides]]
-package = "crates/monochange"
-changelog = "crates/monochange/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_core"
-changelog = "crates/monochange_core/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_cargo"
-changelog = "crates/monochange_cargo/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_npm"
-changelog = "crates/monochange_npm/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_config"
-changelog = "crates/monochange_config/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_deno"
-changelog = "crates/monochange_deno/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_dart"
-changelog = "crates/monochange_dart/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_graph"
-changelog = "crates/monochange_graph/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/monochange_semver"
-changelog = "crates/monochange_semver/CHANGELOG.md"

@@ -36,6 +36,88 @@ fn cli_help_returns_success_output() {
 }
 
 #[test]
+fn check_command_validates_workspace_configuration_and_changesets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[group.sdk]
+packages = ["core"]
+"#,
+	);
+	write_file(
+		tempdir.path().join(".changeset/feature.md"),
+		r"---
+core: minor
+---
+
+#### validate check
+",
+	);
+
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("check"),
+			OsString::from("--root"),
+			tempdir.path().into(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("check output: {error}"));
+	assert!(output.contains("workspace check passed"));
+}
+
+#[test]
+fn check_command_reports_invalid_changeset_targets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+"#,
+	);
+	write_file(
+		tempdir.path().join(".changeset/feature.md"),
+		r"---
+missing: minor
+---
+
+#### invalid target
+",
+	);
+
+	let error = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("check"),
+			OsString::from("--root"),
+			tempdir.path().into(),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected check failure"));
+	assert!(error
+		.to_string()
+		.contains("unknown package or group `missing`"));
+}
+
+#[test]
 fn discover_workspace_aggregates_packages_from_multiple_ecosystems() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let discovery =
@@ -337,6 +419,29 @@ fn plan_release_json_output_contains_compatibility_evidence() {
 }
 
 #[test]
+fn plan_release_expands_group_targeted_changesets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	write_file(
+		tempdir.path().join("group-change.md"),
+		r"---
+sdk: minor
+---
+
+#### grouped release
+",
+	);
+	let plan = plan_release(tempdir.path(), &tempdir.path().join("group-change.md"))
+		.unwrap_or_else(|error| panic!("group release plan: {error}"));
+	let direct_count = plan
+		.decisions
+		.iter()
+		.filter(|decision| decision.recommended_bump.to_string() == "minor")
+		.count();
+	assert_eq!(direct_count, 2);
+}
+
+#[test]
 fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
@@ -401,15 +506,26 @@ fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
 		.unwrap_or_else(|error| panic!("core changelog: {error}"));
 	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("app changelog: {error}"));
+	let group_changelog = fs::read_to_string(tempdir.path().join("CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+	let group_versioned_file = fs::read_to_string(tempdir.path().join("group.toml"))
+		.unwrap_or_else(|error| panic!("group versioned file: {error}"));
+	let package_versioned_file = fs::read_to_string(tempdir.path().join("crates/core/extra.toml"))
+		.unwrap_or_else(|error| panic!("package versioned file: {error}"));
 	let release_version = fs::read_to_string(tempdir.path().join("release-version.txt"))
 		.unwrap_or_else(|error| panic!("release version output: {error}"));
 
 	assert!(output.contains("workflow `release` completed"));
+	assert!(output.contains("group sdk -> v1.1.0"));
 	assert!(workspace_manifest.contains("version = \"1.1.0\""));
 	assert!(core_changelog.contains("## 1.1.0"));
 	assert!(core_changelog.contains("- add release workflow"));
 	assert!(app_changelog.contains("## 1.1.0"));
-	assert!(app_changelog.contains("version group `sdk`"));
+	assert!(app_changelog.contains("shares version group `sdk`"));
+	assert!(group_changelog.contains("Grouped release for `sdk`."));
+	assert!(group_changelog.contains("Members: core, app"));
+	assert!(group_versioned_file.contains("version = \"1.1.0\""));
+	assert!(package_versioned_file.contains("version = \"1.1.0\""));
 	assert_eq!(release_version, "1.1.0");
 	assert!(!tempdir.path().join(".changeset/feature.md").exists());
 }
@@ -459,22 +575,26 @@ fn workflow_unknown_commands_suggest_available_workflows() {
 fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
 	assert_simple_release_pattern(
 		"../../fixtures/cargo/workspace",
-		"crates/core",
+		"core",
+		"crates/core/Cargo.toml",
 		"crates/app/Cargo.toml",
 	);
 	assert_simple_release_pattern(
 		"../../fixtures/npm/workspace",
-		"packages/shared",
+		"shared",
+		"packages/shared/package.json",
 		"packages/web/package.json",
 	);
 	assert_simple_release_pattern(
 		"../../fixtures/deno/workspace",
-		"packages/shared",
+		"shared",
+		"packages/shared/deno.json",
 		"packages/tool/deno.json",
 	);
 	assert_simple_release_pattern(
 		"../../fixtures/dart/workspace",
-		"packages/shared",
+		"shared",
+		"packages/shared/pubspec.yaml",
 		"packages/app/pubspec.yaml",
 	);
 }
@@ -552,14 +672,15 @@ fn release_planning_guide_describes_release_workflow_requirements() {
 
 fn assert_simple_release_pattern(
 	relative_fixture_root: &str,
-	package_reference: &str,
+	change_reference: &str,
+	direct_manifest_suffix: &str,
 	dependent_manifest_suffix: &str,
 ) {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
 	let changes_path = fixture_root.join("changes.generated.md");
 	fs::write(
 		&changes_path,
-		format!("---\n{package_reference}: minor\n---\n\n#### feature\n"),
+		format!("---\n{change_reference}: minor\n---\n\n#### feature\n"),
 	)
 	.unwrap_or_else(|error| panic!("generated changes: {error}"));
 
@@ -573,7 +694,7 @@ fn assert_simple_release_pattern(
 	let direct = plan
 		.decisions
 		.iter()
-		.find(|decision| decision.package_id.contains(package_reference))
+		.find(|decision| decision.package_id.contains(direct_manifest_suffix))
 		.unwrap_or_else(|| panic!("expected direct decision"));
 	let dependent = plan
 		.decisions
@@ -637,6 +758,15 @@ workflow-core = { workspace = true }
 	if !failing_changelog {
 		write_file(root.join("crates/app/CHANGELOG.md"), "# Changelog\n");
 	}
+	write_file(root.join("CHANGELOG.md"), "# Changelog\n");
+	write_file(
+		root.join("group.toml"),
+		"[workspace.package]\nversion = \"1.0.0\"\n[workspace.dependencies]\nworkflow-core = { version = \"1.0.0\" }\n",
+	);
+	write_file(
+		root.join("crates/core/extra.toml"),
+		"[package]\nname = \"workflow-core\"\nversion = \"1.0.0\"\n",
+	);
 	write_file(
 		root.join("monochange.toml"),
 		&format!(
@@ -644,10 +774,24 @@ workflow-core = { workspace = true }
 [defaults]
 parent_bump = "patch"
 
-[[version_groups]]
-name = "sdk"
-members = ["crates/core", "crates/app"]
-strategy = "shared"
+[package.core]
+path = "crates/core"
+type = "cargo"
+changelog = "crates/core/CHANGELOG.md"
+versioned_files = ["crates/core/extra.toml"]
+
+[package.app]
+path = "crates/app"
+type = "cargo"
+changelog = "{app_changelog}"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "CHANGELOG.md"
+versioned_files = ["group.toml"]
+tag = true
+release = true
+version_format = "primary"
 
 [ecosystems.cargo]
 enabled = true
@@ -658,20 +802,13 @@ name = "release"
 [[workflows.steps]]
 type = "PrepareRelease"
 {command_step}
-[[package_overrides]]
-package = "crates/core"
-changelog = "crates/core/CHANGELOG.md"
-
-[[package_overrides]]
-package = "crates/app"
-changelog = "{app_changelog}"
 "#,
 		),
 	);
 	write_file(
 		root.join(".changeset/feature.md"),
 		r"---
-workflow-core: minor
+core: minor
 ---
 
 #### add release workflow

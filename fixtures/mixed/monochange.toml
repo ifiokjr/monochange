@@ -1,6 +1,21 @@
 [defaults]
 parent_bump = "patch"
 
-[[version_groups]]
-name = "sdk"
-members = ["cargo/sdk-core", "packages/web-sdk"]
+[package.sdk-core]
+path = "cargo/sdk-core"
+type = "cargo"
+
+[package.web-sdk]
+path = "packages/web-sdk"
+type = "npm"
+
+[package.deno-tool]
+path = "deno/tool"
+type = "deno"
+
+[package.mobile-sdk]
+path = "dart/mobile_sdk"
+type = "dart"
+
+[group.sdk]
+packages = ["sdk-core", "web-sdk"]

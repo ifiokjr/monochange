@@ -1,0 +1,13 @@
+[defaults]
+parent_bump = "patch"
+
+[package.shared]
+path = "packages/shared"
+type = "dart"
+
+[package.app]
+path = "packages/app"
+type = "dart"
+
+[ecosystems.dart]
+enabled = true
