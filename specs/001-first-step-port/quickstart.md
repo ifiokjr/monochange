@@ -18,6 +18,7 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 package_type = "cargo"
+changelog = "{path}/changelog.md"
 
 [package.sdk-core]
 path = "crates/sdk_core"

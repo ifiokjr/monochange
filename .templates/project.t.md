@@ -115,10 +115,10 @@ build:book
 parent_bump = "patch"
 warn_on_group_mismatch = true
 package_type = "cargo"
+changelog = "{path}/changelog.md"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-changelog = "crates/sdk_core/changelog.md"
 
 [package.web-sdk]
 path = "packages/web-sdk"
@@ -232,14 +232,13 @@ Create a `monochange.toml` file:
 parent_bump = "patch"
 warn_on_group_mismatch = true
 package_type = "cargo"
+changelog = "{path}/changelog.md"
 
 [package.monochange]
 path = "crates/monochange"
-changelog = "crates/monochange/changelog.md"
 
 [package.monochange_core]
 path = "crates/monochange_core"
-changelog = "crates/monochange_core/changelog.md"
 
 [group.main]
 packages = ["monochange", "monochange_core"]
