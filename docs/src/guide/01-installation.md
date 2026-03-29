@@ -9,10 +9,10 @@
 ```bash
 devenv shell
 install:all
-mc check --root .
-mc workspace discover --root . --format json
-mc changes add --root . --package monochange --bump minor --reason "add release planning"
-mc release --dry-run
+mc validate
+mc discover --format json
+mc change --package monochange --bump minor --reason "add release planning"
+mc release --dry-run --format json
 mc release
 ```
 
@@ -29,7 +29,7 @@ docs:check
 docs:update
 docs:verify
 docs:doctor
-mc check --root .
+mc validate
 lint:all
 test:all
 coverage:all

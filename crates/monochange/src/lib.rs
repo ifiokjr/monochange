@@ -5,35 +5,36 @@
 //! <!-- {=monochangeCrateDocs|trim|linePrefix:"//! ":true} -->
 //! `monochange` is the top-level entry point for the workspace.
 //!
-//! Reach for this crate when you want one API and CLI surface that can discover packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, turn explicit change files into a release plan, and run configured release workflows from that plan.
+//! Reach for this crate when you want one API and CLI surface that discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, exposes top-level commands from `monochange.toml`, and runs configured release workflows from those definitions.
 //!
 //! ## Why use it?
 //!
-//! - coordinate one release workflow across several package ecosystems
-//! - expose discovery and release planning as either CLI commands or library calls
+//! - coordinate one workflow-defined CLI across several package ecosystems
+//! - expose discovery, change creation, and release preparation as both commands and library calls
 //! - connect configuration loading, package discovery, graph propagation, and semver evidence in one place
 //!
 //! ## Best for
 //!
 //! - shipping the `mc` CLI in CI or local release tooling
 //! - embedding the full end-to-end planner instead of wiring the lower-level crates together yourself
-//! - rendering discovery or release-plan output in text or JSON
+//! - generating starter config with `mc init` and then evolving the workflow surface over time
 //!
 //! ## Key commands
 //!
 //! ```bash
-//! mc workspace discover --root . --format json
-//! mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
-//! mc plan release --root . --changes .changeset/1234567890-crates-monochange.md --format json
-//! mc release --dry-run
+//! mc init
+//! mc discover --format json
+//! mc change --package crates/monochange --bump patch --reason "describe the change"
+//! mc release --dry-run --format json
 //! ```
 //!
 //! ## Responsibilities
 //!
 //! - aggregate all supported ecosystem adapters
 //! - load `monochange.toml`
+//! - synthesize default workflows when config does not declare any
 //! - resolve change input files
-//! - render discovery and release-plan output in text or JSON
+//! - render discovery and release workflow output in text or JSON
 //! - execute configured release workflows
 //! <!-- {/monochangeCrateDocs} -->
 
@@ -56,28 +57,36 @@ use clap::ValueEnum;
 use monochange_cargo::discover_cargo_packages;
 use monochange_cargo::RustSemverProvider;
 use monochange_config::apply_version_groups;
-use monochange_config::check_workspace;
 use monochange_config::load_change_signals;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
+use monochange_config::validate_workspace;
+use monochange_core::default_workflows;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
+use monochange_core::CommandVariable;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
+use monochange_core::PackageType;
 use monochange_core::ReleasePlan;
 use monochange_core::VersionFormat;
+use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkflowDefinition;
+use monochange_core::WorkflowInputDefinition;
+use monochange_core::WorkflowInputKind;
 use monochange_core::WorkflowStepDefinition;
+use monochange_core::WorkspaceDefaults;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
 use monochange_graph::build_release_plan;
 use monochange_npm::discover_npm_packages;
 use monochange_semver::collect_assessments;
 use monochange_semver::CompatibilityProvider;
+use serde::Serialize;
 use serde_json::json;
 use toml::Value;
 
@@ -102,15 +111,6 @@ impl From<ChangeBump> for BumpSeverity {
 			ChangeBump::Major => Self::Major,
 		}
 	}
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct WorkflowInvocation {
-	name: String,
-	root: PathBuf,
-	dry_run: bool,
-	help: bool,
-	extra_args: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -149,99 +149,141 @@ struct FileUpdate {
 struct WorkflowContext {
 	root: PathBuf,
 	dry_run: bool,
+	inputs: BTreeMap<String, Vec<String>>,
 	prepared_release: Option<PreparedRelease>,
 	command_logs: Vec<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct InitWorkspaceConfiguration {
+	defaults: WorkspaceDefaults,
+	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
+	package: BTreeMap<String, InitPackageDefinition>,
+	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
+	group: BTreeMap<String, InitGroupDefinition>,
+	workflows: Vec<WorkflowDefinition>,
+}
+
+#[derive(Debug, Serialize)]
+struct InitPackageDefinition {
+	path: PathBuf,
+	#[serde(rename = "type")]
+	package_type: PackageType,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	changelog: Option<PathBuf>,
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	versioned_files: Vec<VersionedFileDefinition>,
+}
+
+#[derive(Debug, Serialize)]
+struct InitGroupDefinition {
+	packages: Vec<String>,
+	tag: bool,
+	release: bool,
+	version_format: VersionFormat,
+}
+
 const CHANGESET_DIR: &str = ".changeset";
-const RESERVED_COMMAND_NAMES: &[&str] =
-	&["check", "workspace", "plan", "changes", "help", "version"];
 
 pub fn build_command(bin_name: &'static str) -> Command {
-	Command::new(bin_name)
+	let root = current_dir_or_dot();
+	build_command_for_root(bin_name, &root)
+}
+
+fn build_command_for_root(bin_name: &'static str, root: &Path) -> Command {
+	let workflows = load_workspace_configuration(root).map_or_else(
+		|_| default_workflows(),
+		|configuration| configuration.workflows,
+	);
+	build_command_with_workflows(bin_name, &workflows)
+}
+
+fn build_command_with_workflows(
+	bin_name: &'static str,
+	workflows: &[WorkflowDefinition],
+) -> Command {
+	let mut command = Command::new(bin_name)
 		.about("Manage versions and releases for your multiplatform, multilanguage monorepo")
 		.subcommand_required(true)
 		.arg_required_else_help(true)
 		.subcommand(
-			Command::new("workspace")
-				.subcommand_required(true)
-				.subcommand(
-					Command::new("discover")
-						.about("Discover packages across supported ecosystems")
-						.arg(root_arg())
-						.arg(format_arg()),
+			Command::new("init")
+				.about("Generate monochange.toml with detected packages, groups, and default workflows")
+				.arg(
+					Arg::new("force")
+						.long("force")
+						.help("Overwrite an existing monochange.toml file")
+						.action(ArgAction::SetTrue),
 				),
-		)
-		.subcommand(
-			Command::new("check")
-				.about("Validate monochange configuration and changesets")
-				.arg(root_arg()),
-		)
-		.subcommand(
-			Command::new("plan").subcommand_required(true).subcommand(
-				Command::new("release")
-					.about("Plan a release from explicit change input")
-					.arg(root_arg())
-					.arg(
-						Arg::new("changes")
-							.long("changes")
-							.value_name("PATH")
-							.required(true),
-					)
-					.arg(format_arg()),
-			),
-		)
-		.subcommand(
-			Command::new("changes")
-				.subcommand_required(true)
-				.subcommand(
-					Command::new("add")
-						.about("Create a change file for one or more packages")
-						.arg(root_arg())
-						.arg(
-							Arg::new("package")
-								.long("package")
-								.value_name("PACKAGE")
-								.action(ArgAction::Append)
-								.required(true),
-						)
-						.arg(
-							Arg::new("bump")
-								.long("bump")
-								.value_name("BUMP")
-								.default_value("patch")
-								.value_parser(clap::builder::EnumValueParser::<ChangeBump>::new()),
-						)
-						.arg(
-							Arg::new("reason")
-								.long("reason")
-								.value_name("TEXT")
-								.required(true),
-						)
-						.arg(
-							Arg::new("evidence")
-								.long("evidence")
-								.value_name("TEXT")
-								.action(ArgAction::Append),
-						)
-						.arg(Arg::new("output").long("output").value_name("PATH")),
-				),
-		)
+		);
+
+	for workflow in workflows {
+		command = command.subcommand(build_workflow_subcommand(workflow));
+	}
+
+	command
 }
 
-fn root_arg() -> Arg {
-	Arg::new("root")
-		.long("root")
-		.value_name("PATH")
-		.default_value(".")
+fn build_workflow_subcommand(workflow: &WorkflowDefinition) -> Command {
+	let mut command = Command::new(leak_string(workflow.name.clone()))
+		.about(
+			workflow
+				.help_text
+				.clone()
+				.unwrap_or_else(|| format!("Run the `{}` workflow", workflow.name)),
+		)
+		.arg(
+			Arg::new("dry-run")
+				.long("dry-run")
+				.help("Run the workflow in dry-run mode when supported")
+				.action(ArgAction::SetTrue),
+		);
+
+	for input in &workflow.inputs {
+		command = command.arg(build_workflow_input_arg(input));
+	}
+
+	command
 }
 
-fn format_arg() -> Arg {
-	Arg::new("format")
-		.long("format")
-		.value_name("FORMAT")
-		.default_value("text")
-		.value_parser(clap::builder::EnumValueParser::<OutputFormat>::new())
+fn build_workflow_input_arg(input: &WorkflowInputDefinition) -> Arg {
+	let long_name = leak_string(input.name.replace('_', "-"));
+	let value_name = leak_string(input.name.to_uppercase());
+	let mut arg = Arg::new(leak_string(input.name.clone()))
+		.long(long_name)
+		.required(input.required)
+		.help(input.help_text.clone().unwrap_or_default());
+
+	arg = match input.kind {
+		WorkflowInputKind::String => arg.value_name(value_name),
+		WorkflowInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
+		WorkflowInputKind::Path => arg.value_name("PATH"),
+		WorkflowInputKind::Choice => {
+			arg.value_name(value_name)
+				.value_parser(clap::builder::PossibleValuesParser::new(
+					input
+						.choices
+						.iter()
+						.cloned()
+						.map(leak_string)
+						.collect::<Vec<_>>(),
+				))
+		}
+	};
+
+	if let Some(default) = &input.default {
+		arg = arg.default_value(leak_string(default.clone()));
+	}
+
+	arg
+}
+
+fn leak_string(value: impl Into<String>) -> &'static str {
+	Box::leak(value.into().into_boxed_str())
+}
+
+fn current_dir_or_dot() -> PathBuf {
+	std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
 pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
@@ -255,171 +297,252 @@ pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<Str
 where
 	I: IntoIterator<Item = OsString>,
 {
-	let args = args.into_iter().collect::<Vec<_>>();
-	let Some(invocation) = parse_workflow_invocation(&args)? else {
-		return run_builtin_command(bin_name, args);
-	};
-	if RESERVED_COMMAND_NAMES.contains(&invocation.name.as_str()) {
-		return run_builtin_command(bin_name, args);
-	}
-	if !invocation.extra_args.is_empty() {
-		return Err(MonochangeError::Config(format!(
-			"workflow `{}` does not accept positional arguments: {}",
-			invocation.name,
-			invocation.extra_args.join(" ")
-		)));
-	}
+	let root = current_dir_or_dot();
+	run_with_args_in_dir(bin_name, args, &root)
+}
 
-	let configuration = load_workspace_configuration(&invocation.root)?;
+fn run_with_args_in_dir<I>(bin_name: &'static str, args: I, root: &Path) -> MonochangeResult<String>
+where
+	I: IntoIterator<Item = OsString>,
+{
+	let args = args.into_iter().collect::<Vec<_>>();
+	let configuration = load_workspace_configuration(root);
+	let workflows = configuration
+		.as_ref()
+		.map_or_else(|_| default_workflows(), |loaded| loaded.workflows.clone());
+	let matches =
+		match build_command_with_workflows(bin_name, &workflows).try_get_matches_from(args) {
+			Ok(matches) => matches,
+			Err(error)
+				if matches!(
+					error.kind(),
+					ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
+				) =>
+			{
+				return Ok(error.to_string());
+			}
+			Err(error) => return Err(MonochangeError::Config(error.to_string())),
+		};
+
+	match matches.subcommand() {
+		Some(("init", init_matches)) => {
+			let path = init_workspace(root, init_matches.get_flag("force"))?;
+			Ok(format!("wrote {}", path.display()))
+		}
+		Some((workflow_name, workflow_matches)) => {
+			let configuration = configuration?;
+			execute_matches(root, &configuration, workflow_name, workflow_matches)
+		}
+		None => Err(MonochangeError::Config("unknown command".to_string())),
+	}
+}
+
+fn execute_matches(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	workflow_name: &str,
+	workflow_matches: &ArgMatches,
+) -> MonochangeResult<String> {
 	let Some(workflow) = configuration
 		.workflows
 		.iter()
-		.find(|workflow| workflow.name == invocation.name)
+		.find(|workflow| workflow.name == workflow_name)
 	else {
-		let available_workflows = configuration
-			.workflows
-			.iter()
-			.map(|workflow| workflow.name.as_str())
-			.collect::<Vec<_>>();
-		return Err(MonochangeError::Config(if available_workflows.is_empty() {
-			format!("unknown command `{}`", invocation.name)
-		} else {
-			format!(
-				"unknown command `{}`. available workflows: {}",
-				invocation.name,
-				available_workflows.join(", ")
-			)
-		}));
+		return Err(MonochangeError::Config(format!(
+			"unknown command `{workflow_name}`"
+		)));
 	};
-	if invocation.help {
-		return Ok(workflow_help_output(bin_name, workflow));
-	}
 
-	execute_workflow(&invocation.root, workflow, invocation.dry_run)
+	let dry_run = workflow_matches.get_flag("dry-run");
+	let inputs = collect_workflow_inputs(workflow, workflow_matches);
+	execute_workflow(root, workflow, dry_run, inputs)
 }
 
-fn run_builtin_command(bin_name: &'static str, args: Vec<OsString>) -> MonochangeResult<String> {
-	let matches = match build_command(bin_name).try_get_matches_from(args) {
-		Ok(matches) => matches,
-		Err(error)
-			if matches!(
-				error.kind(),
-				ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
-			) =>
-		{
-			return Ok(error.to_string());
-		}
-		Err(error) => return Err(MonochangeError::Config(error.to_string())),
-	};
-	execute_matches(&matches)
-}
-
-fn parse_workflow_invocation(args: &[OsString]) -> MonochangeResult<Option<WorkflowInvocation>> {
-	let mut iterator = args.iter().skip(1);
-	let mut root = PathBuf::from(".");
-	let mut dry_run = false;
-	let mut help = false;
-	let mut name = None;
-	let mut extra_args = Vec::new();
-
-	while let Some(argument) = iterator.next() {
-		let value = argument.to_string_lossy();
-		match value.as_ref() {
-			"--help" | "-h" => help = true,
-			"--version" | "-V" => return Ok(None),
-			"--dry-run" => dry_run = true,
-			"--root" => {
-				let Some(path) = iterator.next() else {
-					return Err(MonochangeError::Config(
-						"workflow flag `--root` requires a path".to_string(),
-					));
-				};
-				root = PathBuf::from(path);
+fn collect_workflow_inputs(
+	workflow: &WorkflowDefinition,
+	matches: &ArgMatches,
+) -> BTreeMap<String, Vec<String>> {
+	let mut inputs = BTreeMap::new();
+	for input in &workflow.inputs {
+		let values = match input.kind {
+			WorkflowInputKind::StringList => matches
+				.get_many::<String>(input.name.as_str())
+				.map(|values| values.cloned().collect::<Vec<_>>())
+				.unwrap_or_default(),
+			WorkflowInputKind::String | WorkflowInputKind::Path | WorkflowInputKind::Choice => {
+				matches
+					.get_one::<String>(input.name.as_str())
+					.map(|value| vec![value.clone()])
+					.unwrap_or_default()
 			}
-			flag if flag.starts_with('-') => return Ok(None),
-			command => {
-				if name.is_none() {
-					name = Some(command.to_string());
-				} else {
-					extra_args.push(command.to_string());
-				}
-			}
-		}
+		};
+		inputs.insert(input.name.clone(), values);
 	}
-
-	Ok(name.map(|name| WorkflowInvocation {
-		name,
-		root,
-		dry_run,
-		help,
-		extra_args,
-	}))
-}
-
-fn workflow_help_output(bin_name: &str, workflow: &WorkflowDefinition) -> String {
-	let mut lines = vec![format!(
-		"Usage: {bin_name} {} [--root PATH] [--dry-run]",
-		workflow.name,
-	)];
-	lines.push(String::new());
-	lines.push(format!("Workflow: {}", workflow.name));
-	lines.push("Steps:".to_string());
-	for step in &workflow.steps {
-		match step {
-			WorkflowStepDefinition::PrepareRelease => lines.push("- PrepareRelease".to_string()),
-			WorkflowStepDefinition::Command { command } => {
-				lines.push(format!("- Command: {command}"));
-			}
-		}
-	}
-	lines.join("\n")
+	inputs
 }
 
 fn execute_workflow(
 	root: &Path,
 	workflow: &WorkflowDefinition,
 	dry_run: bool,
+	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
 	let mut context = WorkflowContext {
 		root: root.to_path_buf(),
 		dry_run,
+		inputs,
 		prepared_release: None,
 		command_logs: Vec::new(),
 	};
+	let mut output = None;
 
 	for step in &workflow.steps {
 		match step {
+			WorkflowStepDefinition::Validate => {
+				validate_workspace(root)?;
+				output = Some(format!(
+					"workspace validation passed for {}",
+					root.display()
+				));
+			}
+			WorkflowStepDefinition::Discover => {
+				let format = context
+					.inputs
+					.get("format")
+					.and_then(|values| values.first())
+					.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+				output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
+			}
+			WorkflowStepDefinition::CreateChangeFile => {
+				let package_refs = context.inputs.get("package").cloned().unwrap_or_default();
+				if package_refs.is_empty() {
+					return Err(MonochangeError::Config(
+						"workflow `change` requires at least one `--package` value".to_string(),
+					));
+				}
+				let bump = context
+					.inputs
+					.get("bump")
+					.and_then(|values| values.first())
+					.map_or(Ok(ChangeBump::Patch), |value| parse_change_bump(value))?;
+				let reason = context
+					.inputs
+					.get("reason")
+					.and_then(|values| values.first())
+					.cloned()
+					.ok_or_else(|| {
+						MonochangeError::Config(
+							"workflow `change` requires a `--reason` value".to_string(),
+						)
+					})?;
+				let evidence = context.inputs.get("evidence").cloned().unwrap_or_default();
+				let output_path = context
+					.inputs
+					.get("output")
+					.and_then(|values| values.first())
+					.map(PathBuf::from);
+				let path = add_change_file(
+					root,
+					&package_refs,
+					bump.into(),
+					&reason,
+					&evidence,
+					output_path.as_deref(),
+				)?;
+				output = Some(format!("wrote change file {}", path.display()));
+			}
 			WorkflowStepDefinition::PrepareRelease => {
 				context.prepared_release = Some(prepare_release(root, dry_run)?);
+				output = None;
 			}
-			WorkflowStepDefinition::Command { command } => {
-				run_workflow_command(&mut context, command)?;
-			}
+			WorkflowStepDefinition::Command {
+				command,
+				dry_run,
+				shell,
+				variables,
+			} => run_workflow_command(
+				&mut context,
+				command,
+				dry_run.as_deref(),
+				*shell,
+				variables.as_ref(),
+			)?,
 		}
 	}
 
-	Ok(render_workflow_result(workflow, &context))
-}
-
-fn run_workflow_command(context: &mut WorkflowContext, command: &str) -> MonochangeResult<()> {
-	let interpolated = interpolate_workflow_command(context, command);
-	if context.dry_run {
-		context
-			.command_logs
-			.push(format!("skipped command `{interpolated}` (dry-run)"));
-		return Ok(());
+	if let Some(prepared_release) = &context.prepared_release {
+		let format = context
+			.inputs
+			.get("format")
+			.and_then(|values| values.first())
+			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+		return match format {
+			OutputFormat::Json => {
+				render_prepared_release_json(workflow, prepared_release, &context.command_logs)
+			}
+			OutputFormat::Text => Ok(render_workflow_result(workflow, &context)),
+		};
+	}
+	if !context.command_logs.is_empty() {
+		return Ok(render_workflow_result(workflow, &context));
 	}
 
-	let output = ProcessCommand::new("sh")
-		.arg("-c")
-		.arg(&interpolated)
-		.current_dir(&context.root)
-		.output()
-		.map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to run workflow command `{interpolated}`: {error}"
-			))
+	Ok(output.unwrap_or_else(|| {
+		format!(
+			"workflow `{}` completed{}",
+			workflow.name,
+			if dry_run { " (dry-run)" } else { "" }
+		)
+	}))
+}
+
+fn run_workflow_command(
+	context: &mut WorkflowContext,
+	command: &str,
+	dry_run_command: Option<&str>,
+	shell: bool,
+	variables: Option<&BTreeMap<String, CommandVariable>>,
+) -> MonochangeResult<()> {
+	let command_to_run = if context.dry_run {
+		if let Some(command) = dry_run_command {
+			command
+		} else {
+			let skipped = interpolate_workflow_command(context, command, variables);
+			context
+				.command_logs
+				.push(format!("skipped command `{skipped}` (dry-run)"));
+			return Ok(());
+		}
+	} else {
+		command
+	};
+	let interpolated = interpolate_workflow_command(context, command_to_run, variables);
+
+	let output = if shell {
+		ProcessCommand::new("sh")
+			.arg("-c")
+			.arg(&interpolated)
+			.current_dir(&context.root)
+			.output()
+	} else {
+		let parts = shlex::split(&interpolated).ok_or_else(|| {
+			MonochangeError::Config(format!("failed to parse workflow command `{interpolated}`"))
 		})?;
+		let Some((program, args)) = parts.split_first() else {
+			return Err(MonochangeError::Config(
+				"workflow command must not be empty".to_string(),
+			));
+		};
+		ProcessCommand::new(program)
+			.args(args)
+			.current_dir(&context.root)
+			.output()
+	};
+	let output = output.map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to run workflow command `{interpolated}`: {error}"
+		))
+	})?;
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 		let details = if stderr.is_empty() {
@@ -441,7 +564,44 @@ fn run_workflow_command(context: &mut WorkflowContext, command: &str) -> Monocha
 	Ok(())
 }
 
-fn interpolate_workflow_command(context: &WorkflowContext, command: &str) -> String {
+fn interpolate_workflow_command(
+	context: &WorkflowContext,
+	command: &str,
+	variables: Option<&BTreeMap<String, CommandVariable>>,
+) -> String {
+	if let Some(variables) = variables {
+		let mut interpolated = command.to_string();
+		for (needle, variable) in variables {
+			interpolated =
+				interpolated.replace(needle, &workflow_variable_value(context, *variable));
+		}
+		return interpolated;
+	}
+
+	command
+		.replace(
+			"$group_version",
+			&workflow_variable_value(context, CommandVariable::GroupVersion),
+		)
+		.replace(
+			"$released_packages",
+			&workflow_variable_value(context, CommandVariable::ReleasedPackages),
+		)
+		.replace(
+			"$changed_files",
+			&workflow_variable_value(context, CommandVariable::ChangedFiles),
+		)
+		.replace(
+			"$changesets",
+			&workflow_variable_value(context, CommandVariable::Changesets),
+		)
+		.replace(
+			"$version",
+			&workflow_variable_value(context, CommandVariable::Version),
+		)
+}
+
+fn workflow_variable_value(context: &WorkflowContext, variable: CommandVariable) -> String {
 	let version = context
 		.prepared_release
 		.as_ref()
@@ -452,42 +612,39 @@ fn interpolate_workflow_command(context: &WorkflowContext, command: &str) -> Str
 		.as_ref()
 		.and_then(|prepared| prepared.group_version.as_deref())
 		.unwrap_or(version);
-	let released_packages = context
-		.prepared_release
-		.as_ref()
-		.map(|prepared| prepared.released_packages.join(","))
-		.unwrap_or_default();
-	let changed_files = context
-		.prepared_release
-		.as_ref()
-		.map(|prepared| {
-			prepared
-				.changed_files
-				.iter()
-				.map(|path| path.display().to_string())
-				.collect::<Vec<_>>()
-				.join(" ")
-		})
-		.unwrap_or_default();
-	let changesets = context
-		.prepared_release
-		.as_ref()
-		.map(|prepared| {
-			prepared
-				.changeset_paths
-				.iter()
-				.map(|path| path.display().to_string())
-				.collect::<Vec<_>>()
-				.join(" ")
-		})
-		.unwrap_or_default();
-
-	command
-		.replace("$group_version", group_version)
-		.replace("$released_packages", &released_packages)
-		.replace("$changed_files", &changed_files)
-		.replace("$changesets", &changesets)
-		.replace("$version", version)
+	match variable {
+		CommandVariable::Version => version.to_string(),
+		CommandVariable::GroupVersion => group_version.to_string(),
+		CommandVariable::ReleasedPackages => context
+			.prepared_release
+			.as_ref()
+			.map(|prepared| prepared.released_packages.join(","))
+			.unwrap_or_default(),
+		CommandVariable::ChangedFiles => context
+			.prepared_release
+			.as_ref()
+			.map(|prepared| {
+				prepared
+					.changed_files
+					.iter()
+					.map(|path| path.display().to_string())
+					.collect::<Vec<_>>()
+					.join(" ")
+			})
+			.unwrap_or_default(),
+		CommandVariable::Changesets => context
+			.prepared_release
+			.as_ref()
+			.map(|prepared| {
+				prepared
+					.changeset_paths
+					.iter()
+					.map(|path| path.display().to_string())
+					.collect::<Vec<_>>()
+					.join(" ")
+			})
+			.unwrap_or_default(),
+	}
 }
 
 fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowContext) -> String {
@@ -534,58 +691,135 @@ fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowConte
 			lines.push(format!("- {log}"));
 		}
 	}
-	lines.join("\n")
+	lines.join(
+		"
+",
+	)
 }
 
-pub fn execute_matches(matches: &ArgMatches) -> MonochangeResult<String> {
-	match matches.subcommand() {
-		Some(("check", check_matches)) => {
-			let root = required_path(check_matches, "root")?;
-			check_workspace(&root)?;
-			Ok(format!("workspace check passed for {}", root.display()))
+fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
+	match value {
+		"text" => Ok(OutputFormat::Text),
+		"json" => Ok(OutputFormat::Json),
+		other => Err(MonochangeError::Config(format!(
+			"unsupported output format `{other}`"
+		))),
+	}
+}
+
+fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
+	match value {
+		"patch" => Ok(ChangeBump::Patch),
+		"minor" => Ok(ChangeBump::Minor),
+		"major" => Ok(ChangeBump::Major),
+		other => Err(MonochangeError::Config(format!(
+			"unsupported bump `{other}`"
+		))),
+	}
+}
+
+fn init_workspace(root: &Path, force: bool) -> MonochangeResult<PathBuf> {
+	let path = monochange_config::config_path(root);
+	if path.exists() && !force {
+		return Err(MonochangeError::Config(format!(
+			"{} already exists; rerun with --force to overwrite it",
+			path.display()
+		)));
+	}
+
+	let config = synthesize_init_configuration(root)?;
+	let content = toml::to_string_pretty(&config)
+		.map_err(|error| MonochangeError::Config(error.to_string()))?;
+	fs::write(&path, content).map_err(|error| {
+		MonochangeError::Io(format!("failed to write {}: {error}", path.display()))
+	})?;
+	Ok(path)
+}
+
+fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceConfiguration> {
+	let packages = discover_packages(root)?;
+	let mut package_configs = BTreeMap::new();
+	let mut package_ids = Vec::new();
+	let mut name_counts = BTreeMap::<String, usize>::new();
+
+	for package in packages {
+		let count = name_counts.entry(package.name.clone()).or_default();
+		*count += 1;
+		let id = if *count == 1 {
+			package.name.clone()
+		} else {
+			format!("{}-{}", package.name, package.ecosystem.as_str())
+		};
+		package_ids.push(id.clone());
+		let manifest_dir = package.manifest_path.parent().unwrap_or(root).to_path_buf();
+		let relative_dir = root_relative(root, &manifest_dir);
+		let changelog = detect_default_changelog(root, &manifest_dir);
+		package_configs.insert(
+			id,
+			InitPackageDefinition {
+				path: relative_dir,
+				package_type: package_type_for_ecosystem(package.ecosystem),
+				changelog,
+				versioned_files: Vec::new(),
+			},
+		);
+	}
+
+	let mut group_configs = BTreeMap::new();
+	if package_ids.len() > 1 {
+		group_configs.insert(
+			"main".to_string(),
+			InitGroupDefinition {
+				packages: package_ids,
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+			},
+		);
+	}
+
+	Ok(InitWorkspaceConfiguration {
+		defaults: WorkspaceDefaults::default(),
+		package: package_configs,
+		group: group_configs,
+		workflows: default_workflows(),
+	})
+}
+
+fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
+	let mut packages = Vec::new();
+	for discovery in [
+		discover_cargo_packages(root)?,
+		discover_npm_packages(root)?,
+		discover_deno_packages(root)?,
+		discover_dart_packages(root)?,
+	] {
+		packages.extend(discovery.packages);
+	}
+	packages.sort_by(|left, right| left.id.cmp(&right.id));
+	packages.dedup_by(|left, right| left.id == right.id);
+	Ok(packages)
+}
+
+fn detect_default_changelog(root: &Path, manifest_dir: &Path) -> Option<PathBuf> {
+	for candidate in [
+		manifest_dir.join("CHANGELOG.md"),
+		manifest_dir.join("changelog.md"),
+	] {
+		if candidate.exists() {
+			return Some(root_relative(root, &candidate));
 		}
-		Some(("workspace", workspace_matches)) => match workspace_matches.subcommand() {
-			Some(("discover", discover_matches)) => {
-				let root = required_path(discover_matches, "root")?;
-				let format = required_format(discover_matches, "format")?;
-				render_discovery_report(&discover_workspace(&root)?, format)
-			}
-			_ => Err(MonochangeError::Config(
-				"unknown workspace command".to_string(),
-			)),
-		},
-		Some(("plan", plan_matches)) => match plan_matches.subcommand() {
-			Some(("release", release_matches)) => {
-				let root = required_path(release_matches, "root")?;
-				let changes = required_path(release_matches, "changes")?;
-				let format = required_format(release_matches, "format")?;
-				render_release_plan(&plan_release(&root, &changes)?, format)
-			}
-			_ => Err(MonochangeError::Config("unknown plan command".to_string())),
-		},
-		Some(("changes", changes_matches)) => match changes_matches.subcommand() {
-			Some(("add", add_matches)) => {
-				let root = required_path(add_matches, "root")?;
-				let package_refs = required_strings(add_matches, "package")?;
-				let bump = required_bump(add_matches, "bump")?;
-				let reason = required_string(add_matches, "reason")?;
-				let evidence = optional_strings(add_matches, "evidence");
-				let output = optional_path(add_matches, "output");
-				let path = add_change_file(
-					&root,
-					&package_refs,
-					bump.into(),
-					&reason,
-					&evidence,
-					output.as_deref(),
-				)?;
-				Ok(format!("wrote change file {}", path.display()))
-			}
-			_ => Err(MonochangeError::Config(
-				"unknown changes command".to_string(),
-			)),
-		},
-		_ => Err(MonochangeError::Config("unknown command".to_string())),
+	}
+	None
+}
+
+fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
+	match ecosystem {
+		Ecosystem::Cargo => PackageType::Cargo,
+		Ecosystem::Npm => PackageType::Npm,
+		Ecosystem::Deno => PackageType::Deno,
+		Ecosystem::Dart => PackageType::Dart,
+		Ecosystem::Flutter => PackageType::Flutter,
 	}
 }
 
@@ -1162,14 +1396,14 @@ fn build_versioned_file_updates(
 fn apply_versioned_file_definition(
 	root: &Path,
 	updates: &mut BTreeMap<PathBuf, Value>,
-	definition: &monochange_core::VersionedFileDefinition,
+	definition: &VersionedFileDefinition,
 	owner_id: &str,
 	owner_version: &str,
 	shared_release_version: Option<&String>,
 	context: &VersionedFileUpdateContext<'_>,
 ) -> MonochangeResult<()> {
 	match definition {
-		monochange_core::VersionedFileDefinition::Path(path) => {
+		VersionedFileDefinition::Path(path) => {
 			let resolved_path = resolve_config_path(root, path);
 			let mut document = if let Some(document) = updates.remove(&resolved_path) {
 				document
@@ -1185,7 +1419,7 @@ fn apply_versioned_file_definition(
 			);
 			updates.insert(resolved_path, document);
 		}
-		monochange_core::VersionedFileDefinition::Dependency { path, dependency } => {
+		VersionedFileDefinition::Dependency { path, dependency } => {
 			let Some(package_definition) =
 				context.package_definitions_by_id.get(dependency.as_str())
 			else {
@@ -1631,12 +1865,36 @@ fn render_discovery_report(
 	}
 }
 
-fn render_release_plan(plan: &ReleasePlan, format: OutputFormat) -> MonochangeResult<String> {
-	match format {
-		OutputFormat::Json => serde_json::to_string_pretty(&json_release_plan(plan))
-			.map_err(|error| MonochangeError::Discovery(error.to_string())),
-		OutputFormat::Text => Ok(text_release_plan(plan)),
-	}
+fn render_prepared_release_json(
+	workflow: &WorkflowDefinition,
+	prepared_release: &PreparedRelease,
+	command_logs: &[String],
+) -> MonochangeResult<String> {
+	serde_json::to_string_pretty(&json!({
+		"workflow": workflow.name,
+		"dryRun": prepared_release.dry_run,
+		"version": prepared_release.version,
+		"groupVersion": prepared_release.group_version,
+		"releasedPackages": prepared_release.released_packages,
+		"releaseTargets": prepared_release.release_targets.iter().map(|target| {
+			json!({
+				"id": target.id,
+				"kind": target.kind,
+				"version": target.version,
+				"tag": target.tag,
+				"release": target.release,
+				"versionFormat": target.version_format,
+				"tagName": target.tag_name,
+				"members": target.members,
+			})
+		}).collect::<Vec<_>>(),
+		"changedFiles": prepared_release.changed_files,
+		"updatedChangelogs": prepared_release.updated_changelogs,
+		"deletedChangesets": prepared_release.deleted_changesets,
+		"commandLogs": command_logs,
+		"plan": json_release_plan(&prepared_release.plan),
+	}))
+	.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
 fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {
@@ -1739,60 +1997,6 @@ fn text_discovery_report(report: &DiscoveryReport) -> String {
 	lines.join("\n")
 }
 
-fn text_release_plan(plan: &ReleasePlan) -> String {
-	let mut lines = vec![format!(
-		"Release plan for {}",
-		plan.workspace_root.display()
-	)];
-	for decision in plan
-		.decisions
-		.iter()
-		.filter(|decision| decision.recommended_bump.is_release())
-	{
-		let planned_version = decision
-			.planned_version
-			.as_ref()
-			.map_or_else(|| "unversioned".to_string(), ToString::to_string);
-		lines.push(format!(
-			"- {}: {} ({}) -> {}",
-			decision.package_id, decision.recommended_bump, decision.trigger_type, planned_version,
-		));
-		for reason in &decision.reasons {
-			lines.push(format!("  - {reason}"));
-		}
-	}
-	if !plan.groups.is_empty() {
-		lines.push("Version groups:".to_string());
-		for group in &plan.groups {
-			lines.push(format!(
-				"- {}: {} -> {}",
-				group.group_id,
-				group.recommended_bump,
-				group
-					.planned_version
-					.as_ref()
-					.map_or_else(|| "unversioned".to_string(), ToString::to_string),
-			));
-		}
-	}
-	if !plan.compatibility_evidence.is_empty() {
-		lines.push("Compatibility evidence:".to_string());
-		for assessment in &plan.compatibility_evidence {
-			lines.push(format!(
-				"- {}: {} ({})",
-				assessment.package_id, assessment.severity, assessment.summary
-			));
-		}
-	}
-	if !plan.warnings.is_empty() {
-		lines.push("Warnings:".to_string());
-		for warning in &plan.warnings {
-			lines.push(format!("- {warning}"));
-		}
-	}
-	lines.join("\n")
-}
-
 fn default_change_path(root: &Path, package_refs: &[String]) -> PathBuf {
 	let timestamp = SystemTime::now()
 		.duration_since(UNIX_EPOCH)
@@ -1852,54 +2056,6 @@ fn format_publish_state(publish_state: monochange_core::PublishState) -> &'stati
 		monochange_core::PublishState::Unpublished => "unpublished",
 		monochange_core::PublishState::Excluded => "excluded",
 	}
-}
-
-fn required_string(matches: &ArgMatches, key: &str) -> MonochangeResult<String> {
-	matches
-		.get_one::<String>(key)
-		.cloned()
-		.ok_or_else(|| MonochangeError::Config(format!("missing `{key}`")))
-}
-
-fn required_strings(matches: &ArgMatches, key: &str) -> MonochangeResult<Vec<String>> {
-	let values = optional_strings(matches, key);
-	if values.is_empty() {
-		Err(MonochangeError::Config(format!("missing `{key}`")))
-	} else {
-		Ok(values)
-	}
-}
-
-fn optional_strings(matches: &ArgMatches, key: &str) -> Vec<String> {
-	matches
-		.get_many::<String>(key)
-		.map(|values| values.cloned().collect())
-		.unwrap_or_default()
-}
-
-fn optional_path(matches: &ArgMatches, key: &str) -> Option<PathBuf> {
-	matches.get_one::<String>(key).map(PathBuf::from)
-}
-
-fn required_bump(matches: &ArgMatches, key: &str) -> MonochangeResult<ChangeBump> {
-	matches
-		.get_one::<ChangeBump>(key)
-		.copied()
-		.ok_or_else(|| MonochangeError::Config(format!("missing `{key}`")))
-}
-
-fn required_path(matches: &ArgMatches, key: &str) -> MonochangeResult<PathBuf> {
-	matches
-		.get_one::<String>(key)
-		.map(PathBuf::from)
-		.ok_or_else(|| MonochangeError::Config(format!("missing `{key}`")))
-}
-
-fn required_format(matches: &ArgMatches, key: &str) -> MonochangeResult<OutputFormat> {
-	matches
-		.get_one::<OutputFormat>(key)
-		.copied()
-		.ok_or_else(|| MonochangeError::Config(format!("missing `{key}`")))
 }
 
 #[cfg(test)]

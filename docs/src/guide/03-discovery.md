@@ -18,8 +18,8 @@ Run discovery:
 <!-- {=projectDiscoverCommand} -->
 
 ```bash
-mc check --root .
-mc workspace discover --root . --format json
+mc validate
+mc discover --format json
 ```
 
 <!-- {/projectDiscoverCommand} -->

@@ -48,6 +48,7 @@ use miette::LabeledSpan;
 use miette::NamedSource;
 use miette::Report;
 use miette::SourceSpan;
+use monochange_core::default_workflows;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
@@ -63,6 +64,7 @@ use monochange_core::VersionFormat;
 use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkflowDefinition;
+use monochange_core::WorkflowInputKind;
 use monochange_core::WorkflowStepDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
@@ -71,8 +73,7 @@ use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value as YamlValue;
 
 const CONFIG_FILE: &str = "monochange.toml";
-const RESERVED_WORKFLOW_NAMES: &[&str] =
-	&["check", "workspace", "plan", "changes", "help", "version"];
+const RESERVED_WORKFLOW_NAMES: &[&str] = &["init", "help", "version"];
 
 #[derive(Debug, Deserialize, Default)]
 struct RawWorkspaceConfiguration {
@@ -267,6 +268,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		workflows,
 		ecosystems,
 	} = raw;
+	let workflows = if workflows.is_empty() {
+		default_workflows()
+	} else {
+		workflows
+	};
 	let default_package_type = defaults.package_type;
 	let default_package_changelog = defaults.changelog.clone();
 	let defaults_changelog_policy = defaults
@@ -910,13 +916,67 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 				workflow.name
 			)));
 		}
-		for step in &workflow.steps {
-			if matches!(step, WorkflowStepDefinition::Command { command } if command.trim().is_empty())
-			{
+
+		let mut seen_inputs = BTreeSet::new();
+		for input in &workflow.inputs {
+			if input.name.trim().is_empty() {
 				return Err(MonochangeError::Config(format!(
-					"workflow `{}` command steps must provide a non-empty command",
+					"workflow `{}` has an input with an empty name",
 					workflow.name
 				)));
+			}
+			if !seen_inputs.insert(input.name.clone()) {
+				return Err(MonochangeError::Config(format!(
+					"workflow `{}` defines duplicate input `{}`",
+					workflow.name, input.name
+				)));
+			}
+			if matches!(input.name.as_str(), "help" | "dry-run") {
+				return Err(MonochangeError::Config(format!(
+					"workflow `{}` input `{}` collides with an implicit workflow flag",
+					workflow.name, input.name
+				)));
+			}
+			if matches!(input.kind, WorkflowInputKind::Choice) && input.choices.is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"workflow `{}` input `{}` must define at least one choice",
+					workflow.name, input.name
+				)));
+			}
+			if let Some(default) = &input.default {
+				if matches!(input.kind, WorkflowInputKind::Choice)
+					&& !input.choices.iter().any(|choice| choice == default)
+				{
+					return Err(MonochangeError::Config(format!(
+						"workflow `{}` input `{}` default `{default}` is not one of the configured choices",
+						workflow.name, input.name
+					)));
+				}
+			}
+		}
+
+		for step in &workflow.steps {
+			match step {
+				WorkflowStepDefinition::Command {
+					command, dry_run, ..
+				} => {
+					if command.trim().is_empty() {
+						return Err(MonochangeError::Config(format!(
+							"workflow `{}` command steps must provide a non-empty command",
+							workflow.name
+						)));
+					}
+					if matches!(dry_run, Some(value) if value.trim().is_empty()) {
+						return Err(MonochangeError::Config(format!(
+							"workflow `{}` command steps with `dry_run` must provide a non-empty command",
+							workflow.name
+						)));
+					}
+				}
+				WorkflowStepDefinition::Validate
+				| WorkflowStepDefinition::Discover
+				| WorkflowStepDefinition::CreateChangeFile
+				| WorkflowStepDefinition::PrepareRelease => {}
 			}
 		}
 	}
@@ -1290,7 +1350,7 @@ fn ecosystem_matches_package_type(ecosystem: Ecosystem, package_type: PackageTyp
 	)
 }
 
-pub fn check_workspace(root: &Path) -> MonochangeResult<()> {
+pub fn validate_workspace(root: &Path) -> MonochangeResult<()> {
 	let configuration = load_workspace_configuration(root)?;
 	let changeset_dir = root.join(".changeset");
 	if !changeset_dir.exists() {

@@ -118,7 +118,27 @@ Workflows are user-defined top-level commands. In this milestone, a workflow nam
 
 ```toml
 [[workflows]]
+name = "discover"
+help_text = "Discover packages across supported ecosystems"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "Discover"
+
+[[workflows]]
 name = "release"
+help_text = "Prepare a release from discovered change files"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"
@@ -126,6 +146,8 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
+dry_run = "cargo test --workspace --all-features"
+shell = true
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -134,11 +156,10 @@ Workflow command interpolation variables:
 
 <!-- {=configurationWorkflowVariables} -->
 
-- `$version` — one shared release version when all released packages resolve to the same version
-- `$group_version` — one shared synced version across released version groups, falling back to `$version`
-- `$released_packages` — comma-separated released package names
-- `$changed_files` — space-separated changed file paths
-- `$changesets` — space-separated consumed `.changeset/*.md` paths
+- default command substitution when `variables` is omitted: `$version`, `$group_version`, `$released_packages`, `$changed_files`, and `$changesets`
+- custom command substitution when `variables` is present: map your own replacement strings to variable names such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
+- `dry_run` on a `Command` step replaces `command` only when the workflow is run with `--dry-run`
+- `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 
 <!-- {/configurationWorkflowVariables} -->
 
@@ -188,7 +209,7 @@ Under the new model, move that changelog configuration onto the matching `[packa
 
 <!-- {=configurationPackageReferenceRules} -->
 
-Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc check` should guide you toward declared ids.
+Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
 
 <!-- {/configurationPackageReferenceRules} -->
 
@@ -202,7 +223,7 @@ Current implementation notes:
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- supported workflow steps today are `PrepareRelease` and `Command`
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -211,10 +232,10 @@ Current implementation notes:
 Run:
 
 ```bash
-mc check --root .
+mc validate
 ```
 
-`mc check` validates:
+`mc validate` validates:
 
 - package and group declarations
 - manifest presence for each package type

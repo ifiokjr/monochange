@@ -40,7 +40,7 @@
 - [x] T012 [P] Add graph construction and traversal tests in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_graph/src/__tests.rs`
 - [x] T013 Implement the compatibility provider abstraction and bump-severity comparison rules in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_semver/src/lib.rs`
 - [x] T014 [P] Add compatibility-provider unit tests in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_semver/src/__tests.rs`
-- [x] T015 Add CLI command skeletons for `workspace discover` and `plan release` in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs` and `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/bin/mc.rs`
+- [x] T015 Add CLI command skeletons for `discover` and `release --dry-run` in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs` and `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/bin/mc.rs`
 - [x] T016 [P] Add CLI smoke tests for command parsing and help output in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/__tests.rs`
 
 **Checkpoint**: Shared domain, config, graph, compatibility, and CLI command surfaces are ready for story implementation.
@@ -51,7 +51,7 @@
 
 **Goal**: Discover supported packages, native workspace membership, dependency links, glob matches, and version groups across mixed repositories.
 
-**Independent Test**: Point `mc workspace discover --root <fixture> --format json` at representative Cargo, npm-family, Deno, Dart/Flutter, and mixed fixtures and verify that packages, dependency edges, version groups, and warnings are correct without manual package enumeration.
+**Independent Test**: Point `mc discover --format json` from the fixture root at representative Cargo, npm-family, Deno, Dart/Flutter, and mixed fixtures and verify that packages, dependency edges, version groups, and warnings are correct without manual package enumeration.
 
 ### Tests for User Story 1 ⚠️
 
@@ -61,7 +61,7 @@
 - [x] T018 [P] [US1] Add npm/pnpm/Bun workspace and glob discovery fixture tests in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_npm/src/__tests.rs`
 - [x] T019 [P] [US1] Add Deno workspace and standalone discovery fixture tests in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_deno/src/__tests.rs`
 - [x] T020 [P] [US1] Add Dart/Flutter workspace and standalone discovery fixture tests in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_dart/src/__tests.rs`
-- [x] T021 [P] [US1] Add mixed-repository discovery integration tests for `workspace discover` in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/__tests.rs`
+- [x] T021 [P] [US1] Add mixed-repository discovery integration tests for `discover` in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/__tests.rs`
 - [x] T022 [P] [US1] Add CLI contract snapshot tests for discovery JSON output in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/__tests.rs`
 
 ### Implementation for User Story 1
@@ -72,7 +72,7 @@
 - [x] T026 [P] [US1] Implement Dart and Flutter workspace and standalone package discovery in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_dart/src/lib.rs`
 - [x] T027 [US1] Implement version-group resolution and package normalization in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_config/src/lib.rs`
 - [x] T028 [US1] Implement unified adapter aggregation and discovery orchestration in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs`
-- [x] T029 [US1] Implement `workspace discover` JSON/text rendering in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs`
+- [x] T029 [US1] Implement `discover` JSON/text rendering in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs`
 - [x] T030 [US1] Add representative fixture manifests under `/Users/ifiokjr/Developer/projects/monochange/fixtures/cargo`, `/Users/ifiokjr/Developer/projects/monochange/fixtures/npm`, `/Users/ifiokjr/Developer/projects/monochange/fixtures/deno`, `/Users/ifiokjr/Developer/projects/monochange/fixtures/dart`, `/Users/ifiokjr/Developer/projects/monochange/fixtures/flutter`, and `/Users/ifiokjr/Developer/projects/monochange/fixtures/mixed`
 
 **Checkpoint**: User Story 1 should now provide independently testable cross-ecosystem workspace discovery and grouping.
@@ -83,7 +83,7 @@
 
 **Goal**: Compute release plans that propagate changes through transitive dependencies, synchronize version groups, and apply semver-aware escalation when compatibility evidence exists.
 
-**Independent Test**: Run `mc plan release --root <fixture> --changes <file> --format json` on graph fixtures and verify direct bumps, transitive patch propagation, group synchronization, and Rust semver-driven escalation.
+**Independent Test**: Run `mc release --dry-run --format json` from the fixture root on graph fixtures and verify direct bumps, transitive patch propagation, group synchronization, and Rust semver-driven escalation.
 
 ### Tests for User Story 2 ⚠️
 
@@ -91,7 +91,7 @@
 - [x] T032 [P] [US2] Add version-group synchronization tests in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_graph/src/__tests.rs`
 - [x] T033 [P] [US2] Add Rust semver escalation tests in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_semver/src/__tests.rs`
 - [x] T034 [P] [US2] Add release-plan integration tests for mixed dependency graphs in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/__tests.rs`
-- [x] T035 [P] [US2] Add CLI contract snapshot tests for `plan release` output in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/__tests.rs`
+- [x] T035 [P] [US2] Add CLI contract snapshot tests for `release --dry-run` output in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/__tests.rs`
 
 ### Implementation for User Story 2
 
@@ -99,7 +99,7 @@
 - [x] T037 [US2] Implement release propagation, severity merging, and group synchronization in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_graph/src/lib.rs`
 - [x] T038 [US2] Implement the first Rust compatibility provider in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_cargo/src/lib.rs` and `/Users/ifiokjr/Developer/projects/monochange/crates/monochange_semver/src/lib.rs`
 - [x] T039 [US2] Implement release planner orchestration in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs`
-- [x] T040 [US2] Implement `plan release` JSON/text rendering and warnings in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs`
+- [x] T040 [US2] Implement `release --dry-run` JSON/text rendering and warnings in `/Users/ifiokjr/Developer/projects/monochange/crates/monochange/src/main.rs`
 - [x] T041 [US2] Add release-planning fixtures and change-input files under `/Users/ifiokjr/Developer/projects/monochange/fixtures/mixed` and `/Users/ifiokjr/Developer/projects/monochange/fixtures/cargo`
 
 **Checkpoint**: User Stories 1 and 2 should now support discovery plus release planning with transitive and semver-aware behavior.

@@ -49,5 +49,5 @@ version_format = "primary"
 1. Add `[package.<id>]` entries for every release-managed package.
 2. Replace each legacy version group with `[group.<id>]`.
 3. Update existing `.changeset/*.md` files to use package ids or group ids.
-4. Run `mc check --root .` and fix any reported issues.
+4. Run `mc validate` and fix any reported issues.
 5. Run `mc release --dry-run` to verify the resulting release targets.

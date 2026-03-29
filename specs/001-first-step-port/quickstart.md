@@ -50,7 +50,53 @@ enabled = true
 enabled = true
 
 [[workflows]]
+name = "validate"
+
+[[workflows.steps]]
+type = "Validate"
+
+[[workflows]]
+name = "discover"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "Discover"
+
+[[workflows]]
+name = "change"
+
+[[workflows.inputs]]
+name = "package"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "bump"
+type = "choice"
+choices = ["patch", "minor", "major"]
+default = "patch"
+
+[[workflows.inputs]]
+name = "reason"
+type = "string"
+required = true
+
+[[workflows.steps]]
+type = "CreateChangeFile"
+
+[[workflows]]
 name = "release"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"
@@ -59,8 +105,8 @@ type = "PrepareRelease"
 ## 2. Validate and verify workspace discovery
 
 ```bash
-mc check --root .
-mc workspace discover --root . --format json
+mc validate
+mc discover --format json
 ```
 
 ## 3. Supply change input
@@ -68,7 +114,7 @@ mc workspace discover --root . --format json
 Preferred CLI flow:
 
 ```bash
-mc changes add --root . --package sdk-core --bump minor --reason "public API addition"
+mc change --package sdk-core --bump minor --reason "public API addition"
 ```
 
 Equivalent manual file:
@@ -94,8 +140,7 @@ sdk: minor
 ## 4. Compute a release plan
 
 ```bash
-mc plan release --root . --changes .changeset/my-change.md --format json
-mc release --dry-run
+mc release --dry-run --format json
 mc release
 ```
 
