@@ -1,12 +1,26 @@
 #![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
-//! <!-- {=monochangeCoreCrateDocs|trim|linePrefix:"//! ":true} -->
 //! # `monochange_core`
 //!
-//! Shared domain types for `monochange`.
+//! <!-- {=monochangeCoreCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange_core` is the shared vocabulary for the `monochange` workspace.
 //!
-//! This crate defines:
+//! Reach for this crate when you are building ecosystem adapters, release planners, or custom automation and need one set of types for packages, dependency edges, version groups, change signals, and release plans.
+//!
+//! ## Why use it?
+//!
+//! - avoid redefining package and release domain models in each crate
+//! - share one error and result surface across discovery, planning, and workflow layers
+//! - pass normalized workspace data between adapters and planners without extra translation
+//!
+//! ## Best for
+//!
+//! - implementing new ecosystem adapters against the shared `EcosystemAdapter` contract
+//! - moving normalized package or release data between crates without custom conversion code
+//! - depending on the workspace domain model without pulling in discovery or planning behavior
+//!
+//! ## What it provides
 //!
 //! - normalized package and dependency records
 //! - version-group definitions and planned group outcomes

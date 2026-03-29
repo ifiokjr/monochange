@@ -1,8 +1,32 @@
-<!-- {=monochangeCargoCrateDocs} -->
-
 # `monochange_cargo`
 
-Cargo ecosystem support for `monochange`.
+<br />
+
+<!-- {=crateReadmeBadgeRow} -->
+
+[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![Coverage][coverage-image]][coverage-link] [![License][license-image]][license-link]
+
+<!-- {/crateReadmeBadgeRow} -->
+
+<br />
+
+<!-- {=monochangeCargoCrateDocs} -->
+
+`monochange_cargo` discovers Cargo packages and surfaces Rust-specific release evidence.
+
+Reach for this crate when you want to scan Cargo workspaces into normalized `monochange_core` records and optionally feed Rust semver evidence into release planning.
+
+## Why use it?
+
+- discover Cargo workspaces and standalone crates with one adapter
+- normalize crate manifests and dependency edges for the shared planner
+- attach Rust semver evidence through `RustSemverProvider`
+
+## Best for
+
+- building Cargo-aware discovery flows without the full CLI
+- feeding Rust semver evidence into release planning
+- converting Cargo workspace structure into shared `monochange_core` records
 
 ## Public entry points
 
@@ -18,3 +42,23 @@ Cargo ecosystem support for `monochange`.
 - Rust semver provider integration for release planning
 
 <!-- {/monochangeCargoCrateDocs} -->
+
+<!-- {=monochangeCargoBadgeLinks} -->
+
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__cargo-orange?logo=rust
+[crate-link]: https://crates.io/crates/monochange_cargo
+[docs-image]: https://img.shields.io/badge/docs.rs-monochange__cargo-1f425f?logo=docs.rs
+[docs-link]: https://docs.rs/monochange_cargo/
+
+<!-- {/monochangeCargoBadgeLinks} -->
+
+<!-- {=repoStatusBadgeLinks} -->
+
+[ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
+[ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
+[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
+[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
+[license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
+[license-link]: https://opensource.org/license/unlicense
+
+<!-- {/repoStatusBadgeLinks} -->
