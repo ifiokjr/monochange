@@ -11,6 +11,11 @@ This repository uses `devenv` for a reproducible shell.
 ```bash
 devenv shell
 install:all
+mc check --root .
+mc workspace discover --root . --format json
+mc changes add --root . --package monochange --bump minor --reason "add release planning"
+mc release --dry-run
+mc release
 ```
 
 <!-- {/repoDevEnvironmentSetupCode} -->

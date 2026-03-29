@@ -16,7 +16,7 @@
 
 `monochange` is a release-planning toolkit for monorepos that span more than one package ecosystem.
 
-It discovers packages, normalizes dependency data, applies synchronized group rules, turns explicit change files into release plans, and can run workflow-driven release preparation from those same inputs.
+It discovers packages, normalizes dependency data, applies version-group rules, turns explicit change files into release plans, and can run workflow-driven release preparation from those same inputs.
 
 Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter.
 

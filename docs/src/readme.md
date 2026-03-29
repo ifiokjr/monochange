@@ -8,12 +8,13 @@ The current milestone focuses on:
 
 - discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
 - normalize dependency edges across ecosystems
-- declare releaseable packages explicitly through `monochange.toml`
+- declare release-managed packages explicitly in `monochange.toml`
 - coordinate shared release identity through named groups
-- plan transitive releases from markdown changesets
 - validate config and changesets with `mc check`
-- prepare releases through config-defined workflows
-- surface Rust semver evidence when provided
+- compute release plans from explicit change input
+- run config-defined release workflows from `.changeset/*.md`
+- apply Rust semver evidence when provided
+- publish end-user documentation through the mdBook in `docs/`
 
 <!-- {/projectMilestoneCapabilities} -->
 

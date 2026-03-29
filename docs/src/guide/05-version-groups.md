@@ -49,3 +49,9 @@ sdk: minor
 ```
 
 But a changeset may not reference both the group id and one of its members in the same file.
+
+<!-- {=versionGroupsCurrentStatus} -->
+
+Legacy `version_groups.strategy` is no longer the primary authoring model. The current implementation always derives synchronized release behavior from `[group.<id>]` declarations.
+
+<!-- {/versionGroupsCurrentStatus} -->

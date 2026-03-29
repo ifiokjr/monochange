@@ -470,6 +470,7 @@ dependencies = [
 name = "monochange_config"
 version = "0.0.0"
 dependencies = [
+ "doc-comment",
  "insta",
  "miette",
  "monochange_core",

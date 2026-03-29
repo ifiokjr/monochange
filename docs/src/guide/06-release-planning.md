@@ -85,7 +85,22 @@ mc release
 
 <!-- {/projectReleaseCommand} -->
 
-The workflow reads `.changeset/*.md`, computes the synced release, updates manifests, updates configured changelogs and versioned files, and deletes consumed changesets only after a successful non-dry-run run.
+<!-- {=releaseWorkflowBehavior} -->
+
+`mc release` only works when your config defines a workflow named `release`.
+
+During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
+
+Current `PrepareRelease` behavior:
+
+- reads `.changeset/*.md`
+- computes one synchronized release plan from discovered change files
+- updates native manifests plus configured changelogs and versioned files
+- applies group-owned release identity for outward `tag`, `release`, and `version_format`
+- deletes consumed change files only after a successful non-dry-run execution
+- leaves the workspace untouched during `--dry-run`
+
+<!-- {/releaseWorkflowBehavior} -->
 
 Planning rules in this milestone:
 

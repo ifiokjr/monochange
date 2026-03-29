@@ -9,6 +9,11 @@
 ```bash
 devenv shell
 install:all
+mc check --root .
+mc workspace discover --root . --format json
+mc changes add --root . --package monochange --bump minor --reason "add release planning"
+mc release --dry-run
+mc release
 ```
 
 <!-- {/repoDevEnvironmentSetupCode} -->
@@ -24,6 +29,7 @@ docs:check
 docs:update
 docs:verify
 docs:doctor
+mc check --root .
 lint:all
 test:all
 build:all

@@ -46,6 +46,14 @@ type = "PrepareRelease"
 
 <!-- {/projectSetupConfig} -->
 
+<!-- {=projectSetupConfigNote} -->
+
+This guide shows the preferred package/group configuration model.
+
+If you are migrating from older config, replace legacy `[[version_groups]]` and `[[package_overrides]]` entries with `[group.<id>]` and `[package.<id>]` declarations before relying on `mc check` and `mc release`.
+
+<!-- {/projectSetupConfigNote} -->
+
 Then validate and verify discovery:
 
 <!-- {=projectDiscoverCommand} -->

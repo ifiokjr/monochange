@@ -149,6 +149,44 @@ enabled = true
 
 <!-- {/configurationEcosystemSettingsSnippet} -->
 
+## Package overrides migration note
+
+<!-- {=configurationPackageOverridesSnippet} -->
+
+Legacy repositories may still contain `[[package_overrides]]` entries such as:
+
+```toml
+[[package_overrides]]
+package = "crates/sdk_core"
+changelog = "crates/sdk_core/CHANGELOG.md"
+```
+
+Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead.
+
+<!-- {/configurationPackageOverridesSnippet} -->
+
+## Package references
+
+<!-- {=configurationPackageReferenceRules} -->
+
+Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc check` should guide you toward declared ids.
+
+<!-- {/configurationPackageReferenceRules} -->
+
+## Current status
+
+<!-- {=configurationCurrentStatus} -->
+
+Current implementation notes:
+
+- `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven workflows in this milestone
+- `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
+- `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
+- `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
+- supported workflow steps today are `PrepareRelease` and `Command`
+
+<!-- {/configurationCurrentStatus} -->
+
 ## Validation
 
 Run:
