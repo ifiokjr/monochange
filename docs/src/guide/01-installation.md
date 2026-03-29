@@ -26,6 +26,7 @@ docs:verify
 docs:doctor
 lint:all
 test:all
+coverage:all
 build:all
 build:book
 ```

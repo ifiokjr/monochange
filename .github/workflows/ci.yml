@@ -80,3 +80,34 @@ jobs:
       - name: build book
         run: build:book
         shell: devenv shell -- bash -e {0}
+
+  coverage:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run coverage
+        run: coverage:all
+        shell: devenv shell -- bash -e {0}
+
+      - name: upload coverage to codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          files: ./target/coverage/lcov.info
+          disable_search: true
+          fail_ci_if_error: true
+          flags: rust
+          name: monochange-rust-workspace
+          verbose: true

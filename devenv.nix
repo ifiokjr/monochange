@@ -128,10 +128,14 @@ in
     };
     "coverage:all" = {
       exec = ''
-        set -e
-        cargo llvm-cov nextest --workspace --all-features --lcov --output-path lcov.info
+        set -euo pipefail
+        mkdir -p target/coverage
+        cargo llvm-cov clean --workspace
+        cargo llvm-cov nextest --workspace --all-features --all-targets --no-report
+        cargo llvm-cov report --summary-only --fail-under-lines 70
+        cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
       '';
-      description = "Run coverage across the crates.";
+      description = "Run workspace coverage, enforce a 70% line-coverage floor, and write target/coverage/lcov.info.";
       binary = "bash";
     };
     "fix:all" = {

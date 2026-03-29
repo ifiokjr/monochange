@@ -45,6 +45,7 @@ docs:doctor
 mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
 lint:all
 test:all
+coverage:all
 build:all
 build:book
 ```
