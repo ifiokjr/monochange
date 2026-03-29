@@ -11,6 +11,7 @@ Repository configuration lives in `monochange.toml`.
 parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
+package_type = "cargo"
 ```
 
 <!-- {/configurationDefaultsSnippet} -->
@@ -22,10 +23,12 @@ Declare every release-managed package explicitly.
 <!-- {=configurationVersionGroupsSnippet} -->
 
 ```toml
+[defaults]
+package_type = "cargo"
+
 [package.sdk-core]
 path = "crates/sdk_core"
-type = "cargo"
-changelog = "crates/sdk_core/CHANGELOG.md"
+changelog = "crates/sdk_core/changelog.md"
 versioned_files = ["crates/sdk_core/extra.toml"]
 tag = false
 release = false
@@ -37,7 +40,7 @@ version_format = "namespaced"
 Required fields:
 
 - `path`
-- `type`
+- `type`, unless `[defaults].package_type` is set
 
 Supported `type` values:
 
@@ -49,6 +52,7 @@ Supported `type` values:
 
 Optional package fields:
 
+- `type`, when `[defaults].package_type` is set
 - `changelog`
 - `versioned_files`
 - `tag`
@@ -62,7 +66,7 @@ Groups own outward release identity for their member packages.
 ```toml
 [group.sdk]
 packages = ["sdk-core", "web-sdk", "mobile-sdk"]
-changelog = "CHANGELOG.md"
+changelog = "changelog.md"
 versioned_files = ["group.toml"]
 tag = true
 release = true
@@ -158,10 +162,10 @@ Legacy repositories may still contain `[[package_overrides]]` entries such as:
 ```toml
 [[package_overrides]]
 package = "crates/sdk_core"
-changelog = "crates/sdk_core/CHANGELOG.md"
+changelog = "crates/sdk_core/changelog.md"
 ```
 
-Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead.
+Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 

@@ -26,10 +26,11 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v4
 
-      - name: setup
-        uses: ./.github/actions/devenv
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: setup rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install mdbook
+        run: cargo install --locked mdbook
 
       - name: configure pages
         uses: actions/configure-pages@v5
@@ -37,8 +38,7 @@ jobs:
           enablement: true
 
       - name: build book
-        run: build:book
-        shell: devenv shell -- bash -e {0}
+        run: mdbook build docs
 
       - name: upload pages artifact
         uses: actions/upload-pages-artifact@v3

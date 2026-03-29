@@ -19,20 +19,21 @@ Repository-wide default behavior.
 | `parent_bump`            | string  | No       | Default bump applied to affected parent packages when no stronger evidence exists. |
 | `include_private`        | boolean | No       | Whether private packages are included in discovery and planning output.            |
 | `warn_on_group_mismatch` | boolean | No       | Whether existing grouped-version mismatches emit warnings.                         |
+| `package_type`           | string  | No       | Default package `type` used when `[package.<id>]` entries omit `type`.             |
 
 ### `[package.<id>]`
 
 Declares a release-managed package using a monochange-owned id.
 
-| Field             | Type    | Required | Meaning                                                         |
-| ----------------- | ------- | -------- | --------------------------------------------------------------- |
-| `path`            | string  | Yes      | Package directory relative to the repository root.              |
-| `type`            | string  | Yes      | One of `cargo`, `npm`, `deno`, `dart`, or `flutter`.            |
-| `changelog`       | string  | No       | Changelog file updated during release preparation.              |
-| `versioned_files` | array   | No       | Additional files whose version references should be updated.    |
-| `tag`             | boolean | No       | Whether this package should produce a tag when not grouped.     |
-| `release`         | boolean | No       | Whether this package should produce a release when not grouped. |
-| `version_format`  | string  | No       | `namespaced` or `primary`; defaults to `namespaced`.            |
+| Field             | Type    | Required | Meaning                                                                                            |
+| ----------------- | ------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `path`            | string  | Yes      | Package directory relative to the repository root.                                                 |
+| `type`            | string  | Cond.    | One of `cargo`, `npm`, `deno`, `dart`, or `flutter`; optional when `defaults.package_type` is set. |
+| `changelog`       | string  | No       | Changelog file updated during release preparation.                                                 |
+| `versioned_files` | array   | No       | Additional files whose version references should be updated.                                       |
+| `tag`             | boolean | No       | Whether this package should produce a tag when not grouped.                                        |
+| `release`         | boolean | No       | Whether this package should produce a release when not grouped.                                    |
+| `version_format`  | string  | No       | `namespaced` or `primary`; defaults to `namespaced`.                                               |
 
 ### `[group.<id>]`
 
@@ -71,11 +72,11 @@ Per-ecosystem switches and discovery overrides.
 parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
+package_type = "cargo"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-type = "cargo"
-changelog = "crates/sdk_core/CHANGELOG.md"
+changelog = "crates/sdk_core/changelog.md"
 
 [package.web-sdk]
 path = "packages/web-sdk"
@@ -83,7 +84,7 @@ type = "npm"
 
 [group.sdk]
 packages = ["sdk-core", "web-sdk"]
-changelog = "CHANGELOG.md"
+changelog = "changelog.md"
 tag = true
 release = true
 version_format = "primary"
@@ -105,6 +106,7 @@ roots = ["packages/*"]
 ## Validation Rules
 
 - package and group ids share one namespace
+- package `type` is required unless `defaults.package_type` is set
 - groups may only reference declared package ids
 - a package may belong to at most one group
 - only one package or group may use `version_format = "primary"`

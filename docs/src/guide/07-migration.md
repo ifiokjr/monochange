@@ -11,23 +11,24 @@ members = ["crates/monochange", "crates/monochange_core"]
 
 [[package_overrides]]
 package = "crates/monochange"
-changelog = "crates/monochange/CHANGELOG.md"
+changelog = "crates/monochange/changelog.md"
 ```
 
 ## New style
 
 ```toml
+[defaults]
+package_type = "cargo"
+
 [package.monochange]
 path = "crates/monochange"
-type = "cargo"
-changelog = "crates/monochange/CHANGELOG.md"
+changelog = "crates/monochange/changelog.md"
 
 [package.monochange_core]
 path = "crates/monochange_core"
-type = "cargo"
-changelog = "crates/monochange_core/CHANGELOG.md"
+changelog = "crates/monochange_core/changelog.md"
 
-[group.workspace]
+[group.main]
 packages = ["monochange", "monochange_core"]
 tag = true
 release = true
@@ -37,6 +38,7 @@ version_format = "primary"
 ## Migration rules
 
 - move each package override into a `[package.<id>]` table
+- set `[defaults].package_type` when the repository uses a single ecosystem so package entries can omit `type`
 - use package ids in changesets instead of raw manifest paths
 - move each legacy version group into `[group.<id>]`
 - keep package changelog configuration on the package declaration
