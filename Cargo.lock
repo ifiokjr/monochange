@@ -391,7 +391,6 @@ name = "monochange"
 version = "0.0.0"
 dependencies = [
  "clap",
- "doc-comment",
  "insta",
  "monochange_cargo",
  "monochange_config",
@@ -417,15 +416,20 @@ dependencies = [
  "doc-comment",
  "monochange",
  "monochange_cargo",
+ "monochange_config",
  "monochange_core",
+ "monochange_dart",
+ "monochange_deno",
+ "monochange_graph",
  "monochange_npm",
+ "monochange_semver",
+ "semver",
 ]
 
 [[package]]
 name = "monochange_cargo"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "glob",
  "insta",
  "monochange_core",
@@ -444,7 +448,6 @@ dependencies = [
 name = "monochange_config"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "insta",
  "monochange_core",
  "rstest",
@@ -461,7 +464,6 @@ dependencies = [
 name = "monochange_core"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "insta",
  "rstest",
  "semver",
@@ -474,7 +476,6 @@ dependencies = [
 name = "monochange_dart"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "glob",
  "insta",
  "monochange_core",
@@ -491,7 +492,6 @@ dependencies = [
 name = "monochange_deno"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "glob",
  "insta",
  "monochange_core",
@@ -508,7 +508,6 @@ dependencies = [
 name = "monochange_graph"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "insta",
  "monochange_core",
  "monochange_semver",
@@ -521,7 +520,6 @@ dependencies = [
 name = "monochange_npm"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "glob",
  "insta",
  "monochange_core",
@@ -539,7 +537,6 @@ dependencies = [
 name = "monochange_semver"
 version = "0.0.0"
 dependencies = [
- "doc-comment",
  "insta",
  "monochange_core",
  "rstest",

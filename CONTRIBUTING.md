@@ -6,30 +6,50 @@ Thank you for contributing.
 
 This repository uses `devenv` for a reproducible shell.
 
-```sh
+<!-- {=repoDevEnvironmentSetupCode} -->
+
+```bash
 devenv shell
 install:all
 ```
+
+<!-- {/repoDevEnvironmentSetupCode} -->
+
+## Documentation workflow
+
+Shared documentation blocks live in `.templates/` and are synchronized with `mdt`.
+
+- edit provider blocks in `.templates/` when you want one change to update multiple docs
+- run `docs:update` after changing shared docs or consumer blocks
+- run `docs:check` before opening a PR to confirm everything is synchronized
 
 ## Expected workflow
 
 1. Create a feature branch from `main`.
 2. Write failing tests first for non-trivial behavior.
 3. Implement the smallest change that makes the tests pass.
-4. Update docs, READMEs, and fixtures when behavior changes.
+4. Update docs, READMEs, fixtures, and templates when behavior changes.
 5. Run the full local validation suite before opening a PR.
 
 ## Core commands
 
-```sh
+<!-- {=contributingCoreCommands} -->
+
+```bash
 monochange --help
 mc --help
+docs:check
+docs:update
+docs:verify
+docs:doctor
 mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
 lint:all
 test:all
 build:all
 build:book
 ```
+
+<!-- {/contributingCoreCommands} -->
 
 ## Product rules
 

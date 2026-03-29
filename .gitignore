@@ -3,6 +3,7 @@
 /.bin
 /result
 /.direnv
+/.mdt
 # Devenv
 .devenv*
 devenv.local.nix

@@ -1,7 +1,18 @@
 #![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
-doc_comment::doctest!("../readme.md");
+//! <!-- {=monochangeConfigCrateDocs|trim|linePrefix:"//! ":true} -->
+//! # `monochange_config`
+//!
+//! Configuration and change-input parsing for `monochange`.
+//!
+//! ## Responsibilities
+//!
+//! - load `monochange.toml`
+//! - validate version groups and workflows
+//! - resolve package references against discovered packages
+//! - parse change-input files, evidence, and changelog overrides
+//! <!-- {/monochangeConfigCrateDocs} -->
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
