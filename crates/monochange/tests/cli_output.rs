@@ -28,28 +28,30 @@ macro_rules! apply_common_filters {
 }
 
 #[test]
-fn plan_release_cli_patches_parent_packages_when_dependencies_change() {
+fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_ungrouped_release_fixture(tempdir.path());
 
 	assert_cmd_snapshot!(
 		cli()
-			.arg("plan")
+			.current_dir(tempdir.path())
 			.arg("release")
-			.arg("--root")
-			.arg(tempdir.path())
-			.arg("--changes")
-			.arg(tempdir.path().join(".changeset/feature.md")),
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("text"),
 		@r###"
 	success: true
 	exit_code: 0
 	----- stdout -----
-	Release plan for [ROOT]
-	- cargo:[ROOT]/crates/app/Cargo.toml: patch (transitive-dependency) -> 1.0.1
-	  - depends on `cargo:[ROOT]/crates/core/Cargo.toml`
-	- cargo:[ROOT]/crates/core/Cargo.toml: minor (direct-change) -> 1.1.0
-	  - add feature
+	workflow `release` completed (dry-run)
+	released packages: workflow-app, workflow-core
+	release targets:
+	- package app -> app/v1.0.1 (tag: false, release: false)
+	- package core -> core/v1.1.0 (tag: false, release: false)
+	changed files:
+	- crates/app/Cargo.toml
+	- crates/core/Cargo.toml
 	
 	----- stderr -----
 	"###
@@ -63,10 +65,7 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 	seed_group_release_fixture(tempdir.path());
 
 	assert_cmd_snapshot!(
-		cli()
-			.arg("release")
-			.arg("--root")
-			.arg(tempdir.path()),
+		cli().current_dir(tempdir.path()).arg("release"),
 		@r###"
 	success: true
 	exit_code: 0
@@ -110,7 +109,7 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 }
 
 #[test]
-fn check_cli_rejects_packages_in_multiple_groups() {
+fn validate_cli_rejects_packages_in_multiple_groups() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
@@ -135,7 +134,7 @@ packages = ["core"]
 	);
 
 	assert_cmd_snapshot!(
-		cli().arg("check").arg("--root").arg(tempdir.path()),
+		cli().current_dir(tempdir.path()).arg("validate"),
 		@r###"
 	success: false
 	exit_code: 1
