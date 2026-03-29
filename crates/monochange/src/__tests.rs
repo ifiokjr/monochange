@@ -773,16 +773,15 @@ workflow-core = { workspace = true }
 			r#"
 [defaults]
 parent_bump = "patch"
+package_type = "cargo"
+changelog = "{{path}}/changelog.md"
 
 [package.core]
 path = "crates/core"
-type = "cargo"
-changelog = "crates/core/changelog.md"
 versioned_files = ["crates/core/extra.toml"]
 
 [package.app]
 path = "crates/app"
-type = "cargo"
 changelog = "{app_changelog}"
 
 [group.sdk]

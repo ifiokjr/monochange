@@ -50,6 +50,7 @@ use miette::Report;
 use miette::SourceSpan;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
+use monochange_core::ChangelogDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::GroupDefinition;
@@ -97,6 +98,8 @@ struct RawWorkspaceDefaults {
 	warn_on_group_mismatch: bool,
 	#[serde(default)]
 	package_type: Option<PackageType>,
+	#[serde(default)]
+	changelog: Option<RawChangelogDefinition>,
 }
 
 impl Default for RawWorkspaceDefaults {
@@ -106,8 +109,16 @@ impl Default for RawWorkspaceDefaults {
 			include_private: false,
 			warn_on_group_mismatch: default_warn_on_group_mismatch(),
 			package_type: None,
+			changelog: None,
 		}
 	}
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum RawChangelogDefinition {
+	Enabled(bool),
+	Path(String),
 }
 
 #[derive(Debug, Deserialize)]
@@ -116,7 +127,7 @@ struct RawPackageDefinition {
 	#[serde(rename = "type")]
 	package_type: Option<PackageType>,
 	#[serde(default)]
-	changelog: Option<PathBuf>,
+	changelog: Option<RawChangelogDefinition>,
 	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
@@ -198,6 +209,35 @@ fn default_change_origin() -> String {
 	"direct-change".to_string()
 }
 
+impl RawChangelogDefinition {
+	fn as_defaults_definition(&self) -> ChangelogDefinition {
+		match self {
+			Self::Enabled(false) => ChangelogDefinition::Disabled,
+			Self::Enabled(true) => ChangelogDefinition::PackageDefault,
+			Self::Path(path_pattern) => ChangelogDefinition::PathPattern(path_pattern.clone()),
+		}
+	}
+
+	fn resolve_for_package(
+		&self,
+		package_path: &Path,
+		treat_string_as_pattern: bool,
+	) -> Option<PathBuf> {
+		match self {
+			Self::Enabled(false) => None,
+			Self::Enabled(true) => Some(package_path.join("CHANGELOG.md")),
+			Self::Path(path) => {
+				if treat_string_as_pattern {
+					let package_path = package_path.to_string_lossy();
+					Some(PathBuf::from(path.replace("{path}", &package_path)))
+				} else {
+					Some(PathBuf::from(path))
+				}
+			}
+		}
+	}
+}
+
 #[must_use]
 pub fn config_path(root: &Path) -> PathBuf {
 	root.join(CONFIG_FILE)
@@ -228,6 +268,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		ecosystems,
 	} = raw;
 	let default_package_type = defaults.package_type;
+	let default_package_changelog = defaults.changelog.clone();
+	let defaults_changelog_policy = defaults
+		.changelog
+		.as_ref()
+		.map(RawChangelogDefinition::as_defaults_definition);
 	let packages = package
 		.into_iter()
 		.map(|(id, package)| {
@@ -249,11 +294,20 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 					),
 				)
 			})?;
+			let changelog = package
+				.changelog
+				.as_ref()
+				.and_then(|definition| definition.resolve_for_package(&package.path, false))
+				.or_else(|| {
+					default_package_changelog
+						.as_ref()
+						.and_then(|definition| definition.resolve_for_package(&package.path, true))
+				});
 			Ok::<_, MonochangeError>(PackageDefinition {
 				id,
 				path: package.path,
 				package_type,
-				changelog: package.changelog,
+				changelog,
 				versioned_files: package.versioned_files,
 				tag: package.tag,
 				release: package.release,
@@ -284,6 +338,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			include_private: defaults.include_private,
 			warn_on_group_mismatch: defaults.warn_on_group_mismatch,
 			package_type: defaults.package_type,
+			changelog: defaults_changelog_policy,
 		},
 		packages,
 		groups,
