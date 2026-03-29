@@ -13,6 +13,8 @@ rust-version = { workspace = true }
 description = "Configuration parsing and validation for monochange"
 
 [dependencies]
+doc-comment = { workspace = true }
+miette = { workspace = true }
 monochange_core = { workspace = true }
 serde = { workspace = true }
 serde_yaml_ng = { workspace = true }

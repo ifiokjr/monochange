@@ -12,7 +12,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 - use one release-planning model across several language ecosystems
 - replace ad hoc scripts with explicit change files and deterministic release output
-- keep related packages synchronized with `[[version_groups]]`
+- keep related packages synchronized with configured groups
 - propagate dependent bumps through one normalized dependency graph
 - embed the same discovery and planning logic in your own tooling through the workspace crates
 
@@ -45,7 +45,9 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 - discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
 - normalize dependency edges across ecosystems
-- coordinate shared version groups from `monochange.toml`
+- declare release-managed packages explicitly in `monochange.toml`
+- coordinate shared release identity through named groups
+- validate config and changesets with `mc check`
 - compute release plans from explicit change input
 - run config-defined release workflows from `.changeset/*.md`
 - apply Rust semver evidence when provided
@@ -58,6 +60,11 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 ```bash
 devenv shell
 install:all
+mc check --root .
+mc workspace discover --root . --format json
+mc changes add --root . --package monochange --bump minor --reason "add release planning"
+mc release --dry-run
+mc release
 ```
 
 <!-- {/repoDevEnvironmentSetupCode} -->
@@ -71,6 +78,7 @@ docs:check
 docs:update
 docs:verify
 docs:doctor
+mc check --root .
 lint:all
 test:all
 build:all
@@ -88,7 +96,8 @@ docs:check
 docs:update
 docs:verify
 docs:doctor
-mc changes add --root . --package crates/monochange --bump patch --reason "describe the change"
+mc check --root .
+mc changes add --root . --package monochange --bump patch --reason "describe the change"
 lint:all
 test:all
 build:all
@@ -104,9 +113,33 @@ build:book
 parent_bump = "patch"
 warn_on_group_mismatch = true
 
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk"]
+[package.sdk-core]
+path = "crates/sdk_core"
+type = "cargo"
+changelog = "crates/sdk_core/CHANGELOG.md"
+
+[package.web-sdk]
+path = "packages/web-sdk"
+type = "npm"
+
+[package.mobile-sdk]
+path = "packages/mobile-sdk"
+type = "dart"
+
+[group.sdk]
+packages = ["sdk-core", "web-sdk", "mobile-sdk"]
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.npm]
+enabled = true
+
+[ecosystems.deno]
+enabled = true
+
+[ecosystems.dart]
+enabled = true
 
 [[workflows]]
 name = "release"
@@ -119,15 +152,16 @@ type = "PrepareRelease"
 
 <!-- {@projectSetupConfigNote} -->
 
-This is the smallest config needed to make `mc release` work in the current implementation.
+This guide shows the preferred package/group configuration model.
 
-For changelog updates, add `[[package_overrides]]` entries with `changelog` paths. Discovery currently scans all supported ecosystems automatically; the top-level `[ecosystems.*]` settings are parsed today but are not yet used to filter discovery.
+If you are migrating from older config, replace legacy `[[version_groups]]` and `[[package_overrides]]` entries with `[group.<id>]` and `[package.<id>]` declarations before relying on `mc check` and `mc release`.
 
 <!-- {/projectSetupConfigNote} -->
 
 <!-- {@projectDiscoverCommand} -->
 
 ```bash
+mc check --root .
 mc workspace discover --root . --format json
 ```
 
@@ -173,7 +207,7 @@ build:book
 
 - normalized package records
 - dependency edges
-- version groups
+- version groups derived from configured groups
 - warnings
 
 <!-- {/projectDiscoveryOutputIncludes} -->
@@ -196,9 +230,21 @@ Create a `monochange.toml` file:
 parent_bump = "patch"
 warn_on_group_mismatch = true
 
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk"]
+[package.monochange]
+path = "crates/monochange"
+type = "cargo"
+changelog = "crates/monochange/CHANGELOG.md"
+
+[package.monochange_core]
+path = "crates/monochange_core"
+type = "cargo"
+changelog = "crates/monochange_core/CHANGELOG.md"
+
+[group.workspace]
+packages = ["monochange", "monochange_core"]
+tag = true
+release = true
+version_format = "primary"
 
 [[workflows]]
 name = "release"
@@ -207,9 +253,11 @@ name = "release"
 type = "PrepareRelease"
 ```
 
-This is the smallest config needed to make `mc release` work in the current implementation.
+Validate the repository:
 
-For changelog updates, add `[[package_overrides]]` entries with `changelog` paths. Discovery currently scans all supported ecosystems automatically; the top-level `[ecosystems.*]` settings are parsed today but are not yet used to filter discovery.
+```bash
+mc check --root .
+```
 
 Discover the workspace:
 

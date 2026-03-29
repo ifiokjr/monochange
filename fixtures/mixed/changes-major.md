@@ -1,7 +1,7 @@
 ---
-cargo/sdk-core: patch
+sdk-core: patch
 evidence:
-  cargo/sdk-core:
+  sdk-core:
     - rust-semver:major:public API break detected
 ---
 
