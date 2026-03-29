@@ -15,36 +15,81 @@ warn_on_group_mismatch = true
 
 <!-- {/configurationDefaultsSnippet} -->
 
-## Version groups
+## Packages
+
+Declare every release-managed package explicitly.
 
 <!-- {=configurationVersionGroupsSnippet} -->
 
 ```toml
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk", "packages/mobile-sdk"]
-strategy = "shared"
+[package.sdk-core]
+path = "crates/sdk_core"
+type = "cargo"
+changelog = "crates/sdk_core/CHANGELOG.md"
+versioned_files = ["crates/sdk_core/extra.toml"]
+tag = false
+release = false
+version_format = "namespaced"
 ```
 
 <!-- {/configurationVersionGroupsSnippet} -->
 
-## Package overrides
+Required fields:
 
-`package_overrides` currently let you point released packages at changelog files that should be updated by `PrepareRelease`.
+- `path`
+- `type`
 
-<!-- {=configurationPackageOverridesSnippet} -->
+Supported `type` values:
+
+- `cargo`
+- `npm`
+- `deno`
+- `dart`
+- `flutter`
+
+Optional package fields:
+
+- `changelog`
+- `versioned_files`
+- `tag`
+- `release`
+- `version_format`
+
+## Groups
+
+Groups own outward release identity for their member packages.
 
 ```toml
-[[package_overrides]]
-package = "crates/sdk_core"
-changelog = "crates/sdk_core/CHANGELOG.md"
-
-[[package_overrides]]
-package = "packages/web-sdk"
-changelog = "packages/web-sdk/CHANGELOG.md"
+[group.sdk]
+packages = ["sdk-core", "web-sdk", "mobile-sdk"]
+changelog = "CHANGELOG.md"
+versioned_files = ["group.toml"]
+tag = true
+release = true
+version_format = "primary"
 ```
 
-<!-- {/configurationPackageOverridesSnippet} -->
+Rules:
+
+- group members must already be declared under `[package.<id>]`
+- package and group ids share one namespace
+- a package may belong to only one group
+- only one package or group may use `version_format = "primary"`
+- group `tag`, `release`, and `version_format` override member package release identity
+- package changelogs and package `versioned_files` still apply when grouped
+
+## Versioned files
+
+`versioned_files` are additional managed files beyond native manifests.
+
+Examples:
+
+```toml
+versioned_files = ["Cargo.lock"]
+versioned_files = [{ path = "group.toml", dependency = "sdk-core" }]
+```
+
+Dependency targets in `versioned_files` must reference declared package ids.
 
 ## Workflows
 
@@ -61,7 +106,7 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "Command"
-command = "printf '%s\n' '$version'"
+command = "cargo test --workspace --all-features"
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -104,11 +149,27 @@ enabled = true
 
 <!-- {/configurationEcosystemSettingsSnippet} -->
 
+## Package overrides migration note
+
+<!-- {=configurationPackageOverridesSnippet} -->
+
+Legacy repositories may still contain `[[package_overrides]]` entries such as:
+
+```toml
+[[package_overrides]]
+package = "crates/sdk_core"
+changelog = "crates/sdk_core/CHANGELOG.md"
+```
+
+Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead.
+
+<!-- {/configurationPackageOverridesSnippet} -->
+
 ## Package references
 
 <!-- {=configurationPackageReferenceRules} -->
 
-Package references may use package ids, package names, manifest-relative paths, or manifest-directory paths.
+Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc check` should guide you toward declared ids.
 
 <!-- {/configurationPackageReferenceRules} -->
 
@@ -116,11 +177,28 @@ Package references may use package ids, package names, manifest-relative paths, 
 
 <!-- {=configurationCurrentStatus} -->
 
-Current implementation status:
+Current implementation notes:
 
-- actively used today: `defaults.parent_bump`, `defaults.warn_on_group_mismatch`, `version_groups`, `package_overrides.changelog`, and `workflows`
-- parsed but not currently enforced by discovery or planning: `defaults.include_private`, `version_groups.strategy`, and `[ecosystems.*].enabled/roots/exclude`
-- workflow names must be unique, must not collide with built-in commands, and must contain at least one step
-- supported workflow steps today: `PrepareRelease` and `Command`
+- `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven workflows in this milestone
+- `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
+- `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
+- `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
+- supported workflow steps today are `PrepareRelease` and `Command`
 
 <!-- {/configurationCurrentStatus} -->
+
+## Validation
+
+Run:
+
+```bash
+mc check --root .
+```
+
+`mc check` validates:
+
+- package and group declarations
+- manifest presence for each package type
+- group membership rules
+- `versioned_files` references
+- `.changeset/*.md` targets and overlap rules

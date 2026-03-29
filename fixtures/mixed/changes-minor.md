@@ -1,5 +1,5 @@
 ---
-cargo/sdk-core: minor
+sdk-core: minor
 ---
 
 #### public API addition

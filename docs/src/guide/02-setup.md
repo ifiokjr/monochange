@@ -9,9 +9,33 @@ Add a `monochange.toml` file at the repository root.
 parent_bump = "patch"
 warn_on_group_mismatch = true
 
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk"]
+[package.sdk-core]
+path = "crates/sdk_core"
+type = "cargo"
+changelog = "crates/sdk_core/CHANGELOG.md"
+
+[package.web-sdk]
+path = "packages/web-sdk"
+type = "npm"
+
+[package.mobile-sdk]
+path = "packages/mobile-sdk"
+type = "dart"
+
+[group.sdk]
+packages = ["sdk-core", "web-sdk", "mobile-sdk"]
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.npm]
+enabled = true
+
+[ecosystems.deno]
+enabled = true
+
+[ecosystems.dart]
+enabled = true
 
 [[workflows]]
 name = "release"
@@ -24,18 +48,21 @@ type = "PrepareRelease"
 
 <!-- {=projectSetupConfigNote} -->
 
-This is the smallest config needed to make `mc release` work in the current implementation.
+This guide shows the preferred package/group configuration model.
 
-For changelog updates, add `[[package_overrides]]` entries with `changelog` paths. Discovery currently scans all supported ecosystems automatically; the top-level `[ecosystems.*]` settings are parsed today but are not yet used to filter discovery.
+If you are migrating from older config, replace legacy `[[version_groups]]` and `[[package_overrides]]` entries with `[group.<id>]` and `[package.<id>]` declarations before relying on `mc check` and `mc release`.
 
 <!-- {/projectSetupConfigNote} -->
 
-Then verify discovery:
+Then validate and verify discovery:
 
 <!-- {=projectDiscoverCommand} -->
 
 ```bash
+mc check --root .
 mc workspace discover --root . --format json
 ```
 
 <!-- {/projectDiscoverCommand} -->
+
+Use configured package ids such as `sdk-core` and group ids such as `sdk` in changesets and CLI commands.

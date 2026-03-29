@@ -2,7 +2,7 @@
 
 ## Goal
 
-Validate that monochange can discover a mixed-ecosystem repository, calculate transitive release impact, and keep version groups synchronized without GitHub bot automation.
+Validate that monochange can discover a mixed-ecosystem repository, calculate transitive release impact, validate config and changesets, and keep configured groups synchronized.
 
 ## Prerequisites
 
@@ -18,9 +18,23 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 
-[[version_groups]]
-name = "sdk"
-members = ["packages/web-sdk", "packages/mobile-sdk", "crates/sdk_core"]
+[package.sdk-core]
+path = "crates/sdk_core"
+type = "cargo"
+
+[package.web-sdk]
+path = "packages/web-sdk"
+type = "npm"
+
+[package.mobile-sdk]
+path = "packages/mobile-sdk"
+type = "dart"
+
+[group.sdk]
+packages = ["sdk-core", "web-sdk", "mobile-sdk"]
+tag = true
+release = true
+version_format = "primary"
 
 [ecosystems.cargo]
 enabled = true
@@ -41,62 +55,45 @@ name = "release"
 type = "PrepareRelease"
 ```
 
-## 2. Verify workspace discovery
+## 2. Validate and verify workspace discovery
 
 ```bash
+mc check --root .
 mc workspace discover --root . --format json
 ```
-
-Expected outcome:
-
-- all intended packages are listed once
-- each package includes ecosystem identity and manifest location
-- dependency edges are present
-- version-group membership is visible for grouped packages
-- warnings are emitted for invalid glob matches or mismatched grouped versions
 
 ## 3. Supply change input
 
 Preferred CLI flow:
 
 ```bash
-mc changes add --root . --package sdk_core --bump minor --reason "public API addition"
+mc changes add --root . --package sdk-core --bump minor --reason "public API addition"
 ```
 
 Equivalent manual file:
 
 ```markdown
 ---
-sdk_core: minor
+sdk-core: minor
 ---
 
 #### public API addition
 ```
 
-For a Rust compatibility escalation example:
+A grouped release can target the group id directly:
 
 ```markdown
 ---
-sdk_core: patch
-evidence:
-  sdk_core:
-    - rust-semver:major:public API break detected
+sdk: minor
 ---
 
-#### breaking API change
+#### coordinated SDK release
 ```
 
 ## 4. Compute a release plan
 
-For raw planner inspection:
-
 ```bash
 mc plan release --root . --changes .changeset/my-change.md --format json
-```
-
-For the primary repository workflow:
-
-```bash
 mc release --dry-run
 mc release
 ```
@@ -106,9 +103,9 @@ Expected outcome:
 - directly changed packages receive the requested or inferred increment
 - transitive dependents receive at least the configured parent bump
 - grouped packages share one planned version
-- the workflow updates manifests and package changelogs
+- package and group metadata drive release targets
+- the workflow updates manifests, changelogs, and configured `versioned_files`
 - consumed `.changeset/*.md` files are deleted only after a fully successful prepare run
-- compatibility evidence appears in the output when supplied
 
 ## 5. Run repository validation
 
@@ -118,15 +115,3 @@ test:all
 build:all
 build:book
 ```
-
-## 6. Implementation notes
-
-- package references in change files can use ids, names, relative manifest paths, or relative package directories
-- Rust semver escalation is explicit in this milestone and is driven by `evidence` entries such as `rust-semver:major:...`
-- version-group synchronization can create additional releases that then propagate parent bumps to their dependents
-
-## 7. Migration considerations
-
-- existing repositories can start with discovery only, then add change files and version groups incrementally
-- teams migrating from ecosystem-specific tooling should keep native workspace manifests unchanged and layer `monochange.toml` on top
-- GitHub bot automation remains intentionally out of scope for this first delivery

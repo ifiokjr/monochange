@@ -56,6 +56,7 @@ use clap::ValueEnum;
 use monochange_cargo::discover_cargo_packages;
 use monochange_cargo::RustSemverProvider;
 use monochange_config::apply_version_groups;
+use monochange_config::check_workspace;
 use monochange_config::load_change_signals;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
@@ -68,6 +69,7 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::ReleasePlan;
+use monochange_core::VersionFormat;
 use monochange_core::WorkflowDefinition;
 use monochange_core::WorkflowStepDefinition;
 use monochange_dart::discover_dart_packages;
@@ -112,12 +114,25 @@ struct WorkflowInvocation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ReleaseTarget {
+	pub id: String,
+	pub kind: String,
+	pub version: String,
+	pub tag: bool,
+	pub release: bool,
+	pub version_format: VersionFormat,
+	pub tag_name: String,
+	pub members: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PreparedRelease {
 	pub plan: ReleasePlan,
 	pub changeset_paths: Vec<PathBuf>,
 	pub released_packages: Vec<String>,
 	pub version: Option<String>,
 	pub group_version: Option<String>,
+	pub release_targets: Vec<ReleaseTarget>,
 	pub changed_files: Vec<PathBuf>,
 	pub updated_changelogs: Vec<PathBuf>,
 	pub deleted_changesets: Vec<PathBuf>,
@@ -139,7 +154,8 @@ struct WorkflowContext {
 }
 
 const CHANGESET_DIR: &str = ".changeset";
-const RESERVED_COMMAND_NAMES: &[&str] = &["workspace", "plan", "changes", "help", "version"];
+const RESERVED_COMMAND_NAMES: &[&str] =
+	&["check", "workspace", "plan", "changes", "help", "version"];
 
 pub fn build_command(bin_name: &'static str) -> Command {
 	Command::new(bin_name)
@@ -155,6 +171,11 @@ pub fn build_command(bin_name: &'static str) -> Command {
 						.arg(root_arg())
 						.arg(format_arg()),
 				),
+		)
+		.subcommand(
+			Command::new("check")
+				.about("Validate monochange configuration and changesets")
+				.arg(root_arg()),
 		)
 		.subcommand(
 			Command::new("plan").subcommand_required(true).subcommand(
@@ -485,6 +506,15 @@ fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowConte
 				prepared_release.released_packages.join(", ")
 			));
 		}
+		if !prepared_release.release_targets.is_empty() {
+			lines.push("release targets:".to_string());
+			for target in &prepared_release.release_targets {
+				lines.push(format!(
+					"- {} {} -> {} (tag: {}, release: {})",
+					target.kind, target.id, target.tag_name, target.tag, target.release,
+				));
+			}
+		}
 		if !prepared_release.changed_files.is_empty() {
 			lines.push("changed files:".to_string());
 			for path in &prepared_release.changed_files {
@@ -509,6 +539,11 @@ fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowConte
 
 pub fn execute_matches(matches: &ArgMatches) -> MonochangeResult<String> {
 	match matches.subcommand() {
+		Some(("check", check_matches)) => {
+			let root = required_path(check_matches, "root")?;
+			check_workspace(&root)?;
+			Ok(format!("workspace check passed for {}", root.display()))
+		}
 		Some(("workspace", workspace_matches)) => match workspace_matches.subcommand() {
 			Some(("discover", discover_matches)) => {
 				let root = required_path(discover_matches, "root")?;
@@ -594,8 +629,10 @@ pub fn add_change_file(
 	evidence: &[String],
 	output: Option<&Path>,
 ) -> MonochangeResult<PathBuf> {
+	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
-	let packages = canonical_change_packages(root, package_refs, &discovery.packages)?;
+	let packages =
+		canonical_change_packages(root, package_refs, &configuration, &discovery.packages)?;
 	let output_path =
 		output.map_or_else(|| default_change_path(root, &packages), Path::to_path_buf);
 	if let Some(parent) = output_path.parent() {
@@ -617,7 +654,7 @@ pub fn add_change_file(
 pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<ReleasePlan> {
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
-	let change_signals = load_change_signals(changes_path, root, &discovery.packages)?;
+	let change_signals = load_change_signals(changes_path, &configuration, &discovery.packages)?;
 	Ok(build_release_plan_from_signals(
 		&configuration,
 		&discovery,
@@ -632,7 +669,11 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	let change_signals = changeset_paths
 		.iter()
 		.try_fold(Vec::new(), |mut signals, path| {
-			signals.extend(load_change_signals(path, root, &discovery.packages)?);
+			signals.extend(load_change_signals(
+				path,
+				&configuration,
+				&discovery.packages,
+			)?);
 			Ok::<_, MonochangeError>(signals)
 		})?;
 	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals);
@@ -643,19 +684,27 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		));
 	}
 
-	let changelog_overrides = resolve_changelog_overrides(&configuration, &discovery.packages)?;
+	let changelog_targets = resolve_changelog_targets(&configuration, &discovery.packages)?;
 	let manifest_updates = build_cargo_manifest_updates(&discovery.packages, &plan)?;
+	let versioned_file_updates =
+		build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)?;
 	let changelog_updates = build_changelog_updates(
 		root,
+		&configuration,
 		&discovery.packages,
 		&plan,
 		&change_signals,
-		&changelog_overrides,
+		&changelog_targets,
 	)?;
 	let mut changed_files = manifest_updates
 		.iter()
 		.map(|update| root_relative(root, &update.path))
 		.collect::<Vec<_>>();
+	changed_files.extend(
+		versioned_file_updates
+			.iter()
+			.map(|update| root_relative(root, &update.path)),
+	);
 	changed_files.extend(
 		changelog_updates
 			.iter()
@@ -670,9 +719,11 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 
 	let version = shared_release_version(&plan);
 	let group_version = shared_group_version(&plan);
+	let release_targets = build_release_targets(&configuration, &discovery.packages, &plan);
 	let mut deleted_changesets = Vec::new();
 	if !dry_run {
 		apply_file_updates(&manifest_updates)?;
+		apply_file_updates(&versioned_file_updates)?;
 		apply_file_updates(&changelog_updates)?;
 		for path in &changeset_paths {
 			fs::remove_file(path).map_err(|error| {
@@ -688,6 +739,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		released_packages,
 		version,
 		group_version,
+		release_targets,
 		changed_files,
 		updated_changelogs,
 		deleted_changesets,
@@ -749,19 +801,37 @@ fn build_release_plan_from_signals(
 fn canonical_change_packages(
 	root: &Path,
 	package_refs: &[String],
+	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
 ) -> MonochangeResult<Vec<String>> {
 	let mut canonical_packages = Vec::new();
 	for package_ref in package_refs {
-		let package_id = resolve_package_reference(package_ref, root, packages)?;
-		let package = packages
+		let canonical_key = if configuration
+			.groups
 			.iter()
-			.find(|package| package.id == package_id)
-			.ok_or_else(|| {
-				MonochangeError::Config(format!("failed to resolve package `{package_ref}`"))
-			})?;
-		if !canonical_packages.contains(&package.name) {
-			canonical_packages.push(package.name.clone());
+			.any(|group| group.id == *package_ref)
+			|| configuration
+				.packages
+				.iter()
+				.any(|package| package.id == *package_ref)
+		{
+			package_ref.clone()
+		} else {
+			let package_id = resolve_package_reference(package_ref, root, packages)?;
+			let package = packages
+				.iter()
+				.find(|package| package.id == package_id)
+				.ok_or_else(|| {
+					MonochangeError::Config(format!("failed to resolve package `{package_ref}`"))
+				})?;
+			package
+				.metadata
+				.get("config_id")
+				.cloned()
+				.unwrap_or_else(|| package.name.clone())
+		};
+		if !canonical_packages.contains(&canonical_key) {
+			canonical_packages.push(canonical_key);
 		}
 	}
 	Ok(canonical_packages)
@@ -784,36 +854,55 @@ fn released_package_names(packages: &[PackageRecord], plan: &ReleasePlan) -> Vec
 	released_packages
 }
 
-fn resolve_changelog_overrides(
+type PackageChangelogTargets = BTreeMap<String, PathBuf>;
+type GroupChangelogTargets = BTreeMap<String, PathBuf>;
+
+fn resolve_changelog_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
-) -> MonochangeResult<BTreeMap<String, PathBuf>> {
-	let mut changelog_overrides = BTreeMap::new();
-	for package_override in &configuration.package_overrides {
-		let Some(changelog_path) = &package_override.changelog else {
+) -> MonochangeResult<(PackageChangelogTargets, GroupChangelogTargets)> {
+	let mut package_targets = BTreeMap::new();
+	let mut group_targets = BTreeMap::new();
+
+	for package_definition in &configuration.packages {
+		let Some(changelog_path) = &package_definition.changelog else {
 			continue;
 		};
-		let package_id = resolve_package_reference(
-			&package_override.package,
-			&configuration.root_path,
-			packages,
-		)?;
-		let resolved_path = if changelog_path.is_absolute() {
-			changelog_path.clone()
-		} else {
-			configuration.root_path.join(changelog_path)
-		};
-		changelog_overrides.insert(package_id, resolved_path);
+		let package_id =
+			resolve_package_reference(&package_definition.id, &configuration.root_path, packages)?;
+		package_targets.insert(
+			package_id,
+			resolve_config_path(&configuration.root_path, changelog_path),
+		);
 	}
-	Ok(changelog_overrides)
+	for group_definition in &configuration.groups {
+		let Some(changelog_path) = &group_definition.changelog else {
+			continue;
+		};
+		group_targets.insert(
+			group_definition.id.clone(),
+			resolve_config_path(&configuration.root_path, changelog_path),
+		);
+	}
+
+	Ok((package_targets, group_targets))
+}
+
+fn resolve_config_path(root: &Path, path: &Path) -> PathBuf {
+	if path.is_absolute() {
+		path.to_path_buf()
+	} else {
+		root.join(path)
+	}
 }
 
 fn build_changelog_updates(
 	_root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 	change_signals: &[ChangeSignal],
-	changelog_overrides: &BTreeMap<String, PathBuf>,
+	changelog_targets: &(PackageChangelogTargets, GroupChangelogTargets),
 ) -> MonochangeResult<Vec<FileUpdate>> {
 	let mut notes_by_package = BTreeMap::<String, BTreeSet<String>>::new();
 	for signal in change_signals {
@@ -826,12 +915,14 @@ fn build_changelog_updates(
 	}
 
 	let mut updates = Vec::new();
+	let package_changelog_targets = &changelog_targets.0;
+	let group_changelog_targets = &changelog_targets.1;
 	for decision in plan
 		.decisions
 		.iter()
 		.filter(|decision| decision.recommended_bump.is_release())
 	{
-		let Some(changelog_path) = changelog_overrides.get(&decision.package_id) else {
+		let Some(changelog_path) = package_changelog_targets.get(&decision.package_id) else {
 			continue;
 		};
 		let Some(package) = packages
@@ -848,32 +939,93 @@ fn build_changelog_updates(
 			.map(|notes| notes.iter().cloned().collect::<Vec<_>>())
 			.filter(|notes| !notes.is_empty())
 			.unwrap_or_else(|| decision.reasons.clone());
-		let current = if changelog_path.exists() {
-			fs::read_to_string(changelog_path).map_err(|error| {
-				MonochangeError::Io(format!(
-					"failed to read {}: {error}",
-					changelog_path.display()
-				))
-			})?
-		} else {
-			String::new()
-		};
-		let mut content = current.trim_end().to_string();
-		if !content.is_empty() {
-			content.push_str("\n\n");
-		}
-		content.push_str(&render_changelog_section(
-			&package.name,
-			&planned_version.to_string(),
-			&notes,
-		));
-		content.push('\n');
 		updates.push(FileUpdate {
 			path: changelog_path.clone(),
-			content,
+			content: append_changelog_section(
+				changelog_path,
+				&render_changelog_section(&package.name, &planned_version.to_string(), &notes),
+			)?,
 		});
 	}
-	Ok(updates)
+
+	for planned_group in plan
+		.groups
+		.iter()
+		.filter(|group| group.recommended_bump.is_release())
+	{
+		let Some(changelog_path) = group_changelog_targets.get(&planned_group.group_id) else {
+			continue;
+		};
+		let Some(planned_version) = planned_group.planned_version.as_ref() else {
+			continue;
+		};
+		let member_notes = planned_group
+			.members
+			.iter()
+			.filter_map(|member_id| notes_by_package.get(member_id))
+			.flat_map(BTreeSet::iter)
+			.cloned()
+			.collect::<BTreeSet<_>>()
+			.into_iter()
+			.collect::<Vec<_>>();
+		let member_ids = configuration
+			.groups
+			.iter()
+			.find(|group| group.id == planned_group.group_id)
+			.map(|group| group.packages.clone())
+			.unwrap_or_default();
+		let notes = if member_notes.is_empty() {
+			vec![format!(
+				"prepare grouped release for `{}`",
+				planned_group.group_id
+			)]
+		} else {
+			member_notes
+		};
+		updates.push(FileUpdate {
+			path: changelog_path.clone(),
+			content: append_changelog_section(
+				changelog_path,
+				&render_group_changelog_section(
+					&planned_group.group_id,
+					&planned_version.to_string(),
+					&member_ids,
+					&notes,
+				),
+			)?,
+		});
+	}
+
+	Ok(dedup_file_updates(updates))
+}
+
+fn append_changelog_section(path: &Path, section: &str) -> MonochangeResult<String> {
+	let current = if path.exists() {
+		fs::read_to_string(path).map_err(|error| {
+			MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
+		})?
+	} else {
+		String::new()
+	};
+	let mut content = current.trim_end().to_string();
+	if !content.is_empty() {
+		content.push_str("\n\n");
+	}
+	content.push_str(section);
+	content.push('\n');
+	Ok(content)
+}
+
+fn dedup_file_updates(updates: Vec<FileUpdate>) -> Vec<FileUpdate> {
+	updates
+		.into_iter()
+		.fold(BTreeMap::<PathBuf, String>::new(), |mut acc, update| {
+			acc.insert(update.path, update.content);
+			acc
+		})
+		.into_iter()
+		.map(|(path, content)| FileUpdate { path, content })
+		.collect()
 }
 
 fn render_changelog_section(package_name: &str, version: &str, notes: &[String]) -> String {
@@ -886,6 +1038,341 @@ fn render_changelog_section(package_name: &str, version: &str, notes: &[String])
 		}
 	}
 	lines.join("\n")
+}
+
+fn render_group_changelog_section(
+	group_name: &str,
+	version: &str,
+	members: &[String],
+	notes: &[String],
+) -> String {
+	let mut lines = vec![format!("## {version}"), String::new()];
+	lines.push(format!("Grouped release for `{group_name}`."));
+	if !members.is_empty() {
+		lines.push(format!("Members: {}", members.join(", ")));
+		lines.push(String::new());
+	}
+	for note in notes {
+		lines.push(format!("- {note}"));
+	}
+	lines.join("\n")
+}
+
+struct VersionedFileUpdateContext<'a> {
+	package_definitions_by_id: BTreeMap<&'a str, &'a monochange_core::PackageDefinition>,
+	package_by_record_id: BTreeMap<&'a str, &'a PackageRecord>,
+	released_versions_by_native_name: BTreeMap<String, String>,
+}
+
+fn build_versioned_file_updates(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> MonochangeResult<Vec<FileUpdate>> {
+	if configuration.packages.is_empty() && configuration.groups.is_empty() {
+		return Ok(Vec::new());
+	}
+	let released_versions_by_record_id = released_versions_by_record_id(plan);
+	let package_by_record_id = packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<BTreeMap<_, _>>();
+	let package_definitions_by_id = configuration
+		.packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<BTreeMap<_, _>>();
+	let released_versions_by_config_id = packages
+		.iter()
+		.filter_map(|package| {
+			package.metadata.get("config_id").and_then(|config_id| {
+				released_versions_by_record_id
+					.get(&package.id)
+					.map(|version| (config_id.clone(), version.clone()))
+			})
+		})
+		.collect::<BTreeMap<_, _>>();
+	let released_versions_by_native_name = packages
+		.iter()
+		.filter_map(|package| {
+			released_versions_by_record_id
+				.get(&package.id)
+				.map(|version| (package.name.clone(), version.clone()))
+		})
+		.collect::<BTreeMap<_, _>>();
+	let shared_release_version = shared_release_version(plan);
+	let context = VersionedFileUpdateContext {
+		package_definitions_by_id,
+		package_by_record_id,
+		released_versions_by_native_name,
+	};
+	let mut updates = BTreeMap::<PathBuf, Value>::new();
+
+	for package_definition in &configuration.packages {
+		let Some(version) = released_versions_by_config_id.get(&package_definition.id) else {
+			continue;
+		};
+		for versioned_file in &package_definition.versioned_files {
+			apply_versioned_file_definition(
+				root,
+				&mut updates,
+				versioned_file,
+				package_definition.id.as_str(),
+				version,
+				shared_release_version.as_ref(),
+				&context,
+			)?;
+		}
+	}
+
+	for group_definition in &configuration.groups {
+		let Some(group_version) = plan
+			.groups
+			.iter()
+			.find(|group| group.group_id == group_definition.id)
+			.and_then(|group| group.planned_version.as_ref())
+			.map(ToString::to_string)
+		else {
+			continue;
+		};
+		for versioned_file in &group_definition.versioned_files {
+			apply_versioned_file_definition(
+				root,
+				&mut updates,
+				versioned_file,
+				group_definition.id.as_str(),
+				&group_version,
+				Some(&group_version),
+				&context,
+			)?;
+		}
+	}
+
+	updates
+		.into_iter()
+		.map(|(path, document)| {
+			toml::to_string_pretty(&document)
+				.map(|content| FileUpdate { path, content })
+				.map_err(|error| MonochangeError::Config(error.to_string()))
+		})
+		.collect()
+}
+
+fn apply_versioned_file_definition(
+	root: &Path,
+	updates: &mut BTreeMap<PathBuf, Value>,
+	definition: &monochange_core::VersionedFileDefinition,
+	owner_id: &str,
+	owner_version: &str,
+	shared_release_version: Option<&String>,
+	context: &VersionedFileUpdateContext<'_>,
+) -> MonochangeResult<()> {
+	match definition {
+		monochange_core::VersionedFileDefinition::Path(path) => {
+			let resolved_path = resolve_config_path(root, path);
+			let mut document = if let Some(document) = updates.remove(&resolved_path) {
+				document
+			} else {
+				read_toml_document(&resolved_path)?
+			};
+			update_document_for_release_file(
+				&mut document,
+				owner_id,
+				owner_version,
+				&context.released_versions_by_native_name,
+				shared_release_version.map(String::as_str),
+			);
+			updates.insert(resolved_path, document);
+		}
+		monochange_core::VersionedFileDefinition::Dependency { path, dependency } => {
+			let Some(package_definition) =
+				context.package_definitions_by_id.get(dependency.as_str())
+			else {
+				return Err(MonochangeError::Config(format!(
+					"versioned file dependency `{dependency}` is not a declared package"
+				)));
+			};
+			let dependency_native_name = context
+				.package_by_record_id
+				.values()
+				.find(|package| package.metadata.get("config_id") == Some(&package_definition.id))
+				.map_or_else(|| dependency.clone(), |package| package.name.clone());
+			let Some(version) = context
+				.released_versions_by_native_name
+				.get(&dependency_native_name)
+			else {
+				return Ok(());
+			};
+			let resolved_path = resolve_config_path(root, path);
+			let mut document = if let Some(document) = updates.remove(&resolved_path) {
+				document
+			} else {
+				read_toml_document(&resolved_path)?
+			};
+			let single_dependency = BTreeMap::from([(dependency_native_name, version.clone())]);
+			update_document_dependencies(&mut document, &single_dependency);
+			updates.insert(resolved_path, document);
+		}
+	}
+	Ok(())
+}
+
+fn update_document_for_release_file(
+	document: &mut Value,
+	owner_id: &str,
+	owner_version: &str,
+	released_versions_by_native_name: &BTreeMap<String, String>,
+	shared_release_version: Option<&str>,
+) {
+	if let Some(package_table) = document.get_mut("package").and_then(Value::as_table_mut) {
+		package_table.insert(
+			"version".to_string(),
+			Value::String(owner_version.to_string()),
+		);
+		let _ = owner_id;
+	}
+	if let Some(workspace_table) = document.get_mut("workspace").and_then(Value::as_table_mut) {
+		if let Some(workspace_package_table) = workspace_table
+			.get_mut("package")
+			.and_then(Value::as_table_mut)
+		{
+			if let Some(shared_release_version) = shared_release_version {
+				workspace_package_table.insert(
+					"version".to_string(),
+					Value::String(shared_release_version.to_string()),
+				);
+			}
+		}
+	}
+	update_document_dependencies(document, released_versions_by_native_name);
+}
+
+fn update_document_dependencies(
+	document: &mut Value,
+	released_versions_by_native_name: &BTreeMap<String, String>,
+) {
+	for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+		update_dependency_table(document, section, released_versions_by_native_name);
+	}
+	if let Some(workspace_table) = document.get_mut("workspace").and_then(Value::as_table_mut) {
+		if let Some(workspace_dependency_table) = workspace_table
+			.get_mut("dependencies")
+			.and_then(Value::as_table_mut)
+		{
+			for (package_name, version) in released_versions_by_native_name {
+				let Some(entry) = workspace_dependency_table.get_mut(package_name) else {
+					continue;
+				};
+				if let Some(entry_table) = entry.as_table_mut() {
+					entry_table.insert("version".to_string(), Value::String(version.clone()));
+				} else {
+					*entry = Value::String(version.clone());
+				}
+			}
+		}
+	}
+}
+
+fn released_versions_by_record_id(plan: &ReleasePlan) -> BTreeMap<String, String> {
+	plan.decisions
+		.iter()
+		.filter(|decision| decision.recommended_bump.is_release())
+		.filter_map(|decision| {
+			decision
+				.planned_version
+				.as_ref()
+				.map(|version| (decision.package_id.clone(), version.to_string()))
+		})
+		.collect()
+}
+
+fn build_release_targets(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> Vec<ReleaseTarget> {
+	let mut release_targets = configuration
+		.groups
+		.iter()
+		.filter_map(|group| {
+			plan.groups
+				.iter()
+				.find(|planned_group| {
+					planned_group.group_id == group.id
+						&& planned_group.recommended_bump.is_release()
+				})
+				.and_then(|planned_group| {
+					planned_group
+						.planned_version
+						.as_ref()
+						.map(|version| ReleaseTarget {
+							id: group.id.clone(),
+							kind: "group".to_string(),
+							version: version.to_string(),
+							tag: group.tag,
+							release: group.release,
+							version_format: group.version_format,
+							tag_name: render_tag_name(
+								&group.id,
+								&version.to_string(),
+								group.version_format,
+							),
+							members: group.packages.clone(),
+						})
+				})
+		})
+		.collect::<Vec<_>>();
+	for decision in plan
+		.decisions
+		.iter()
+		.filter(|decision| decision.recommended_bump.is_release() && decision.group_id.is_none())
+	{
+		let Some(package) = packages
+			.iter()
+			.find(|package| package.id == decision.package_id)
+		else {
+			continue;
+		};
+		let Some(version) = decision.planned_version.as_ref() else {
+			continue;
+		};
+		let config_id = package
+			.metadata
+			.get("config_id")
+			.cloned()
+			.unwrap_or_else(|| package.name.clone());
+		let Some(identity) = configuration.effective_release_identity(&config_id) else {
+			continue;
+		};
+		let kind = match identity.owner_kind {
+			monochange_core::ReleaseOwnerKind::Package => "package",
+			monochange_core::ReleaseOwnerKind::Group => "group",
+		};
+		release_targets.push(ReleaseTarget {
+			id: identity.owner_id.clone(),
+			kind: kind.to_string(),
+			version: version.to_string(),
+			tag: identity.tag,
+			release: identity.release,
+			version_format: identity.version_format,
+			tag_name: render_tag_name(
+				&identity.owner_id,
+				&version.to_string(),
+				identity.version_format,
+			),
+			members: identity.members,
+		});
+	}
+	release_targets.sort_by(|left, right| left.id.cmp(&right.id));
+	release_targets
+}
+
+fn render_tag_name(id: &str, version: &str, version_format: VersionFormat) -> String {
+	match version_format {
+		VersionFormat::Namespaced => format!("{id}/v{version}"),
+		VersionFormat::Primary => format!("v{version}"),
+	}
 }
 
 fn build_cargo_manifest_updates(

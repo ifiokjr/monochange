@@ -31,25 +31,29 @@ warn_on_group_mismatch = true
 <!-- {@configurationVersionGroupsSnippet} -->
 
 ```toml
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk", "packages/mobile-sdk"]
-strategy = "shared"
+[package.sdk-core]
+path = "crates/sdk_core"
+type = "cargo"
+changelog = "crates/sdk_core/CHANGELOG.md"
+versioned_files = ["crates/sdk_core/extra.toml"]
+tag = false
+release = false
+version_format = "namespaced"
 ```
 
 <!-- {/configurationVersionGroupsSnippet} -->
 
 <!-- {@configurationPackageOverridesSnippet} -->
 
+Legacy repositories may still contain `[[package_overrides]]` entries such as:
+
 ```toml
 [[package_overrides]]
 package = "crates/sdk_core"
 changelog = "crates/sdk_core/CHANGELOG.md"
-
-[[package_overrides]]
-package = "packages/web-sdk"
-changelog = "packages/web-sdk/CHANGELOG.md"
 ```
+
+Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 
@@ -64,7 +68,7 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "Command"
-command = "printf '%s\n' '$version'"
+command = "cargo test --workspace --all-features"
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -103,28 +107,38 @@ enabled = true
 
 <!-- {@configurationPackageReferenceRules} -->
 
-Package references may use package ids, package names, manifest-relative paths, or manifest-directory paths.
+Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc check` should guide you toward declared ids.
 
 <!-- {/configurationPackageReferenceRules} -->
 
 <!-- {@configurationCurrentStatus} -->
 
-Current implementation status:
+Current implementation notes:
 
-- actively used today: `defaults.parent_bump`, `defaults.warn_on_group_mismatch`, `version_groups`, `package_overrides.changelog`, and `workflows`
-- parsed but not currently enforced by discovery or planning: `defaults.include_private`, `version_groups.strategy`, and `[ecosystems.*].enabled/roots/exclude`
-- workflow names must be unique, must not collide with built-in commands, and must contain at least one step
-- supported workflow steps today: `PrepareRelease` and `Command`
+- `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven workflows in this milestone
+- `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
+- `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
+- `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
+- supported workflow steps today are `PrepareRelease` and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
 <!-- {@versionGroupsExample} -->
 
 ```toml
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk"]
-strategy = "shared"
+[package.sdk-core]
+path = "cargo/sdk-core"
+type = "cargo"
+
+[package.web-sdk]
+path = "packages/web-sdk"
+type = "npm"
+
+[group.sdk]
+packages = ["sdk-core", "web-sdk"]
+tag = true
+release = true
+version_format = "primary"
 ```
 
 <!-- {/versionGroupsExample} -->
@@ -134,6 +148,9 @@ strategy = "shared"
 - the highest required bump in the group wins
 - every member in the group receives that bump
 - one planned group version is calculated from the highest current member version
+- the group owns outward release identity
+- member package changelogs can still be updated individually
+- group changelog and group `versioned_files` can also be updated
 - dependents of newly synced members still receive propagated parent bumps
 - unmatched members produce warnings during discovery
 - mismatched current versions produce warnings when `warn_on_group_mismatch = true`
@@ -142,14 +159,14 @@ strategy = "shared"
 
 <!-- {@versionGroupsCurrentStatus} -->
 
-`strategy` is parsed from config, but the current implementation always applies shared synchronized versioning behavior.
+Legacy `version_groups.strategy` is no longer the primary authoring model. The current implementation always derives synchronized release behavior from `[group.<id>]` declarations.
 
 <!-- {/versionGroupsCurrentStatus} -->
 
 <!-- {@releaseChangesAddCommand} -->
 
 ```bash
-mc changes add --root . --package sdk_core --bump minor --reason "public API addition"
+mc changes add --root . --package sdk-core --bump minor --reason "public API addition"
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -158,7 +175,7 @@ mc changes add --root . --package sdk_core --bump minor --reason "public API add
 
 ```markdown
 ---
-sdk_core: minor
+sdk-core: minor
 ---
 
 #### public API addition
@@ -170,11 +187,9 @@ sdk_core: minor
 
 ```markdown
 ---
-sdk_core: patch
-origin:
-  sdk_core: direct-change
+sdk-core: patch
 evidence:
-  sdk_core:
+  sdk-core:
     - rust-semver:major:public API break detected
 ---
 
@@ -189,18 +204,23 @@ evidence:
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
-- version-group synchronization runs before final output is rendered
+- configured groups synchronize before final output is rendered
+- release targets carry effective `tag`, `release`, and `version_format` metadata
 
 <!-- {/releasePlanningRules} -->
 
 <!-- {@releaseWorkflowBehavior} -->
 
+`mc release` only works when your config defines a workflow named `release`.
+
+During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
+
 Current `PrepareRelease` behavior:
 
 - reads `.changeset/*.md`
 - computes one synchronized release plan from discovered change files
-- updates Cargo package versions and Cargo workspace dependency versions when a release is applied
-- appends changelog sections only for packages configured through `[[package_overrides]]` with `changelog` paths
+- updates native manifests plus configured changelogs and versioned files
+- applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run`
 

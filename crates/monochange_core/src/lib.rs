@@ -71,6 +71,18 @@ pub enum MonochangeError {
 	Config(String),
 	#[error("discovery error: {0}")]
 	Discovery(String),
+	#[error("{0}")]
+	Diagnostic(String),
+}
+
+impl MonochangeError {
+	#[must_use]
+	pub fn render(&self) -> String {
+		match self {
+			Self::Diagnostic(report) => report.clone(),
+			_ => self.to_string(),
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -269,11 +281,65 @@ pub struct DependencyEdge {
 	pub is_direct: bool,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PackageType {
+	Cargo,
+	Npm,
+	Deno,
+	Dart,
+	Flutter,
+}
+
+impl PackageType {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Cargo => "cargo",
+			Self::Npm => "npm",
+			Self::Deno => "deno",
+			Self::Dart => "dart",
+			Self::Flutter => "flutter",
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VersionFormat {
+	#[default]
+	Namespaced,
+	Primary,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct VersionGroupDefinition {
-	pub name: String,
-	pub members: Vec<String>,
-	pub strategy: Option<String>,
+#[serde(untagged)]
+pub enum VersionedFileDefinition {
+	Path(PathBuf),
+	Dependency { path: PathBuf, dependency: String },
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PackageDefinition {
+	pub id: String,
+	pub path: PathBuf,
+	pub package_type: PackageType,
+	pub changelog: Option<PathBuf>,
+	pub versioned_files: Vec<VersionedFileDefinition>,
+	pub tag: bool,
+	pub release: bool,
+	pub version_format: VersionFormat,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GroupDefinition {
+	pub id: String,
+	pub packages: Vec<String>,
+	pub changelog: Option<PathBuf>,
+	pub versioned_files: Vec<VersionedFileDefinition>,
+	pub tag: bool,
+	pub release: bool,
+	pub version_format: VersionFormat,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -304,12 +370,6 @@ pub struct EcosystemSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PackageOverride {
-	pub package: String,
-	pub changelog: Option<PathBuf>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum WorkflowStepDefinition {
 	PrepareRelease,
@@ -323,17 +383,82 @@ pub struct WorkflowDefinition {
 	pub steps: Vec<WorkflowStepDefinition>,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReleaseOwnerKind {
+	Package,
+	Group,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EffectiveReleaseIdentity {
+	pub owner_id: String,
+	pub owner_kind: ReleaseOwnerKind,
+	pub group_id: Option<String>,
+	pub tag: bool,
+	pub release: bool,
+	pub version_format: VersionFormat,
+	pub members: Vec<String>,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
 	pub defaults: WorkspaceDefaults,
-	pub version_groups: Vec<VersionGroupDefinition>,
-	pub package_overrides: Vec<PackageOverride>,
+	pub packages: Vec<PackageDefinition>,
+	pub groups: Vec<GroupDefinition>,
 	pub workflows: Vec<WorkflowDefinition>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,
 	pub dart: EcosystemSettings,
+}
+
+impl WorkspaceConfiguration {
+	#[must_use]
+	pub fn package_by_id(&self, package_id: &str) -> Option<&PackageDefinition> {
+		self.packages
+			.iter()
+			.find(|package| package.id == package_id)
+	}
+
+	#[must_use]
+	pub fn group_by_id(&self, group_id: &str) -> Option<&GroupDefinition> {
+		self.groups.iter().find(|group| group.id == group_id)
+	}
+
+	#[must_use]
+	pub fn group_for_package(&self, package_id: &str) -> Option<&GroupDefinition> {
+		self.groups
+			.iter()
+			.find(|group| group.packages.iter().any(|member| member == package_id))
+	}
+
+	#[must_use]
+	pub fn effective_release_identity(&self, package_id: &str) -> Option<EffectiveReleaseIdentity> {
+		let package = self.package_by_id(package_id)?;
+		if let Some(group) = self.group_for_package(package_id) {
+			return Some(EffectiveReleaseIdentity {
+				owner_id: group.id.clone(),
+				owner_kind: ReleaseOwnerKind::Group,
+				group_id: Some(group.id.clone()),
+				tag: group.tag,
+				release: group.release,
+				version_format: group.version_format,
+				members: group.packages.clone(),
+			});
+		}
+
+		Some(EffectiveReleaseIdentity {
+			owner_id: package.id.clone(),
+			owner_kind: ReleaseOwnerKind::Package,
+			group_id: None,
+			tag: package.tag,
+			release: package.release,
+			version_format: package.version_format,
+			members: vec![package.id.clone()],
+		})
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

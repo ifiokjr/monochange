@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the first-step configuration surface for cross-ecosystem workspace discovery, release planning, and workflow-driven release preparation.
+Define the configuration surface for cross-ecosystem workspace discovery, changeset validation, release planning, and workflow-driven release preparation.
 
 ## File Location
 
@@ -18,26 +18,38 @@ Repository-wide default behavior.
 | ------------------------ | ------- | -------- | ---------------------------------------------------------------------------------- |
 | `parent_bump`            | string  | No       | Default bump applied to affected parent packages when no stronger evidence exists. |
 | `include_private`        | boolean | No       | Whether private packages are included in discovery and planning output.            |
-| `warn_on_group_mismatch` | boolean | No       | Whether existing version-group mismatches emit warnings.                           |
+| `warn_on_group_mismatch` | boolean | No       | Whether existing grouped-version mismatches emit warnings.                         |
 
-### `[[version_groups]]`
+### `[package.<id>]`
 
-Defines packages that always share the same planned version.
+Declares a release-managed package using a monochange-owned id.
 
-| Field      | Type             | Required | Meaning                                                                  |
-| ---------- | ---------------- | -------- | ------------------------------------------------------------------------ |
-| `name`     | string           | Yes      | Stable group identifier.                                                 |
-| `members`  | array of strings | Yes      | Package identifiers or manifest-relative paths that belong to the group. |
-| `strategy` | string           | No       | Group versioning strategy; defaults to shared version behavior.          |
+| Field             | Type    | Required | Meaning                                                         |
+| ----------------- | ------- | -------- | --------------------------------------------------------------- |
+| `path`            | string  | Yes      | Package directory relative to the repository root.              |
+| `type`            | string  | Yes      | One of `cargo`, `npm`, `deno`, `dart`, or `flutter`.            |
+| `changelog`       | string  | No       | Changelog file updated during release preparation.              |
+| `versioned_files` | array   | No       | Additional files whose version references should be updated.    |
+| `tag`             | boolean | No       | Whether this package should produce a tag when not grouped.     |
+| `release`         | boolean | No       | Whether this package should produce a release when not grouped. |
+| `version_format`  | string  | No       | `namespaced` or `primary`; defaults to `namespaced`.            |
+
+### `[group.<id>]`
+
+Declares a shared release unit that owns outward release identity for its member packages.
+
+| Field             | Type             | Required | Meaning                                                     |
+| ----------------- | ---------------- | -------- | ----------------------------------------------------------- |
+| `packages`        | array of strings | Yes      | Declared package ids that belong to the group.              |
+| `changelog`       | string           | No       | Group changelog updated during release preparation.         |
+| `versioned_files` | array            | No       | Additional shared files updated during release preparation. |
+| `tag`             | boolean          | No       | Whether the group should produce a tag.                     |
+| `release`         | boolean          | No       | Whether the group should produce a release.                 |
+| `version_format`  | string           | No       | `namespaced` or `primary`; defaults to `namespaced`.        |
 
 ### `[[workflows]]`
 
 Defines named workflows that can be run as top-level commands such as `mc release`.
-
-| Field   | Type   | Required | Meaning                       |
-| ------- | ------ | -------- | ----------------------------- |
-| `name`  | string | Yes      | Workflow command name.        |
-| `steps` | array  | Yes      | Ordered typed workflow steps. |
 
 ### `[[workflows.steps]]`
 
@@ -48,30 +60,9 @@ Built-in typed workflow steps.
 | `type`    | string | Yes      | One of `PrepareRelease` or `Command`.                       |
 | `command` | string | No       | Required when `type = "Command"`; shell command to execute. |
 
-### `[[package_overrides]]`
-
-Per-package release behavior overrides.
-
-| Field       | Type   | Required | Meaning                                                 |
-| ----------- | ------ | -------- | ------------------------------------------------------- |
-| `package`   | string | Yes      | Package identifier, manifest-relative path, or name.    |
-| `changelog` | string | No       | Changelog file updated during workflow release prepare. |
-
-### `[ecosystems.cargo]`
-
-### `[ecosystems.npm]`
-
-### `[ecosystems.deno]`
-
-### `[ecosystems.dart]`
+### `[ecosystems.cargo]`, `[ecosystems.npm]`, `[ecosystems.deno]`, `[ecosystems.dart]`
 
 Per-ecosystem switches and discovery overrides.
-
-| Field     | Type             | Required | Meaning                                        |
-| --------- | ---------------- | -------- | ---------------------------------------------- |
-| `enabled` | boolean          | No       | Enables or disables the ecosystem adapter.     |
-| `roots`   | array of strings | No       | Additional scan roots for that ecosystem.      |
-| `exclude` | array of strings | No       | Paths or globs to exclude from that ecosystem. |
 
 ## Example
 
@@ -81,9 +72,21 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 
-[[version_groups]]
-name = "sdk"
-members = ["crates/sdk_core", "packages/web-sdk", "packages/mobile-sdk"]
+[package.sdk-core]
+path = "crates/sdk_core"
+type = "cargo"
+changelog = "crates/sdk_core/CHANGELOG.md"
+
+[package.web-sdk]
+path = "packages/web-sdk"
+type = "npm"
+
+[group.sdk]
+packages = ["sdk-core", "web-sdk"]
+changelog = "CHANGELOG.md"
+tag = true
+release = true
+version_format = "primary"
 
 [[workflows]]
 name = "release"
@@ -91,38 +94,20 @@ name = "release"
 [[workflows.steps]]
 type = "PrepareRelease"
 
-[[package_overrides]]
-package = "crates/sdk_core"
-changelog = "crates/sdk_core/CHANGELOG.md"
-
 [ecosystems.cargo]
 enabled = true
 
 [ecosystems.npm]
 enabled = true
 roots = ["packages/*"]
-
-[ecosystems.deno]
-enabled = true
-
-[ecosystems.dart]
-enabled = true
 ```
 
 ## Validation Rules
 
-- Unknown top-level sections must produce actionable warnings or errors.
-- Group names must be unique.
-- Workflow names must be unique.
-- Workflow names must not collide with reserved built-in commands.
-- `Command` workflow steps must provide a non-empty `command`.
-- Group members must resolve to discovered packages.
-- Package overrides must resolve deterministically against discovered packages.
-- Ecosystem-specific roots may use supported glob syntax.
-- Excluded paths must remove matching packages from final discovery output.
-- If `parent_bump` is omitted, the default is `patch`.
-
-## Extensibility Requirements
-
-- The format must remain composable so later milestones can add publishing and automation settings without breaking existing planning configuration.
-- Ecosystem-specific settings must remain namespaced so adapters can evolve independently.
+- package and group ids share one namespace
+- groups may only reference declared package ids
+- a package may belong to at most one group
+- only one package or group may use `version_format = "primary"`
+- `versioned_files` dependency entries must reference declared package ids
+- changesets may reference only declared package ids or group ids
+- a changeset may not reference both a group and one of its members in the same file

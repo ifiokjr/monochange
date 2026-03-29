@@ -1,0 +1,13 @@
+[defaults]
+parent_bump = "patch"
+
+[package.shared]
+path = "packages/shared"
+type = "npm"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[ecosystems.npm]
+enabled = true
