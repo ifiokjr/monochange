@@ -19,7 +19,7 @@
 - [x] T012 Add `monochange_config` tests for valid and invalid `versioned_files` entries.
 - [x] T013 Add `monochange_config` tests for changeset validation against configured ids.
 - [x] T014 Add `monochange_config` tests for invalid changeset group/member overlap.
-- [x] T015 Add `monochange` CLI tests for `mc check --root .` success and failure cases.
+- [x] T015 Add `monochange` CLI tests for `mc validate` success and failure cases.
 
 ## Phase 2 — Core models
 
@@ -48,8 +48,8 @@
 ## Phase 5 — CLI validation command
 
 - [x] T031 Add `check` as a top-level built-in CLI command.
-- [x] T032 Implement `check_workspace` for config + changeset validation.
-- [x] T033 Render user-friendly success output for `mc check`.
+- [x] T032 Implement `validate_workspace` for config + changeset validation.
+- [x] T033 Render user-friendly success output for `mc validate`.
 - [x] T034 Wire `miette` failure output into the CLI path.
 
 ## Phase 6 — Runtime integration
@@ -63,7 +63,7 @@
 ## Phase 7 — Repo migration and docs
 
 - [x] T040 Migrate repo `monochange.toml` to the new package/group model.
-- [x] T041 Update docs and spec contracts to document package/group config and `mc check`.
+- [x] T041 Update docs and spec contracts to document package/group config and `mc validate`.
 - [x] T042 Add migration guidance from `version_groups`/`package_overrides` to `package`/`group`.
 
 ## Phase 8 — Validation

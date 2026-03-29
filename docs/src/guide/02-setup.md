@@ -28,17 +28,58 @@ tag = true
 release = true
 version_format = "primary"
 
-[ecosystems.npm]
-enabled = true
+[[workflows]]
+name = "validate"
+help_text = "Validate monochange configuration and changesets"
 
-[ecosystems.deno]
-enabled = true
+[[workflows.steps]]
+type = "Validate"
 
-[ecosystems.dart]
-enabled = true
+[[workflows]]
+name = "discover"
+help_text = "Discover packages across supported ecosystems"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "Discover"
+
+[[workflows]]
+name = "change"
+help_text = "Create a change file for one or more packages"
+
+[[workflows.inputs]]
+name = "package"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "bump"
+type = "choice"
+choices = ["patch", "minor", "major"]
+default = "patch"
+
+[[workflows.inputs]]
+name = "reason"
+type = "string"
+required = true
+
+[[workflows.steps]]
+type = "CreateChangeFile"
 
 [[workflows]]
 name = "release"
+help_text = "Prepare a release from discovered change files"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"
@@ -48,9 +89,9 @@ type = "PrepareRelease"
 
 <!-- {=projectSetupConfigNote} -->
 
-This guide shows the preferred package/group configuration model.
+This guide shows the preferred package/group configuration model together with the default top-level workflows emitted by `mc init`.
 
-If you are migrating from older config, replace legacy `[[version_groups]]` and `[[package_overrides]]` entries with `[group.<id>]` and `[package.<id>]` declarations before relying on `mc check` and `mc release`.
+If you omit `[[workflows]]`, MonoChange synthesizes the default `validate`, `discover`, `change`, and `release` workflows automatically. Repositories can then customize those commands by declaring workflows explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 
@@ -59,8 +100,8 @@ Then validate and verify discovery:
 <!-- {=projectDiscoverCommand} -->
 
 ```bash
-mc check --root .
-mc workspace discover --root . --format json
+mc validate
+mc discover --format json
 ```
 
 <!-- {/projectDiscoverCommand} -->

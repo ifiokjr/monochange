@@ -5,7 +5,7 @@ Create a changeset with the CLI:
 <!-- {=releaseChangesAddCommand} -->
 
 ```bash
-mc changes add --root . --package sdk-core --bump minor --reason "public API addition"
+mc change --package sdk-core --bump minor --reason "public API addition"
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -54,7 +54,7 @@ evidence:
 Validate before planning:
 
 ```bash
-mc check --root .
+mc validate
 ```
 
 Generate a plan directly when you want to inspect the raw planner output:
@@ -62,7 +62,7 @@ Generate a plan directly when you want to inspect the raw planner output:
 <!-- {=projectPlanCommand} -->
 
 ```bash
-mc plan release --root . --changes .changeset/my-change.md --format json
+mc release --dry-run --format json
 ```
 
 <!-- {/projectPlanCommand} -->
@@ -72,7 +72,7 @@ Preferred repository workflow:
 <!-- {=projectDryRunCommand} -->
 
 ```bash
-mc release --dry-run
+mc release --dry-run --format json
 ```
 
 <!-- {/projectDryRunCommand} -->
@@ -87,7 +87,7 @@ mc release
 
 <!-- {=releaseWorkflowBehavior} -->
 
-`mc release` only works when your config defines a workflow named `release`.
+`mc release` is a workflow-defined top-level command. When your config omits workflows, MonoChange synthesizes the default `release` workflow automatically.
 
 During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
 
@@ -106,7 +106,7 @@ Planning rules in this milestone:
 
 <!-- {=releasePlanningRules} -->
 
-- `mc changes add` defaults `--bump` to `patch`
+- `mc change` defaults `--bump` to `patch`
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents

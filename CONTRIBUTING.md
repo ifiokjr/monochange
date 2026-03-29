@@ -11,10 +11,10 @@ This repository uses `devenv` for a reproducible shell.
 ```bash
 devenv shell
 install:all
-mc check --root .
-mc workspace discover --root . --format json
-mc changes add --root . --package monochange --bump minor --reason "add release planning"
-mc release --dry-run
+mc validate
+mc discover --format json
+mc change --package monochange --bump minor --reason "add release planning"
+mc release --dry-run --format json
 mc release
 ```
 
@@ -47,8 +47,8 @@ docs:check
 docs:update
 docs:verify
 docs:doctor
-mc check --root .
-mc changes add --root . --package monochange --bump patch --reason "describe the change"
+mc validate
+mc change --package monochange --bump patch --reason "describe the change"
 lint:all
 test:all
 coverage:all
@@ -72,7 +72,7 @@ build:book
 - Every non-trivial behavior change starts with a failing test.
 - Release-planning logic needs realistic fixture coverage.
 - Cross-ecosystem behavior should remain consistent across Cargo, npm-family, Deno, Dart, and Flutter.
-- `mc check --root .` should stay green alongside the rest of the validation suite.
+- `mc validate` should stay green alongside the rest of the validation suite.
 
 ## Safety and linting constraints
 

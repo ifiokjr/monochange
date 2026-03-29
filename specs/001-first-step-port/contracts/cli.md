@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Define the user-facing command contract for workspace discovery, validation, release planning, and workflow-driven release preparation.
+Define the user-facing command contract for workflow-defined top-level commands covering workspace validation, discovery, change capture, and release preparation.
 
 ## Command 1: Workspace Validation
 
 ```bash
-mc check --root <path>
-monochange check --root <path>
+mc validate
+monochange validate
 ```
 
 ### Behavior
@@ -21,7 +21,8 @@ monochange check --root <path>
 ## Command 2: Workspace Discovery
 
 ```bash
-mc workspace discover --root <path> --format <text|json>
+mc discover --format <text|json>
+monochange discover --format <text|json>
 ```
 
 ### Behavior
@@ -30,41 +31,48 @@ mc workspace discover --root <path> --format <text|json>
 - produces a unified view of packages, dependency edges, configured groups, and warnings
 - does not modify repository files
 
-## Command 3: Release Plan Generation
+## Command 3: Change File Creation
 
 ```bash
-mc plan release --root <path> --changes <path> --format <text|json>
+mc change --package <id>... --reason <text> [--bump <patch|minor|major>] [--evidence <value>...] [--output <path>]
+monochange change --package <id>... --reason <text> [--bump <patch|minor|major>] [--evidence <value>...] [--output <path>]
 ```
 
 ### Behavior
 
-- reads explicit markdown changeset input
-- resolves configured package ids or group ids
-- expands group-targeted changesets into package-level signals
-- calculates release impact through direct and transitive dependency edges
-- applies configured-group synchronization before finalizing output
-- includes compatibility evidence when a provider escalates severity
+- requires one or more configured package ids or group ids
+- records a markdown changeset file under `.changeset/` by default
+- defaults `--bump` to `patch`
+- supports optional compatibility evidence strings and explicit output paths
 
-## Command 4: Workflow-Driven Release Preparation
+## Command 4: Release Planning and Preparation
 
 ```bash
-mc release --root <path> [--dry-run]
-monochange release --root <path> [--dry-run]
+mc release [--dry-run] [--format <text|json>]
+monochange release [--dry-run] [--format <text|json>]
 ```
 
 ### Behavior
 
 - loads workflows from `monochange.toml` and dispatches them as top-level commands
 - auto-discovers `.changeset/*.md` under the repository root
-- updates native manifests plus configured changelogs and `versioned_files`
+- `--dry-run` performs planning and rendering only without mutating files
+- updates native manifests plus configured changelogs and `versioned_files` during non-dry-run execution
 - applies group release identity precedence for `tag`, `release`, and `version_format`
 - deletes consumed changesets only after a fully successful non-dry-run execution
-- in `--dry-run`, performs planning and rendering only and does not mutate files
+
+## Workflow Surface Rules
+
+- repositories may define custom top-level commands through `[[workflows]]`
+- when `[[workflows]]` is omitted, MonoChange synthesizes `validate`, `discover`, `change`, and `release`
+- workflow-declared inputs become CLI flags
+- all workflow commands implicitly support `--help` and `--dry-run`
+- `init`, `help`, and `version` remain reserved built-ins
 
 ## Text Output Requirements
 
 - identify the workflow name
 - indicate whether execution was a dry-run
-- report release targets with effective tag/release metadata
+- report release targets with effective tag/release metadata when applicable
 - list released packages and changed files when applicable
 - show command-step execution summaries when workflow commands run
