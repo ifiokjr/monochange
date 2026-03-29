@@ -380,16 +380,65 @@ pub struct EcosystemSettings {
 	pub exclude: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowInputKind {
+	String,
+	StringList,
+	Path,
+	Choice,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct WorkflowInputDefinition {
+	pub name: String,
+	#[serde(rename = "type")]
+	pub kind: WorkflowInputKind,
+	#[serde(default)]
+	pub help_text: Option<String>,
+	#[serde(default)]
+	pub required: bool,
+	#[serde(default)]
+	pub default: Option<String>,
+	#[serde(default)]
+	pub choices: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandVariable {
+	Version,
+	GroupVersion,
+	ReleasedPackages,
+	ChangedFiles,
+	Changesets,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum WorkflowStepDefinition {
+	Validate,
+	Discover,
+	CreateChangeFile,
 	PrepareRelease,
-	Command { command: String },
+	Command {
+		command: String,
+		#[serde(default)]
+		dry_run: Option<String>,
+		#[serde(default)]
+		shell: bool,
+		#[serde(default)]
+		variables: Option<BTreeMap<String, CommandVariable>>,
+	},
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkflowDefinition {
 	pub name: String,
+	#[serde(default)]
+	pub help_text: Option<String>,
+	#[serde(default)]
+	pub inputs: Vec<WorkflowInputDefinition>,
 	#[serde(default)]
 	pub steps: Vec<WorkflowStepDefinition>,
 }
@@ -470,6 +519,97 @@ impl WorkspaceConfiguration {
 			members: vec![package.id.clone()],
 		})
 	}
+}
+
+#[must_use]
+pub fn default_workflows() -> Vec<WorkflowDefinition> {
+	vec![
+		WorkflowDefinition {
+			name: "validate".to_string(),
+			help_text: Some("Validate monochange configuration and changesets".to_string()),
+			inputs: Vec::new(),
+			steps: vec![WorkflowStepDefinition::Validate],
+		},
+		WorkflowDefinition {
+			name: "discover".to_string(),
+			help_text: Some("Discover packages across supported ecosystems".to_string()),
+			inputs: vec![WorkflowInputDefinition {
+				name: "format".to_string(),
+				kind: WorkflowInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec!["text".to_string(), "json".to_string()],
+			}],
+			steps: vec![WorkflowStepDefinition::Discover],
+		},
+		WorkflowDefinition {
+			name: "change".to_string(),
+			help_text: Some("Create a change file for one or more packages".to_string()),
+			inputs: vec![
+				WorkflowInputDefinition {
+					name: "package".to_string(),
+					kind: WorkflowInputKind::StringList,
+					help_text: Some("Package or group to include in the change".to_string()),
+					required: true,
+					default: None,
+					choices: Vec::new(),
+				},
+				WorkflowInputDefinition {
+					name: "bump".to_string(),
+					kind: WorkflowInputKind::Choice,
+					help_text: Some("Requested semantic version bump".to_string()),
+					required: false,
+					default: Some("patch".to_string()),
+					choices: vec![
+						"patch".to_string(),
+						"minor".to_string(),
+						"major".to_string(),
+					],
+				},
+				WorkflowInputDefinition {
+					name: "reason".to_string(),
+					kind: WorkflowInputKind::String,
+					help_text: Some("Why this change is being recorded".to_string()),
+					required: true,
+					default: None,
+					choices: Vec::new(),
+				},
+				WorkflowInputDefinition {
+					name: "evidence".to_string(),
+					kind: WorkflowInputKind::StringList,
+					help_text: Some("Additional evidence strings to include".to_string()),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+				WorkflowInputDefinition {
+					name: "output".to_string(),
+					kind: WorkflowInputKind::Path,
+					help_text: Some(
+						"Write the generated change file to a specific path".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+			],
+			steps: vec![WorkflowStepDefinition::CreateChangeFile],
+		},
+		WorkflowDefinition {
+			name: "release".to_string(),
+			help_text: Some("Prepare a release from discovered change files".to_string()),
+			inputs: vec![WorkflowInputDefinition {
+				name: "format".to_string(),
+				kind: WorkflowInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec!["text".to_string(), "json".to_string()],
+			}],
+			steps: vec![WorkflowStepDefinition::PrepareRelease],
+		},
+	]
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

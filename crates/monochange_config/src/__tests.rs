@@ -9,9 +9,9 @@ use semver::Version;
 use tempfile::tempdir;
 
 use crate::apply_version_groups;
-use crate::check_workspace;
 use crate::load_change_signals;
 use crate::load_workspace_configuration;
+use crate::validate_workspace;
 
 #[test]
 fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
@@ -26,7 +26,16 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.changelog, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert!(configuration.workflows.is_empty());
+	assert_eq!(configuration.workflows.len(), 4);
+	let workflow_names = configuration
+		.workflows
+		.iter()
+		.map(|workflow| workflow.name.as_str())
+		.collect::<Vec<_>>();
+	assert_eq!(
+		workflow_names,
+		vec!["validate", "discover", "change", "release"]
+	);
 	assert_eq!(configuration.cargo.enabled, None);
 	assert_eq!(configuration.npm.enabled, None);
 	assert_eq!(configuration.deno.enabled, None);
@@ -590,7 +599,7 @@ sdk: minor
 }
 
 #[test]
-fn check_workspace_rejects_changesets_that_mix_group_and_member_references() {
+fn validate_workspace_rejects_changesets_that_mix_group_and_member_references() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
 	fs::create_dir_all(tempdir.path().join(".changeset"))
@@ -619,7 +628,7 @@ core: patch
 	)
 	.unwrap_or_else(|error| panic!("changeset write: {error}"));
 
-	let error = check_workspace(tempdir.path())
+	let error = validate_workspace(tempdir.path())
 		.err()
 		.unwrap_or_else(|| panic!("expected changeset validation error"));
 	let rendered = error.render();
@@ -635,7 +644,7 @@ fn load_workspace_configuration_rejects_reserved_workflow_names() {
 		tempdir.path().join("monochange.toml"),
 		r#"
 [[workflows]]
-name = "workspace"
+name = "init"
 
 [[workflows.steps]]
 type = "PrepareRelease"

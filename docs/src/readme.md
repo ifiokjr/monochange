@@ -8,10 +8,9 @@ The current milestone focuses on:
 
 - discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
 - normalize dependency edges across ecosystems
-- declare release-managed packages explicitly in `monochange.toml`
-- coordinate shared release identity through named groups
-- validate config and changesets with `mc check`
+- coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input
+- expose top-level CLI commands from workflow definitions
 - run config-defined release workflows from `.changeset/*.md`
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
@@ -22,62 +21,36 @@ The current milestone focuses on:
 
 <!-- {=projectCoreWorkflow} -->
 
-Create a `monochange.toml` file:
+Initialize the repository with detected packages, groups, and default workflows:
 
-```toml
-[defaults]
-parent_bump = "patch"
-warn_on_group_mismatch = true
-package_type = "cargo"
-changelog = "{path}/changelog.md"
-
-[package.monochange]
-path = "crates/monochange"
-
-[package.monochange_core]
-path = "crates/monochange_core"
-
-[group.main]
-packages = ["monochange", "monochange_core"]
-tag = true
-release = true
-version_format = "primary"
-
-[[workflows]]
-name = "release"
-
-[[workflows.steps]]
-type = "PrepareRelease"
+```bash
+mc init
 ```
+
+The generated `monochange.toml` becomes the source of truth for top-level commands like `mc validate`, `mc discover`, `mc change`, and `mc release`.
 
 Validate the repository:
 
 ```bash
-mc check --root .
+mc validate
 ```
 
 Discover the workspace:
 
 ```bash
-mc workspace discover --root . --format json
+mc discover --format json
 ```
 
 Create a change file:
 
 ```bash
-mc changes add --root . --package monochange --bump minor --reason "add release planning"
+mc change --package monochange --bump minor --reason "add release planning"
 ```
 
 Preview the release workflow:
 
 ```bash
-mc release --dry-run
-```
-
-Inspect the raw planner when needed:
-
-```bash
-mc plan release --root . --changes .changeset/my-change.md --format json
+mc release --dry-run --format json
 ```
 
 Prepare the release:
@@ -110,7 +83,7 @@ Discovery output includes:
 
 - normalized package records
 - dependency edges
-- version groups derived from configured groups
+- release groups derived from configured groups
 - warnings
 
 <!-- {/projectDiscoveryOutputIncludes} -->

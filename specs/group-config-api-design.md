@@ -19,7 +19,7 @@ The new API should:
 - support shared group changelogs and per-package changelogs
 - support extra `versioned_files` at both package and group level
 - support release/tag policy at both package and group level
-- introduce `mc check` as the validation entrypoint for config and changesets
+- introduce `mc validate` as the validation entrypoint for config and changesets
 - use `miette` diagnostics for actionable, source-aware errors
 
 ## Finalized Decisions
@@ -156,12 +156,12 @@ Invalid changeset cases:
 
 ### 11. Validation command
 
-`mc check` should validate both configuration and changesets.
+`mc validate` should validate both configuration and changesets.
 
 Primary form:
 
 ```bash
-mc check --root .
+mc validate
 ```
 
 ## Proposed Configuration Schema
@@ -242,11 +242,11 @@ That means:
 - group `tag/release/version_format` are used instead
 - package `changelog` and `versioned_files` still apply
 
-## `mc check` Contract
+## `mc validate` Contract
 
 ## Responsibilities
 
-`mc check` should validate:
+`mc validate` should validate:
 
 ### Configuration
 
@@ -389,7 +389,7 @@ This design note does not implement the feature yet. Implementation work would i
 
 1. replacing current config structs and parsers
 2. adding `miette`-based diagnostics
-3. adding `mc check`
+3. adding `mc validate`
 4. updating changeset resolution logic to use declared ids only
 5. updating release preparation to respect group precedence
 6. updating docs, examples, and tests

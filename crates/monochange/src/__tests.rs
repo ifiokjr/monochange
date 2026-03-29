@@ -6,24 +6,27 @@ use monochange_core::Ecosystem;
 use tempfile::tempdir;
 
 use crate::add_change_file;
-use crate::build_command;
+use crate::build_command_for_root;
 use crate::discover_workspace;
 use crate::plan_release;
 use crate::run_with_args;
+use crate::run_with_args_in_dir;
+
+fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
+where
+	I: IntoIterator<Item = OsString>,
+{
+	run_with_args_in_dir("mc", args, root)
+}
 
 #[test]
-fn cli_parses_workspace_discover_command() {
-	let matches = build_command("mc")
-		.try_get_matches_from([
-			OsString::from("mc"),
-			OsString::from("workspace"),
-			OsString::from("discover"),
-			OsString::from("--root"),
-			OsString::from("fixtures/mixed"),
-		])
+fn cli_parses_discover_command() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let matches = build_command_for_root("mc", &fixture_root)
+		.try_get_matches_from([OsString::from("mc"), OsString::from("discover")])
 		.unwrap_or_else(|error| panic!("matches: {error}"));
 
-	assert_eq!(matches.subcommand_name(), Some("workspace"));
+	assert_eq!(matches.subcommand_name(), Some("discover"));
 }
 
 #[test]
@@ -32,11 +35,60 @@ fn cli_help_returns_success_output() {
 		.unwrap_or_else(|error| panic!("help output: {error}"));
 
 	assert!(output.contains("Usage: mc <COMMAND>"));
-	assert!(output.contains("changes"));
+	assert!(output.contains("change"));
 }
 
 #[test]
-fn check_command_validates_workspace_configuration_and_changesets() {
+fn init_writes_detected_packages_groups_and_default_workflows() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	);
+	write_file(
+		tempdir.path().join("packages/web/package.json"),
+		"{\"name\":\"web\",\"version\":\"1.0.0\"}",
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("init")],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(output.contains("wrote"));
+	assert!(config.contains("[package.core]"));
+	assert!(config.contains("[package.web]"));
+	assert!(config.contains("[group.main]"));
+	assert!(config.contains("name = \"validate\""));
+	assert!(config.contains("name = \"discover\""));
+	assert!(config.contains("name = \"change\""));
+	assert!(config.contains("name = \"release\""));
+	assert!(config.contains("type = \"Discover\""));
+	assert!(config.contains("type = \"CreateChangeFile\""));
+}
+
+#[test]
+fn init_requires_force_to_overwrite_existing_configuration() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\nparent_bump = \"patch\"\n",
+	);
+
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("init")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected init failure"));
+	assert!(error.to_string().contains("--force"));
+}
+
+#[test]
+fn validate_command_validates_workspace_configuration_and_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
 		tempdir.path().join("crates/core/Cargo.toml"),
@@ -59,25 +111,20 @@ packages = ["core"]
 core: minor
 ---
 
-#### validate check
+#### validate workspace
 ",
 	);
 
-	let output = run_with_args(
-		"mc",
-		[
-			OsString::from("mc"),
-			OsString::from("check"),
-			OsString::from("--root"),
-			tempdir.path().into(),
-		],
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
 	)
-	.unwrap_or_else(|error| panic!("check output: {error}"));
-	assert!(output.contains("workspace check passed"));
+	.unwrap_or_else(|error| panic!("validate output: {error}"));
+	assert!(output.contains("workspace validation passed"));
 }
 
 #[test]
-fn check_command_reports_invalid_changeset_targets() {
+fn validate_command_reports_invalid_changeset_targets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
 		tempdir.path().join("crates/core/Cargo.toml"),
@@ -101,17 +148,12 @@ missing: minor
 ",
 	);
 
-	let error = run_with_args(
-		"mc",
-		[
-			OsString::from("mc"),
-			OsString::from("check"),
-			OsString::from("--root"),
-			tempdir.path().into(),
-		],
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
 	)
 	.err()
-	.unwrap_or_else(|| panic!("expected check failure"));
+	.unwrap_or_else(|| panic!("expected validation failure"));
 	assert!(error
 		.to_string()
 		.contains("unknown package or group `missing`"));
@@ -152,14 +194,11 @@ fn discover_workspace_aggregates_packages_from_multiple_ecosystems() {
 #[test]
 fn workspace_discover_json_output_contains_contract_fields() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
-	let output = run_with_args(
-		"mc",
+	let output = run_cli(
+		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("workspace"),
 			OsString::from("discover"),
-			OsString::from("--root"),
-			fixture_root.into_os_string(),
 			OsString::from("--format"),
 			OsString::from("json"),
 		],
@@ -235,14 +274,11 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let output_path = tempdir.path().join("feature.md");
 
-	let output = run_with_args(
-		"mc",
+	let output = run_cli(
+		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("changes"),
-			OsString::from("add"),
-			OsString::from("--root"),
-			fixture_root.clone().into_os_string(),
+			OsString::from("change"),
 			OsString::from("--package"),
 			OsString::from("sdk-core"),
 			OsString::from("--package"),
@@ -267,18 +303,18 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 
 #[test]
 fn changes_add_canonicalizes_package_references_to_package_names() {
-	let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("crates/monochange/Cargo.toml"),
+		"[package]\nname = \"monochange\"\nversion = \"1.0.0\"\n",
+	);
 	let output_path = tempdir.path().join("repo-change.md");
 
-	run_with_args(
-		"mc",
+	run_cli(
+		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("changes"),
-			OsString::from("add"),
-			OsString::from("--root"),
-			repo_root.into_os_string(),
+			OsString::from("change"),
 			OsString::from("--package"),
 			OsString::from("crates/monochange"),
 			OsString::from("--bump"),
@@ -323,14 +359,11 @@ fn changes_add_supports_evidence_and_round_trips_into_plan_release() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let output_path = tempdir.path().join("major.md");
 
-	run_with_args(
-		"mc",
+	run_cli(
+		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("changes"),
-			OsString::from("add"),
-			OsString::from("--root"),
-			fixture_root.clone().into_os_string(),
+			OsString::from("change"),
 			OsString::from("--package"),
 			OsString::from("sdk-core"),
 			OsString::from("--bump"),
@@ -360,14 +393,11 @@ fn changes_add_supports_evidence_and_round_trips_into_plan_release() {
 #[test]
 fn changes_add_rejects_unknown_package_references() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
-	let error = run_with_args(
-		"mc",
+	let error = run_cli(
+		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("changes"),
-			OsString::from("add"),
-			OsString::from("--root"),
-			fixture_root.into_os_string(),
+			OsString::from("change"),
 			OsString::from("--package"),
 			OsString::from("missing-package"),
 			OsString::from("--reason"),
@@ -383,35 +413,49 @@ fn changes_add_rejects_unknown_package_references() {
 }
 
 #[test]
-fn plan_release_json_output_contains_compatibility_evidence() {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
-	let output = run_with_args(
-		"mc",
+fn release_dry_run_json_output_contains_compatibility_evidence() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	write_file(
+		tempdir.path().join(".changeset/feature.md"),
+		r"---
+core: patch
+origin:
+  core: direct-change
+evidence:
+  core:
+    - rust-semver:major:public API break detected
+---
+
+#### breaking api change
+",
+	);
+
+	let output = run_cli(
+		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("plan"),
 			OsString::from("release"),
-			OsString::from("--root"),
-			fixture_root.clone().into_os_string(),
-			OsString::from("--changes"),
-			fixture_root.join("changes-major.md").into_os_string(),
+			OsString::from("--dry-run"),
 			OsString::from("--format"),
 			OsString::from("json"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("plan output: {error}"));
+	.unwrap_or_else(|error| panic!("release output: {error}"));
 	let parsed: serde_json::Value =
 		serde_json::from_str(&output).unwrap_or_else(|error| panic!("json: {error}"));
 
 	assert_eq!(
-		parsed["compatibilityEvidence"].as_array().map(Vec::len),
+		parsed["plan"]["compatibilityEvidence"]
+			.as_array()
+			.map(Vec::len),
 		Some(1)
 	);
 	assert_eq!(
-		parsed["compatibilityEvidence"][0]["severity"].as_str(),
+		parsed["plan"]["compatibilityEvidence"][0]["severity"].as_str(),
 		Some("major")
 	);
-	assert!(parsed["decisions"]
+	assert!(parsed["plan"]["decisions"]
 		.as_array()
 		.unwrap_or_else(|| panic!("decisions array"))
 		.iter()
@@ -452,13 +496,11 @@ fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
 	let original_changelog = fs::read_to_string(&core_changelog)
 		.unwrap_or_else(|error| panic!("core changelog: {error}"));
 
-	let output = run_with_args(
-		"mc",
+	let output = run_cli(
+		tempdir.path(),
 		[
 			OsString::from("mc"),
 			OsString::from("release"),
-			OsString::from("--root"),
-			tempdir.path().into(),
 			OsString::from("--dry-run"),
 		],
 	)
@@ -490,14 +532,9 @@ fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
 		false,
 	);
 
-	let output = run_with_args(
-		"mc",
-		[
-			OsString::from("mc"),
-			OsString::from("release"),
-			OsString::from("--root"),
-			tempdir.path().into(),
-		],
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
 	)
 	.unwrap_or_else(|error| panic!("workflow output: {error}"));
 	let workspace_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
@@ -535,14 +572,9 @@ fn workflow_release_failures_do_not_delete_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, true);
 
-	let error = run_with_args(
-		"mc",
-		[
-			OsString::from("mc"),
-			OsString::from("release"),
-			OsString::from("--root"),
-			tempdir.path().into(),
-		],
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected workflow failure"));
@@ -556,19 +588,78 @@ fn workflow_unknown_commands_suggest_available_workflows() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
 
-	let error = run_with_args(
-		"mc",
-		[
-			OsString::from("mc"),
-			OsString::from("ship-it"),
-			OsString::from("--root"),
-			tempdir.path().into(),
-		],
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("ship-it")],
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected workflow suggestion"));
 
-	assert!(error.to_string().contains("available workflows: release"));
+	assert!(error
+		.to_string()
+		.contains("unrecognized subcommand 'ship-it'"));
+}
+
+#[test]
+fn workflow_command_steps_can_run_through_the_shell() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[[workflows]]
+name = "announce"
+
+[[workflows.steps]]
+type = "Command"
+command = "printf '%s' shell-command > shell-output.txt"
+shell = true
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("announce")],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	let shell_output = fs::read_to_string(tempdir.path().join("shell-output.txt"))
+		.unwrap_or_else(|error| panic!("shell output: {error}"));
+
+	assert!(output.contains("workflow `announce` completed"));
+	assert_eq!(shell_output, "shell-command");
+}
+
+#[test]
+fn workflow_command_steps_use_dry_run_overrides_when_present() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[[workflows]]
+name = "announce"
+
+[[workflows.steps]]
+type = "Command"
+command = "printf '%s' real-run > command-output.txt"
+dry_run = "printf '%s' dry-run > dry-run-output.txt"
+shell = true
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("announce"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	let dry_run_output = fs::read_to_string(tempdir.path().join("dry-run-output.txt"))
+		.unwrap_or_else(|error| panic!("dry-run output: {error}"));
+
+	assert!(output.contains("workflow `announce` completed (dry-run)"));
+	assert_eq!(dry_run_output, "dry-run");
+	assert!(!tempdir.path().join("command-output.txt").exists());
 }
 
 #[test]
@@ -610,9 +701,8 @@ fn quickstart_and_docs_reference_the_same_core_commands() {
 		fs::read_to_string(quickstart).unwrap_or_else(|error| panic!("quickstart: {error}"));
 
 	for command in [
-		"mc workspace discover --root . --format json",
-		"mc changes add --root . --package",
-		"mc plan release --root . --changes",
+		"mc discover --format json",
+		"mc change --package",
 		"mc release --dry-run",
 		"mc release",
 		"lint:all",
@@ -658,7 +748,7 @@ fn release_planning_guide_describes_release_workflow_requirements() {
 		fs::read_to_string(release_guide).unwrap_or_else(|error| panic!("release guide: {error}"));
 
 	for expected in [
-		"`mc release` only works when your config defines a workflow named `release`.",
+		"`mc release` is a workflow-defined top-level command.",
 		"`[[package_overrides]]`",
 		"`.changeset/*.md`",
 		"`--dry-run`",
@@ -710,7 +800,7 @@ fn assert_simple_release_pattern(
 fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changelog: bool) {
 	let command_step = command_step.map_or_else(String::new, |command| {
 		let escaped_command = command.replace('\\', "\\\\").replace('"', "\\\"");
-		format!("\n[[workflows.steps]]\ntype = \"Command\"\ncommand = \"{escaped_command}\"\n")
+		format!("\n[[workflows.steps]]\ntype = \"Command\"\ncommand = \"{escaped_command}\"\nshell = true\n")
 	});
 	let app_changelog = if failing_changelog {
 		write_file(root.join("blocked"), "not a directory");
@@ -797,6 +887,12 @@ enabled = true
 
 [[workflows]]
 name = "release"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"

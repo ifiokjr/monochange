@@ -16,7 +16,7 @@
 
 `monochange` is a release-planning toolkit for monorepos that span more than one package ecosystem.
 
-It discovers packages, normalizes dependency data, applies version-group rules, turns explicit change files into release plans, and can run workflow-driven release preparation from those same inputs.
+It discovers packages, normalizes dependency data, applies group rules, turns explicit change files into release plans, and can run workflow-driven release preparation from those same inputs.
 
 Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter.
 
@@ -28,9 +28,9 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 - use one release-planning model across several language ecosystems
 - replace ad hoc scripts with explicit change files and deterministic release output
-- keep related packages synchronized with configured groups
+- keep related packages synchronized with `[group.<id>]`
 - propagate dependent bumps through one normalized dependency graph
-- embed the same discovery and planning logic in your own tooling through the workspace crates
+- expose top-level CLI commands from workflows declared in `monochange.toml`
 
 <!-- {/projectWhyUse} -->
 
@@ -40,10 +40,9 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 - discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
 - normalize dependency edges across ecosystems
-- declare release-managed packages explicitly in `monochange.toml`
-- coordinate shared release identity through named groups
-- validate config and changesets with `mc check`
+- coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input
+- expose top-level CLI commands from workflow definitions
 - run config-defined release workflows from `.changeset/*.md`
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
@@ -56,11 +55,11 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 - `monochange` — end-user CLI and orchestration layer for discovery, planning, and workflow-driven releases.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange-orange?logo=rust)](https://crates.io/crates/monochange) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange-1f425f?logo=docs.rs)](https://docs.rs/monochange/)
-- `monochange_core` — shared domain model for packages, dependency edges, version groups, change signals, and release plans.
+- `monochange_core` — shared domain model for packages, dependency edges, groups, change signals, and release plans.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust)](https://crates.io/crates/monochange_core) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs)](https://docs.rs/monochange_core/)
-- `monochange_config` — loads `monochange.toml`, parses `.changeset/*.md`, and validates planning inputs.
+- `monochange_config` — loads `monochange.toml`, parses `.changeset/*.md`, and validates workflow inputs.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust)](https://crates.io/crates/monochange_config) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs)](https://docs.rs/monochange_config/)
-- `monochange_graph` — propagates release impact through dependency edges and synchronized version groups.
+- `monochange_graph` — propagates release impact through dependency edges and synchronized groups.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust)](https://crates.io/crates/monochange_graph) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs)](https://docs.rs/monochange_graph/)
 - `monochange_semver` — merges requested bumps with compatibility-provider evidence.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust)](https://crates.io/crates/monochange_semver) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs)](https://docs.rs/monochange_semver/)
@@ -84,10 +83,10 @@ Enter the reproducible development shell and install workspace tooling:
 ```bash
 devenv shell
 install:all
-mc check --root .
-mc workspace discover --root . --format json
-mc changes add --root . --package monochange --bump minor --reason "add release planning"
-mc release --dry-run
+mc validate
+mc discover --format json
+mc change --package monochange --bump minor --reason "add release planning"
+mc release --dry-run --format json
 mc release
 ```
 
@@ -95,62 +94,36 @@ mc release
 
 <!-- {=projectCoreWorkflow} -->
 
-Create a `monochange.toml` file:
+Initialize the repository with detected packages, groups, and default workflows:
 
-```toml
-[defaults]
-parent_bump = "patch"
-warn_on_group_mismatch = true
-package_type = "cargo"
-changelog = "{path}/changelog.md"
-
-[package.monochange]
-path = "crates/monochange"
-
-[package.monochange_core]
-path = "crates/monochange_core"
-
-[group.main]
-packages = ["monochange", "monochange_core"]
-tag = true
-release = true
-version_format = "primary"
-
-[[workflows]]
-name = "release"
-
-[[workflows.steps]]
-type = "PrepareRelease"
+```bash
+mc init
 ```
+
+The generated `monochange.toml` becomes the source of truth for top-level commands like `mc validate`, `mc discover`, `mc change`, and `mc release`.
 
 Validate the repository:
 
 ```bash
-mc check --root .
+mc validate
 ```
 
 Discover the workspace:
 
 ```bash
-mc workspace discover --root . --format json
+mc discover --format json
 ```
 
 Create a change file:
 
 ```bash
-mc changes add --root . --package monochange --bump minor --reason "add release planning"
+mc change --package monochange --bump minor --reason "add release planning"
 ```
 
 Preview the release workflow:
 
 ```bash
-mc release --dry-run
-```
-
-Inspect the raw planner when needed:
-
-```bash
-mc plan release --root . --changes .changeset/my-change.md --format json
+mc release --dry-run --format json
 ```
 
 Prepare the release:
@@ -174,7 +147,7 @@ docs:check
 docs:update
 docs:verify
 docs:doctor
-mc check --root .
+mc validate
 lint:all
 test:all
 coverage:all

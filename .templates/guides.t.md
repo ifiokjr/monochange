@@ -65,7 +65,27 @@ Under the new model, move that changelog configuration onto the matching `[packa
 
 ```toml
 [[workflows]]
+name = "discover"
+help_text = "Discover packages across supported ecosystems"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "Discover"
+
+[[workflows]]
 name = "release"
+help_text = "Prepare a release from discovered change files"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"
@@ -73,17 +93,18 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
+dry_run = "cargo test --workspace --all-features"
+shell = true
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
 
 <!-- {@configurationWorkflowVariables} -->
 
-- `$version` — one shared release version when all released packages resolve to the same version
-- `$group_version` — one shared synced version across released version groups, falling back to `$version`
-- `$released_packages` — comma-separated released package names
-- `$changed_files` — space-separated changed file paths
-- `$changesets` — space-separated consumed `.changeset/*.md` paths
+- default command substitution when `variables` is omitted: `$version`, `$group_version`, `$released_packages`, `$changed_files`, and `$changesets`
+- custom command substitution when `variables` is present: map your own replacement strings to variable names such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
+- `dry_run` on a `Command` step replaces `command` only when the workflow is run with `--dry-run`
+- `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 
 <!-- {/configurationWorkflowVariables} -->
 
@@ -111,7 +132,7 @@ enabled = true
 
 <!-- {@configurationPackageReferenceRules} -->
 
-Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc check` should guide you toward declared ids.
+Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
 
 <!-- {/configurationPackageReferenceRules} -->
 
@@ -123,7 +144,7 @@ Current implementation notes:
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- supported workflow steps today are `PrepareRelease` and `Command`
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -170,7 +191,7 @@ Legacy `version_groups.strategy` is no longer the primary authoring model. The c
 <!-- {@releaseChangesAddCommand} -->
 
 ```bash
-mc changes add --root . --package sdk-core --bump minor --reason "public API addition"
+mc change --package sdk-core --bump minor --reason "public API addition"
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -204,7 +225,7 @@ evidence:
 
 <!-- {@releasePlanningRules} -->
 
-- `mc changes add` defaults `--bump` to `patch`
+- `mc change` defaults `--bump` to `patch`
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
@@ -215,7 +236,7 @@ evidence:
 
 <!-- {@releaseWorkflowBehavior} -->
 
-`mc release` only works when your config defines a workflow named `release`.
+`mc release` is a workflow-defined top-level command. When your config omits workflows, MonoChange synthesizes the default `release` workflow automatically.
 
 During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
 

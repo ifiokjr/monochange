@@ -4,14 +4,14 @@
 
 ## Summary
 
-Replace the current `[[version_groups]]` and `[[package_overrides]]` configuration model with explicit `[package.<id>]` and `[group.<id>]` declarations, add `mc check` as the dedicated validation command, and move release preparation and changeset resolution onto configured package/group ids rather than implicit package-name/path matching.
+Replace the current `[[version_groups]]` and `[[package_overrides]]` configuration model with explicit `[package.<id>]` and `[group.<id>]` declarations, add `mc validate` as the dedicated validation command, and move release preparation and changeset resolution onto configured package/group ids rather than implicit package-name/path matching.
 
 This implementation should preserve the existing release-planning and workflow-driven release preparation capabilities while making configuration stricter, more expressive, and easier to validate. The main technical shifts are:
 
 - introduce explicit config-owned identifiers for packages and groups
 - add richer config models for changelogs, extra versioned files, and release identity settings
 - make grouped packages inherit outward release identity from their parent group
-- validate config and `.changeset/*.md` files through a new `mc check` entrypoint
+- validate config and `.changeset/*.md` files through a new `mc validate` entrypoint
 - adopt `miette` for source-aware diagnostics with actionable remediation hints
 
 ## Objectives
@@ -23,7 +23,7 @@ This implementation should preserve the existing release-planning and workflow-d
 5. Add `versioned_files` to both packages and groups.
 6. Add `tag`, `release`, and `version_format` to both packages and groups.
 7. Enforce exactly zero or one `version_format = "primary"` across all config items.
-8. Add `mc check --root .` to validate config and changesets with `miette` diagnostics.
+8. Add `mc validate` to validate config and changesets with `miette` diagnostics.
 9. Update release preparation so grouped packages still apply package changelogs and package `versioned_files`, while group release identity takes precedence.
 
 ## Non-Goals
@@ -53,7 +53,7 @@ This implementation should preserve the existing release-planning and workflow-d
 - `monochange.toml` parsing and validation
 - changeset parsing and target resolution
 - workflow release preparation behavior
-- CLI command dispatch (`mc check`)
+- CLI command dispatch (`mc validate`)
 - docs/contracts/examples/tests
 
 ## Proposed Architecture Changes
@@ -239,8 +239,8 @@ Even if actual tag/release creation is deferred, the model should carry enough i
 Add a top-level command:
 
 ```bash
-mc check --root .
-monochange check --root .
+mc validate
+monochange validate
 ```
 
 ### Behavior
@@ -300,11 +300,11 @@ Add failing tests for:
 
 Add failing tests for:
 
-- `mc check --root .` success path
-- `mc check` fails on invalid config with readable diagnostic text
-- `mc check` fails on invalid changeset target
-- `mc check` fails on group/member overlap in one changeset
-- `mc check` works through both `mc` and `monochange`
+- `mc validate` success path
+- `mc validate` fails on invalid config with readable diagnostic text
+- `mc validate` fails on invalid changeset target
+- `mc validate` fails on group/member overlap in one changeset
+- `mc validate` works through both `mc` and `monochange`
 
 ### release-preparation tests
 
@@ -347,11 +347,11 @@ Add failing tests for:
 3. Expand group-targeted changesets into package-level change signals for planning.
 4. Ensure diagnostics include the changeset file path and frontmatter source span.
 
-## Phase 5 — `mc check` implementation
+## Phase 5 — `mc validate` implementation
 
 1. Add CLI command wiring in `crates/monochange/src/lib.rs`.
 2. Implement a reusable validation function, for example:
-   - `check_workspace(root: &Path) -> MonochangeResult<CheckReport>`
+   - `validate_workspace(root: &Path) -> MonochangeResult<ValidationReport>`
 3. Run config validation first, then changeset validation.
 4. Render concise success output and `miette` failures.
 
@@ -380,7 +380,7 @@ Add migration guidance from:
 Document:
 
 - configured ids vs native names
-- `mc check`
+- `mc validate`
 - group changesets vs package changesets
 - grouped package precedence rules
 
@@ -392,7 +392,7 @@ Run:
 - `devenv shell -- lint:all`
 - `devenv shell -- build:book`
 
-Then dogfood on the repository’s own `monochange.toml` by migrating it to the new model and using `mc check` to validate it.
+Then dogfood on the repository’s own `monochange.toml` by migrating it to the new model and using `mc validate` to validate it.
 
 ## File-Level Change Map
 
@@ -412,7 +412,7 @@ Potentially split out of `monochange_config` or `monochange`:
 
 - config validation diagnostics
 - versioned-file parsing
-- check command/report rendering
+- validation command/report rendering
 - effective release-identity resolution
 
 ## Risks and Mitigations
@@ -422,7 +422,7 @@ Potentially split out of `monochange_config` or `monochange`:
 Mitigation:
 
 - implement migration incrementally behind tests
-- migrate the repo config only after `mc check` is stable
+- migrate the repo config only after `mc validate` is stable
 
 ### Risk: Changeset ids become harder for users to author
 
@@ -451,7 +451,7 @@ Mitigation:
 This feature slice is complete when:
 
 1. `monochange.toml` can declare packages via `[package.<id>]` and groups via `[group.<id>]`.
-2. `mc check --root .` validates config and `.changeset/*.md` files.
+2. `mc validate` validates config and `.changeset/*.md` files.
 3. invalid config and changesets produce actionable `miette` diagnostics.
 4. group-targeted changesets are supported.
 5. group/member overlap in a single changeset is rejected.

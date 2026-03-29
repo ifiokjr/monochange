@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use semver::Version;
 
+use crate::default_workflows;
 use crate::materialize_dependency_edges;
 use crate::BumpSeverity;
 use crate::DependencyKind;
@@ -15,6 +16,7 @@ use crate::PackageType;
 use crate::PublishState;
 use crate::ReleaseOwnerKind;
 use crate::VersionFormat;
+use crate::WorkflowStepDefinition;
 use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
 
@@ -86,6 +88,26 @@ fn materialize_dependency_edges_matches_dependency_names_to_packages() {
 	let edge = edges.first().unwrap_or_else(|| panic!("expected one edge"));
 	assert_eq!(edge.from_package_id, source.id);
 	assert_eq!(edge.to_package_id, target.id);
+}
+
+#[test]
+fn default_workflows_expose_validate_discover_change_and_release() {
+	let workflows = default_workflows();
+	let workflow_names = workflows
+		.iter()
+		.map(|workflow| workflow.name.as_str())
+		.collect::<Vec<_>>();
+	assert_eq!(
+		workflow_names,
+		vec!["validate", "discover", "change", "release"]
+	);
+	let validate_workflow = workflows
+		.first()
+		.unwrap_or_else(|| panic!("expected validate workflow"));
+	assert_eq!(
+		validate_workflow.steps,
+		vec![WorkflowStepDefinition::Validate]
+	);
 }
 
 #[test]
