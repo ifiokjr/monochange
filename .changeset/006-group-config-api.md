@@ -1,5 +1,13 @@
 ---
-monochange-workspace: minor
+monochange: minor
+monochange_core: minor
+monochange_cargo: minor
+monochange_npm: minor
+monochange_config: minor
+monochange_deno: minor
+monochange_dart: minor
+monochange_graph: minor
+monochange_semver: minor
 ---
 
 #### replace legacy config with package/group release model

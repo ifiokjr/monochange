@@ -95,6 +95,8 @@ struct RawWorkspaceDefaults {
 	include_private: bool,
 	#[serde(default = "default_warn_on_group_mismatch")]
 	warn_on_group_mismatch: bool,
+	#[serde(default)]
+	package_type: Option<PackageType>,
 }
 
 impl Default for RawWorkspaceDefaults {
@@ -103,6 +105,7 @@ impl Default for RawWorkspaceDefaults {
 			parent_bump: default_parent_bump(),
 			include_private: false,
 			warn_on_group_mismatch: default_warn_on_group_mismatch(),
+			package_type: None,
 		}
 	}
 }
@@ -111,7 +114,7 @@ impl Default for RawWorkspaceDefaults {
 struct RawPackageDefinition {
 	path: PathBuf,
 	#[serde(rename = "type")]
-	package_type: PackageType,
+	package_type: Option<PackageType>,
 	#[serde(default)]
 	changelog: Option<PathBuf>,
 	#[serde(default)]
@@ -224,19 +227,40 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		workflows,
 		ecosystems,
 	} = raw;
+	let default_package_type = defaults.package_type;
 	let packages = package
 		.into_iter()
-		.map(|(id, package)| PackageDefinition {
-			id,
-			path: package.path,
-			package_type: package.package_type,
-			changelog: package.changelog,
-			versioned_files: package.versioned_files,
-			tag: package.tag,
-			release: package.release,
-			version_format: package.version_format,
+		.map(|(id, package)| {
+			let package_type = package.package_type.or(default_package_type).ok_or_else(|| {
+				config_diagnostic(
+					&contents,
+					format!(
+						"package `{id}` must declare `type` or set `[defaults].package_type`"
+					),
+					vec![config_section_label(
+						&contents,
+						"package",
+						&id,
+						"package missing type",
+					)],
+					Some(
+						"set `type = \"cargo\"` (or another supported type) on the package, or set `[defaults].package_type` for a single-ecosystem repository"
+							.to_string(),
+					),
+				)
+			})?;
+			Ok::<_, MonochangeError>(PackageDefinition {
+				id,
+				path: package.path,
+				package_type,
+				changelog: package.changelog,
+				versioned_files: package.versioned_files,
+				tag: package.tag,
+				release: package.release,
+				version_format: package.version_format,
+			})
 		})
-		.collect::<Vec<_>>();
+		.collect::<Result<Vec<_>, _>>()?;
 	let groups = group
 		.into_iter()
 		.map(|(id, group)| GroupDefinition {
@@ -259,6 +283,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			parent_bump: defaults.parent_bump,
 			include_private: defaults.include_private,
 			warn_on_group_mismatch: defaults.warn_on_group_mismatch,
+			package_type: defaults.package_type,
 		},
 		packages,
 		groups,
