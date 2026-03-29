@@ -32,6 +32,7 @@ docs:doctor
 mc check --root .
 lint:all
 test:all
+coverage:all
 build:all
 build:book
 ```
