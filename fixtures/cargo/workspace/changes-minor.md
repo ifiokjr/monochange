@@ -1,5 +1,5 @@
 ---
-cargo-core: minor
+core: minor
 ---
 
 #### new API surface
