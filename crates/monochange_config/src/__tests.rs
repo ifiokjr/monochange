@@ -24,6 +24,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert!(configuration.defaults.warn_on_group_mismatch);
 	assert_eq!(configuration.defaults.package_type, None);
 	assert_eq!(configuration.defaults.changelog, None);
+	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
 	assert_eq!(configuration.workflows.len(), 4);
@@ -101,6 +102,7 @@ type = "PrepareRelease"
 	assert_eq!(configuration.packages.len(), 2);
 	assert_eq!(configuration.groups.len(), 1);
 	assert_eq!(configuration.workflows.len(), 1);
+	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert_eq!(configuration.npm.roots, vec!["packages/*"]);
 	let first_package = configuration
 		.packages
@@ -234,6 +236,55 @@ changelog = "docs/tool-release-notes.md"
 	assert_eq!(
 		tool.changelog,
 		Some(std::path::PathBuf::from("docs/tool-release-notes.md"))
+	);
+}
+
+#[test]
+fn load_workspace_configuration_supports_empty_update_messages() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	write_cargo_package(tempdir.path(), "crates/app", "app");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+empty_update_message = "No package-specific changes for {package}; version is now {version}."
+
+[package.core]
+path = "crates/core"
+empty_update_message = "Package override for {package}@{version}"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+empty_update_message = "Group fallback for {package} from {group}"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let core = configuration
+		.package_by_id("core")
+		.unwrap_or_else(|| panic!("expected core package"));
+	let group = configuration
+		.group_by_id("sdk")
+		.unwrap_or_else(|| panic!("expected sdk group"));
+
+	assert_eq!(
+		configuration.defaults.empty_update_message.as_deref(),
+		Some("No package-specific changes for {package}; version is now {version}.")
+	);
+	assert_eq!(
+		core.empty_update_message.as_deref(),
+		Some("Package override for {package}@{version}")
+	);
+	assert_eq!(
+		group.empty_update_message.as_deref(),
+		Some("Group fallback for {package} from {group}")
 	);
 }
 

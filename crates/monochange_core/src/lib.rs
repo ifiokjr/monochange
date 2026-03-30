@@ -356,6 +356,7 @@ pub struct PackageDefinition {
 	pub path: PathBuf,
 	pub package_type: PackageType,
 	pub changelog: Option<PathBuf>,
+	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -367,6 +368,7 @@ pub struct GroupDefinition {
 	pub id: String,
 	pub packages: Vec<String>,
 	pub changelog: Option<PathBuf>,
+	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -380,6 +382,7 @@ pub struct WorkspaceDefaults {
 	pub warn_on_group_mismatch: bool,
 	pub package_type: Option<PackageType>,
 	pub changelog: Option<ChangelogDefinition>,
+	pub empty_update_message: Option<String>,
 }
 
 impl Default for WorkspaceDefaults {
@@ -390,6 +393,7 @@ impl Default for WorkspaceDefaults {
 			warn_on_group_mismatch: true,
 			package_type: None,
 			changelog: None,
+			empty_update_message: None,
 		}
 	}
 }

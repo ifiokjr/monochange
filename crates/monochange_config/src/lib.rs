@@ -102,6 +102,8 @@ struct RawWorkspaceDefaults {
 	package_type: Option<PackageType>,
 	#[serde(default)]
 	changelog: Option<RawChangelogDefinition>,
+	#[serde(default)]
+	empty_update_message: Option<String>,
 }
 
 impl Default for RawWorkspaceDefaults {
@@ -112,6 +114,7 @@ impl Default for RawWorkspaceDefaults {
 			warn_on_group_mismatch: default_warn_on_group_mismatch(),
 			package_type: None,
 			changelog: None,
+			empty_update_message: None,
 		}
 	}
 }
@@ -131,6 +134,8 @@ struct RawPackageDefinition {
 	#[serde(default)]
 	changelog: Option<RawChangelogDefinition>,
 	#[serde(default)]
+	empty_update_message: Option<String>,
+	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
 	tag: bool,
@@ -145,6 +150,8 @@ struct RawGroupDefinition {
 	packages: Vec<String>,
 	#[serde(default)]
 	changelog: Option<PathBuf>,
+	#[serde(default)]
+	empty_update_message: Option<String>,
 	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
@@ -315,6 +322,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				path: package.path,
 				package_type,
 				changelog,
+				empty_update_message: package.empty_update_message,
 				versioned_files: package.versioned_files,
 				tag: package.tag,
 				release: package.release,
@@ -328,6 +336,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			id,
 			packages: group.packages,
 			changelog: group.changelog,
+			empty_update_message: group.empty_update_message,
 			versioned_files: group.versioned_files,
 			tag: group.tag,
 			release: group.release,
@@ -346,6 +355,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			warn_on_group_mismatch: defaults.warn_on_group_mismatch,
 			package_type: defaults.package_type,
 			changelog: defaults_changelog_policy,
+			empty_update_message: defaults.empty_update_message,
 		},
 		packages,
 		groups,
