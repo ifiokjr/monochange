@@ -8,6 +8,7 @@ use tempfile::tempdir;
 use crate::add_change_file;
 use crate::build_command_for_root;
 use crate::discover_workspace;
+use crate::evaluate_changeset_policy;
 use crate::plan_release;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
@@ -813,6 +814,50 @@ shell = true
 }
 
 #[test]
+fn evaluate_changeset_policy_requires_changesets_for_matching_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_changeset_policy_fixture(tempdir.path(), false);
+
+	let evaluation = evaluate_changeset_policy(
+		tempdir.path(),
+		&["crates/core/src/lib.rs".to_string()],
+		&Vec::new(),
+	)
+	.unwrap_or_else(|error| panic!("policy evaluation: {error}"));
+
+	assert_eq!(
+		evaluation.status,
+		monochange_core::ChangesetPolicyStatus::Failed
+	);
+	assert!(evaluation.required);
+	assert!(evaluation.comment.is_some());
+	assert_eq!(evaluation.matched_paths, vec!["crates/core/src/lib.rs"]);
+}
+
+#[test]
+fn evaluate_changeset_policy_skips_when_allowed_label_is_present() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_changeset_policy_fixture(tempdir.path(), false);
+
+	let evaluation = evaluate_changeset_policy(
+		tempdir.path(),
+		&["crates/core/src/lib.rs".to_string()],
+		&["no-changeset-required".to_string()],
+	)
+	.unwrap_or_else(|error| panic!("policy evaluation: {error}"));
+
+	assert_eq!(
+		evaluation.status,
+		monochange_core::ChangesetPolicyStatus::Skipped
+	);
+	assert!(!evaluation.required);
+	assert_eq!(
+		evaluation.matched_skip_labels,
+		vec!["no-changeset-required"]
+	);
+}
+
+#[test]
 fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
 	assert_simple_release_pattern(
 		"../../fixtures/cargo/workspace",
@@ -1067,6 +1112,78 @@ fn copy_directory(source: &Path, destination: &Path) {
 				)
 			});
 		}
+	}
+}
+
+fn seed_changeset_policy_fixture(root: &Path, with_changeset: bool) {
+	write_file(
+		root.join("Cargo.toml"),
+		r#"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+"#,
+	);
+	write_file(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+	);
+	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
+	write_file(root.join("docs/readme.md"), "# docs\n");
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.bot.changesets]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["crates/**"]
+ignored_paths = ["docs/**", "*.md"]
+
+[[workflows]]
+name = "changeset-check"
+help_text = "Validate pull-request changeset policy"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.inputs]]
+name = "changed_path"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "label"
+type = "string_list"
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"
+"#,
+	);
+	if with_changeset {
+		write_file(
+			root.join(".changeset/feature.md"),
+			r"---
+core: patch
+---
+
+#### add feature
+",
+		);
 	}
 }
 

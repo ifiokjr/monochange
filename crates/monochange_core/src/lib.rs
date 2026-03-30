@@ -25,7 +25,7 @@
 //! - normalized package and dependency records
 //! - version-group definitions and planned group outcomes
 //! - change signals and compatibility assessments
-//! - changelog formats, changelog targets, structured release-note types, release-manifest types, and GitHub automation config types
+//! - changelog formats, changelog targets, structured release-note types, release-manifest types, GitHub automation config types, and changeset-policy evaluation types
 //! - shared error and result types
 //!
 //! ## Example
@@ -506,6 +506,7 @@ pub enum WorkflowStepDefinition {
 		#[serde(default)]
 		names: Vec<String>,
 	},
+	EnforceChangesetPolicy,
 	Command {
 		command: String,
 		#[serde(default)]
@@ -801,6 +802,74 @@ pub struct GitHubPullRequestSettings {
 	pub auto_merge: bool,
 }
 
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubChangesetBotSettings {
+	pub enabled: bool,
+	pub required: bool,
+	pub skip_labels: Vec<String>,
+	pub comment_on_failure: bool,
+	pub changed_paths: Vec<String>,
+	pub ignored_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct GitHubBotSettings {
+	#[serde(default)]
+	pub changesets: GitHubChangesetBotSettings,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChangesetPolicyStatus {
+	Passed,
+	Failed,
+	Skipped,
+	NotRequired,
+}
+
+impl ChangesetPolicyStatus {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Passed => "passed",
+			Self::Failed => "failed",
+			Self::Skipped => "skipped",
+			Self::NotRequired => "not_required",
+		}
+	}
+}
+
+impl fmt::Display for ChangesetPolicyStatus {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetPolicyEvaluation {
+	pub status: ChangesetPolicyStatus,
+	pub required: bool,
+	pub summary: String,
+	#[serde(default)]
+	pub comment: Option<String>,
+	#[serde(default)]
+	pub labels: Vec<String>,
+	#[serde(default)]
+	pub matched_skip_labels: Vec<String>,
+	#[serde(default)]
+	pub changed_paths: Vec<String>,
+	#[serde(default)]
+	pub matched_paths: Vec<String>,
+	#[serde(default)]
+	pub ignored_paths: Vec<String>,
+	#[serde(default)]
+	pub changeset_paths: Vec<String>,
+	#[serde(default)]
+	pub errors: Vec<String>,
+}
+
 impl Default for GitHubReleaseSettings {
 	fn default() -> Self {
 		Self {
@@ -826,6 +895,19 @@ impl Default for GitHubPullRequestSettings {
 	}
 }
 
+impl Default for GitHubChangesetBotSettings {
+	fn default() -> Self {
+		Self {
+			enabled: false,
+			required: true,
+			skip_labels: Vec::new(),
+			comment_on_failure: true,
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
+		}
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GitHubConfiguration {
 	pub owner: String,
@@ -834,6 +916,8 @@ pub struct GitHubConfiguration {
 	pub releases: GitHubReleaseSettings,
 	#[serde(default)]
 	pub pull_requests: GitHubPullRequestSettings,
+	#[serde(default)]
+	pub bot: GitHubBotSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

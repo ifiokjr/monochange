@@ -141,6 +141,7 @@ mc release --dry-run --format json
 - render discovery and release workflow output in text or JSON
 - execute configured release workflows
 - preview or publish GitHub releases from prepared release data
+- evaluate pull-request changeset policy from CI-supplied changed paths and labels
 
 <!-- {/monochangeCrateDocs} -->
 
@@ -167,7 +168,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 - normalized package and dependency records
 - version-group definitions and planned group outcomes
 - change signals and compatibility assessments
-- changelog formats, changelog targets, structured release-note types, release-manifest types, and GitHub automation config types
+- changelog formats, changelog targets, structured release-note types, release-manifest types, GitHub automation config types, and changeset-policy evaluation types
 - shared error and result types
 
 ## Example
@@ -259,7 +260,7 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 - load `monochange.toml`
 - validate version groups and workflows
 - resolve package references against discovered packages
-- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, and workflow GitHub/manifest steps
+- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and workflow GitHub/manifest/policy steps
 
 ## Example
 
@@ -363,6 +364,7 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 ## Example
 
 ```rust
+use monochange_core::GitHubBotSettings;
 use monochange_core::GitHubConfiguration;
 use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseSettings;
@@ -407,6 +409,7 @@ let github = GitHubConfiguration {
     repo: "monochange".to_string(),
     releases: GitHubReleaseSettings::default(),
     pull_requests: GitHubPullRequestSettings::default(),
+    bot: GitHubBotSettings::default(),
 };
 
 let requests = build_release_requests(&github, &manifest);

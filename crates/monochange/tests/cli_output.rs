@@ -363,6 +363,47 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 }
 
 #[test]
+fn changeset_policy_cli_json_reports_failure_comment() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_changeset_policy_fixture(tempdir.path(), false);
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(tempdir.path())
+			.arg("changeset-check")
+			.arg("--format")
+			.arg("json")
+			.arg("--changed-path")
+			.arg("crates/core/src/lib.rs"),
+		@r####"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	{
+	  "status": "failed",
+	  "required": true,
+	  "summary": "changeset policy failed: a changeset is required for the matched paths",
+	  "comment": "### MonoChange changeset policy failed\n\nchangeset policy failed: a changeset is required for the matched paths\n\nMatched changed paths:\n- `crates/core/src/lib.rs`\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add a `.changeset/*.md` file, for example with `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
+	  "labels": [],
+	  "matchedSkipLabels": [],
+	  "changedPaths": [
+	    "crates/core/src/lib.rs"
+	  ],
+	  "matchedPaths": [
+	    "crates/core/src/lib.rs"
+	  ],
+	  "ignoredPaths": [],
+	  "changesetPaths": [],
+	  "errors": []
+	}
+	
+	----- stderr -----
+	"####
+	);
+}
+
+#[test]
 fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -872,6 +913,76 @@ type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 "#,
 	);
+}
+
+fn seed_changeset_policy_fixture(root: &Path, with_changeset: bool) {
+	write_file(
+		root.join("Cargo.toml"),
+		r#"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+"#,
+	);
+	write_file(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+	);
+	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.bot.changesets]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["crates/**"]
+ignored_paths = ["docs/**", "*.md"]
+
+[[workflows]]
+name = "changeset-check"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.inputs]]
+name = "changed_path"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "label"
+type = "string_list"
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"
+"#,
+	);
+	if with_changeset {
+		write_file(
+			root.join(".changeset/feature.md"),
+			r"---
+core: patch
+---
+
+#### add feature
+",
+		);
+	}
 }
 
 fn seed_release_pr_workflow_fixture(root: &Path) {

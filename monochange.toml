@@ -3,7 +3,13 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
+
+[release_notes]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
 
 [package.monochange]
 path = "crates/monochange"
@@ -48,13 +54,68 @@ packages = [
 	"monochange_semver",
 	"monochange_github",
 ]
-changelog = "changelog.md"
 tag = true
 release = true
 version_format = "primary"
 
+[group.main.changelog]
+path = "changelog.md"
+format = "monochange"
+
 [ecosystems.cargo]
 enabled = true
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[github.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[github.bot.changesets]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = [
+	"crates/**",
+	".github/**",
+	"Cargo.toml",
+	"Cargo.lock",
+	"devenv.nix",
+	"devenv.yaml",
+	"devenv.lock",
+	"monochange.toml",
+	"codecov.yml",
+	"deny.toml",
+	"scripts/**",
+]
+ignored_paths = [
+	".changeset/**",
+	"docs/**",
+	"**/*.md",
+	"license",
+]
+
+[[deployments]]
+name = "docs"
+trigger = "release_published"
+workflow = "docs-release"
+environment = "github-pages"
+release_targets = ["main"]
+requires = ["main"]
+metadata = { site = "github-pages" }
 
 [[workflows]]
 name = "validate"
@@ -97,6 +158,14 @@ type = "string"
 required = true
 
 [[workflows.inputs]]
+name = "type"
+type = "string"
+
+[[workflows.inputs]]
+name = "details"
+type = "string"
+
+[[workflows.inputs]]
 name = "evidence"
 type = "string_list"
 
@@ -119,3 +188,84 @@ default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"
+
+[[workflows]]
+name = "release-manifest"
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+
+[[workflows]]
+name = "publish-release"
+help_text = "Prepare a release and publish GitHub releases"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
+
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a GitHub release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
+
+[[workflows]]
+name = "release-deploy"
+help_text = "Prepare a release and emit deployment intents"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
+
+[[workflows]]
+name = "changeset-check"
+help_text = "Evaluate pull-request changeset policy"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.inputs]]
+name = "changed_path"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "label"
+type = "string_list"
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"

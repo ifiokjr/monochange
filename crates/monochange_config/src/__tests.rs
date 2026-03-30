@@ -215,6 +215,51 @@ auto_merge = true
 }
 
 #[test]
+fn load_workspace_configuration_parses_github_changeset_bot_settings() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.bot.changesets]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required", "internal"]
+comment_on_failure = true
+changed_paths = ["crates/**"]
+ignored_paths = ["docs/**", "*.md"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let github = configuration
+		.github
+		.unwrap_or_else(|| panic!("expected github config"));
+
+	assert!(github.bot.changesets.enabled);
+	assert!(github.bot.changesets.required);
+	assert!(github.bot.changesets.comment_on_failure);
+	assert_eq!(
+		github.bot.changesets.skip_labels,
+		vec!["no-changeset-required", "internal"]
+	);
+	assert_eq!(github.bot.changesets.changed_paths, vec!["crates/**"]);
+	assert_eq!(github.bot.changesets.ignored_paths, vec!["docs/**", "*.md"]);
+}
+
+#[test]
 fn load_workspace_configuration_parses_deployments() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
@@ -1708,6 +1753,79 @@ type = "OpenReleasePullRequest"
 	assert!(error
 		.to_string()
 		.contains("uses `OpenReleasePullRequest` but `[github]` is not configured"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_enforce_changeset_policy_without_github_bot_config() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[[workflows]]
+name = "changeset-check"
+
+[[workflows.inputs]]
+name = "changed_path"
+type = "string_list"
+required = true
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected changeset policy workflow config error"));
+	assert!(error
+		.to_string()
+		.contains("uses `EnforceChangesetPolicy` but `[github]` is not configured"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_enforce_changeset_policy_without_changed_path_input() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.bot.changesets]
+enabled = true
+changed_paths = ["crates/**"]
+
+[[workflows]]
+name = "changeset-check"
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected changeset policy workflow config error"));
+	assert!(error
+		.to_string()
+		.contains("does not declare a `changed_path` input"));
 }
 
 #[test]
