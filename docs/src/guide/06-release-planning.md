@@ -90,6 +90,37 @@ mc release
 
 <!-- {/projectReleaseCommand} -->
 
+## GitHub automation built on the release plan
+
+<!-- {=githubAutomationOverview} -->
+
+MonoChange keeps GitHub automation layered on top of the same `PrepareRelease` result used for normal release planning.
+
+That means one set of `.changeset/*.md` inputs can drive all of these workflows consistently:
+
+- `mc release-manifest` writes a stable JSON artifact for downstream automation
+- `mc publish-release` previews or publishes GitHub releases from the structured release notes
+- `mc release-pr` previews or opens an idempotent release pull request
+- `mc release-deploy` emits deployment intents for later workflow execution
+- `mc changeset-check` evaluates pull-request changeset policy from CI-supplied changed paths and labels
+
+<!-- {/githubAutomationOverview} -->
+
+<!-- {=githubAutomationWorkflowCommands} -->
+
+```bash
+mc release --dry-run --format json
+mc release-manifest --dry-run
+mc publish-release --dry-run --format json
+mc release-pr --dry-run --format json
+mc release-deploy --dry-run --format json
+mc changeset-check --format json --changed-path crates/monochange/src/lib.rs
+```
+
+<!-- {/githubAutomationWorkflowCommands} -->
+
+For a complete repository example, see the dedicated [GitHub automation guide](./08-github-automation.md).
+
 <!-- {=releaseWorkflowBehavior} -->
 
 `mc release` is a workflow-defined top-level command. When your config omits workflows, MonoChange synthesizes the default `release` workflow automatically.
@@ -121,7 +152,16 @@ name: changeset-policy
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+
+concurrency:
+  group: changeset-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -130,24 +170,34 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v5
-      - uses: cachix/install-nix-action@v31
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
-      - id: changed
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: collect changed files
+        id: changed
         uses: tj-actions/changed-files@v46
-      - name: Run MonoChange policy check
+
+      - name: run changeset policy
         env:
           PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+        shell: bash
         run: |
+          set -euo pipefail
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
           args=(changeset-check --format json)
-          for path in ${{ steps.changed.outputs.all_changed_files }}; do
+          for path in $CHANGED_FILES; do
             args+=(--changed-path "$path")
           done
           for label in "${labels[@]}"; do
             args+=(--label "$label")
           done
-          devenv shell -- mc "${args[@]}" > policy.json
+          devenv shell -- mc "${args[@]}" | tee policy.json
           jq -e '.status != "failed"' policy.json >/dev/null
 ```
 

@@ -54,6 +54,22 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {/projectMilestoneCapabilities} -->
 
+## GitHub automation
+
+<!-- {=projectGitHubAutomationOverview} -->
+
+MonoChange can promote one prepared release into several GitHub-facing automation flows without changing the underlying release-plan model.
+
+- `mc release-manifest` writes a stable JSON artifact for downstream jobs
+- `mc publish-release --dry-run --format json` previews GitHub release payloads before publishing
+- `mc release-pr --dry-run --format json` previews the release branch, commit, and pull request body
+- `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
+- `mc changeset-check --format json --changed-path ...` evaluates pull-request changeset policy from CI-supplied paths and labels
+
+<!-- {/projectGitHubAutomationOverview} -->
+
+See [`docs/src/guide/08-github-automation.md`](docs/src/guide/08-github-automation.md) for a complete configuration and workflow example.
+
 ## Workspace crates
 
 <!-- {=projectCrateCatalog} -->

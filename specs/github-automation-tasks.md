@@ -62,11 +62,11 @@
 
 ## Phase 7 — Docs, examples, and rollout
 
-- [ ] T070 Update `readme.md` and `docs/src/guide/06-release-planning.md` for the new automation model.
-- [ ] T071 Add a GitHub automation guide to the mdBook.
-- [ ] T072 Add example `monochange.toml` snippets for changelog formats, GitHub releases, release PRs, deployments, and bot rules.
-- [ ] T073 Re-run docs sync, linting, testing, coverage, and book builds.
-- [ ] T074 Dogfood the new automation on the MonoChange repository itself.
+- [x] T070 Update `readme.md` and `docs/src/guide/06-release-planning.md` for the new automation model.
+- [x] T071 Add a GitHub automation guide to the mdBook.
+- [x] T072 Add example `monochange.toml` snippets for changelog formats, GitHub releases, release PRs, deployments, and bot rules.
+- [x] T073 Re-run docs sync, linting, testing, coverage, and book builds.
+- [x] T074 Dogfood the new automation on the MonoChange repository itself.
 
 ## Suggested execution order
 
