@@ -39,7 +39,11 @@ path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
-change_templates = ["#### $summary\n\n$details\n\n$provenance", "#### $summary\n\n$provenance", "- $summary"]
+change_templates = [
+	"#### $summary\n\n$details\n\n$provenance",
+	"#### $summary\n\n$provenance",
+	"- $summary",
+]
 
 [group.main.changelog]
 path = "changelog.md"

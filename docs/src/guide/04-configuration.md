@@ -162,7 +162,11 @@ CLI commands are user-defined top-level commands. Each `[cli.<command>]` entry b
 
 ```toml
 [release_notes]
-change_templates = ["#### $summary\n\n$details\n\n$provenance", "#### $summary\n\n$provenance", "- $summary"]
+change_templates = [
+	"#### $summary\n\n$details\n\n$provenance",
+	"#### $summary\n\n$provenance",
+	"- $summary",
+]
 
 [package.core]
 path = "crates/core"

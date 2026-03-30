@@ -2240,7 +2240,8 @@ fn render_prepared_changeset_provenance(changeset: &PreparedChangeset) -> String
 				.and_then(|revision| revision.commit.as_ref())
 				.map(|commit| commit.sha.as_str());
 			let last_updated_commit = last_updated.commit.as_ref();
-			if last_updated_commit.is_some_and(|commit| Some(commit.sha.as_str()) != introduced_sha) {
+			if last_updated_commit.is_some_and(|commit| Some(commit.sha.as_str()) != introduced_sha)
+			{
 				lines.push(format!(
 					"> Last updated: `{}`",
 					last_updated_commit
