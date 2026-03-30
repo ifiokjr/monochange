@@ -14,3 +14,4 @@ devenv.local.nix
 *.pending-snap
 *.snap.new
 .ant-colony/
+.pi/
