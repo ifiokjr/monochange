@@ -408,8 +408,8 @@ Current implementation notes:
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_path` command input, and reusable diagnostics for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Deploy`, `VerifyChangesets`, and `Command`
-- legacy `PublishGitHubRelease`, `OpenReleasePullRequest`, and `EnforceChangesetPolicy` step names are still accepted as migration aliases
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `Deploy`, `VerifyChangesets`, and `Command`
+- legacy `PublishGitHubRelease` and `OpenReleasePullRequest` step names are still accepted as migration aliases
 
 <!-- {/configurationCurrentStatus} -->
 

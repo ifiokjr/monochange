@@ -756,9 +756,9 @@ fn execute_cli_command(
 				} else {
 					context.issue_comment_results =
 						github_provider::comment_released_issues(&github, &manifest)?
-						.into_iter()
-						.map(|result| {
-							format!(
+							.into_iter()
+							.map(|result| {
+								format!(
 								"{} {} ({})",
 								result.repository,
 								result.issue_id,
@@ -768,8 +768,8 @@ fn execute_cli_command(
 										"skipped_existing",
 								}
 							)
-						})
-						.collect();
+							})
+							.collect();
 				}
 				output = None;
 			}

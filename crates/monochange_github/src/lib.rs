@@ -59,6 +59,7 @@
 //!     }],
 //!     released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
 //!     changed_files: Vec::new(),
+//!     changesets: Vec::new(),
 //!     changelogs: Vec::new(),
 //!     deleted_changesets: Vec::new(),
 //!     deployments: Vec::new(),

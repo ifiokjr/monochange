@@ -28,10 +28,9 @@ The current milestone focuses on:
 
 MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
-- `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus derived provenance metadata
+- `mc release-manifest` writes a stable JSON artifact for downstream jobs
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
-- GitHub release flows can comment on issues closed by the originating pull request once the tagged release is published
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
 - `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
