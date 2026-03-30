@@ -162,11 +162,50 @@ Introduce a stable JSON artifact, for example:
 	"workflow": "release",
 	"dryRun": false,
 	"version": "1.2.0",
-	"releaseTargets": [],
-	"releasedPackages": [],
-	"changedFiles": [],
-	"changelogs": [],
-	"deployments": []
+	"groupVersion": "1.2.0",
+	"releaseTargets": [
+		{
+			"id": "sdk",
+			"kind": "group",
+			"version": "1.2.0",
+			"tag": true,
+			"release": true,
+			"versionFormat": "primary",
+			"tagName": "v1.2.0",
+			"members": ["core", "app"]
+		}
+	],
+	"releasedPackages": ["workflow-core", "workflow-app"],
+	"changedFiles": ["Cargo.toml", "changelog.md"],
+	"changelogs": [
+		{
+			"ownerId": "sdk",
+			"ownerKind": "group",
+			"path": "changelog.md",
+			"format": "monochange",
+			"notes": {
+				"title": "1.2.0",
+				"summary": ["Grouped release for `sdk`."],
+				"sections": [
+					{
+						"title": "Changed",
+						"entries": ["add release manifest output"]
+					}
+				]
+			},
+			"rendered": "## 1.2.0\n\nGrouped release for `sdk`.\n\n- add release manifest output"
+		}
+	],
+	"deletedChangesets": [".changeset/feature.md"],
+	"deployments": [],
+	"plan": {
+		"workspaceRoot": ".",
+		"decisions": [],
+		"groups": [],
+		"warnings": [],
+		"unresolvedItems": [],
+		"compatibilityEvidence": []
+	}
 }
 ```
 

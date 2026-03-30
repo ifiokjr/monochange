@@ -90,6 +90,17 @@ default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"
+
+[[workflows]]
+name = "release-manifest"
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
 ```
 
 <!-- {/projectSetupConfig} -->

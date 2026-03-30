@@ -33,7 +33,7 @@
 //! - load `monochange.toml`
 //! - validate version groups and workflows
 //! - resolve package references against discovered packages
-//! - parse change-input files, evidence, changelog paths, and changelog format overrides
+//! - parse change-input files, evidence, changelog paths, changelog format overrides, and workflow manifest-render steps
 //!
 //! ## Example
 //!
@@ -1133,6 +1133,14 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 					if matches!(dry_run, Some(value) if value.trim().is_empty()) {
 						return Err(MonochangeError::Config(format!(
 							"workflow `{}` command steps with `dry_run` must provide a non-empty command",
+							workflow.name
+						)));
+					}
+				}
+				WorkflowStepDefinition::RenderReleaseManifest { path } => {
+					if matches!(path, Some(path) if path.as_os_str().is_empty()) {
+						return Err(MonochangeError::Config(format!(
+							"workflow `{}` render-manifest steps must provide a non-empty path when `path` is set",
 							workflow.name
 						)));
 					}

@@ -97,9 +97,10 @@ Current `PrepareRelease` behavior:
 - computes one synchronized release plan from discovered change files
 - updates native manifests plus configured changelogs and versioned files
 - renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
+- can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
-- leaves the workspace untouched during `--dry-run`
+- leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest
 
 <!-- {/releaseWorkflowBehavior} -->
 
@@ -113,6 +114,7 @@ Planning rules in this milestone:
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
+- release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->

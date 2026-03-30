@@ -288,7 +288,8 @@ MonoChange should be able to emit a stable machine-readable artifact describing:
 - versions
 - tags
 - released packages
-- changelog outputs
+- changelog outputs, including structured note sections and rendered markdown
+- the synchronized release plan that produced those outputs
 - deployment intent
 
 This manifest becomes the contract between:

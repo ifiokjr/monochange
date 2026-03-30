@@ -234,6 +234,29 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	exit_code: 0
 	----- stdout -----
 	{
+	  "workflow": "release",
+	  "dryRun": true,
+	  "version": "1.1.0",
+	  "groupVersion": "1.1.0",
+	  "releaseTargets": [
+	    {
+	      "id": "sdk",
+	      "kind": "group",
+	      "version": "1.1.0",
+	      "tag": true,
+	      "release": true,
+	      "versionFormat": "primary",
+	      "tagName": "v1.1.0",
+	      "members": [
+	        "core",
+	        "app"
+	      ]
+	    }
+	  ],
+	  "releasedPackages": [
+	    "workflow-app",
+	    "workflow-core"
+	  ],
 	  "changedFiles": [
 	    "Cargo.toml",
 	    "changelog.md",
@@ -242,35 +265,76 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	    "crates/core/Cargo.toml",
 	    "group.toml"
 	  ],
-	  "commandLogs": [],
+	  "changelogs": [
+	    {
+	      "ownerId": "sdk",
+	      "ownerKind": "group",
+	      "path": "changelog.md",
+	      "format": "monochange",
+	      "notes": {
+	        "title": "1.1.0",
+	        "summary": [
+	          "Grouped release for `sdk`.",
+	          "Members: core, app"
+	        ],
+	        "sections": [
+	          {
+	            "title": "Changed",
+	            "entries": [
+	              "add feature"
+	            ]
+	          }
+	        ]
+	      },
+	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n- add feature"
+	    },
+	    {
+	      "ownerId": "cargo:crates/core/Cargo.toml",
+	      "ownerKind": "package",
+	      "path": "crates/core/CHANGELOG.md",
+	      "format": "monochange",
+	      "notes": {
+	        "title": "1.1.0",
+	        "summary": [],
+	        "sections": [
+	          {
+	            "title": "Changed",
+	            "entries": [
+	              "add feature"
+	            ]
+	          }
+	        ]
+	      },
+	      "rendered": "## 1.1.0\n\n- add feature"
+	    }
+	  ],
 	  "deletedChangesets": [],
-	  "dryRun": true,
-	  "groupVersion": "1.1.0",
+	  "deployments": [],
 	  "plan": {
-	    "compatibilityEvidence": [],
+	    "workspaceRoot": ".",
 	    "decisions": [
 	      {
-	        "bump": "minor",
 	        "package": "cargo:crates/app/Cargo.toml",
+	        "bump": "minor",
+	        "trigger": "version-group-synchronization",
 	        "plannedVersion": "1.1.0",
 	        "reasons": [
 	          "depends on `cargo:crates/core/Cargo.toml`",
 	          "shares version group `sdk`"
 	        ],
-	        "trigger": "version-group-synchronization",
 	        "upstreamSources": [
 	          "cargo:crates/core/Cargo.toml"
 	        ]
 	      },
 	      {
-	        "bump": "minor",
 	        "package": "cargo:crates/core/Cargo.toml",
+	        "bump": "minor",
+	        "trigger": "direct-change",
 	        "plannedVersion": "1.1.0",
 	        "reasons": [
 	          "add feature",
 	          "shares version group `sdk`"
 	        ],
-	        "trigger": "direct-change",
 	        "upstreamSources": [
 	          "cargo:crates/core/Cargo.toml"
 	        ]
@@ -278,49 +342,187 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	    ],
 	    "groups": [
 	      {
-	        "bump": "minor",
 	        "id": "sdk",
+	        "plannedVersion": "1.1.0",
 	        "members": [
 	          "cargo:crates/core/Cargo.toml",
 	          "cargo:crates/app/Cargo.toml"
 	        ],
-	        "plannedVersion": "1.1.0"
+	        "bump": "minor"
 	      }
 	    ],
-	    "unresolvedItems": [],
 	    "warnings": [],
-	    "workspaceRoot": "."
-	  },
+	    "unresolvedItems": [],
+	    "compatibilityEvidence": []
+	  }
+	}
+	
+	----- stderr -----
+	"###
+	);
+}
+
+#[test]
+fn release_manifest_workflow_writes_manifest_json() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_manifest_workflow_fixture(tempdir.path());
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(tempdir.path())
+			.arg("release-manifest")
+			.arg("--dry-run"),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	workflow `release-manifest` completed (dry-run)
+	version: 1.1.0
+	released packages: workflow-app, workflow-core
+	release targets:
+	- group sdk -> v1.1.0 (tag: true, release: true)
+	release manifest: .monochange/release-manifest.json
+	changed files:
+	- Cargo.toml
+	- changelog.md
+	- crates/app/Cargo.toml
+	- crates/core/CHANGELOG.md
+	- crates/core/Cargo.toml
+	- group.toml
+	
+	----- stderr -----
+	"###
+	);
+
+	let manifest_path = tempdir.path().join(".monochange/release-manifest.json");
+	let manifest = fs::read_to_string(&manifest_path)
+		.unwrap_or_else(|error| panic!("read manifest {}: {error}", manifest_path.display()));
+	assert_snapshot!(manifest, @r###"
+	{
+	  "workflow": "release-manifest",
+	  "dryRun": true,
+	  "version": "1.1.0",
+	  "groupVersion": "1.1.0",
 	  "releaseTargets": [
 	    {
 	      "id": "sdk",
 	      "kind": "group",
+	      "version": "1.1.0",
+	      "tag": true,
+	      "release": true,
+	      "versionFormat": "primary",
+	      "tagName": "v1.1.0",
 	      "members": [
 	        "core",
 	        "app"
-	      ],
-	      "release": true,
-	      "tag": true,
-	      "tagName": "v1.1.0",
-	      "version": "1.1.0",
-	      "versionFormat": "primary"
+	      ]
 	    }
 	  ],
 	  "releasedPackages": [
 	    "workflow-app",
 	    "workflow-core"
 	  ],
-	  "updatedChangelogs": [
+	  "changedFiles": [
+	    "Cargo.toml",
 	    "changelog.md",
-	    "crates/core/CHANGELOG.md"
+	    "crates/app/Cargo.toml",
+	    "crates/core/CHANGELOG.md",
+	    "crates/core/Cargo.toml",
+	    "group.toml"
 	  ],
-	  "version": "1.1.0",
-	  "workflow": "release"
+	  "changelogs": [
+	    {
+	      "ownerId": "sdk",
+	      "ownerKind": "group",
+	      "path": "changelog.md",
+	      "format": "monochange",
+	      "notes": {
+	        "title": "1.1.0",
+	        "summary": [
+	          "Grouped release for `sdk`.",
+	          "Members: core, app"
+	        ],
+	        "sections": [
+	          {
+	            "title": "Changed",
+	            "entries": [
+	              "add feature"
+	            ]
+	          }
+	        ]
+	      },
+	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n- add feature"
+	    },
+	    {
+	      "ownerId": "cargo:crates/core/Cargo.toml",
+	      "ownerKind": "package",
+	      "path": "crates/core/CHANGELOG.md",
+	      "format": "monochange",
+	      "notes": {
+	        "title": "1.1.0",
+	        "summary": [],
+	        "sections": [
+	          {
+	            "title": "Changed",
+	            "entries": [
+	              "add feature"
+	            ]
+	          }
+	        ]
+	      },
+	      "rendered": "## 1.1.0\n\n- add feature"
+	    }
+	  ],
+	  "deletedChangesets": [],
+	  "deployments": [],
+	  "plan": {
+	    "workspaceRoot": ".",
+	    "decisions": [
+	      {
+	        "package": "cargo:crates/app/Cargo.toml",
+	        "bump": "minor",
+	        "trigger": "version-group-synchronization",
+	        "plannedVersion": "1.1.0",
+	        "reasons": [
+	          "depends on `cargo:crates/core/Cargo.toml`",
+	          "shares version group `sdk`"
+	        ],
+	        "upstreamSources": [
+	          "cargo:crates/core/Cargo.toml"
+	        ]
+	      },
+	      {
+	        "package": "cargo:crates/core/Cargo.toml",
+	        "bump": "minor",
+	        "trigger": "direct-change",
+	        "plannedVersion": "1.1.0",
+	        "reasons": [
+	          "add feature",
+	          "shares version group `sdk`"
+	        ],
+	        "upstreamSources": [
+	          "cargo:crates/core/Cargo.toml"
+	        ]
+	      }
+	    ],
+	    "groups": [
+	      {
+	        "id": "sdk",
+	        "plannedVersion": "1.1.0",
+	        "members": [
+	          "cargo:crates/core/Cargo.toml",
+	          "cargo:crates/app/Cargo.toml"
+	        ],
+	        "bump": "minor"
+	      }
+	    ],
+	    "warnings": [],
+	    "unresolvedItems": [],
+	    "compatibilityEvidence": []
+	  }
 	}
-	
-	----- stderr -----
-	"###
-	);
+	"###);
 }
 
 #[test]
@@ -592,6 +794,48 @@ core: minor
 
 #### add feature
 ",
+	);
+}
+
+fn seed_manifest_workflow_fixture(root: &Path) {
+	seed_group_release_fixture(root);
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = false
+
+[package.core]
+path = "crates/core"
+changelog = true
+
+[package.app]
+path = "crates/app"
+changelog = false
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+versioned_files = ["group.toml"]
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.cargo]
+enabled = true
+
+[[workflows]]
+name = "release-manifest"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+"#,
 	);
 }
 

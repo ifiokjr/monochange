@@ -86,6 +86,10 @@ name = "release"
 
 [[workflows.steps]]
 type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -111,6 +115,15 @@ type = "PrepareRelease"
 	assert_eq!(configuration.packages.len(), 2);
 	assert_eq!(configuration.groups.len(), 1);
 	assert_eq!(configuration.workflows.len(), 1);
+	assert_eq!(
+		configuration
+			.workflows
+			.first()
+			.unwrap_or_else(|| panic!("expected workflow"))
+			.steps
+			.len(),
+		2
+	);
 	assert_eq!(configuration.npm.roots, vec!["packages/*"]);
 	let first_package = configuration
 		.packages

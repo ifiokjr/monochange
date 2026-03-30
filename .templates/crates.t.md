@@ -157,7 +157,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 - normalized package and dependency records
 - version-group definitions and planned group outcomes
 - change signals and compatibility assessments
-- changelog formats, changelog targets, and structured release-note types
+- changelog formats, changelog targets, structured release-note types, and release-manifest types
 - shared error and result types
 
 ## Example
@@ -249,7 +249,7 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 - load `monochange.toml`
 - validate version groups and workflows
 - resolve package references against discovered packages
-- parse change-input files, evidence, changelog paths, and changelog format overrides
+- parse change-input files, evidence, changelog paths, changelog format overrides, and workflow manifest-render steps
 
 ## Example
 

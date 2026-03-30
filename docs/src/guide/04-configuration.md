@@ -154,6 +154,10 @@ default = "text"
 type = "PrepareRelease"
 
 [[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+
+[[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
 dry_run = "cargo test --workspace --all-features"
@@ -240,7 +244,7 @@ Current implementation notes:
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, and `Command`
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 

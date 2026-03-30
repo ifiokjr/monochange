@@ -40,7 +40,7 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 - load `monochange.toml`
 - validate version groups and workflows
 - resolve package references against discovered packages
-- parse change-input files, evidence, changelog paths, and changelog format overrides
+- parse change-input files, evidence, changelog paths, changelog format overrides, and workflow manifest-render steps
 
 ## Example
 

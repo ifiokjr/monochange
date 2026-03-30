@@ -25,7 +25,7 @@
 //! - normalized package and dependency records
 //! - version-group definitions and planned group outcomes
 //! - change signals and compatibility assessments
-//! - changelog formats, changelog targets, and structured release-note types
+//! - changelog formats, changelog targets, structured release-note types, and release-manifest types
 //! - shared error and result types
 //!
 //! ## Example
@@ -477,6 +477,10 @@ pub enum WorkflowStepDefinition {
 	Discover,
 	CreateChangeFile,
 	PrepareRelease,
+	RenderReleaseManifest {
+		#[serde(default)]
+		path: Option<PathBuf>,
+	},
 	Command {
 		command: String,
 		#[serde(default)]
@@ -567,6 +571,120 @@ fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> Str
 pub enum ReleaseOwnerKind {
 	Package,
 	Group,
+}
+
+impl ReleaseOwnerKind {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Package => "package",
+			Self::Group => "group",
+		}
+	}
+}
+
+impl fmt::Display for ReleaseOwnerKind {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestTarget {
+	pub id: String,
+	pub kind: ReleaseOwnerKind,
+	pub version: String,
+	pub tag: bool,
+	pub release: bool,
+	pub version_format: VersionFormat,
+	pub tag_name: String,
+	pub members: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestChangelog {
+	pub owner_id: String,
+	pub owner_kind: ReleaseOwnerKind,
+	pub path: PathBuf,
+	pub format: ChangelogFormat,
+	pub notes: ReleaseNotesDocument,
+	pub rendered: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestPlanDecision {
+	pub package: String,
+	pub bump: BumpSeverity,
+	pub trigger: String,
+	pub planned_version: Option<String>,
+	pub reasons: Vec<String>,
+	pub upstream_sources: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestPlanGroup {
+	pub id: String,
+	pub planned_version: Option<String>,
+	pub members: Vec<String>,
+	pub bump: BumpSeverity,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestCompatibilityEvidence {
+	pub package: String,
+	pub provider: String,
+	pub severity: BumpSeverity,
+	pub summary: String,
+	pub confidence: String,
+	pub evidence_location: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestPlan {
+	pub workspace_root: PathBuf,
+	pub decisions: Vec<ReleaseManifestPlanDecision>,
+	pub groups: Vec<ReleaseManifestPlanGroup>,
+	pub warnings: Vec<String>,
+	pub unresolved_items: Vec<String>,
+	pub compatibility_evidence: Vec<ReleaseManifestCompatibilityEvidence>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseDeploymentIntent {
+	pub name: String,
+	#[serde(default)]
+	pub environment: Option<String>,
+	#[serde(default)]
+	pub release_targets: Vec<String>,
+	#[serde(default)]
+	pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifest {
+	pub workflow: String,
+	pub dry_run: bool,
+	#[serde(default)]
+	pub version: Option<String>,
+	#[serde(default)]
+	pub group_version: Option<String>,
+	pub release_targets: Vec<ReleaseManifestTarget>,
+	pub released_packages: Vec<String>,
+	pub changed_files: Vec<PathBuf>,
+	pub changelogs: Vec<ReleaseManifestChangelog>,
+	#[serde(default)]
+	pub deleted_changesets: Vec<PathBuf>,
+	#[serde(default)]
+	pub deployments: Vec<ReleaseDeploymentIntent>,
+	pub plan: ReleaseManifestPlan,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

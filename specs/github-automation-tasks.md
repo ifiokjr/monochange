@@ -5,7 +5,7 @@
 - [ ] T001 Finalize terminology for release PRs, changeset PR checks, deployments, and GitHub release publication.
 - [ ] T002 Lock the initial config surface for changelog, GitHub, deployment, and bot sections.
 - [ ] T003 Decide whether the first bot implementation is GitHub Actions-only or includes a GitHub App.
-- [ ] T004 Define the release manifest JSON contract.
+- [x] T004 Define the release manifest JSON contract.
 
 ## Phase 1 — Changelog formats and release notes
 
@@ -13,15 +13,15 @@
 - [x] T011 Add config parsing for changelog format settings in `crates/monochange_config/src/lib.rs`.
 - [x] T012 Refactor changelog writing to render through a structured release-note model in `crates/monochange/src/lib.rs`.
 - [x] T013 Add tests for defaults, package overrides, and group overrides for changelog formats.
-- [ ] T014 Add snapshot coverage for rendered changelog output where useful.
+- [x] T014 Add snapshot coverage for rendered changelog output where useful.
 
 ## Phase 2 — Release manifest
 
-- [ ] T020 Add release manifest domain types in `crates/monochange_core/src/lib.rs`.
-- [ ] T021 Add release manifest rendering in `crates/monochange/src/lib.rs`.
-- [ ] T022 Add workflow support for a `RenderReleaseManifest` step.
-- [ ] T023 Add JSON snapshot tests for release manifests.
-- [ ] T024 Document the release manifest contract in `specs/` and user docs.
+- [x] T020 Add release manifest domain types in `crates/monochange_core/src/lib.rs`.
+- [x] T021 Add release manifest rendering in `crates/monochange/src/lib.rs`.
+- [x] T022 Add workflow support for a `RenderReleaseManifest` step.
+- [x] T023 Add JSON snapshot tests for release manifests.
+- [x] T024 Document the release manifest contract in `specs/` and user docs.
 
 ## Phase 3 — GitHub releases
 

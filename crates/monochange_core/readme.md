@@ -33,7 +33,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 - normalized package and dependency records
 - version-group definitions and planned group outcomes
 - change signals and compatibility assessments
-- changelog formats, changelog targets, and structured release-note types
+- changelog formats, changelog targets, structured release-note types, and release-manifest types
 - shared error and result types
 
 ## Example
