@@ -36,7 +36,48 @@ fn cli_help_returns_success_output() {
 		.unwrap_or_else(|error| panic!("help output: {error}"));
 
 	assert!(output.contains("Usage: mc <COMMAND>"));
+	assert!(output.contains("assist"));
+	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
+}
+
+#[test]
+fn assist_command_prints_install_and_mcp_guidance() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("assist"),
+			OsString::from("pi"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("assist output: {error}"));
+
+	assert!(output.contains("@monochange/cli"));
+	assert!(output.contains("@monochange/skill"));
+	assert!(output.contains("monochange mcp"));
+	assert!(output.contains("mc validate"));
+}
+
+#[test]
+fn assist_command_supports_json_output() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("assist"),
+			OsString::from("generic"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("assist json output: {error}"));
+
+	assert!(output.contains("\"mcp_config\""));
+	assert!(output.contains("\"install\""));
+	assert!(output.contains("@monochange/skill"));
 }
 
 #[test]

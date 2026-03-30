@@ -30,10 +30,12 @@ monochange_gitlab = { workspace = true }
 monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }
+rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shlex = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 toml = { workspace = true }
 
 [dev-dependencies]

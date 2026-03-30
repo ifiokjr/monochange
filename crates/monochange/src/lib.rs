@@ -23,9 +23,11 @@
 //!
 //! ```bash
 //! mc init
+//! mc assist pi
 //! mc discover --format json
 //! mc change --package monochange --bump patch --reason "describe the change"
 //! mc release --dry-run --format json
+//! mc mcp
 //! ```
 //!
 //! ## Responsibilities
@@ -35,9 +37,10 @@
 //! - synthesize default CLI commands when config does not declare any
 //! - resolve change input files
 //! - render discovery and release command output in text or JSON
-//! - execute configured CLI commands
+//! - execute configured CLI commands plus built-in assistant setup and MCP commands
 //! - preview or publish provider releases from prepared release data
 //! - evaluate pull-request changeset policy from CI-supplied changed paths and labels
+//! - expose JSON-first MCP tools for assistant workflows
 //! <!-- {/monochangeCrateDocs} -->
 
 use std::collections::BTreeMap;
@@ -136,6 +139,8 @@ use serde::Serialize;
 use serde_json::json;
 use toml::Value;
 
+mod mcp;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum OutputFormat {
 	Text,
@@ -159,7 +164,22 @@ impl From<ChangeBump> for BumpSeverity {
 	}
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum Assistant {
+	Generic,
+	Claude,
+	Cursor,
+	Copilot,
+	Pi,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum AssistOutputFormat {
+	Text,
+	Json,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct ReleaseTarget {
 	pub id: String,
 	pub kind: ReleaseOwnerKind,
@@ -351,6 +371,11 @@ fn build_command_with_cli(bin_name: &'static str, cli: &[CliCommandDefinition]) 
 						.help("Overwrite an existing monochange.toml file")
 						.action(ArgAction::SetTrue),
 				),
+		)
+		.subcommand(build_assist_subcommand())
+		.subcommand(
+			Command::new("mcp")
+				.about("Start the monochange MCP (Model Context Protocol) server over stdin/stdout"),
 		);
 
 	for cli_command in cli {
@@ -358,6 +383,24 @@ fn build_command_with_cli(bin_name: &'static str, cli: &[CliCommandDefinition]) 
 	}
 
 	command
+}
+
+fn build_assist_subcommand() -> Command {
+	Command::new("assist")
+		.about("Print assistant setup guidance, install steps, and MCP configuration")
+		.arg(
+			Arg::new("assistant")
+				.help("Assistant profile to print")
+				.required(true)
+				.value_parser(["generic", "claude", "cursor", "copilot", "pi"]),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format for the assistant setup profile")
+				.default_value("text")
+				.value_parser(["text", "json"]),
+		)
 }
 
 fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
@@ -422,10 +465,132 @@ fn current_dir_or_dot() -> PathBuf {
 	std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
+fn assistant_display_name(assistant: Assistant) -> &'static str {
+	match assistant {
+		Assistant::Generic => "Generic MCP client",
+		Assistant::Claude => "Claude",
+		Assistant::Cursor => "Cursor",
+		Assistant::Copilot => "GitHub Copilot",
+		Assistant::Pi => "Pi",
+	}
+}
+
+fn assistant_setup_payload(assistant: Assistant) -> serde_json::Value {
+	let mcp_config = json!({
+		"mcpServers": {
+			"monochange": {
+				"command": "monochange",
+				"args": ["mcp"]
+			}
+		}
+	});
+	let guidance = vec![
+		"Read `monochange.toml` before proposing release workflow changes.".to_string(),
+		"Run `mc validate` before and after release-affecting edits.".to_string(),
+		"Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.".to_string(),
+		"Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes when encoding release intent.".to_string(),
+		"Use `mc release --dry-run --format json` before any mutating release command or source-provider publish flow.".to_string(),
+	];
+	let notes = match assistant {
+		Assistant::Generic => vec![
+			"Add the MCP snippet to any client that supports stdio MCP servers.".to_string(),
+			"Install `@monochange/skill` when you want a reusable local skill bundle with the same repo guidance.".to_string(),
+		],
+		Assistant::Claude => vec![
+			"Add the MCP snippet to Claude's MCP configuration and keep the repo-local guidance in project instructions.".to_string(),
+			"Use the skill package as a reviewable source of guidance rather than embedding one-off release instructions in each chat.".to_string(),
+		],
+		Assistant::Cursor => vec![
+			"Configure the MCP server in Cursor at the workspace or user level.".to_string(),
+			"Pair MCP with repo instructions so Cursor agents validate and dry-run release changes before editing manifests or changelogs.".to_string(),
+		],
+		Assistant::Copilot => vec![
+			"Use this MCP snippet in Copilot or VS Code environments that support MCP-compatible server definitions.".to_string(),
+			"Keep the guidance close to workspace instructions so Copilot follows Monochange's explicit changeset and dry-run workflow.".to_string(),
+		],
+		Assistant::Pi => vec![
+			"Install `@monochange/skill` and copy the bundled files into your Pi skills directory when you want reusable Monochange-specific instructions.".to_string(),
+			"Configure Pi to run `monochange mcp` so agents can inspect the workspace model, create changesets, and preview releases through MCP tools.".to_string(),
+		],
+	};
+
+	json!({
+		"assistant": assistant_display_name(assistant),
+		"strategy": {
+			"type": "official-profile",
+			"scope": "config-snippets-guidance-install",
+			"summary": "monochange ships official assistant setup guidance with install steps, MCP config, and repo-local workflow rules."
+		},
+		"install": {
+			"cli": {
+				"npm": "npm install -g @monochange/cli",
+				"cargo": "cargo install monochange"
+			},
+			"skill": {
+				"npm": "npm install -g @monochange/skill",
+				"copy": "monochange-skill --copy ~/.pi/agent/skills/monochange"
+			}
+		},
+		"mcp_config": mcp_config,
+		"repo_guidance": guidance,
+		"notes": notes,
+	})
+}
+
+fn run_assist(assistant: Assistant, format: AssistOutputFormat) -> MonochangeResult<String> {
+	let payload = assistant_setup_payload(assistant);
+	match format {
+		AssistOutputFormat::Json => serde_json::to_string_pretty(&payload)
+			.map_err(|error| MonochangeError::Config(error.to_string())),
+		AssistOutputFormat::Text => {
+			let mcp_config = serde_json::to_string_pretty(&payload["mcp_config"])
+				.map_err(|error| MonochangeError::Config(error.to_string()))?;
+			let install = serde_json::to_string_pretty(&payload["install"])
+				.map_err(|error| MonochangeError::Config(error.to_string()))?;
+			let mut output = String::new();
+			let _ = writeln!(output, "monochange assist");
+			let _ = writeln!(output);
+			let _ = writeln!(
+				output,
+				"Assistant                 {}",
+				payload["assistant"].as_str().unwrap_or_default()
+			);
+			let _ = writeln!(
+				output,
+				"Strategy                  {}",
+				payload["strategy"]["summary"].as_str().unwrap_or_default()
+			);
+			let _ = writeln!(output);
+			let _ = writeln!(output, "Install:");
+			let _ = writeln!(output, "{install}");
+			let _ = writeln!(output);
+			let _ = writeln!(output, "MCP config snippet:");
+			let _ = writeln!(output, "{mcp_config}");
+			let _ = writeln!(output);
+			let _ = writeln!(output, "Suggested repo-local guidance:");
+			for item in payload["repo_guidance"].as_array().into_iter().flatten() {
+				if let Some(text) = item.as_str() {
+					let _ = writeln!(output, "- {text}");
+				}
+			}
+			let _ = writeln!(output);
+			let _ = writeln!(output, "Notes for {}:", assistant_display_name(assistant));
+			for item in payload["notes"].as_array().into_iter().flatten() {
+				if let Some(text) = item.as_str() {
+					let _ = writeln!(output, "- {text}");
+				}
+			}
+			Ok(output.trim_end().to_string())
+		}
+	}
+}
+
 pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let args = std::env::args_os();
 	let output = run_with_args(bin_name, args)?;
-	println!("{output}");
+	if !output.is_empty() {
+		println!("{output}");
+	}
 	Ok(())
 }
 
@@ -463,6 +628,43 @@ where
 		Some(("init", init_matches)) => {
 			let path = init_workspace(root, init_matches.get_flag("force"))?;
 			Ok(format!("wrote {}", path.display()))
+		}
+		Some(("assist", assist_matches)) => {
+			let assistant = match assist_matches
+				.get_one::<String>("assistant")
+				.map(String::as_str)
+			{
+				Some("generic") => Assistant::Generic,
+				Some("claude") => Assistant::Claude,
+				Some("cursor") => Assistant::Cursor,
+				Some("copilot") => Assistant::Copilot,
+				Some("pi") => Assistant::Pi,
+				Some(value) => {
+					return Err(MonochangeError::Config(format!(
+						"unknown assistant `{value}`"
+					)))
+				}
+				None => return Err(MonochangeError::Config("missing assistant".to_string())),
+			};
+			let format = match assist_matches
+				.get_one::<String>("format")
+				.map_or("text", String::as_str)
+			{
+				"text" => AssistOutputFormat::Text,
+				"json" => AssistOutputFormat::Json,
+				value => {
+					return Err(MonochangeError::Config(format!(
+						"unknown assist output format `{value}`"
+					)))
+				}
+			};
+			run_assist(assistant, format)
+		}
+		Some(("mcp", _)) => {
+			let runtime = tokio::runtime::Runtime::new()
+				.map_err(|error| MonochangeError::Config(error.to_string()))?;
+			runtime.block_on(mcp::run_server());
+			Ok(String::new())
 		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;
