@@ -2,7 +2,7 @@
 
 <!-- {=githubAutomationOverview} -->
 
-MonoChange keeps source-provider automation layered on top of the same `PrepareRelease` result used for normal release planning.
+MonoChange keeps source-provider automation layered on top of the same `PrepareRelease` result used for normal release planning. For GitHub-backed releases, the rendered release manifest also includes file-level changeset provenance, so downstream automation can reuse the author, commit, pull-request, and issue context attached to each authored changeset.
 
 That means one set of `.changeset/*.md` inputs can drive all of these commands and automation flows consistently:
 
@@ -39,7 +39,7 @@ path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
-change_templates = ["#### $summary\n\n$details", "- $summary"]
+change_templates = ["#### $summary\n\n$details\n\n$provenance", "#### $summary\n\n$provenance", "- $summary"]
 
 [group.main.changelog]
 path = "changelog.md"
@@ -86,6 +86,9 @@ type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
+
+[[cli.publish-release.steps]]
+type = "CommentReleasedIssues"
 
 [cli.release-pr]
 help_text = "Prepare a release and open or update a provider release request"

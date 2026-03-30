@@ -40,6 +40,8 @@ sdk: minor
 #### coordinated SDK release
 ```
 
+MonoChange keeps its own changeset standard rather than reusing a narrower external parser. In addition to package/group bump entries, MonoChange changesets can include reserved metadata keys such as `evidence`, `origin`, and `type`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs.
+
 Optionally include Rust semver evidence:
 
 <!-- {=releaseEvidenceExample} -->
@@ -191,14 +193,15 @@ Planning rules in this milestone:
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
 - `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
-- change templates support detailed multi-line release-note entries through `$details`
+- change templates support detailed multi-line release-note entries through `$details` and optional provenance blocks through `$provenance`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
-- release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
+- release-manifest JSON captures release targets, changelog payloads, authored changesets, provenance metadata, changed files, and the synchronized release plan for downstream automation
 - `PublishRelease` reuses the same structured release data to build provider release requests for grouped and package-owned releases
 - `OpenReleaseRequest` reuses the same structured release data to render release-request summaries, branch names, and idempotent provider updates
+- `CommentReleasedIssues` can use provider-enriched changeset provenance to add release follow-up comments on closed issues once a release is published
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
 - `VerifyChangesets` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation

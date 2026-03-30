@@ -60,6 +60,7 @@
 //!     released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
 //!     changed_files: Vec::new(),
 //!     changelogs: Vec::new(),
+//!     changesets: Vec::new(),
 //!     deleted_changesets: Vec::new(),
 //!     deployments: Vec::new(),
 //!     plan: ReleaseManifestPlan {
@@ -95,8 +96,18 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use monochange_core::GitHubConfiguration;
+use monochange_core::HostedActorRef;
+use monochange_core::HostedActorSourceKind;
+use monochange_core::HostedIssueRef;
+use monochange_core::HostedIssueRelationshipKind;
+use monochange_core::HostedReviewRequestKind;
+use monochange_core::HostedReviewRequestRef;
+use monochange_core::HostingCapabilities;
+use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PreparedChangeset;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesSource;
@@ -123,6 +134,37 @@ pub type GitHubReleaseOutcome = SourceReleaseOutcome;
 pub type GitHubPullRequestRequest = SourceChangeRequest;
 pub type GitHubPullRequestOperation = SourceChangeRequestOperation;
 pub type GitHubPullRequestOutcome = SourceChangeRequestOutcome;
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubIssueCommentPlan {
+	pub repository: String,
+	pub issue_id: String,
+	pub issue_url: Option<String>,
+	pub body: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GitHubIssueCommentOperation {
+	Created,
+	SkippedExisting,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubIssueCommentOutcome {
+	pub repository: String,
+	pub issue_id: String,
+	pub operation: GitHubIssueCommentOperation,
+	pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct GitHubRelatedReviewRequest {
+	review_request: HostedReviewRequestRef,
+	issues: Vec<HostedIssueRef>,
+}
 
 #[derive(Debug, Serialize)]
 struct GitHubReleasePayload<'a> {
@@ -190,6 +232,165 @@ struct GraphqlPullRequestNode {
 	_number: u64,
 }
 
+#[derive(Debug, Deserialize)]
+struct GitHubUserResponse {
+	id: u64,
+	login: String,
+	html_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubCommitPullRequestResponse {
+	number: u64,
+	title: String,
+	html_url: Option<String>,
+	body: Option<String>,
+	user: Option<GitHubUserResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GraphqlPullRequestIssuesResponse {
+	repository: Option<GraphqlPullRequestIssuesRepository>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GraphqlPullRequestIssuesRepository {
+	pull_request: Option<GraphqlPullRequestIssuesNode>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GraphqlPullRequestIssuesNode {
+	closing_issues_references: GraphqlIssueConnection,
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphqlIssueConnection {
+	nodes: Vec<GraphqlIssueNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphqlIssueNode {
+	number: u64,
+	title: String,
+	url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubIssueCommentResponse {
+	html_url: Option<String>,
+	body: Option<String>,
+}
+
+#[must_use]
+pub fn github_hosting_capabilities() -> HostingCapabilities {
+	HostingCapabilities {
+		commit_web_urls: true,
+		actor_profiles: true,
+		review_request_lookup: true,
+		related_issues: true,
+		issue_comments: true,
+	}
+}
+
+#[must_use]
+pub fn github_web_base_url() -> String {
+	env::var("GITHUB_SERVER_URL").unwrap_or_else(|_| "https://github.com".to_string())
+}
+
+#[must_use]
+pub fn github_host() -> Option<String> {
+	let base_url = github_web_base_url();
+	let without_scheme = base_url
+		.trim_start_matches("https://")
+		.trim_start_matches("http://");
+	let host = without_scheme.split('/').next().unwrap_or_default().trim();
+	if host.is_empty() {
+		None
+	} else {
+		Some(host.to_string())
+	}
+}
+
+#[must_use]
+pub fn github_commit_url(github: &GitHubConfiguration, sha: &str) -> String {
+	format!(
+		"{}/{}/{}/commit/{}",
+		github_web_base_url().trim_end_matches('/'),
+		github.owner,
+		github.repo,
+		sha
+	)
+}
+
+#[must_use]
+pub fn github_pull_request_url(github: &GitHubConfiguration, number: u64) -> String {
+	format!(
+		"{}/{}/{}/pull/{}",
+		github_web_base_url().trim_end_matches('/'),
+		github.owner,
+		github.repo,
+		number
+	)
+}
+
+#[must_use]
+pub fn github_issue_url(github: &GitHubConfiguration, number: u64) -> String {
+	format!(
+		"{}/{}/{}/issues/{}",
+		github_web_base_url().trim_end_matches('/'),
+		github.owner,
+		github.repo,
+		number
+	)
+}
+
+pub fn enrich_changeset_provenance(
+	github: &GitHubConfiguration,
+	changesets: &mut [PreparedChangeset],
+) {
+	let host = github_host();
+	let capabilities = github_hosting_capabilities();
+	for changeset in changesets.iter_mut() {
+		let Some(provenance) = changeset.provenance.as_mut() else {
+			continue;
+		};
+		provenance.provider = HostingProviderKind::GitHub;
+		provenance.host.clone_from(&host);
+		provenance.capabilities = capabilities.clone();
+		for revision in [&mut provenance.introduced, &mut provenance.last_updated] {
+			let Some(revision) = revision.as_mut() else {
+				continue;
+			};
+			if let Some(commit) = revision.commit.as_mut() {
+				commit.provider = HostingProviderKind::GitHub;
+				commit.host.clone_from(&host);
+				commit.url = Some(github_commit_url(github, &commit.sha));
+			}
+			if let Some(actor) = revision.actor.as_mut() {
+				actor.provider = HostingProviderKind::GitHub;
+				actor.host.clone_from(&host);
+			}
+		}
+	}
+
+	let Ok(token) = env::var("GITHUB_TOKEN").or_else(|_| env::var("GH_TOKEN")) else {
+		return;
+	};
+	let Ok(runtime) = github_runtime() else {
+		return;
+	};
+	let api_base_url = env::var("GITHUB_API_URL").ok();
+	runtime.block_on(async {
+		let Ok(client) = build_github_client(&token, api_base_url.as_deref()) else {
+			return;
+		};
+		enrich_changeset_provenance_with_client(&client, github, changesets).await;
+	});
+}
+
 #[must_use]
 pub fn build_release_requests(
 	github: &SourceConfiguration,
@@ -238,6 +439,323 @@ pub fn build_release_pull_request_request(
 		labels: github.pull_requests.labels.clone(),
 		auto_merge: github.pull_requests.auto_merge,
 		commit_message: title,
+	}
+}
+
+async fn enrich_changeset_provenance_with_client(
+	client: &Octocrab,
+	github: &GitHubConfiguration,
+	changesets: &mut [PreparedChangeset],
+) {
+	let host = github_host();
+	let capabilities = github_hosting_capabilities();
+	for changeset in changesets.iter_mut() {
+		let Some(provenance) = changeset.provenance.as_mut() else {
+			continue;
+		};
+		provenance.provider = HostingProviderKind::GitHub;
+		provenance.host.clone_from(&host);
+		provenance.capabilities = capabilities.clone();
+		for revision in [&mut provenance.introduced, &mut provenance.last_updated] {
+			let Some(revision) = revision.as_mut() else {
+				continue;
+			};
+			if let Some(commit) = revision.commit.as_mut() {
+				commit.provider = HostingProviderKind::GitHub;
+				commit.host.clone_from(&host);
+				commit.url = Some(github_commit_url(github, &commit.sha));
+			}
+			if let Some(actor) = revision.actor.as_mut() {
+				actor.provider = HostingProviderKind::GitHub;
+				actor.host.clone_from(&host);
+			}
+		}
+	}
+	let mut review_requests_by_sha =
+		std::collections::BTreeMap::<String, Option<GitHubRelatedReviewRequest>>::new();
+	for changeset in changesets.iter_mut() {
+		let Some(provenance) = changeset.provenance.as_mut() else {
+			continue;
+		};
+		let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
+		for revision in [&mut provenance.introduced, &mut provenance.last_updated] {
+			let Some(revision) = revision.as_mut() else {
+				continue;
+			};
+			let Some(commit) = revision.commit.as_ref() else {
+				continue;
+			};
+			let commit_sha = commit.sha.clone();
+			let related_review_request = if let Some(cached) =
+				review_requests_by_sha.get(&commit_sha)
+			{
+				cached.clone()
+			} else {
+				let loaded = lookup_commit_review_request_with_client(client, github, &commit_sha)
+					.await
+					.ok()
+					.flatten();
+				review_requests_by_sha.insert(commit_sha.clone(), loaded.clone());
+				loaded
+			};
+			if let Some(related_review_request) = related_review_request {
+				for issue in related_review_request.issues {
+					issues_by_id.entry(issue.id.clone()).or_insert(issue);
+				}
+				revision.review_request = Some(related_review_request.review_request.clone());
+				if let Some(author) = related_review_request.review_request.author.clone() {
+					revision.actor = Some(author);
+				}
+			}
+			if let Some(actor) = revision.actor.as_mut() {
+				actor.provider = HostingProviderKind::GitHub;
+				actor.host.clone_from(&host);
+			}
+		}
+		provenance.related_issues = issues_by_id.into_values().collect();
+	}
+}
+
+async fn lookup_commit_review_request_with_client(
+	client: &Octocrab,
+	github: &GitHubConfiguration,
+	sha: &str,
+) -> MonochangeResult<Option<GitHubRelatedReviewRequest>> {
+	let path = format!(
+		"/repos/{}/{}/commits/{}/pulls",
+		github.owner, github.repo, sha
+	);
+	let pull_requests = get_json::<Vec<GitHubCommitPullRequestResponse>>(client, &path).await?;
+	let Some(pull_request) = pull_requests.into_iter().next() else {
+		return Ok(None);
+	};
+	let author = pull_request.user.map(|user| HostedActorRef {
+		provider: HostingProviderKind::GitHub,
+		host: github_host(),
+		id: Some(user.id.to_string()),
+		login: Some(user.login.clone()),
+		display_name: Some(user.login),
+		url: user.html_url,
+		source: HostedActorSourceKind::ReviewRequestAuthor,
+	});
+	let review_request = HostedReviewRequestRef {
+		provider: HostingProviderKind::GitHub,
+		host: github_host(),
+		kind: HostedReviewRequestKind::PullRequest,
+		id: format!("#{}", pull_request.number),
+		title: Some(pull_request.title),
+		url: pull_request
+			.html_url
+			.or_else(|| Some(github_pull_request_url(github, pull_request.number))),
+		author,
+	};
+	let issues = load_pull_request_issues_with_client(
+		client,
+		github,
+		pull_request.number,
+		pull_request.body.as_deref(),
+	)
+	.await
+	.unwrap_or_default();
+	Ok(Some(GitHubRelatedReviewRequest {
+		review_request,
+		issues,
+	}))
+}
+
+async fn load_pull_request_issues_with_client(
+	client: &Octocrab,
+	github: &GitHubConfiguration,
+	number: u64,
+	body: Option<&str>,
+) -> MonochangeResult<Vec<HostedIssueRef>> {
+	let response = client
+		.graphql::<GraphqlPullRequestIssuesResponse>(&json!({
+			"query": "query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { closingIssuesReferences(first: 50) { nodes { number title url } } } } }",
+			"owner": github.owner,
+			"repo": github.repo,
+			"number": number,
+		}))
+		.await
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to load GitHub closing issues for pull request #{number}: {error}"
+			))
+		})?;
+	let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
+	for issue in response
+		.repository
+		.and_then(|repository| repository.pull_request)
+		.into_iter()
+		.flat_map(|pull_request| pull_request.closing_issues_references.nodes)
+	{
+		issues_by_id.insert(
+			format!("#{}", issue.number),
+			HostedIssueRef {
+				provider: HostingProviderKind::GitHub,
+				host: github_host(),
+				id: format!("#{}", issue.number),
+				title: Some(issue.title),
+				url: Some(issue.url),
+				relationship: HostedIssueRelationshipKind::ClosedByReviewRequest,
+			},
+		);
+	}
+	for issue_number in body.map(extract_issue_numbers).unwrap_or_default() {
+		issues_by_id
+			.entry(format!("#{issue_number}"))
+			.or_insert_with(|| HostedIssueRef {
+				provider: HostingProviderKind::GitHub,
+				host: github_host(),
+				id: format!("#{issue_number}"),
+				title: None,
+				url: Some(github_issue_url(github, issue_number)),
+				relationship: HostedIssueRelationshipKind::ReferencedByReviewRequest,
+			});
+	}
+	Ok(issues_by_id.into_values().collect())
+}
+
+fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
+	let mut issue_numbers = std::collections::BTreeSet::new();
+	let bytes = text.as_bytes();
+	let mut index = 0;
+	while let Some(byte) = bytes.get(index) {
+		if *byte != b'#' {
+			index += 1;
+			continue;
+		}
+		let mut digits = String::new();
+		let mut cursor = index + 1;
+		while let Some(next) = bytes.get(cursor) {
+			if !next.is_ascii_digit() {
+				break;
+			}
+			digits.push(char::from(*next));
+			cursor += 1;
+		}
+		if let Ok(number) = digits.parse::<u64>() {
+			issue_numbers.insert(number);
+		}
+		index = cursor;
+	}
+	issue_numbers
+}
+
+#[must_use]
+pub fn plan_released_issue_comments(
+	github: &GitHubConfiguration,
+	manifest: &ReleaseManifest,
+) -> Vec<GitHubIssueCommentPlan> {
+	let release_tags = manifest
+		.release_targets
+		.iter()
+		.filter(|target| target.release)
+		.map(|target| target.tag_name.clone())
+		.collect::<Vec<_>>();
+	if release_tags.is_empty() {
+		return Vec::new();
+	}
+	let marker = release_comment_marker(&release_tags);
+	let body = release_issue_comment_body(&release_tags, &marker);
+	let mut plans_by_issue = std::collections::BTreeMap::<String, GitHubIssueCommentPlan>::new();
+	for issue in manifest
+		.changesets
+		.iter()
+		.filter_map(|changeset| changeset.provenance.as_ref())
+		.flat_map(|provenance| provenance.related_issues.iter())
+		.filter(|issue| issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest)
+	{
+		plans_by_issue
+			.entry(issue.id.clone())
+			.or_insert_with(|| GitHubIssueCommentPlan {
+				repository: format!("{}/{}", github.owner, github.repo),
+				issue_id: issue.id.clone(),
+				issue_url: issue.url.clone(),
+				body: body.clone(),
+			});
+	}
+	plans_by_issue.into_values().collect()
+}
+
+pub fn comment_released_issues(
+	github: &GitHubConfiguration,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<Vec<GitHubIssueCommentOutcome>> {
+	let plans = plan_released_issue_comments(github, manifest);
+	if plans.is_empty() {
+		return Ok(Vec::new());
+	}
+	let source = github_source_configuration(github);
+	let runtime = github_runtime()?;
+	runtime.block_on(async {
+		let client = github_client_from_env(&source)?;
+		let outcome = comment_released_issues_with_client(&client, github, &plans).await;
+		outcome
+	})
+}
+
+async fn comment_released_issues_with_client(
+	client: &Octocrab,
+	github: &GitHubConfiguration,
+	plans: &[GitHubIssueCommentPlan],
+) -> MonochangeResult<Vec<GitHubIssueCommentOutcome>> {
+	let mut outcomes = Vec::with_capacity(plans.len());
+	for plan in plans {
+		let issue_number = plan
+			.issue_id
+			.trim_start_matches('#')
+			.parse::<u64>()
+			.map_err(|error| {
+				MonochangeError::Config(format!(
+					"invalid issue id `{}` for release comment: {error}",
+					plan.issue_id
+				))
+			})?;
+		let path = format!(
+			"/repos/{}/{}/issues/{}/comments",
+			github.owner, github.repo, issue_number
+		);
+		let existing_comments = get_json::<Vec<GitHubIssueCommentResponse>>(client, &path).await?;
+		if existing_comments.iter().any(|comment| {
+			comment
+				.body
+				.as_deref()
+				.is_some_and(|body| body.contains(&plan.body))
+		}) {
+			outcomes.push(GitHubIssueCommentOutcome {
+				repository: plan.repository.clone(),
+				issue_id: plan.issue_id.clone(),
+				operation: GitHubIssueCommentOperation::SkippedExisting,
+				url: plan.issue_url.clone(),
+			});
+			continue;
+		}
+		let response = post_json::<_, GitHubIssueCommentResponse>(
+			client,
+			&path,
+			&json!({ "body": plan.body }),
+		)
+		.await?;
+		outcomes.push(GitHubIssueCommentOutcome {
+			repository: plan.repository.clone(),
+			issue_id: plan.issue_id.clone(),
+			operation: GitHubIssueCommentOperation::Created,
+			url: response.html_url.or_else(|| plan.issue_url.clone()),
+		});
+	}
+	Ok(outcomes)
+}
+
+fn release_comment_marker(release_tags: &[String]) -> String {
+	format!("<!-- monochange:released-in:{} -->", release_tags.join("|"))
+}
+
+fn release_issue_comment_body(release_tags: &[String], marker: &str) -> String {
+	if let Some(release_tag) = release_tags.first().filter(|_| release_tags.len() == 1) {
+		format!("Released in {release_tag}.\n\n{marker}")
+	} else {
+		format!("Released in {}.\n\n{marker}", release_tags.join(", "))
 	}
 }
 
@@ -458,6 +976,19 @@ fn github_runtime() -> MonochangeResult<tokio::runtime::Runtime> {
 		.enable_all()
 		.build()
 		.map_err(|error| MonochangeError::Io(format!("failed to build GitHub runtime: {error}")))
+}
+
+fn github_source_configuration(github: &GitHubConfiguration) -> SourceConfiguration {
+	SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		owner: github.owner.clone(),
+		repo: github.repo.clone(),
+		host: None,
+		api_url: None,
+		releases: github.releases.clone(),
+		pull_requests: github.pull_requests.clone(),
+		bot: github.bot.clone(),
+	}
 }
 
 fn github_client_from_env(source: &SourceConfiguration) -> MonochangeResult<Octocrab> {
