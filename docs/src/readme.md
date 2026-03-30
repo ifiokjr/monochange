@@ -16,6 +16,7 @@ The current milestone focuses on:
 - emit stable release-manifest JSON for downstream automation
 - preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
 - model deployment intents for downstream automation and merge-driven release workflows
+- enforce pull-request changeset policy through typed workflow steps and reusable diagnostics
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 

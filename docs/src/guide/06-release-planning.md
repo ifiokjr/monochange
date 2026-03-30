@@ -108,10 +108,48 @@ Current `PrepareRelease` behavior:
 - can preview or publish GitHub releases via `PublishGitHubRelease`
 - can preview or open/update release pull requests via `OpenReleasePullRequest`
 - can emit deployment intents via `Deploy` for merge-driven or workflow-driven deploy orchestration
+- can evaluate pull-request changeset policy via `EnforceChangesetPolicy` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or GitHub release preview
+
+A GitHub Actions check can pass changed paths and labels directly into a policy workflow, for example:
+
+```yaml
+name: changeset-policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - id: changed
+        uses: tj-actions/changed-files@v46
+      - name: Run MonoChange policy check
+        env:
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
+          args=(changeset-check --format json)
+          for path in ${{ steps.changed.outputs.all_changed_files }}; do
+            args+=(--changed-path "$path")
+          done
+          for label in "${labels[@]}"; do
+            args+=(--label "$label")
+          done
+          devenv shell -- mc "${args[@]}" > policy.json
+          jq -e '.status != "failed"' policy.json >/dev/null
+```
 
 <!-- {/releaseWorkflowBehavior} -->
 
@@ -131,6 +169,7 @@ Planning rules in this milestone:
 - `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
 - `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
+- `EnforceChangesetPolicy` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->

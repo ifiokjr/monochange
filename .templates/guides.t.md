@@ -169,6 +169,28 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "Deploy"
 
+[[workflows]]
+name = "changeset-check"
+help_text = "Evaluate pull-request changeset policy"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.inputs]]
+name = "changed_path"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "label"
+type = "string_list"
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"
+
 [[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
@@ -207,6 +229,14 @@ base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
+
+[github.bot.changesets]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["crates/**", "packages/**"]
+ignored_paths = ["docs/**", "*.md"]
 
 [[deployments]]
 name = "production"
@@ -257,8 +287,9 @@ Current implementation notes:
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
 - GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
+- changeset policy workflows currently expect `[github.bot.changesets]`, a `changed_path` workflow input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository workflows can decide when and how to execute them
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, and `Command`
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `EnforceChangesetPolicy`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -357,6 +388,7 @@ evidence:
 - `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
 - `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
+- `EnforceChangesetPolicy` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
@@ -379,9 +411,47 @@ Current `PrepareRelease` behavior:
 - can preview or publish GitHub releases via `PublishGitHubRelease`
 - can preview or open/update release pull requests via `OpenReleasePullRequest`
 - can emit deployment intents via `Deploy` for merge-driven or workflow-driven deploy orchestration
+- can evaluate pull-request changeset policy via `EnforceChangesetPolicy` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or GitHub release preview
+
+A GitHub Actions check can pass changed paths and labels directly into a policy workflow, for example:
+
+```yaml
+name: changeset-policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - id: changed
+        uses: tj-actions/changed-files@v46
+      - name: Run MonoChange policy check
+        env:
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
+          args=(changeset-check --format json)
+          for path in ${{ steps.changed.outputs.all_changed_files }}; do
+            args+=(--changed-path "$path")
+          done
+          for label in "${labels[@]}"; do
+            args+=(--label "$label")
+          done
+          devenv shell -- mc "${args[@]}" > policy.json
+          jq -e '.status != "failed"' policy.json >/dev/null
+```
 
 <!-- {/releaseWorkflowBehavior} -->

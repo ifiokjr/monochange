@@ -1331,6 +1331,7 @@ name = "monochange"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "glob",
  "insta",
  "insta-cmd",
  "monochange_cargo",
@@ -1393,6 +1394,7 @@ name = "monochange_config"
 version = "0.0.0"
 dependencies = [
  "doc-comment",
+ "glob",
  "insta",
  "miette",
  "monochange_core",

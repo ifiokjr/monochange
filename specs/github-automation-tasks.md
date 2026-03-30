@@ -53,12 +53,12 @@
 
 ## Phase 6 — Changeset bot policy
 
-- [ ] T060 Add bot policy config parsing.
-- [ ] T061 Implement a reusable changeset policy evaluator.
-- [ ] T062 Add CLI or workflow support for PR policy enforcement.
-- [ ] T063 Add GitHub Action examples for required changeset checks.
-- [ ] T064 Add rule coverage for skip labels, changed paths, ignored paths, and invalid changesets.
-- [ ] T065 Add snapshot tests for bot diagnostics and comments.
+- [x] T060 Add bot policy config parsing.
+- [x] T061 Implement a reusable changeset policy evaluator.
+- [x] T062 Add CLI or workflow support for PR policy enforcement.
+- [x] T063 Add GitHub Action examples for required changeset checks.
+- [x] T064 Add rule coverage for skip labels, changed paths, ignored paths, and invalid changesets.
+- [x] T065 Add snapshot tests for bot diagnostics and comments.
 
 ## Phase 7 — Docs, examples, and rollout
 

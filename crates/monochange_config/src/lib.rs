@@ -33,7 +33,7 @@
 //! - load `monochange.toml`
 //! - validate version groups and workflows
 //! - resolve package references against discovered packages
-//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, and workflow GitHub/manifest steps
+//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and workflow GitHub/manifest/policy steps
 //!
 //! ## Example
 //!
@@ -83,6 +83,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::path::PathBuf;
 
+use glob::Pattern;
 use miette::Diagnostic;
 use miette::LabeledSpan;
 use miette::NamedSource;
@@ -99,6 +100,8 @@ use monochange_core::DeploymentDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::ExtraChangelogSection;
+use monochange_core::GitHubBotSettings;
+use monochange_core::GitHubChangesetBotSettings;
 use monochange_core::GitHubConfiguration;
 use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
@@ -273,6 +276,8 @@ struct RawGitHubConfiguration {
 	releases: RawGitHubReleaseSettings,
 	#[serde(default)]
 	pull_requests: RawGitHubPullRequestSettings,
+	#[serde(default)]
+	bot: RawGitHubBotSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -330,6 +335,42 @@ impl Default for RawGitHubPullRequestSettings {
 			auto_merge: false,
 		}
 	}
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Deserialize)]
+struct RawGitHubChangesetBotSettings {
+	#[serde(default)]
+	enabled: bool,
+	#[serde(default = "default_true")]
+	required: bool,
+	#[serde(default)]
+	skip_labels: Vec<String>,
+	#[serde(default = "default_true")]
+	comment_on_failure: bool,
+	#[serde(default)]
+	changed_paths: Vec<String>,
+	#[serde(default)]
+	ignored_paths: Vec<String>,
+}
+
+impl Default for RawGitHubChangesetBotSettings {
+	fn default() -> Self {
+		Self {
+			enabled: false,
+			required: default_true(),
+			skip_labels: Vec::new(),
+			comment_on_failure: default_true(),
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
+		}
+	}
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawGitHubBotSettings {
+	#[serde(default)]
+	changesets: RawGitHubChangesetBotSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -650,6 +691,16 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			title: github.pull_requests.title,
 			labels: github.pull_requests.labels,
 			auto_merge: github.pull_requests.auto_merge,
+		},
+		bot: GitHubBotSettings {
+			changesets: GitHubChangesetBotSettings {
+				enabled: github.bot.changesets.enabled,
+				required: github.bot.changesets.required,
+				skip_labels: github.bot.changesets.skip_labels,
+				comment_on_failure: github.bot.changesets.comment_on_failure,
+				changed_paths: github.bot.changesets.changed_paths,
+				ignored_paths: github.bot.changesets.ignored_paths,
+			},
 		},
 	});
 
@@ -1488,6 +1539,40 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 			"[github.pull_requests].labels must not include empty values".to_string(),
 		));
 	}
+	if github
+		.bot
+		.changesets
+		.skip_labels
+		.iter()
+		.any(|label| label.trim().is_empty())
+	{
+		return Err(MonochangeError::Config(
+			"[github.bot.changesets].skip_labels must not include empty values".to_string(),
+		));
+	}
+	for (field, patterns) in [
+		(
+			"[github.bot.changesets].changed_paths",
+			&github.bot.changesets.changed_paths,
+		),
+		(
+			"[github.bot.changesets].ignored_paths",
+			&github.bot.changesets.ignored_paths,
+		),
+	] {
+		for pattern in patterns {
+			if pattern.trim().is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"{field} must not include empty values"
+				)));
+			}
+			Pattern::new(pattern).map_err(|error| {
+				MonochangeError::Config(format!(
+					"{field} contains invalid glob pattern `{pattern}`: {error}"
+				))
+			})?;
+		}
+	}
 	Ok(())
 }
 
@@ -1584,7 +1669,8 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 				| WorkflowStepDefinition::PrepareRelease
 				| WorkflowStepDefinition::PublishGitHubRelease
 				| WorkflowStepDefinition::OpenReleasePullRequest
-				| WorkflowStepDefinition::Deploy { .. } => {}
+				| WorkflowStepDefinition::Deploy { .. }
+				| WorkflowStepDefinition::EnforceChangesetPolicy => {}
 			}
 		}
 	}
@@ -1635,30 +1721,74 @@ fn validate_workflow_runtime_requirements(
 			}
 		}
 		for step in &workflow.steps {
-			let WorkflowStepDefinition::Deploy { names } = step else {
-				continue;
-			};
-			if deployments.is_empty() {
-				return Err(MonochangeError::Config(format!(
-					"workflow `{}` uses `Deploy` but no `[[deployments]]` are configured",
-					workflow.name
-				)));
-			}
-			for name in names {
-				if !deployments
-					.iter()
-					.any(|deployment| deployment.name == *name)
-				{
-					return Err(MonochangeError::Config(format!(
-						"workflow `{}` deploy step references unknown deployment `{name}`",
-						workflow.name
-					)));
+			match step {
+				WorkflowStepDefinition::Deploy { names } => {
+					if deployments.is_empty() {
+						return Err(MonochangeError::Config(format!(
+							"workflow `{}` uses `Deploy` but no `[[deployments]]` are configured",
+							workflow.name
+						)));
+					}
+					for name in names {
+						if !deployments
+							.iter()
+							.any(|deployment| deployment.name == *name)
+						{
+							return Err(MonochangeError::Config(format!(
+								"workflow `{}` deploy step references unknown deployment `{name}`",
+								workflow.name
+							)));
+						}
+					}
 				}
+				WorkflowStepDefinition::EnforceChangesetPolicy => {
+					let github = github.ok_or_else(|| {
+						MonochangeError::Config(format!(
+							"workflow `{}` uses `EnforceChangesetPolicy` but `[github]` is not configured",
+							workflow.name
+						))
+					})?;
+					if !github.bot.changesets.enabled {
+						return Err(MonochangeError::Config(format!(
+							"workflow `{}` uses `EnforceChangesetPolicy` but `[github.bot.changesets].enabled` is false",
+							workflow.name
+						)));
+					}
+					let changed_path_input =
+						workflow_input(workflow, "changed_path").ok_or_else(|| {
+							MonochangeError::Config(format!(
+							"workflow `{}` uses `EnforceChangesetPolicy` but does not declare a `changed_path` input",
+							workflow.name
+						))
+						})?;
+					if !matches!(changed_path_input.kind, WorkflowInputKind::StringList) {
+						return Err(MonochangeError::Config(format!(
+							"workflow `{}` input `changed_path` must use type `string_list` for `EnforceChangesetPolicy`",
+							workflow.name
+						)));
+					}
+					if let Some(label_input) = workflow_input(workflow, "label") {
+						if !matches!(label_input.kind, WorkflowInputKind::StringList) {
+							return Err(MonochangeError::Config(format!(
+								"workflow `{}` input `label` must use type `string_list` when used with `EnforceChangesetPolicy`",
+								workflow.name
+							)));
+						}
+					}
+				}
+				_ => {}
 			}
 		}
 	}
 
 	Ok(())
+}
+
+fn workflow_input<'a>(
+	workflow: &'a WorkflowDefinition,
+	name: &str,
+) -> Option<&'a monochange_core::WorkflowInputDefinition> {
+	workflow.inputs.iter().find(|input| input.name == name)
 }
 
 #[allow(clippy::needless_pass_by_value)]

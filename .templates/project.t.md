@@ -55,6 +55,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - emit stable release-manifest JSON for downstream automation
 - preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
 - model deployment intents for downstream automation and merge-driven release workflows
+- enforce pull-request changeset policy through typed workflow steps and reusable diagnostics
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -166,6 +167,14 @@ base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
+
+[github.bot.changesets]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["crates/**", "packages/**"]
+ignored_paths = ["docs/**", "*.md"]
 
 [[deployments]]
 name = "production"
@@ -297,6 +306,28 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "Deploy"
+
+[[workflows]]
+name = "changeset-check"
+help_text = "Evaluate pull-request changeset policy"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.inputs]]
+name = "changed_path"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "label"
+type = "string_list"
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"
 ```
 
 <!-- {/projectSetupConfig} -->

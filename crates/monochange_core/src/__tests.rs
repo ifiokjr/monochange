@@ -8,10 +8,12 @@ use crate::render_release_notes;
 use crate::BumpSeverity;
 use crate::ChangelogFormat;
 use crate::ChangelogTarget;
+use crate::ChangesetPolicyStatus;
 use crate::DependencyKind;
 use crate::DeploymentTrigger;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
+use crate::GitHubChangesetBotSettings;
 use crate::GroupDefinition;
 use crate::PackageDefinition;
 use crate::PackageDependency;
@@ -120,6 +122,23 @@ fn materialize_dependency_edges_matches_dependency_names_to_packages() {
 	let edge = edges.first().unwrap_or_else(|| panic!("expected one edge"));
 	assert_eq!(edge.from_package_id, source.id);
 	assert_eq!(edge.to_package_id, target.id);
+}
+
+#[test]
+fn changeset_policy_status_renders_stable_strings() {
+	assert_eq!(ChangesetPolicyStatus::Passed.as_str(), "passed");
+	assert_eq!(ChangesetPolicyStatus::Failed.to_string(), "failed");
+	assert_eq!(ChangesetPolicyStatus::Skipped.as_str(), "skipped");
+	assert_eq!(ChangesetPolicyStatus::NotRequired.as_str(), "not_required");
+}
+
+#[test]
+fn github_changeset_bot_settings_default_to_opt_in_enforcement() {
+	let settings = GitHubChangesetBotSettings::default();
+	assert!(!settings.enabled);
+	assert!(settings.required);
+	assert!(settings.comment_on_failure);
+	assert!(settings.skip_labels.is_empty());
 }
 
 #[test]
