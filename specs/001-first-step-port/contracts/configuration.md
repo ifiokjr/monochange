@@ -14,40 +14,43 @@ Define the configuration surface for cross-ecosystem workspace discovery, change
 
 Repository-wide default behavior.
 
-| Field                    | Type            | Required | Meaning                                                                                                           |
-| ------------------------ | --------------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| `parent_bump`            | string          | No       | Default bump applied to affected parent packages when no stronger evidence exists.                                |
-| `include_private`        | boolean         | No       | Whether private packages are included in discovery and planning output.                                           |
-| `warn_on_group_mismatch` | boolean         | No       | Whether existing grouped-version mismatches emit warnings.                                                        |
-| `package_type`           | string          | No       | Default package `type` used when `[package.<id>]` entries omit `type`.                                            |
-| `changelog`              | boolean\|string | No       | Default package changelog policy: `true` → `{path}/CHANGELOG.md`, `false` → none, string → pattern with `{path}`. |
+| Field                    | Type            | Required | Meaning                                                                                                                |
+| ------------------------ | --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `parent_bump`            | string          | No       | Default bump applied to affected parent packages when no stronger evidence exists.                                     |
+| `include_private`        | boolean         | No       | Whether private packages are included in discovery and planning output.                                                |
+| `warn_on_group_mismatch` | boolean         | No       | Whether existing grouped-version mismatches emit warnings.                                                             |
+| `package_type`           | string          | No       | Default package `type` used when `[package.<id>]` entries omit `type`.                                                 |
+| `changelog`              | boolean\|string | No       | Default package changelog policy: `true` → `{path}/CHANGELOG.md`, `false` → none, string → pattern with `{path}`.      |
+| `empty_update_message`   | string          | No       | Default fallback changelog entry template used when a changelog target needs a version update but has no direct notes. |
 
 ### `[package.<id>]`
 
 Declares a release-managed package using a monochange-owned id.
 
-| Field             | Type            | Required | Meaning                                                                                            |
-| ----------------- | --------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `path`            | string          | Yes      | Package directory relative to the repository root.                                                 |
-| `type`            | string          | Cond.    | One of `cargo`, `npm`, `deno`, `dart`, or `flutter`; optional when `defaults.package_type` is set. |
-| `changelog`       | boolean\|string | No       | `true` → `{path}/CHANGELOG.md`, `false` → none, string → exact changelog path for the package.     |
-| `versioned_files` | array           | No       | Additional files whose version references should be updated.                                       |
-| `tag`             | boolean         | No       | Whether this package should produce a tag when not grouped.                                        |
-| `release`         | boolean         | No       | Whether this package should produce a release when not grouped.                                    |
-| `version_format`  | string          | No       | `namespaced` or `primary`; defaults to `namespaced`.                                               |
+| Field                  | Type            | Required | Meaning                                                                                            |
+| ---------------------- | --------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `path`                 | string          | Yes      | Package directory relative to the repository root.                                                 |
+| `type`                 | string          | Cond.    | One of `cargo`, `npm`, `deno`, `dart`, or `flutter`; optional when `defaults.package_type` is set. |
+| `changelog`            | boolean\|string | No       | `true` → `{path}/CHANGELOG.md`, `false` → none, string → exact changelog path for the package.     |
+| `empty_update_message` | string          | No       | Fallback changelog entry template for this package when no direct notes were recorded.             |
+| `versioned_files`      | array           | No       | Additional files whose version references should be updated.                                       |
+| `tag`                  | boolean         | No       | Whether this package should produce a tag when not grouped.                                        |
+| `release`              | boolean         | No       | Whether this package should produce a release when not grouped.                                    |
+| `version_format`       | string          | No       | `namespaced` or `primary`; defaults to `namespaced`.                                               |
 
 ### `[group.<id>]`
 
 Declares a shared release unit that owns outward release identity for its member packages.
 
-| Field             | Type             | Required | Meaning                                                     |
-| ----------------- | ---------------- | -------- | ----------------------------------------------------------- |
-| `packages`        | array of strings | Yes      | Declared package ids that belong to the group.              |
-| `changelog`       | string           | No       | Group changelog updated during release preparation.         |
-| `versioned_files` | array            | No       | Additional shared files updated during release preparation. |
-| `tag`             | boolean          | No       | Whether the group should produce a tag.                     |
-| `release`         | boolean          | No       | Whether the group should produce a release.                 |
-| `version_format`  | string           | No       | `namespaced` or `primary`; defaults to `namespaced`.        |
+| Field                  | Type             | Required | Meaning                                                                                                     |
+| ---------------------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `packages`             | array of strings | Yes      | Declared package ids that belong to the group.                                                              |
+| `changelog`            | string           | No       | Group changelog updated during release preparation.                                                         |
+| `empty_update_message` | string           | No       | Fallback changelog entry template used for grouped package or group changelog entries without direct notes. |
+| `versioned_files`      | array            | No       | Additional shared files updated during release preparation.                                                 |
+| `tag`                  | boolean          | No       | Whether the group should produce a tag.                                                                     |
+| `release`              | boolean          | No       | Whether the group should produce a release.                                                                 |
+| `version_format`       | string           | No       | `namespaced` or `primary`; defaults to `namespaced`.                                                        |
 
 ### `[[workflows]]`
 
@@ -110,6 +113,9 @@ roots = ["packages/*"]
 - package `type` is required unless `defaults.package_type` is set
 - package `changelog` accepts `true`, `false`, or a string path
 - `defaults.changelog` accepts `true`, `false`, or a string pattern that may include `{path}`
+- `empty_update_message` may be declared on `[defaults]`, `[package.<id>]`, and `[group.<id>]`
+- package changelog fallback precedence is package → group → defaults → built-in message
+- group changelog fallback precedence is group → defaults → built-in message
 - groups may only reference declared package ids
 - a package may belong to at most one group
 - only one package or group may use `version_format = "primary"`

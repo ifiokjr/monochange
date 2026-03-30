@@ -566,13 +566,36 @@ fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
 	assert!(core_changelog.contains("## 1.1.0"));
 	assert!(core_changelog.contains("- add release workflow"));
 	assert!(app_changelog.contains("## 1.1.0"));
-	assert!(app_changelog.contains("shares version group `sdk`"));
+	assert!(app_changelog.contains("No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
 	assert!(group_changelog.contains("Members: core, app"));
 	assert!(group_versioned_file.contains("version = \"1.1.0\""));
 	assert!(package_versioned_file.contains("version = \"1.1.0\""));
 	assert_eq!(release_version, "1.1.0");
 	assert!(!tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn workflow_release_uses_empty_update_message_precedence_for_grouped_changelogs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_group_empty_update_message_fixture(tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/changelog.md"))
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/changelog.md"))
+		.unwrap_or_else(|error| panic!("app changelog: {error}"));
+	let group_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+
+	assert!(output.contains("workflow `release` completed"));
+	assert!(core_changelog.contains("Package override for workflow-core -> 1.0.1"));
+	assert!(app_changelog.contains("Update triggered by group sdk; version 1.0.1."));
+	assert!(group_changelog.contains("Update triggered by group sdk; version 1.0.1."));
 }
 
 #[test]
@@ -1039,6 +1062,78 @@ core: minor
 
 #### add release workflow
 ",
+	);
+}
+
+fn seed_group_empty_update_message_fixture(root: &Path) {
+	write_file(
+		root.join("Cargo.toml"),
+		r#"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+"#,
+	);
+	write_file(
+		root.join("crates/core/Cargo.toml"),
+		r#"
+[package]
+name = "workflow-core"
+version = { workspace = true }
+edition = "2021"
+"#,
+	);
+	write_file(
+		root.join("crates/app/Cargo.toml"),
+		r#"
+[package]
+name = "workflow-app"
+version = { workspace = true }
+edition = "2021"
+"#,
+	);
+	write_file(root.join("crates/core/changelog.md"), "# Changelog\n");
+	write_file(root.join("crates/app/changelog.md"), "# Changelog\n");
+	write_file(root.join("changelog.md"), "# Changelog\n");
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+changelog = "{path}/changelog.md"
+empty_update_message = "Default update for {package} -> {version}."
+
+[package.core]
+path = "crates/core"
+empty_update_message = "Package override for {package} -> {version}"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+empty_update_message = "Update triggered by group {group}; version {version}."
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.cargo]
+enabled = true
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		root.join(".changeset/group-release.md"),
+		"---\nsdk: patch\n---\n",
 	);
 }
 
