@@ -3,7 +3,12 @@ use std::path::PathBuf;
 use httpmock::Method::GET;
 use httpmock::Method::POST;
 use httpmock::MockServer;
+use monochange_core::BotSettings;
+use monochange_core::ChangeRequestSettings;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::ReleaseProviderSettings;
+use monochange_core::SourceConfiguration;
+use monochange_core::SourceProvider;
 use monochange_github::publish_release_pull_request;
 use monochange_github::publish_release_requests;
 use monochange_github::GitHubPullRequestOperation;
@@ -30,19 +35,24 @@ fn publish_release_requests_reads_github_env_configuration() {
 	});
 
 	with_github_env(&server.base_url(), || {
-		let outcomes = publish_release_requests(&[GitHubReleaseRequest {
-			repository: "ifiokjr/monochange".to_string(),
-			owner: "ifiokjr".to_string(),
-			repo: "monochange".to_string(),
-			target_id: "sdk".to_string(),
-			target_kind: ReleaseOwnerKind::Group,
-			tag_name: "v1.2.0".to_string(),
-			name: "sdk 1.2.0".to_string(),
-			body: Some("release body".to_string()),
-			draft: false,
-			prerelease: false,
-			generate_release_notes: false,
-		}])
+		let github = sample_github_source();
+		let outcomes = publish_release_requests(
+			&github,
+			&[GitHubReleaseRequest {
+				provider: SourceProvider::GitHub,
+				repository: "ifiokjr/monochange".to_string(),
+				owner: "ifiokjr".to_string(),
+				repo: "monochange".to_string(),
+				target_id: "sdk".to_string(),
+				target_kind: ReleaseOwnerKind::Group,
+				tag_name: "v1.2.0".to_string(),
+				name: "sdk 1.2.0".to_string(),
+				body: Some("release body".to_string()),
+				draft: false,
+				prerelease: false,
+				generate_release_notes: false,
+			}],
+		)
 		.unwrap_or_else(|error| panic!("publish releases: {error}"));
 		assert_eq!(outcomes[0].operation, GitHubReleaseOperation::Created);
 	});
@@ -99,9 +109,12 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 		.unwrap_or_else(|error| panic!("update release file: {error}"));
 
 	with_github_env(&server.base_url(), || {
+		let github = sample_github_source();
 		let outcome = publish_release_pull_request(
+			&github,
 			&repo,
 			&GitHubPullRequestRequest {
+				provider: SourceProvider::GitHub,
 				repository: "ifiokjr/monochange".to_string(),
 				owner: "ifiokjr".to_string(),
 				repo: "monochange".to_string(),
@@ -122,6 +135,19 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 	list_pull_requests.assert();
 	create_pull_request.assert();
 	add_labels.assert();
+}
+
+fn sample_github_source() -> SourceConfiguration {
+	SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		host: None,
+		api_url: None,
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	}
 }
 
 fn with_github_env<R>(base_url: &str, action: impl FnOnce() -> R) -> R {

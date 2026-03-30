@@ -46,7 +46,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - run config-defined release commands from `.changeset/*.md`
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
-- preview or publish GitHub releases and release pull requests from typed command steps and shared release data
+- preview or publish provider releases and release requests from typed command steps and shared release data
 - model deployment intents for downstream automation and merge-driven release commands
 - verify changeset coverage for changed files through typed command steps and reusable diagnostics
 - apply Rust semver evidence when provided
@@ -58,11 +58,11 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {=projectGitHubAutomationOverview} -->
 
-MonoChange can promote one prepared release into several GitHub-facing automation flows without changing the underlying release-plan model.
+MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
 - `mc release-manifest` writes a stable JSON artifact for downstream jobs
-- `mc publish-release --dry-run --format json` previews GitHub release payloads before publishing
-- `mc release-pr --dry-run --format json` previews the release branch, commit, and pull request body
+- `mc publish-release --dry-run --format json` previews provider release payloads before publishing
+- `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
 - `mc verify --format json --changed-path ...` verifies that changed files are covered by attached changesets
 

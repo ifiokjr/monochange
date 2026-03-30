@@ -28,7 +28,7 @@
 - [x] T030 Create `crates/monochange_github` for GitHub API integration.
 - [x] T031 Implement GitHub repository and release config parsing.
 - [x] T032 Implement release payload rendering from prepared release data.
-- [x] T033 Add workflow support for `PublishGitHubRelease`.
+- [x] T033 Add workflow support for `PublishRelease`.
 - [x] T034 Add dry-run output for GitHub release publication.
 - [x] T035 Add integration tests for grouped and ungrouped GitHub release payloads.
 - [x] T036 Add release-note customization for `change_templates`, `extra_changelog_sections`, and optional change `type` / `details` fields.
@@ -39,7 +39,7 @@
 
 - [x] T040 Implement release PR config parsing.
 - [x] T041 Implement branch naming, commit generation, and PR title/body rendering.
-- [x] T042 Add workflow support for `OpenReleasePullRequest`.
+- [x] T042 Add workflow support for `OpenReleaseRequest`.
 - [x] T043 Add idempotent update behavior for an existing release PR.
 - [x] T044 Add integration and snapshot tests for release PR bodies and branch behavior.
 

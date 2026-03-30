@@ -25,7 +25,7 @@
 //! - normalized package and dependency records
 //! - version-group definitions and planned group outcomes
 //! - change signals and compatibility assessments
-//! - changelog formats, changelog targets, structured release-note types, release-manifest types, GitHub automation config types, and changeset-policy evaluation types
+//! - changelog formats, changelog targets, structured release-note types, release-manifest types, source-automation config types, and changeset-policy evaluation types
 //! - shared error and result types
 //!
 //! ## Example
@@ -504,8 +504,10 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		path: Option<PathBuf>,
 	},
-	PublishGitHubRelease,
-	OpenReleasePullRequest,
+	#[serde(alias = "PublishGitHubRelease")]
+	PublishRelease,
+	#[serde(alias = "OpenReleasePullRequest")]
+	OpenReleaseRequest,
 	Deploy {
 		#[serde(default)]
 		names: Vec<String>,
@@ -924,6 +926,126 @@ pub struct GitHubConfiguration {
 	pub pull_requests: GitHubPullRequestSettings,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub enum SourceProvider {
+	#[default]
+	#[serde(rename = "github", alias = "git_hub")]
+	GitHub,
+	#[serde(rename = "gitlab", alias = "git_lab")]
+	GitLab,
+	#[serde(rename = "gitea")]
+	Gitea,
+}
+
+impl SourceProvider {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::GitHub => "github",
+			Self::GitLab => "gitlab",
+			Self::Gitea => "gitea",
+		}
+	}
+}
+
+impl fmt::Display for SourceProvider {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+pub type ReleaseNotesSource = GitHubReleaseNotesSource;
+pub type ReleaseProviderSettings = GitHubReleaseSettings;
+pub type ChangeRequestSettings = GitHubPullRequestSettings;
+pub type ChangesetBotSettings = GitHubChangesetBotSettings;
+pub type BotSettings = GitHubBotSettings;
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SourceConfiguration {
+	#[serde(default)]
+	pub provider: SourceProvider,
+	pub owner: String,
+	pub repo: String,
+	#[serde(default)]
+	pub host: Option<String>,
+	#[serde(default)]
+	pub api_url: Option<String>,
+	#[serde(default)]
+	pub releases: ReleaseProviderSettings,
+	#[serde(default)]
+	pub pull_requests: ChangeRequestSettings,
+	#[serde(default)]
+	pub bot: BotSettings,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceReleaseRequest {
+	pub provider: SourceProvider,
+	pub repository: String,
+	pub owner: String,
+	pub repo: String,
+	pub target_id: String,
+	pub target_kind: ReleaseOwnerKind,
+	pub tag_name: String,
+	pub name: String,
+	pub body: Option<String>,
+	pub draft: bool,
+	pub prerelease: bool,
+	pub generate_release_notes: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceReleaseOperation {
+	Created,
+	Updated,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceReleaseOutcome {
+	pub provider: SourceProvider,
+	pub repository: String,
+	pub tag_name: String,
+	pub operation: SourceReleaseOperation,
+	pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceChangeRequest {
+	pub provider: SourceProvider,
+	pub repository: String,
+	pub owner: String,
+	pub repo: String,
+	pub base_branch: String,
+	pub head_branch: String,
+	pub title: String,
+	pub body: String,
+	pub labels: Vec<String>,
+	pub auto_merge: bool,
+	pub commit_message: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceChangeRequestOperation {
+	Created,
+	Updated,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceChangeRequestOutcome {
+	pub provider: SourceProvider,
+	pub repository: String,
+	pub number: u64,
+	pub head_branch: String,
+	pub operation: SourceChangeRequestOperation,
+	pub url: Option<String>,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EffectiveReleaseIdentity {
 	pub owner_id: String,
@@ -946,6 +1068,7 @@ pub struct WorkspaceConfiguration {
 	pub cli: Vec<CliCommandDefinition>,
 	pub changesets: ChangesetSettings,
 	pub github: Option<GitHubConfiguration>,
+	pub source: Option<SourceConfiguration>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,

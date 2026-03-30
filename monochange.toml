@@ -41,6 +41,12 @@ path = "crates/monochange_semver"
 [package.monochange_github]
 path = "crates/monochange_github"
 
+[package.monochange_gitlab]
+path = "crates/monochange_gitlab"
+
+[package.monochange_gitea]
+path = "crates/monochange_gitea"
+
 [group.main]
 packages = [
 	"monochange",
@@ -53,6 +59,8 @@ packages = [
 	"monochange_graph",
 	"monochange_semver",
 	"monochange_github",
+	"monochange_gitlab",
+	"monochange_gitea",
 ]
 tag = true
 release = true
@@ -65,17 +73,18 @@ format = "monochange"
 [ecosystems.cargo]
 enabled = true
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 enabled = true
 draft = false
 prerelease = false
 source = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 enabled = true
 branch_prefix = "monochange/release"
 base = "main"
@@ -83,11 +92,30 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[changesets.verify]
+[source.bot.changesets]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
+changed_paths = [
+	"crates/**",
+	".github/**",
+	"Cargo.toml",
+	"Cargo.lock",
+	"devenv.nix",
+	"devenv.yaml",
+	"devenv.lock",
+	"monochange.toml",
+	"codecov.yml",
+	"deny.toml",
+	"scripts/**",
+]
+ignored_paths = [
+	".changeset/**",
+	"docs/**",
+	"**/*.md",
+	"license",
+]
 
 [[deployments]]
 name = "docs"
@@ -177,7 +205,7 @@ type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
-help_text = "Prepare a release and publish GitHub releases"
+help_text = "Prepare a release and publish provider releases"
 
 [[cli.publish-release.inputs]]
 name = "format"
@@ -189,10 +217,10 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 
 [cli.release-pr]
-help_text = "Prepare a release and open or update a GitHub release pull request"
+help_text = "Prepare a release and open or update a provider release request"
 
 [[cli.release-pr.inputs]]
 name = "format"
@@ -204,7 +232,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 
 [cli.release-deploy]
 help_text = "Prepare a release and emit deployment intents"
@@ -227,23 +255,23 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.verify]
-help_text = "Verify that changed files are covered by attached changesets"
+[cli.changeset-check]
+help_text = "Evaluate pull-request changeset policy"
 
-[[cli.verify.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
-name = "changed_paths"
+[[cli.changeset-check.inputs]]
+name = "changed_path"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.changeset-check.steps]]
+type = "EnforceChangesetPolicy"

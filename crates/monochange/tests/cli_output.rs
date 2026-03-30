@@ -423,7 +423,7 @@ fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 			.current_dir(tempdir.path())
 			.arg("release-pr")
 			.arg("--dry-run"),
-		@r###"
+		@r"
 	success: true
 	exit_code: 0
 	----- stdout -----
@@ -432,8 +432,8 @@ fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 	released packages: workflow-app, workflow-core
 	release targets:
 	- group sdk -> v1.1.0 (tag: true, release: true)
-	release pull request:
-	- dry-run ifiokjr/monochange monochange/release/release-pr -> main
+	release request:
+	- dry-run ifiokjr/monochange monochange/release/release-pr -> main via github
 	changed files:
 	- Cargo.toml
 	- changelog.md
@@ -441,9 +441,9 @@ fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 	- crates/core/CHANGELOG.md
 	- crates/core/Cargo.toml
 	- group.toml
-	
+
 	----- stderr -----
-	"###
+	"
 	);
 }
 
@@ -1029,7 +1029,7 @@ enabled = true
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 "#,
 	);
 }

@@ -67,8 +67,6 @@ Optional package fields:
 - `changelog`
 - `empty_update_message`
 - `versioned_files`
-- `ignored_paths`
-- `additional_paths`
 - `tag`
 - `release`
 - `version_format`
@@ -86,20 +84,6 @@ Optional package fields:
 - `"{path}/changelog.md"` or another pattern → replace `{path}` with each package path
 
 A package-level `changelog` value overrides the default for that package.
-
-`ignored_paths` and `additional_paths` are used by `VerifyChangesets`-based CLI commands such as `mc verify`.
-
-- `ignored_paths` are glob patterns evaluated relative to the package root and can exclude files under the package path from triggering changeset verification
-- `additional_paths` are glob patterns that can pull extra repository paths into that package's verification scope, even when those paths live outside the package root
-
-For example:
-
-```toml
-[package.sdk-core]
-path = "crates/sdk_core"
-ignored_paths = ["tests/fixtures/**"]
-additional_paths = ["scripts/release-sdk-core.sh", "Cargo.lock"]
-```
 
 `empty_update_message` lets changelog targets render a readable fallback entry when a version update is required but no direct release notes were recorded for that target. This is especially useful for grouped packages that keep their own changelog entries even when only another member of the group changed.
 
@@ -219,7 +203,7 @@ type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
-help_text = "Prepare a release and publish GitHub releases"
+help_text = "Prepare a release and publish provider releases"
 
 [[cli.publish-release.inputs]]
 name = "format"
@@ -231,10 +215,10 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 
 [cli.release-pr]
-help_text = "Prepare a release and open or update a release pull request"
+help_text = "Prepare a release and open or update a provider release request"
 
 [[cli.release-pr.inputs]]
 name = "format"
@@ -246,7 +230,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 
 [cli.release-deploy]
 help_text = "Prepare a release and emit deployment intents"
@@ -269,26 +253,26 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.verify]
-help_text = "Verify that changed files are covered by attached changesets"
+[cli.changeset-check]
+help_text = "Evaluate pull-request changeset policy"
 
-[[cli.verify.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
-name = "changed_paths"
+[[cli.changeset-check.inputs]]
+name = "changed_path"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.changeset-check.steps]]
+type = "EnforceChangesetPolicy"
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -306,22 +290,23 @@ CLI command interpolation variables:
 
 ## GitHub release settings
 
-Use `[github]` plus `[github.releases]` when you want command steps such as `PublishGitHubRelease` to derive repository release payloads from the prepared release.
+Use `[source]` plus `[source.releases]` when you want command steps such as `PublishRelease` to derive repository release payloads from the prepared release. GitHub remains the default provider when `provider` is omitted.
 
 <!-- {=configurationGitHubSnippet} -->
 
 ```toml
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 enabled = true
 draft = false
 prerelease = false
 source = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 enabled = true
 branch_prefix = "monochange/release"
 base = "main"
@@ -329,11 +314,13 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[changesets.verify]
+[source.bot.changesets]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
+changed_paths = ["crates/**", "packages/**"]
+ignored_paths = ["docs/**", "*.md"]
 
 [[deployments]]
 name = "production"
@@ -416,11 +403,13 @@ Current implementation notes:
 - legacy `[[workflows]]` configuration is no longer supported; use `[cli.<command>]` plus `[[cli.<command>.steps]]` instead
 - `[ecosystems.*].enabled/roots/exclude` are parsed, but discovery still scans all supported ecosystems regardless of those settings today
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
-- GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
-- changeset verification commands expect `[changesets.verify]`, a `changed_paths` command input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
+- source automation expects `[source]` with provider-specific settings under `[source.releases]`, `[source.pull_requests]`, and `[source.bot.changesets]`; GitHub remains the default provider
+- live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
+- release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
+- changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_path` command input, and reusable diagnostics for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `VerifyChangesets`, and `Command`
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `Deploy`, `EnforceChangesetPolicy`, and `Command`
+- legacy `PublishGitHubRelease` and `OpenReleasePullRequest` step names are still accepted as migration aliases
 
 <!-- {/configurationCurrentStatus} -->
 

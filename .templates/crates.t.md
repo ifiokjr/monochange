@@ -140,8 +140,8 @@ mc release --dry-run --format json
 - resolve change input files
 - render discovery and release command output in text or JSON
 - execute configured CLI commands
-- preview or publish GitHub releases from prepared release data
-- verify that changed files are covered by attached changesets from CI-supplied changed paths and labels
+- preview or publish provider releases from prepared release data
+- evaluate pull-request changeset policy from CI-supplied changed paths and labels
 
 <!-- {/monochangeCrateDocs} -->
 
@@ -168,7 +168,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 - normalized package and dependency records
 - version-group definitions and planned group outcomes
 - change signals and compatibility assessments
-- changelog formats, changelog targets, structured release-note types, release-manifest types, GitHub automation config types, and changeset-policy evaluation types
+- changelog formats, changelog targets, structured release-note types, release-manifest types, source-automation config types, and changeset-policy evaluation types
 - shared error and result types
 
 ## Example
@@ -260,7 +260,7 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 - load `monochange.toml`
 - validate version groups and CLI commands
 - resolve package references against discovered packages
-- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and command GitHub/manifest/policy steps
+- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, source-provider config, changeset-bot policy config, and command release/manifest/policy steps
 
 ## Example
 
@@ -364,9 +364,11 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 ## Example
 
 ```rust
-use monochange_core::GitHubConfiguration;
-use monochange_core::GitHubPullRequestSettings;
-use monochange_core::GitHubReleaseSettings;
+use monochange_core::BotSettings;
+use monochange_core::ChangeRequestSettings;
+use monochange_core::ReleaseProviderSettings;
+use monochange_core::SourceConfiguration;
+use monochange_core::SourceProvider;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestPlan;
 use monochange_core::ReleaseManifestTarget;
@@ -403,11 +405,15 @@ let manifest = ReleaseManifest {
         compatibility_evidence: Vec::new(),
     },
 };
-let github = GitHubConfiguration {
+let github = SourceConfiguration {
+    provider: SourceProvider::GitHub,
     owner: "ifiokjr".to_string(),
     repo: "monochange".to_string(),
-    releases: GitHubReleaseSettings::default(),
-    pull_requests: GitHubPullRequestSettings::default(),
+    host: None,
+    api_url: None,
+    releases: ReleaseProviderSettings::default(),
+    pull_requests: ChangeRequestSettings::default(),
+    bot: BotSettings::default(),
 };
 
 let requests = build_release_requests(&github, &manifest);

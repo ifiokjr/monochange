@@ -272,8 +272,8 @@ Introduce a core release-notes data structure that can drive:
 
 The current `Command` step is too generic for several GitHub-facing behaviors. Add typed steps such as:
 
-- `PublishGitHubRelease`
-- `OpenReleasePullRequest`
+- `PublishRelease`
+- `OpenReleaseRequest`
 - `WriteReleaseManifest`
 - `Deploy`
 - `EnforceChangesetPolicy`

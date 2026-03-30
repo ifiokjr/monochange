@@ -36,8 +36,8 @@
 //! - resolve change input files
 //! - render discovery and release command output in text or JSON
 //! - execute configured CLI commands
-//! - preview or publish GitHub releases from prepared release data
-//! - verify that changed files are covered by attached changesets from CI-supplied changed paths and labels
+//! - preview or publish provider releases from prepared release data
+//! - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 //! <!-- {/monochangeCrateDocs} -->
 
 use std::collections::BTreeMap;
@@ -74,8 +74,6 @@ use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
-use monochange_core::ChangesetSettings;
-use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
@@ -102,17 +100,22 @@ use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleasePlan;
+use monochange_core::SourceChangeRequest;
+use monochange_core::SourceChangeRequestOperation;
+use monochange_core::SourceChangeRequestOutcome;
+use monochange_core::SourceConfiguration;
+use monochange_core::SourceProvider;
+use monochange_core::SourceReleaseOperation;
+use monochange_core::SourceReleaseOutcome;
+use monochange_core::SourceReleaseRequest;
 use monochange_core::VersionFormat;
 use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkspaceDefaults;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
-use monochange_github::build_release_pull_request_request;
-use monochange_github::build_release_requests;
-use monochange_github::publish_release_pull_request;
-use monochange_github::publish_release_requests;
-use monochange_github::GitHubPullRequestRequest;
-use monochange_github::GitHubReleaseRequest;
+use monochange_gitea as gitea_provider;
+use monochange_github as github_provider;
+use monochange_gitlab as gitlab_provider;
 use monochange_graph::build_release_plan;
 use monochange_npm::discover_npm_packages;
 use monochange_semver::collect_assessments;
@@ -228,10 +231,10 @@ struct CliContext {
 	inputs: BTreeMap<String, Vec<String>>,
 	prepared_release: Option<PreparedRelease>,
 	release_manifest_path: Option<PathBuf>,
-	github_release_requests: Vec<GitHubReleaseRequest>,
-	github_release_results: Vec<String>,
-	release_pull_request_request: Option<GitHubPullRequestRequest>,
-	release_pull_request_result: Option<String>,
+	release_requests: Vec<SourceReleaseRequest>,
+	release_results: Vec<String>,
+	release_request: Option<SourceChangeRequest>,
+	release_request_result: Option<String>,
 	deployment_intents: Vec<ReleaseDeploymentIntent>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
 	command_logs: Vec<String>,
@@ -240,7 +243,6 @@ struct CliContext {
 #[derive(Debug, Serialize)]
 struct InitWorkspaceConfiguration {
 	defaults: WorkspaceDefaults,
-	changesets: ChangesetSettings,
 	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
 	package: BTreeMap<String, InitPackageDefinition>,
 	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -266,10 +268,6 @@ struct InitPackageDefinition {
 	changelog: Option<PathBuf>,
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	versioned_files: Vec<VersionedFileDefinition>,
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	ignored_paths: Vec<String>,
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	additional_paths: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -363,16 +361,10 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 		.long(long_name)
 		.required(input.required)
 		.help(input.help_text.clone().unwrap_or_default());
-	if input.name == "changed_paths" {
-		arg = arg.visible_alias("changed-path");
-	}
 
 	arg = match input.kind {
 		CliInputKind::String => arg.value_name(value_name),
-		CliInputKind::StringList => arg
-			.value_name(value_name)
-			.action(ArgAction::Append)
-			.num_args(1..),
+		CliInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
 		CliInputKind::Path => arg.value_name("PATH"),
 		CliInputKind::Choice => {
 			arg.value_name(value_name)
@@ -506,10 +498,10 @@ fn execute_cli_command(
 		inputs,
 		prepared_release: None,
 		release_manifest_path: None,
-		github_release_requests: Vec::new(),
-		github_release_results: Vec::new(),
-		release_pull_request_request: None,
-		release_pull_request_result: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
 		deployment_intents: Vec::new(),
 		changeset_policy_evaluation: None,
 		command_logs: Vec::new(),
@@ -614,16 +606,15 @@ fn execute_cli_command(
 				}
 				output = None;
 			}
-			CliStepDefinition::PublishGitHubRelease => {
+			CliStepDefinition::PublishRelease => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
-						"`PublishGitHubRelease` requires a previous `PrepareRelease` step"
-							.to_string(),
+						"`PublishRelease` requires a previous `PrepareRelease` step".to_string(),
 					)
 				})?;
-				let github = load_workspace_configuration(root)?.github.ok_or_else(|| {
+				let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
 					MonochangeError::Config(
-						"`PublishGitHubRelease` requires `[github]` configuration".to_string(),
+						"`PublishRelease` requires `[source]` configuration".to_string(),
 					)
 				})?;
 				let manifest = build_release_manifest(
@@ -632,49 +623,48 @@ fn execute_cli_command(
 					&context.deployment_intents,
 					&context.command_logs,
 				);
-				context.github_release_requests = build_release_requests(&github, &manifest);
+				context.release_requests = build_source_release_requests(&source, &manifest);
 				if context.dry_run {
-					context.github_release_results = context
-						.github_release_requests
+					context.release_results = context
+						.release_requests
 						.iter()
 						.map(|request| {
 							format!(
-								"dry-run {} {} ({})",
-								request.repository, request.tag_name, request.name
+								"dry-run {} {} ({}) via {}",
+								request.repository,
+								request.tag_name,
+								request.name,
+								request.provider
 							)
 						})
 						.collect();
 				} else {
-					context.github_release_results =
-						publish_release_requests(&context.github_release_requests)?
+					context.release_results =
+						publish_source_release_requests(&source, &context.release_requests)?
 							.into_iter()
 							.map(|result| {
 								format!(
-									"{} {} ({})",
+									"{} {} ({}) via {}",
 									result.repository,
 									result.tag_name,
-									match result.operation {
-										monochange_github::GitHubReleaseOperation::Created =>
-											"created",
-										monochange_github::GitHubReleaseOperation::Updated =>
-											"updated",
-									}
+									format_source_operation(&result.operation),
+									result.provider
 								)
 							})
 							.collect();
 				}
 				output = None;
 			}
-			CliStepDefinition::OpenReleasePullRequest => {
+			CliStepDefinition::OpenReleaseRequest => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
-						"`OpenReleasePullRequest` requires a previous `PrepareRelease` step"
+						"`OpenReleaseRequest` requires a previous `PrepareRelease` step"
 							.to_string(),
 					)
 				})?;
-				let github = load_workspace_configuration(root)?.github.ok_or_else(|| {
+				let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
 					MonochangeError::Config(
-						"`OpenReleasePullRequest` requires `[github]` configuration".to_string(),
+						"`OpenReleaseRequest` requires `[source]` configuration".to_string(),
 					)
 				})?;
 				let manifest = build_release_manifest(
@@ -683,26 +673,28 @@ fn execute_cli_command(
 					&context.deployment_intents,
 					&context.command_logs,
 				);
-				let request = build_release_pull_request_request(&github, &manifest);
+				let request = build_source_change_request(&source, &manifest);
 				if context.dry_run {
-					context.release_pull_request_result = Some(format!(
-						"dry-run {} {} -> {}",
-						request.repository, request.head_branch, request.base_branch
+					context.release_request_result = Some(format!(
+						"dry-run {} {} -> {} via {}",
+						request.repository,
+						request.head_branch,
+						request.base_branch,
+						request.provider
 					));
 				} else {
 					let tracked_paths = tracked_release_pull_request_paths(&context, &manifest);
-					let result = publish_release_pull_request(root, &request, &tracked_paths)?;
-					context.release_pull_request_result = Some(format!(
-						"{} #{} ({})",
+					let result =
+						publish_source_change_request(&source, root, &request, &tracked_paths)?;
+					context.release_request_result = Some(format!(
+						"{} #{} ({}) via {}",
 						result.repository,
 						result.number,
-						match result.operation {
-							monochange_github::GitHubPullRequestOperation::Created => "created",
-							monochange_github::GitHubPullRequestOperation::Updated => "updated",
-						}
+						format_change_request_operation(&result.operation),
+						result.provider
 					));
 				}
-				context.release_pull_request_request = Some(request);
+				context.release_request = Some(request);
 				output = None;
 			}
 			CliStepDefinition::Deploy { names } => {
@@ -719,15 +711,15 @@ fn execute_cli_command(
 				)?;
 				output = None;
 			}
-			CliStepDefinition::VerifyChangesets => {
+			CliStepDefinition::EnforceChangesetPolicy => {
 				let changed_paths = context
 					.inputs
-					.get("changed_paths")
+					.get("changed_path")
 					.cloned()
 					.unwrap_or_default();
 				let labels = context.inputs.get("label").cloned().unwrap_or_default();
 				context.changeset_policy_evaluation =
-					Some(verify_changesets(root, &changed_paths, &labels)?);
+					Some(evaluate_changeset_policy(root, &changed_paths, &labels)?);
 				output = None;
 			}
 			CliStepDefinition::Command {
@@ -761,8 +753,8 @@ fn execute_cli_command(
 				);
 				render_release_cli_command_json(
 					&manifest,
-					&context.github_release_requests,
-					context.release_pull_request_request.as_ref(),
+					&context.release_requests,
+					context.release_request.as_ref(),
 				)
 			}
 			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
@@ -973,15 +965,15 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 		if let Some(path) = &context.release_manifest_path {
 			lines.push(format!("release manifest: {}", path.display()));
 		}
-		if !context.github_release_results.is_empty() {
-			lines.push("github releases:".to_string());
-			for release in &context.github_release_results {
+		if !context.release_results.is_empty() {
+			lines.push("releases:".to_string());
+			for release in &context.release_results {
 				lines.push(format!("- {release}"));
 			}
 		}
-		if let Some(release_pull_request_result) = &context.release_pull_request_result {
-			lines.push("release pull request:".to_string());
-			lines.push(format!("- {release_pull_request_result}"));
+		if let Some(release_request_result) = &context.release_request_result {
+			lines.push("release request:".to_string());
+			lines.push(format!("- {release_request_result}"));
 		}
 		if !context.deployment_intents.is_empty() {
 			lines.push("deployments:".to_string());
@@ -1006,7 +998,7 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 		}
 	}
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
-		lines.push(format!("changeset verification: {}", evaluation.status));
+		lines.push(format!("changeset policy: {}", evaluation.status));
 		lines.push(evaluation.summary.clone());
 		if !evaluation.matched_skip_labels.is_empty() {
 			lines.push(format!(
@@ -1024,18 +1016,6 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 			lines.push("changeset files:".to_string());
 			for path in &evaluation.changeset_paths {
 				lines.push(format!("- {path}"));
-			}
-		}
-		if !evaluation.affected_package_ids.is_empty() {
-			lines.push("affected packages:".to_string());
-			for package_id in &evaluation.affected_package_ids {
-				lines.push(format!("- {package_id}"));
-			}
-		}
-		if !evaluation.uncovered_package_ids.is_empty() {
-			lines.push("uncovered packages:".to_string());
-			for package_id in &evaluation.uncovered_package_ids {
-				lines.push(format!("- {package_id}"));
 			}
 		}
 		if !evaluation.errors.is_empty() {
@@ -1078,16 +1058,28 @@ fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 	}
 }
 
-pub fn verify_changesets(
+pub fn evaluate_changeset_policy(
 	root: &Path,
 	changed_paths: &[String],
 	labels: &[String],
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
 	let configuration = load_workspace_configuration(root)?;
-	let verify = &configuration.changesets.verify;
-	if !verify.enabled {
+	let source = configuration.source.as_ref().ok_or_else(|| {
+		MonochangeError::Config(
+			"changeset policy evaluation requires `[source]` configuration".to_string(),
+		)
+	})?;
+	if source.provider != SourceProvider::GitHub {
 		return Err(MonochangeError::Config(
-			"changeset verification requires `[changesets.verify].enabled = true`".to_string(),
+			"changeset policy evaluation is currently only supported for `provider = \"github\"`"
+				.to_string(),
+		));
+	}
+	let policy = &source.bot.changesets;
+	if !policy.enabled {
+		return Err(MonochangeError::Config(
+			"changeset policy evaluation requires `[source.bot.changesets].enabled = true`"
+				.to_string(),
 		));
 	}
 
@@ -1105,7 +1097,7 @@ pub fn verify_changesets(
 	let matched_skip_labels = labels
 		.iter()
 		.filter(|label| {
-			verify
+			policy
 				.skip_labels
 				.iter()
 				.any(|candidate| candidate == *label)
@@ -1117,119 +1109,77 @@ pub fn verify_changesets(
 		.filter(|path| is_changeset_markdown_path(path))
 		.cloned()
 		.collect::<Vec<_>>();
-	let config_ids_by_package_id = configuration
-		.packages
-		.iter()
-		.map(|package| {
-			resolve_package_reference(&package.id, &configuration.root_path, &discovery.packages)
-				.map(|package_id| (package_id, package.id.clone()))
-		})
-		.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
-
-	let mut matched_paths = Vec::new();
 	let mut ignored_paths = Vec::new();
-	let mut affected_package_ids = BTreeSet::new();
+	let mut candidate_paths = Vec::new();
 	for path in changed_paths
 		.iter()
 		.filter(|path| !is_changeset_markdown_path(path))
 	{
-		let mut matched_any_package = false;
-		let mut ignored_by_package = false;
-		for package in &configuration.packages {
-			if path_touches_package(path, package) {
-				matched_any_package = true;
-				affected_package_ids.insert(package.id.clone());
-				continue;
-			}
-			if path_is_ignored_for_package(path, package) {
-				ignored_by_package = true;
-			}
-		}
-		if matched_any_package {
-			matched_paths.push(path.clone());
-		} else if ignored_by_package {
+		if matches_any_pattern(&policy.ignored_paths, path) {
 			ignored_paths.push(path.clone());
+		} else {
+			candidate_paths.push(path.clone());
 		}
 	}
+	let matched_paths = if policy.changed_paths.is_empty() {
+		candidate_paths.clone()
+	} else {
+		candidate_paths
+			.into_iter()
+			.filter(|path| matches_any_pattern(&policy.changed_paths, path))
+			.collect::<Vec<_>>()
+	};
 
-	let mut covered_package_ids = BTreeSet::new();
 	let mut errors = Vec::new();
 	for changeset_path in &changeset_paths {
 		let absolute_path = root.join(changeset_path);
 		if !absolute_path.exists() {
 			errors.push(format!(
-				"attached changeset `{changeset_path}` does not exist in the checked-out workspace"
+				"changed changeset `{changeset_path}` does not exist in the checked-out workspace"
 			));
 			continue;
 		}
-		match load_change_signals(&absolute_path, &configuration, &discovery.packages) {
-			Ok(signals) => {
-				for signal in signals {
-					covered_package_ids.insert(
-						config_ids_by_package_id
-							.get(&signal.package_id)
-							.cloned()
-							.unwrap_or(signal.package_id),
-					);
-				}
-			}
-			Err(error) => errors.push(error.render()),
+		if let Err(error) = load_change_signals(&absolute_path, &configuration, &discovery.packages)
+		{
+			errors.push(error.render());
 		}
 	}
 
-	let uncovered_package_ids = affected_package_ids
-		.difference(&covered_package_ids)
-		.cloned()
-		.collect::<Vec<_>>();
-	if matched_skip_labels.is_empty() && !uncovered_package_ids.is_empty() {
-		errors.push(format!(
-			"changed packages are not covered by attached changesets: {}",
-			uncovered_package_ids.join(", ")
-		));
-	}
-
-	let affected_package_ids = affected_package_ids.into_iter().collect::<Vec<_>>();
-	let covered_package_ids = covered_package_ids.into_iter().collect::<Vec<_>>();
-	let required =
-		!affected_package_ids.is_empty() && verify.required && matched_skip_labels.is_empty();
-	let status = if errors.is_empty() {
-		if !matched_skip_labels.is_empty() {
-			ChangesetPolicyStatus::Skipped
-		} else if affected_package_ids.is_empty() {
-			ChangesetPolicyStatus::NotRequired
-		} else {
-			ChangesetPolicyStatus::Passed
-		}
-	} else {
+	let required = !matched_paths.is_empty() && policy.required && matched_skip_labels.is_empty();
+	let status = if !errors.is_empty() {
 		ChangesetPolicyStatus::Failed
+	} else if !matched_skip_labels.is_empty() {
+		ChangesetPolicyStatus::Skipped
+	} else if matched_paths.is_empty() {
+		ChangesetPolicyStatus::NotRequired
+	} else if required && changeset_paths.is_empty() {
+		ChangesetPolicyStatus::Failed
+	} else {
+		ChangesetPolicyStatus::Passed
 	};
 	let summary = match status {
-		ChangesetPolicyStatus::Failed if errors
-			.iter()
-			.any(|error| error.contains("not covered by attached changesets")) =>
-		{
-			format!(
-				"changeset verification failed: attached changesets do not cover {} changed package{}",
-				uncovered_package_ids.len(),
-				if uncovered_package_ids.len() == 1 { "" } else { "s" }
-			)
+		ChangesetPolicyStatus::Failed if !errors.is_empty() => {
+			"changeset policy failed: one or more changed changeset files are invalid".to_string()
 		}
 		ChangesetPolicyStatus::Failed => {
-			"changeset verification failed: one or more attached changeset files are invalid"
-				.to_string()
+			"changeset policy failed: a changeset is required for the matched paths".to_string()
 		}
 		ChangesetPolicyStatus::Skipped => format!(
-			"changeset verification skipped because the change has an allowed label: {}",
+			"changeset policy skipped because the pull request has an allowed label: {}",
 			matched_skip_labels.join(", ")
 		),
 		ChangesetPolicyStatus::NotRequired => {
-			"changeset verification passed: no configured packages were affected by the changed files"
+			"changeset policy passed: no changed paths matched the configured policy"
+				.to_string()
+		}
+		ChangesetPolicyStatus::Passed if changeset_paths.is_empty() => {
+			"changeset policy passed: matching paths do not require a changeset under the current policy"
 				.to_string()
 		}
 		ChangesetPolicyStatus::Passed => format!(
-			"changeset verification passed: attached changesets cover {} changed package{}",
-			affected_package_ids.len(),
-			if affected_package_ids.len() == 1 { "" } else { "s" }
+			"changeset policy passed: validated {} changed changeset file{}",
+			changeset_paths.len(),
+			if changeset_paths.len() == 1 { "" } else { "s" }
 		),
 	};
 
@@ -1244,13 +1194,10 @@ pub fn verify_changesets(
 		matched_paths,
 		ignored_paths,
 		changeset_paths,
-		affected_package_ids,
-		covered_package_ids,
-		uncovered_package_ids,
 		errors,
 	};
-	if evaluation.status == ChangesetPolicyStatus::Failed && verify.comment_on_failure {
-		evaluation.comment = Some(render_changeset_verification_comment(verify, &evaluation));
+	if evaluation.status == ChangesetPolicyStatus::Failed && policy.comment_on_failure {
+		evaluation.comment = Some(render_changeset_policy_comment(policy, &evaluation));
 	}
 
 	Ok(evaluation)
@@ -1269,69 +1216,33 @@ fn is_changeset_markdown_path(path: &str) -> bool {
 			.is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
 }
 
-fn path_touches_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
-	if matches_any_package_pattern(path, package, &package.additional_paths) {
-		return true;
-	}
-	if !path_is_within_package(path, package) {
-		return false;
-	}
-	!path_is_ignored_for_package(path, package)
-}
-
-fn path_is_ignored_for_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
-	path_is_within_package(path, package)
-		&& matches_any_package_pattern(path, package, &package.ignored_paths)
-}
-
-fn path_is_within_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
-	let package_root = normalize_changed_path(&package.path.to_string_lossy());
-	path == package_root || path.starts_with(&format!("{package_root}/"))
-}
-
-fn matches_any_package_pattern(
-	path: &str,
-	package: &monochange_core::PackageDefinition,
-	patterns: &[String],
-) -> bool {
-	let package_root = normalize_changed_path(&package.path.to_string_lossy());
-	let relative_path = path
-		.strip_prefix(&format!("{package_root}/"))
-		.or_else(|| (path == package_root).then_some(""));
+fn matches_any_pattern(patterns: &[String], path: &str) -> bool {
 	patterns.iter().any(|pattern| {
-		Pattern::new(pattern).ok().is_some_and(|compiled| {
-			compiled.matches(path)
-				|| relative_path.is_some_and(|relative_path| compiled.matches(relative_path))
-		})
+		Pattern::new(pattern)
+			.ok()
+			.is_some_and(|pattern| pattern.matches(path))
 	})
 }
 
-fn render_changeset_verification_comment(
-	verify: &ChangesetVerificationSettings,
+fn render_changeset_policy_comment(
+	policy: &monochange_core::ChangesetBotSettings,
 	evaluation: &ChangesetPolicyEvaluation,
 ) -> String {
 	let mut lines = vec![
-		"### MonoChange changeset verification failed".to_string(),
+		"### MonoChange changeset policy failed".to_string(),
 		String::new(),
 		evaluation.summary.clone(),
 	];
 	if !evaluation.matched_paths.is_empty() {
 		lines.push(String::new());
-		lines.push("Changed package paths:".to_string());
+		lines.push("Matched changed paths:".to_string());
 		for path in &evaluation.matched_paths {
 			lines.push(format!("- `{path}`"));
 		}
 	}
-	if !evaluation.affected_package_ids.is_empty() {
-		lines.push(String::new());
-		lines.push("Affected packages:".to_string());
-		for package_id in &evaluation.affected_package_ids {
-			lines.push(format!("- `{package_id}`"));
-		}
-	}
 	if !evaluation.changeset_paths.is_empty() {
 		lines.push(String::new());
-		lines.push("Attached changeset files:".to_string());
+		lines.push("Changed changeset files:".to_string());
 		for path in &evaluation.changeset_paths {
 			lines.push(format!("- `{path}`"));
 		}
@@ -1343,21 +1254,17 @@ fn render_changeset_verification_comment(
 			lines.push(format!("- {error}"));
 		}
 	}
-	if !verify.skip_labels.is_empty() {
+	if !policy.skip_labels.is_empty() {
 		lines.push(String::new());
 		lines.push("Allowed skip labels:".to_string());
-		for label in &verify.skip_labels {
+		for label in &policy.skip_labels {
 			lines.push(format!("- `{label}`"));
 		}
 	}
 	lines.push(String::new());
 	lines.push("How to fix:".to_string());
-	lines.push("- add or update a `.changeset/*.md` file so it references every changed package or owning group".to_string());
-	lines.push(
-		"- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`"
-			.to_string(),
-	);
-	if !verify.skip_labels.is_empty() {
+	lines.push("- add a `.changeset/*.md` file, for example with `mc change --package <id> --bump patch --reason \"describe the change\"`".to_string());
+	if !policy.skip_labels.is_empty() {
 		lines.push(
 			"- or apply one of the configured skip labels when no release note is required"
 				.to_string(),
@@ -1409,8 +1316,6 @@ fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceC
 				package_type: package_type_for_ecosystem(package.ecosystem),
 				changelog,
 				versioned_files: Vec::new(),
-				ignored_paths: Vec::new(),
-				additional_paths: Vec::new(),
 			},
 		);
 	}
@@ -1430,14 +1335,6 @@ fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceC
 
 	Ok(InitWorkspaceConfiguration {
 		defaults: WorkspaceDefaults::default(),
-		changesets: ChangesetSettings {
-			verify: ChangesetVerificationSettings {
-				enabled: true,
-				required: true,
-				skip_labels: vec!["no-changeset-required".to_string()],
-				comment_on_failure: true,
-			},
-		},
 		package: package_configs,
 		group: group_configs,
 		cli: default_cli_command_map(),
@@ -3199,18 +3096,90 @@ fn render_release_manifest_json(manifest: &ReleaseManifest) -> MonochangeResult<
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
+fn build_source_release_requests(
+	source: &SourceConfiguration,
+	manifest: &ReleaseManifest,
+) -> Vec<SourceReleaseRequest> {
+	match source.provider {
+		SourceProvider::GitHub => github_provider::build_release_requests(source, manifest),
+		SourceProvider::GitLab => gitlab_provider::build_release_requests(source, manifest),
+		SourceProvider::Gitea => gitea_provider::build_release_requests(source, manifest),
+	}
+}
+
+fn build_source_change_request(
+	source: &SourceConfiguration,
+	manifest: &ReleaseManifest,
+) -> SourceChangeRequest {
+	match source.provider {
+		SourceProvider::GitHub => {
+			github_provider::build_release_pull_request_request(source, manifest)
+		}
+		SourceProvider::GitLab => {
+			gitlab_provider::build_release_pull_request_request(source, manifest)
+		}
+		SourceProvider::Gitea => {
+			gitea_provider::build_release_pull_request_request(source, manifest)
+		}
+	}
+}
+
+fn publish_source_release_requests(
+	source: &SourceConfiguration,
+	requests: &[SourceReleaseRequest],
+) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
+	match source.provider {
+		SourceProvider::GitHub => github_provider::publish_release_requests(source, requests),
+		SourceProvider::GitLab => gitlab_provider::publish_release_requests(source, requests),
+		SourceProvider::Gitea => gitea_provider::publish_release_requests(source, requests),
+	}
+}
+
+fn publish_source_change_request(
+	source: &SourceConfiguration,
+	root: &Path,
+	request: &SourceChangeRequest,
+	tracked_paths: &[PathBuf],
+) -> MonochangeResult<SourceChangeRequestOutcome> {
+	match source.provider {
+		SourceProvider::GitHub => {
+			github_provider::publish_release_pull_request(source, root, request, tracked_paths)
+		}
+		SourceProvider::GitLab => {
+			gitlab_provider::publish_release_pull_request(source, root, request, tracked_paths)
+		}
+		SourceProvider::Gitea => {
+			gitea_provider::publish_release_pull_request(source, root, request, tracked_paths)
+		}
+	}
+}
+
+fn format_source_operation(operation: &SourceReleaseOperation) -> &'static str {
+	match operation {
+		SourceReleaseOperation::Created => "created",
+		SourceReleaseOperation::Updated => "updated",
+	}
+}
+
+fn format_change_request_operation(operation: &SourceChangeRequestOperation) -> &'static str {
+	match operation {
+		SourceChangeRequestOperation::Created => "created",
+		SourceChangeRequestOperation::Updated => "updated",
+	}
+}
+
 fn render_release_cli_command_json(
 	manifest: &ReleaseManifest,
-	github_releases: &[GitHubReleaseRequest],
-	release_pull_request: Option<&GitHubPullRequestRequest>,
+	releases: &[SourceReleaseRequest],
+	release_request: Option<&SourceChangeRequest>,
 ) -> MonochangeResult<String> {
-	if github_releases.is_empty() && release_pull_request.is_none() {
+	if releases.is_empty() && release_request.is_none() {
 		return render_release_manifest_json(manifest);
 	}
 	serde_json::to_string_pretty(&json!({
 		"manifest": manifest,
-		"githubReleases": github_releases,
-		"pullRequest": release_pull_request,
+		"releases": releases,
+		"releaseRequest": release_request,
 	}))
 	.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }

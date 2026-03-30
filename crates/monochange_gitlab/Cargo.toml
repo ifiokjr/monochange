@@ -1,0 +1,28 @@
+[package]
+name = "monochange_gitlab"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_gitlab"
+edition = { workspace = true }
+include = { workspace = true }
+keywords = ["gitlab", "releases", "versioning", "monorepo"]
+license = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "GitLab release payload rendering and publishing for monochange"
+
+[dependencies]
+monochange_core = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+urlencoding = "2"
+
+[dev-dependencies]
+httpmock = "0.8.3"
+temp-env = "0.3"
+tempfile = "3"
+
+[lints]
+workspace = true
