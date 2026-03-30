@@ -253,26 +253,26 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.changeset-check]
+[cli.verify]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -408,7 +408,7 @@ Current implementation notes:
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_path` command input, and reusable diagnostics for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `Deploy`, `EnforceChangesetPolicy`, and `Command`
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `Deploy`, `VerifyChangesets`, and `Command`
 - legacy `PublishGitHubRelease` and `OpenReleasePullRequest` step names are still accepted as migration aliases
 
 <!-- {/configurationCurrentStatus} -->

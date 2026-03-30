@@ -255,23 +255,23 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.changeset-check]
+[cli.verify]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
+[[cli.verify.steps]]
 type = "VerifyChangesets"

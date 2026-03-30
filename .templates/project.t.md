@@ -69,7 +69,7 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
-- `mc changeset-check --format json --changed-path ...` evaluates pull-request changeset policy from CI-supplied paths and labels
+- `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
 <!-- {/projectGitHubAutomationOverview} -->
 
@@ -321,26 +321,26 @@ type = "PrepareRelease"
 [[cli.release-deploy.steps]]
 type = "Deploy"
 
-[cli.changeset-check]
+[cli.verify]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 ```
 
 <!-- {/projectSetupConfig} -->
@@ -349,7 +349,7 @@ type = "EnforceChangesetPolicy"
 
 This guide shows the preferred package/group configuration model together with an expanded CLI command surface.
 
-`mc init` emits the default `validate`, `discover`, `change`, and `release` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `changeset-check` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
+`mc init` emits the default `validate`, `discover`, `change`, and `release` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 

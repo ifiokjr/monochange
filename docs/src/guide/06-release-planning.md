@@ -109,7 +109,7 @@ Current `PrepareRelease` behavior:
 - can preview or publish provider releases via `PublishRelease`
 - can preview or open/update release requests via `OpenReleaseRequest`
 - can emit deployment intents via `Deploy` for merge-driven or CI-driven deploy orchestration
-- can evaluate pull-request changeset policy via `EnforceChangesetPolicy` using changed paths and labels supplied by CI
+- can evaluate pull-request changeset policy via `VerifyChangesets` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
@@ -166,10 +166,10 @@ jobs:
           set -euo pipefail
 
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(changeset-check --format json)
+          args=(verify --format json)
 
           for path in $CHANGED_FILES; do
-            args+=(--changed-path "$path")
+            args+=(--changed-paths "$path")
           done
 
           for label in "${labels[@]}"; do
@@ -200,7 +200,7 @@ Planning rules in this milestone:
 - `PublishRelease` reuses the same structured release data to build provider release requests for grouped and package-owned releases
 - `OpenReleaseRequest` reuses the same structured release data to render release-request summaries, branch names, and idempotent provider updates
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
-- `EnforceChangesetPolicy` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
+- `VerifyChangesets` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->

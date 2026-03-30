@@ -10,7 +10,7 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 - `mc publish-release` previews or publishes provider releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent provider release request
 - `mc release-deploy` emits deployment intents for later workflow execution
-- `mc changeset-check` evaluates pull-request changeset policy from CI-supplied changed paths and labels
+- `mc verify` evaluates pull-request changeset policy from CI-supplied changed paths and labels
 
 <!-- {/githubAutomationOverview} -->
 
@@ -24,7 +24,7 @@ mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-deploy --dry-run --format json
-mc changeset-check --format json --changed-path crates/monochange/src/lib.rs
+mc verify --format json --changed-paths crates/monochange/src/lib.rs
 ```
 
 <!-- {/githubAutomationWorkflowCommands} -->
@@ -164,26 +164,26 @@ type = "PrepareRelease"
 [[cli.release-deploy.steps]]
 type = "Deploy"
 
-[cli.changeset-check]
+[cli.verify]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 ```
 
 <!-- {/githubAutomationPolicyAndDeployConfigExample} -->
@@ -237,10 +237,10 @@ jobs:
           set -euo pipefail
 
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(changeset-check --format json)
+          args=(verify --format json)
 
           for path in $CHANGED_FILES; do
-            args+=(--changed-path "$path")
+            args+=(--changed-paths "$path")
           done
 
           for label in "${labels[@]}"; do
@@ -261,8 +261,8 @@ jobs:
 The MonoChange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
-- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `changeset-check` as top-level CLI commands
-- running a real `changeset-policy` GitHub Actions workflow that shells into `mc changeset-check`
+- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` as top-level CLI commands
+- running a real `changeset-policy` GitHub Actions workflow that shells into `mc verify`
 - keeping docs deployment represented as a deployment intent so downstream workflows can reason about it from the release manifest
 
 <!-- {/githubAutomationDogfoodNotes} -->

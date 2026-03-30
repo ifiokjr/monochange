@@ -32,7 +32,7 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
-- `mc changeset-check --format json --changed-path ...` evaluates pull-request changeset policy from CI-supplied paths and labels
+- `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
 <!-- {/projectGitHubAutomationOverview} -->
 
