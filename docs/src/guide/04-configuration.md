@@ -154,9 +154,9 @@ versioned_files = [{ path = "group.toml", dependency = "sdk-core" }]
 
 Dependency targets in `versioned_files` must reference declared package ids.
 
-## Workflows
+## CLI commands
 
-Workflows are user-defined top-level commands. In this milestone, a workflow name such as `release` becomes invocable as `mc release`.
+CLI commands are user-defined top-level commands. Each `[cli.<command>]` entry becomes invocable as `mc <command>`, and legacy `[[workflows]]` tables are no longer supported.
 
 <!-- {=configurationWorkflowsSnippet} -->
 
@@ -192,7 +192,13 @@ default = "text"
 [[cli.release.steps]]
 type = "PrepareRelease"
 
-[[cli.release.steps]]
+[cli.release-manifest]
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[cli.release-manifest.steps]]
+type = "PrepareRelease"
+
+[[cli.release-manifest.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
@@ -271,7 +277,7 @@ type = "EnforceChangesetPolicy"
 
 <!-- {/configurationWorkflowsSnippet} -->
 
-Workflow command interpolation variables:
+CLI command interpolation variables:
 
 <!-- {=configurationWorkflowVariables} -->
 
@@ -284,7 +290,7 @@ Workflow command interpolation variables:
 
 ## GitHub release settings
 
-Use `[github]` plus `[github.releases]` when you want workflow steps such as `PublishGitHubRelease` to derive repository release payloads from the prepared release.
+Use `[github]` plus `[github.releases]` when you want command steps such as `PublishGitHubRelease` to derive repository release payloads from the prepared release.
 
 <!-- {=configurationGitHubSnippet} -->
 
@@ -393,7 +399,8 @@ Current implementation notes:
 
 - `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven CLI commands in this milestone
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
-- `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
+- legacy `[[workflows]]` configuration is no longer supported; use `[cli.<command>]` plus `[[cli.<command>.steps]]` instead
+- `[ecosystems.*].enabled/roots/exclude` are parsed, but discovery still scans all supported ecosystems regardless of those settings today
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
 - GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls

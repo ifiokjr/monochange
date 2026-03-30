@@ -7,6 +7,7 @@ Create a changeset with the CLI:
 ```bash
 mc change --package sdk-core --bump minor --reason "public API addition"
 mc change --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
+mc change --package sdk-core --bump major --reason "break the public API" --evidence rust-semver:major:public API break detected --output .changeset/sdk-core-major.md
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -116,6 +117,10 @@ Current `PrepareRelease` behavior:
 
 A GitHub Actions check can pass changed paths and labels directly into a policy workflow, for example:
 
+<!-- {/releaseWorkflowBehavior} -->
+
+<!-- {=changesetPolicyGitHubActionWorkflow} -->
+
 ```yaml
 name: changeset-policy
 
@@ -134,6 +139,7 @@ concurrency:
 
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -158,19 +164,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
           args=(changeset-check --format json)
+
           for path in $CHANGED_FILES; do
             args+=(--changed-path "$path")
           done
+
           for label in "${labels[@]}"; do
             args+=(--label "$label")
           done
-          devenv shell -- mc "${args[@]}" | tee policy.json
+
+          devenv shell -- mc "${args[@]}" | tee policy.raw
+          awk 'BEGIN { capture = 0 } /^\{/ { capture = 1 } capture { print }' policy.raw > policy.json
           jq -e '.status != "failed"' policy.json >/dev/null
 ```
 
-<!-- {/releaseWorkflowBehavior} -->
+<!-- {/changesetPolicyGitHubActionWorkflow} -->
 
 Planning rules in this milestone:
 
@@ -179,6 +190,7 @@ Planning rules in this milestone:
 - `mc change` defaults `--bump` to `patch`
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
+- `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
 - change templates support detailed multi-line release-note entries through `$details`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents

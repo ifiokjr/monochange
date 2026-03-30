@@ -24,7 +24,7 @@
 //! ```bash
 //! mc init
 //! mc discover --format json
-//! mc change --package crates/monochange --bump patch --reason "describe the change"
+//! mc change --package monochange --bump patch --reason "describe the change"
 //! mc release --dry-run --format json
 //! ```
 //!
