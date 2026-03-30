@@ -337,31 +337,34 @@ Reach for this crate when you already have discovered packages, dependency edges
 
 <!-- {@monochangeGithubCrateDocs} -->
 
-`monochange_github` turns `MonoChange` release manifests into GitHub release requests.
+`monochange_github` turns `MonoChange` release manifests into GitHub automation requests.
 
-Reach for this crate when you want to preview or publish GitHub releases using the same structured release data that powers changelog files and release manifests.
+Reach for this crate when you want to preview or publish GitHub releases and release pull requests using the same structured release data that powers changelog files and release manifests.
 
 ## Why use it?
 
-- derive GitHub release payloads from `MonoChange`'s structured release manifest
-- keep GitHub release bodies aligned with changelog rendering and release targets
-- reuse one publishing path for dry-run previews and real release publication
+- derive GitHub release payloads and release-PR bodies from `MonoChange`'s structured release manifest
+- keep GitHub automation aligned with changelog rendering and release targets
+- reuse one publishing path for dry-run previews and real repository updates
 
 ## Best for
 
 - building GitHub release automation on top of `mc release`
-- previewing would-be GitHub releases in CI before publishing
-- converting grouped or package release targets into repository release payloads
+- previewing would-be GitHub releases and release PRs in CI before publishing
+- converting grouped or package release targets into repository automation payloads
 
 ## Public entry points
 
 - `build_release_requests(config, manifest)` converts a release manifest into GitHub release requests
 - `publish_release_requests(requests)` publishes requests through the `gh` CLI when available
+- `build_release_pull_request_request(config, manifest)` converts a release manifest into a GitHub release-PR request
+- `publish_release_pull_request(root, request, tracked_paths)` creates or updates a release PR through `git` and `gh`
 
 ## Example
 
 ```rust
 use monochange_core::GitHubConfiguration;
+use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseSettings;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestPlan;
@@ -403,6 +406,7 @@ let github = GitHubConfiguration {
     owner: "ifiokjr".to_string(),
     repo: "monochange".to_string(),
     releases: GitHubReleaseSettings::default(),
+    pull_requests: GitHubPullRequestSettings::default(),
 };
 
 let requests = build_release_requests(&github, &manifest);

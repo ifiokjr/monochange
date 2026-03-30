@@ -180,6 +180,22 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "PublishGitHubRelease"
 
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
+
 [[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
@@ -216,6 +232,14 @@ enabled = true
 draft = false
 prerelease = false
 source = "monochange"
+
+[github.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
 ```
 
 <!-- {/configurationGitHubSnippet} -->
@@ -290,7 +314,8 @@ Current implementation notes:
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `gh` for live publishing outside dry-run mode
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, and `Command`
+- GitHub release pull requests currently expect `[github.pull_requests]` and use `git` plus `gh` for live branch, commit, push, and PR update operations
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 

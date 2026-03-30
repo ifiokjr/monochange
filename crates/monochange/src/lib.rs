@@ -98,8 +98,11 @@ use monochange_core::WorkflowStepDefinition;
 use monochange_core::WorkspaceDefaults;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
+use monochange_github::build_release_pull_request_request;
 use monochange_github::build_release_requests;
+use monochange_github::publish_release_pull_request;
 use monochange_github::publish_release_requests;
+use monochange_github::GitHubPullRequestRequest;
 use monochange_github::GitHubReleaseRequest;
 use monochange_graph::build_release_plan;
 use monochange_npm::discover_npm_packages;
@@ -218,6 +221,8 @@ struct WorkflowContext {
 	release_manifest_path: Option<PathBuf>,
 	github_release_requests: Vec<GitHubReleaseRequest>,
 	github_release_results: Vec<String>,
+	release_pull_request_request: Option<GitHubPullRequestRequest>,
+	release_pull_request_result: Option<String>,
 	command_logs: Vec<String>,
 }
 
@@ -462,6 +467,8 @@ fn execute_workflow(
 		release_manifest_path: None,
 		github_release_requests: Vec::new(),
 		github_release_results: Vec::new(),
+		release_pull_request_request: None,
+		release_pull_request_result: None,
 		command_logs: Vec::new(),
 	};
 	let mut output = None;
@@ -607,6 +614,42 @@ fn execute_workflow(
 				}
 				output = None;
 			}
+			WorkflowStepDefinition::OpenReleasePullRequest => {
+				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+					MonochangeError::Config(
+						"`OpenReleasePullRequest` requires a previous `PrepareRelease` step"
+							.to_string(),
+					)
+				})?;
+				let github = load_workspace_configuration(root)?.github.ok_or_else(|| {
+					MonochangeError::Config(
+						"`OpenReleasePullRequest` requires `[github]` configuration".to_string(),
+					)
+				})?;
+				let manifest =
+					build_release_manifest(workflow, prepared_release, &context.command_logs);
+				let request = build_release_pull_request_request(&github, &manifest);
+				if context.dry_run {
+					context.release_pull_request_result = Some(format!(
+						"dry-run {} {} -> {}",
+						request.repository, request.head_branch, request.base_branch
+					));
+				} else {
+					let tracked_paths = tracked_release_pull_request_paths(&context, &manifest);
+					let result = publish_release_pull_request(root, &request, &tracked_paths)?;
+					context.release_pull_request_result = Some(format!(
+						"{} #{} ({})",
+						result.repository,
+						result.number,
+						match result.operation {
+							monochange_github::GitHubPullRequestOperation::Created => "created",
+							monochange_github::GitHubPullRequestOperation::Updated => "updated",
+						}
+					));
+				}
+				context.release_pull_request_request = Some(request);
+				output = None;
+			}
 			WorkflowStepDefinition::Command {
 				command,
 				dry_run,
@@ -632,11 +675,11 @@ fn execute_workflow(
 			OutputFormat::Json => {
 				let manifest =
 					build_release_manifest(workflow, prepared_release, &context.command_logs);
-				if context.github_release_requests.is_empty() {
-					render_release_manifest_json(&manifest)
-				} else {
-					render_release_publish_json(&manifest, &context.github_release_requests)
-				}
+				render_release_workflow_json(
+					&manifest,
+					&context.github_release_requests,
+					context.release_pull_request_request.as_ref(),
+				)
 			}
 			OutputFormat::Text => Ok(render_workflow_result(workflow, &context)),
 		};
@@ -838,6 +881,10 @@ fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowConte
 			for release in &context.github_release_results {
 				lines.push(format!("- {release}"));
 			}
+		}
+		if let Some(release_pull_request_result) = &context.release_pull_request_result {
+			lines.push("release pull request:".to_string());
+			lines.push(format!("- {release_pull_request_result}"));
 		}
 		if !prepared_release.changed_files.is_empty() {
 			lines.push("changed files:".to_string());
@@ -2463,15 +2510,34 @@ fn render_release_manifest_json(manifest: &ReleaseManifest) -> MonochangeResult<
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
-fn render_release_publish_json(
+fn render_release_workflow_json(
 	manifest: &ReleaseManifest,
 	github_releases: &[GitHubReleaseRequest],
+	release_pull_request: Option<&GitHubPullRequestRequest>,
 ) -> MonochangeResult<String> {
+	if github_releases.is_empty() && release_pull_request.is_none() {
+		return render_release_manifest_json(manifest);
+	}
 	serde_json::to_string_pretty(&json!({
 		"manifest": manifest,
 		"githubReleases": github_releases,
+		"pullRequest": release_pull_request,
 	}))
 	.map_err(|error| MonochangeError::Discovery(error.to_string()))
+}
+
+fn tracked_release_pull_request_paths(
+	context: &WorkflowContext,
+	manifest: &ReleaseManifest,
+) -> Vec<PathBuf> {
+	let mut tracked_paths = manifest.changed_files.clone();
+	tracked_paths.extend(manifest.deleted_changesets.clone());
+	if let Some(path) = &context.release_manifest_path {
+		tracked_paths.push(path.clone());
+	}
+	tracked_paths.sort();
+	tracked_paths.dedup();
+	tracked_paths
 }
 
 fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {

@@ -53,7 +53,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - run config-defined release workflows from `.changeset/*.md`
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
-- preview or publish GitHub releases from typed workflow steps and shared release data
+- preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -69,6 +69,7 @@ mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
 mc release --dry-run --format json
 mc publish-release --dry-run --format json
+mc release-pr --dry-run --format json
 mc release
 ```
 
@@ -156,6 +157,13 @@ repo = "monochange"
 
 [github.releases]
 source = "monochange"
+
+[github.pull_requests]
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
 
 [[workflows]]
 name = "validate"
@@ -247,6 +255,22 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "PublishGitHubRelease"
+
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a GitHub release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
 ```
 
 <!-- {/projectSetupConfig} -->

@@ -37,11 +37,11 @@
 
 ## Phase 4 — Release PR automation
 
-- [ ] T040 Implement release PR config parsing.
-- [ ] T041 Implement branch naming, commit generation, and PR title/body rendering.
-- [ ] T042 Add workflow support for `OpenReleasePullRequest`.
-- [ ] T043 Add idempotent update behavior for an existing release PR.
-- [ ] T044 Add integration and snapshot tests for release PR bodies and branch behavior.
+- [x] T040 Implement release PR config parsing.
+- [x] T041 Implement branch naming, commit generation, and PR title/body rendering.
+- [x] T042 Add workflow support for `OpenReleasePullRequest`.
+- [x] T043 Add idempotent update behavior for an existing release PR.
+- [x] T044 Add integration and snapshot tests for release PR bodies and branch behavior.
 
 ## Phase 5 — Deployment orchestration
 

@@ -99,6 +99,7 @@ use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::ExtraChangelogSection;
 use monochange_core::GitHubConfiguration;
+use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
 use monochange_core::GitHubReleaseSettings;
 use monochange_core::GroupDefinition;
@@ -260,6 +261,8 @@ struct RawGitHubConfiguration {
 	repo: String,
 	#[serde(default)]
 	releases: RawGitHubReleaseSettings,
+	#[serde(default)]
+	pull_requests: RawGitHubPullRequestSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -285,6 +288,36 @@ impl Default for RawGitHubReleaseSettings {
 			prerelease: false,
 			generate_notes: false,
 			source: GitHubReleaseNotesSource::Monochange,
+		}
+	}
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Deserialize)]
+struct RawGitHubPullRequestSettings {
+	#[serde(default = "default_true")]
+	enabled: bool,
+	#[serde(default = "default_pull_request_branch_prefix")]
+	branch_prefix: String,
+	#[serde(default = "default_pull_request_base")]
+	base: String,
+	#[serde(default = "default_pull_request_title")]
+	title: String,
+	#[serde(default = "default_pull_request_labels")]
+	labels: Vec<String>,
+	#[serde(default)]
+	auto_merge: bool,
+}
+
+impl Default for RawGitHubPullRequestSettings {
+	fn default() -> Self {
+		Self {
+			enabled: default_true(),
+			branch_prefix: default_pull_request_branch_prefix(),
+			base: default_pull_request_base(),
+			title: default_pull_request_title(),
+			labels: default_pull_request_labels(),
+			auto_merge: false,
 		}
 	}
 }
@@ -339,6 +372,22 @@ fn default_change_origin() -> String {
 
 fn default_true() -> bool {
 	true
+}
+
+fn default_pull_request_branch_prefix() -> String {
+	"monochange/release".to_string()
+}
+
+fn default_pull_request_base() -> String {
+	"main".to_string()
+}
+
+fn default_pull_request_title() -> String {
+	"chore(release): prepare release".to_string()
+}
+
+fn default_pull_request_labels() -> Vec<String> {
+	vec!["release".to_string(), "automated".to_string()]
 }
 
 impl RawChangelogConfig {
@@ -580,6 +629,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			prerelease: github.releases.prerelease,
 			generate_notes: github.releases.generate_notes,
 			source: github.releases.source,
+		},
+		pull_requests: GitHubPullRequestSettings {
+			enabled: github.pull_requests.enabled,
+			branch_prefix: github.pull_requests.branch_prefix,
+			base: github.pull_requests.base,
+			title: github.pull_requests.title,
+			labels: github.pull_requests.labels,
+			auto_merge: github.pull_requests.auto_merge,
 		},
 	});
 
@@ -1335,6 +1392,31 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 				.to_string(),
 		));
 	}
+	if github.pull_requests.branch_prefix.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"[github.pull_requests].branch_prefix must not be empty".to_string(),
+		));
+	}
+	if github.pull_requests.base.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"[github.pull_requests].base must not be empty".to_string(),
+		));
+	}
+	if github.pull_requests.title.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"[github.pull_requests].title must not be empty".to_string(),
+		));
+	}
+	if github
+		.pull_requests
+		.labels
+		.iter()
+		.any(|label| label.trim().is_empty())
+	{
+		return Err(MonochangeError::Config(
+			"[github.pull_requests].labels must not include empty values".to_string(),
+		));
+	}
 	Ok(())
 }
 
@@ -1429,7 +1511,8 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 				| WorkflowStepDefinition::Discover
 				| WorkflowStepDefinition::CreateChangeFile
 				| WorkflowStepDefinition::PrepareRelease
-				| WorkflowStepDefinition::PublishGitHubRelease => {}
+				| WorkflowStepDefinition::PublishGitHubRelease
+				| WorkflowStepDefinition::OpenReleasePullRequest => {}
 			}
 		}
 	}
@@ -1456,6 +1539,24 @@ fn validate_workflow_runtime_requirements(
 			if !github.releases.enabled {
 				return Err(MonochangeError::Config(format!(
 					"workflow `{}` uses `PublishGitHubRelease` but `[github.releases].enabled` is false",
+					workflow.name
+				)));
+			}
+		}
+		if workflow
+			.steps
+			.iter()
+			.any(|step| matches!(step, WorkflowStepDefinition::OpenReleasePullRequest))
+		{
+			let github = github.ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"workflow `{}` uses `OpenReleasePullRequest` but `[github]` is not configured",
+					workflow.name
+				))
+			})?;
+			if !github.pull_requests.enabled {
+				return Err(MonochangeError::Config(format!(
+					"workflow `{}` uses `OpenReleasePullRequest` but `[github.pull_requests].enabled` is false",
 					workflow.name
 				)));
 			}

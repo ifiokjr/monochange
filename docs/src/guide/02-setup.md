@@ -46,6 +46,13 @@ repo = "monochange"
 [github.releases]
 source = "monochange"
 
+[github.pull_requests]
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
 [[workflows]]
 name = "validate"
 help_text = "Validate monochange configuration and changesets"
@@ -136,6 +143,22 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "PublishGitHubRelease"
+
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a GitHub release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
 ```
 
 <!-- {/projectSetupConfig} -->

@@ -363,6 +363,41 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 }
 
 #[test]
+fn release_pr_workflow_reports_dry_run_pull_request_preview() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_pr_workflow_fixture(tempdir.path());
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(tempdir.path())
+			.arg("release-pr")
+			.arg("--dry-run"),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	workflow `release-pr` completed (dry-run)
+	version: 1.1.0
+	released packages: workflow-app, workflow-core
+	release targets:
+	- group sdk -> v1.1.0 (tag: true, release: true)
+	release pull request:
+	- dry-run ifiokjr/monochange monochange/release/release-pr -> main
+	changed files:
+	- Cargo.toml
+	- changelog.md
+	- crates/app/Cargo.toml
+	- crates/core/CHANGELOG.md
+	- crates/core/Cargo.toml
+	- group.toml
+	
+	----- stderr -----
+	"###
+	);
+}
+
+#[test]
 fn release_manifest_workflow_writes_manifest_json() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -835,6 +870,56 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
+"#,
+	);
+}
+
+fn seed_release_pr_workflow_fixture(root: &Path) {
+	seed_group_release_fixture(root);
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = false
+
+[package.core]
+path = "crates/core"
+changelog = true
+
+[package.app]
+path = "crates/app"
+changelog = false
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+versioned_files = ["group.toml"]
+tag = true
+release = true
+version_format = "primary"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.pull_requests]
+branch_prefix = "monochange/release"
+base = "main"
+labels = ["release", "automated"]
+
+[ecosystems.cargo]
+enabled = true
+
+[[workflows]]
+name = "release-pr"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
 "#,
 	);
 }

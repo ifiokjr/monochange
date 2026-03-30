@@ -497,6 +497,7 @@ pub enum WorkflowStepDefinition {
 		path: Option<PathBuf>,
 	},
 	PublishGitHubRelease,
+	OpenReleasePullRequest,
 	Command {
 		command: String,
 		#[serde(default)]
@@ -736,6 +737,17 @@ pub struct GitHubReleaseSettings {
 	pub source: GitHubReleaseNotesSource,
 }
 
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubPullRequestSettings {
+	pub enabled: bool,
+	pub branch_prefix: String,
+	pub base: String,
+	pub title: String,
+	pub labels: Vec<String>,
+	pub auto_merge: bool,
+}
+
 impl Default for GitHubReleaseSettings {
 	fn default() -> Self {
 		Self {
@@ -748,12 +760,27 @@ impl Default for GitHubReleaseSettings {
 	}
 }
 
+impl Default for GitHubPullRequestSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			branch_prefix: "monochange/release".to_string(),
+			base: "main".to_string(),
+			title: "chore(release): prepare release".to_string(),
+			labels: vec!["release".to_string(), "automated".to_string()],
+			auto_merge: false,
+		}
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GitHubConfiguration {
 	pub owner: String,
 	pub repo: String,
 	#[serde(default)]
 	pub releases: GitHubReleaseSettings,
+	#[serde(default)]
+	pub pull_requests: GitHubPullRequestSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

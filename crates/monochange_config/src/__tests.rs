@@ -170,6 +170,14 @@ draft = true
 prerelease = true
 source = "github_generated"
 generate_notes = true
+
+[github.pull_requests]
+enabled = true
+branch_prefix = "automation/release"
+base = "develop"
+title = "chore(release): prepare release"
+labels = ["release", "automated", "bot"]
+auto_merge = true
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -189,6 +197,18 @@ generate_notes = true
 		github.releases.source,
 		monochange_core::GitHubReleaseNotesSource::GitHubGenerated
 	);
+	assert!(github.pull_requests.enabled);
+	assert_eq!(github.pull_requests.branch_prefix, "automation/release");
+	assert_eq!(github.pull_requests.base, "develop");
+	assert_eq!(
+		github.pull_requests.title,
+		"chore(release): prepare release"
+	);
+	assert_eq!(
+		github.pull_requests.labels,
+		vec!["release", "automated", "bot"]
+	);
+	assert!(github.pull_requests.auto_merge);
 }
 
 #[test]
@@ -946,6 +966,39 @@ type = "PublishGitHubRelease"
 	assert!(error
 		.to_string()
 		.contains("uses `PublishGitHubRelease` but `[github]` is not configured"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_open_release_pull_request_without_github_config() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[[workflows]]
+name = "release-pr"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected github workflow config error"));
+	assert!(error
+		.to_string()
+		.contains("uses `OpenReleasePullRequest` but `[github]` is not configured"));
 }
 
 #[test]

@@ -137,6 +137,22 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "PublishGitHubRelease"
 
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
+
 [[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
@@ -167,6 +183,14 @@ enabled = true
 draft = false
 prerelease = false
 source = "monochange"
+
+[github.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
 ```
 
 <!-- {/configurationGitHubSnippet} -->
@@ -208,7 +232,8 @@ Current implementation notes:
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `gh` for live publishing outside dry-run mode
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, and `Command`
+- GitHub release pull requests currently expect `[github.pull_requests]` and use `git` plus `gh` for live branch, commit, push, and PR update operations
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -304,6 +329,7 @@ evidence:
 - release targets carry effective `tag`, `release`, and `version_format` metadata
 - release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
 - `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
+- `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
@@ -324,6 +350,7 @@ Current `PrepareRelease` behavior:
 - applies workspace-wide release-note templates from `[release_notes].change_templates`
 - can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
 - can preview or publish GitHub releases via `PublishGitHubRelease`
+- can preview or open/update release pull requests via `OpenReleasePullRequest`
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or GitHub release preview

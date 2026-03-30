@@ -106,6 +106,7 @@ Current `PrepareRelease` behavior:
 - applies workspace-wide release-note templates from `[release_notes].change_templates`
 - can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
 - can preview or publish GitHub releases via `PublishGitHubRelease`
+- can preview or open/update release pull requests via `OpenReleasePullRequest`
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or GitHub release preview
@@ -126,6 +127,7 @@ Planning rules in this milestone:
 - release targets carry effective `tag`, `release`, and `version_format` metadata
 - release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
 - `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
+- `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
