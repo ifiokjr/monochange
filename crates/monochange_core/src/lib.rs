@@ -508,6 +508,7 @@ pub enum CliStepDefinition {
 	PublishRelease,
 	#[serde(alias = "OpenReleasePullRequest")]
 	OpenReleaseRequest,
+	CommentReleasedIssues,
 	Deploy {
 		#[serde(default)]
 		names: Vec<String>,
@@ -701,6 +702,250 @@ pub struct ReleaseManifestChangelog {
 	pub rendered: String,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HostingProviderKind {
+	#[default]
+	GenericGit,
+	GitHub,
+	GitLab,
+	Bitbucket,
+}
+
+impl HostingProviderKind {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::GenericGit => "generic_git",
+			Self::GitHub => "github",
+			Self::GitLab => "gitlab",
+			Self::Bitbucket => "bitbucket",
+		}
+	}
+}
+
+impl fmt::Display for HostingProviderKind {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostingCapabilities {
+	pub commit_web_urls: bool,
+	pub actor_profiles: bool,
+	pub review_request_lookup: bool,
+	pub related_issues: bool,
+	pub issue_comments: bool,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedActorSourceKind {
+	#[default]
+	CommitAuthor,
+	CommitCommitter,
+	ReviewRequestAuthor,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedActorRef {
+	pub provider: HostingProviderKind,
+	#[serde(default)]
+	pub host: Option<String>,
+	#[serde(default)]
+	pub id: Option<String>,
+	#[serde(default)]
+	pub login: Option<String>,
+	#[serde(default)]
+	pub display_name: Option<String>,
+	#[serde(default)]
+	pub url: Option<String>,
+	pub source: HostedActorSourceKind,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedCommitRef {
+	pub provider: HostingProviderKind,
+	#[serde(default)]
+	pub host: Option<String>,
+	pub sha: String,
+	pub short_sha: String,
+	#[serde(default)]
+	pub url: Option<String>,
+	#[serde(default)]
+	pub authored_at: Option<String>,
+	#[serde(default)]
+	pub committed_at: Option<String>,
+	#[serde(default)]
+	pub author_name: Option<String>,
+	#[serde(default)]
+	pub author_email: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedReviewRequestKind {
+	#[default]
+	PullRequest,
+	MergeRequest,
+}
+
+impl HostedReviewRequestKind {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::PullRequest => "pull_request",
+			Self::MergeRequest => "merge_request",
+		}
+	}
+}
+
+impl fmt::Display for HostedReviewRequestKind {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedReviewRequestRef {
+	pub provider: HostingProviderKind,
+	#[serde(default)]
+	pub host: Option<String>,
+	pub kind: HostedReviewRequestKind,
+	pub id: String,
+	#[serde(default)]
+	pub title: Option<String>,
+	#[serde(default)]
+	pub url: Option<String>,
+	#[serde(default)]
+	pub author: Option<HostedActorRef>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedIssueRelationshipKind {
+	#[default]
+	ClosedByReviewRequest,
+	ReferencedByReviewRequest,
+	Mentioned,
+	Manual,
+}
+
+impl HostedIssueRelationshipKind {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::ClosedByReviewRequest => "closed_by_review_request",
+			Self::ReferencedByReviewRequest => "referenced_by_review_request",
+			Self::Mentioned => "mentioned",
+			Self::Manual => "manual",
+		}
+	}
+}
+
+impl fmt::Display for HostedIssueRelationshipKind {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedIssueRef {
+	pub provider: HostingProviderKind,
+	#[serde(default)]
+	pub host: Option<String>,
+	pub id: String,
+	#[serde(default)]
+	pub title: Option<String>,
+	#[serde(default)]
+	pub url: Option<String>,
+	pub relationship: HostedIssueRelationshipKind,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetRevision {
+	#[serde(default)]
+	pub actor: Option<HostedActorRef>,
+	#[serde(default)]
+	pub commit: Option<HostedCommitRef>,
+	#[serde(default)]
+	pub review_request: Option<HostedReviewRequestRef>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetProvenance {
+	pub provider: HostingProviderKind,
+	#[serde(default)]
+	pub host: Option<String>,
+	#[serde(default)]
+	pub capabilities: HostingCapabilities,
+	#[serde(default)]
+	pub introduced: Option<ChangesetRevision>,
+	#[serde(default)]
+	pub last_updated: Option<ChangesetRevision>,
+	#[serde(default)]
+	pub related_issues: Vec<HostedIssueRef>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChangesetTargetKind {
+	Package,
+	Group,
+}
+
+impl ChangesetTargetKind {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Package => "package",
+			Self::Group => "group",
+		}
+	}
+}
+
+impl fmt::Display for ChangesetTargetKind {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparedChangesetTarget {
+	pub id: String,
+	pub kind: ChangesetTargetKind,
+	#[serde(default)]
+	pub bump: Option<BumpSeverity>,
+	pub origin: String,
+	#[serde(default)]
+	pub evidence_refs: Vec<String>,
+	#[serde(default)]
+	pub change_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparedChangeset {
+	pub path: PathBuf,
+	#[serde(default)]
+	pub summary: Option<String>,
+	#[serde(default)]
+	pub details: Option<String>,
+	pub targets: Vec<PreparedChangesetTarget>,
+	#[serde(default)]
+	pub provenance: Option<ChangesetProvenance>,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseManifestPlanDecision {
@@ -772,6 +1017,8 @@ pub struct ReleaseManifest {
 	pub released_packages: Vec<String>,
 	pub changed_files: Vec<PathBuf>,
 	pub changelogs: Vec<ReleaseManifestChangelog>,
+	#[serde(default)]
+	pub changesets: Vec<PreparedChangeset>,
 	#[serde(default)]
 	pub deleted_changesets: Vec<PathBuf>,
 	#[serde(default)]
@@ -1327,8 +1574,7 @@ pub struct ChangeSignal {
 	pub notes: Option<String>,
 	pub details: Option<String>,
 	pub change_type: Option<String>,
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub source_path: Option<String>,
+	pub source_path: PathBuf,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

@@ -372,6 +372,7 @@ fn sample_manifest() -> ReleaseManifest {
 		}],
 		released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
 		changed_files: vec![PathBuf::from("Cargo.toml")],
+		changesets: Vec::new(),
 		changelogs: vec![ReleaseManifestChangelog {
 			owner_id: "sdk".to_string(),
 			owner_kind: ReleaseOwnerKind::Group,

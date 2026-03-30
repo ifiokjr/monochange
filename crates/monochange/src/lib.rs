@@ -43,6 +43,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -61,6 +62,7 @@ use monochange_cargo::discover_cargo_packages;
 use monochange_cargo::RustSemverProvider;
 use monochange_config::apply_version_groups;
 use monochange_config::load_change_signals;
+use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_config::validate_workspace;
@@ -74,6 +76,8 @@ use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
+use monochange_core::ChangesetProvenance;
+use monochange_core::ChangesetRevision;
 use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
@@ -85,10 +89,17 @@ use monochange_core::DeploymentTrigger;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::ExtraChangelogSection;
+use monochange_core::HostedActorRef;
+use monochange_core::HostedActorSourceKind;
+use monochange_core::HostedCommitRef;
+use monochange_core::HostingCapabilities;
+use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
+use monochange_core::PreparedChangeset;
+use monochange_core::PreparedChangesetTarget;
 use monochange_core::ReleaseDeploymentIntent;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
@@ -174,6 +185,7 @@ pub struct PreparedChangelog {
 pub struct PreparedRelease {
 	pub plan: ReleasePlan,
 	pub changeset_paths: Vec<PathBuf>,
+	pub changesets: Vec<PreparedChangeset>,
 	pub released_packages: Vec<String>,
 	pub version: Option<String>,
 	pub group_version: Option<String>,
@@ -211,6 +223,7 @@ struct ReleaseNoteChange {
 	details: Option<String>,
 	bump: BumpSeverity,
 	change_type: Option<String>,
+	provenance: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -220,6 +233,7 @@ struct GroupReleaseNoteKey {
 	details: Option<String>,
 	bump: BumpSeverity,
 	change_type: Option<String>,
+	provenance: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -247,6 +261,8 @@ struct CliContext {
 	release_results: Vec<String>,
 	release_request: Option<SourceChangeRequest>,
 	release_request_result: Option<String>,
+	issue_comment_plans: Vec<github_provider::GitHubIssueCommentPlan>,
+	issue_comment_results: Vec<String>,
 	deployment_intents: Vec<ReleaseDeploymentIntent>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
 	command_logs: Vec<String>,
@@ -514,6 +530,8 @@ fn execute_cli_command(
 		release_results: Vec::new(),
 		release_request: None,
 		release_request_result: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
 		deployment_intents: Vec::new(),
 		changeset_policy_evaluation: None,
 		command_logs: Vec::new(),
@@ -709,6 +727,52 @@ fn execute_cli_command(
 				context.release_request = Some(request);
 				output = None;
 			}
+			CliStepDefinition::CommentReleasedIssues => {
+				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+					MonochangeError::Config(
+						"`CommentReleasedIssues` requires a previous `PrepareRelease` step"
+							.to_string(),
+					)
+				})?;
+				let github = load_workspace_configuration(root)?.github.ok_or_else(|| {
+					MonochangeError::Config(
+						"`CommentReleasedIssues` requires `[github]` configuration".to_string(),
+					)
+				})?;
+				let manifest = build_release_manifest(
+					cli_command,
+					prepared_release,
+					&context.deployment_intents,
+					&context.command_logs,
+				);
+				context.issue_comment_plans =
+					github_provider::plan_released_issue_comments(&github, &manifest);
+				if context.dry_run {
+					context.issue_comment_results = context
+						.issue_comment_plans
+						.iter()
+						.map(|plan| format!("dry-run {} {}", plan.repository, plan.issue_id))
+						.collect();
+				} else {
+					context.issue_comment_results =
+						github_provider::comment_released_issues(&github, &manifest)?
+							.into_iter()
+							.map(|result| {
+								format!(
+								"{} {} ({})",
+								result.repository,
+								result.issue_id,
+								match result.operation {
+									monochange_github::GitHubIssueCommentOperation::Created => "created",
+									monochange_github::GitHubIssueCommentOperation::SkippedExisting =>
+										"skipped_existing",
+								}
+							)
+							})
+							.collect();
+				}
+				output = None;
+			}
 			CliStepDefinition::Deploy { names } => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
@@ -767,6 +831,7 @@ fn execute_cli_command(
 					&manifest,
 					&context.release_requests,
 					context.release_request.as_ref(),
+					&context.issue_comment_plans,
 				)
 			}
 			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
@@ -986,6 +1051,12 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 		if let Some(release_request_result) = &context.release_request_result {
 			lines.push("release request:".to_string());
 			lines.push(format!("- {release_request_result}"));
+		}
+		if !context.issue_comment_results.is_empty() {
+			lines.push("issue comments:".to_string());
+			for issue_comment in &context.issue_comment_results {
+				lines.push(format!("- {issue_comment}"));
+			}
 		}
 		if !context.deployment_intents.is_empty() {
 			lines.push("deployments:".to_string());
@@ -1567,16 +1638,18 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
 	let changeset_paths = discover_changeset_paths(root)?;
-	let change_signals = changeset_paths
+	let loaded_changesets = changeset_paths
 		.iter()
-		.try_fold(Vec::new(), |mut signals, path| {
-			signals.extend(load_change_signals(
-				path,
-				&configuration,
-				&discovery.packages,
-			)?);
-			Ok::<_, MonochangeError>(signals)
-		})?;
+		.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
+		.collect::<MonochangeResult<Vec<_>>>()?;
+	let change_signals = loaded_changesets
+		.iter()
+		.flat_map(|changeset| changeset.signals.clone())
+		.collect::<Vec<_>>();
+	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
+	if let Some(github) = configuration.github.as_ref() {
+		github_provider::enrich_changeset_provenance(github, &mut changesets);
+	}
 	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals);
 	let released_packages = released_package_names(&discovery.packages, &plan);
 	if released_packages.is_empty() {
@@ -1595,6 +1668,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		&discovery.packages,
 		&plan,
 		&change_signals,
+		&changesets,
 		&changelog_targets,
 	)?;
 	let mut changed_files = manifest_updates
@@ -1652,6 +1726,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	Ok(PreparedRelease {
 		plan,
 		changeset_paths,
+		changesets,
 		released_packages,
 		version,
 		group_version,
@@ -1690,6 +1765,105 @@ fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 		)));
 	}
 	Ok(changeset_paths)
+}
+
+fn build_prepared_changesets(
+	root: &Path,
+	loaded_changesets: &[monochange_config::LoadedChangesetFile],
+) -> Vec<PreparedChangeset> {
+	loaded_changesets
+		.iter()
+		.map(|changeset| PreparedChangeset {
+			path: root_relative(root, &changeset.path),
+			summary: changeset.summary.clone(),
+			details: changeset.details.clone(),
+			targets: changeset
+				.targets
+				.iter()
+				.map(|target| PreparedChangesetTarget {
+					id: target.id.clone(),
+					kind: target.kind,
+					bump: target.bump,
+					origin: target.origin.clone(),
+					evidence_refs: target.evidence_refs.clone(),
+					change_type: target.change_type.clone(),
+				})
+				.collect(),
+			provenance: Some(build_generic_changeset_provenance(root, &changeset.path)),
+		})
+		.collect()
+}
+
+fn build_generic_changeset_provenance(root: &Path, changeset_path: &Path) -> ChangesetProvenance {
+	ChangesetProvenance {
+		provider: HostingProviderKind::GenericGit,
+		host: None,
+		capabilities: HostingCapabilities::default(),
+		introduced: load_git_changeset_revision(root, changeset_path, true),
+		last_updated: load_git_changeset_revision(root, changeset_path, false),
+		related_issues: Vec::new(),
+	}
+}
+
+fn load_git_changeset_revision(
+	root: &Path,
+	changeset_path: &Path,
+	introduced: bool,
+) -> Option<ChangesetRevision> {
+	let relative_path = root_relative(root, changeset_path);
+	let mut command = ProcessCommand::new("git");
+	command.current_dir(root).arg("log").arg("--follow");
+	if introduced {
+		command.arg("--diff-filter=A");
+	}
+	command
+		.arg("-n")
+		.arg("1")
+		.arg("--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%cI")
+		.arg("--")
+		.arg(&relative_path);
+	let output = command.output().ok()?;
+	if !output.status.success() {
+		return None;
+	}
+	let stdout = String::from_utf8(output.stdout).ok()?;
+	let trimmed = stdout.trim();
+	if trimmed.is_empty() {
+		return None;
+	}
+	let parts = trimmed.split('\u{1f}').collect::<Vec<_>>();
+	let [sha, author_name, author_email, authored_at, committed_at] = parts.as_slice() else {
+		return None;
+	};
+	let author_name = (*author_name).to_string();
+	let author_email = (*author_email).to_string();
+	Some(ChangesetRevision {
+		actor: Some(HostedActorRef {
+			provider: HostingProviderKind::GenericGit,
+			host: None,
+			id: None,
+			login: None,
+			display_name: Some(author_name.clone()),
+			url: None,
+			source: HostedActorSourceKind::CommitAuthor,
+		}),
+		commit: Some(HostedCommitRef {
+			provider: HostingProviderKind::GenericGit,
+			host: None,
+			sha: (*sha).to_string(),
+			short_sha: short_commit_sha(sha),
+			url: None,
+			authored_at: Some((*authored_at).to_string()),
+			committed_at: Some((*committed_at).to_string()),
+			author_name: Some(author_name),
+			author_email: Some(author_email),
+		}),
+		review_request: None,
+	})
+}
+
+fn short_commit_sha(sha: &str) -> String {
+	sha.chars().take(7).collect()
 }
 
 fn build_release_plan_from_signals(
@@ -1818,16 +1992,28 @@ fn resolve_config_path(root: &Path, path: &Path) -> PathBuf {
 }
 
 fn build_changelog_updates(
-	_root: &Path,
+	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 	change_signals: &[ChangeSignal],
+	changesets: &[PreparedChangeset],
 	changelog_targets: &(PackageChangelogTargets, GroupChangelogTargets),
 ) -> MonochangeResult<Vec<ChangelogUpdate>> {
+	let provenance_by_changeset_path = changesets
+		.iter()
+		.map(|changeset| {
+			(
+				changeset.path.clone(),
+				render_prepared_changeset_provenance(changeset),
+			)
+		})
+		.collect::<BTreeMap<_, _>>();
 	let release_note_changes = change_signals
 		.iter()
-		.filter_map(|signal| build_release_note_change(signal, packages))
+		.filter_map(|signal| {
+			build_release_note_change(signal, packages, root, &provenance_by_changeset_path)
+		})
 		.fold(
 			BTreeMap::<String, Vec<ReleaseNoteChange>>::new(),
 			|mut acc, change| {
@@ -2003,22 +2189,78 @@ fn dedup_changelog_updates(updates: Vec<ChangelogUpdate>) -> Vec<ChangelogUpdate
 fn build_release_note_change(
 	signal: &ChangeSignal,
 	packages: &[PackageRecord],
+	root: &Path,
+	provenance_by_changeset_path: &BTreeMap<PathBuf, String>,
 ) -> Option<ReleaseNoteChange> {
 	let summary = signal.notes.clone()?;
 	let package = packages
 		.iter()
 		.find(|package| package.id == signal.package_id)?;
 	let package_id = config_package_id(package);
+	let source_path = root_relative(root, &signal.source_path);
 	Some(ReleaseNoteChange {
 		package_id: signal.package_id.clone(),
 		package_name: package_id.clone(),
 		package_labels: Vec::new(),
-		source_path: signal.source_path.clone(),
+		source_path: Some(source_path.display().to_string()),
 		summary,
 		details: signal.details.clone(),
 		bump: signal.requested_bump.unwrap_or(BumpSeverity::Patch),
 		change_type: signal.change_type.clone(),
+		provenance: provenance_by_changeset_path.get(&source_path).cloned(),
 	})
+}
+
+fn render_prepared_changeset_provenance(changeset: &PreparedChangeset) -> String {
+	let mut lines = vec![format!("> Changeset: `{}`", changeset.path.display())];
+	if let Some(provenance) = &changeset.provenance {
+		if let Some(introduced) = provenance.introduced.as_ref() {
+			let mut line = "> Introduced:".to_string();
+			if let Some(commit) = introduced.commit.as_ref() {
+				let _ = write!(line, " `{}`", commit.short_sha);
+			}
+			if let Some(actor) = introduced.actor.as_ref() {
+				if let Some(login) = actor.login.as_deref() {
+					let _ = write!(line, " by @{login}");
+				} else if let Some(display_name) = actor.display_name.as_deref() {
+					let _ = write!(line, " by {display_name}");
+				}
+			}
+			if let Some(review_request) = introduced.review_request.as_ref() {
+				let _ = write!(line, " via {} {}", review_request.kind, review_request.id);
+			}
+			if line != "> Introduced:" {
+				lines.push(line);
+			}
+		}
+		if let Some(last_updated) = provenance.last_updated.as_ref() {
+			let introduced_sha = provenance
+				.introduced
+				.as_ref()
+				.and_then(|revision| revision.commit.as_ref())
+				.map(|commit| commit.sha.as_str());
+			let last_updated_commit = last_updated.commit.as_ref();
+			if last_updated_commit.is_some_and(|commit| Some(commit.sha.as_str()) != introduced_sha)
+			{
+				lines.push(format!(
+					"> Last updated: `{}`",
+					last_updated_commit
+						.map(|commit| commit.short_sha.as_str())
+						.unwrap_or_default()
+				));
+			}
+		}
+		if !provenance.related_issues.is_empty() {
+			let issues = provenance
+				.related_issues
+				.iter()
+				.map(|issue| format!("{} {}", issue.relationship, issue.id))
+				.collect::<Vec<_>>()
+				.join(", ");
+			lines.push(format!("> Issues: {issues}"));
+		}
+	}
+	lines.join("\n")
 }
 
 fn render_package_empty_update_message(
@@ -2186,6 +2428,7 @@ fn package_release_note_changes(
 			details: None,
 			bump: decision.recommended_bump,
 			change_type: None,
+			provenance: None,
 		});
 	}
 	changes
@@ -2226,6 +2469,7 @@ fn group_release_note_changes(
 			details: None,
 			bump: planned_group.recommended_bump,
 			change_type: None,
+			provenance: None,
 		});
 	} else {
 		changes = aggregate_group_release_note_changes(changes);
@@ -2243,6 +2487,7 @@ fn aggregate_group_release_note_changes(changes: Vec<ReleaseNoteChange>) -> Vec<
 			details: change.details.clone(),
 			bump: change.bump,
 			change_type: change.change_type.clone(),
+			provenance: change.provenance.clone(),
 		};
 		if let Some(index) = indexes.get(&key).copied() {
 			let entry = &mut aggregated[index];
@@ -2507,6 +2752,7 @@ fn apply_change_template(
 		("$target_id", Some(target_id)),
 		("$bump", Some(bump.as_str())),
 		("$type", change.change_type.as_deref()),
+		("$provenance", change.provenance.as_deref()),
 	] {
 		if rendered.contains(needle) {
 			let value = value?;
@@ -3243,6 +3489,7 @@ fn build_release_manifest(
 				rendered: changelog.rendered.clone(),
 			})
 			.collect(),
+		changesets: prepared_release.changesets.clone(),
 		deleted_changesets: prepared_release.deleted_changesets.clone(),
 		deployments: deployment_intents.to_vec(),
 		plan: ReleaseManifestPlan {
@@ -3371,14 +3618,16 @@ fn render_release_cli_command_json(
 	manifest: &ReleaseManifest,
 	releases: &[SourceReleaseRequest],
 	release_request: Option<&SourceChangeRequest>,
+	issue_comments: &[github_provider::GitHubIssueCommentPlan],
 ) -> MonochangeResult<String> {
-	if releases.is_empty() && release_request.is_none() {
+	if releases.is_empty() && release_request.is_none() && issue_comments.is_empty() {
 		return render_release_manifest_json(manifest);
 	}
 	serde_json::to_string_pretty(&json!({
 		"manifest": manifest,
 		"releases": releases,
 		"releaseRequest": release_request,
+		"issueComments": issue_comments,
 	}))
 	.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }

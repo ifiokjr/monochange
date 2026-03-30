@@ -12,6 +12,7 @@ use tempfile::tempdir;
 
 use crate::apply_version_groups;
 use crate::load_change_signals;
+use crate::load_changeset_file;
 use crate::load_workspace_configuration;
 use crate::resolve_package_reference;
 use crate::validate_workspace;
@@ -1302,6 +1303,7 @@ evidence:
 	assert_eq!(signal.package_id, package.id);
 	assert_eq!(signal.requested_bump, Some(BumpSeverity::Minor));
 	assert_eq!(signal.notes.as_deref(), Some("public API addition"));
+	assert_eq!(signal.source_path, tempdir.path().join("change.md"));
 	assert_eq!(
 		signal.evidence_refs,
 		vec!["rust-semver:major:public API break detected"]
@@ -1353,6 +1355,7 @@ Roll the signing key before the release window closes.
 	let signal = signals.first().unwrap_or_else(|| panic!("expected signal"));
 
 	assert_eq!(signal.change_type.as_deref(), Some("security"));
+	assert_eq!(signal.source_path, tempdir.path().join("change.md"));
 	assert_eq!(
 		signal.details.as_deref(),
 		Some("Roll the signing key before the release window closes.")
@@ -1582,6 +1585,83 @@ sdk: minor
 	assert!(signals
 		.iter()
 		.all(|signal| signal.requested_bump == Some(BumpSeverity::Minor)));
+}
+
+#[test]
+fn load_changeset_file_preserves_group_targets_and_source_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	write_npm_package(tempdir.path(), "packages/web", "web");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[group.sdk]
+packages = ["core", "web"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+	fs::write(
+		tempdir.path().join("change.md"),
+		r"---
+sdk: minor
+origin:
+  sdk: pull-request
+---
+
+#### grouped release
+",
+	)
+	.unwrap_or_else(|error| panic!("changes write: {error}"));
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			tempdir.path().join("crates/core/Cargo.toml"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Npm,
+			"web",
+			tempdir.path().join("packages/web/package.json"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let changeset =
+		load_changeset_file(&tempdir.path().join("change.md"), &configuration, &packages)
+			.unwrap_or_else(|error| panic!("changeset file: {error}"));
+
+	assert_eq!(changeset.path, tempdir.path().join("change.md"));
+	assert_eq!(changeset.summary.as_deref(), Some("grouped release"));
+	assert_eq!(changeset.targets.len(), 1);
+	let target = changeset
+		.targets
+		.first()
+		.unwrap_or_else(|| panic!("expected one changeset target"));
+	assert_eq!(target.id, "sdk");
+	assert_eq!(target.kind.as_str(), "group");
+	assert_eq!(target.origin, "pull-request");
+	assert_eq!(changeset.signals.len(), 2);
+	assert!(changeset
+		.signals
+		.iter()
+		.all(|signal| signal.source_path == tempdir.path().join("change.md")));
 }
 
 #[test]
