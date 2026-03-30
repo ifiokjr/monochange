@@ -9,12 +9,12 @@ use crate::BumpSeverity;
 use crate::ChangelogFormat;
 use crate::ChangelogTarget;
 use crate::ChangesetPolicyStatus;
+use crate::ChangesetVerificationSettings;
 use crate::CliStepDefinition;
 use crate::DependencyKind;
 use crate::DeploymentTrigger;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
-use crate::GitHubChangesetBotSettings;
 use crate::GroupDefinition;
 use crate::PackageDefinition;
 use crate::PackageDependency;
@@ -133,16 +133,16 @@ fn changeset_policy_status_renders_stable_strings() {
 }
 
 #[test]
-fn github_changeset_bot_settings_default_to_opt_in_enforcement() {
-	let settings = GitHubChangesetBotSettings::default();
-	assert!(!settings.enabled);
+fn changeset_verification_settings_default_to_enabled_enforcement() {
+	let settings = ChangesetVerificationSettings::default();
+	assert!(settings.enabled);
 	assert!(settings.required);
 	assert!(settings.comment_on_failure);
 	assert!(settings.skip_labels.is_empty());
 }
 
 #[test]
-fn default_cli_commands_expose_validate_discover_change_and_release() {
+fn default_cli_commands_expose_validate_discover_change_release_and_verify() {
 	let cli = default_cli_commands();
 	let cli_command_names = cli
 		.iter()
@@ -150,7 +150,7 @@ fn default_cli_commands_expose_validate_discover_change_and_release() {
 		.collect::<Vec<_>>();
 	assert_eq!(
 		cli_command_names,
-		vec!["validate", "discover", "change", "release"]
+		vec!["validate", "discover", "change", "release", "verify"]
 	);
 	let validate_cli_command = cli
 		.first()
@@ -253,6 +253,8 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				extra_changelog_sections: Vec::new(),
 				empty_update_message: None,
 				versioned_files: Vec::new(),
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
 				tag: false,
 				release: false,
 				version_format: VersionFormat::Namespaced,
@@ -268,6 +270,8 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				extra_changelog_sections: Vec::new(),
 				empty_update_message: None,
 				versioned_files: Vec::new(),
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
 				tag: false,
 				release: false,
 				version_format: VersionFormat::Namespaced,
@@ -280,6 +284,8 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				extra_changelog_sections: Vec::new(),
 				empty_update_message: None,
 				versioned_files: Vec::new(),
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
 				tag: false,
 				release: false,
 				version_format: VersionFormat::Namespaced,
@@ -300,6 +306,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 			version_format: VersionFormat::Primary,
 		}],
 		cli: Vec::new(),
+		changesets: crate::ChangesetSettings::default(),
 		github: None,
 		cargo: EcosystemSettings::default(),
 		npm: EcosystemSettings::default(),

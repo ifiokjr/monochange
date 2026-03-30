@@ -8,10 +8,10 @@ use tempfile::tempdir;
 use crate::add_change_file;
 use crate::build_command_for_root;
 use crate::discover_workspace;
-use crate::evaluate_changeset_policy;
 use crate::plan_release;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
+use crate::verify_changesets;
 
 fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
@@ -811,16 +811,16 @@ shell = true
 }
 
 #[test]
-fn evaluate_changeset_policy_requires_changesets_for_matching_paths() {
+fn verify_changesets_requires_attached_coverage_for_changed_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
 
-	let evaluation = evaluate_changeset_policy(
+	let evaluation = verify_changesets(
 		tempdir.path(),
 		&["crates/core/src/lib.rs".to_string()],
 		&Vec::new(),
 	)
-	.unwrap_or_else(|error| panic!("policy evaluation: {error}"));
+	.unwrap_or_else(|error| panic!("verification: {error}"));
 
 	assert_eq!(
 		evaluation.status,
@@ -829,19 +829,20 @@ fn evaluate_changeset_policy_requires_changesets_for_matching_paths() {
 	assert!(evaluation.required);
 	assert!(evaluation.comment.is_some());
 	assert_eq!(evaluation.matched_paths, vec!["crates/core/src/lib.rs"]);
+	assert_eq!(evaluation.uncovered_package_ids, vec!["core"]);
 }
 
 #[test]
-fn evaluate_changeset_policy_skips_when_allowed_label_is_present() {
+fn verify_changesets_skips_when_allowed_label_is_present() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
 
-	let evaluation = evaluate_changeset_policy(
+	let evaluation = verify_changesets(
 		tempdir.path(),
 		&["crates/core/src/lib.rs".to_string()],
 		&["no-changeset-required".to_string()],
 	)
-	.unwrap_or_else(|error| panic!("policy evaluation: {error}"));
+	.unwrap_or_else(|error| panic!("verification: {error}"));
 
 	assert_eq!(
 		evaluation.status,
@@ -1126,48 +1127,49 @@ resolver = "2"
 		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
 	);
 	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
+	write_file(
+		root.join("crates/core/tests/smoke.rs"),
+		"#[test]\nfn smoke() {}\n",
+	);
 	write_file(root.join("docs/readme.md"), "# docs\n");
+	write_file(root.join("Cargo.lock"), "# lock\n");
 	write_file(
 		root.join("monochange.toml"),
 		r#"
 [defaults]
 package_type = "cargo"
 
-[package.core]
-path = "crates/core"
-
-[github]
-owner = "ifiokjr"
-repo = "monochange"
-
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = ["crates/**"]
-ignored_paths = ["docs/**", "*.md"]
 
-[cli.changeset-check]
-help_text = "Validate pull-request changeset policy"
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
 
-[[cli.changeset-check.inputs]]
+[cli.verify]
+help_text = "Verify that changed files are covered by attached changesets"
+
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 "#,
 	);
 	if with_changeset {
