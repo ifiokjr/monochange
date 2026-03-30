@@ -10,7 +10,7 @@
 - `defaults`: Shared planning defaults.
 - `packages`: Declared package definitions keyed by monochange-owned ids.
 - `groups`: Declared shared release units keyed by monochange-owned ids.
-- `workflows`: Configured top-level workflows.
+- `cli`: Configured top-level CLI commands.
 - per-ecosystem settings for cargo, npm, deno, and dart adapters.
 
 ### Validation Rules
@@ -94,7 +94,7 @@
 
 ## 8. PreparedRelease
 
-**Purpose**: Captures the results of workflow-driven release preparation.
+**Purpose**: Captures the results of command-driven release preparation.
 
 ### Includes
 

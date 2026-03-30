@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the user-facing command contract for workflow-defined top-level commands covering workspace validation, discovery, change capture, and release preparation.
+Define the user-facing command contract for config-defined top-level commands covering workspace validation, discovery, change capture, and release preparation.
 
 ## Command 1: Workspace Validation
 
@@ -54,25 +54,25 @@ monochange release [--dry-run] [--format <text|json>]
 
 ### Behavior
 
-- loads workflows from `monochange.toml` and dispatches them as top-level commands
+- loads CLI command definitions from `monochange.toml` and dispatches them as top-level commands
 - auto-discovers `.changeset/*.md` under the repository root
 - `--dry-run` performs planning and rendering only without mutating files
 - updates native manifests plus configured changelogs and `versioned_files` during non-dry-run execution
 - applies group release identity precedence for `tag`, `release`, and `version_format`
 - deletes consumed changesets only after a fully successful non-dry-run execution
 
-## Workflow Surface Rules
+## CLI Surface Rules
 
-- repositories may define custom top-level commands through `[[workflows]]`
-- when `[[workflows]]` is omitted, MonoChange synthesizes `validate`, `discover`, `change`, and `release`
-- workflow-declared inputs become CLI flags
-- all workflow commands implicitly support `--help` and `--dry-run`
+- repositories may define custom top-level commands through `[cli.<command>]`
+- when `[cli.<command>]` is omitted, MonoChange synthesizes `validate`, `discover`, `change`, and `release`
+- command-declared inputs become CLI flags
+- all configured commands implicitly support `--help` and `--dry-run`
 - `init`, `help`, and `version` remain reserved built-ins
 
 ## Text Output Requirements
 
-- identify the workflow name
+- identify the command name
 - indicate whether execution was a dry-run
 - report release targets with effective tag/release metadata when applicable
 - list released packages and changed files when applicable
-- show command-step execution summaries when workflow commands run
+- show command-step execution summaries when command steps run

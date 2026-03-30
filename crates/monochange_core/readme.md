@@ -19,7 +19,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 ## Why use it?
 
 - avoid redefining package and release domain models in each crate
-- share one error and result surface across discovery, planning, and workflow layers
+- share one error and result surface across discovery, planning, and command layers
 - pass normalized workspace data between adapters and planners without extra translation
 
 ## Best for

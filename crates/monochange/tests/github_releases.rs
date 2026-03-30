@@ -33,7 +33,7 @@ fn publish_github_release_dry_run_renders_group_release_payloads() {
 		.contains("Grouped release for `sdk`."));
 
 	let manifest = &json["manifest"];
-	assert_eq!(manifest["workflow"], "publish-release");
+	assert_eq!(manifest["command"], "publish-release");
 	assert_eq!(manifest["version"], "1.1.0");
 	assert_eq!(manifest["groupVersion"], "1.1.0");
 	assert_eq!(manifest["releaseTargets"][0]["id"], "sdk");
@@ -196,19 +196,18 @@ source = "monochange"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "publish-release"
+[cli.publish-release]
 
-[[workflows.inputs]]
+[[cli.publish-release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PublishGitHubRelease"
 "#,
 	);
@@ -291,19 +290,18 @@ source = "monochange"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "publish-release"
+[cli.publish-release]
 
-[[workflows.inputs]]
+[[cli.publish-release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PublishGitHubRelease"
 "#,
 	);
@@ -367,19 +365,18 @@ source = "monochange"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "publish-release"
+[cli.publish-release]
 
-[[workflows.inputs]]
+[[cli.publish-release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PublishGitHubRelease"
 "#####,
 	);

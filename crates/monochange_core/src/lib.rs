@@ -11,7 +11,7 @@
 //! ## Why use it?
 //!
 //! - avoid redefining package and release domain models in each crate
-//! - share one error and result surface across discovery, planning, and workflow layers
+//! - share one error and result surface across discovery, planning, and command layers
 //! - pass normalized workspace data between adapters and planners without extra translation
 //!
 //! ## Best for
@@ -457,7 +457,7 @@ pub struct EcosystemSettings {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum WorkflowInputKind {
+pub enum CliInputKind {
 	String,
 	StringList,
 	Path,
@@ -465,10 +465,10 @@ pub enum WorkflowInputKind {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct WorkflowInputDefinition {
+pub struct CliInputDefinition {
 	pub name: String,
 	#[serde(rename = "type")]
-	pub kind: WorkflowInputKind,
+	pub kind: CliInputKind,
 	#[serde(default)]
 	pub help_text: Option<String>,
 	#[serde(default)]
@@ -491,7 +491,7 @@ pub enum CommandVariable {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum WorkflowStepDefinition {
+pub enum CliStepDefinition {
 	Validate,
 	Discover,
 	CreateChangeFile,
@@ -509,8 +509,8 @@ pub enum WorkflowStepDefinition {
 	EnforceChangesetPolicy,
 	Command {
 		command: String,
-		#[serde(default)]
-		dry_run: Option<String>,
+		#[serde(default, alias = "dry_run")]
+		dry_run_command: Option<String>,
 		#[serde(default)]
 		shell: bool,
 		#[serde(default)]
@@ -560,14 +560,14 @@ pub struct DeploymentDefinition {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct WorkflowDefinition {
+pub struct CliCommandDefinition {
 	pub name: String,
 	#[serde(default)]
 	pub help_text: Option<String>,
 	#[serde(default)]
-	pub inputs: Vec<WorkflowInputDefinition>,
+	pub inputs: Vec<CliInputDefinition>,
 	#[serde(default)]
-	pub steps: Vec<WorkflowStepDefinition>,
+	pub steps: Vec<CliStepDefinition>,
 }
 
 #[must_use]
@@ -755,7 +755,7 @@ pub struct ReleaseDeploymentIntent {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseManifest {
-	pub workflow: String,
+	pub command: String,
 	pub dry_run: bool,
 	#[serde(default)]
 	pub version: Option<String>,
@@ -939,7 +939,7 @@ pub struct WorkspaceConfiguration {
 	pub deployments: Vec<DeploymentDefinition>,
 	pub packages: Vec<PackageDefinition>,
 	pub groups: Vec<GroupDefinition>,
-	pub workflows: Vec<WorkflowDefinition>,
+	pub cli: Vec<CliCommandDefinition>,
 	pub github: Option<GitHubConfiguration>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
@@ -995,42 +995,42 @@ impl WorkspaceConfiguration {
 }
 
 #[must_use]
-pub fn default_workflows() -> Vec<WorkflowDefinition> {
+pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 	vec![
-		WorkflowDefinition {
+		CliCommandDefinition {
 			name: "validate".to_string(),
 			help_text: Some("Validate monochange configuration and changesets".to_string()),
 			inputs: Vec::new(),
-			steps: vec![WorkflowStepDefinition::Validate],
+			steps: vec![CliStepDefinition::Validate],
 		},
-		WorkflowDefinition {
+		CliCommandDefinition {
 			name: "discover".to_string(),
 			help_text: Some("Discover packages across supported ecosystems".to_string()),
-			inputs: vec![WorkflowInputDefinition {
+			inputs: vec![CliInputDefinition {
 				name: "format".to_string(),
-				kind: WorkflowInputKind::Choice,
+				kind: CliInputKind::Choice,
 				help_text: Some("Output format".to_string()),
 				required: false,
 				default: Some("text".to_string()),
 				choices: vec!["text".to_string(), "json".to_string()],
 			}],
-			steps: vec![WorkflowStepDefinition::Discover],
+			steps: vec![CliStepDefinition::Discover],
 		},
-		WorkflowDefinition {
+		CliCommandDefinition {
 			name: "change".to_string(),
 			help_text: Some("Create a change file for one or more packages".to_string()),
 			inputs: vec![
-				WorkflowInputDefinition {
+				CliInputDefinition {
 					name: "package".to_string(),
-					kind: WorkflowInputKind::StringList,
+					kind: CliInputKind::StringList,
 					help_text: Some("Package or group to include in the change".to_string()),
 					required: true,
 					default: None,
 					choices: Vec::new(),
 				},
-				WorkflowInputDefinition {
+				CliInputDefinition {
 					name: "bump".to_string(),
-					kind: WorkflowInputKind::Choice,
+					kind: CliInputKind::Choice,
 					help_text: Some("Requested semantic version bump".to_string()),
 					required: false,
 					default: Some("patch".to_string()),
@@ -1040,17 +1040,17 @@ pub fn default_workflows() -> Vec<WorkflowDefinition> {
 						"major".to_string(),
 					],
 				},
-				WorkflowInputDefinition {
+				CliInputDefinition {
 					name: "reason".to_string(),
-					kind: WorkflowInputKind::String,
+					kind: CliInputKind::String,
 					help_text: Some("Short release-note summary for this change".to_string()),
 					required: true,
 					default: None,
 					choices: Vec::new(),
 				},
-				WorkflowInputDefinition {
+				CliInputDefinition {
 					name: "type".to_string(),
-					kind: WorkflowInputKind::String,
+					kind: CliInputKind::String,
 					help_text: Some(
 						"Optional release-note type such as `security` or `note`".to_string(),
 					),
@@ -1058,25 +1058,25 @@ pub fn default_workflows() -> Vec<WorkflowDefinition> {
 					default: None,
 					choices: Vec::new(),
 				},
-				WorkflowInputDefinition {
+				CliInputDefinition {
 					name: "details".to_string(),
-					kind: WorkflowInputKind::String,
+					kind: CliInputKind::String,
 					help_text: Some("Optional multi-line release-note details".to_string()),
 					required: false,
 					default: None,
 					choices: Vec::new(),
 				},
-				WorkflowInputDefinition {
+				CliInputDefinition {
 					name: "evidence".to_string(),
-					kind: WorkflowInputKind::StringList,
+					kind: CliInputKind::StringList,
 					help_text: Some("Additional evidence strings to include".to_string()),
 					required: false,
 					default: None,
 					choices: Vec::new(),
 				},
-				WorkflowInputDefinition {
+				CliInputDefinition {
 					name: "output".to_string(),
-					kind: WorkflowInputKind::Path,
+					kind: CliInputKind::Path,
 					help_text: Some(
 						"Write the generated change file to a specific path".to_string(),
 					),
@@ -1085,20 +1085,20 @@ pub fn default_workflows() -> Vec<WorkflowDefinition> {
 					choices: Vec::new(),
 				},
 			],
-			steps: vec![WorkflowStepDefinition::CreateChangeFile],
+			steps: vec![CliStepDefinition::CreateChangeFile],
 		},
-		WorkflowDefinition {
+		CliCommandDefinition {
 			name: "release".to_string(),
 			help_text: Some("Prepare a release from discovered change files".to_string()),
-			inputs: vec![WorkflowInputDefinition {
+			inputs: vec![CliInputDefinition {
 				name: "format".to_string(),
-				kind: WorkflowInputKind::Choice,
+				kind: CliInputKind::Choice,
 				help_text: Some("Output format".to_string()),
 				required: false,
 				default: Some("text".to_string()),
 				choices: vec!["text".to_string(), "json".to_string()],
 			}],
-			steps: vec![WorkflowStepDefinition::PrepareRelease],
+			steps: vec![CliStepDefinition::PrepareRelease],
 		},
 	]
 }

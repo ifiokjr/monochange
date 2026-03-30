@@ -202,7 +202,7 @@ fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	success: true
 	exit_code: 0
 	----- stdout -----
-	workflow `release` completed (dry-run)
+	command `release` completed (dry-run)
 	released packages: workflow-app, workflow-core
 	release targets:
 	- package app -> app/v1.0.1 (tag: false, release: false)
@@ -234,7 +234,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	exit_code: 0
 	----- stdout -----
 	{
-	  "workflow": "release",
+	  "command": "release",
 	  "dryRun": true,
 	  "version": "1.1.0",
 	  "groupVersion": "1.1.0",
@@ -418,7 +418,7 @@ fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 	success: true
 	exit_code: 0
 	----- stdout -----
-	workflow `release-pr` completed (dry-run)
+	command `release-pr` completed (dry-run)
 	version: 1.1.0
 	released packages: workflow-app, workflow-core
 	release targets:
@@ -453,7 +453,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	success: true
 	exit_code: 0
 	----- stdout -----
-	workflow `release-manifest` completed (dry-run)
+	command `release-manifest` completed (dry-run)
 	version: 1.1.0
 	released packages: workflow-app, workflow-core
 	release targets:
@@ -476,7 +476,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 		.unwrap_or_else(|error| panic!("read manifest {}: {error}", manifest_path.display()));
 	assert_snapshot!(manifest, @r###"
 	{
-	  "workflow": "release-manifest",
+	  "command": "release-manifest",
 	  "dryRun": true,
 	  "version": "1.1.0",
 	  "groupVersion": "1.1.0",
@@ -634,7 +634,7 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 	success: true
 	exit_code: 0
 	----- stdout -----
-	workflow `release` completed
+	command `release` completed
 	version: 1.1.0
 	released packages: workflow-app, workflow-core
 	release targets:
@@ -849,16 +849,15 @@ version_format = "primary"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.inputs]]
+[[cli.release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 "#,
 	);
@@ -902,13 +901,12 @@ version_format = "primary"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release-manifest"
+[cli.release-manifest]
 
-[[workflows.steps]]
+[[cli.release-manifest.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-manifest.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 "#,
@@ -950,25 +948,24 @@ comment_on_failure = true
 changed_paths = ["crates/**"]
 ignored_paths = ["docs/**", "*.md"]
 
-[[workflows]]
-name = "changeset-check"
+[cli.changeset-check]
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
 "#,
 	);
@@ -1023,13 +1020,12 @@ labels = ["release", "automated"]
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release-pr"
+[cli.release-pr]
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "OpenReleasePullRequest"
 "#,
 	);

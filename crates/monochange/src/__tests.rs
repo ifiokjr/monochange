@@ -40,7 +40,7 @@ fn cli_help_returns_success_output() {
 }
 
 #[test]
-fn init_writes_detected_packages_groups_and_default_workflows() {
+fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
 		tempdir.path().join("crates/core/Cargo.toml"),
@@ -63,10 +63,10 @@ fn init_writes_detected_packages_groups_and_default_workflows() {
 	assert!(config.contains("[package.core]"));
 	assert!(config.contains("[package.web]"));
 	assert!(config.contains("[group.main]"));
-	assert!(config.contains("name = \"validate\""));
-	assert!(config.contains("name = \"discover\""));
-	assert!(config.contains("name = \"change\""));
-	assert!(config.contains("name = \"release\""));
+	assert!(config.contains("[cli.validate]"));
+	assert!(config.contains("[cli.discover]"));
+	assert!(config.contains("[cli.change]"));
+	assert!(config.contains("[cli.release]"));
 	assert!(config.contains("type = \"Discover\""));
 	assert!(config.contains("type = \"CreateChangeFile\""));
 }
@@ -532,7 +532,7 @@ sdk: minor
 }
 
 #[test]
-fn workflow_release_dry_run_json_includes_deployment_intents() {
+fn command_release_dry_run_json_includes_deployment_intents() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
 	write_file(
@@ -573,19 +573,18 @@ channel = "stable"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.inputs]]
+[[cli.release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "Deploy"
 "#,
 	);
@@ -600,9 +599,9 @@ type = "Deploy"
 			OsString::from("json"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let json = serde_json::from_str::<serde_json::Value>(&output)
-		.unwrap_or_else(|error| panic!("parse workflow json: {error}"));
+		.unwrap_or_else(|error| panic!("parse command json: {error}"));
 
 	assert_eq!(json["deployments"][0]["name"], "production");
 	assert_eq!(json["deployments"][0]["trigger"], "workflow");
@@ -614,7 +613,7 @@ type = "Deploy"
 }
 
 #[test]
-fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
+fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
 	let workspace_manifest = tempdir.path().join("Cargo.toml");
@@ -632,9 +631,9 @@ fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
 			OsString::from("--dry-run"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	.unwrap_or_else(|error| panic!("command output: {error}"));
 
-	assert!(output.contains("workflow `release` completed (dry-run)"));
+	assert!(output.contains("command `release` completed (dry-run)"));
 	assert!(output.contains("version: 1.1.0"));
 	assert!(output.contains("workflow-app"));
 	assert!(output.contains("workflow-core"));
@@ -652,7 +651,7 @@ fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
 }
 
 #[test]
-fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
+fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(
 		tempdir.path(),
@@ -664,7 +663,7 @@ fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("release")],
 	)
-	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let workspace_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
 		.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
 	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/changelog.md"))
@@ -680,11 +679,11 @@ fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
 	let release_version = fs::read_to_string(tempdir.path().join("release-version.txt"))
 		.unwrap_or_else(|error| panic!("release version output: {error}"));
 
-	assert!(output.contains("workflow `release` completed"));
+	assert!(output.contains("command `release` completed"));
 	assert!(output.contains("group sdk -> v1.1.0"));
 	assert!(workspace_manifest.contains("version = \"1.1.0\""));
 	assert!(core_changelog.contains("## 1.1.0"));
-	assert!(core_changelog.contains("- add release workflow"));
+	assert!(core_changelog.contains("- add release command"));
 	assert!(app_changelog.contains("## 1.1.0"));
 	assert!(app_changelog.contains("No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
@@ -696,7 +695,7 @@ fn workflow_release_updates_manifests_changelogs_and_deletes_changesets() {
 }
 
 #[test]
-fn workflow_release_uses_empty_update_message_precedence_for_grouped_changelogs() {
+fn command_release_uses_empty_update_message_precedence_for_grouped_changelogs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_group_empty_update_message_fixture(tempdir.path());
 
@@ -704,7 +703,7 @@ fn workflow_release_uses_empty_update_message_precedence_for_grouped_changelogs(
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("release")],
 	)
-	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/changelog.md"))
 		.unwrap_or_else(|error| panic!("core changelog: {error}"));
 	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/changelog.md"))
@@ -712,14 +711,14 @@ fn workflow_release_uses_empty_update_message_precedence_for_grouped_changelogs(
 	let group_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(output.contains("workflow `release` completed"));
+	assert!(output.contains("command `release` completed"));
 	assert!(core_changelog.contains("Package override for workflow-core -> 1.0.1"));
 	assert!(app_changelog.contains("Update triggered by group sdk; version 1.0.1."));
 	assert!(group_changelog.contains("Update triggered by group sdk; version 1.0.1."));
 }
 
 #[test]
-fn workflow_release_failures_do_not_delete_changesets() {
+fn command_release_failures_do_not_delete_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, true);
 
@@ -728,14 +727,14 @@ fn workflow_release_failures_do_not_delete_changesets() {
 		[OsString::from("mc"), OsString::from("release")],
 	)
 	.err()
-	.unwrap_or_else(|| panic!("expected workflow failure"));
+	.unwrap_or_else(|| panic!("expected command failure"));
 
 	assert!(error.to_string().contains("failed to create"));
 	assert!(tempdir.path().join(".changeset/feature.md").exists());
 }
 
 #[test]
-fn workflow_unknown_commands_suggest_available_workflows() {
+fn command_unknown_commands_suggest_available_cli() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
 
@@ -744,7 +743,7 @@ fn workflow_unknown_commands_suggest_available_workflows() {
 		[OsString::from("mc"), OsString::from("ship-it")],
 	)
 	.err()
-	.unwrap_or_else(|| panic!("expected workflow suggestion"));
+	.unwrap_or_else(|| panic!("expected command suggestion"));
 
 	assert!(error
 		.to_string()
@@ -752,15 +751,14 @@ fn workflow_unknown_commands_suggest_available_workflows() {
 }
 
 #[test]
-fn workflow_command_steps_can_run_through_the_shell() {
+fn cli_command_command_steps_can_run_through_the_shell() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
 		tempdir.path().join("monochange.toml"),
 		r#"
-[[workflows]]
-name = "announce"
+[cli.announce]
 
-[[workflows.steps]]
+[[cli.announce.steps]]
 type = "Command"
 command = "printf '%s' shell-command > shell-output.txt"
 shell = true
@@ -771,27 +769,26 @@ shell = true
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("announce")],
 	)
-	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let shell_output = fs::read_to_string(tempdir.path().join("shell-output.txt"))
 		.unwrap_or_else(|error| panic!("shell output: {error}"));
 
-	assert!(output.contains("workflow `announce` completed"));
+	assert!(output.contains("command `announce` completed"));
 	assert_eq!(shell_output, "shell-command");
 }
 
 #[test]
-fn workflow_command_steps_use_dry_run_overrides_when_present() {
+fn cli_command_command_steps_use_dry_run_overrides_when_present() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
 		tempdir.path().join("monochange.toml"),
 		r#"
-[[workflows]]
-name = "announce"
+[cli.announce]
 
-[[workflows.steps]]
+[[cli.announce.steps]]
 type = "Command"
 command = "printf '%s' real-run > command-output.txt"
-dry_run = "printf '%s' dry-run > dry-run-output.txt"
+dry_run_command = "printf '%s' dry-run > dry-run-output.txt"
 shell = true
 "#,
 	);
@@ -804,11 +801,11 @@ shell = true
 			OsString::from("--dry-run"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let dry_run_output = fs::read_to_string(tempdir.path().join("dry-run-output.txt"))
 		.unwrap_or_else(|error| panic!("dry-run output: {error}"));
 
-	assert!(output.contains("workflow `announce` completed (dry-run)"));
+	assert!(output.contains("command `announce` completed (dry-run)"));
 	assert_eq!(dry_run_output, "dry-run");
 	assert!(!tempdir.path().join("command-output.txt").exists());
 }
@@ -886,7 +883,7 @@ fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
 }
 
 #[test]
-fn workflow_release_dry_run_is_consistent_across_ecosystem_fixtures() {
+fn command_release_dry_run_is_consistent_across_ecosystem_fixtures() {
 	assert_cli_release_pattern(
 		"../../fixtures/cargo/workspace",
 		"core",
@@ -977,14 +974,14 @@ fn discovery_guide_describes_stable_relative_output_paths() {
 }
 
 #[test]
-fn release_planning_guide_describes_release_workflow_requirements() {
+fn release_planning_guide_describes_release_cli_command_requirements() {
 	let release_guide =
 		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/guide/06-release-planning.md");
 	let content =
 		fs::read_to_string(release_guide).unwrap_or_else(|error| panic!("release guide: {error}"));
 
 	for expected in [
-		"`mc release` is a workflow-defined top-level command.",
+		"`mc release` is a config-defined top-level command.",
 		"`[[package_overrides]]`",
 		"`.changeset/*.md`",
 		"`--dry-run`",
@@ -1058,7 +1055,7 @@ fn assert_cli_release_pattern(
 			OsString::from("json"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let parsed: serde_json::Value =
 		serde_json::from_str(&output).unwrap_or_else(|error| panic!("json: {error}"));
 	let decisions = parsed["plan"]["decisions"]
@@ -1151,26 +1148,25 @@ comment_on_failure = true
 changed_paths = ["crates/**"]
 ignored_paths = ["docs/**", "*.md"]
 
-[[workflows]]
-name = "changeset-check"
+[cli.changeset-check]
 help_text = "Validate pull-request changeset policy"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
 "#,
 	);
@@ -1190,7 +1186,7 @@ core: patch
 fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changelog: bool) {
 	let command_step = command_step.map_or_else(String::new, |command| {
 		let escaped_command = command.replace('\\', "\\\\").replace('"', "\\\"");
-		format!("\n[[workflows.steps]]\ntype = \"Command\"\ncommand = \"{escaped_command}\"\nshell = true\n")
+		format!("\n[[cli.release.steps]]\ntype = \"Command\"\ncommand = \"{escaped_command}\"\nshell = true\n")
 	});
 	let app_changelog = if failing_changelog {
 		write_file(root.join("blocked"), "not a directory");
@@ -1275,16 +1271,15 @@ version_format = "primary"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.inputs]]
+[[cli.release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 {command_step}
 "#,
@@ -1296,7 +1291,7 @@ type = "PrepareRelease"
 core: minor
 ---
 
-#### add release workflow
+#### add release command
 ",
 	);
 }
@@ -1360,10 +1355,9 @@ version_format = "primary"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 "#,
 	);

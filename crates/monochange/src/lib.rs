@@ -5,11 +5,11 @@
 //! <!-- {=monochangeCrateDocs|trim|linePrefix:"//! ":true} -->
 //! `monochange` is the top-level entry point for the workspace.
 //!
-//! Reach for this crate when you want one API and CLI surface that discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, exposes top-level commands from `monochange.toml`, and runs configured release workflows from those definitions.
+//! Reach for this crate when you want one API and CLI surface that discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, exposes top-level commands from `monochange.toml`, and runs configured CLI commands from those definitions.
 //!
 //! ## Why use it?
 //!
-//! - coordinate one workflow-defined CLI across several package ecosystems
+//! - coordinate one config-defined CLI across several package ecosystems
 //! - expose discovery, change creation, and release preparation as both commands and library calls
 //! - connect configuration loading, package discovery, graph propagation, and semver evidence in one place
 //!
@@ -17,7 +17,7 @@
 //!
 //! - shipping the `mc` CLI in CI or local release tooling
 //! - embedding the full end-to-end planner instead of wiring the lower-level crates together yourself
-//! - generating starter config with `mc init` and then evolving the workflow surface over time
+//! - generating starter config with `mc init` and then evolving the CLI command surface over time
 //!
 //! ## Key commands
 //!
@@ -32,10 +32,10 @@
 //!
 //! - aggregate all supported ecosystem adapters
 //! - load `monochange.toml`
-//! - synthesize default workflows when config does not declare any
+//! - synthesize default CLI commands when config does not declare any
 //! - resolve change input files
-//! - render discovery and release workflow output in text or JSON
-//! - execute configured release workflows
+//! - render discovery and release command output in text or JSON
+//! - execute configured CLI commands
 //! - preview or publish GitHub releases from prepared release data
 //! - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 //! <!-- {/monochangeCrateDocs} -->
@@ -64,7 +64,7 @@ use monochange_config::load_change_signals;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_config::validate_workspace;
-use monochange_core::default_workflows;
+use monochange_core::default_cli_commands;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
 use monochange_core::render_release_notes;
@@ -74,6 +74,10 @@ use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
+use monochange_core::CliCommandDefinition;
+use monochange_core::CliInputDefinition;
+use monochange_core::CliInputKind;
+use monochange_core::CliStepDefinition;
 use monochange_core::CommandVariable;
 use monochange_core::DeploymentDefinition;
 use monochange_core::DeploymentTrigger;
@@ -98,10 +102,6 @@ use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleasePlan;
 use monochange_core::VersionFormat;
 use monochange_core::VersionedFileDefinition;
-use monochange_core::WorkflowDefinition;
-use monochange_core::WorkflowInputDefinition;
-use monochange_core::WorkflowInputKind;
-use monochange_core::WorkflowStepDefinition;
 use monochange_core::WorkspaceDefaults;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
@@ -220,7 +220,7 @@ enum BuiltinReleaseSection {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct WorkflowContext {
+struct CliContext {
 	root: PathBuf,
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
@@ -242,7 +242,16 @@ struct InitWorkspaceConfiguration {
 	package: BTreeMap<String, InitPackageDefinition>,
 	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
 	group: BTreeMap<String, InitGroupDefinition>,
-	workflows: Vec<WorkflowDefinition>,
+	cli: BTreeMap<String, InitCliCommandDefinition>,
+}
+
+#[derive(Debug, Serialize)]
+struct InitCliCommandDefinition {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	help_text: Option<String>,
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	inputs: Vec<CliInputDefinition>,
+	steps: Vec<CliStepDefinition>,
 }
 
 #[derive(Debug, Serialize)]
@@ -266,30 +275,43 @@ struct InitGroupDefinition {
 
 const CHANGESET_DIR: &str = ".changeset";
 
+fn default_cli_command_map() -> BTreeMap<String, InitCliCommandDefinition> {
+	default_cli_commands()
+		.into_iter()
+		.map(|cli_command| {
+			(
+				cli_command.name,
+				InitCliCommandDefinition {
+					help_text: cli_command.help_text,
+					inputs: cli_command.inputs,
+					steps: cli_command.steps,
+				},
+			)
+		})
+		.collect()
+}
+
 pub fn build_command(bin_name: &'static str) -> Command {
 	let root = current_dir_or_dot();
 	build_command_for_root(bin_name, &root)
 }
 
 fn build_command_for_root(bin_name: &'static str, root: &Path) -> Command {
-	let workflows = load_workspace_configuration(root).map_or_else(
-		|_| default_workflows(),
-		|configuration| configuration.workflows,
+	let cli = load_workspace_configuration(root).map_or_else(
+		|_| default_cli_commands(),
+		|configuration| configuration.cli,
 	);
-	build_command_with_workflows(bin_name, &workflows)
+	build_command_with_cli(bin_name, &cli)
 }
 
-fn build_command_with_workflows(
-	bin_name: &'static str,
-	workflows: &[WorkflowDefinition],
-) -> Command {
+fn build_command_with_cli(bin_name: &'static str, cli: &[CliCommandDefinition]) -> Command {
 	let mut command = Command::new(bin_name)
 		.about("Manage versions and releases for your multiplatform, multilanguage monorepo")
 		.subcommand_required(true)
 		.arg_required_else_help(true)
 		.subcommand(
 			Command::new("init")
-				.about("Generate monochange.toml with detected packages, groups, and default workflows")
+				.about("Generate monochange.toml with detected packages, groups, and default CLI commands")
 				.arg(
 					Arg::new("force")
 						.long("force")
@@ -298,36 +320,36 @@ fn build_command_with_workflows(
 				),
 		);
 
-	for workflow in workflows {
-		command = command.subcommand(build_workflow_subcommand(workflow));
+	for cli_command in cli {
+		command = command.subcommand(build_cli_command_subcommand(cli_command));
 	}
 
 	command
 }
 
-fn build_workflow_subcommand(workflow: &WorkflowDefinition) -> Command {
-	let mut command = Command::new(leak_string(workflow.name.clone()))
+fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
+	let mut command = Command::new(leak_string(cli_command.name.clone()))
 		.about(
-			workflow
+			cli_command
 				.help_text
 				.clone()
-				.unwrap_or_else(|| format!("Run the `{}` workflow", workflow.name)),
+				.unwrap_or_else(|| format!("Run the `{}` command", cli_command.name)),
 		)
 		.arg(
 			Arg::new("dry-run")
 				.long("dry-run")
-				.help("Run the workflow in dry-run mode when supported")
+				.help("Run the command in dry-run mode when supported")
 				.action(ArgAction::SetTrue),
 		);
 
-	for input in &workflow.inputs {
-		command = command.arg(build_workflow_input_arg(input));
+	for input in &cli_command.inputs {
+		command = command.arg(build_cli_command_input_arg(input));
 	}
 
 	command
 }
 
-fn build_workflow_input_arg(input: &WorkflowInputDefinition) -> Arg {
+fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 	let long_name = leak_string(input.name.replace('_', "-"));
 	let value_name = leak_string(input.name.to_uppercase());
 	let mut arg = Arg::new(leak_string(input.name.clone()))
@@ -336,10 +358,10 @@ fn build_workflow_input_arg(input: &WorkflowInputDefinition) -> Arg {
 		.help(input.help_text.clone().unwrap_or_default());
 
 	arg = match input.kind {
-		WorkflowInputKind::String => arg.value_name(value_name),
-		WorkflowInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
-		WorkflowInputKind::Path => arg.value_name("PATH"),
-		WorkflowInputKind::Choice => {
+		CliInputKind::String => arg.value_name(value_name),
+		CliInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
+		CliInputKind::Path => arg.value_name("PATH"),
+		CliInputKind::Choice => {
 			arg.value_name(value_name)
 				.value_parser(clap::builder::PossibleValuesParser::new(
 					input
@@ -388,31 +410,30 @@ where
 {
 	let args = args.into_iter().collect::<Vec<_>>();
 	let configuration = load_workspace_configuration(root);
-	let workflows = configuration
+	let cli = configuration
 		.as_ref()
-		.map_or_else(|_| default_workflows(), |loaded| loaded.workflows.clone());
-	let matches =
-		match build_command_with_workflows(bin_name, &workflows).try_get_matches_from(args) {
-			Ok(matches) => matches,
-			Err(error)
-				if matches!(
-					error.kind(),
-					ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
-				) =>
-			{
-				return Ok(error.to_string());
-			}
-			Err(error) => return Err(MonochangeError::Config(error.to_string())),
-		};
+		.map_or_else(|_| default_cli_commands(), |loaded| loaded.cli.clone());
+	let matches = match build_command_with_cli(bin_name, &cli).try_get_matches_from(args) {
+		Ok(matches) => matches,
+		Err(error)
+			if matches!(
+				error.kind(),
+				ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
+			) =>
+		{
+			return Ok(error.to_string());
+		}
+		Err(error) => return Err(MonochangeError::Config(error.to_string())),
+	};
 
 	match matches.subcommand() {
 		Some(("init", init_matches)) => {
 			let path = init_workspace(root, init_matches.get_flag("force"))?;
 			Ok(format!("wrote {}", path.display()))
 		}
-		Some((workflow_name, workflow_matches)) => {
+		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;
-			execute_matches(root, &configuration, workflow_name, workflow_matches)
+			execute_matches(root, &configuration, cli_command_name, cli_command_matches)
 		}
 		None => Err(MonochangeError::Config("unknown command".to_string())),
 	}
@@ -421,54 +442,52 @@ where
 fn execute_matches(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
-	workflow_name: &str,
-	workflow_matches: &ArgMatches,
+	cli_command_name: &str,
+	cli_command_matches: &ArgMatches,
 ) -> MonochangeResult<String> {
-	let Some(workflow) = configuration
-		.workflows
+	let Some(cli_command) = configuration
+		.cli
 		.iter()
-		.find(|workflow| workflow.name == workflow_name)
+		.find(|cli_command| cli_command.name == cli_command_name)
 	else {
 		return Err(MonochangeError::Config(format!(
-			"unknown command `{workflow_name}`"
+			"unknown command `{cli_command_name}`"
 		)));
 	};
 
-	let dry_run = workflow_matches.get_flag("dry-run");
-	let inputs = collect_workflow_inputs(workflow, workflow_matches);
-	execute_workflow(root, workflow, dry_run, inputs)
+	let dry_run = cli_command_matches.get_flag("dry-run");
+	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
+	execute_cli_command(root, cli_command, dry_run, inputs)
 }
 
-fn collect_workflow_inputs(
-	workflow: &WorkflowDefinition,
+fn collect_cli_command_inputs(
+	cli_command: &CliCommandDefinition,
 	matches: &ArgMatches,
 ) -> BTreeMap<String, Vec<String>> {
 	let mut inputs = BTreeMap::new();
-	for input in &workflow.inputs {
+	for input in &cli_command.inputs {
 		let values = match input.kind {
-			WorkflowInputKind::StringList => matches
+			CliInputKind::StringList => matches
 				.get_many::<String>(input.name.as_str())
 				.map(|values| values.cloned().collect::<Vec<_>>())
 				.unwrap_or_default(),
-			WorkflowInputKind::String | WorkflowInputKind::Path | WorkflowInputKind::Choice => {
-				matches
-					.get_one::<String>(input.name.as_str())
-					.map(|value| vec![value.clone()])
-					.unwrap_or_default()
-			}
+			CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => matches
+				.get_one::<String>(input.name.as_str())
+				.map(|value| vec![value.clone()])
+				.unwrap_or_default(),
 		};
 		inputs.insert(input.name.clone(), values);
 	}
 	inputs
 }
 
-fn execute_workflow(
+fn execute_cli_command(
 	root: &Path,
-	workflow: &WorkflowDefinition,
+	cli_command: &CliCommandDefinition,
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
-	let mut context = WorkflowContext {
+	let mut context = CliContext {
 		root: root.to_path_buf(),
 		dry_run,
 		inputs,
@@ -484,16 +503,16 @@ fn execute_workflow(
 	};
 	let mut output = None;
 
-	for step in &workflow.steps {
+	for step in &cli_command.steps {
 		match step {
-			WorkflowStepDefinition::Validate => {
+			CliStepDefinition::Validate => {
 				validate_workspace(root)?;
 				output = Some(format!(
 					"workspace validation passed for {}",
 					root_relative(root, root).display()
 				));
 			}
-			WorkflowStepDefinition::Discover => {
+			CliStepDefinition::Discover => {
 				let format = context
 					.inputs
 					.get("format")
@@ -501,11 +520,11 @@ fn execute_workflow(
 					.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 				output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
 			}
-			WorkflowStepDefinition::CreateChangeFile => {
+			CliStepDefinition::CreateChangeFile => {
 				let package_refs = context.inputs.get("package").cloned().unwrap_or_default();
 				if package_refs.is_empty() {
 					return Err(MonochangeError::Config(
-						"workflow `change` requires at least one `--package` value".to_string(),
+						"command `change` requires at least one `--package` value".to_string(),
 					));
 				}
 				let bump = context
@@ -520,7 +539,7 @@ fn execute_workflow(
 					.cloned()
 					.ok_or_else(|| {
 						MonochangeError::Config(
-							"workflow `change` requires a `--reason` value".to_string(),
+							"command `change` requires a `--reason` value".to_string(),
 						)
 					})?;
 				let change_type = context
@@ -554,11 +573,11 @@ fn execute_workflow(
 					root_relative(root, &path).display()
 				));
 			}
-			WorkflowStepDefinition::PrepareRelease => {
+			CliStepDefinition::PrepareRelease => {
 				context.prepared_release = Some(prepare_release(root, dry_run)?);
 				output = None;
 			}
-			WorkflowStepDefinition::RenderReleaseManifest { path } => {
+			CliStepDefinition::RenderReleaseManifest { path } => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`RenderReleaseManifest` requires a previous `PrepareRelease` step"
@@ -566,7 +585,7 @@ fn execute_workflow(
 					)
 				})?;
 				let manifest = build_release_manifest(
-					workflow,
+					cli_command,
 					prepared_release,
 					&context.deployment_intents,
 					&context.command_logs,
@@ -582,7 +601,7 @@ fn execute_workflow(
 				}
 				output = None;
 			}
-			WorkflowStepDefinition::PublishGitHubRelease => {
+			CliStepDefinition::PublishGitHubRelease => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`PublishGitHubRelease` requires a previous `PrepareRelease` step"
@@ -595,7 +614,7 @@ fn execute_workflow(
 					)
 				})?;
 				let manifest = build_release_manifest(
-					workflow,
+					cli_command,
 					prepared_release,
 					&context.deployment_intents,
 					&context.command_logs,
@@ -633,7 +652,7 @@ fn execute_workflow(
 				}
 				output = None;
 			}
-			WorkflowStepDefinition::OpenReleasePullRequest => {
+			CliStepDefinition::OpenReleasePullRequest => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`OpenReleasePullRequest` requires a previous `PrepareRelease` step"
@@ -646,7 +665,7 @@ fn execute_workflow(
 					)
 				})?;
 				let manifest = build_release_manifest(
-					workflow,
+					cli_command,
 					prepared_release,
 					&context.deployment_intents,
 					&context.command_logs,
@@ -673,7 +692,7 @@ fn execute_workflow(
 				context.release_pull_request_request = Some(request);
 				output = None;
 			}
-			WorkflowStepDefinition::Deploy { names } => {
+			CliStepDefinition::Deploy { names } => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`Deploy` requires a previous `PrepareRelease` step".to_string(),
@@ -687,7 +706,7 @@ fn execute_workflow(
 				)?;
 				output = None;
 			}
-			WorkflowStepDefinition::EnforceChangesetPolicy => {
+			CliStepDefinition::EnforceChangesetPolicy => {
 				let changed_paths = context
 					.inputs
 					.get("changed_path")
@@ -698,15 +717,15 @@ fn execute_workflow(
 					Some(evaluate_changeset_policy(root, &changed_paths, &labels)?);
 				output = None;
 			}
-			WorkflowStepDefinition::Command {
+			CliStepDefinition::Command {
 				command,
-				dry_run,
+				dry_run_command,
 				shell,
 				variables,
-			} => run_workflow_command(
+			} => run_cli_command_command(
 				&mut context,
 				command,
-				dry_run.as_deref(),
+				dry_run_command.as_deref(),
 				*shell,
 				variables.as_ref(),
 			)?,
@@ -722,18 +741,18 @@ fn execute_workflow(
 		return match format {
 			OutputFormat::Json => {
 				let manifest = build_release_manifest(
-					workflow,
+					cli_command,
 					prepared_release,
 					&context.deployment_intents,
 					&context.command_logs,
 				);
-				render_release_workflow_json(
+				render_release_cli_command_json(
 					&manifest,
 					&context.github_release_requests,
 					context.release_pull_request_request.as_ref(),
 				)
 			}
-			OutputFormat::Text => Ok(render_workflow_result(workflow, &context)),
+			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
 		};
 	}
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
@@ -748,24 +767,24 @@ fn execute_workflow(
 					"failed to render changeset policy evaluation as json: {error}"
 				))
 			}),
-			OutputFormat::Text => Ok(render_workflow_result(workflow, &context)),
+			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
 		};
 	}
 	if !context.command_logs.is_empty() {
-		return Ok(render_workflow_result(workflow, &context));
+		return Ok(render_cli_command_result(cli_command, &context));
 	}
 
 	Ok(output.unwrap_or_else(|| {
 		format!(
-			"workflow `{}` completed{}",
-			workflow.name,
+			"command `{}` completed{}",
+			cli_command.name,
 			if dry_run { " (dry-run)" } else { "" }
 		)
 	}))
 }
 
-fn run_workflow_command(
-	context: &mut WorkflowContext,
+fn run_cli_command_command(
+	context: &mut CliContext,
 	command: &str,
 	dry_run_command: Option<&str>,
 	shell: bool,
@@ -775,7 +794,7 @@ fn run_workflow_command(
 		if let Some(command) = dry_run_command {
 			command
 		} else {
-			let skipped = interpolate_workflow_command(context, command, variables);
+			let skipped = interpolate_cli_command_command(context, command, variables);
 			context
 				.command_logs
 				.push(format!("skipped command `{skipped}` (dry-run)"));
@@ -784,7 +803,7 @@ fn run_workflow_command(
 	} else {
 		command
 	};
-	let interpolated = interpolate_workflow_command(context, command_to_run, variables);
+	let interpolated = interpolate_cli_command_command(context, command_to_run, variables);
 
 	let output = if shell {
 		ProcessCommand::new("sh")
@@ -794,11 +813,11 @@ fn run_workflow_command(
 			.output()
 	} else {
 		let parts = shlex::split(&interpolated).ok_or_else(|| {
-			MonochangeError::Config(format!("failed to parse workflow command `{interpolated}`"))
+			MonochangeError::Config(format!("failed to parse command `{interpolated}`"))
 		})?;
 		let Some((program, args)) = parts.split_first() else {
 			return Err(MonochangeError::Config(
-				"workflow command must not be empty".to_string(),
+				"command must not be empty".to_string(),
 			));
 		};
 		ProcessCommand::new(program)
@@ -807,9 +826,7 @@ fn run_workflow_command(
 			.output()
 	};
 	let output = output.map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to run workflow command `{interpolated}`: {error}"
-		))
+		MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
 	})?;
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -819,7 +836,7 @@ fn run_workflow_command(
 			stderr
 		};
 		return Err(MonochangeError::Discovery(format!(
-			"workflow command `{interpolated}` failed: {details}"
+			"command `{interpolated}` failed: {details}"
 		)));
 	}
 
@@ -832,8 +849,8 @@ fn run_workflow_command(
 	Ok(())
 }
 
-fn interpolate_workflow_command(
-	context: &WorkflowContext,
+fn interpolate_cli_command_command(
+	context: &CliContext,
 	command: &str,
 	variables: Option<&BTreeMap<String, CommandVariable>>,
 ) -> String {
@@ -841,7 +858,7 @@ fn interpolate_workflow_command(
 		let mut interpolated = command.to_string();
 		for (needle, variable) in variables {
 			interpolated =
-				interpolated.replace(needle, &workflow_variable_value(context, *variable));
+				interpolated.replace(needle, &cli_command_variable_value(context, *variable));
 		}
 		return interpolated;
 	}
@@ -849,27 +866,27 @@ fn interpolate_workflow_command(
 	command
 		.replace(
 			"$group_version",
-			&workflow_variable_value(context, CommandVariable::GroupVersion),
+			&cli_command_variable_value(context, CommandVariable::GroupVersion),
 		)
 		.replace(
 			"$released_packages",
-			&workflow_variable_value(context, CommandVariable::ReleasedPackages),
+			&cli_command_variable_value(context, CommandVariable::ReleasedPackages),
 		)
 		.replace(
 			"$changed_files",
-			&workflow_variable_value(context, CommandVariable::ChangedFiles),
+			&cli_command_variable_value(context, CommandVariable::ChangedFiles),
 		)
 		.replace(
 			"$changesets",
-			&workflow_variable_value(context, CommandVariable::Changesets),
+			&cli_command_variable_value(context, CommandVariable::Changesets),
 		)
 		.replace(
 			"$version",
-			&workflow_variable_value(context, CommandVariable::Version),
+			&cli_command_variable_value(context, CommandVariable::Version),
 		)
 }
 
-fn workflow_variable_value(context: &WorkflowContext, variable: CommandVariable) -> String {
+fn cli_command_variable_value(context: &CliContext, variable: CommandVariable) -> String {
 	let version = context
 		.prepared_release
 		.as_ref()
@@ -915,10 +932,10 @@ fn workflow_variable_value(context: &WorkflowContext, variable: CommandVariable)
 	}
 }
 
-fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowContext) -> String {
+fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliContext) -> String {
 	let mut lines = vec![format!(
-		"workflow `{}` completed{}",
-		workflow.name,
+		"command `{}` completed{}",
+		cli_command.name,
 		if context.dry_run { " (dry-run)" } else { "" }
 	)];
 	if let Some(prepared_release) = &context.prepared_release {
@@ -1004,7 +1021,7 @@ fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowConte
 		}
 	}
 	if !context.command_logs.is_empty() {
-		lines.push("workflow commands:".to_string());
+		lines.push("commands:".to_string());
 		for log in &context.command_logs {
 			lines.push(format!("- {log}"));
 		}
@@ -1309,7 +1326,7 @@ fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceC
 		defaults: WorkspaceDefaults::default(),
 		package: package_configs,
 		group: group_configs,
-		workflows: default_workflows(),
+		cli: default_cli_command_map(),
 	})
 }
 
@@ -2937,7 +2954,7 @@ fn resolve_deployment_intents(
 					.find(|deployment| deployment.name == *name)
 					.ok_or_else(|| {
 						MonochangeError::Config(format!(
-							"unknown deployment `{name}` requested by workflow deploy step"
+							"unknown deployment `{name}` requested by command deploy step"
 						))
 					})
 			})
@@ -2978,13 +2995,13 @@ fn resolve_deployment_intents(
 }
 
 fn build_release_manifest(
-	workflow: &WorkflowDefinition,
+	cli_command: &CliCommandDefinition,
 	prepared_release: &PreparedRelease,
 	deployment_intents: &[ReleaseDeploymentIntent],
 	_command_logs: &[String],
 ) -> ReleaseManifest {
 	ReleaseManifest {
-		workflow: workflow.name.clone(),
+		command: cli_command.name.clone(),
 		dry_run: prepared_release.dry_run,
 		version: prepared_release.version.clone(),
 		group_version: prepared_release.group_version.clone(),
@@ -3068,7 +3085,7 @@ fn render_release_manifest_json(manifest: &ReleaseManifest) -> MonochangeResult<
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
-fn render_release_workflow_json(
+fn render_release_cli_command_json(
 	manifest: &ReleaseManifest,
 	github_releases: &[GitHubReleaseRequest],
 	release_pull_request: Option<&GitHubPullRequestRequest>,
@@ -3085,7 +3102,7 @@ fn render_release_workflow_json(
 }
 
 fn tracked_release_pull_request_paths(
-	context: &WorkflowContext,
+	context: &CliContext,
 	manifest: &ReleaseManifest,
 ) -> Vec<PathBuf> {
 	let mut tracked_paths = manifest.changed_files.clone();

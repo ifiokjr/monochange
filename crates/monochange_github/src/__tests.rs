@@ -85,7 +85,7 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 		bot: GitHubBotSettings::default(),
 	};
 	let manifest = ReleaseManifest {
-		workflow: "release".to_string(),
+		command: "release".to_string(),
 		dry_run: true,
 		version: None,
 		group_version: None,
@@ -579,7 +579,7 @@ fn git_output(root: &Path, args: &[&str]) -> String {
 
 fn sample_manifest() -> ReleaseManifest {
 	ReleaseManifest {
-		workflow: "release".to_string(),
+		command: "release".to_string(),
 		dry_run: true,
 		version: Some("1.2.0".to_string()),
 		group_version: Some("1.2.0".to_string()),

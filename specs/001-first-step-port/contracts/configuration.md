@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the configuration surface for cross-ecosystem workspace discovery, changeset validation, release planning, and workflow-driven release preparation.
+Define the configuration surface for cross-ecosystem workspace discovery, changeset validation, release planning, and command-driven release preparation.
 
 ## File Location
 
@@ -52,13 +52,13 @@ Declares a shared release unit that owns outward release identity for its member
 | `release`              | boolean          | No       | Whether the group should produce a release.                                                                 |
 | `version_format`       | string           | No       | `namespaced` or `primary`; defaults to `namespaced`.                                                        |
 
-### `[[workflows]]`
+### `[cli.<command>]`
 
-Defines named workflows that can be run as top-level commands such as `mc release`.
+Defines a named top-level command such as `mc release`.
 
-### `[[workflows.steps]]`
+### `[[cli.<command>.steps]]`
 
-Built-in typed workflow steps.
+Built-in typed command steps.
 
 | Field     | Type   | Required | Meaning                                                     |
 | --------- | ------ | -------- | ----------------------------------------------------------- |
@@ -93,10 +93,9 @@ tag = true
 release = true
 version_format = "primary"
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 
 [ecosystems.cargo]

@@ -42,7 +42,7 @@
 //! use monochange_github::build_release_requests;
 //!
 //! let manifest = ReleaseManifest {
-//!     workflow: "release".to_string(),
+//!     command: "release".to_string(),
 //!     dry_run: true,
 //!     version: Some("1.2.0".to_string()),
 //!     group_version: Some("1.2.0".to_string()),
@@ -275,7 +275,7 @@ pub fn build_release_pull_request_request(
 		base_branch: github.pull_requests.base.clone(),
 		head_branch: release_pull_request_branch(
 			&github.pull_requests.branch_prefix,
-			&manifest.workflow,
+			&manifest.command,
 		),
 		title: title.clone(),
 		body: release_pull_request_body(manifest),
@@ -672,8 +672,8 @@ fn release_body(
 	}
 }
 
-fn release_pull_request_branch(branch_prefix: &str, workflow: &str) -> String {
-	let workflow = workflow
+fn release_pull_request_branch(branch_prefix: &str, command: &str) -> String {
+	let command = command
 		.chars()
 		.map(|character| {
 			if character.is_ascii_alphanumeric() {
@@ -685,17 +685,17 @@ fn release_pull_request_branch(branch_prefix: &str, workflow: &str) -> String {
 		.collect::<String>()
 		.trim_matches('-')
 		.to_string();
-	let workflow = if workflow.is_empty() {
+	let command = if command.is_empty() {
 		"release".to_string()
 	} else {
-		workflow
+		command
 	};
-	format!("{}/{}", branch_prefix.trim_end_matches('/'), workflow)
+	format!("{}/{}", branch_prefix.trim_end_matches('/'), command)
 }
 
 fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 	let mut lines = vec!["## Prepared release".to_string(), String::new()];
-	lines.push(format!("- workflow: `{}`", manifest.workflow));
+	lines.push(format!("- command: `{}`", manifest.command));
 	for target in manifest
 		.release_targets
 		.iter()

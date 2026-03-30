@@ -34,14 +34,14 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.workflows.len(), 4);
-	let workflow_names = configuration
-		.workflows
+	assert_eq!(configuration.cli.len(), 4);
+	let cli_command_names = configuration
+		.cli
 		.iter()
-		.map(|workflow| workflow.name.as_str())
+		.map(|cli_command| cli_command.name.as_str())
 		.collect::<Vec<_>>();
 	assert_eq!(
-		workflow_names,
+		cli_command_names,
 		vec!["validate", "discover", "change", "release"]
 	);
 	assert_eq!(configuration.cargo.enabled, None);
@@ -51,7 +51,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 }
 
 #[test]
-fn load_workspace_configuration_parses_package_group_and_workflow_declarations() {
+fn load_workspace_configuration_parses_package_group_and_cli_command_declarations() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
 	write_npm_package(tempdir.path(), "packages/web", "web");
@@ -83,13 +83,12 @@ version_format = "primary"
 enabled = true
 roots = ["packages/*"]
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 "#,
@@ -116,12 +115,12 @@ path = ".monochange/release-manifest.json"
 	);
 	assert_eq!(configuration.packages.len(), 2);
 	assert_eq!(configuration.groups.len(), 1);
-	assert_eq!(configuration.workflows.len(), 1);
+	assert_eq!(configuration.cli.len(), 1);
 	assert_eq!(
 		configuration
-			.workflows
+			.cli
 			.first()
-			.unwrap_or_else(|| panic!("expected workflow"))
+			.unwrap_or_else(|| panic!("expected CLI command"))
 			.steps
 			.len(),
 		2
@@ -1664,13 +1663,12 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[[workflows]]
-name = "publish"
+[cli.publish]
 
-[[workflows.steps]]
+[[cli.publish.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.publish.steps]]
 type = "PublishGitHubRelease"
 "#,
 	)
@@ -1678,7 +1676,7 @@ type = "PublishGitHubRelease"
 
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
-		.unwrap_or_else(|| panic!("expected github workflow config error"));
+		.unwrap_or_else(|| panic!("expected github CLI command config error"));
 	assert!(error
 		.to_string()
 		.contains("uses `PublishGitHubRelease` but `[github]` is not configured"));
@@ -1702,13 +1700,12 @@ name = "production"
 trigger = "workflow"
 workflow = "deploy-production"
 
-[[workflows]]
-name = "deploy-release"
+[cli.deploy-release]
 
-[[workflows.steps]]
+[[cli.deploy-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.deploy-release.steps]]
 type = "Deploy"
 names = ["staging"]
 "#,
@@ -1735,13 +1732,12 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[[workflows]]
-name = "release-pr"
+[cli.release-pr]
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "OpenReleasePullRequest"
 "#,
 	)
@@ -1749,7 +1745,7 @@ type = "OpenReleasePullRequest"
 
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
-		.unwrap_or_else(|| panic!("expected github workflow config error"));
+		.unwrap_or_else(|| panic!("expected github CLI command config error"));
 	assert!(error
 		.to_string()
 		.contains("uses `OpenReleasePullRequest` but `[github]` is not configured"));
@@ -1768,15 +1764,14 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[[workflows]]
-name = "changeset-check"
+[cli.changeset-check]
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
 "#,
 	)
@@ -1784,7 +1779,7 @@ type = "EnforceChangesetPolicy"
 
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
-		.unwrap_or_else(|| panic!("expected changeset policy workflow config error"));
+		.unwrap_or_else(|| panic!("expected changeset policy CLI command config error"));
 	assert!(error
 		.to_string()
 		.contains("uses `EnforceChangesetPolicy` but `[github]` is not configured"));
@@ -1811,10 +1806,9 @@ repo = "monochange"
 enabled = true
 changed_paths = ["crates/**"]
 
-[[workflows]]
-name = "changeset-check"
+[cli.changeset-check]
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
 "#,
 	)
@@ -1822,7 +1816,7 @@ type = "EnforceChangesetPolicy"
 
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
-		.unwrap_or_else(|| panic!("expected changeset policy workflow config error"));
+		.unwrap_or_else(|| panic!("expected changeset policy CLI command config error"));
 	assert!(error
 		.to_string()
 		.contains("does not declare a `changed_path` input"));
@@ -1841,13 +1835,12 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[[workflows]]
-name = "deploy-release"
+[cli.deploy-release]
 
-[[workflows.steps]]
+[[cli.deploy-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.deploy-release.steps]]
 type = "Deploy"
 "#,
 	)
@@ -1855,7 +1848,7 @@ type = "Deploy"
 
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
-		.unwrap_or_else(|| panic!("expected deployment workflow config error"));
+		.unwrap_or_else(|| panic!("expected deployment CLI command config error"));
 	assert!(error
 		.to_string()
 		.contains("uses `Deploy` but no `[[deployments]]` are configured"));
@@ -1998,15 +1991,14 @@ path = "crates/core"
 }
 
 #[test]
-fn load_workspace_configuration_rejects_reserved_workflow_names() {
+fn load_workspace_configuration_rejects_reserved_cli_command_names() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
 		tempdir.path().join("monochange.toml"),
 		r#"
-[[workflows]]
-name = "init"
+[cli.init]
 
-[[workflows.steps]]
+[[cli.init.steps]]
 type = "PrepareRelease"
 "#,
 	)
@@ -2020,21 +2012,19 @@ type = "PrepareRelease"
 }
 
 #[test]
-fn load_workspace_configuration_rejects_duplicate_workflows() {
+fn load_workspace_configuration_rejects_duplicate_cli_command_tables() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
 		tempdir.path().join("monochange.toml"),
 		r#"
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "Command"
 command = "cargo check"
 "#,
@@ -2045,7 +2035,31 @@ command = "cargo check"
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 
-	assert!(error.to_string().contains("duplicate workflow `release`"));
+	assert!(error.to_string().contains("failed to parse"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_legacy_workflows_namespace() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(error
+		.to_string()
+		.contains("legacy `[[workflows]]` configuration is no longer supported"));
 }
 
 #[test]

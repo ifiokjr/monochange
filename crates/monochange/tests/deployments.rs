@@ -130,19 +130,18 @@ channel = "stable"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release-deploy"
+[cli.release-deploy]
 
-[[workflows.inputs]]
+[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "Deploy"
 "#,
 	);

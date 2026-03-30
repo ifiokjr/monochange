@@ -94,14 +94,14 @@ fn run_json_workflow(root: &Path, args: &[&str]) -> Value {
 		.arg("json")
 		.args(args)
 		.output()
-		.unwrap_or_else(|error| panic!("workflow output: {error}"));
+		.unwrap_or_else(|error| panic!("command output: {error}"));
 	assert!(
 		output.status.success(),
 		"{}",
 		String::from_utf8_lossy(&output.stderr)
 	);
 	serde_json::from_slice(&output.stdout)
-		.unwrap_or_else(|error| panic!("parse workflow json: {error}"))
+		.unwrap_or_else(|error| panic!("parse command json: {error}"))
 }
 
 fn seed_policy_fixture(root: &Path, with_changeset: bool, invalid_changeset: bool) {
@@ -140,25 +140,24 @@ comment_on_failure = true
 changed_paths = ["crates/**"]
 ignored_paths = ["docs/**", "*.md"]
 
-[[workflows]]
-name = "changeset-check"
+[cli.changeset-check]
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
 "#,
 	);
