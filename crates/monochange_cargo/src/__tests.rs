@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use monochange_core::materialize_dependency_edges;
 use monochange_core::ChangeSignal;
@@ -93,7 +94,7 @@ fn rust_semver_provider_parses_compatibility_evidence() {
 		notes: Some("breaking change".to_string()),
 		details: None,
 		change_type: None,
-		source_path: None,
+		source_path: PathBuf::from(".changeset/feature.md"),
 	};
 	let provider = RustSemverProvider;
 	let assessment = provider

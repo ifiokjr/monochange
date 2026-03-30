@@ -40,6 +40,8 @@ sdk: minor
 #### coordinated SDK release
 ```
 
+MonoChange keeps its own changeset standard rather than reusing a narrower external parser. In addition to package/group bump entries, MonoChange changesets can include reserved metadata keys such as `evidence`, `origin`, and `type`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs.
+
 Optionally include Rust semver evidence:
 
 <!-- {=releaseEvidenceExample} -->

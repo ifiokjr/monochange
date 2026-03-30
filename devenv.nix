@@ -142,10 +142,10 @@ in
       exec = ''
         set -e
         fix:clippy
-        docs:update
+        docs:update # runs `mdt update`
         fix:format
       '';
-      description = "Fix all autofixable problems.";
+      description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
       binary = "bash";
     };
     "fix:format" = {

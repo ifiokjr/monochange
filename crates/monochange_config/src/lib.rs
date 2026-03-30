@@ -97,6 +97,7 @@ use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetSettings;
+use monochange_core::ChangesetTargetKind;
 use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
@@ -140,6 +141,7 @@ const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"target_id",
 	"bump",
 	"type",
+	"provenance",
 ];
 
 #[derive(Debug, Deserialize, Default)]
@@ -467,6 +469,25 @@ struct RawChangeEntry {
 	origin: String,
 	#[serde(default)]
 	evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LoadedChangesetTarget {
+	pub id: String,
+	pub kind: ChangesetTargetKind,
+	pub bump: Option<BumpSeverity>,
+	pub origin: String,
+	pub evidence_refs: Vec<String>,
+	pub change_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LoadedChangesetFile {
+	pub path: PathBuf,
+	pub summary: Option<String>,
+	pub details: Option<String>,
+	pub targets: Vec<LoadedChangesetTarget>,
+	pub signals: Vec<ChangeSignal>,
 }
 
 #[allow(unused_assignments)]
@@ -903,6 +924,14 @@ pub fn load_change_signals(
 	configuration: &WorkspaceConfiguration,
 	packages: &[PackageRecord],
 ) -> MonochangeResult<Vec<ChangeSignal>> {
+	Ok(load_changeset_file(changes_path, configuration, packages)?.signals)
+}
+
+pub fn load_changeset_file(
+	changes_path: &Path,
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+) -> MonochangeResult<LoadedChangesetFile> {
 	let contents = fs::read_to_string(changes_path).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to read {}: {error}",
@@ -990,10 +1019,24 @@ pub fn load_change_signals(
 		}
 	}
 
+	let summary = raw.changes.first().and_then(|change| change.reason.clone());
+	let details = raw
+		.changes
+		.first()
+		.and_then(|change| change.details.clone());
 	let mut seen_package_ids = BTreeSet::new();
 	let mut signals = Vec::new();
+	let mut targets = Vec::new();
 	for change in raw.changes {
 		if let Some(group) = groups_by_id.get(change.package.as_str()) {
+			targets.push(LoadedChangesetTarget {
+				id: change.package.clone(),
+				kind: ChangesetTargetKind::Group,
+				bump: change.bump,
+				origin: change.origin.clone(),
+				evidence_refs: change.evidence.clone(),
+				change_type: change.change_type.clone(),
+			});
 			for member_id in &group.packages {
 				let package_id =
 					resolve_package_reference(member_id, &configuration.root_path, packages)?;
@@ -1021,10 +1064,18 @@ pub fn load_change_signals(
 					notes: change.reason.clone(),
 					details: change.details.clone(),
 					change_type: change.change_type.clone(),
-					source_path: Some(changes_path.display().to_string()),
+					source_path: changes_path.to_path_buf(),
 				});
 			}
 		} else {
+			targets.push(LoadedChangesetTarget {
+				id: change.package.clone(),
+				kind: ChangesetTargetKind::Package,
+				bump: change.bump,
+				origin: change.origin.clone(),
+				evidence_refs: change.evidence.clone(),
+				change_type: change.change_type.clone(),
+			});
 			let package_id =
 				resolve_package_reference(&change.package, &configuration.root_path, packages)?;
 			if !seen_package_ids.insert(package_id.clone()) {
@@ -1051,12 +1102,18 @@ pub fn load_change_signals(
 				notes: change.reason,
 				details: change.details,
 				change_type: change.change_type,
-				source_path: Some(changes_path.display().to_string()),
+				source_path: changes_path.to_path_buf(),
 			});
 		}
 	}
 
-	Ok(signals)
+	Ok(LoadedChangesetFile {
+		path: changes_path.to_path_buf(),
+		summary,
+		details,
+		targets,
+		signals,
+	})
 }
 
 pub fn resolve_package_reference(
@@ -1952,6 +2009,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::PrepareRelease
 				| CliStepDefinition::PublishRelease
 				| CliStepDefinition::OpenReleaseRequest
+				| CliStepDefinition::CommentReleasedIssues
 				| CliStepDefinition::Deploy { .. }
 				| CliStepDefinition::VerifyChangesets => {}
 			}
@@ -2000,6 +2058,24 @@ fn validate_cli_runtime_requirements(
 			if !source.pull_requests.enabled {
 				return Err(MonochangeError::Config(format!(
 					"CLI command `{}` uses `OpenReleaseRequest` but `[source.pull_requests].enabled` is false",
+					cli_command.name
+				)));
+			}
+		}
+		if cli_command
+			.steps
+			.iter()
+			.any(|step| matches!(step, CliStepDefinition::CommentReleasedIssues))
+		{
+			let source = source.ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"CLI command `{}` uses `CommentReleasedIssues` but `[source]` is not configured",
+					cli_command.name
+				))
+			})?;
+			if source.provider != SourceProvider::GitHub {
+				return Err(MonochangeError::Config(format!(
+					"CLI command `{}` uses `CommentReleasedIssues` but `[source].provider` must be `github`",
 					cli_command.name
 				)));
 			}

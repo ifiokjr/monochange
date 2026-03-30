@@ -309,6 +309,37 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	      "rendered": "## 1.1.0\n\n### Features\n\n- add feature"
 	    }
 	  ],
+	  "changesets": [
+	    {
+	      "path": ".changeset/feature.md",
+	      "summary": "add feature",
+	      "details": null,
+	      "targets": [
+	        {
+	          "id": "core",
+	          "kind": "package",
+	          "bump": "minor",
+	          "origin": "direct-change",
+	          "evidenceRefs": [],
+	          "changeType": null
+	        }
+	      ],
+	      "provenance": {
+	        "provider": "generic_git",
+	        "host": null,
+	        "capabilities": {
+	          "commitWebUrls": false,
+	          "actorProfiles": false,
+	          "reviewRequestLookup": false,
+	          "relatedIssues": false,
+	          "issueComments": false
+	        },
+	        "introduced": null,
+	        "lastUpdated": null,
+	        "relatedIssues": []
+	      }
+	    }
+	  ],
 	  "deletedChangesets": [],
 	  "deployments": [],
 	  "plan": {
@@ -559,6 +590,37 @@ fn release_manifest_workflow_writes_manifest_json() {
 	        ]
 	      },
 	      "rendered": "## 1.1.0\n\n### Features\n\n- add feature"
+	    }
+	  ],
+	  "changesets": [
+	    {
+	      "path": ".changeset/feature.md",
+	      "summary": "add feature",
+	      "details": null,
+	      "targets": [
+	        {
+	          "id": "core",
+	          "kind": "package",
+	          "bump": "minor",
+	          "origin": "direct-change",
+	          "evidenceRefs": [],
+	          "changeType": null
+	        }
+	      ],
+	      "provenance": {
+	        "provider": "generic_git",
+	        "host": null,
+	        "capabilities": {
+	          "commitWebUrls": false,
+	          "actorProfiles": false,
+	          "reviewRequestLookup": false,
+	          "relatedIssues": false,
+	          "issueComments": false
+	        },
+	        "introduced": null,
+	        "lastUpdated": null,
+	        "relatedIssues": []
+	      }
 	    }
 	  ],
 	  "deletedChangesets": [],
