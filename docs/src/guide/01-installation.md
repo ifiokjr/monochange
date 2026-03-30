@@ -15,6 +15,7 @@ mc change --package monochange --bump minor --reason "add release planning"
 mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
+mc release-deploy --dry-run --format json
 mc release
 ```
 

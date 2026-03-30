@@ -53,6 +53,14 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
+[[deployments]]
+name = "production"
+trigger = "release_pr_merge"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
+
 [[workflows]]
 name = "validate"
 help_text = "Validate monochange configuration and changesets"
@@ -159,6 +167,22 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "OpenReleasePullRequest"
+
+[[workflows]]
+name = "release-deploy"
+help_text = "Prepare a release and emit deployment intents"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
 ```
 
 <!-- {/projectSetupConfig} -->

@@ -47,6 +47,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
 - preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
+- model deployment intents for downstream automation and merge-driven release workflows
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -94,6 +95,7 @@ mc change --package monochange --bump minor --reason "add release planning"
 mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
+mc release-deploy --dry-run --format json
 mc release
 ```
 

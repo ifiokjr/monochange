@@ -23,9 +23,9 @@
 //! ## Public entry points
 //!
 //! - `build_release_requests(config, manifest)` converts a release manifest into GitHub release requests
-//! - `publish_release_requests(requests)` publishes requests through the `gh` CLI when available
+//! - `publish_release_requests(requests)` publishes requests through the GitHub API via `octocrab`
 //! - `build_release_pull_request_request(config, manifest)` converts a release manifest into a GitHub release-PR request
-//! - `publish_release_pull_request(root, request, tracked_paths)` creates or updates a release PR through `git` and `gh`
+//! - `publish_release_pull_request(root, request, tracked_paths)` creates or updates a release PR through `git` and the GitHub API
 //!
 //! ## Example
 //!
@@ -84,6 +84,7 @@
 //! ```
 //! <!-- {/monochangeGithubCrateDocs} -->
 
+use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -95,9 +96,13 @@ use monochange_core::MonochangeResult;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseOwnerKind;
+use octocrab::Octocrab;
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use tokio::runtime::Builder as RuntimeBuilder;
+use urlencoding::encode;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -163,6 +168,72 @@ pub struct GitHubPullRequestOutcome {
 	pub url: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct GitHubReleasePayload<'a> {
+	tag_name: &'a str,
+	name: &'a str,
+	body: Option<&'a str>,
+	draft: bool,
+	prerelease: bool,
+	generate_release_notes: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubPullRequestPayload<'a> {
+	title: &'a str,
+	head: &'a str,
+	base: &'a str,
+	body: &'a str,
+	draft: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubPullRequestUpdatePayload<'a> {
+	title: &'a str,
+	body: &'a str,
+	base: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubLabelsPayload<'a> {
+	labels: &'a [String],
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubExistingRelease {
+	id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubReleaseResponse {
+	html_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubPullRequestResponse {
+	number: u64,
+	html_url: Option<String>,
+	node_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GraphqlEnableAutoMergeResponse {
+	enable_pull_request_auto_merge: Option<GraphqlPullRequestMutation>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GraphqlPullRequestMutation {
+	pull_request: Option<GraphqlPullRequestNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphqlPullRequestNode {
+	#[serde(rename = "number")]
+	_number: u64,
+}
+
 #[must_use]
 pub fn build_release_requests(
 	github: &GitHubConfiguration,
@@ -215,10 +286,12 @@ pub fn build_release_pull_request_request(
 pub fn publish_release_requests(
 	requests: &[GitHubReleaseRequest],
 ) -> MonochangeResult<Vec<GitHubReleaseOutcome>> {
-	requests
-		.iter()
-		.map(publish_release_request)
-		.collect::<Result<Vec<_>, _>>()
+	let runtime = github_runtime()?;
+	runtime.block_on(async {
+		let client = github_client_from_env()?;
+		let outcome = publish_release_requests_with_client(&client, requests).await;
+		outcome
+	})
 }
 
 pub fn publish_release_pull_request(
@@ -231,96 +304,61 @@ pub fn publish_release_pull_request(
 	git_commit_paths(root, &request.commit_message)?;
 	git_push_branch(root, &request.head_branch)?;
 
-	let operation = if let Some(existing) = lookup_existing_pull_request(request)? {
-		update_pull_request(request, existing.number)?;
-		GitHubPullRequestOperation::Updated
-	} else {
-		create_pull_request(request)?;
-		GitHubPullRequestOperation::Created
-	};
-	let pull_request = lookup_existing_pull_request(request)?.ok_or_else(|| {
-		MonochangeError::Config(format!(
-			"failed to resolve release pull request for branch `{}` after publication",
-			request.head_branch
-		))
-	})?;
-	if request.auto_merge {
-		enable_pull_request_auto_merge(request, pull_request.number)?;
-	}
-	Ok(GitHubPullRequestOutcome {
-		repository: request.repository.clone(),
-		number: pull_request.number,
-		head_branch: request.head_branch.clone(),
-		operation,
-		url: pull_request.url,
+	let runtime = github_runtime()?;
+	runtime.block_on(async {
+		let client = github_client_from_env()?;
+		let outcome = publish_release_pull_request_with_client(&client, request).await;
+		outcome
 	})
 }
 
-fn publish_release_request(
+async fn publish_release_requests_with_client(
+	client: &Octocrab,
+	requests: &[GitHubReleaseRequest],
+) -> MonochangeResult<Vec<GitHubReleaseOutcome>> {
+	let mut outcomes = Vec::with_capacity(requests.len());
+	for request in requests {
+		outcomes.push(publish_release_request_with_client(client, request).await?);
+	}
+	Ok(outcomes)
+}
+
+async fn publish_release_request_with_client(
+	client: &Octocrab,
 	request: &GitHubReleaseRequest,
 ) -> MonochangeResult<GitHubReleaseOutcome> {
-	let existing = lookup_existing_release(request)?;
-	let payload = serde_json::to_string(&json!({
-		"tag_name": request.tag_name,
-		"name": request.name,
-		"body": request.body,
-		"draft": request.draft,
-		"prerelease": request.prerelease,
-		"generate_release_notes": request.generate_release_notes,
-	}))
-	.map_err(|error| MonochangeError::Config(error.to_string()))?;
-	let (operation, endpoint) = match existing {
+	let payload = GitHubReleasePayload {
+		tag_name: &request.tag_name,
+		name: &request.name,
+		body: request.body.as_deref(),
+		draft: request.draft,
+		prerelease: request.prerelease,
+		generate_release_notes: request.generate_release_notes,
+	};
+	let existing = lookup_existing_release_with_client(client, request).await?;
+	let (operation, response) = match existing {
 		Some(existing) => (
 			GitHubReleaseOperation::Updated,
-			format!(
-				"repos/{}/{}/releases/{}",
-				request.owner, request.repo, existing.id
-			),
+			patch_json::<_, GitHubReleaseResponse>(
+				client,
+				&format!(
+					"/repos/{}/{}/releases/{}",
+					request.owner, request.repo, existing.id
+				),
+				&payload,
+			)
+			.await?,
 		),
 		None => (
 			GitHubReleaseOperation::Created,
-			format!("repos/{}/{}/releases", request.owner, request.repo),
+			post_json::<_, GitHubReleaseResponse>(
+				client,
+				&format!("/repos/{}/{}/releases", request.owner, request.repo),
+				&payload,
+			)
+			.await?,
 		),
 	};
-	let method = match operation {
-		GitHubReleaseOperation::Created => "POST",
-		GitHubReleaseOperation::Updated => "PATCH",
-	};
-	let output = Command::new("gh")
-		.arg("api")
-		.arg("--method")
-		.arg(method)
-		.arg(endpoint)
-		.arg("--input")
-		.arg("-")
-		.stdin(std::process::Stdio::piped())
-		.stdout(std::process::Stdio::piped())
-		.stderr(std::process::Stdio::piped())
-		.spawn()
-		.and_then(|mut child| {
-			use std::io::Write;
-			child
-				.stdin
-				.as_mut()
-				.ok_or_else(|| std::io::Error::other("failed to open gh stdin"))?
-				.write_all(payload.as_bytes())?;
-			child.wait_with_output()
-		})
-		.map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to run `gh api` for {}: {error}",
-				request.tag_name
-			))
-		})?;
-	if !output.status.success() {
-		return Err(MonochangeError::Config(format!(
-			"GitHub release publish failed for `{}`: {}",
-			request.tag_name,
-			String::from_utf8_lossy(&output.stderr).trim()
-		)));
-	}
-	let response = serde_json::from_slice::<GitHubReleaseResponse>(&output.stdout)
-		.map_err(|error| MonochangeError::Config(error.to_string()))?;
 	Ok(GitHubReleaseOutcome {
 		repository: request.repository.clone(),
 		tag_name: request.tag_name.clone(),
@@ -329,133 +367,217 @@ fn publish_release_request(
 	})
 }
 
-fn lookup_existing_release(
+async fn publish_release_pull_request_with_client(
+	client: &Octocrab,
+	request: &GitHubPullRequestRequest,
+) -> MonochangeResult<GitHubPullRequestOutcome> {
+	let existing = lookup_existing_pull_request_with_client(client, request).await?;
+	let (operation, pull_request) = match existing {
+		Some(existing) => (
+			GitHubPullRequestOperation::Updated,
+			patch_json::<_, GitHubPullRequestResponse>(
+				client,
+				&format!(
+					"/repos/{}/{}/pulls/{}",
+					request.owner, request.repo, existing.number
+				),
+				&GitHubPullRequestUpdatePayload {
+					title: &request.title,
+					body: &request.body,
+					base: &request.base_branch,
+				},
+			)
+			.await?,
+		),
+		None => (
+			GitHubPullRequestOperation::Created,
+			post_json::<_, GitHubPullRequestResponse>(
+				client,
+				&format!("/repos/{}/{}/pulls", request.owner, request.repo),
+				&GitHubPullRequestPayload {
+					title: &request.title,
+					head: &request.head_branch,
+					base: &request.base_branch,
+					body: &request.body,
+					draft: false,
+				},
+			)
+			.await?,
+		),
+	};
+	if !request.labels.is_empty() {
+		let _: serde_json::Value = post_json(
+			client,
+			&format!(
+				"/repos/{}/{}/issues/{}/labels",
+				request.owner, request.repo, pull_request.number
+			),
+			&GitHubLabelsPayload {
+				labels: &request.labels,
+			},
+		)
+		.await?;
+	}
+	if request.auto_merge {
+		enable_pull_request_auto_merge_with_client(client, &pull_request.node_id).await?;
+	}
+	Ok(GitHubPullRequestOutcome {
+		repository: request.repository.clone(),
+		number: pull_request.number,
+		head_branch: request.head_branch.clone(),
+		operation,
+		url: pull_request.html_url,
+	})
+}
+
+async fn lookup_existing_release_with_client(
+	client: &Octocrab,
 	request: &GitHubReleaseRequest,
 ) -> MonochangeResult<Option<GitHubExistingRelease>> {
-	let output = Command::new("gh")
-		.arg("api")
-		.arg(format!(
-			"repos/{}/{}/releases/tags/{}",
-			request.owner, request.repo, request.tag_name
-		))
-		.output()
-		.map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to query existing GitHub release for `{}`: {error}",
-				request.tag_name
-			))
-		})?;
-	if output.status.success() {
-		let release = serde_json::from_slice::<GitHubExistingRelease>(&output.stdout)
-			.map_err(|error| MonochangeError::Config(error.to_string()))?;
-		return Ok(Some(release));
-	}
-	let stderr = String::from_utf8_lossy(&output.stderr);
-	if stderr.contains("HTTP 404") || stderr.contains("Not Found") {
-		return Ok(None);
-	}
-	Err(MonochangeError::Config(format!(
-		"failed to query GitHub release `{}`: {}",
-		request.tag_name,
-		stderr.trim()
-	)))
+	get_optional_json(
+		client,
+		&format!(
+			"/repos/{}/{}/releases/tags/{}",
+			request.owner,
+			request.repo,
+			encode(&request.tag_name)
+		),
+	)
+	.await
 }
 
-fn create_pull_request(request: &GitHubPullRequestRequest) -> MonochangeResult<()> {
-	let mut command = Command::new("gh");
-	command
-		.arg("pr")
-		.arg("create")
-		.arg("--repo")
-		.arg(&request.repository)
-		.arg("--base")
-		.arg(&request.base_branch)
-		.arg("--head")
-		.arg(&request.head_branch)
-		.arg("--title")
-		.arg(&request.title)
-		.arg("--body")
-		.arg(&request.body);
-	for label in &request.labels {
-		command.arg("--label").arg(label);
-	}
-	run_command(command, "create GitHub release pull request")?;
-	Ok(())
-}
-
-fn update_pull_request(request: &GitHubPullRequestRequest, number: u64) -> MonochangeResult<()> {
-	let mut command = Command::new("gh");
-	command
-		.arg("pr")
-		.arg("edit")
-		.arg(number.to_string())
-		.arg("--repo")
-		.arg(&request.repository)
-		.arg("--title")
-		.arg(&request.title)
-		.arg("--body")
-		.arg(&request.body);
-	for label in &request.labels {
-		command.arg("--add-label").arg(label);
-	}
-	run_command(command, "update GitHub release pull request")?;
-	Ok(())
-}
-
-fn enable_pull_request_auto_merge(
+async fn lookup_existing_pull_request_with_client(
+	client: &Octocrab,
 	request: &GitHubPullRequestRequest,
-	number: u64,
-) -> MonochangeResult<()> {
-	run_command(
-		{
-			let mut command = Command::new("gh");
-			command
-				.arg("pr")
-				.arg("merge")
-				.arg(number.to_string())
-				.arg("--repo")
-				.arg(&request.repository)
-				.arg("--auto")
-				.arg("--squash")
-				.arg("--delete-branch=false");
-			command
-		},
-		"enable GitHub pull request auto merge",
-	)?;
-	Ok(())
-}
-
-fn lookup_existing_pull_request(
-	request: &GitHubPullRequestRequest,
-) -> MonochangeResult<Option<GitHubExistingPullRequest>> {
-	let output = Command::new("gh")
-		.arg("pr")
-		.arg("list")
-		.arg("--repo")
-		.arg(&request.repository)
-		.arg("--state")
-		.arg("open")
-		.arg("--head")
-		.arg(&request.head_branch)
-		.arg("--json")
-		.arg("number,url")
-		.output()
-		.map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to query GitHub pull requests for `{}`: {error}",
-				request.head_branch
-			))
-		})?;
-	if !output.status.success() {
-		return Err(MonochangeError::Config(format!(
-			"failed to query GitHub pull requests for `{}`: {}",
-			request.head_branch,
-			String::from_utf8_lossy(&output.stderr).trim()
-		)));
-	}
-	let pull_requests = serde_json::from_slice::<Vec<GitHubExistingPullRequest>>(&output.stdout)
-		.map_err(|error| MonochangeError::Config(error.to_string()))?;
+) -> MonochangeResult<Option<GitHubPullRequestResponse>> {
+	let path = format!(
+		"/repos/{}/{}/pulls?state=open&head={}:{}&base={}&per_page=1",
+		request.owner,
+		request.repo,
+		encode(&request.owner),
+		encode(&request.head_branch),
+		encode(&request.base_branch)
+	);
+	let pull_requests = get_json::<Vec<GitHubPullRequestResponse>>(client, &path).await?;
 	Ok(pull_requests.into_iter().next())
+}
+
+async fn enable_pull_request_auto_merge_with_client(
+	client: &Octocrab,
+	node_id: &str,
+) -> MonochangeResult<()> {
+	let response = client
+		.graphql::<GraphqlEnableAutoMergeResponse>(&json!({
+			"query": "mutation($pullRequestId: ID!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }) { pullRequest { number } } }",
+			"variables": {
+				"pullRequestId": node_id,
+			},
+		}))
+		.await
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to enable GitHub pull request auto merge: {error}"
+			))
+		})?;
+	if response
+		.enable_pull_request_auto_merge
+		.and_then(|payload| payload.pull_request)
+		.is_none()
+	{
+		return Err(MonochangeError::Config(
+			"GitHub pull request auto merge returned no pull request payload".to_string(),
+		));
+	}
+	Ok(())
+}
+
+fn github_runtime() -> MonochangeResult<tokio::runtime::Runtime> {
+	RuntimeBuilder::new_current_thread()
+		.enable_all()
+		.build()
+		.map_err(|error| MonochangeError::Io(format!("failed to build GitHub runtime: {error}")))
+}
+
+fn github_client_from_env() -> MonochangeResult<Octocrab> {
+	let token = env::var("GITHUB_TOKEN")
+		.or_else(|_| env::var("GH_TOKEN"))
+		.map_err(|_| {
+			MonochangeError::Config(
+				"set `GITHUB_TOKEN` (or `GH_TOKEN`) before running GitHub automation".to_string(),
+			)
+		})?;
+	build_github_client(&token, env::var("GITHUB_API_URL").ok().as_deref())
+}
+
+fn build_github_client(token: &str, base_uri: Option<&str>) -> MonochangeResult<Octocrab> {
+	let builder = Octocrab::builder().personal_token(token.to_string());
+	let builder = if let Some(base_uri) = base_uri {
+		builder.base_uri(base_uri).map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to configure GitHub base URL `{base_uri}`: {error}"
+			))
+		})?
+	} else {
+		builder
+	};
+	builder.build().map_err(|error| {
+		MonochangeError::Config(format!("failed to build GitHub API client: {error}"))
+	})
+}
+
+async fn get_optional_json<T>(client: &Octocrab, path: &str) -> MonochangeResult<Option<T>>
+where
+	T: DeserializeOwned,
+{
+	match client.get::<T, _, _>(path, None::<&()>).await {
+		Ok(value) => Ok(Some(value)),
+		Err(octocrab::Error::GitHub { source, .. }) if source.status_code.as_u16() == 404 => {
+			Ok(None)
+		}
+		Err(error) => Err(MonochangeError::Config(format!(
+			"GitHub API GET `{path}` failed: {error}"
+		))),
+	}
+}
+
+async fn get_json<T>(client: &Octocrab, path: &str) -> MonochangeResult<T>
+where
+	T: DeserializeOwned,
+{
+	match client.get::<T, _, _>(path, None::<&()>).await {
+		Ok(value) => Ok(value),
+		Err(error) => Err(MonochangeError::Config(format!(
+			"GitHub API GET `{path}` failed: {error}"
+		))),
+	}
+}
+
+async fn post_json<Body, Response>(
+	client: &Octocrab,
+	path: &str,
+	body: &Body,
+) -> MonochangeResult<Response>
+where
+	Body: Serialize + ?Sized,
+	Response: DeserializeOwned,
+{
+	client.post(path, Some(body)).await.map_err(|error| {
+		MonochangeError::Config(format!("GitHub API POST `{path}` failed: {error}"))
+	})
+}
+
+async fn patch_json<Body, Response>(
+	client: &Octocrab,
+	path: &str,
+	body: &Body,
+) -> MonochangeResult<Response>
+where
+	Body: Serialize + ?Sized,
+	Response: DeserializeOwned,
+{
+	client.patch(path, Some(body)).await.map_err(|error| {
+		MonochangeError::Config(format!("GitHub API PATCH `{path}` failed: {error}"))
+	})
 }
 
 fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
@@ -667,22 +789,6 @@ fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifestTarg
 		}
 	}
 	lines.join("\n")
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubExistingRelease {
-	id: u64,
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubReleaseResponse {
-	html_url: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubExistingPullRequest {
-	number: u64,
-	url: Option<String>,
 }
 
 #[cfg(test)]

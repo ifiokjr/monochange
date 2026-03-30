@@ -72,7 +72,7 @@ Extend CLI and execution logic for:
 
 Recommended responsibilities:
 
-- GitHub REST API client wrapper
+- GitHub REST / GraphQL API client wrapper built on `octocrab`
 - release creation/update logic
 - pull request creation/update logic
 - bot comment/status helpers
@@ -139,6 +139,9 @@ auto_merge = false
 name = "production"
 trigger = "release_pr_merge"
 workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
 ```
 
 ## E. Bot policy config

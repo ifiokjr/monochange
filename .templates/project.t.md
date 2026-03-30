@@ -54,6 +54,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
 - preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
+- model deployment intents for downstream automation and merge-driven release workflows
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -70,6 +71,7 @@ mc change --package monochange --bump minor --reason "add release planning"
 mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
+mc release-deploy --dry-run --format json
 mc release
 ```
 
@@ -164,6 +166,14 @@ base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
+
+[[deployments]]
+name = "production"
+trigger = "release_pr_merge"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
 
 [[workflows]]
 name = "validate"
@@ -271,6 +281,22 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "OpenReleasePullRequest"
+
+[[workflows]]
+name = "release-deploy"
+help_text = "Prepare a release and emit deployment intents"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
 ```
 
 <!-- {/projectSetupConfig} -->

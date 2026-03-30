@@ -95,6 +95,7 @@ use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
+use monochange_core::DeploymentDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::ExtraChangelogSection;
@@ -139,6 +140,8 @@ struct RawWorkspaceConfiguration {
 	defaults: RawWorkspaceDefaults,
 	#[serde(default)]
 	release_notes: RawReleaseNotesSettings,
+	#[serde(default)]
+	deployments: Vec<DeploymentDefinition>,
 	#[serde(default)]
 	package: BTreeMap<String, RawPackageDefinition>,
 	#[serde(default)]
@@ -504,6 +507,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	let RawWorkspaceConfiguration {
 		defaults,
 		release_notes,
+		deployments,
 		package,
 		group,
 		workflows,
@@ -642,9 +646,10 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 
 	validate_workflows(&workflows)?;
 	validate_release_notes_configuration(&contents, &release_notes, &packages, &groups)?;
+	validate_deployments_configuration(&contents, &deployments)?;
 	validate_github_configuration(github.as_ref())?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
-	validate_workflow_runtime_requirements(&workflows, github.as_ref())?;
+	validate_workflow_runtime_requirements(&workflows, github.as_ref(), &deployments)?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -659,6 +664,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		release_notes: ReleaseNotesSettings {
 			change_templates: release_notes.change_templates,
 		},
+		deployments,
 		packages,
 		groups,
 		workflows,
@@ -1350,6 +1356,61 @@ fn validate_extra_changelog_sections(
 	Ok(())
 }
 
+fn validate_deployments_configuration(
+	contents: &str,
+	deployments: &[DeploymentDefinition],
+) -> MonochangeResult<()> {
+	let mut seen_names = BTreeSet::new();
+	for deployment in deployments {
+		if deployment.name.trim().is_empty() {
+			return Err(MonochangeError::Config(
+				"deployment names must not be empty".to_string(),
+			));
+		}
+		if !seen_names.insert(deployment.name.clone()) {
+			return Err(MonochangeError::Config(format!(
+				"duplicate deployment `{}`",
+				deployment.name
+			)));
+		}
+		if deployment.workflow.trim().is_empty() {
+			return Err(config_diagnostic(
+				contents,
+				format!(
+					"deployment `{}` must declare a non-empty workflow",
+					deployment.name
+				),
+				Vec::new(),
+				Some(
+					"set `workflow = \"deploy-production\"` or remove the deployment entry"
+						.to_string(),
+				),
+			));
+		}
+		if deployment
+			.requires
+			.iter()
+			.any(|required| required.trim().is_empty())
+		{
+			return Err(MonochangeError::Config(format!(
+				"deployment `{}` must not include empty `requires` entries",
+				deployment.name
+			)));
+		}
+		if deployment
+			.release_targets
+			.iter()
+			.any(|target| target.trim().is_empty())
+		{
+			return Err(MonochangeError::Config(format!(
+				"deployment `{}` must not include empty `release_targets` entries",
+				deployment.name
+			)));
+		}
+	}
+	Ok(())
+}
+
 fn change_template_variables(template: &str) -> Vec<String> {
 	let mut variables = BTreeSet::new();
 	let mut characters = template.chars().peekable();
@@ -1512,7 +1573,8 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 				| WorkflowStepDefinition::CreateChangeFile
 				| WorkflowStepDefinition::PrepareRelease
 				| WorkflowStepDefinition::PublishGitHubRelease
-				| WorkflowStepDefinition::OpenReleasePullRequest => {}
+				| WorkflowStepDefinition::OpenReleasePullRequest
+				| WorkflowStepDefinition::Deploy { .. } => {}
 			}
 		}
 	}
@@ -1523,6 +1585,7 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 fn validate_workflow_runtime_requirements(
 	workflows: &[WorkflowDefinition],
 	github: Option<&GitHubConfiguration>,
+	deployments: &[DeploymentDefinition],
 ) -> MonochangeResult<()> {
 	for workflow in workflows {
 		if workflow
@@ -1559,6 +1622,28 @@ fn validate_workflow_runtime_requirements(
 					"workflow `{}` uses `OpenReleasePullRequest` but `[github.pull_requests].enabled` is false",
 					workflow.name
 				)));
+			}
+		}
+		for step in &workflow.steps {
+			let WorkflowStepDefinition::Deploy { names } = step else {
+				continue;
+			};
+			if deployments.is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"workflow `{}` uses `Deploy` but no `[[deployments]]` are configured",
+					workflow.name
+				)));
+			}
+			for name in names {
+				if !deployments
+					.iter()
+					.any(|deployment| deployment.name == *name)
+				{
+					return Err(MonochangeError::Config(format!(
+						"workflow `{}` deploy step references unknown deployment `{name}`",
+						workflow.name
+					)));
+				}
 			}
 		}
 	}

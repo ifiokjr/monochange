@@ -531,6 +531,88 @@ sdk: minor
 }
 
 #[test]
+fn workflow_release_dry_run_json_includes_deployment_intents() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = "{path}/changelog.md"
+
+[package.core]
+path = "crates/core"
+versioned_files = ["crates/core/extra.toml"]
+
+[package.app]
+path = "crates/app"
+changelog = "crates/app/changelog.md"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+versioned_files = ["group.toml"]
+tag = true
+release = true
+version_format = "primary"
+
+[[deployments]]
+name = "production"
+trigger = "workflow"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
+
+[deployments.metadata]
+channel = "stable"
+
+[ecosystems.cargo]
+enabled = true
+
+[[workflows]]
+name = "release"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	let json = serde_json::from_str::<serde_json::Value>(&output)
+		.unwrap_or_else(|error| panic!("parse workflow json: {error}"));
+
+	assert_eq!(json["deployments"][0]["name"], "production");
+	assert_eq!(json["deployments"][0]["trigger"], "workflow");
+	assert_eq!(json["deployments"][0]["workflow"], "deploy-production");
+	assert_eq!(json["deployments"][0]["environment"], "production");
+	assert_eq!(json["deployments"][0]["releaseTargets"][0], "sdk");
+	assert_eq!(json["deployments"][0]["requires"][0], "main");
+	assert_eq!(json["deployments"][0]["metadata"]["channel"], "stable");
+}
+
+#[test]
 fn workflow_release_dry_run_discovers_changesets_without_mutating_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);

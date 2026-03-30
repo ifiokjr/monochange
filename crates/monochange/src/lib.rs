@@ -71,6 +71,8 @@ use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::CommandVariable;
+use monochange_core::DeploymentDefinition;
+use monochange_core::DeploymentTrigger;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::ExtraChangelogSection;
@@ -78,6 +80,7 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
+use monochange_core::ReleaseDeploymentIntent;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestCompatibilityEvidence;
@@ -223,6 +226,7 @@ struct WorkflowContext {
 	github_release_results: Vec<String>,
 	release_pull_request_request: Option<GitHubPullRequestRequest>,
 	release_pull_request_result: Option<String>,
+	deployment_intents: Vec<ReleaseDeploymentIntent>,
 	command_logs: Vec<String>,
 }
 
@@ -469,6 +473,7 @@ fn execute_workflow(
 		github_release_results: Vec::new(),
 		release_pull_request_request: None,
 		release_pull_request_result: None,
+		deployment_intents: Vec::new(),
 		command_logs: Vec::new(),
 	};
 	let mut output = None;
@@ -554,8 +559,12 @@ fn execute_workflow(
 							.to_string(),
 					)
 				})?;
-				let manifest =
-					build_release_manifest(workflow, prepared_release, &context.command_logs);
+				let manifest = build_release_manifest(
+					workflow,
+					prepared_release,
+					&context.deployment_intents,
+					&context.command_logs,
+				);
 				if let Some(path) = path {
 					let resolved_path = resolve_config_path(root, path);
 					let rendered = render_release_manifest_json(&manifest)?;
@@ -579,8 +588,12 @@ fn execute_workflow(
 						"`PublishGitHubRelease` requires `[github]` configuration".to_string(),
 					)
 				})?;
-				let manifest =
-					build_release_manifest(workflow, prepared_release, &context.command_logs);
+				let manifest = build_release_manifest(
+					workflow,
+					prepared_release,
+					&context.deployment_intents,
+					&context.command_logs,
+				);
 				context.github_release_requests = build_release_requests(&github, &manifest);
 				if context.dry_run {
 					context.github_release_results = context
@@ -626,8 +639,12 @@ fn execute_workflow(
 						"`OpenReleasePullRequest` requires `[github]` configuration".to_string(),
 					)
 				})?;
-				let manifest =
-					build_release_manifest(workflow, prepared_release, &context.command_logs);
+				let manifest = build_release_manifest(
+					workflow,
+					prepared_release,
+					&context.deployment_intents,
+					&context.command_logs,
+				);
 				let request = build_release_pull_request_request(&github, &manifest);
 				if context.dry_run {
 					context.release_pull_request_result = Some(format!(
@@ -648,6 +665,20 @@ fn execute_workflow(
 					));
 				}
 				context.release_pull_request_request = Some(request);
+				output = None;
+			}
+			WorkflowStepDefinition::Deploy { names } => {
+				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+					MonochangeError::Config(
+						"`Deploy` requires a previous `PrepareRelease` step".to_string(),
+					)
+				})?;
+				let configuration = load_workspace_configuration(root)?;
+				context.deployment_intents = resolve_deployment_intents(
+					&configuration.deployments,
+					&prepared_release.release_targets,
+					names,
+				)?;
 				output = None;
 			}
 			WorkflowStepDefinition::Command {
@@ -673,8 +704,12 @@ fn execute_workflow(
 			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 		return match format {
 			OutputFormat::Json => {
-				let manifest =
-					build_release_manifest(workflow, prepared_release, &context.command_logs);
+				let manifest = build_release_manifest(
+					workflow,
+					prepared_release,
+					&context.deployment_intents,
+					&context.command_logs,
+				);
 				render_release_workflow_json(
 					&manifest,
 					&context.github_release_requests,
@@ -885,6 +920,15 @@ fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowConte
 		if let Some(release_pull_request_result) = &context.release_pull_request_result {
 			lines.push("release pull request:".to_string());
 			lines.push(format!("- {release_pull_request_result}"));
+		}
+		if !context.deployment_intents.is_empty() {
+			lines.push("deployments:".to_string());
+			for deployment in &context.deployment_intents {
+				lines.push(format!(
+					"- {} -> {} ({})",
+					deployment.name, deployment.workflow, deployment.trigger
+				));
+			}
 		}
 		if !prepared_release.changed_files.is_empty() {
 			lines.push("changed files:".to_string());
@@ -2420,9 +2464,69 @@ fn render_discovery_report(
 	}
 }
 
+fn resolve_deployment_intents(
+	deployments: &[DeploymentDefinition],
+	release_targets: &[ReleaseTarget],
+	names: &[String],
+) -> MonochangeResult<Vec<ReleaseDeploymentIntent>> {
+	let selected_deployments = if names.is_empty() {
+		deployments
+			.iter()
+			.filter(|deployment| deployment.trigger == DeploymentTrigger::Workflow)
+			.collect::<Vec<_>>()
+	} else {
+		names
+			.iter()
+			.map(|name| {
+				deployments
+					.iter()
+					.find(|deployment| deployment.name == *name)
+					.ok_or_else(|| {
+						MonochangeError::Config(format!(
+							"unknown deployment `{name}` requested by workflow deploy step"
+						))
+					})
+			})
+			.collect::<Result<Vec<_>, _>>()?
+	};
+	let release_target_ids = release_targets
+		.iter()
+		.map(|target| target.id.as_str())
+		.collect::<BTreeSet<_>>();
+	Ok(selected_deployments
+		.into_iter()
+		.map(|deployment| {
+			let deployment_release_targets = if deployment.release_targets.is_empty() {
+				release_targets
+					.iter()
+					.filter(|target| target.release)
+					.map(|target| target.id.clone())
+					.collect::<Vec<_>>()
+			} else {
+				deployment
+					.release_targets
+					.iter()
+					.filter(|target| release_target_ids.contains(target.as_str()))
+					.cloned()
+					.collect::<Vec<_>>()
+			};
+			ReleaseDeploymentIntent {
+				name: deployment.name.clone(),
+				trigger: deployment.trigger,
+				workflow: deployment.workflow.clone(),
+				environment: deployment.environment.clone(),
+				release_targets: deployment_release_targets,
+				requires: deployment.requires.clone(),
+				metadata: deployment.metadata.clone(),
+			}
+		})
+		.collect())
+}
+
 fn build_release_manifest(
 	workflow: &WorkflowDefinition,
 	prepared_release: &PreparedRelease,
+	deployment_intents: &[ReleaseDeploymentIntent],
 	_command_logs: &[String],
 ) -> ReleaseManifest {
 	ReleaseManifest {
@@ -2459,7 +2563,7 @@ fn build_release_manifest(
 			})
 			.collect(),
 		deleted_changesets: prepared_release.deleted_changesets.clone(),
-		deployments: Vec::new(),
+		deployments: deployment_intents.to_vec(),
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: prepared_release

@@ -498,6 +498,10 @@ pub enum WorkflowStepDefinition {
 	},
 	PublishGitHubRelease,
 	OpenReleasePullRequest,
+	Deploy {
+		#[serde(default)]
+		names: Vec<String>,
+	},
 	Command {
 		command: String,
 		#[serde(default)]
@@ -507,6 +511,47 @@ pub enum WorkflowStepDefinition {
 		#[serde(default)]
 		variables: Option<BTreeMap<String, CommandVariable>>,
 	},
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DeploymentTrigger {
+	#[default]
+	Workflow,
+	ReleasePrMerge,
+	ReleasePublished,
+}
+
+impl DeploymentTrigger {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Workflow => "workflow",
+			Self::ReleasePrMerge => "release_pr_merge",
+			Self::ReleasePublished => "release_published",
+		}
+	}
+}
+
+impl fmt::Display for DeploymentTrigger {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DeploymentDefinition {
+	pub name: String,
+	pub trigger: DeploymentTrigger,
+	pub workflow: String,
+	#[serde(default)]
+	pub environment: Option<String>,
+	#[serde(default)]
+	pub release_targets: Vec<String>,
+	#[serde(default)]
+	pub requires: Vec<String>,
+	#[serde(default)]
+	pub metadata: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -690,10 +735,14 @@ pub struct ReleaseManifestPlan {
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseDeploymentIntent {
 	pub name: String,
+	pub trigger: DeploymentTrigger,
+	pub workflow: String,
 	#[serde(default)]
 	pub environment: Option<String>,
 	#[serde(default)]
 	pub release_targets: Vec<String>,
+	#[serde(default)]
+	pub requires: Vec<String>,
 	#[serde(default)]
 	pub metadata: BTreeMap<String, String>,
 }
@@ -799,6 +848,7 @@ pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
 	pub defaults: WorkspaceDefaults,
 	pub release_notes: ReleaseNotesSettings,
+	pub deployments: Vec<DeploymentDefinition>,
 	pub packages: Vec<PackageDefinition>,
 	pub groups: Vec<GroupDefinition>,
 	pub workflows: Vec<WorkflowDefinition>,

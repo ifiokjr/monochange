@@ -45,11 +45,11 @@
 
 ## Phase 5 — Deployment orchestration
 
-- [ ] T050 Add deployment intent types and config parsing.
-- [ ] T051 Add workflow support for `Deploy` or manifest-driven deployment orchestration.
-- [ ] T052 Add merge-trigger examples in `.github/workflows/` documentation.
-- [ ] T053 Add tests for deployment trigger evaluation and environment metadata.
-- [ ] T054 Document safe deployment gating and environment usage.
+- [x] T050 Add deployment intent types and config parsing.
+- [x] T051 Add workflow support for `Deploy` or manifest-driven deployment orchestration.
+- [x] T052 Add merge-trigger examples in `.github/workflows/` documentation.
+- [x] T053 Add tests for deployment trigger evaluation and environment metadata.
+- [x] T054 Document safe deployment gating and environment usage.
 
 ## Phase 6 — Changeset bot policy
 

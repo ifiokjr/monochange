@@ -31,9 +31,9 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 ## Public entry points
 
 - `build_release_requests(config, manifest)` converts a release manifest into GitHub release requests
-- `publish_release_requests(requests)` publishes requests through the `gh` CLI when available
+- `publish_release_requests(requests)` publishes requests through the GitHub API via `octocrab`
 - `build_release_pull_request_request(config, manifest)` converts a release manifest into a GitHub release-PR request
-- `publish_release_pull_request(root, request, tracked_paths)` creates or updates a release PR through `git` and `gh`
+- `publish_release_pull_request(root, request, tracked_paths)` creates or updates a release PR through `git` and the GitHub API
 
 ## Example
 

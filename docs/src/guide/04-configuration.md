@@ -196,6 +196,22 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "OpenReleasePullRequest"
 
+[[workflows]]
+name = "release-deploy"
+help_text = "Prepare a release and emit deployment intents"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
+
 [[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
@@ -240,6 +256,14 @@ base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
+
+[[deployments]]
+name = "production"
+trigger = "release_pr_merge"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
 ```
 
 <!-- {/configurationGitHubSnippet} -->
@@ -313,9 +337,10 @@ Current implementation notes:
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `gh` for live publishing outside dry-run mode
-- GitHub release pull requests currently expect `[github.pull_requests]` and use `git` plus `gh` for live branch, commit, push, and PR update operations
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, and `Command`
+- GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
+- GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
+- deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository workflows can decide when and how to execute them
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 

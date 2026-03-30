@@ -14,9 +14,17 @@ description = "GitHub release payload rendering and publishing for monochange"
 
 [dependencies]
 monochange_core = { workspace = true }
+octocrab = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+urlencoding = "2"
+
+[dev-dependencies]
+httpmock = "0.7"
+temp-env = "0.3"
+tempfile = "3"
 
 [lints]
 workspace = true
