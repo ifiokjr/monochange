@@ -39,11 +39,7 @@ path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
-change_templates = [
-	"#### $summary\n\n$details\n\n$provenance",
-	"#### $summary\n\n$provenance",
-	"- $summary",
-]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
 
 [group.main.changelog]
 path = "changelog.md"
@@ -90,9 +86,6 @@ type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
-
-[[cli.publish-release.steps]]
-type = "CommentReleasedIssues"
 
 [cli.release-pr]
 help_text = "Prepare a release and open or update a provider release request"

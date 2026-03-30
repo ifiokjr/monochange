@@ -162,11 +162,7 @@ CLI commands are user-defined top-level commands. Each `[cli.<command>]` entry b
 
 ```toml
 [release_notes]
-change_templates = [
-	"#### $summary\n\n$details\n\n$provenance",
-	"#### $summary\n\n$provenance",
-	"- $summary",
-]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
 
 [package.core]
 path = "crates/core"
@@ -220,9 +216,6 @@ type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
-
-[[cli.publish-release.steps]]
-type = "CommentReleasedIssues"
 
 [cli.release-pr]
 help_text = "Prepare a release and open or update a provider release request"
@@ -387,7 +380,7 @@ MonoChange currently supports two changelog formats:
 
 Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
 
-You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, `$type`, and `$provenance`.
+You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`. Git-derived template variables are planned next.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 
