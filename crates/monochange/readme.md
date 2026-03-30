@@ -14,11 +14,11 @@
 
 `monochange` is the top-level entry point for the workspace.
 
-Reach for this crate when you want one API and CLI surface that discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, exposes top-level commands from `monochange.toml`, and runs configured release workflows from those definitions.
+Reach for this crate when you want one API and CLI surface that discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, exposes top-level commands from `monochange.toml`, and runs configured CLI commands from those definitions.
 
 ## Why use it?
 
-- coordinate one workflow-defined CLI across several package ecosystems
+- coordinate one config-defined CLI across several package ecosystems
 - expose discovery, change creation, and release preparation as both commands and library calls
 - connect configuration loading, package discovery, graph propagation, and semver evidence in one place
 
@@ -26,7 +26,7 @@ Reach for this crate when you want one API and CLI surface that discovers packag
 
 - shipping the `mc` CLI in CI or local release tooling
 - embedding the full end-to-end planner instead of wiring the lower-level crates together yourself
-- generating starter config with `mc init` and then evolving the workflow surface over time
+- generating starter config with `mc init` and then evolving the CLI command surface over time
 
 ## Key commands
 
@@ -41,10 +41,10 @@ mc release --dry-run --format json
 
 - aggregate all supported ecosystem adapters
 - load `monochange.toml`
-- synthesize default workflows when config does not declare any
+- synthesize default CLI commands when config does not declare any
 - resolve change input files
-- render discovery and release workflow output in text or JSON
-- execute configured release workflows
+- render discovery and release command output in text or JSON
+- execute configured CLI commands
 - preview or publish GitHub releases from prepared release data
 - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 

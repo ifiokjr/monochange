@@ -12,7 +12,7 @@
 
 <!-- {=monochangeConfigCrateDocs} -->
 
-`monochange_config` parses and validates the inputs that drive planning and release workflows.
+`monochange_config` parses and validates the inputs that drive planning and release commands.
 
 Reach for this crate when you need to load `monochange.toml`, resolve package references, or turn `.changeset/*.md` files into validated change signals for the planner.
 
@@ -20,7 +20,7 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 
 - centralize config parsing and validation rules in one place
 - resolve package references against discovered workspace packages
-- keep workflow definitions, version groups, and change files aligned with the planner's expectations
+- keep CLI command definitions, version groups, and change files aligned with the planner's expectations
 
 ## Best for
 
@@ -38,9 +38,9 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 ## Responsibilities
 
 - load `monochange.toml`
-- validate version groups and workflows
+- validate version groups and CLI commands
 - resolve package references against discovered packages
-- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and workflow GitHub/manifest/policy steps
+- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and command GitHub/manifest/policy steps
 
 ## Example
 

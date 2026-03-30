@@ -109,11 +109,11 @@
 
 `monochange` is the top-level entry point for the workspace.
 
-Reach for this crate when you want one API and CLI surface that discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, exposes top-level commands from `monochange.toml`, and runs configured release workflows from those definitions.
+Reach for this crate when you want one API and CLI surface that discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter workspaces, exposes top-level commands from `monochange.toml`, and runs configured CLI commands from those definitions.
 
 ## Why use it?
 
-- coordinate one workflow-defined CLI across several package ecosystems
+- coordinate one config-defined CLI across several package ecosystems
 - expose discovery, change creation, and release preparation as both commands and library calls
 - connect configuration loading, package discovery, graph propagation, and semver evidence in one place
 
@@ -121,7 +121,7 @@ Reach for this crate when you want one API and CLI surface that discovers packag
 
 - shipping the `mc` CLI in CI or local release tooling
 - embedding the full end-to-end planner instead of wiring the lower-level crates together yourself
-- generating starter config with `mc init` and then evolving the workflow surface over time
+- generating starter config with `mc init` and then evolving the CLI command surface over time
 
 ## Key commands
 
@@ -136,10 +136,10 @@ mc release --dry-run --format json
 
 - aggregate all supported ecosystem adapters
 - load `monochange.toml`
-- synthesize default workflows when config does not declare any
+- synthesize default CLI commands when config does not declare any
 - resolve change input files
-- render discovery and release workflow output in text or JSON
-- execute configured release workflows
+- render discovery and release command output in text or JSON
+- execute configured CLI commands
 - preview or publish GitHub releases from prepared release data
 - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 
@@ -154,7 +154,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 ## Why use it?
 
 - avoid redefining package and release domain models in each crate
-- share one error and result surface across discovery, planning, and workflow layers
+- share one error and result surface across discovery, planning, and command layers
 - pass normalized workspace data between adapters and planners without extra translation
 
 ## Best for
@@ -232,7 +232,7 @@ Reach for this crate when you want to scan Cargo workspaces into normalized `mon
 
 <!-- {@monochangeConfigCrateDocs} -->
 
-`monochange_config` parses and validates the inputs that drive planning and release workflows.
+`monochange_config` parses and validates the inputs that drive planning and release commands.
 
 Reach for this crate when you need to load `monochange.toml`, resolve package references, or turn `.changeset/*.md` files into validated change signals for the planner.
 
@@ -240,7 +240,7 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 
 - centralize config parsing and validation rules in one place
 - resolve package references against discovered workspace packages
-- keep workflow definitions, version groups, and change files aligned with the planner's expectations
+- keep CLI command definitions, version groups, and change files aligned with the planner's expectations
 
 ## Best for
 
@@ -258,9 +258,9 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 ## Responsibilities
 
 - load `monochange.toml`
-- validate version groups and workflows
+- validate version groups and CLI commands
 - resolve package references against discovered packages
-- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and workflow GitHub/manifest/policy steps
+- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and command GitHub/manifest/policy steps
 
 ## Example
 
@@ -376,7 +376,7 @@ use monochange_core::VersionFormat;
 use monochange_github::build_release_requests;
 
 let manifest = ReleaseManifest {
-    workflow: "release".to_string(),
+    command: "release".to_string(),
     dry_run: true,
     version: Some("1.2.0".to_string()),
     group_version: Some("1.2.0".to_string()),

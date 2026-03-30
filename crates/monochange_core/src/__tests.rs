@@ -2,13 +2,14 @@ use std::path::PathBuf;
 
 use semver::Version;
 
-use crate::default_workflows;
+use crate::default_cli_commands;
 use crate::materialize_dependency_edges;
 use crate::render_release_notes;
 use crate::BumpSeverity;
 use crate::ChangelogFormat;
 use crate::ChangelogTarget;
 use crate::ChangesetPolicyStatus;
+use crate::CliStepDefinition;
 use crate::DependencyKind;
 use crate::DeploymentTrigger;
 use crate::Ecosystem;
@@ -25,7 +26,6 @@ use crate::ReleaseNotesSection;
 use crate::ReleaseNotesSettings;
 use crate::ReleaseOwnerKind;
 use crate::VersionFormat;
-use crate::WorkflowStepDefinition;
 use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
 
@@ -142,22 +142,22 @@ fn github_changeset_bot_settings_default_to_opt_in_enforcement() {
 }
 
 #[test]
-fn default_workflows_expose_validate_discover_change_and_release() {
-	let workflows = default_workflows();
-	let workflow_names = workflows
+fn default_cli_commands_expose_validate_discover_change_and_release() {
+	let cli = default_cli_commands();
+	let cli_command_names = cli
 		.iter()
-		.map(|workflow| workflow.name.as_str())
+		.map(|cli_command| cli_command.name.as_str())
 		.collect::<Vec<_>>();
 	assert_eq!(
-		workflow_names,
+		cli_command_names,
 		vec!["validate", "discover", "change", "release"]
 	);
-	let validate_workflow = workflows
+	let validate_cli_command = cli
 		.first()
-		.unwrap_or_else(|| panic!("expected validate workflow"));
+		.unwrap_or_else(|| panic!("expected validate cli command"));
 	assert_eq!(
-		validate_workflow.steps,
-		vec![WorkflowStepDefinition::Validate]
+		validate_cli_command.steps,
+		vec![CliStepDefinition::Validate]
 	);
 }
 
@@ -299,7 +299,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 			release: true,
 			version_format: VersionFormat::Primary,
 		}],
-		workflows: Vec::new(),
+		cli: Vec::new(),
 		github: None,
 		cargo: EcosystemSettings::default(),
 		npm: EcosystemSettings::default(),

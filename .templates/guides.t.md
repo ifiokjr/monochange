@@ -91,111 +91,105 @@ change_templates = ["#### $summary\n\n$details", "- $summary"]
 path = "crates/core"
 extra_changelog_sections = [{ name = "Security", types = ["security"] }]
 
-[[workflows]]
-name = "discover"
+[cli.discover]
 help_text = "Discover packages across supported ecosystems"
 
-[[workflows.inputs]]
+[[cli.discover.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.discover.steps]]
 type = "Discover"
 
-[[workflows]]
-name = "release"
+[cli.release]
 help_text = "Prepare a release from discovered change files"
 
-[[workflows.inputs]]
+[[cli.release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
-[[workflows]]
-name = "publish-release"
+[cli.publish-release]
 help_text = "Prepare a release and publish GitHub releases"
 
-[[workflows.inputs]]
+[[cli.publish-release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PublishGitHubRelease"
 
-[[workflows]]
-name = "release-pr"
+[cli.release-pr]
 help_text = "Prepare a release and open or update a release pull request"
 
-[[workflows.inputs]]
+[[cli.release-pr.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "OpenReleasePullRequest"
 
-[[workflows]]
-name = "release-deploy"
+[cli.release-deploy]
 help_text = "Prepare a release and emit deployment intents"
 
-[[workflows.inputs]]
+[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "Deploy"
 
-[[workflows]]
-name = "changeset-check"
+[[cli.release-deploy.steps]]
+type = "Command"
+command = "cargo test --workspace --all-features"
+dry_run_command = "cargo test --workspace --all-features"
+shell = true
+
+[cli.changeset-check]
 help_text = "Evaluate pull-request changeset policy"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
-
-[[workflows.steps]]
-type = "Command"
-command = "cargo test --workspace --all-features"
-dry_run = "cargo test --workspace --all-features"
-shell = true
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -204,7 +198,7 @@ shell = true
 
 - default command substitution when `variables` is omitted: `$version`, `$group_version`, `$released_packages`, `$changed_files`, and `$changesets`
 - custom command substitution when `variables` is present: map your own replacement strings to variable names such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
-- `dry_run` on a `Command` step replaces `command` only when the workflow is run with `--dry-run`
+- `dry_run_command` on a `Command` step replaces `command` only when the CLI command is run with `--dry-run`
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 
 <!-- {/configurationWorkflowVariables} -->
@@ -281,15 +275,15 @@ Package references in changesets and CLI commands should use configured package 
 
 Current implementation notes:
 
-- `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven workflows in this milestone
+- `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven CLI commands in this milestone
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
 - GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
-- changeset policy workflows currently expect `[github.bot.changesets]`, a `changed_path` workflow input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
-- deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository workflows can decide when and how to execute them
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `EnforceChangesetPolicy`, and `Command`
+- changeset policy commands currently expect `[github.bot.changesets]`, a `changed_path` command input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
+- deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `EnforceChangesetPolicy`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -395,7 +389,7 @@ evidence:
 
 <!-- {@releaseWorkflowBehavior} -->
 
-`mc release` is a workflow-defined top-level command. When your config omits workflows, MonoChange synthesizes the default `release` workflow automatically.
+`mc release` is a config-defined top-level command. When your config omits `[cli.<command>]` entries, MonoChange synthesizes the default `release` command automatically.
 
 During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
 
@@ -410,7 +404,7 @@ Current `PrepareRelease` behavior:
 - can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
 - can preview or publish GitHub releases via `PublishGitHubRelease`
 - can preview or open/update release pull requests via `OpenReleasePullRequest`
-- can emit deployment intents via `Deploy` for merge-driven or workflow-driven deploy orchestration
+- can emit deployment intents via `Deploy` for merge-driven or CI-driven deploy orchestration
 - can evaluate pull-request changeset policy via `EnforceChangesetPolicy` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
