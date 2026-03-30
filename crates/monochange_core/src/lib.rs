@@ -402,6 +402,10 @@ pub struct PackageDefinition {
 	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
+	#[serde(default)]
+	pub ignored_paths: Vec<String>,
+	#[serde(default)]
+	pub additional_paths: Vec<String>,
 	pub tag: bool,
 	pub release: bool,
 	pub version_format: VersionFormat,
@@ -506,7 +510,7 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		names: Vec<String>,
 	},
-	EnforceChangesetPolicy,
+	VerifyChangesets,
 	Command {
 		command: String,
 		#[serde(default, alias = "dry_run")]
@@ -804,19 +808,17 @@ pub struct GitHubPullRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct GitHubChangesetBotSettings {
+pub struct ChangesetVerificationSettings {
 	pub enabled: bool,
 	pub required: bool,
 	pub skip_labels: Vec<String>,
 	pub comment_on_failure: bool,
-	pub changed_paths: Vec<String>,
-	pub ignored_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
-pub struct GitHubBotSettings {
+pub struct ChangesetSettings {
 	#[serde(default)]
-	pub changesets: GitHubChangesetBotSettings,
+	pub verify: ChangesetVerificationSettings,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -867,6 +869,12 @@ pub struct ChangesetPolicyEvaluation {
 	#[serde(default)]
 	pub changeset_paths: Vec<String>,
 	#[serde(default)]
+	pub affected_package_ids: Vec<String>,
+	#[serde(default)]
+	pub covered_package_ids: Vec<String>,
+	#[serde(default)]
+	pub uncovered_package_ids: Vec<String>,
+	#[serde(default)]
 	pub errors: Vec<String>,
 }
 
@@ -895,15 +903,13 @@ impl Default for GitHubPullRequestSettings {
 	}
 }
 
-impl Default for GitHubChangesetBotSettings {
+impl Default for ChangesetVerificationSettings {
 	fn default() -> Self {
 		Self {
-			enabled: false,
+			enabled: true,
 			required: true,
 			skip_labels: Vec::new(),
 			comment_on_failure: true,
-			changed_paths: Vec::new(),
-			ignored_paths: Vec::new(),
 		}
 	}
 }
@@ -916,8 +922,6 @@ pub struct GitHubConfiguration {
 	pub releases: GitHubReleaseSettings,
 	#[serde(default)]
 	pub pull_requests: GitHubPullRequestSettings,
-	#[serde(default)]
-	pub bot: GitHubBotSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -940,6 +944,7 @@ pub struct WorkspaceConfiguration {
 	pub packages: Vec<PackageDefinition>,
 	pub groups: Vec<GroupDefinition>,
 	pub cli: Vec<CliCommandDefinition>,
+	pub changesets: ChangesetSettings,
 	pub github: Option<GitHubConfiguration>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
@@ -1099,6 +1104,42 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				choices: vec!["text".to_string(), "json".to_string()],
 			}],
 			steps: vec![CliStepDefinition::PrepareRelease],
+		},
+		CliCommandDefinition {
+			name: "verify".to_string(),
+			help_text: Some(
+				"Verify that changed files are covered by attached changesets".to_string(),
+			),
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Output format".to_string()),
+					required: false,
+					default: Some("text".to_string()),
+					choices: vec!["text".to_string(), "json".to_string()],
+				},
+				CliInputDefinition {
+					name: "changed_paths".to_string(),
+					kind: CliInputKind::StringList,
+					help_text: Some(
+						"Changed repository paths to verify against attached changesets"
+							.to_string(),
+					),
+					required: true,
+					default: None,
+					choices: Vec::new(),
+				},
+				CliInputDefinition {
+					name: "label".to_string(),
+					kind: CliInputKind::StringList,
+					help_text: Some("Labels that may skip verification".to_string()),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+			],
+			steps: vec![CliStepDefinition::VerifyChangesets],
 		},
 	]
 }

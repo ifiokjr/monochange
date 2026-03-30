@@ -176,26 +176,26 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.changeset-check]
-help_text = "Evaluate pull-request changeset policy"
+[cli.verify]
+help_text = "Verify that changed files are covered by attached changesets"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -230,13 +230,11 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = ["crates/**", "packages/**"]
-ignored_paths = ["docs/**", "*.md"]
 
 [[deployments]]
 name = "production"
@@ -288,9 +286,9 @@ Current implementation notes:
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
 - GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
-- changeset policy commands currently expect `[github.bot.changesets]`, a `changed_path` command input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
+- changeset verification commands expect `[changesets.verify]`, a `changed_paths` command input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `EnforceChangesetPolicy`, and `Command`
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `VerifyChangesets`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -391,7 +389,7 @@ evidence:
 - `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
 - `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
-- `EnforceChangesetPolicy` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
+- `VerifyChangesets` maps changed files onto configured packages, applies package-level `ignored_paths` / `additional_paths`, and checks that attached `.changeset/*.md` files cover every changed package or owning group
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
@@ -414,7 +412,7 @@ Current `PrepareRelease` behavior:
 - can preview or publish GitHub releases via `PublishGitHubRelease`
 - can preview or open/update release pull requests via `OpenReleasePullRequest`
 - can emit deployment intents via `Deploy` for merge-driven or CI-driven deploy orchestration
-- can evaluate pull-request changeset policy via `EnforceChangesetPolicy` using changed paths and labels supplied by CI
+- can verify changed files via `VerifyChangesets` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
@@ -471,7 +469,7 @@ jobs:
           set -euo pipefail
 
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(changeset-check --format json)
+          args=(verify --format json)
 
           for path in $CHANGED_FILES; do
             args+=(--changed-path "$path")
@@ -498,7 +496,7 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 - `mc publish-release` previews or publishes GitHub releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent release pull request
 - `mc release-deploy` emits deployment intents for later workflow execution
-- `mc changeset-check` evaluates pull-request changeset policy from CI-supplied changed paths and labels
+- `mc verify` checks whether changed files are covered by attached changesets
 
 <!-- {/githubAutomationOverview} -->
 
@@ -510,7 +508,7 @@ mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-deploy --dry-run --format json
-mc changeset-check --format json --changed-path crates/monochange/src/lib.rs
+mc verify --format json --changed-path crates/monochange/src/lib.rs
 ```
 
 <!-- {/githubAutomationWorkflowCommands} -->
@@ -591,30 +589,16 @@ type = "OpenReleasePullRequest"
 <!-- {@githubAutomationPolicyAndDeployConfigExample} -->
 
 ```toml
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = [
-	"crates/**",
-	".github/**",
-	"Cargo.toml",
-	"Cargo.lock",
-	"devenv.nix",
-	"devenv.yaml",
-	"devenv.lock",
-	"monochange.toml",
-	"codecov.yml",
-	"deny.toml",
-	"scripts/**",
-]
-ignored_paths = [
-	".changeset/**",
-	"docs/**",
-	"**/*.md",
-	"license",
-]
+
+[package.monochange]
+path = "crates/monochange"
+ignored_paths = ["tests/fixtures/**"]
+additional_paths = ["scripts/**"]
 
 [[deployments]]
 name = "docs"
@@ -640,26 +624,26 @@ type = "PrepareRelease"
 [[cli.release-deploy.steps]]
 type = "Deploy"
 
-[cli.changeset-check]
-help_text = "Evaluate pull-request changeset policy"
+[cli.verify]
+help_text = "Verify that changed files are covered by attached changesets"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 ```
 
 <!-- {/githubAutomationPolicyAndDeployConfigExample} -->
@@ -669,8 +653,8 @@ type = "EnforceChangesetPolicy"
 The MonoChange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
-- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `changeset-check` as top-level CLI commands
-- running a real `changeset-policy` GitHub Actions workflow that shells into `mc changeset-check`
+- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` as top-level CLI commands
+- running a real `changeset-policy` GitHub Actions workflow that shells into `mc verify`
 - keeping docs deployment represented as a deployment intent so downstream workflows can reason about it from the release manifest
 
 <!-- {/githubAutomationDogfoodNotes} -->

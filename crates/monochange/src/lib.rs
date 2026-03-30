@@ -37,7 +37,7 @@
 //! - render discovery and release command output in text or JSON
 //! - execute configured CLI commands
 //! - preview or publish GitHub releases from prepared release data
-//! - evaluate pull-request changeset policy from CI-supplied changed paths and labels
+//! - verify that changed files are covered by attached changesets from CI-supplied changed paths and labels
 //! <!-- {/monochangeCrateDocs} -->
 
 use std::collections::BTreeMap;
@@ -74,6 +74,8 @@ use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
+use monochange_core::ChangesetSettings;
+use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
@@ -238,6 +240,7 @@ struct CliContext {
 #[derive(Debug, Serialize)]
 struct InitWorkspaceConfiguration {
 	defaults: WorkspaceDefaults,
+	changesets: ChangesetSettings,
 	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
 	package: BTreeMap<String, InitPackageDefinition>,
 	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -263,6 +266,10 @@ struct InitPackageDefinition {
 	changelog: Option<PathBuf>,
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	versioned_files: Vec<VersionedFileDefinition>,
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	ignored_paths: Vec<String>,
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	additional_paths: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -356,10 +363,16 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 		.long(long_name)
 		.required(input.required)
 		.help(input.help_text.clone().unwrap_or_default());
+	if input.name == "changed_paths" {
+		arg = arg.visible_alias("changed-path");
+	}
 
 	arg = match input.kind {
 		CliInputKind::String => arg.value_name(value_name),
-		CliInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
+		CliInputKind::StringList => arg
+			.value_name(value_name)
+			.action(ArgAction::Append)
+			.num_args(1..),
 		CliInputKind::Path => arg.value_name("PATH"),
 		CliInputKind::Choice => {
 			arg.value_name(value_name)
@@ -706,15 +719,15 @@ fn execute_cli_command(
 				)?;
 				output = None;
 			}
-			CliStepDefinition::EnforceChangesetPolicy => {
+			CliStepDefinition::VerifyChangesets => {
 				let changed_paths = context
 					.inputs
-					.get("changed_path")
+					.get("changed_paths")
 					.cloned()
 					.unwrap_or_default();
 				let labels = context.inputs.get("label").cloned().unwrap_or_default();
 				context.changeset_policy_evaluation =
-					Some(evaluate_changeset_policy(root, &changed_paths, &labels)?);
+					Some(verify_changesets(root, &changed_paths, &labels)?);
 				output = None;
 			}
 			CliStepDefinition::Command {
@@ -993,7 +1006,7 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 		}
 	}
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
-		lines.push(format!("changeset policy: {}", evaluation.status));
+		lines.push(format!("changeset verification: {}", evaluation.status));
 		lines.push(evaluation.summary.clone());
 		if !evaluation.matched_skip_labels.is_empty() {
 			lines.push(format!(
@@ -1011,6 +1024,18 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 			lines.push("changeset files:".to_string());
 			for path in &evaluation.changeset_paths {
 				lines.push(format!("- {path}"));
+			}
+		}
+		if !evaluation.affected_package_ids.is_empty() {
+			lines.push("affected packages:".to_string());
+			for package_id in &evaluation.affected_package_ids {
+				lines.push(format!("- {package_id}"));
+			}
+		}
+		if !evaluation.uncovered_package_ids.is_empty() {
+			lines.push("uncovered packages:".to_string());
+			for package_id in &evaluation.uncovered_package_ids {
+				lines.push(format!("- {package_id}"));
 			}
 		}
 		if !evaluation.errors.is_empty() {
@@ -1053,22 +1078,16 @@ fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 	}
 }
 
-pub fn evaluate_changeset_policy(
+pub fn verify_changesets(
 	root: &Path,
 	changed_paths: &[String],
 	labels: &[String],
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
 	let configuration = load_workspace_configuration(root)?;
-	let github = configuration.github.as_ref().ok_or_else(|| {
-		MonochangeError::Config(
-			"changeset policy evaluation requires `[github]` configuration".to_string(),
-		)
-	})?;
-	let policy = &github.bot.changesets;
-	if !policy.enabled {
+	let verify = &configuration.changesets.verify;
+	if !verify.enabled {
 		return Err(MonochangeError::Config(
-			"changeset policy evaluation requires `[github.bot.changesets].enabled = true`"
-				.to_string(),
+			"changeset verification requires `[changesets.verify].enabled = true`".to_string(),
 		));
 	}
 
@@ -1086,7 +1105,7 @@ pub fn evaluate_changeset_policy(
 	let matched_skip_labels = labels
 		.iter()
 		.filter(|label| {
-			policy
+			verify
 				.skip_labels
 				.iter()
 				.any(|candidate| candidate == *label)
@@ -1098,77 +1117,119 @@ pub fn evaluate_changeset_policy(
 		.filter(|path| is_changeset_markdown_path(path))
 		.cloned()
 		.collect::<Vec<_>>();
+	let config_ids_by_package_id = configuration
+		.packages
+		.iter()
+		.map(|package| {
+			resolve_package_reference(&package.id, &configuration.root_path, &discovery.packages)
+				.map(|package_id| (package_id, package.id.clone()))
+		})
+		.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
+
+	let mut matched_paths = Vec::new();
 	let mut ignored_paths = Vec::new();
-	let mut candidate_paths = Vec::new();
+	let mut affected_package_ids = BTreeSet::new();
 	for path in changed_paths
 		.iter()
 		.filter(|path| !is_changeset_markdown_path(path))
 	{
-		if matches_any_pattern(&policy.ignored_paths, path) {
+		let mut matched_any_package = false;
+		let mut ignored_by_package = false;
+		for package in &configuration.packages {
+			if path_touches_package(path, package) {
+				matched_any_package = true;
+				affected_package_ids.insert(package.id.clone());
+				continue;
+			}
+			if path_is_ignored_for_package(path, package) {
+				ignored_by_package = true;
+			}
+		}
+		if matched_any_package {
+			matched_paths.push(path.clone());
+		} else if ignored_by_package {
 			ignored_paths.push(path.clone());
-		} else {
-			candidate_paths.push(path.clone());
 		}
 	}
-	let matched_paths = if policy.changed_paths.is_empty() {
-		candidate_paths.clone()
-	} else {
-		candidate_paths
-			.into_iter()
-			.filter(|path| matches_any_pattern(&policy.changed_paths, path))
-			.collect::<Vec<_>>()
-	};
 
+	let mut covered_package_ids = BTreeSet::new();
 	let mut errors = Vec::new();
 	for changeset_path in &changeset_paths {
 		let absolute_path = root.join(changeset_path);
 		if !absolute_path.exists() {
 			errors.push(format!(
-				"changed changeset `{changeset_path}` does not exist in the checked-out workspace"
+				"attached changeset `{changeset_path}` does not exist in the checked-out workspace"
 			));
 			continue;
 		}
-		if let Err(error) = load_change_signals(&absolute_path, &configuration, &discovery.packages)
-		{
-			errors.push(error.render());
+		match load_change_signals(&absolute_path, &configuration, &discovery.packages) {
+			Ok(signals) => {
+				for signal in signals {
+					covered_package_ids.insert(
+						config_ids_by_package_id
+							.get(&signal.package_id)
+							.cloned()
+							.unwrap_or(signal.package_id),
+					);
+				}
+			}
+			Err(error) => errors.push(error.render()),
 		}
 	}
 
-	let required = !matched_paths.is_empty() && policy.required && matched_skip_labels.is_empty();
-	let status = if !errors.is_empty() {
-		ChangesetPolicyStatus::Failed
-	} else if !matched_skip_labels.is_empty() {
-		ChangesetPolicyStatus::Skipped
-	} else if matched_paths.is_empty() {
-		ChangesetPolicyStatus::NotRequired
-	} else if required && changeset_paths.is_empty() {
-		ChangesetPolicyStatus::Failed
+	let uncovered_package_ids = affected_package_ids
+		.difference(&covered_package_ids)
+		.cloned()
+		.collect::<Vec<_>>();
+	if matched_skip_labels.is_empty() && !uncovered_package_ids.is_empty() {
+		errors.push(format!(
+			"changed packages are not covered by attached changesets: {}",
+			uncovered_package_ids.join(", ")
+		));
+	}
+
+	let affected_package_ids = affected_package_ids.into_iter().collect::<Vec<_>>();
+	let covered_package_ids = covered_package_ids.into_iter().collect::<Vec<_>>();
+	let required =
+		!affected_package_ids.is_empty() && verify.required && matched_skip_labels.is_empty();
+	let status = if errors.is_empty() {
+		if !matched_skip_labels.is_empty() {
+			ChangesetPolicyStatus::Skipped
+		} else if affected_package_ids.is_empty() {
+			ChangesetPolicyStatus::NotRequired
+		} else {
+			ChangesetPolicyStatus::Passed
+		}
 	} else {
-		ChangesetPolicyStatus::Passed
+		ChangesetPolicyStatus::Failed
 	};
 	let summary = match status {
-		ChangesetPolicyStatus::Failed if !errors.is_empty() => {
-			"changeset policy failed: one or more changed changeset files are invalid".to_string()
+		ChangesetPolicyStatus::Failed if errors
+			.iter()
+			.any(|error| error.contains("not covered by attached changesets")) =>
+		{
+			format!(
+				"changeset verification failed: attached changesets do not cover {} changed package{}",
+				uncovered_package_ids.len(),
+				if uncovered_package_ids.len() == 1 { "" } else { "s" }
+			)
 		}
 		ChangesetPolicyStatus::Failed => {
-			"changeset policy failed: a changeset is required for the matched paths".to_string()
+			"changeset verification failed: one or more attached changeset files are invalid"
+				.to_string()
 		}
 		ChangesetPolicyStatus::Skipped => format!(
-			"changeset policy skipped because the pull request has an allowed label: {}",
+			"changeset verification skipped because the change has an allowed label: {}",
 			matched_skip_labels.join(", ")
 		),
 		ChangesetPolicyStatus::NotRequired => {
-			"changeset policy passed: no changed paths matched the configured policy"
-				.to_string()
-		}
-		ChangesetPolicyStatus::Passed if changeset_paths.is_empty() => {
-			"changeset policy passed: matching paths do not require a changeset under the current policy"
+			"changeset verification passed: no configured packages were affected by the changed files"
 				.to_string()
 		}
 		ChangesetPolicyStatus::Passed => format!(
-			"changeset policy passed: validated {} changed changeset file{}",
-			changeset_paths.len(),
-			if changeset_paths.len() == 1 { "" } else { "s" }
+			"changeset verification passed: attached changesets cover {} changed package{}",
+			affected_package_ids.len(),
+			if affected_package_ids.len() == 1 { "" } else { "s" }
 		),
 	};
 
@@ -1183,10 +1244,13 @@ pub fn evaluate_changeset_policy(
 		matched_paths,
 		ignored_paths,
 		changeset_paths,
+		affected_package_ids,
+		covered_package_ids,
+		uncovered_package_ids,
 		errors,
 	};
-	if evaluation.status == ChangesetPolicyStatus::Failed && policy.comment_on_failure {
-		evaluation.comment = Some(render_changeset_policy_comment(policy, &evaluation));
+	if evaluation.status == ChangesetPolicyStatus::Failed && verify.comment_on_failure {
+		evaluation.comment = Some(render_changeset_verification_comment(verify, &evaluation));
 	}
 
 	Ok(evaluation)
@@ -1205,33 +1269,69 @@ fn is_changeset_markdown_path(path: &str) -> bool {
 			.is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
 }
 
-fn matches_any_pattern(patterns: &[String], path: &str) -> bool {
+fn path_touches_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
+	if matches_any_package_pattern(path, package, &package.additional_paths) {
+		return true;
+	}
+	if !path_is_within_package(path, package) {
+		return false;
+	}
+	!path_is_ignored_for_package(path, package)
+}
+
+fn path_is_ignored_for_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
+	path_is_within_package(path, package)
+		&& matches_any_package_pattern(path, package, &package.ignored_paths)
+}
+
+fn path_is_within_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
+	let package_root = normalize_changed_path(&package.path.to_string_lossy());
+	path == package_root || path.starts_with(&format!("{package_root}/"))
+}
+
+fn matches_any_package_pattern(
+	path: &str,
+	package: &monochange_core::PackageDefinition,
+	patterns: &[String],
+) -> bool {
+	let package_root = normalize_changed_path(&package.path.to_string_lossy());
+	let relative_path = path
+		.strip_prefix(&format!("{package_root}/"))
+		.or_else(|| (path == package_root).then_some(""));
 	patterns.iter().any(|pattern| {
-		Pattern::new(pattern)
-			.ok()
-			.is_some_and(|pattern| pattern.matches(path))
+		Pattern::new(pattern).ok().is_some_and(|compiled| {
+			compiled.matches(path)
+				|| relative_path.is_some_and(|relative_path| compiled.matches(relative_path))
+		})
 	})
 }
 
-fn render_changeset_policy_comment(
-	policy: &monochange_core::GitHubChangesetBotSettings,
+fn render_changeset_verification_comment(
+	verify: &ChangesetVerificationSettings,
 	evaluation: &ChangesetPolicyEvaluation,
 ) -> String {
 	let mut lines = vec![
-		"### MonoChange changeset policy failed".to_string(),
+		"### MonoChange changeset verification failed".to_string(),
 		String::new(),
 		evaluation.summary.clone(),
 	];
 	if !evaluation.matched_paths.is_empty() {
 		lines.push(String::new());
-		lines.push("Matched changed paths:".to_string());
+		lines.push("Changed package paths:".to_string());
 		for path in &evaluation.matched_paths {
 			lines.push(format!("- `{path}`"));
 		}
 	}
+	if !evaluation.affected_package_ids.is_empty() {
+		lines.push(String::new());
+		lines.push("Affected packages:".to_string());
+		for package_id in &evaluation.affected_package_ids {
+			lines.push(format!("- `{package_id}`"));
+		}
+	}
 	if !evaluation.changeset_paths.is_empty() {
 		lines.push(String::new());
-		lines.push("Changed changeset files:".to_string());
+		lines.push("Attached changeset files:".to_string());
 		for path in &evaluation.changeset_paths {
 			lines.push(format!("- `{path}`"));
 		}
@@ -1243,17 +1343,21 @@ fn render_changeset_policy_comment(
 			lines.push(format!("- {error}"));
 		}
 	}
-	if !policy.skip_labels.is_empty() {
+	if !verify.skip_labels.is_empty() {
 		lines.push(String::new());
 		lines.push("Allowed skip labels:".to_string());
-		for label in &policy.skip_labels {
+		for label in &verify.skip_labels {
 			lines.push(format!("- `{label}`"));
 		}
 	}
 	lines.push(String::new());
 	lines.push("How to fix:".to_string());
-	lines.push("- add a `.changeset/*.md` file, for example with `mc change --package <id> --bump patch --reason \"describe the change\"`".to_string());
-	if !policy.skip_labels.is_empty() {
+	lines.push("- add or update a `.changeset/*.md` file so it references every changed package or owning group".to_string());
+	lines.push(
+		"- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`"
+			.to_string(),
+	);
+	if !verify.skip_labels.is_empty() {
 		lines.push(
 			"- or apply one of the configured skip labels when no release note is required"
 				.to_string(),
@@ -1305,6 +1409,8 @@ fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceC
 				package_type: package_type_for_ecosystem(package.ecosystem),
 				changelog,
 				versioned_files: Vec::new(),
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
 			},
 		);
 	}
@@ -1324,6 +1430,14 @@ fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceC
 
 	Ok(InitWorkspaceConfiguration {
 		defaults: WorkspaceDefaults::default(),
+		changesets: ChangesetSettings {
+			verify: ChangesetVerificationSettings {
+				enabled: true,
+				required: true,
+				skip_labels: vec!["no-changeset-required".to_string()],
+				comment_on_failure: true,
+			},
+		},
 		package: package_configs,
 		group: group_configs,
 		cli: default_cli_command_map(),

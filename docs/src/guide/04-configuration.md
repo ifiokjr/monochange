@@ -67,6 +67,8 @@ Optional package fields:
 - `changelog`
 - `empty_update_message`
 - `versioned_files`
+- `ignored_paths`
+- `additional_paths`
 - `tag`
 - `release`
 - `version_format`
@@ -84,6 +86,20 @@ Optional package fields:
 - `"{path}/changelog.md"` or another pattern → replace `{path}` with each package path
 
 A package-level `changelog` value overrides the default for that package.
+
+`ignored_paths` and `additional_paths` are used by `VerifyChangesets`-based CLI commands such as `mc verify`.
+
+- `ignored_paths` are glob patterns evaluated relative to the package root and can exclude files under the package path from triggering changeset verification
+- `additional_paths` are glob patterns that can pull extra repository paths into that package's verification scope, even when those paths live outside the package root
+
+For example:
+
+```toml
+[package.sdk-core]
+path = "crates/sdk_core"
+ignored_paths = ["tests/fixtures/**"]
+additional_paths = ["scripts/release-sdk-core.sh", "Cargo.lock"]
+```
 
 `empty_update_message` lets changelog targets render a readable fallback entry when a version update is required but no direct release notes were recorded for that target. This is especially useful for grouped packages that keep their own changelog entries even when only another member of the group changed.
 
@@ -253,26 +269,26 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.changeset-check]
-help_text = "Evaluate pull-request changeset policy"
+[cli.verify]
+help_text = "Verify that changed files are covered by attached changesets"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -313,13 +329,11 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = ["crates/**", "packages/**"]
-ignored_paths = ["docs/**", "*.md"]
 
 [[deployments]]
 name = "production"
@@ -404,9 +418,9 @@ Current implementation notes:
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
 - GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
-- changeset policy commands currently expect `[github.bot.changesets]`, a `changed_path` command input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
+- changeset verification commands expect `[changesets.verify]`, a `changed_paths` command input, and render reusable diagnostics plus optional failure comments for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `EnforceChangesetPolicy`, and `Command`
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, `VerifyChangesets`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 

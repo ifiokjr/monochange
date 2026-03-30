@@ -46,7 +46,7 @@ mc release --dry-run --format json
 - render discovery and release command output in text or JSON
 - execute configured CLI commands
 - preview or publish GitHub releases from prepared release data
-- evaluate pull-request changeset policy from CI-supplied changed paths and labels
+- verify that changed files are covered by attached changesets from CI-supplied changed paths and labels
 
 <!-- {/monochangeCrateDocs} -->
 

@@ -96,6 +96,8 @@ use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
+use monochange_core::ChangesetSettings;
+use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
@@ -104,8 +106,6 @@ use monochange_core::DeploymentDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::ExtraChangelogSection;
-use monochange_core::GitHubBotSettings;
-use monochange_core::GitHubChangesetBotSettings;
 use monochange_core::GitHubConfiguration;
 use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
@@ -154,6 +154,8 @@ struct RawWorkspaceConfiguration {
 	cli: BTreeMap<String, RawCliCommandDefinition>,
 	#[serde(default)]
 	workflows: Vec<CliCommandDefinition>,
+	#[serde(default)]
+	changesets: RawChangesetSettings,
 	#[serde(default)]
 	github: Option<RawGitHubConfiguration>,
 	#[serde(default)]
@@ -227,6 +229,10 @@ struct RawPackageDefinition {
 	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
+	ignored_paths: Vec<String>,
+	#[serde(default)]
+	additional_paths: Vec<String>,
+	#[serde(default)]
 	tag: bool,
 	#[serde(default)]
 	release: bool,
@@ -289,8 +295,6 @@ struct RawGitHubConfiguration {
 	releases: RawGitHubReleaseSettings,
 	#[serde(default)]
 	pull_requests: RawGitHubPullRequestSettings,
-	#[serde(default)]
-	bot: RawGitHubBotSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -352,8 +356,8 @@ impl Default for RawGitHubPullRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawGitHubChangesetBotSettings {
-	#[serde(default)]
+struct RawChangesetVerificationSettings {
+	#[serde(default = "default_true")]
 	enabled: bool,
 	#[serde(default = "default_true")]
 	required: bool,
@@ -361,29 +365,23 @@ struct RawGitHubChangesetBotSettings {
 	skip_labels: Vec<String>,
 	#[serde(default = "default_true")]
 	comment_on_failure: bool,
-	#[serde(default)]
-	changed_paths: Vec<String>,
-	#[serde(default)]
-	ignored_paths: Vec<String>,
 }
 
-impl Default for RawGitHubChangesetBotSettings {
+impl Default for RawChangesetVerificationSettings {
 	fn default() -> Self {
 		Self {
-			enabled: false,
+			enabled: default_true(),
 			required: default_true(),
 			skip_labels: Vec::new(),
 			comment_on_failure: default_true(),
-			changed_paths: Vec::new(),
-			ignored_paths: Vec::new(),
 		}
 	}
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct RawGitHubBotSettings {
+struct RawChangesetSettings {
 	#[serde(default)]
-	changesets: RawGitHubChangesetBotSettings,
+	verify: RawChangesetVerificationSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -573,6 +571,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		group,
 		cli,
 		workflows,
+		changesets,
 		github,
 		ecosystems,
 	} = raw;
@@ -650,6 +649,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				extra_changelog_sections: package.extra_changelog_sections,
 				empty_update_message: package.empty_update_message,
 				versioned_files: package.versioned_files,
+				ignored_paths: package.ignored_paths,
+				additional_paths: package.additional_paths,
 				tag: package.tag,
 				release: package.release,
 				version_format: package.version_format,
@@ -700,6 +701,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			})
 		})
 		.collect::<Result<Vec<_>, _>>()?;
+	let changesets = ChangesetSettings {
+		verify: ChangesetVerificationSettings {
+			enabled: changesets.verify.enabled,
+			required: changesets.verify.required,
+			skip_labels: changesets.verify.skip_labels,
+			comment_on_failure: changesets.verify.comment_on_failure,
+		},
+	};
 	let github = github.map(|github| GitHubConfiguration {
 		owner: github.owner,
 		repo: github.repo,
@@ -718,24 +727,15 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			labels: github.pull_requests.labels,
 			auto_merge: github.pull_requests.auto_merge,
 		},
-		bot: GitHubBotSettings {
-			changesets: GitHubChangesetBotSettings {
-				enabled: github.bot.changesets.enabled,
-				required: github.bot.changesets.required,
-				skip_labels: github.bot.changesets.skip_labels,
-				comment_on_failure: github.bot.changesets.comment_on_failure,
-				changed_paths: github.bot.changesets.changed_paths,
-				ignored_paths: github.bot.changesets.ignored_paths,
-			},
-		},
 	});
 
 	validate_cli(&cli)?;
 	validate_release_notes_configuration(&contents, &release_notes, &packages, &groups)?;
 	validate_deployments_configuration(&contents, &deployments)?;
+	validate_changesets_configuration(&changesets, &packages)?;
 	validate_github_configuration(github.as_ref())?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
-	validate_cli_runtime_requirements(&cli, github.as_ref(), &deployments)?;
+	validate_cli_runtime_requirements(&cli, &changesets, github.as_ref(), &deployments)?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -755,6 +755,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		packages,
 		groups,
 		cli,
+		changesets,
 		github,
 		cargo: ecosystems.cargo,
 		npm: ecosystems.npm,
@@ -1565,38 +1566,42 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 			"[github.pull_requests].labels must not include empty values".to_string(),
 		));
 	}
-	if github
-		.bot
-		.changesets
+	Ok(())
+}
+
+fn validate_changesets_configuration(
+	changesets: &ChangesetSettings,
+	packages: &[PackageDefinition],
+) -> MonochangeResult<()> {
+	if changesets
+		.verify
 		.skip_labels
 		.iter()
 		.any(|label| label.trim().is_empty())
 	{
 		return Err(MonochangeError::Config(
-			"[github.bot.changesets].skip_labels must not include empty values".to_string(),
+			"[changesets.verify].skip_labels must not include empty values".to_string(),
 		));
 	}
-	for (field, patterns) in [
-		(
-			"[github.bot.changesets].changed_paths",
-			&github.bot.changesets.changed_paths,
-		),
-		(
-			"[github.bot.changesets].ignored_paths",
-			&github.bot.changesets.ignored_paths,
-		),
-	] {
-		for pattern in patterns {
-			if pattern.trim().is_empty() {
-				return Err(MonochangeError::Config(format!(
-					"{field} must not include empty values"
-				)));
+	for package in packages {
+		for (field, patterns) in [
+			("ignored_paths", &package.ignored_paths),
+			("additional_paths", &package.additional_paths),
+		] {
+			for pattern in patterns {
+				if pattern.trim().is_empty() {
+					return Err(MonochangeError::Config(format!(
+						"[package.{}].{field} must not include empty values",
+						package.id
+					)));
+				}
+				Pattern::new(pattern).map_err(|error| {
+					MonochangeError::Config(format!(
+						"[package.{}].{field} contains invalid glob pattern `{pattern}`: {error}",
+						package.id
+					))
+				})?;
 			}
-			Pattern::new(pattern).map_err(|error| {
-				MonochangeError::Config(format!(
-					"{field} contains invalid glob pattern `{pattern}`: {error}"
-				))
-			})?;
 		}
 	}
 	Ok(())
@@ -1698,7 +1703,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::PublishGitHubRelease
 				| CliStepDefinition::OpenReleasePullRequest
 				| CliStepDefinition::Deploy { .. }
-				| CliStepDefinition::EnforceChangesetPolicy => {}
+				| CliStepDefinition::VerifyChangesets => {}
 			}
 		}
 	}
@@ -1708,6 +1713,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 
 fn validate_cli_runtime_requirements(
 	cli: &[CliCommandDefinition],
+	changesets: &ChangesetSettings,
 	github: Option<&GitHubConfiguration>,
 	deployments: &[DeploymentDefinition],
 ) -> MonochangeResult<()> {
@@ -1769,36 +1775,30 @@ fn validate_cli_runtime_requirements(
 						}
 					}
 				}
-				CliStepDefinition::EnforceChangesetPolicy => {
-					let github = github.ok_or_else(|| {
-						MonochangeError::Config(format!(
-							"CLI command `{}` uses `EnforceChangesetPolicy` but `[github]` is not configured",
-							cli_command.name
-						))
-					})?;
-					if !github.bot.changesets.enabled {
+				CliStepDefinition::VerifyChangesets => {
+					if !changesets.verify.enabled {
 						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` uses `EnforceChangesetPolicy` but `[github.bot.changesets].enabled` is false",
+							"CLI command `{}` uses `VerifyChangesets` but `[changesets.verify].enabled` is false",
 							cli_command.name
 						)));
 					}
-					let changed_path_input = cli_command_input(cli_command, "changed_path")
+					let changed_paths_input = cli_command_input(cli_command, "changed_paths")
 						.ok_or_else(|| {
 							MonochangeError::Config(format!(
-								"CLI command `{}` uses `EnforceChangesetPolicy` but does not declare a `changed_path` input",
+								"CLI command `{}` uses `VerifyChangesets` but does not declare a `changed_paths` input",
 								cli_command.name
 							))
 						})?;
-					if !matches!(changed_path_input.kind, CliInputKind::StringList) {
+					if !matches!(changed_paths_input.kind, CliInputKind::StringList) {
 						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` input `changed_path` must use type `string_list` for `EnforceChangesetPolicy`",
+							"CLI command `{}` input `changed_paths` must use type `string_list` for `VerifyChangesets`",
 							cli_command.name
 						)));
 					}
 					if let Some(label_input) = cli_command_input(cli_command, "label") {
 						if !matches!(label_input.kind, CliInputKind::StringList) {
 							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` input `label` must use type `string_list` when used with `EnforceChangesetPolicy`",
+								"CLI command `{}` input `label` must use type `string_list` when used with `VerifyChangesets`",
 								cli_command.name
 							)));
 						}
