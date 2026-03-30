@@ -106,14 +106,14 @@ Current `PrepareRelease` behavior:
 - groups release notes into default `Breaking changes`, `Features`, `Fixes`, and `Notes` sections, with package/group overrides available through `extra_changelog_sections`
 - applies workspace-wide release-note templates from `[release_notes].change_templates`
 - can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
-- can preview or publish GitHub releases via `PublishGitHubRelease`
-- can preview or open/update release pull requests via `OpenReleasePullRequest`
+- can preview or publish provider releases via `PublishRelease`
+- can preview or open/update release requests via `OpenReleaseRequest`
 - can emit deployment intents via `Deploy` for merge-driven or CI-driven deploy orchestration
-- can verify changed files via `VerifyChangesets` using changed paths and labels supplied by CI
+- can evaluate pull-request changeset policy via `VerifyChangesets` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
-- leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or GitHub release preview
+- leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or release preview
 
 A GitHub Actions check can pass changed paths and labels directly into a policy workflow, for example:
 
@@ -169,7 +169,7 @@ jobs:
           args=(verify --format json)
 
           for path in $CHANGED_FILES; do
-            args+=(--changed-path "$path")
+            args+=(--changed-paths "$path")
           done
 
           for label in "${labels[@]}"; do
@@ -197,10 +197,10 @@ Planning rules in this milestone:
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
 - release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
-- `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
-- `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
+- `PublishRelease` reuses the same structured release data to build provider release requests for grouped and package-owned releases
+- `OpenReleaseRequest` reuses the same structured release data to render release-request summaries, branch names, and idempotent provider updates
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
-- `VerifyChangesets` maps changed files onto configured packages, applies package-level `ignored_paths` / `additional_paths`, and checks that attached `.changeset/*.md` files cover every changed package or owning group
+- `VerifyChangesets` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->

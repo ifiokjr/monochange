@@ -83,8 +83,8 @@ Recommended responsibilities:
 Add these typed steps to `WorkflowStepDefinition`:
 
 - `RenderReleaseManifest`
-- `PublishGitHubRelease`
-- `OpenReleasePullRequest`
+- `PublishRelease`
+- `OpenReleaseRequest`
 - `Deploy`
 - `EnforceChangesetPolicy`
 
@@ -248,7 +248,7 @@ This artifact should be usable by:
 
 1. Add `monochange_github` crate.
 2. Implement authenticated GitHub release creation/update.
-3. Add `PublishGitHubRelease` workflow step.
+3. Add `PublishRelease` workflow step.
 4. Support dry-run preview of would-be tags, releases, and bodies.
 5. Add integration tests around release payload generation.
 6. Extend release-note customization with workspace `change_templates`, per-target `extra_changelog_sections`, and optional change `type` / `details` fields.
@@ -259,7 +259,7 @@ This artifact should be usable by:
 
 1. Implement branch naming and commit generation.
 2. Implement PR body rendering from release notes.
-3. Add `OpenReleasePullRequest` workflow step.
+3. Add `OpenReleaseRequest` workflow step.
 4. Support idempotent update of an existing release PR.
 5. Add tests for grouped releases and ungrouped releases.
 

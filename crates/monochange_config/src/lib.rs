@@ -33,7 +33,7 @@
 //! - load `monochange.toml`
 //! - validate version groups and CLI commands
 //! - resolve package references against discovered packages
-//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and command GitHub/manifest/policy steps
+//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, source-provider config, changeset-bot policy config, and command release/manifest/policy steps
 //!
 //! ## Example
 //!
@@ -106,6 +106,8 @@ use monochange_core::DeploymentDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::ExtraChangelogSection;
+use monochange_core::GitHubBotSettings;
+use monochange_core::GitHubChangesetBotSettings;
 use monochange_core::GitHubConfiguration;
 use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
@@ -117,6 +119,8 @@ use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::ReleaseNotesSettings;
+use monochange_core::SourceConfiguration;
+use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
 use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
@@ -156,6 +160,8 @@ struct RawWorkspaceConfiguration {
 	workflows: Vec<CliCommandDefinition>,
 	#[serde(default)]
 	changesets: RawChangesetSettings,
+	#[serde(default)]
+	source: Option<RawSourceConfiguration>,
 	#[serde(default)]
 	github: Option<RawGitHubConfiguration>,
 	#[serde(default)]
@@ -287,6 +293,54 @@ struct RawReleaseNotesSettings {
 	change_templates: Vec<String>,
 }
 
+#[derive(Debug, Deserialize, Default)]
+struct RawChangesetSettings {
+	#[serde(default)]
+	verify: RawChangesetVerificationSettings,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Deserialize)]
+struct RawChangesetVerificationSettings {
+	#[serde(default = "default_true")]
+	enabled: bool,
+	#[serde(default = "default_true")]
+	required: bool,
+	#[serde(default)]
+	skip_labels: Vec<String>,
+	#[serde(default = "default_true")]
+	comment_on_failure: bool,
+}
+
+impl Default for RawChangesetVerificationSettings {
+	fn default() -> Self {
+		Self {
+			enabled: default_true(),
+			required: default_true(),
+			skip_labels: Vec::new(),
+			comment_on_failure: default_true(),
+		}
+	}
+}
+
+#[derive(Debug, Deserialize)]
+struct RawSourceConfiguration {
+	#[serde(default)]
+	provider: SourceProvider,
+	owner: String,
+	repo: String,
+	#[serde(default)]
+	host: Option<String>,
+	#[serde(default)]
+	api_url: Option<String>,
+	#[serde(default)]
+	releases: RawGitHubReleaseSettings,
+	#[serde(default)]
+	pull_requests: RawGitHubPullRequestSettings,
+	#[serde(default)]
+	bot: RawGitHubBotSettings,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawGitHubConfiguration {
 	owner: String,
@@ -295,6 +349,8 @@ struct RawGitHubConfiguration {
 	releases: RawGitHubReleaseSettings,
 	#[serde(default)]
 	pull_requests: RawGitHubPullRequestSettings,
+	#[serde(default)]
+	bot: RawGitHubBotSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -356,8 +412,8 @@ impl Default for RawGitHubPullRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawChangesetVerificationSettings {
-	#[serde(default = "default_true")]
+struct RawGitHubChangesetBotSettings {
+	#[serde(default)]
 	enabled: bool,
 	#[serde(default = "default_true")]
 	required: bool,
@@ -365,23 +421,29 @@ struct RawChangesetVerificationSettings {
 	skip_labels: Vec<String>,
 	#[serde(default = "default_true")]
 	comment_on_failure: bool,
+	#[serde(default)]
+	changed_paths: Vec<String>,
+	#[serde(default)]
+	ignored_paths: Vec<String>,
 }
 
-impl Default for RawChangesetVerificationSettings {
+impl Default for RawGitHubChangesetBotSettings {
 	fn default() -> Self {
 		Self {
-			enabled: default_true(),
+			enabled: false,
 			required: default_true(),
 			skip_labels: Vec::new(),
 			comment_on_failure: default_true(),
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
 		}
 	}
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct RawChangesetSettings {
+struct RawGitHubBotSettings {
 	#[serde(default)]
-	verify: RawChangesetVerificationSettings,
+	changesets: RawGitHubChangesetBotSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -572,6 +634,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		cli,
 		workflows,
 		changesets,
+		source,
 		github,
 		ecosystems,
 	} = raw;
@@ -701,6 +764,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			})
 		})
 		.collect::<Result<Vec<_>, _>>()?;
+	if source.is_some() && github.is_some() {
+		return Err(MonochangeError::Config(
+			"configure either `[source]` or legacy `[github]`, but not both".to_string(),
+		));
+	}
 	let changesets = ChangesetSettings {
 		verify: ChangesetVerificationSettings {
 			enabled: changesets.verify.enabled,
@@ -709,24 +777,88 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			comment_on_failure: changesets.verify.comment_on_failure,
 		},
 	};
-	let github = github.map(|github| GitHubConfiguration {
-		owner: github.owner,
-		repo: github.repo,
+	let source = source.map(|source| SourceConfiguration {
+		provider: source.provider,
+		owner: source.owner,
+		repo: source.repo,
+		host: source.host,
+		api_url: source.api_url,
 		releases: GitHubReleaseSettings {
-			enabled: github.releases.enabled,
-			draft: github.releases.draft,
-			prerelease: github.releases.prerelease,
-			generate_notes: github.releases.generate_notes,
-			source: github.releases.source,
+			enabled: source.releases.enabled,
+			draft: source.releases.draft,
+			prerelease: source.releases.prerelease,
+			generate_notes: source.releases.generate_notes,
+			source: source.releases.source,
 		},
 		pull_requests: GitHubPullRequestSettings {
-			enabled: github.pull_requests.enabled,
-			branch_prefix: github.pull_requests.branch_prefix,
-			base: github.pull_requests.base,
-			title: github.pull_requests.title,
-			labels: github.pull_requests.labels,
-			auto_merge: github.pull_requests.auto_merge,
+			enabled: source.pull_requests.enabled,
+			branch_prefix: source.pull_requests.branch_prefix,
+			base: source.pull_requests.base,
+			title: source.pull_requests.title,
+			labels: source.pull_requests.labels,
+			auto_merge: source.pull_requests.auto_merge,
 		},
+		bot: GitHubBotSettings {
+			changesets: GitHubChangesetBotSettings {
+				enabled: source.bot.changesets.enabled,
+				required: source.bot.changesets.required,
+				skip_labels: source.bot.changesets.skip_labels,
+				comment_on_failure: source.bot.changesets.comment_on_failure,
+				changed_paths: source.bot.changesets.changed_paths,
+				ignored_paths: source.bot.changesets.ignored_paths,
+			},
+		},
+	});
+	let github = if let Some(source) = &source {
+		(source.provider == SourceProvider::GitHub).then(|| GitHubConfiguration {
+			owner: source.owner.clone(),
+			repo: source.repo.clone(),
+			releases: source.releases.clone(),
+			pull_requests: source.pull_requests.clone(),
+			bot: source.bot.clone(),
+		})
+	} else {
+		github.map(|github| GitHubConfiguration {
+			owner: github.owner,
+			repo: github.repo,
+			releases: GitHubReleaseSettings {
+				enabled: github.releases.enabled,
+				draft: github.releases.draft,
+				prerelease: github.releases.prerelease,
+				generate_notes: github.releases.generate_notes,
+				source: github.releases.source,
+			},
+			pull_requests: GitHubPullRequestSettings {
+				enabled: github.pull_requests.enabled,
+				branch_prefix: github.pull_requests.branch_prefix,
+				base: github.pull_requests.base,
+				title: github.pull_requests.title,
+				labels: github.pull_requests.labels,
+				auto_merge: github.pull_requests.auto_merge,
+			},
+			bot: GitHubBotSettings {
+				changesets: GitHubChangesetBotSettings {
+					enabled: github.bot.changesets.enabled,
+					required: github.bot.changesets.required,
+					skip_labels: github.bot.changesets.skip_labels,
+					comment_on_failure: github.bot.changesets.comment_on_failure,
+					changed_paths: github.bot.changesets.changed_paths,
+					ignored_paths: github.bot.changesets.ignored_paths,
+				},
+			},
+		})
+	};
+	let source = source.or_else(|| {
+		github.as_ref().map(|github| SourceConfiguration {
+			provider: SourceProvider::GitHub,
+			owner: github.owner.clone(),
+			repo: github.repo.clone(),
+			host: None,
+			api_url: None,
+			releases: github.releases.clone(),
+			pull_requests: github.pull_requests.clone(),
+			bot: github.bot.clone(),
+		})
 	});
 
 	validate_cli(&cli)?;
@@ -734,8 +866,9 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	validate_deployments_configuration(&contents, &deployments)?;
 	validate_changesets_configuration(&changesets, &packages)?;
 	validate_github_configuration(github.as_ref())?;
+	validate_source_configuration(source.as_ref())?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
-	validate_cli_runtime_requirements(&cli, &changesets, github.as_ref(), &deployments)?;
+	validate_cli_runtime_requirements(&cli, &changesets, source.as_ref(), &deployments)?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -757,6 +890,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		cli,
 		changesets,
 		github,
+		source,
 		cargo: ecosystems.cargo,
 		npm: ecosystems.npm,
 		deno: ecosystems.deno,
@@ -1566,7 +1700,121 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 			"[github.pull_requests].labels must not include empty values".to_string(),
 		));
 	}
+	if github
+		.bot
+		.changesets
+		.skip_labels
+		.iter()
+		.any(|label| label.trim().is_empty())
+	{
+		return Err(MonochangeError::Config(
+			"[github.bot.changesets].skip_labels must not include empty values".to_string(),
+		));
+	}
+	for (field, patterns) in [
+		(
+			"[github.bot.changesets].changed_paths",
+			&github.bot.changesets.changed_paths,
+		),
+		(
+			"[github.bot.changesets].ignored_paths",
+			&github.bot.changesets.ignored_paths,
+		),
+	] {
+		for pattern in patterns {
+			if pattern.trim().is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"{field} must not include empty values"
+				)));
+			}
+			Pattern::new(pattern).map_err(|error| {
+				MonochangeError::Config(format!(
+					"{field} contains invalid glob pattern `{pattern}`: {error}"
+				))
+			})?;
+		}
+	}
 	Ok(())
+}
+
+fn validate_source_configuration(source: Option<&SourceConfiguration>) -> MonochangeResult<()> {
+	let Some(source) = source else {
+		return Ok(());
+	};
+	if source.owner.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"[source].owner must not be empty".to_string(),
+		));
+	}
+	if source.repo.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"[source].repo must not be empty".to_string(),
+		));
+	}
+	match source.provider {
+		SourceProvider::GitHub => validate_github_configuration(Some(&GitHubConfiguration {
+			owner: source.owner.clone(),
+			repo: source.repo.clone(),
+			releases: source.releases.clone(),
+			pull_requests: source.pull_requests.clone(),
+			bot: source.bot.clone(),
+		})),
+		SourceProvider::GitLab => {
+			if source.releases.draft {
+				return Err(MonochangeError::Config(
+					"[source.releases].draft is not supported for `provider = \"gitlab\"`"
+						.to_string(),
+				));
+			}
+			if source.releases.prerelease {
+				return Err(MonochangeError::Config(
+					"[source.releases].prerelease is not supported for `provider = \"gitlab\"`"
+						.to_string(),
+				));
+			}
+			if source.releases.generate_notes
+				|| matches!(
+					source.releases.source,
+					GitHubReleaseNotesSource::GitHubGenerated
+				) {
+				return Err(MonochangeError::Config(
+					"provider-generated release notes are not supported for `provider = \"gitlab\"`; use `source = \"monochange\"`"
+						.to_string(),
+				));
+			}
+			if source.pull_requests.auto_merge {
+				return Err(MonochangeError::Config(
+					"[source.pull_requests].auto_merge is not supported for `provider = \"gitlab\"`"
+						.to_string(),
+				));
+			}
+			Ok(())
+		}
+		SourceProvider::Gitea => {
+			if source.host.as_deref().is_none_or(str::is_empty) {
+				return Err(MonochangeError::Config(
+					"[source].host must be set for `provider = \"gitea\"`".to_string(),
+				));
+			}
+			if source.releases.generate_notes
+				|| matches!(
+					source.releases.source,
+					GitHubReleaseNotesSource::GitHubGenerated
+				) {
+				return Err(MonochangeError::Config(
+					"provider-generated release notes are not supported for `provider = \"gitea\"`; use `source = \"monochange\"`"
+						.to_string(),
+				));
+			}
+			if source.pull_requests.auto_merge {
+				return Err(MonochangeError::Config(
+					"[source.pull_requests].auto_merge is not supported for `provider = \"gitea\"`"
+						.to_string(),
+				));
+			}
+			Ok(())
+		}
+	}
 }
 
 fn validate_changesets_configuration(
@@ -1700,8 +1948,8 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::Discover
 				| CliStepDefinition::CreateChangeFile
 				| CliStepDefinition::PrepareRelease
-				| CliStepDefinition::PublishGitHubRelease
-				| CliStepDefinition::OpenReleasePullRequest
+				| CliStepDefinition::PublishRelease
+				| CliStepDefinition::OpenReleaseRequest
 				| CliStepDefinition::Deploy { .. }
 				| CliStepDefinition::VerifyChangesets => {}
 			}
@@ -1714,24 +1962,24 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 fn validate_cli_runtime_requirements(
 	cli: &[CliCommandDefinition],
 	changesets: &ChangesetSettings,
-	github: Option<&GitHubConfiguration>,
+	source: Option<&SourceConfiguration>,
 	deployments: &[DeploymentDefinition],
 ) -> MonochangeResult<()> {
 	for cli_command in cli {
 		if cli_command
 			.steps
 			.iter()
-			.any(|step| matches!(step, CliStepDefinition::PublishGitHubRelease))
+			.any(|step| matches!(step, CliStepDefinition::PublishRelease))
 		{
-			let github = github.ok_or_else(|| {
+			let source = source.ok_or_else(|| {
 				MonochangeError::Config(format!(
-					"CLI command `{}` uses `PublishGitHubRelease` but `[github]` is not configured",
+					"CLI command `{}` uses `PublishRelease` but `[source]` is not configured",
 					cli_command.name
 				))
 			})?;
-			if !github.releases.enabled {
+			if !source.releases.enabled {
 				return Err(MonochangeError::Config(format!(
-					"CLI command `{}` uses `PublishGitHubRelease` but `[github.releases].enabled` is false",
+					"CLI command `{}` uses `PublishRelease` but `[source.releases].enabled` is false",
 					cli_command.name
 				)));
 			}
@@ -1739,17 +1987,17 @@ fn validate_cli_runtime_requirements(
 		if cli_command
 			.steps
 			.iter()
-			.any(|step| matches!(step, CliStepDefinition::OpenReleasePullRequest))
+			.any(|step| matches!(step, CliStepDefinition::OpenReleaseRequest))
 		{
-			let github = github.ok_or_else(|| {
+			let source = source.ok_or_else(|| {
 				MonochangeError::Config(format!(
-					"CLI command `{}` uses `OpenReleasePullRequest` but `[github]` is not configured",
+					"CLI command `{}` uses `OpenReleaseRequest` but `[source]` is not configured",
 					cli_command.name
 				))
 			})?;
-			if !github.pull_requests.enabled {
+			if !source.pull_requests.enabled {
 				return Err(MonochangeError::Config(format!(
-					"CLI command `{}` uses `OpenReleasePullRequest` but `[github.pull_requests].enabled` is false",
+					"CLI command `{}` uses `OpenReleaseRequest` but `[source.pull_requests].enabled` is false",
 					cli_command.name
 				)));
 			}

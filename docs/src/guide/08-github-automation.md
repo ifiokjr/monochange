@@ -2,15 +2,15 @@
 
 <!-- {=githubAutomationOverview} -->
 
-MonoChange keeps GitHub automation layered on top of the same `PrepareRelease` result used for normal release planning.
+MonoChange keeps source-provider automation layered on top of the same `PrepareRelease` result used for normal release planning.
 
 That means one set of `.changeset/*.md` inputs can drive all of these commands and automation flows consistently:
 
 - `mc release-manifest` writes a stable JSON artifact for downstream automation
-- `mc publish-release` previews or publishes GitHub releases from the structured release notes
-- `mc release-pr` previews or opens an idempotent release pull request
+- `mc publish-release` previews or publishes provider releases from the structured release notes
+- `mc release-pr` previews or opens an idempotent provider release request
 - `mc release-deploy` emits deployment intents for later workflow execution
-- `mc verify` checks whether changed files are covered by attached changesets
+- `mc verify` evaluates pull-request changeset policy from CI-supplied changed paths and labels
 
 <!-- {/githubAutomationOverview} -->
 
@@ -24,7 +24,7 @@ mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-deploy --dry-run --format json
-mc verify --format json --changed-path crates/monochange/src/lib.rs
+mc verify --format json --changed-paths crates/monochange/src/lib.rs
 ```
 
 <!-- {/githubAutomationWorkflowCommands} -->
@@ -45,15 +45,16 @@ change_templates = ["#### $summary\n\n$details", "- $summary"]
 path = "changelog.md"
 format = "monochange"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 enabled = true
 source = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 enabled = true
 branch_prefix = "monochange/release"
 base = "main"
@@ -72,7 +73,7 @@ type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
-help_text = "Prepare a release and publish GitHub releases"
+help_text = "Prepare a release and publish provider releases"
 
 [[cli.publish-release.inputs]]
 name = "format"
@@ -84,10 +85,10 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 
 [cli.release-pr]
-help_text = "Prepare a release and open or update a GitHub release pull request"
+help_text = "Prepare a release and open or update a provider release request"
 
 [[cli.release-pr.inputs]]
 name = "format"
@@ -99,7 +100,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 ```
 
 <!-- {/githubAutomationReleaseConfigExample} -->
@@ -109,16 +110,35 @@ type = "OpenReleasePullRequest"
 <!-- {=githubAutomationPolicyAndDeployConfigExample} -->
 
 ```toml
-[changesets.verify]
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+
+[source.bot.changesets]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-
-[package.monochange]
-path = "crates/monochange"
-ignored_paths = ["tests/fixtures/**"]
-additional_paths = ["scripts/**"]
+changed_paths = [
+	"crates/**",
+	".github/**",
+	"Cargo.toml",
+	"Cargo.lock",
+	"devenv.nix",
+	"devenv.yaml",
+	"devenv.lock",
+	"monochange.toml",
+	"codecov.yml",
+	"deny.toml",
+	"scripts/**",
+]
+ignored_paths = [
+	".changeset/**",
+	"docs/**",
+	"**/*.md",
+	"license",
+]
 
 [[deployments]]
 name = "docs"
@@ -145,7 +165,7 @@ type = "PrepareRelease"
 type = "Deploy"
 
 [cli.verify]
-help_text = "Verify that changed files are covered by attached changesets"
+help_text = "Evaluate pull-request changeset policy"
 
 [[cli.verify.inputs]]
 name = "format"
@@ -154,7 +174,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.verify.inputs]]
-name = "changed_paths"
+name = "changed_path"
 type = "string_list"
 required = true
 
@@ -220,7 +240,7 @@ jobs:
           args=(verify --format json)
 
           for path in $CHANGED_FILES; do
-            args+=(--changed-path "$path")
+            args+=(--changed-paths "$path")
           done
 
           for label in "${labels[@]}"; do

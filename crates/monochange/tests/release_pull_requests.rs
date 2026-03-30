@@ -18,7 +18,7 @@ fn open_release_pull_request_dry_run_renders_group_release_preview() {
 	seed_group_release_fixture(tempdir.path());
 
 	let json = run_json_workflow(tempdir.path(), "release-pr");
-	let pull_request = &json["pullRequest"];
+	let pull_request = &json["releaseRequest"];
 	assert_eq!(pull_request["repository"], "ifiokjr/monochange");
 	assert_eq!(pull_request["baseBranch"], "main");
 	assert_eq!(pull_request["headBranch"], "monochange/release/release-pr");
@@ -45,7 +45,7 @@ fn open_release_pull_request_dry_run_renders_package_release_preview() {
 	seed_ungrouped_release_fixture(tempdir.path());
 
 	let json = run_json_workflow(tempdir.path(), "release-pr");
-	let pull_request = &json["pullRequest"];
+	let pull_request = &json["releaseRequest"];
 	assert_eq!(pull_request["baseBranch"], "develop");
 	assert_eq!(pull_request["headBranch"], "automation/release/release-pr");
 	assert_eq!(pull_request["autoMerge"], true);
@@ -166,7 +166,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 "#,
 	);
 	write_file(
@@ -261,7 +261,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 "#,
 	);
 	write_file(

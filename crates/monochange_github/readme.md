@@ -38,9 +38,11 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 ## Example
 
 ```rust
-use monochange_core::GitHubConfiguration;
-use monochange_core::GitHubPullRequestSettings;
-use monochange_core::GitHubReleaseSettings;
+use monochange_core::BotSettings;
+use monochange_core::ChangeRequestSettings;
+use monochange_core::ReleaseProviderSettings;
+use monochange_core::SourceConfiguration;
+use monochange_core::SourceProvider;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestPlan;
 use monochange_core::ReleaseManifestTarget;
@@ -77,11 +79,15 @@ let manifest = ReleaseManifest {
         compatibility_evidence: Vec::new(),
     },
 };
-let github = GitHubConfiguration {
+let github = SourceConfiguration {
+    provider: SourceProvider::GitHub,
     owner: "ifiokjr".to_string(),
     repo: "monochange".to_string(),
-    releases: GitHubReleaseSettings::default(),
-    pull_requests: GitHubPullRequestSettings::default(),
+    host: None,
+    api_url: None,
+    releases: ReleaseProviderSettings::default(),
+    pull_requests: ChangeRequestSettings::default(),
+    bot: BotSettings::default(),
 };
 
 let requests = build_release_requests(&github, &manifest);

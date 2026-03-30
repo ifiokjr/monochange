@@ -53,9 +53,9 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - run config-defined release commands from `.changeset/*.md`
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
-- preview or publish GitHub releases and release pull requests from typed command steps and shared release data
+- preview or publish provider releases and release requests from typed command steps and shared release data
 - model deployment intents for downstream automation and merge-driven release commands
-- verify changeset coverage for changed files through typed command steps and reusable diagnostics
+- enforce pull-request changeset policy through typed command steps and reusable diagnostics
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -63,13 +63,13 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {@projectGitHubAutomationOverview} -->
 
-MonoChange can promote one prepared release into several GitHub-facing automation flows without changing the underlying release-plan model.
+MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
 - `mc release-manifest` writes a stable JSON artifact for downstream jobs
-- `mc publish-release --dry-run --format json` previews GitHub release payloads before publishing
-- `mc release-pr --dry-run --format json` previews the release branch, commit, and pull request body
+- `mc publish-release --dry-run --format json` previews provider release payloads before publishing
+- `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
-- `mc verify --format json --changed-path ...` verifies that changed files are covered by attached changesets
+- `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
 <!-- {/projectGitHubAutomationOverview} -->
 
@@ -167,25 +167,28 @@ version_format = "primary"
 path = "docs/sdk-changelog.md"
 format = "monochange"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 source = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 branch_prefix = "monochange/release"
 base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[changesets.verify]
+[source.bot.changesets]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
+changed_paths = ["crates/**", "packages/**"]
+ignored_paths = ["docs/**", "*.md"]
 
 [[deployments]]
 name = "production"
@@ -274,7 +277,7 @@ type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
-help_text = "Prepare a release and publish GitHub releases"
+help_text = "Prepare a release and publish provider releases"
 
 [[cli.publish-release.inputs]]
 name = "format"
@@ -286,10 +289,10 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 
 [cli.release-pr]
-help_text = "Prepare a release and open or update a GitHub release pull request"
+help_text = "Prepare a release and open or update a provider release request"
 
 [[cli.release-pr.inputs]]
 name = "format"
@@ -301,7 +304,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 
 [cli.release-deploy]
 help_text = "Prepare a release and emit deployment intents"
@@ -319,7 +322,7 @@ type = "PrepareRelease"
 type = "Deploy"
 
 [cli.verify]
-help_text = "Verify that changed files are covered by attached changesets"
+help_text = "Evaluate pull-request changeset policy"
 
 [[cli.verify.inputs]]
 name = "format"
@@ -328,7 +331,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.verify.inputs]]
-name = "changed_paths"
+name = "changed_path"
 type = "string_list"
 required = true
 
@@ -346,7 +349,7 @@ type = "VerifyChangesets"
 
 This guide shows the preferred package/group configuration model together with an expanded CLI command surface.
 
-`mc init` emits the default `validate`, `discover`, `change`, `release`, and `verify` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, and `release-deploy` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
+`mc init` emits the default `validate`, `discover`, `change`, and `release` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 
