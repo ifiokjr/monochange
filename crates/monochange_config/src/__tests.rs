@@ -238,6 +238,46 @@ changelog = "docs/tool-release-notes.md"
 }
 
 #[test]
+fn migration_guide_new_style_example_loads_successfully() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/monochange", "monochange");
+	write_cargo_package(tempdir.path(), "crates/monochange_core", "monochange_core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.monochange]
+path = "crates/monochange"
+changelog = "crates/monochange/changelog.md"
+
+[package.monochange_core]
+path = "crates/monochange_core"
+changelog = "crates/monochange_core/changelog.md"
+
+[group.main]
+packages = ["monochange", "monochange_core"]
+tag = true
+release = true
+version_format = "primary"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	assert_eq!(configuration.packages.len(), 2);
+	assert_eq!(configuration.groups.len(), 1);
+	let group = configuration
+		.groups
+		.first()
+		.unwrap_or_else(|| panic!("expected migration group"));
+	assert_eq!(group.id, "main");
+	assert_eq!(group.packages, vec!["monochange", "monochange_core"]);
+}
+
+#[test]
 fn load_workspace_configuration_requires_package_type_without_default() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
@@ -341,7 +381,9 @@ packages = ["core", "other"]
 		.unwrap_or_else(|| panic!("expected configuration error"));
 	let rendered = error.render();
 
-	assert!(rendered.contains("belongs to multiple groups"));
+	assert!(rendered.contains("error: package `core` belongs to multiple groups"));
+	assert!(rendered.contains("--> monochange.toml"));
+	assert!(rendered.contains("labels:"));
 	assert!(rendered.contains("move the package into exactly one [group.<id>] declaration"));
 }
 
@@ -722,8 +764,9 @@ missing-package: patch
 	.unwrap_or_else(|| panic!("expected configuration error"));
 	let rendered = error.render();
 
+	assert!(rendered.contains("error: changeset `"));
 	assert!(rendered.contains("unknown package or group `missing-package`"));
-	assert!(rendered.contains("declare the package or group id in monochange.toml"));
+	assert!(rendered.contains("help: declare the package or group id in monochange.toml"));
 }
 
 fn write_cargo_package(root: &std::path::Path, relative_dir: &str, name: &str) {

@@ -11,6 +11,7 @@
 
 - native workspace globs are expanded by each ecosystem adapter
 - dependency names are normalized into one graph
+- package ids and manifest paths in CLI output are rendered relative to the repository root for deterministic automation
 - version-group assignments are attached after discovery
 - unmatched group members and version mismatches produce warnings
 - discovery currently scans all supported ecosystems regardless of `[ecosystems.*]` toggles in `monochange.toml`
@@ -231,6 +232,7 @@ evidence:
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
+- CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
 

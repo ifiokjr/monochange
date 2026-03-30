@@ -207,6 +207,7 @@ fn workspace_discover_json_output_contains_contract_fields() {
 	let parsed: serde_json::Value =
 		serde_json::from_str(&output).unwrap_or_else(|error| panic!("json: {error}"));
 
+	assert_eq!(parsed["workspaceRoot"].as_str(), Some("."));
 	assert_eq!(parsed["packages"].as_array().map(Vec::len), Some(4));
 	assert_eq!(parsed["versionGroups"].as_array().map(Vec::len), Some(1));
 	assert_eq!(parsed["dependencies"].as_array().map(Vec::len), Some(3));
@@ -215,6 +216,13 @@ fn workspace_discover_json_output_contains_contract_fields() {
 		.unwrap_or_else(|| panic!("packages array"))
 		.iter()
 		.all(|package| package.get("manifestPath").is_some()));
+	assert!(parsed["packages"]
+		.as_array()
+		.unwrap_or_else(|| panic!("packages array"))
+		.iter()
+		.all(|package| package["id"]
+			.as_str()
+			.is_some_and(|id| !id.contains(fixture_root.to_string_lossy().as_ref()))));
 }
 
 #[test]
@@ -691,6 +699,34 @@ fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
 }
 
 #[test]
+fn workflow_release_dry_run_is_consistent_across_ecosystem_fixtures() {
+	assert_cli_release_pattern(
+		"../../fixtures/cargo/workspace",
+		"core",
+		"crates/core/Cargo.toml",
+		"crates/app/Cargo.toml",
+	);
+	assert_cli_release_pattern(
+		"../../fixtures/npm/workspace",
+		"shared",
+		"packages/shared/package.json",
+		"packages/web/package.json",
+	);
+	assert_cli_release_pattern(
+		"../../fixtures/deno/workspace",
+		"shared",
+		"packages/shared/deno.json",
+		"packages/tool/deno.json",
+	);
+	assert_cli_release_pattern(
+		"../../fixtures/dart/workspace",
+		"shared",
+		"packages/shared/pubspec.yaml",
+		"packages/app/pubspec.yaml",
+	);
+}
+
+#[test]
 fn quickstart_and_docs_reference_the_same_core_commands() {
 	let docs_readme = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/readme.md");
 	let quickstart =
@@ -741,6 +777,19 @@ fn configuration_guide_calls_out_current_implementation_limits() {
 }
 
 #[test]
+fn discovery_guide_describes_stable_relative_output_paths() {
+	let discovery_guide =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/guide/03-discovery.md");
+	let content = fs::read_to_string(discovery_guide)
+		.unwrap_or_else(|error| panic!("discovery guide: {error}"));
+
+	assert!(
+		content.contains("rendered relative to the repository root"),
+		"discovery guide missing stable relative output note"
+	);
+}
+
+#[test]
 fn release_planning_guide_describes_release_workflow_requirements() {
 	let release_guide =
 		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/guide/06-release-planning.md");
@@ -767,19 +816,21 @@ fn assert_simple_release_pattern(
 	dependent_manifest_suffix: &str,
 ) {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
-	let changes_path = fixture_root.join("changes.generated.md");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+	let changes_path = tempdir.path().join("changes.generated.md");
 	fs::write(
 		&changes_path,
 		format!("---\n{change_reference}: minor\n---\n\n#### feature\n"),
 	)
 	.unwrap_or_else(|error| panic!("generated changes: {error}"));
 
-	let discovery = discover_workspace(&fixture_root)
+	let discovery = discover_workspace(tempdir.path())
 		.unwrap_or_else(|error| panic!("fixture discovery: {error}"));
 	assert_eq!(discovery.packages.len(), 2);
 	assert_eq!(discovery.dependencies.len(), 1);
 
-	let plan = plan_release(&fixture_root, &changes_path)
+	let plan = plan_release(tempdir.path(), &changes_path)
 		.unwrap_or_else(|error| panic!("fixture release plan: {error}"));
 	let direct = plan
 		.decisions
@@ -794,7 +845,87 @@ fn assert_simple_release_pattern(
 
 	assert_eq!(direct.recommended_bump.to_string(), "minor");
 	assert_eq!(dependent.recommended_bump.to_string(), "patch");
-	fs::remove_file(changes_path).unwrap_or_else(|error| panic!("remove changes: {error}"));
+}
+
+fn assert_cli_release_pattern(
+	relative_fixture_root: &str,
+	change_reference: &str,
+	direct_manifest_suffix: &str,
+	dependent_manifest_suffix: &str,
+) {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+	write_file(
+		tempdir.path().join(".changeset/feature.md"),
+		&format!("---\n{change_reference}: minor\n---\n\n#### feature\n"),
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	let parsed: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("json: {error}"));
+	let decisions = parsed["plan"]["decisions"]
+		.as_array()
+		.unwrap_or_else(|| panic!("plan decisions"));
+	let direct = decisions
+		.iter()
+		.find(|decision| {
+			decision["package"]
+				.as_str()
+				.is_some_and(|package| package.contains(direct_manifest_suffix))
+		})
+		.unwrap_or_else(|| panic!("expected direct release decision"));
+	let dependent = decisions
+		.iter()
+		.find(|decision| {
+			decision["package"]
+				.as_str()
+				.is_some_and(|package| package.contains(dependent_manifest_suffix))
+		})
+		.unwrap_or_else(|| panic!("expected dependent release decision"));
+
+	assert_eq!(direct["bump"].as_str(), Some("minor"));
+	assert_eq!(dependent["bump"].as_str(), Some("patch"));
+}
+
+fn copy_directory(source: &Path, destination: &Path) {
+	fs::create_dir_all(destination)
+		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
+	for entry in fs::read_dir(source)
+		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
+	{
+		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
+		let source_path = entry.path();
+		let destination_path = destination.join(entry.file_name());
+		let file_type = entry
+			.file_type()
+			.unwrap_or_else(|error| panic!("file type {}: {error}", source_path.display()));
+		if file_type.is_dir() {
+			copy_directory(&source_path, &destination_path);
+		} else if file_type.is_file() {
+			if let Some(parent) = destination_path.parent() {
+				fs::create_dir_all(parent)
+					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+			}
+			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
+				panic!(
+					"copy {} -> {}: {error}",
+					source_path.display(),
+					destination_path.display()
+				)
+			});
+		}
+	}
 }
 
 fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changelog: bool) {
