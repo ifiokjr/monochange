@@ -13,3 +13,4 @@ devenv.local.nix
 # insta snapshots
 *.pending-snap
 *.snap.new
+.ant-colony/

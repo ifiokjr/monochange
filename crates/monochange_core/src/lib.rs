@@ -52,7 +52,9 @@
 //! <!-- {/monochangeCoreCrateDocs} -->
 
 use std::collections::BTreeMap;
+use std::env;
 use std::fmt;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -235,6 +237,7 @@ pub struct PackageRecord {
 }
 
 impl PackageRecord {
+	#[allow(clippy::needless_pass_by_value)]
 	#[must_use]
 	pub fn new(
 		ecosystem: Ecosystem,
@@ -245,14 +248,18 @@ impl PackageRecord {
 		publish_state: PublishState,
 	) -> Self {
 		let name = name.into();
-		let id = format!("{}:{}", ecosystem.as_str(), manifest_path.to_string_lossy());
+		let normalized_workspace_root = normalize_path(&workspace_root);
+		let normalized_manifest_path = normalize_path(&manifest_path);
+		let id_path = relative_to_root(&normalized_workspace_root, &normalized_manifest_path)
+			.unwrap_or_else(|| normalized_manifest_path.clone());
+		let id = format!("{}:{}", ecosystem.as_str(), id_path.to_string_lossy());
 
 		Self {
 			id,
 			name,
 			ecosystem,
-			manifest_path,
-			workspace_root,
+			manifest_path: normalized_manifest_path,
+			workspace_root: normalized_workspace_root,
 			current_version,
 			publish_state,
 			version_group_id: None,
@@ -263,11 +270,28 @@ impl PackageRecord {
 
 	#[must_use]
 	pub fn relative_manifest_path(&self, root: &Path) -> Option<PathBuf> {
-		self.manifest_path
-			.strip_prefix(root)
-			.ok()
-			.map(Path::to_path_buf)
+		relative_to_root(root, &self.manifest_path)
 	}
+}
+
+#[must_use]
+pub fn normalize_path(path: &Path) -> PathBuf {
+	let absolute = if path.is_absolute() {
+		path.to_path_buf()
+	} else {
+		env::current_dir().map_or_else(|_| path.to_path_buf(), |cwd| cwd.join(path))
+	};
+	fs::canonicalize(&absolute).unwrap_or(absolute)
+}
+
+#[must_use]
+pub fn relative_to_root(root: &Path, path: &Path) -> Option<PathBuf> {
+	let normalized_root = normalize_path(root);
+	let normalized_path = normalize_path(path);
+	normalized_path
+		.strip_prefix(&normalized_root)
+		.ok()
+		.map(Path::to_path_buf)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

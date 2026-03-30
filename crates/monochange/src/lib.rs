@@ -63,6 +63,7 @@ use monochange_config::resolve_package_reference;
 use monochange_config::validate_workspace;
 use monochange_core::default_workflows;
 use monochange_core::materialize_dependency_edges;
+use monochange_core::relative_to_root;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::CommandVariable;
@@ -402,7 +403,7 @@ fn execute_workflow(
 				validate_workspace(root)?;
 				output = Some(format!(
 					"workspace validation passed for {}",
-					root.display()
+					root_relative(root, root).display()
 				));
 			}
 			WorkflowStepDefinition::Discover => {
@@ -449,7 +450,10 @@ fn execute_workflow(
 					&evidence,
 					output_path.as_deref(),
 				)?;
-				output = Some(format!("wrote change file {}", path.display()));
+				output = Some(format!(
+					"wrote change file {}",
+					root_relative(root, &path).display()
+				));
 			}
 			WorkflowStepDefinition::PrepareRelease => {
 				context.prepared_release = Some(prepare_release(root, dry_run)?);
@@ -796,9 +800,22 @@ fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
 	] {
 		packages.extend(discovery.packages);
 	}
+	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
 	Ok(packages)
+}
+
+fn normalize_package_ids(root: &Path, packages: &mut [PackageRecord]) {
+	for package in packages {
+		if let Some(relative_manifest) = relative_to_root(root, &package.manifest_path) {
+			package.id = format!(
+				"{}:{}",
+				package.ecosystem.as_str(),
+				relative_manifest.display()
+			);
+		}
+	}
 }
 
 fn detect_default_changelog(root: &Path, manifest_dir: &Path) -> Option<PathBuf> {
@@ -838,6 +855,7 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 		packages.extend(discovery.packages);
 	}
 
+	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
 
@@ -985,8 +1003,7 @@ fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 	let changeset_dir = root.join(CHANGESET_DIR);
 	if !changeset_dir.exists() {
 		return Err(MonochangeError::Config(format!(
-			"no markdown changesets found under {}",
-			changeset_dir.display()
+			"no markdown changesets found under {CHANGESET_DIR}"
 		)));
 	}
 
@@ -1004,8 +1021,7 @@ fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 	changeset_paths.sort();
 	if changeset_paths.is_empty() {
 		return Err(MonochangeError::Config(format!(
-			"no markdown changesets found under {}",
-			changeset_dir.display()
+			"no markdown changesets found under {CHANGESET_DIR}"
 		)));
 	}
 	Ok(changeset_paths)
@@ -1850,8 +1866,12 @@ fn shared_group_version(plan: &ReleasePlan) -> Option<String> {
 }
 
 fn root_relative(root: &Path, path: &Path) -> PathBuf {
-	path.strip_prefix(root)
-		.map_or_else(|_| path.to_path_buf(), Path::to_path_buf)
+	let relative = relative_to_root(root, path).unwrap_or_else(|| path.to_path_buf());
+	if relative.as_os_str().is_empty() {
+		PathBuf::from(".")
+	} else {
+		relative
+	}
 }
 
 fn render_discovery_report(
@@ -1899,14 +1919,14 @@ fn render_prepared_release_json(
 
 fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {
 	json!({
-		"workspaceRoot": report.workspace_root,
+		"workspaceRoot": PathBuf::from("."),
 		"packages": report.packages.iter().map(|package| {
 			json!({
 				"id": package.id,
 				"name": package.name,
 				"ecosystem": package.ecosystem.as_str(),
-				"manifestPath": package.manifest_path,
-				"workspaceRoot": package.workspace_root,
+				"manifestPath": root_relative(&report.workspace_root, &package.manifest_path),
+				"workspaceRoot": PathBuf::from("."),
 				"version": package.current_version.as_ref().map(ToString::to_string),
 				"versionGroup": package.version_group_id,
 				"publishState": format_publish_state(package.publish_state),
@@ -1933,7 +1953,7 @@ fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {
 
 fn json_release_plan(plan: &ReleasePlan) -> serde_json::Value {
 	json!({
-		"workspaceRoot": plan.workspace_root,
+		"workspaceRoot": PathBuf::from("."),
 		"decisions": plan.decisions.iter().map(|decision| {
 			json!({
 				"package": decision.package_id,

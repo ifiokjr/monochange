@@ -112,5 +112,6 @@ Planning rules in this milestone:
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
+- CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
