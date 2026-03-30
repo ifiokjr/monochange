@@ -1943,7 +1943,11 @@ fn load_workspace_configuration_parses_release_note_customization() {
 package_type = "cargo"
 
 [release_notes]
-change_templates = ["#### $summary ($package $bump)\n\n$details", "- $summary"]
+change_templates = [
+    "#### $summary ($package $bump)\n\n$details\n\n$context",
+    "#### $summary\n\n_Owner:_ $change_owner_link\n_PR:_ $review_request_link\n_Closed issues:_ $closed_issue_links",
+    "- $summary"
+]
 
 [package.core]
 path = "crates/core"
@@ -1958,7 +1962,7 @@ extra_changelog_sections = [{ name = "Security", types = ["security"] }]
 		.package_by_id("core")
 		.unwrap_or_else(|| panic!("expected package"));
 
-	assert_eq!(configuration.release_notes.change_templates.len(), 2);
+	assert_eq!(configuration.release_notes.change_templates.len(), 3);
 	assert_eq!(package.extra_changelog_sections.len(), 1);
 	let extra_section = package
 		.extra_changelog_sections

@@ -77,9 +77,9 @@ use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
+use monochange_core::ChangesetContext;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
-use monochange_core::ChangesetProvenance;
 use monochange_core::ChangesetRevision;
 use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
@@ -95,6 +95,9 @@ use monochange_core::ExtraChangelogSection;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
+use monochange_core::HostedIssueRef;
+use monochange_core::HostedIssueRelationshipKind;
+use monochange_core::HostedReviewRequestRef;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
@@ -243,7 +246,38 @@ struct ReleaseNoteChange {
 	details: Option<String>,
 	bump: BumpSeverity,
 	change_type: Option<String>,
-	provenance: Option<String>,
+	context: Option<String>,
+	changeset_path: Option<String>,
+	change_owner: Option<String>,
+	change_owner_link: Option<String>,
+	review_request: Option<String>,
+	review_request_link: Option<String>,
+	introduced_commit: Option<String>,
+	introduced_commit_link: Option<String>,
+	last_updated_commit: Option<String>,
+	last_updated_commit_link: Option<String>,
+	related_issues: Option<String>,
+	related_issue_links: Option<String>,
+	closed_issues: Option<String>,
+	closed_issue_links: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+struct RenderedChangesetContext {
+	context: String,
+	changeset_path: String,
+	change_owner: Option<String>,
+	change_owner_link: Option<String>,
+	review_request: Option<String>,
+	review_request_link: Option<String>,
+	introduced_commit: Option<String>,
+	introduced_commit_link: Option<String>,
+	last_updated_commit: Option<String>,
+	last_updated_commit_link: Option<String>,
+	related_issues: Option<String>,
+	related_issue_links: Option<String>,
+	closed_issues: Option<String>,
+	closed_issue_links: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -253,7 +287,7 @@ struct GroupReleaseNoteKey {
 	details: Option<String>,
 	bump: BumpSeverity,
 	change_type: Option<String>,
-	provenance: Option<String>,
+	context: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -1850,7 +1884,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		.collect::<Vec<_>>();
 	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
 	if let Some(github) = configuration.github.as_ref() {
-		github_provider::enrich_changeset_provenance(github, &mut changesets);
+		github_provider::enrich_changeset_context(github, &mut changesets);
 	}
 	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals);
 	let released_packages = released_package_names(&discovery.packages, &plan);
@@ -1991,13 +2025,13 @@ fn build_prepared_changesets(
 					change_type: target.change_type.clone(),
 				})
 				.collect(),
-			provenance: Some(build_generic_changeset_provenance(root, &changeset.path)),
+			context: Some(build_generic_changeset_context(root, &changeset.path)),
 		})
 		.collect()
 }
 
-fn build_generic_changeset_provenance(root: &Path, changeset_path: &Path) -> ChangesetProvenance {
-	ChangesetProvenance {
+fn build_generic_changeset_context(root: &Path, changeset_path: &Path) -> ChangesetContext {
+	ChangesetContext {
 		provider: HostingProviderKind::GenericGit,
 		host: None,
 		capabilities: HostingCapabilities::default(),
@@ -2202,19 +2236,19 @@ fn build_changelog_updates(
 	changesets: &[PreparedChangeset],
 	changelog_targets: &(PackageChangelogTargets, GroupChangelogTargets),
 ) -> MonochangeResult<Vec<ChangelogUpdate>> {
-	let provenance_by_changeset_path = changesets
+	let changeset_context_by_path = changesets
 		.iter()
 		.map(|changeset| {
 			(
 				changeset.path.clone(),
-				render_prepared_changeset_provenance(changeset),
+				build_rendered_changeset_context(root, changeset),
 			)
 		})
 		.collect::<BTreeMap<_, _>>();
 	let release_note_changes = change_signals
 		.iter()
 		.filter_map(|signal| {
-			build_release_note_change(signal, packages, root, &provenance_by_changeset_path)
+			build_release_note_change(signal, packages, root, &changeset_context_by_path)
 		})
 		.fold(
 			BTreeMap::<String, Vec<ReleaseNoteChange>>::new(),
@@ -2392,7 +2426,7 @@ fn build_release_note_change(
 	signal: &ChangeSignal,
 	packages: &[PackageRecord],
 	root: &Path,
-	provenance_by_changeset_path: &BTreeMap<PathBuf, String>,
+	changeset_context_by_path: &BTreeMap<PathBuf, RenderedChangesetContext>,
 ) -> Option<ReleaseNoteChange> {
 	let summary = signal.notes.clone()?;
 	let package = packages
@@ -2400,6 +2434,7 @@ fn build_release_note_change(
 		.find(|package| package.id == signal.package_id)?;
 	let package_id = config_package_id(package);
 	let source_path = root_relative(root, &signal.source_path);
+	let rendered_context = changeset_context_by_path.get(&source_path);
 	Some(ReleaseNoteChange {
 		package_id: signal.package_id.clone(),
 		package_name: package_id.clone(),
@@ -2409,60 +2444,172 @@ fn build_release_note_change(
 		details: signal.details.clone(),
 		bump: signal.requested_bump.unwrap_or(BumpSeverity::Patch),
 		change_type: signal.change_type.clone(),
-		provenance: provenance_by_changeset_path.get(&source_path).cloned(),
+		context: rendered_context.map(|context| context.context.clone()),
+		changeset_path: rendered_context.map(|context| context.changeset_path.clone()),
+		change_owner: rendered_context.and_then(|context| context.change_owner.clone()),
+		change_owner_link: rendered_context.and_then(|context| context.change_owner_link.clone()),
+		review_request: rendered_context.and_then(|context| context.review_request.clone()),
+		review_request_link: rendered_context
+			.and_then(|context| context.review_request_link.clone()),
+		introduced_commit: rendered_context.and_then(|context| context.introduced_commit.clone()),
+		introduced_commit_link: rendered_context
+			.and_then(|context| context.introduced_commit_link.clone()),
+		last_updated_commit: rendered_context
+			.and_then(|context| context.last_updated_commit.clone()),
+		last_updated_commit_link: rendered_context
+			.and_then(|context| context.last_updated_commit_link.clone()),
+		related_issues: rendered_context.and_then(|context| context.related_issues.clone()),
+		related_issue_links: rendered_context
+			.and_then(|context| context.related_issue_links.clone()),
+		closed_issues: rendered_context.and_then(|context| context.closed_issues.clone()),
+		closed_issue_links: rendered_context.and_then(|context| context.closed_issue_links.clone()),
 	})
 }
 
-fn render_prepared_changeset_provenance(changeset: &PreparedChangeset) -> String {
-	let mut lines = vec![format!("> Changeset: `{}`", changeset.path.display())];
-	if let Some(provenance) = &changeset.provenance {
-		if let Some(introduced) = provenance.introduced.as_ref() {
-			let mut line = "> Introduced:".to_string();
-			if let Some(commit) = introduced.commit.as_ref() {
-				let _ = write!(line, " `{}`", commit.short_sha);
-			}
-			if let Some(actor) = introduced.actor.as_ref() {
-				if let Some(login) = actor.login.as_deref() {
-					let _ = write!(line, " by @{login}");
-				} else if let Some(display_name) = actor.display_name.as_deref() {
-					let _ = write!(line, " by {display_name}");
-				}
-			}
-			if let Some(review_request) = introduced.review_request.as_ref() {
-				let _ = write!(line, " via {} {}", review_request.kind, review_request.id);
-			}
-			if line != "> Introduced:" {
-				lines.push(line);
-			}
-		}
-		if let Some(last_updated) = provenance.last_updated.as_ref() {
-			let introduced_sha = provenance
-				.introduced
+fn build_rendered_changeset_context(
+	root: &Path,
+	changeset: &PreparedChangeset,
+) -> RenderedChangesetContext {
+	let changeset_path = root_relative(root, &changeset.path).display().to_string();
+	let mut rendered = RenderedChangesetContext {
+		changeset_path: changeset_path.clone(),
+		..RenderedChangesetContext::default()
+	};
+	let mut lines = vec![format!("> _Changeset:_ `{changeset_path}`")];
+	let Some(context) = changeset.context.as_ref() else {
+		rendered.context = lines.join("\n");
+		return rendered;
+	};
+
+	let primary_revision = context
+		.introduced
+		.as_ref()
+		.or(context.last_updated.as_ref());
+	if let Some(actor) = primary_revision.and_then(|revision| revision.actor.as_ref()) {
+		let label = render_actor_label(actor);
+		let link = render_markdown_link(&label, actor.url.as_deref());
+		rendered.change_owner = Some(label.clone());
+		rendered.change_owner_link = Some(link.clone());
+		lines.push(format!("> _Owner:_ {link}"));
+	}
+
+	let review_request = context
+		.introduced
+		.as_ref()
+		.and_then(|revision| revision.review_request.as_ref())
+		.or_else(|| {
+			context
+				.last_updated
 				.as_ref()
-				.and_then(|revision| revision.commit.as_ref())
-				.map(|commit| commit.sha.as_str());
-			let last_updated_commit = last_updated.commit.as_ref();
-			if last_updated_commit.is_some_and(|commit| Some(commit.sha.as_str()) != introduced_sha)
-			{
-				lines.push(format!(
-					"> Last updated: `{}`",
-					last_updated_commit
-						.map(|commit| commit.short_sha.as_str())
-						.unwrap_or_default()
-				));
-			}
+				.and_then(|revision| revision.review_request.as_ref())
+		});
+	if let Some(review_request) = review_request {
+		let label = render_review_request_label(review_request);
+		let link = render_markdown_link(&label, review_request.url.as_deref());
+		rendered.review_request = Some(label.clone());
+		rendered.review_request_link = Some(link.clone());
+		lines.push(format!("> _Review:_ {link}"));
+	}
+
+	if let Some(commit) = context
+		.introduced
+		.as_ref()
+		.and_then(|revision| revision.commit.as_ref())
+	{
+		let label = commit.short_sha.clone();
+		let link = render_markdown_link(&format!("`{label}`"), commit.url.as_deref());
+		rendered.introduced_commit = Some(label);
+		rendered.introduced_commit_link = Some(link.clone());
+		lines.push(format!("> _Introduced in:_ {link}"));
+	}
+
+	let introduced_sha = context
+		.introduced
+		.as_ref()
+		.and_then(|revision| revision.commit.as_ref())
+		.map(|commit| commit.sha.as_str());
+	if let Some(commit) = context
+		.last_updated
+		.as_ref()
+		.and_then(|revision| revision.commit.as_ref())
+		.filter(|commit| Some(commit.sha.as_str()) != introduced_sha)
+	{
+		let label = commit.short_sha.clone();
+		let link = render_markdown_link(&format!("`{label}`"), commit.url.as_deref());
+		rendered.last_updated_commit = Some(label);
+		rendered.last_updated_commit_link = Some(link.clone());
+		lines.push(format!("> _Last updated in:_ {link}"));
+	}
+
+	let closed_issues = context
+		.related_issues
+		.iter()
+		.filter(|issue| issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest)
+		.collect::<Vec<_>>();
+	if !closed_issues.is_empty() {
+		let labels = render_issue_labels(&closed_issues);
+		let issue_links = render_issue_links(&closed_issues);
+		rendered.closed_issues = Some(labels.clone());
+		rendered.closed_issue_links = Some(issue_links.clone());
+		lines.push(format!("> _Closed issues:_ {issue_links}"));
+	}
+
+	let related_issues = context
+		.related_issues
+		.iter()
+		.filter(|issue| issue.relationship != HostedIssueRelationshipKind::ClosedByReviewRequest)
+		.collect::<Vec<_>>();
+	if !related_issues.is_empty() {
+		let labels = render_issue_labels(&related_issues);
+		let issue_links = render_issue_links(&related_issues);
+		rendered.related_issues = Some(labels.clone());
+		rendered.related_issue_links = Some(issue_links.clone());
+		lines.push(format!("> _Related issues:_ {issue_links}"));
+	}
+
+	rendered.context = lines.join("\n");
+	rendered
+}
+
+fn render_actor_label(actor: &HostedActorRef) -> String {
+	if let Some(login) = actor.login.as_deref() {
+		format!("@{login}")
+	} else if let Some(display_name) = actor.display_name.as_deref() {
+		display_name.to_string()
+	} else {
+		"unknown".to_string()
+	}
+}
+
+fn render_review_request_label(review_request: &HostedReviewRequestRef) -> String {
+	match review_request.kind {
+		monochange_core::HostedReviewRequestKind::PullRequest => {
+			format!("PR {}", review_request.id)
 		}
-		if !provenance.related_issues.is_empty() {
-			let issues = provenance
-				.related_issues
-				.iter()
-				.map(|issue| format!("{} {}", issue.relationship, issue.id))
-				.collect::<Vec<_>>()
-				.join(", ");
-			lines.push(format!("> Issues: {issues}"));
+		monochange_core::HostedReviewRequestKind::MergeRequest => {
+			format!("MR {}", review_request.id)
 		}
 	}
-	lines.join("\n")
+}
+
+fn render_markdown_link(label: &str, url: Option<&str>) -> String {
+	url.map_or_else(|| label.to_string(), |url| format!("[{label}]({url})"))
+}
+
+fn render_issue_labels(issues: &[&HostedIssueRef]) -> String {
+	issues
+		.iter()
+		.map(|issue| issue.id.clone())
+		.collect::<Vec<_>>()
+		.join(", ")
+}
+
+fn render_issue_links(issues: &[&HostedIssueRef]) -> String {
+	issues
+		.iter()
+		.map(|issue| render_markdown_link(&issue.id, issue.url.as_deref()))
+		.collect::<Vec<_>>()
+		.join(", ")
 }
 
 fn render_package_empty_update_message(
@@ -2630,7 +2777,20 @@ fn package_release_note_changes(
 			details: None,
 			bump: decision.recommended_bump,
 			change_type: None,
-			provenance: None,
+			context: None,
+			changeset_path: None,
+			change_owner: None,
+			change_owner_link: None,
+			review_request: None,
+			review_request_link: None,
+			introduced_commit: None,
+			introduced_commit_link: None,
+			last_updated_commit: None,
+			last_updated_commit_link: None,
+			related_issues: None,
+			related_issue_links: None,
+			closed_issues: None,
+			closed_issue_links: None,
 		});
 	}
 	changes
@@ -2671,7 +2831,20 @@ fn group_release_note_changes(
 			details: None,
 			bump: planned_group.recommended_bump,
 			change_type: None,
-			provenance: None,
+			context: None,
+			changeset_path: None,
+			change_owner: None,
+			change_owner_link: None,
+			review_request: None,
+			review_request_link: None,
+			introduced_commit: None,
+			introduced_commit_link: None,
+			last_updated_commit: None,
+			last_updated_commit_link: None,
+			related_issues: None,
+			related_issue_links: None,
+			closed_issues: None,
+			closed_issue_links: None,
 		});
 	} else {
 		changes = aggregate_group_release_note_changes(changes);
@@ -2689,7 +2862,7 @@ fn aggregate_group_release_note_changes(changes: Vec<ReleaseNoteChange>) -> Vec<
 			details: change.details.clone(),
 			bump: change.bump,
 			change_type: change.change_type.clone(),
-			provenance: change.provenance.clone(),
+			context: change.context.clone(),
 		};
 		if let Some(index) = indexes.get(&key).copied() {
 			let entry = &mut aggregated[index];
@@ -2936,7 +3109,11 @@ fn format_group_labeled_entry(change: &ReleaseNoteChange, rendered: &str) -> Str
 	format!("> [!NOTE]\n> {labels}\n\n{rendered}")
 }
 
-const DEFAULT_CHANGE_TEMPLATES: [&str; 2] = ["#### $summary\n\n$details", "- $summary"];
+const DEFAULT_CHANGE_TEMPLATES: [&str; 3] = [
+	"#### $summary\n\n$details\n\n$context",
+	"#### $summary\n\n$details",
+	"- $summary",
+];
 
 fn apply_change_template(
 	template: &str,
@@ -2954,7 +3131,36 @@ fn apply_change_template(
 		("$target_id", Some(target_id)),
 		("$bump", Some(bump.as_str())),
 		("$type", change.change_type.as_deref()),
-		("$provenance", change.provenance.as_deref()),
+		("$context", change.context.as_deref()),
+		("$provenance", change.context.as_deref()),
+		("$changeset_path", change.changeset_path.as_deref()),
+		("$change_owner", change.change_owner.as_deref()),
+		("$change_owner_link", change.change_owner_link.as_deref()),
+		("$review_request", change.review_request.as_deref()),
+		(
+			"$review_request_link",
+			change.review_request_link.as_deref(),
+		),
+		("$introduced_commit", change.introduced_commit.as_deref()),
+		(
+			"$introduced_commit_link",
+			change.introduced_commit_link.as_deref(),
+		),
+		(
+			"$last_updated_commit",
+			change.last_updated_commit.as_deref(),
+		),
+		(
+			"$last_updated_commit_link",
+			change.last_updated_commit_link.as_deref(),
+		),
+		("$related_issues", change.related_issues.as_deref()),
+		(
+			"$related_issue_links",
+			change.related_issue_links.as_deref(),
+		),
+		("$closed_issues", change.closed_issues.as_deref()),
+		("$closed_issue_links", change.closed_issue_links.as_deref()),
 	] {
 		if rendered.contains(needle) {
 			let value = value?;

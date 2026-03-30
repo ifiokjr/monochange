@@ -347,20 +347,20 @@ pub fn github_issue_url(github: &GitHubConfiguration, number: u64) -> String {
 	)
 }
 
-pub fn enrich_changeset_provenance(
+pub fn enrich_changeset_context(
 	github: &GitHubConfiguration,
 	changesets: &mut [PreparedChangeset],
 ) {
 	let host = github_host();
 	let capabilities = github_hosting_capabilities();
 	for changeset in changesets.iter_mut() {
-		let Some(provenance) = changeset.provenance.as_mut() else {
+		let Some(context) = changeset.context.as_mut() else {
 			continue;
 		};
-		provenance.provider = HostingProviderKind::GitHub;
-		provenance.host.clone_from(&host);
-		provenance.capabilities = capabilities.clone();
-		for revision in [&mut provenance.introduced, &mut provenance.last_updated] {
+		context.provider = HostingProviderKind::GitHub;
+		context.host.clone_from(&host);
+		context.capabilities = capabilities.clone();
+		for revision in [&mut context.introduced, &mut context.last_updated] {
 			let Some(revision) = revision.as_mut() else {
 				continue;
 			};
@@ -387,7 +387,7 @@ pub fn enrich_changeset_provenance(
 		let Ok(client) = build_github_client(&token, api_base_url.as_deref()) else {
 			return;
 		};
-		enrich_changeset_provenance_with_client(&client, github, changesets).await;
+		enrich_changeset_context_with_client(&client, github, changesets).await;
 	});
 }
 
@@ -442,7 +442,7 @@ pub fn build_release_pull_request_request(
 	}
 }
 
-async fn enrich_changeset_provenance_with_client(
+async fn enrich_changeset_context_with_client(
 	client: &Octocrab,
 	github: &GitHubConfiguration,
 	changesets: &mut [PreparedChangeset],
@@ -450,13 +450,13 @@ async fn enrich_changeset_provenance_with_client(
 	let host = github_host();
 	let capabilities = github_hosting_capabilities();
 	for changeset in changesets.iter_mut() {
-		let Some(provenance) = changeset.provenance.as_mut() else {
+		let Some(context) = changeset.context.as_mut() else {
 			continue;
 		};
-		provenance.provider = HostingProviderKind::GitHub;
-		provenance.host.clone_from(&host);
-		provenance.capabilities = capabilities.clone();
-		for revision in [&mut provenance.introduced, &mut provenance.last_updated] {
+		context.provider = HostingProviderKind::GitHub;
+		context.host.clone_from(&host);
+		context.capabilities = capabilities.clone();
+		for revision in [&mut context.introduced, &mut context.last_updated] {
 			let Some(revision) = revision.as_mut() else {
 				continue;
 			};
@@ -474,11 +474,11 @@ async fn enrich_changeset_provenance_with_client(
 	let mut review_requests_by_sha =
 		std::collections::BTreeMap::<String, Option<GitHubRelatedReviewRequest>>::new();
 	for changeset in changesets.iter_mut() {
-		let Some(provenance) = changeset.provenance.as_mut() else {
+		let Some(context) = changeset.context.as_mut() else {
 			continue;
 		};
 		let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
-		for revision in [&mut provenance.introduced, &mut provenance.last_updated] {
+		for revision in [&mut context.introduced, &mut context.last_updated] {
 			let Some(revision) = revision.as_mut() else {
 				continue;
 			};
@@ -512,7 +512,7 @@ async fn enrich_changeset_provenance_with_client(
 				actor.host.clone_from(&host);
 			}
 		}
-		provenance.related_issues = issues_by_id.into_values().collect();
+		context.related_issues = issues_by_id.into_values().collect();
 	}
 }
 
@@ -662,8 +662,8 @@ pub fn plan_released_issue_comments(
 	for issue in manifest
 		.changesets
 		.iter()
-		.filter_map(|changeset| changeset.provenance.as_ref())
-		.flat_map(|provenance| provenance.related_issues.iter())
+		.filter_map(|changeset| changeset.context.as_ref())
+		.flat_map(|context| context.related_issues.iter())
 		.filter(|issue| issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest)
 	{
 		plans_by_issue
