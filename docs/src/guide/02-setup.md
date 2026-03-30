@@ -14,8 +14,12 @@ package_type = "cargo"
 path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
+[release_notes]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
+
 [package.sdk-core]
 path = "crates/sdk_core"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
 
 [package.web-sdk]
 path = "packages/web-sdk"
@@ -34,6 +38,13 @@ version_format = "primary"
 [group.sdk.changelog]
 path = "docs/sdk-changelog.md"
 format = "monochange"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+source = "monochange"
 
 [[workflows]]
 name = "validate"
@@ -75,6 +86,14 @@ name = "reason"
 type = "string"
 required = true
 
+[[workflows.inputs]]
+name = "type"
+type = "string"
+
+[[workflows.inputs]]
+name = "details"
+type = "string"
+
 [[workflows.steps]]
 type = "CreateChangeFile"
 
@@ -101,6 +120,22 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
+
+[[workflows]]
+name = "publish-release"
+help_text = "Prepare a release and publish GitHub releases"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
 ```
 
 <!-- {/projectSetupConfig} -->

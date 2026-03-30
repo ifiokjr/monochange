@@ -25,12 +25,15 @@
 
 ## Phase 3 — GitHub releases
 
-- [ ] T030 Create `crates/monochange_github` for GitHub API integration.
-- [ ] T031 Implement GitHub repository and release config parsing.
-- [ ] T032 Implement release payload rendering from prepared release data.
-- [ ] T033 Add workflow support for `PublishGitHubRelease`.
-- [ ] T034 Add dry-run output for GitHub release publication.
-- [ ] T035 Add integration tests for grouped and ungrouped GitHub release payloads.
+- [x] T030 Create `crates/monochange_github` for GitHub API integration.
+- [x] T031 Implement GitHub repository and release config parsing.
+- [x] T032 Implement release payload rendering from prepared release data.
+- [x] T033 Add workflow support for `PublishGitHubRelease`.
+- [x] T034 Add dry-run output for GitHub release publication.
+- [x] T035 Add integration tests for grouped and ungrouped GitHub release payloads.
+- [x] T036 Add release-note customization for `change_templates`, `extra_changelog_sections`, and optional change `type` / `details` fields.
+
+> Follow-up note: add git-derived release-note template variables next (`$commit_hash`, `$commit_author_name`, and related metadata).
 
 ## Phase 4 — Release PR automation
 

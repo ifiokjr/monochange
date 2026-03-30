@@ -127,6 +127,13 @@ Workflows are user-defined top-level commands. In this milestone, a workflow nam
 <!-- {=configurationWorkflowsSnippet} -->
 
 ```toml
+[release_notes]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
+
+[package.core]
+path = "crates/core"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+
 [[workflows]]
 name = "discover"
 help_text = "Discover packages across supported ecosystems"
@@ -157,6 +164,22 @@ type = "PrepareRelease"
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
+[[workflows]]
+name = "publish-release"
+help_text = "Prepare a release and publish GitHub releases"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
+
 [[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
@@ -176,6 +199,26 @@ Workflow command interpolation variables:
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 
 <!-- {/configurationWorkflowVariables} -->
+
+## GitHub release settings
+
+Use `[github]` plus `[github.releases]` when you want workflow steps such as `PublishGitHubRelease` to derive repository release payloads from the prepared release.
+
+<!-- {=configurationGitHubSnippet} -->
+
+```toml
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+```
+
+<!-- {/configurationGitHubSnippet} -->
 
 ## Ecosystem settings
 
@@ -220,9 +263,11 @@ Under the new model, move that changelog configuration onto the matching `[packa
 MonoChange currently supports two changelog formats:
 
 - `monochange` keeps the current heading-and-bullets layout
-- `keep_a_changelog` renders section headings such as `### Changed`
+- `keep_a_changelog` renders section headings such as `### Features`, `### Fixes`, and `### Breaking changes`
 
 Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
+
+You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`. Git-derived template variables are planned next.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 
@@ -244,7 +289,8 @@ Current implementation notes:
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, and `Command`
+- GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `gh` for live publishing outside dry-run mode
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 

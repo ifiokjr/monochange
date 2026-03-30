@@ -36,6 +36,7 @@
 //! - resolve change input files
 //! - render discovery and release workflow output in text or JSON
 //! - execute configured release workflows
+//! - preview or publish GitHub releases from prepared release data
 //! <!-- {/monochangeCrateDocs} -->
 
 use std::collections::BTreeMap;
@@ -72,6 +73,7 @@ use monochange_core::ChangelogTarget;
 use monochange_core::CommandVariable;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
+use monochange_core::ExtraChangelogSection;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
@@ -96,6 +98,9 @@ use monochange_core::WorkflowStepDefinition;
 use monochange_core::WorkspaceDefaults;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
+use monochange_github::build_release_requests;
+use monochange_github::publish_release_requests;
+use monochange_github::GitHubReleaseRequest;
 use monochange_graph::build_release_plan;
 use monochange_npm::discover_npm_packages;
 use monochange_semver::collect_assessments;
@@ -181,12 +186,38 @@ struct ChangelogUpdate {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+struct ReleaseNoteChange {
+	package_id: String,
+	package_name: String,
+	summary: String,
+	details: Option<String>,
+	bump: BumpSeverity,
+	change_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct ResolvedSectionDefinition {
+	title: String,
+	types: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+enum BuiltinReleaseSection {
+	Major,
+	Minor,
+	Patch,
+	Note,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 struct WorkflowContext {
 	root: PathBuf,
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 	prepared_release: Option<PreparedRelease>,
 	release_manifest_path: Option<PathBuf>,
+	github_release_requests: Vec<GitHubReleaseRequest>,
+	github_release_results: Vec<String>,
 	command_logs: Vec<String>,
 }
 
@@ -429,6 +460,8 @@ fn execute_workflow(
 		inputs,
 		prepared_release: None,
 		release_manifest_path: None,
+		github_release_requests: Vec::new(),
+		github_release_results: Vec::new(),
 		command_logs: Vec::new(),
 	};
 	let mut output = None;
@@ -472,6 +505,16 @@ fn execute_workflow(
 							"workflow `change` requires a `--reason` value".to_string(),
 						)
 					})?;
+				let change_type = context
+					.inputs
+					.get("type")
+					.and_then(|values| values.first())
+					.cloned();
+				let details = context
+					.inputs
+					.get("details")
+					.and_then(|values| values.first())
+					.cloned();
 				let evidence = context.inputs.get("evidence").cloned().unwrap_or_default();
 				let output_path = context
 					.inputs
@@ -483,6 +526,8 @@ fn execute_workflow(
 					&package_refs,
 					bump.into(),
 					&reason,
+					change_type.as_deref(),
+					details.as_deref(),
 					&evidence,
 					output_path.as_deref(),
 				)?;
@@ -515,6 +560,53 @@ fn execute_workflow(
 				}
 				output = None;
 			}
+			WorkflowStepDefinition::PublishGitHubRelease => {
+				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+					MonochangeError::Config(
+						"`PublishGitHubRelease` requires a previous `PrepareRelease` step"
+							.to_string(),
+					)
+				})?;
+				let github = load_workspace_configuration(root)?.github.ok_or_else(|| {
+					MonochangeError::Config(
+						"`PublishGitHubRelease` requires `[github]` configuration".to_string(),
+					)
+				})?;
+				let manifest =
+					build_release_manifest(workflow, prepared_release, &context.command_logs);
+				context.github_release_requests = build_release_requests(&github, &manifest);
+				if context.dry_run {
+					context.github_release_results = context
+						.github_release_requests
+						.iter()
+						.map(|request| {
+							format!(
+								"dry-run {} {} ({})",
+								request.repository, request.tag_name, request.name
+							)
+						})
+						.collect();
+				} else {
+					context.github_release_results =
+						publish_release_requests(&context.github_release_requests)?
+							.into_iter()
+							.map(|result| {
+								format!(
+									"{} {} ({})",
+									result.repository,
+									result.tag_name,
+									match result.operation {
+										monochange_github::GitHubReleaseOperation::Created =>
+											"created",
+										monochange_github::GitHubReleaseOperation::Updated =>
+											"updated",
+									}
+								)
+							})
+							.collect();
+				}
+				output = None;
+			}
 			WorkflowStepDefinition::Command {
 				command,
 				dry_run,
@@ -537,11 +629,15 @@ fn execute_workflow(
 			.and_then(|values| values.first())
 			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 		return match format {
-			OutputFormat::Json => render_release_manifest_json(&build_release_manifest(
-				workflow,
-				prepared_release,
-				&context.command_logs,
-			)),
+			OutputFormat::Json => {
+				let manifest =
+					build_release_manifest(workflow, prepared_release, &context.command_logs);
+				if context.github_release_requests.is_empty() {
+					render_release_manifest_json(&manifest)
+				} else {
+					render_release_publish_json(&manifest, &context.github_release_requests)
+				}
+			}
 			OutputFormat::Text => Ok(render_workflow_result(workflow, &context)),
 		};
 	}
@@ -736,6 +832,12 @@ fn render_workflow_result(workflow: &WorkflowDefinition, context: &WorkflowConte
 		}
 		if let Some(path) = &context.release_manifest_path {
 			lines.push(format!("release manifest: {}", path.display()));
+		}
+		if !context.github_release_results.is_empty() {
+			lines.push("github releases:".to_string());
+			for release in &context.github_release_results {
+				lines.push(format!("- {release}"));
+			}
 		}
 		if !prepared_release.changed_files.is_empty() {
 			lines.push("changed files:".to_string());
@@ -934,11 +1036,14 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	})
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_change_file(
 	root: &Path,
 	package_refs: &[String],
 	bump: BumpSeverity,
 	reason: &str,
+	change_type: Option<&str>,
+	details: Option<&str>,
 	evidence: &[String],
 	output: Option<&Path>,
 ) -> MonochangeResult<PathBuf> {
@@ -954,7 +1059,8 @@ pub fn add_change_file(
 		})?;
 	}
 
-	let content = render_changeset_markdown(&packages, bump, reason, evidence);
+	let content =
+		render_changeset_markdown(&packages, bump, reason, change_type, details, evidence);
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write {}: {error}",
@@ -1237,15 +1343,18 @@ fn build_changelog_updates(
 	change_signals: &[ChangeSignal],
 	changelog_targets: &(PackageChangelogTargets, GroupChangelogTargets),
 ) -> MonochangeResult<Vec<ChangelogUpdate>> {
-	let mut notes_by_package = BTreeMap::<String, BTreeSet<String>>::new();
-	for signal in change_signals {
-		if let Some(note) = &signal.notes {
-			notes_by_package
-				.entry(signal.package_id.clone())
-				.or_default()
-				.insert(note.clone());
-		}
-	}
+	let release_note_changes = change_signals
+		.iter()
+		.filter_map(|signal| build_release_note_change(signal, packages))
+		.fold(
+			BTreeMap::<String, Vec<ReleaseNoteChange>>::new(),
+			|mut acc, change| {
+				acc.entry(change.package_id.clone())
+					.or_default()
+					.push(change);
+				acc
+			},
+		);
 
 	let mut updates = Vec::new();
 	let package_changelog_targets = &changelog_targets.0;
@@ -1267,19 +1376,31 @@ fn build_changelog_updates(
 		let Some(planned_version) = decision.planned_version.as_ref() else {
 			continue;
 		};
-		let notes = notes_by_package
-			.get(&decision.package_id)
-			.map(|notes| notes.iter().cloned().collect::<Vec<_>>())
-			.filter(|notes| !notes.is_empty())
-			.unwrap_or_else(|| decision.reasons.clone());
-		let document = package_release_notes(&package.name, &planned_version.to_string(), &notes);
+		let package_id = config_package_id(package);
+		let changes = package_release_note_changes(
+			decision,
+			package,
+			release_note_changes.get(&decision.package_id),
+		);
+		let document = build_release_notes_document(
+			&package_id,
+			&planned_version.to_string(),
+			Vec::new(),
+			configuration
+				.package_by_id(&package_id)
+				.map_or(&[][..], |package| {
+					package.extra_changelog_sections.as_slice()
+				}),
+			&configuration.release_notes.change_templates,
+			&changes,
+		);
 		let rendered = render_release_notes(changelog_target.format, &document);
 		updates.push(ChangelogUpdate {
 			file: FileUpdate {
 				path: changelog_target.path.clone(),
 				content: append_changelog_section(&changelog_target.path, &rendered)?,
 			},
-			owner_id: decision.package_id.clone(),
+			owner_id: package_id,
 			owner_kind: ReleaseOwnerKind::Package,
 			format: changelog_target.format,
 			notes: document,
@@ -1298,34 +1419,22 @@ fn build_changelog_updates(
 		let Some(planned_version) = planned_group.planned_version.as_ref() else {
 			continue;
 		};
-		let member_notes = planned_group
-			.members
-			.iter()
-			.filter_map(|member_id| notes_by_package.get(member_id))
-			.flat_map(BTreeSet::iter)
-			.cloned()
-			.collect::<BTreeSet<_>>()
-			.into_iter()
-			.collect::<Vec<_>>();
 		let member_ids = configuration
 			.groups
 			.iter()
 			.find(|group| group.id == planned_group.group_id)
 			.map(|group| group.packages.clone())
 			.unwrap_or_default();
-		let notes = if member_notes.is_empty() {
-			vec![format!(
-				"prepare grouped release for `{}`",
-				planned_group.group_id
-			)]
-		} else {
-			member_notes
-		};
-		let document = group_release_notes(
+		let changes = group_release_note_changes(planned_group, &release_note_changes);
+		let document = build_release_notes_document(
 			&planned_group.group_id,
 			&planned_version.to_string(),
-			&member_ids,
-			&notes,
+			group_release_summary(&planned_group.group_id, &member_ids),
+			configuration
+				.group_by_id(&planned_group.group_id)
+				.map_or(&[][..], |group| group.extra_changelog_sections.as_slice()),
+			&configuration.release_notes.change_templates,
+			&changes,
 		);
 		let rendered = render_release_notes(changelog_target.format, &document);
 		updates.push(ChangelogUpdate {
@@ -1375,43 +1484,320 @@ fn dedup_changelog_updates(updates: Vec<ChangelogUpdate>) -> Vec<ChangelogUpdate
 		.collect()
 }
 
-fn package_release_notes(
-	package_name: &str,
-	version: &str,
-	notes: &[String],
-) -> ReleaseNotesDocument {
-	ReleaseNotesDocument {
-		title: version.to_string(),
-		summary: Vec::new(),
-		sections: vec![ReleaseNotesSection {
-			title: "Changed".to_string(),
-			entries: if notes.is_empty() {
-				vec![format!("prepare release for `{package_name}`")]
-			} else {
-				notes.to_vec()
-			},
-		}],
-	}
+fn build_release_note_change(
+	signal: &ChangeSignal,
+	packages: &[PackageRecord],
+) -> Option<ReleaseNoteChange> {
+	let package = packages
+		.iter()
+		.find(|package| package.id == signal.package_id)?;
+	let package_id = config_package_id(package);
+	Some(ReleaseNoteChange {
+		package_id: signal.package_id.clone(),
+		package_name: package_id.clone(),
+		summary: signal
+			.notes
+			.clone()
+			.unwrap_or_else(|| format!("prepare release for `{package_id}`")),
+		details: signal.details.clone(),
+		bump: signal.requested_bump.unwrap_or(BumpSeverity::Patch),
+		change_type: signal.change_type.clone(),
+	})
 }
 
-fn group_release_notes(
-	group_name: &str,
-	version: &str,
-	members: &[String],
-	notes: &[String],
-) -> ReleaseNotesDocument {
+fn package_release_note_changes(
+	decision: &monochange_core::ReleaseDecision,
+	package: &PackageRecord,
+	direct_changes: Option<&Vec<ReleaseNoteChange>>,
+) -> Vec<ReleaseNoteChange> {
+	let mut changes = direct_changes.cloned().unwrap_or_default();
+	if changes.is_empty() {
+		let package_id = config_package_id(package);
+		changes.push(ReleaseNoteChange {
+			package_id: decision.package_id.clone(),
+			package_name: package_id.clone(),
+			summary: if decision.reasons.is_empty() {
+				format!("prepare release for `{package_id}`")
+			} else {
+				decision.reasons.join("; ")
+			},
+			details: None,
+			bump: decision.recommended_bump,
+			change_type: None,
+		});
+	}
+	changes
+}
+
+fn group_release_note_changes(
+	planned_group: &monochange_core::PlannedVersionGroup,
+	release_note_changes: &BTreeMap<String, Vec<ReleaseNoteChange>>,
+) -> Vec<ReleaseNoteChange> {
+	let mut changes = planned_group
+		.members
+		.iter()
+		.flat_map(|member_id| {
+			release_note_changes
+				.get(member_id)
+				.into_iter()
+				.flatten()
+				.cloned()
+		})
+		.collect::<Vec<_>>();
+	if changes.is_empty() {
+		changes.push(ReleaseNoteChange {
+			package_id: planned_group.group_id.clone(),
+			package_name: planned_group.group_id.clone(),
+			summary: format!("prepare grouped release for `{}`", planned_group.group_id),
+			details: None,
+			bump: planned_group.recommended_bump,
+			change_type: None,
+		});
+	}
+	changes
+}
+
+fn group_release_summary(group_name: &str, members: &[String]) -> Vec<String> {
 	let mut summary = vec![format!("Grouped release for `{group_name}`.")];
 	if !members.is_empty() {
 		summary.push(format!("Members: {}", members.join(", ")));
 	}
+	summary
+}
+
+fn build_release_notes_document(
+	target_id: &str,
+	version: &str,
+	summary: Vec<String>,
+	extra_sections: &[ExtraChangelogSection],
+	change_templates: &[String],
+	changes: &[ReleaseNoteChange],
+) -> ReleaseNotesDocument {
 	ReleaseNotesDocument {
 		title: version.to_string(),
 		summary,
-		sections: vec![ReleaseNotesSection {
-			title: "Changed".to_string(),
-			entries: notes.to_vec(),
-		}],
+		sections: render_release_note_sections(
+			target_id,
+			version,
+			extra_sections,
+			change_templates,
+			changes,
+		),
 	}
+}
+
+fn render_release_note_sections(
+	target_id: &str,
+	version: &str,
+	extra_sections: &[ExtraChangelogSection],
+	change_templates: &[String],
+	changes: &[ReleaseNoteChange],
+) -> Vec<ReleaseNotesSection> {
+	let overridden_builtins = extra_sections
+		.iter()
+		.flat_map(|section| {
+			section
+				.types
+				.iter()
+				.map(|change_type| change_type.trim().to_string())
+		})
+		.collect::<BTreeSet<_>>();
+	let resolved_extra_sections = extra_sections
+		.iter()
+		.map(|section| ResolvedSectionDefinition {
+			title: section.name.clone(),
+			types: section.types.clone(),
+		})
+		.collect::<Vec<_>>();
+	let mut builtin_entries = BTreeMap::<BuiltinReleaseSection, Vec<String>>::new();
+	let mut extra_entries = vec![Vec::<String>::new(); resolved_extra_sections.len()];
+
+	for change in changes {
+		let rendered = render_change_entry(change, target_id, version, change_templates);
+		match classify_release_note_change(change, &resolved_extra_sections) {
+			ResolvedReleaseSectionTarget::Builtin(section) => {
+				push_unique_release_note_entry(
+					builtin_entries.entry(section).or_default(),
+					rendered,
+				);
+			}
+			ResolvedReleaseSectionTarget::Extra(index) => {
+				push_unique_release_note_entry(&mut extra_entries[index], rendered);
+			}
+		}
+	}
+
+	let mut sections = Vec::new();
+	for builtin in builtin_release_sections() {
+		if overridden_builtins.contains(builtin.selector()) {
+			continue;
+		}
+		if let Some(entries) = builtin_entries
+			.remove(&builtin)
+			.filter(|entries| !entries.is_empty())
+		{
+			sections.push(ReleaseNotesSection {
+				title: builtin.title().to_string(),
+				entries,
+			});
+		}
+	}
+	for (index, section) in resolved_extra_sections.iter().enumerate() {
+		if extra_entries[index].is_empty() {
+			continue;
+		}
+		sections.push(ReleaseNotesSection {
+			title: section.title.clone(),
+			entries: extra_entries[index].clone(),
+		});
+	}
+	if sections.is_empty() {
+		sections.push(ReleaseNotesSection {
+			title: "Changed".to_string(),
+			entries: vec!["- prepare release".to_string()],
+		});
+	}
+	sections
+}
+
+#[allow(variant_size_differences)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum ResolvedReleaseSectionTarget {
+	Builtin(BuiltinReleaseSection),
+	Extra(usize),
+}
+
+fn classify_release_note_change(
+	change: &ReleaseNoteChange,
+	extra_sections: &[ResolvedSectionDefinition],
+) -> ResolvedReleaseSectionTarget {
+	if let Some(change_type) = change.change_type.as_deref() {
+		if let Some(index) = extra_sections
+			.iter()
+			.position(|section| section_matches_resolved_type(section, change_type))
+		{
+			return ResolvedReleaseSectionTarget::Extra(index);
+		}
+		if change_type == BuiltinReleaseSection::Note.selector() {
+			return ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note);
+		}
+	}
+	let builtin = BuiltinReleaseSection::from_bump(change.bump);
+	if let Some(index) = extra_sections
+		.iter()
+		.position(|section| section_matches_resolved_type(section, builtin.selector()))
+	{
+		return ResolvedReleaseSectionTarget::Extra(index);
+	}
+	ResolvedReleaseSectionTarget::Builtin(builtin)
+}
+
+fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
+	section
+		.types
+		.iter()
+		.any(|candidate| candidate.trim() == change_type)
+}
+
+fn render_change_entry(
+	change: &ReleaseNoteChange,
+	target_id: &str,
+	version: &str,
+	change_templates: &[String],
+) -> String {
+	for template in change_templates
+		.iter()
+		.map(String::as_str)
+		.chain(DEFAULT_CHANGE_TEMPLATES)
+	{
+		if let Some(rendered) = apply_change_template(template, change, target_id, version) {
+			return rendered;
+		}
+	}
+	format!("- {}", change.summary)
+}
+
+const DEFAULT_CHANGE_TEMPLATES: [&str; 2] = ["#### $summary\n\n$details", "- $summary"];
+
+fn apply_change_template(
+	template: &str,
+	change: &ReleaseNoteChange,
+	target_id: &str,
+	version: &str,
+) -> Option<String> {
+	let bump = change.bump.to_string();
+	let mut rendered = template.to_string();
+	for (needle, value) in [
+		("$summary", Some(change.summary.as_str())),
+		("$details", change.details.as_deref()),
+		("$package", Some(change.package_name.as_str())),
+		("$version", Some(version)),
+		("$target_id", Some(target_id)),
+		("$bump", Some(bump.as_str())),
+		("$type", change.change_type.as_deref()),
+	] {
+		if rendered.contains(needle) {
+			let value = value?;
+			rendered = rendered.replace(needle, value);
+		}
+	}
+	let rendered = rendered.trim().to_string();
+	if rendered.is_empty() {
+		None
+	} else {
+		Some(rendered)
+	}
+}
+
+fn push_unique_release_note_entry(entries: &mut Vec<String>, entry: String) {
+	if !entries.iter().any(|existing| existing == &entry) {
+		entries.push(entry);
+	}
+}
+
+fn config_package_id(package: &PackageRecord) -> String {
+	package
+		.metadata
+		.get("config_id")
+		.cloned()
+		.unwrap_or_else(|| package.name.clone())
+}
+
+impl BuiltinReleaseSection {
+	fn from_bump(bump: BumpSeverity) -> Self {
+		match bump {
+			BumpSeverity::Major => Self::Major,
+			BumpSeverity::Minor => Self::Minor,
+			BumpSeverity::None | BumpSeverity::Patch => Self::Patch,
+		}
+	}
+
+	fn selector(self) -> &'static str {
+		match self {
+			Self::Major => "major",
+			Self::Minor => "minor",
+			Self::Patch => "patch",
+			Self::Note => "note",
+		}
+	}
+
+	fn title(self) -> &'static str {
+		match self {
+			Self::Major => "Breaking changes",
+			Self::Minor => "Features",
+			Self::Patch => "Fixes",
+			Self::Note => "Notes",
+		}
+	}
+}
+
+fn builtin_release_sections() -> [BuiltinReleaseSection; 4] {
+	[
+		BuiltinReleaseSection::Major,
+		BuiltinReleaseSection::Minor,
+		BuiltinReleaseSection::Patch,
+		BuiltinReleaseSection::Note,
+	]
 }
 
 struct VersionedFileUpdateContext<'a> {
@@ -2077,6 +2463,17 @@ fn render_release_manifest_json(manifest: &ReleaseManifest) -> MonochangeResult<
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
+fn render_release_publish_json(
+	manifest: &ReleaseManifest,
+	github_releases: &[GitHubReleaseRequest],
+) -> MonochangeResult<String> {
+	serde_json::to_string_pretty(&json!({
+		"manifest": manifest,
+		"githubReleases": github_releases,
+	}))
+	.map_err(|error| MonochangeError::Discovery(error.to_string()))
+}
+
 fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {
 	json!({
 		"workspaceRoot": PathBuf::from("."),
@@ -2171,11 +2568,19 @@ fn render_changeset_markdown(
 	package_refs: &[String],
 	bump: BumpSeverity,
 	reason: &str,
+	change_type: Option<&str>,
+	details: Option<&str>,
 	evidence: &[String],
 ) -> String {
 	let mut lines = vec!["---".to_string()];
 	for package in package_refs {
 		lines.push(format!("{package}: {bump}"));
+	}
+	if let Some(change_type) = change_type.filter(|value| !value.trim().is_empty()) {
+		lines.push("type:".to_string());
+		for package in package_refs {
+			lines.push(format!("  {package}: {change_type}"));
+		}
 	}
 	if !evidence.is_empty() {
 		lines.push("evidence:".to_string());
@@ -2189,6 +2594,10 @@ fn render_changeset_markdown(
 	lines.push("---".to_string());
 	lines.push(String::new());
 	lines.push(format!("#### {reason}"));
+	if let Some(details) = details.filter(|value| !value.trim().is_empty()) {
+		lines.push(String::new());
+		lines.push(details.trim().to_string());
+	}
 	lines.push(String::new());
 	lines.join("\n")
 }

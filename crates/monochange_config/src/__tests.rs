@@ -148,6 +148,50 @@ path = ".monochange/release-manifest.json"
 }
 
 #[test]
+fn load_workspace_configuration_parses_github_release_settings() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+enabled = true
+draft = true
+prerelease = true
+source = "github_generated"
+generate_notes = true
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let github = configuration
+		.github
+		.unwrap_or_else(|| panic!("expected github config"));
+	assert_eq!(github.owner, "ifiokjr");
+	assert_eq!(github.repo, "monochange");
+	assert!(github.releases.enabled);
+	assert!(github.releases.draft);
+	assert!(github.releases.prerelease);
+	assert!(github.releases.generate_notes);
+	assert_eq!(
+		github.releases.source,
+		monochange_core::GitHubReleaseNotesSource::GitHubGenerated
+	);
+}
+
+#[test]
 fn load_workspace_configuration_uses_defaults_package_type_when_type_is_omitted() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
@@ -718,6 +762,57 @@ evidence:
 }
 
 #[test]
+fn load_change_signals_parses_markdown_change_types_and_details() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+	fs::write(
+		tempdir.path().join("change.md"),
+		r"---
+core: patch
+type:
+  core: security
+---
+
+#### rotate signing keys
+
+Roll the signing key before the release window closes.
+",
+	)
+	.unwrap_or_else(|error| panic!("changes write: {error}"));
+	let mut packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-core",
+		tempdir.path().join("crates/core/Cargo.toml"),
+		tempdir.path().to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let signals = load_change_signals(&tempdir.path().join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| panic!("change signals: {error}"));
+	let signal = signals.first().unwrap_or_else(|| panic!("expected signal"));
+
+	assert_eq!(signal.change_type.as_deref(), Some("security"));
+	assert_eq!(
+		signal.details.as_deref(),
+		Some("Roll the signing key before the release window closes.")
+	);
+}
+
+#[test]
 fn load_change_signals_expands_group_targets_into_member_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
@@ -818,6 +913,127 @@ core: patch
 
 	assert!(rendered.contains("references both group `sdk` and member package `core`"));
 	assert!(rendered.contains("reference either the group or one of its member packages"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_publish_github_release_without_github_config() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[[workflows]]
+name = "publish"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected github workflow config error"));
+	assert!(error
+		.to_string()
+		.contains("uses `PublishGitHubRelease` but `[github]` is not configured"));
+}
+
+#[test]
+fn load_workspace_configuration_parses_release_note_customization() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#####"
+[defaults]
+package_type = "cargo"
+
+[release_notes]
+change_templates = ["#### $summary ($package $bump)\n\n$details", "- $summary"]
+
+[package.core]
+path = "crates/core"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+"#####,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.package_by_id("core")
+		.unwrap_or_else(|| panic!("expected package"));
+
+	assert_eq!(configuration.release_notes.change_templates.len(), 2);
+	assert_eq!(package.extra_changelog_sections.len(), 1);
+	let extra_section = package
+		.extra_changelog_sections
+		.first()
+		.unwrap_or_else(|| panic!("expected extra changelog section"));
+	assert_eq!(extra_section.name, "Security");
+	assert_eq!(extra_section.types, vec!["security"]);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_empty_extra_changelog_section_types() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+extra_changelog_sections = [{ name = "Security", types = [] }]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("extra changelog section `Security` must declare at least one type"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_unknown_change_template_variables() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[release_notes]
+change_templates = ["- $summary ($commit_hash)"]
+
+[package.core]
+path = "crates/core"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+	assert!(error
+		.render()
+		.contains("unsupported variables: commit_hash"));
 }
 
 #[test]

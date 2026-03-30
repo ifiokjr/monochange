@@ -28,6 +28,8 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust)](https://crates.io/crates/monochange_config) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs)](https://docs.rs/monochange_config/)
 - `monochange_graph` — propagates release impact through dependency edges and synchronized groups.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust)](https://crates.io/crates/monochange_graph) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs)](https://docs.rs/monochange_graph/)
+- `monochange_github` — converts release manifests into GitHub release payloads and publishing operations.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__github-orange?logo=rust)](https://crates.io/crates/monochange_github) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__github-1f425f?logo=docs.rs)](https://docs.rs/monochange_github/)
 - `monochange_semver` — merges requested bumps with compatibility-provider evidence.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust)](https://crates.io/crates/monochange_semver) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs)](https://docs.rs/monochange_semver/)
 - `monochange_cargo` — Cargo discovery plus Rust semver evidence integration.
@@ -51,6 +53,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - run config-defined release workflows from `.changeset/*.md`
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
+- preview or publish GitHub releases from typed workflow steps and shared release data
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -65,6 +68,7 @@ mc validate
 mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
 mc release --dry-run --format json
+mc publish-release --dry-run --format json
 mc release
 ```
 
@@ -121,8 +125,12 @@ package_type = "cargo"
 path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
+[release_notes]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
+
 [package.sdk-core]
 path = "crates/sdk_core"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
 
 [package.web-sdk]
 path = "packages/web-sdk"
@@ -141,6 +149,13 @@ version_format = "primary"
 [group.sdk.changelog]
 path = "docs/sdk-changelog.md"
 format = "monochange"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+source = "monochange"
 
 [[workflows]]
 name = "validate"
@@ -182,6 +197,14 @@ name = "reason"
 type = "string"
 required = true
 
+[[workflows.inputs]]
+name = "type"
+type = "string"
+
+[[workflows.inputs]]
+name = "details"
+type = "string"
+
 [[workflows.steps]]
 type = "CreateChangeFile"
 
@@ -208,6 +231,22 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
+
+[[workflows]]
+name = "publish-release"
+help_text = "Prepare a release and publish GitHub releases"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
 ```
 
 <!-- {/projectSetupConfig} -->

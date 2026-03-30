@@ -310,6 +310,41 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 }
 
 #[test]
+fn changes_add_supports_release_note_type_and_details() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let output_path = tempdir.path().join("security.md");
+
+	run_cli(
+		&fixture_root,
+		[
+			OsString::from("mc"),
+			OsString::from("change"),
+			OsString::from("--package"),
+			OsString::from("sdk-core"),
+			OsString::from("--bump"),
+			OsString::from("patch"),
+			OsString::from("--reason"),
+			OsString::from("rotate signing keys"),
+			OsString::from("--type"),
+			OsString::from("security"),
+			OsString::from("--details"),
+			OsString::from("Roll the signing key before the release window closes."),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+	let content = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read change file: {error}"));
+
+	assert!(content.contains("type:"));
+	assert!(content.contains("sdk-core: security"));
+	assert!(content.contains("#### rotate signing keys"));
+	assert!(content.contains("Roll the signing key before the release window closes."));
+}
+
+#[test]
 fn changes_add_canonicalizes_package_references_to_package_names() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
@@ -349,6 +384,8 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 		&["sdk-core".to_string()],
 		monochange_core::BumpSeverity::Patch,
 		"default output",
+		None,
+		None,
 		&[],
 		None,
 	)

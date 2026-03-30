@@ -279,17 +279,17 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	        ],
 	        "sections": [
 	          {
-	            "title": "Changed",
+	            "title": "Features",
 	            "entries": [
-	              "add feature"
+	              "- add feature"
 	            ]
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n- add feature"
+	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n### Features\n\n- add feature"
 	    },
 	    {
-	      "ownerId": "cargo:crates/core/Cargo.toml",
+	      "ownerId": "core",
 	      "ownerKind": "package",
 	      "path": "crates/core/CHANGELOG.md",
 	      "format": "monochange",
@@ -298,14 +298,14 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	        "summary": [],
 	        "sections": [
 	          {
-	            "title": "Changed",
+	            "title": "Features",
 	            "entries": [
-	              "add feature"
+	              "- add feature"
 	            ]
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\n- add feature"
+	      "rendered": "## 1.1.0\n\n### Features\n\n- add feature"
 	    }
 	  ],
 	  "deletedChangesets": [],
@@ -445,17 +445,17 @@ fn release_manifest_workflow_writes_manifest_json() {
 	        ],
 	        "sections": [
 	          {
-	            "title": "Changed",
+	            "title": "Features",
 	            "entries": [
-	              "add feature"
+	              "- add feature"
 	            ]
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n- add feature"
+	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n### Features\n\n- add feature"
 	    },
 	    {
-	      "ownerId": "cargo:crates/core/Cargo.toml",
+	      "ownerId": "core",
 	      "ownerKind": "package",
 	      "path": "crates/core/CHANGELOG.md",
 	      "format": "monochange",
@@ -464,14 +464,14 @@ fn release_manifest_workflow_writes_manifest_json() {
 	        "summary": [],
 	        "sections": [
 	          {
-	            "title": "Changed",
+	            "title": "Features",
 	            "entries": [
-	              "add feature"
+	              "- add feature"
 	            ]
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\n- add feature"
+	      "rendered": "## 1.1.0\n\n### Features\n\n- add feature"
 	    }
 	  ],
 	  "deletedChangesets": [],

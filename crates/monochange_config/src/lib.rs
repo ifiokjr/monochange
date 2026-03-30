@@ -33,7 +33,7 @@
 //! - load `monochange.toml`
 //! - validate version groups and workflows
 //! - resolve package references against discovered packages
-//! - parse change-input files, evidence, changelog paths, changelog format overrides, and workflow manifest-render steps
+//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, and workflow GitHub/manifest steps
 //!
 //! ## Example
 //!
@@ -97,12 +97,17 @@ use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
+use monochange_core::ExtraChangelogSection;
+use monochange_core::GitHubConfiguration;
+use monochange_core::GitHubReleaseNotesSource;
+use monochange_core::GitHubReleaseSettings;
 use monochange_core::GroupDefinition;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
+use monochange_core::ReleaseNotesSettings;
 use monochange_core::VersionFormat;
 use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
@@ -117,17 +122,30 @@ use serde_yaml_ng::Value as YamlValue;
 
 const CONFIG_FILE: &str = "monochange.toml";
 const RESERVED_WORKFLOW_NAMES: &[&str] = &["init", "help", "version"];
+const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
+	"summary",
+	"details",
+	"package",
+	"version",
+	"target_id",
+	"bump",
+	"type",
+];
 
 #[derive(Debug, Deserialize, Default)]
 struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	defaults: RawWorkspaceDefaults,
 	#[serde(default)]
+	release_notes: RawReleaseNotesSettings,
+	#[serde(default)]
 	package: BTreeMap<String, RawPackageDefinition>,
 	#[serde(default)]
 	group: BTreeMap<String, RawGroupDefinition>,
 	#[serde(default)]
 	workflows: Vec<WorkflowDefinition>,
+	#[serde(default)]
+	github: Option<RawGitHubConfiguration>,
 	#[serde(default)]
 	ecosystems: RawEcosystems,
 }
@@ -190,6 +208,8 @@ struct RawPackageDefinition {
 	#[serde(default)]
 	changelog: Option<RawChangelogConfig>,
 	#[serde(default)]
+	extra_changelog_sections: Vec<ExtraChangelogSection>,
+	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
 	tag: bool,
@@ -204,6 +224,8 @@ struct RawGroupDefinition {
 	packages: Vec<String>,
 	#[serde(default)]
 	changelog: Option<RawChangelogConfig>,
+	#[serde(default)]
+	extra_changelog_sections: Vec<ExtraChangelogSection>,
 	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
@@ -227,6 +249,47 @@ struct RawEcosystems {
 }
 
 #[derive(Debug, Deserialize, Default)]
+struct RawReleaseNotesSettings {
+	#[serde(default)]
+	change_templates: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawGitHubConfiguration {
+	owner: String,
+	repo: String,
+	#[serde(default)]
+	releases: RawGitHubReleaseSettings,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Deserialize)]
+struct RawGitHubReleaseSettings {
+	#[serde(default = "default_true")]
+	enabled: bool,
+	#[serde(default)]
+	draft: bool,
+	#[serde(default)]
+	prerelease: bool,
+	#[serde(default)]
+	generate_notes: bool,
+	#[serde(default)]
+	source: GitHubReleaseNotesSource,
+}
+
+impl Default for RawGitHubReleaseSettings {
+	fn default() -> Self {
+		Self {
+			enabled: default_true(),
+			draft: false,
+			prerelease: false,
+			generate_notes: false,
+			source: GitHubReleaseNotesSource::Monochange,
+		}
+	}
+}
+
+#[derive(Debug, Deserialize, Default)]
 struct RawChangeFile {
 	#[serde(default)]
 	changes: Vec<RawChangeEntry>,
@@ -239,6 +302,10 @@ struct RawChangeEntry {
 	bump: Option<BumpSeverity>,
 	#[serde(default)]
 	reason: Option<String>,
+	#[serde(default)]
+	details: Option<String>,
+	#[serde(rename = "type", default)]
+	change_type: Option<String>,
 	#[serde(default = "default_change_origin")]
 	origin: String,
 	#[serde(default)]
@@ -268,6 +335,10 @@ fn default_warn_on_group_mismatch() -> bool {
 
 fn default_change_origin() -> String {
 	"direct-change".to_string()
+}
+
+fn default_true() -> bool {
+	true
 }
 
 impl RawChangelogConfig {
@@ -383,9 +454,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 
 	let RawWorkspaceConfiguration {
 		defaults,
+		release_notes,
 		package,
 		group,
 		workflows,
+		github,
 		ecosystems,
 	} = raw;
 	let workflows = if workflows.is_empty() {
@@ -447,6 +520,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				path: package.path,
 				package_type,
 				changelog,
+				extra_changelog_sections: package.extra_changelog_sections,
 				versioned_files: package.versioned_files,
 				tag: package.tag,
 				release: package.release,
@@ -489,6 +563,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				id,
 				packages: group.packages,
 				changelog,
+				extra_changelog_sections: group.extra_changelog_sections,
 				versioned_files: group.versioned_files,
 				tag: group.tag,
 				release: group.release,
@@ -496,9 +571,23 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			})
 		})
 		.collect::<Result<Vec<_>, _>>()?;
+	let github = github.map(|github| GitHubConfiguration {
+		owner: github.owner,
+		repo: github.repo,
+		releases: GitHubReleaseSettings {
+			enabled: github.releases.enabled,
+			draft: github.releases.draft,
+			prerelease: github.releases.prerelease,
+			generate_notes: github.releases.generate_notes,
+			source: github.releases.source,
+		},
+	});
 
 	validate_workflows(&workflows)?;
+	validate_release_notes_configuration(&contents, &release_notes, &packages, &groups)?;
+	validate_github_configuration(github.as_ref())?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
+	validate_workflow_runtime_requirements(&workflows, github.as_ref())?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -510,9 +599,13 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			changelog: defaults_changelog_policy,
 			changelog_format: default_changelog_format,
 		},
+		release_notes: ReleaseNotesSettings {
+			change_templates: release_notes.change_templates,
+		},
 		packages,
 		groups,
 		workflows,
+		github,
 		cargo: ecosystems.cargo,
 		npm: ecosystems.npm,
 		deno: ecosystems.deno,
@@ -641,6 +734,8 @@ pub fn load_change_signals(
 					change_origin: change.origin.clone(),
 					evidence_refs: change.evidence.clone(),
 					notes: change.reason.clone(),
+					details: change.details.clone(),
+					change_type: change.change_type.clone(),
 				});
 			}
 		} else {
@@ -668,6 +763,8 @@ pub fn load_change_signals(
 				change_origin: change.origin,
 				evidence_refs: change.evidence,
 				notes: change.reason,
+				details: change.details,
+				change_type: change.change_type,
 			});
 		}
 	}
@@ -718,14 +815,15 @@ fn parse_markdown_change_file(
 	})?;
 	let evidence_mapping = yaml_mapping(&mapping, "evidence");
 	let origin_mapping = yaml_mapping(&mapping, "origin");
-	let reason = markdown_reason(body);
+	let type_mapping = yaml_mapping(&mapping, "type");
+	let (reason, details) = markdown_change_text(body);
 	let mut changes = Vec::new();
 
 	for (key, value) in &mapping {
 		let Some(package) = key.as_str() else {
 			continue;
 		};
-		if matches!(package, "evidence" | "origin") {
+		if matches!(package, "evidence" | "origin" | "type") {
 			continue;
 		}
 		let requested_bump = value
@@ -741,6 +839,8 @@ fn parse_markdown_change_file(
 			package: package.to_string(),
 			bump: Some(requested_bump),
 			reason: reason.clone(),
+			details: details.clone(),
+			change_type: type_mapping.and_then(|mapping| yaml_string(mapping, package)),
 			origin: origin_mapping
 				.and_then(|mapping| yaml_string(mapping, package))
 				.unwrap_or_else(default_change_origin),
@@ -753,22 +853,42 @@ fn parse_markdown_change_file(
 	Ok(RawChangeFile { changes })
 }
 
-fn markdown_reason(body: &str) -> Option<String> {
+fn markdown_change_text(body: &str) -> (Option<String>, Option<String>) {
 	let trimmed = body.trim();
 	if trimmed.is_empty() {
-		return None;
+		return (None, None);
 	}
-	for line in trimmed.lines() {
+	let lines = trimmed.lines().collect::<Vec<_>>();
+	let Some((summary_index, summary_line)) = lines.iter().enumerate().find_map(|(index, line)| {
 		let candidate = line.trim();
 		if candidate.is_empty() {
-			continue;
+			None
+		} else {
+			Some((index, candidate))
 		}
-		if let Some(stripped) = candidate.strip_prefix('#') {
-			return Some(stripped.trim_start_matches('#').trim().to_string());
-		}
-		return Some(candidate.to_string());
-	}
-	None
+	}) else {
+		return (None, None);
+	};
+	let summary = summary_line.strip_prefix('#').map_or_else(
+		|| summary_line.to_string(),
+		|value| value.trim_start_matches('#').trim().to_string(),
+	);
+	let details = lines
+		.iter()
+		.skip(summary_index + 1)
+		.copied()
+		.collect::<Vec<_>>()
+		.join("\n")
+		.trim()
+		.to_string();
+	(
+		Some(summary),
+		if details.is_empty() {
+			None
+		} else {
+			Some(details)
+		},
+	)
 }
 
 fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {
@@ -1058,6 +1178,166 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 	}
 }
 
+fn validate_release_notes_configuration(
+	contents: &str,
+	release_notes: &RawReleaseNotesSettings,
+	packages: &[PackageDefinition],
+	groups: &[GroupDefinition],
+) -> MonochangeResult<()> {
+	for template in &release_notes.change_templates {
+		if template.trim().is_empty() {
+			return Err(MonochangeError::Config(
+				"[release_notes].change_templates must not include empty templates".to_string(),
+			));
+		}
+		let unsupported_variables = change_template_variables(template)
+			.into_iter()
+			.filter(|variable| !SUPPORTED_CHANGE_TEMPLATE_VARIABLES.contains(&variable.as_str()))
+			.collect::<BTreeSet<_>>();
+		if !unsupported_variables.is_empty() {
+			return Err(MonochangeError::Config(format!(
+				"[release_notes].change_templates uses unsupported variables: {}",
+				unsupported_variables
+					.into_iter()
+					.collect::<Vec<_>>()
+					.join(", ")
+			)));
+		}
+	}
+	for package in packages {
+		validate_extra_changelog_sections(
+			contents,
+			"package",
+			&package.id,
+			&package.extra_changelog_sections,
+		)?;
+	}
+	for group in groups {
+		validate_extra_changelog_sections(
+			contents,
+			"group",
+			&group.id,
+			&group.extra_changelog_sections,
+		)?;
+	}
+	Ok(())
+}
+
+fn validate_extra_changelog_sections(
+	contents: &str,
+	section_kind: &str,
+	section_id: &str,
+	extra_sections: &[ExtraChangelogSection],
+) -> MonochangeResult<()> {
+	for extra_section in extra_sections {
+		if extra_section.name.trim().is_empty() {
+			return Err(config_diagnostic(
+				contents,
+				format!(
+					"{section_kind} `{section_id}` has an extra changelog section with an empty `name`"
+				),
+				vec![config_section_label(
+					contents,
+					section_kind,
+					section_id,
+					"extra changelog section missing name",
+				)],
+				Some(
+					"set `extra_changelog_sections = [{ name = \"Security\", types = [\"security\"] }]` or remove the empty section definition"
+						.to_string(),
+				),
+			));
+		}
+		if extra_section.types.is_empty() {
+			return Err(config_diagnostic(
+				contents,
+				format!(
+					"{section_kind} `{section_id}` extra changelog section `{}` must declare at least one type",
+					extra_section.name
+				),
+				vec![config_section_label(
+					contents,
+					section_kind,
+					section_id,
+					"extra changelog section missing types",
+				)],
+				Some(
+					"add one or more `types = [\"security\"]` entries so monochange knows which changes belong in that section"
+						.to_string(),
+				),
+			));
+		}
+		if extra_section
+			.types
+			.iter()
+			.any(|change_type| change_type.trim().is_empty())
+		{
+			return Err(config_diagnostic(
+				contents,
+				format!(
+					"{section_kind} `{section_id}` extra changelog section `{}` must not include empty types",
+					extra_section.name
+				),
+				vec![config_section_label(
+					contents,
+					section_kind,
+					section_id,
+					"extra changelog section has an empty type",
+				)],
+				Some(
+					"remove empty values from `types` and keep only named change types".to_string(),
+				),
+			));
+		}
+	}
+	Ok(())
+}
+
+fn change_template_variables(template: &str) -> Vec<String> {
+	let mut variables = BTreeSet::new();
+	let mut characters = template.chars().peekable();
+	while let Some(character) = characters.next() {
+		if character != '$' {
+			continue;
+		}
+		let mut variable = String::new();
+		while let Some(next) =
+			characters.next_if(|next| next.is_ascii_alphanumeric() || *next == '_')
+		{
+			variable.push(next);
+		}
+		if !variable.is_empty() {
+			variables.insert(variable);
+		}
+	}
+	variables.into_iter().collect()
+}
+
+fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> MonochangeResult<()> {
+	let Some(github) = github else {
+		return Ok(());
+	};
+	if github.owner.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"[github].owner must not be empty".to_string(),
+		));
+	}
+	if github.repo.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"[github].repo must not be empty".to_string(),
+		));
+	}
+	if github.releases.generate_notes
+		&& matches!(github.releases.source, GitHubReleaseNotesSource::Monochange)
+	{
+		return Err(MonochangeError::Config(
+			"[github.releases].generate_notes cannot be true when `source = \"monochange\"`; choose one release-note source"
+				.to_string(),
+		));
+	}
+	Ok(())
+}
+
 fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> {
 	let mut seen_names = BTreeSet::new();
 
@@ -1148,7 +1428,36 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 				WorkflowStepDefinition::Validate
 				| WorkflowStepDefinition::Discover
 				| WorkflowStepDefinition::CreateChangeFile
-				| WorkflowStepDefinition::PrepareRelease => {}
+				| WorkflowStepDefinition::PrepareRelease
+				| WorkflowStepDefinition::PublishGitHubRelease => {}
+			}
+		}
+	}
+
+	Ok(())
+}
+
+fn validate_workflow_runtime_requirements(
+	workflows: &[WorkflowDefinition],
+	github: Option<&GitHubConfiguration>,
+) -> MonochangeResult<()> {
+	for workflow in workflows {
+		if workflow
+			.steps
+			.iter()
+			.any(|step| matches!(step, WorkflowStepDefinition::PublishGitHubRelease))
+		{
+			let github = github.ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"workflow `{}` uses `PublishGitHubRelease` but `[github]` is not configured",
+					workflow.name
+				))
+			})?;
+			if !github.releases.enabled {
+				return Err(MonochangeError::Config(format!(
+					"workflow `{}` uses `PublishGitHubRelease` but `[github.releases].enabled` is false",
+					workflow.name
+				)));
 			}
 		}
 	}

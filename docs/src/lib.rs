@@ -5,6 +5,7 @@ doc_comment::doctest!("../../crates/monochange_core/readme.md");
 doc_comment::doctest!("../../crates/monochange_cargo/readme.md");
 doc_comment::doctest!("../../crates/monochange_config/readme.md");
 doc_comment::doctest!("../../crates/monochange_graph/readme.md");
+doc_comment::doctest!("../../crates/monochange_github/readme.md");
 doc_comment::doctest!("../../crates/monochange_npm/readme.md");
 doc_comment::doctest!("../../crates/monochange_deno/readme.md");
 doc_comment::doctest!("../../crates/monochange_dart/readme.md");

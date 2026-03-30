@@ -33,7 +33,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 - normalized package and dependency records
 - version-group definitions and planned group outcomes
 - change signals and compatibility assessments
-- changelog formats, changelog targets, structured release-note types, and release-manifest types
+- changelog formats, changelog targets, structured release-note types, release-manifest types, and GitHub automation config types
 - shared error and result types
 
 ## Example
@@ -48,15 +48,15 @@ let notes = ReleaseNotesDocument {
     title: "1.2.3".to_string(),
     summary: vec!["Grouped release for `sdk`.".to_string()],
     sections: vec![ReleaseNotesSection {
-        title: "Changed".to_string(),
-        entries: vec!["add keep-a-changelog output".to_string()],
+        title: "Features".to_string(),
+        entries: vec!["- add keep-a-changelog output".to_string()],
     }],
 };
 
 let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
 
 assert!(rendered.contains("## [1.2.3]"));
-assert!(rendered.contains("### Changed"));
+assert!(rendered.contains("### Features"));
 assert!(rendered.contains("- add keep-a-changelog output"));
 ```
 

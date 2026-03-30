@@ -25,7 +25,7 @@
 //! - normalized package and dependency records
 //! - version-group definitions and planned group outcomes
 //! - change signals and compatibility assessments
-//! - changelog formats, changelog targets, structured release-note types, and release-manifest types
+//! - changelog formats, changelog targets, structured release-note types, release-manifest types, and GitHub automation config types
 //! - shared error and result types
 //!
 //! ## Example
@@ -40,15 +40,15 @@
 //!     title: "1.2.3".to_string(),
 //!     summary: vec!["Grouped release for `sdk`.".to_string()],
 //!     sections: vec![ReleaseNotesSection {
-//!         title: "Changed".to_string(),
-//!         entries: vec!["add keep-a-changelog output".to_string()],
+//!         title: "Features".to_string(),
+//!         entries: vec!["- add keep-a-changelog output".to_string()],
 //!     }],
 //! };
 //!
 //! let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
 //!
 //! assert!(rendered.contains("## [1.2.3]"));
-//! assert!(rendered.contains("### Changed"));
+//! assert!(rendered.contains("### Features"));
 //! assert!(rendered.contains("- add keep-a-changelog output"));
 //! ```
 //! <!-- {/monochangeCoreCrateDocs} -->
@@ -381,11 +381,25 @@ pub struct ReleaseNotesDocument {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ExtraChangelogSection {
+	pub name: String,
+	#[serde(default)]
+	pub types: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct ReleaseNotesSettings {
+	#[serde(default)]
+	pub change_templates: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PackageDefinition {
 	pub id: String,
 	pub path: PathBuf,
 	pub package_type: PackageType,
 	pub changelog: Option<ChangelogTarget>,
+	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -397,6 +411,7 @@ pub struct GroupDefinition {
 	pub id: String,
 	pub packages: Vec<String>,
 	pub changelog: Option<ChangelogTarget>,
+	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -481,6 +496,7 @@ pub enum WorkflowStepDefinition {
 		#[serde(default)]
 		path: Option<PathBuf>,
 	},
+	PublishGitHubRelease,
 	Command {
 		command: String,
 		#[serde(default)]
@@ -535,9 +551,7 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 			lines.push(format!("### {}", section.title));
 			lines.push(String::new());
 		}
-		for entry in &section.entries {
-			lines.push(format!("- {entry}"));
-		}
+		push_release_note_entries(&mut lines, &section.entries);
 	}
 	lines.join("\n")
 }
@@ -559,11 +573,27 @@ fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> Str
 		}
 		lines.push(format!("### {}", section.title));
 		lines.push(String::new());
-		for entry in &section.entries {
-			lines.push(format!("- {entry}"));
-		}
+		push_release_note_entries(&mut lines, &section.entries);
 	}
 	lines.join("\n")
+}
+
+fn push_release_note_entries(lines: &mut Vec<String>, entries: &[String]) {
+	for (index, entry) in entries.iter().enumerate() {
+		let trimmed = entry.trim();
+		if trimmed.contains('\n') {
+			lines.extend(trimmed.lines().map(ToString::to_string));
+			if index + 1 < entries.len() {
+				lines.push(String::new());
+			}
+			continue;
+		}
+		if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with('#') {
+			lines.push(trimmed.to_string());
+		} else {
+			lines.push(format!("- {trimmed}"));
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -687,6 +717,45 @@ pub struct ReleaseManifest {
 	pub plan: ReleaseManifestPlan,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GitHubReleaseNotesSource {
+	#[default]
+	Monochange,
+	#[serde(rename = "github_generated")]
+	GitHubGenerated,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubReleaseSettings {
+	pub enabled: bool,
+	pub draft: bool,
+	pub prerelease: bool,
+	pub generate_notes: bool,
+	pub source: GitHubReleaseNotesSource,
+}
+
+impl Default for GitHubReleaseSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			draft: false,
+			prerelease: false,
+			generate_notes: false,
+			source: GitHubReleaseNotesSource::Monochange,
+		}
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubConfiguration {
+	pub owner: String,
+	pub repo: String,
+	#[serde(default)]
+	pub releases: GitHubReleaseSettings,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EffectiveReleaseIdentity {
 	pub owner_id: String,
@@ -702,9 +771,11 @@ pub struct EffectiveReleaseIdentity {
 pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
 	pub defaults: WorkspaceDefaults,
+	pub release_notes: ReleaseNotesSettings,
 	pub packages: Vec<PackageDefinition>,
 	pub groups: Vec<GroupDefinition>,
 	pub workflows: Vec<WorkflowDefinition>,
+	pub github: Option<GitHubConfiguration>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,
@@ -807,8 +878,26 @@ pub fn default_workflows() -> Vec<WorkflowDefinition> {
 				WorkflowInputDefinition {
 					name: "reason".to_string(),
 					kind: WorkflowInputKind::String,
-					help_text: Some("Why this change is being recorded".to_string()),
+					help_text: Some("Short release-note summary for this change".to_string()),
 					required: true,
+					default: None,
+					choices: Vec::new(),
+				},
+				WorkflowInputDefinition {
+					name: "type".to_string(),
+					kind: WorkflowInputKind::String,
+					help_text: Some(
+						"Optional release-note type such as `security` or `note`".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+				WorkflowInputDefinition {
+					name: "details".to_string(),
+					kind: WorkflowInputKind::String,
+					help_text: Some("Optional multi-line release-note details".to_string()),
+					required: false,
 					default: None,
 					choices: Vec::new(),
 				},
@@ -874,6 +963,8 @@ pub struct ChangeSignal {
 	pub change_origin: String,
 	pub evidence_refs: Vec<String>,
 	pub notes: Option<String>,
+	pub details: Option<String>,
+	pub change_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

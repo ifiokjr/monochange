@@ -248,6 +248,9 @@ This artifact should be usable by:
 3. Add `PublishGitHubRelease` workflow step.
 4. Support dry-run preview of would-be tags, releases, and bodies.
 5. Add integration tests around release payload generation.
+6. Extend release-note customization with workspace `change_templates`, per-target `extra_changelog_sections`, and optional change `type` / `details` fields.
+
+> Follow-up note: add git-derived change-template variables next (`$commit_hash`, `$commit_author_name`, and related metadata) once commit-aware release-note rendering is implemented.
 
 ## Phase 4 — Release PR automation
 

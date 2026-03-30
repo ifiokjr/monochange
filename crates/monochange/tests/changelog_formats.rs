@@ -70,14 +70,14 @@ type = "PrepareRelease"
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
 	assert!(core_changelog.contains("## [1.1.0]"));
-	assert!(core_changelog.contains("### Changed"));
+	assert!(core_changelog.contains("### Features"));
 	assert!(core_changelog.contains("- add keep a changelog support"));
 	assert!(app_changelog.contains("## [1.1.0]"));
-	assert!(app_changelog.contains("### Changed"));
+	assert!(app_changelog.contains("### Features"));
 	assert!(group_changelog.contains("## [1.1.0]"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
 	assert!(group_changelog.contains("Members: core, app"));
-	assert!(group_changelog.contains("### Changed"));
+	assert!(group_changelog.contains("### Features"));
 }
 
 #[test]
@@ -144,15 +144,15 @@ type = "PrepareRelease"
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
 	assert!(core_changelog.contains("## [1.1.0]"));
-	assert!(core_changelog.contains("### Changed"));
+	assert!(core_changelog.contains("### Features"));
 	assert!(app_changelog.contains("## 1.1.0"));
 	assert!(!app_changelog.contains("## [1.1.0]"));
-	assert!(!app_changelog.contains("### Changed"));
-	assert!(app_changelog.contains("- shares version group `sdk`"));
+	assert!(app_changelog.contains("### Features"));
+	assert!(app_changelog.contains("shares version group `sdk`"));
 	assert!(group_changelog.contains("## 1.1.0"));
 	assert!(!group_changelog.contains("## [1.1.0]"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
-	assert!(!group_changelog.contains("### Changed"));
+	assert!(group_changelog.contains("### Features"));
 }
 
 fn seed_release_fixture(root: &Path, config: &str) {

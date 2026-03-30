@@ -19,6 +19,7 @@ use crate::PackageType;
 use crate::PublishState;
 use crate::ReleaseNotesDocument;
 use crate::ReleaseNotesSection;
+use crate::ReleaseNotesSettings;
 use crate::ReleaseOwnerKind;
 use crate::VersionFormat;
 use crate::WorkflowStepDefinition;
@@ -210,6 +211,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 	WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
 		defaults: WorkspaceDefaults::default(),
+		release_notes: ReleaseNotesSettings::default(),
 		packages: vec![
 			PackageDefinition {
 				id: "monochange".to_string(),
@@ -219,6 +221,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 					path: PathBuf::from("crates/monochange/changelog.md"),
 					format: ChangelogFormat::Monochange,
 				}),
+				extra_changelog_sections: Vec::new(),
 				versioned_files: Vec::new(),
 				tag: false,
 				release: false,
@@ -232,6 +235,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 					path: PathBuf::from("crates/monochange_core/changelog.md"),
 					format: ChangelogFormat::Monochange,
 				}),
+				extra_changelog_sections: Vec::new(),
 				versioned_files: Vec::new(),
 				tag: false,
 				release: false,
@@ -242,6 +246,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				path: PathBuf::from("crates/monochange_graph"),
 				package_type: PackageType::Cargo,
 				changelog: None,
+				extra_changelog_sections: Vec::new(),
 				versioned_files: Vec::new(),
 				tag: false,
 				release: false,
@@ -255,12 +260,14 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				path: PathBuf::from("changelog.md"),
 				format: ChangelogFormat::Monochange,
 			}),
+			extra_changelog_sections: Vec::new(),
 			versioned_files: Vec::new(),
 			tag: true,
 			release: true,
 			version_format: VersionFormat::Primary,
 		}],
 		workflows: Vec::new(),
+		github: None,
 		cargo: EcosystemSettings::default(),
 		npm: EcosystemSettings::default(),
 		deno: EcosystemSettings::default(),

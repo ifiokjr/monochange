@@ -441,6 +441,7 @@ dependencies = [
  "monochange_core",
  "monochange_dart",
  "monochange_deno",
+ "monochange_github",
  "monochange_graph",
  "monochange_npm",
  "monochange_semver",
@@ -465,6 +466,7 @@ dependencies = [
  "monochange_core",
  "monochange_dart",
  "monochange_deno",
+ "monochange_github",
  "monochange_graph",
  "monochange_npm",
  "monochange_semver",
@@ -549,6 +551,16 @@ dependencies = [
  "similar-asserts",
  "thiserror",
  "walkdir",
+]
+
+[[package]]
+name = "monochange_github"
+version = "0.0.0"
+dependencies = [
+ "monochange_core",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
