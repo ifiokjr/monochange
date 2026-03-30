@@ -104,9 +104,6 @@ Current `PrepareRelease` behavior:
 - updates native manifests plus configured changelogs and versioned files
 - renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
 - groups release notes into default `Breaking changes`, `Features`, `Fixes`, and `Notes` sections, with package/group overrides available through `extra_changelog_sections`
-- prefixes grouped changelog entries with their source package id by default so member provenance stays visible in shared group changelogs
-- uses GitHub alert syntax for grouped entries when a labeled note spans multiple lines or combines multiple packages from one changeset
-- summarizes grouped releases with `Changed members` and `Synchronized members` lines when only part of a group contributed direct notes
 - applies workspace-wide release-note templates from `[release_notes].change_templates`
 - can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
 - can preview or publish provider releases via `PublishRelease`
