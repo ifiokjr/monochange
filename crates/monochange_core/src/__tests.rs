@@ -38,11 +38,36 @@ fn package_record_uses_manifest_path_for_stable_id() {
 		PublishState::Public,
 	);
 
-	assert_eq!(
-		package.id,
-		"cargo:fixtures/cargo/workspace/crates/core/Cargo.toml"
-	);
+	assert_eq!(package.id, "cargo:crates/core/Cargo.toml");
 	assert_eq!(package.current_version, Some(Version::new(1, 2, 3)));
+}
+
+#[test]
+fn package_record_ids_are_stable_for_relative_and_absolute_roots() {
+	let workspace_root = PathBuf::from("fixtures/cargo/workspace");
+	let manifest_path = workspace_root.join("crates/core/Cargo.toml");
+	let relative = PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		manifest_path.clone(),
+		workspace_root.clone(),
+		Some(Version::new(1, 2, 3)),
+		PublishState::Public,
+	);
+	let absolute_root = std::env::current_dir()
+		.unwrap_or_else(|error| panic!("cwd: {error}"))
+		.join(&workspace_root);
+	let absolute = PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		absolute_root.join("crates/core/Cargo.toml"),
+		absolute_root,
+		Some(Version::new(1, 2, 3)),
+		PublishState::Public,
+	);
+
+	assert_eq!(relative.id, absolute.id);
+	assert_eq!(relative.id, "cargo:crates/core/Cargo.toml");
 }
 
 #[test]

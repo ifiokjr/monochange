@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
 use insta_cmd::get_cargo_bin;
 use tempfile::tempdir;
@@ -22,9 +23,166 @@ macro_rules! apply_common_filters {
 			settings.add_filter(r"\b[A-Z]:\\[^\s]+?\\Temp\\[^\\\s]+", "[ROOT]");
 			settings.add_filter(r"SourceOffset\(\d+\)", "SourceOffset([OFFSET])");
 			settings.add_filter(r"length: \d+", "length: [LEN]");
+			settings.add_filter(r"@ bytes \d+\.\.\d+", "@ bytes [OFFSET]..[END]");
 			settings.bind_to_scope()
 		};
 	};
+}
+
+#[test]
+fn validate_cli_succeeds_for_valid_workspace() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_ungrouped_release_fixture(tempdir.path());
+
+	assert_cmd_snapshot!(
+		cli().current_dir(tempdir.path()).arg("validate"),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	workspace validation passed for .
+	
+	----- stderr -----
+	"###
+	);
+}
+
+#[test]
+fn discover_cli_json_reports_relative_paths_and_stable_ids() {
+	apply_common_filters!();
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(&fixture_root)
+			.arg("discover")
+			.arg("--format")
+			.arg("json"),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	{
+	  "dependencies": [
+	    {
+	      "direct": true,
+	      "from": "dart:dart/mobile_sdk/pubspec.yaml",
+	      "kind": "runtime",
+	      "to": "npm:packages/web-sdk/package.json"
+	    },
+	    {
+	      "direct": true,
+	      "from": "deno:deno/tool/deno.json",
+	      "kind": "runtime",
+	      "to": "npm:packages/web-sdk/package.json"
+	    },
+	    {
+	      "direct": true,
+	      "from": "npm:packages/web-sdk/package.json",
+	      "kind": "runtime",
+	      "to": "cargo:cargo/sdk-core/Cargo.toml"
+	    }
+	  ],
+	  "packages": [
+	    {
+	      "ecosystem": "cargo",
+	      "id": "cargo:cargo/sdk-core/Cargo.toml",
+	      "manifestPath": "cargo/sdk-core/Cargo.toml",
+	      "name": "sdk-core",
+	      "publishState": "public",
+	      "version": "1.0.0",
+	      "versionGroup": "sdk",
+	      "workspaceRoot": "."
+	    },
+	    {
+	      "ecosystem": "dart",
+	      "id": "dart:dart/mobile_sdk/pubspec.yaml",
+	      "manifestPath": "dart/mobile_sdk/pubspec.yaml",
+	      "name": "mobile_sdk",
+	      "publishState": "public",
+	      "version": "1.0.0",
+	      "versionGroup": null,
+	      "workspaceRoot": "."
+	    },
+	    {
+	      "ecosystem": "deno",
+	      "id": "deno:deno/tool/deno.json",
+	      "manifestPath": "deno/tool/deno.json",
+	      "name": "deno-tool",
+	      "publishState": "public",
+	      "version": "1.0.0",
+	      "versionGroup": null,
+	      "workspaceRoot": "."
+	    },
+	    {
+	      "ecosystem": "npm",
+	      "id": "npm:packages/web-sdk/package.json",
+	      "manifestPath": "packages/web-sdk/package.json",
+	      "name": "web-sdk",
+	      "publishState": "public",
+	      "version": "1.0.0",
+	      "versionGroup": "sdk",
+	      "workspaceRoot": "."
+	    }
+	  ],
+	  "versionGroups": [
+	    {
+	      "id": "sdk",
+	      "members": [
+	        "cargo:cargo/sdk-core/Cargo.toml",
+	        "npm:packages/web-sdk/package.json"
+	      ],
+	      "mismatchDetected": false
+	    }
+	  ],
+	  "warnings": [],
+	  "workspaceRoot": "."
+	}
+	
+	----- stderr -----
+	"###
+	);
+}
+
+#[test]
+fn change_cli_writes_requested_file_contents() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_ungrouped_release_fixture(tempdir.path());
+	let output_path = tempdir.path().join("feature.md");
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(tempdir.path())
+			.arg("change")
+			.arg("--package")
+			.arg("core")
+			.arg("--bump")
+			.arg("minor")
+			.arg("--reason")
+			.arg("document cli snapshots")
+			.arg("--output")
+			.arg(&output_path),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	wrote change file feature.md
+	
+	----- stderr -----
+	"###
+	);
+
+	let change_file =
+		fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("change file: {error}"));
+	assert_snapshot!(change_file, @r###"
+---
+core: minor
+---
+
+#### document cli snapshots
+"###);
 }
 
 #[test]
@@ -54,6 +212,134 @@ fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	- crates/core/Cargo.toml
 	
 	----- stderr -----
+	"###
+	);
+}
+
+#[test]
+fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_group_release_fixture(tempdir.path());
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("json"),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	{
+	  "changedFiles": [
+	    "Cargo.toml",
+	    "changelog.md",
+	    "crates/app/Cargo.toml",
+	    "crates/core/CHANGELOG.md",
+	    "crates/core/Cargo.toml",
+	    "group.toml"
+	  ],
+	  "commandLogs": [],
+	  "deletedChangesets": [],
+	  "dryRun": true,
+	  "groupVersion": "1.1.0",
+	  "plan": {
+	    "compatibilityEvidence": [],
+	    "decisions": [
+	      {
+	        "bump": "minor",
+	        "package": "cargo:crates/app/Cargo.toml",
+	        "plannedVersion": "1.1.0",
+	        "reasons": [
+	          "depends on `cargo:crates/core/Cargo.toml`",
+	          "shares version group `sdk`"
+	        ],
+	        "trigger": "version-group-synchronization",
+	        "upstreamSources": [
+	          "cargo:crates/core/Cargo.toml"
+	        ]
+	      },
+	      {
+	        "bump": "minor",
+	        "package": "cargo:crates/core/Cargo.toml",
+	        "plannedVersion": "1.1.0",
+	        "reasons": [
+	          "add feature",
+	          "shares version group `sdk`"
+	        ],
+	        "trigger": "direct-change",
+	        "upstreamSources": [
+	          "cargo:crates/core/Cargo.toml"
+	        ]
+	      }
+	    ],
+	    "groups": [
+	      {
+	        "bump": "minor",
+	        "id": "sdk",
+	        "members": [
+	          "cargo:crates/core/Cargo.toml",
+	          "cargo:crates/app/Cargo.toml"
+	        ],
+	        "plannedVersion": "1.1.0"
+	      }
+	    ],
+	    "unresolvedItems": [],
+	    "warnings": [],
+	    "workspaceRoot": "."
+	  },
+	  "releaseTargets": [
+	    {
+	      "id": "sdk",
+	      "kind": "group",
+	      "members": [
+	        "core",
+	        "app"
+	      ],
+	      "release": true,
+	      "tag": true,
+	      "tagName": "v1.1.0",
+	      "version": "1.1.0",
+	      "versionFormat": "primary"
+	    }
+	  ],
+	  "releasedPackages": [
+	    "workflow-app",
+	    "workflow-core"
+	  ],
+	  "updatedChangelogs": [
+	    "changelog.md",
+	    "crates/core/CHANGELOG.md"
+	  ],
+	  "version": "1.1.0",
+	  "workflow": "release"
+	}
+	
+	----- stderr -----
+	"###
+	);
+}
+
+#[test]
+fn release_cli_reports_missing_changesets_cleanly() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_ungrouped_release_fixture(tempdir.path());
+	fs::remove_file(tempdir.path().join(".changeset/feature.md"))
+		.unwrap_or_else(|error| panic!("remove changeset: {error}"));
+
+	assert_cmd_snapshot!(
+		cli().current_dir(tempdir.path()).arg("release"),
+		@r###"
+	success: false
+	exit_code: 1
+	----- stdout -----
+	
+	----- stderr -----
+	config error: no markdown changesets found under .changeset
 	"###
 	);
 }
@@ -141,8 +427,12 @@ packages = ["core"]
 	----- stdout -----
 	
 	----- stderr -----
-	Diagnostic { message: "package `core` belongs to multiple groups: `cli` and `sdk`", help: "move the package into exactly one [group.<id>] declaration", labels: "[LabeledSpan { label: Some(\"first group membership\"), span: SourceSpan { offset: SourceOffset([OFFSET]), length: [LEN] }, primary: false }, LabeledSpan { label: Some(\"conflicting group membership\"), span: SourceSpan { offset: SourceOffset([OFFSET]), length: [LEN] }, primary: false }]" }
-	NOTE: If you're looking for the fancy error reports, install miette with the `fancy` feature, or write your own and hook it up with miette::set_hook().
+	error: package `core` belongs to multiple groups: `cli` and `sdk`
+	--> monochange.toml
+	labels:
+	- first group membership @ bytes [OFFSET]..[END]
+	- conflicting group membership @ bytes [OFFSET]..[END]
+	help: move the package into exactly one [group.<id>] declaration
 	"###
 	);
 }
@@ -283,6 +573,12 @@ enabled = true
 
 [[workflows]]
 name = "release"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"

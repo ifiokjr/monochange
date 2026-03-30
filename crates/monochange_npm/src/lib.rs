@@ -40,6 +40,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
+use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
@@ -348,6 +349,7 @@ fn expand_member_patterns(
 		let matches = glob(&joined_pattern)
 			.into_iter()
 			.flat_map(|paths| paths.filter_map(Result::ok))
+			.map(|path| normalize_path(&path))
 			.collect::<Vec<_>>();
 		if matches.is_empty() {
 			warnings.push(format!(
@@ -377,6 +379,7 @@ fn find_pnpm_workspaces(root: &Path) -> Vec<PathBuf> {
 		.filter_map(Result::ok)
 		.filter(|entry| entry.file_name() == PNPM_WORKSPACE_FILE)
 		.map(DirEntry::into_path)
+		.map(|path| normalize_path(&path))
 		.collect()
 }
 
@@ -387,6 +390,7 @@ fn find_all_package_json(root: &Path) -> Vec<PathBuf> {
 		.filter_map(Result::ok)
 		.filter(|entry| entry.file_name() == PACKAGE_JSON_FILE)
 		.map(DirEntry::into_path)
+		.map(|path| normalize_path(&path))
 		.collect()
 }
 
