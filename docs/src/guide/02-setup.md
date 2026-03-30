@@ -53,6 +53,14 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
+[github.bot.changesets]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["crates/**", "packages/**"]
+ignored_paths = ["docs/**", "*.md"]
+
 [[deployments]]
 name = "production"
 trigger = "release_pr_merge"
@@ -183,6 +191,28 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "Deploy"
+
+[[workflows]]
+name = "changeset-check"
+help_text = "Evaluate pull-request changeset policy"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.inputs]]
+name = "changed_path"
+type = "string_list"
+required = true
+
+[[workflows.inputs]]
+name = "label"
+type = "string_list"
+
+[[workflows.steps]]
+type = "EnforceChangesetPolicy"
 ```
 
 <!-- {/projectSetupConfig} -->

@@ -53,20 +53,20 @@
 
 ## Phase 6 — Changeset bot policy
 
-- [ ] T060 Add bot policy config parsing.
-- [ ] T061 Implement a reusable changeset policy evaluator.
-- [ ] T062 Add CLI or workflow support for PR policy enforcement.
-- [ ] T063 Add GitHub Action examples for required changeset checks.
-- [ ] T064 Add rule coverage for skip labels, changed paths, ignored paths, and invalid changesets.
-- [ ] T065 Add snapshot tests for bot diagnostics and comments.
+- [x] T060 Add bot policy config parsing.
+- [x] T061 Implement a reusable changeset policy evaluator.
+- [x] T062 Add CLI or workflow support for PR policy enforcement.
+- [x] T063 Add GitHub Action examples for required changeset checks.
+- [x] T064 Add rule coverage for skip labels, changed paths, ignored paths, and invalid changesets.
+- [x] T065 Add snapshot tests for bot diagnostics and comments.
 
 ## Phase 7 — Docs, examples, and rollout
 
-- [ ] T070 Update `readme.md` and `docs/src/guide/06-release-planning.md` for the new automation model.
-- [ ] T071 Add a GitHub automation guide to the mdBook.
-- [ ] T072 Add example `monochange.toml` snippets for changelog formats, GitHub releases, release PRs, deployments, and bot rules.
-- [ ] T073 Re-run docs sync, linting, testing, coverage, and book builds.
-- [ ] T074 Dogfood the new automation on the MonoChange repository itself.
+- [x] T070 Update `readme.md` and `docs/src/guide/06-release-planning.md` for the new automation model.
+- [x] T071 Add a GitHub automation guide to the mdBook.
+- [x] T072 Add example `monochange.toml` snippets for changelog formats, GitHub releases, release PRs, deployments, and bot rules.
+- [x] T073 Re-run docs sync, linting, testing, coverage, and book builds.
+- [x] T074 Dogfood the new automation on the MonoChange repository itself.
 
 ## Suggested execution order
 
