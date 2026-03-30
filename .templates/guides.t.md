@@ -115,7 +115,13 @@ default = "text"
 [[cli.release.steps]]
 type = "PrepareRelease"
 
-[[cli.release.steps]]
+[cli.release-manifest]
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[cli.release-manifest.steps]]
+type = "PrepareRelease"
+
+[[cli.release-manifest.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
@@ -277,7 +283,8 @@ Current implementation notes:
 
 - `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven CLI commands in this milestone
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
-- `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
+- legacy `[[workflows]]` configuration is no longer supported; use `[cli.<command>]` plus `[[cli.<command>.steps]]` instead
+- `[ecosystems.*].enabled/roots/exclude` are parsed, but discovery still scans all supported ecosystems regardless of those settings today
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
 - GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
@@ -333,6 +340,7 @@ Legacy `version_groups.strategy` is no longer the primary authoring model. The c
 ```bash
 mc change --package sdk-core --bump minor --reason "public API addition"
 mc change --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
+mc change --package sdk-core --bump major --reason "break the public API" --evidence rust-semver:major:public API break detected --output .changeset/sdk-core-major.md
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -373,6 +381,7 @@ evidence:
 - `mc change` defaults `--bump` to `patch`
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
+- `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
 - change templates support detailed multi-line release-note entries through `$details`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
@@ -413,6 +422,10 @@ Current `PrepareRelease` behavior:
 
 A GitHub Actions check can pass changed paths and labels directly into a policy workflow, for example:
 
+<!-- {/releaseWorkflowBehavior} -->
+
+<!-- {@changesetPolicyGitHubActionWorkflow} -->
+
 ```yaml
 name: changeset-policy
 
@@ -431,6 +444,7 @@ concurrency:
 
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -455,25 +469,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
           args=(changeset-check --format json)
+
           for path in $CHANGED_FILES; do
             args+=(--changed-path "$path")
           done
+
           for label in "${labels[@]}"; do
             args+=(--label "$label")
           done
-          devenv shell -- mc "${args[@]}" | tee policy.json
+
+          devenv shell -- mc "${args[@]}" | tee policy.raw
+          awk 'BEGIN { capture = 0 } /^\{/ { capture = 1 } capture { print }' policy.raw > policy.json
           jq -e '.status != "failed"' policy.json >/dev/null
 ```
 
-<!-- {/releaseWorkflowBehavior} -->
+<!-- {/changesetPolicyGitHubActionWorkflow} -->
 
 <!-- {@githubAutomationOverview} -->
 
 MonoChange keeps GitHub automation layered on top of the same `PrepareRelease` result used for normal release planning.
 
-That means one set of `.changeset/*.md` inputs can drive all of these workflows consistently:
+That means one set of `.changeset/*.md` inputs can drive all of these commands and automation flows consistently:
 
 - `mc release-manifest` writes a stable JSON artifact for downstream automation
 - `mc publish-release` previews or publishes GitHub releases from the structured release notes
@@ -526,47 +545,44 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[[workflows]]
-name = "release-manifest"
+[cli.release-manifest]
 help_text = "Prepare a release and write a stable JSON manifest"
 
-[[workflows.steps]]
+[[cli.release-manifest.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-manifest.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
-[[workflows]]
-name = "publish-release"
+[cli.publish-release]
 help_text = "Prepare a release and publish GitHub releases"
 
-[[workflows.inputs]]
+[[cli.publish-release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PublishGitHubRelease"
 
-[[workflows]]
-name = "release-pr"
+[cli.release-pr]
 help_text = "Prepare a release and open or update a GitHub release pull request"
 
-[[workflows.inputs]]
+[[cli.release-pr.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "OpenReleasePullRequest"
 ```
 
@@ -609,42 +625,40 @@ release_targets = ["main"]
 requires = ["main"]
 metadata = { site = "github-pages" }
 
-[[workflows]]
-name = "release-deploy"
+[cli.release-deploy]
 help_text = "Prepare a release and emit deployment intents"
 
-[[workflows.inputs]]
+[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "Deploy"
 
-[[workflows]]
-name = "changeset-check"
+[cli.changeset-check]
 help_text = "Evaluate pull-request changeset policy"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
 ```
 
@@ -655,7 +669,7 @@ type = "EnforceChangesetPolicy"
 The MonoChange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
-- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `changeset-check` as top-level workflows
+- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `changeset-check` as top-level CLI commands
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc changeset-check`
 - keeping docs deployment represented as a deployment intent so downstream workflows can reason about it from the release manifest
 

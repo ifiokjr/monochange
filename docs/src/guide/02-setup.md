@@ -114,6 +114,14 @@ type = "string"
 name = "details"
 type = "string"
 
+[[cli.change.inputs]]
+name = "evidence"
+type = "string_list"
+
+[[cli.change.inputs]]
+name = "output"
+type = "path"
+
 [[cli.change.steps]]
 type = "CreateChangeFile"
 
@@ -184,26 +192,25 @@ type = "PrepareRelease"
 [[cli.release-deploy.steps]]
 type = "Deploy"
 
-[[workflows]]
-name = "changeset-check"
+[cli.changeset-check]
 help_text = "Evaluate pull-request changeset policy"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "changed_path"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.changeset-check.inputs]]
 name = "label"
 type = "string_list"
 
-[[workflows.steps]]
+[[cli.changeset-check.steps]]
 type = "EnforceChangesetPolicy"
 ```
 
@@ -211,9 +218,9 @@ type = "EnforceChangesetPolicy"
 
 <!-- {=projectSetupConfigNote} -->
 
-This guide shows the preferred package/group configuration model together with the default top-level CLI commands emitted by `mc init`.
+This guide shows the preferred package/group configuration model together with an expanded CLI command surface.
 
-If you omit `[cli.<command>]` entries, MonoChange synthesizes the default `validate`, `discover`, `change`, and `release` commands automatically. Repositories can then customize those commands by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
+`mc init` emits the default `validate`, `discover`, `change`, and `release` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `changeset-check` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 
