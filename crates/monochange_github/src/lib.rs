@@ -30,9 +30,11 @@
 //! ## Example
 //!
 //! ```rust
-//! use monochange_core::GitHubConfiguration;
-//! use monochange_core::GitHubPullRequestSettings;
-//! use monochange_core::GitHubReleaseSettings;
+//! use monochange_core::BotSettings;
+//! use monochange_core::ChangeRequestSettings;
+//! use monochange_core::ReleaseProviderSettings;
+//! use monochange_core::SourceConfiguration;
+//! use monochange_core::SourceProvider;
 //! use monochange_core::ReleaseManifest;
 //! use monochange_core::ReleaseManifestPlan;
 //! use monochange_core::ReleaseManifestTarget;
@@ -69,11 +71,15 @@
 //!         compatibility_evidence: Vec::new(),
 //!     },
 //! };
-//! let github = GitHubConfiguration {
+//! let github = SourceConfiguration {
+//!     provider: SourceProvider::GitHub,
 //!     owner: "ifiokjr".to_string(),
 //!     repo: "monochange".to_string(),
-//!     releases: GitHubReleaseSettings::default(),
-//!     pull_requests: GitHubPullRequestSettings::default(),
+//!     host: None,
+//!     api_url: None,
+//!     releases: ReleaseProviderSettings::default(),
+//!     pull_requests: ChangeRequestSettings::default(),
+//!     bot: BotSettings::default(),
 //! };
 //!
 //! let requests = build_release_requests(&github, &manifest);
@@ -89,13 +95,20 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use monochange_core::GitHubConfiguration;
-use monochange_core::GitHubReleaseNotesSource;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
+use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::SourceChangeRequest;
+use monochange_core::SourceChangeRequestOperation;
+use monochange_core::SourceChangeRequestOutcome;
+use monochange_core::SourceConfiguration;
+use monochange_core::SourceProvider;
+use monochange_core::SourceReleaseOperation;
+use monochange_core::SourceReleaseOutcome;
+use monochange_core::SourceReleaseRequest;
 use octocrab::Octocrab;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -104,69 +117,12 @@ use serde_json::json;
 use tokio::runtime::Builder as RuntimeBuilder;
 use urlencoding::encode;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubReleaseRequest {
-	pub repository: String,
-	pub owner: String,
-	pub repo: String,
-	pub target_id: String,
-	pub target_kind: ReleaseOwnerKind,
-	pub tag_name: String,
-	pub name: String,
-	pub body: Option<String>,
-	pub draft: bool,
-	pub prerelease: bool,
-	pub generate_release_notes: bool,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GitHubReleaseOperation {
-	Created,
-	Updated,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubReleaseOutcome {
-	pub repository: String,
-	pub tag_name: String,
-	pub operation: GitHubReleaseOperation,
-	pub html_url: Option<String>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubPullRequestRequest {
-	pub repository: String,
-	pub owner: String,
-	pub repo: String,
-	pub base_branch: String,
-	pub head_branch: String,
-	pub title: String,
-	pub body: String,
-	pub labels: Vec<String>,
-	pub auto_merge: bool,
-	pub commit_message: String,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GitHubPullRequestOperation {
-	Created,
-	Updated,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubPullRequestOutcome {
-	pub repository: String,
-	pub number: u64,
-	pub head_branch: String,
-	pub operation: GitHubPullRequestOperation,
-	pub url: Option<String>,
-}
+pub type GitHubReleaseRequest = SourceReleaseRequest;
+pub type GitHubReleaseOperation = SourceReleaseOperation;
+pub type GitHubReleaseOutcome = SourceReleaseOutcome;
+pub type GitHubPullRequestRequest = SourceChangeRequest;
+pub type GitHubPullRequestOperation = SourceChangeRequestOperation;
+pub type GitHubPullRequestOutcome = SourceChangeRequestOutcome;
 
 #[derive(Debug, Serialize)]
 struct GitHubReleasePayload<'a> {
@@ -236,7 +192,7 @@ struct GraphqlPullRequestNode {
 
 #[must_use]
 pub fn build_release_requests(
-	github: &GitHubConfiguration,
+	github: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> Vec<GitHubReleaseRequest> {
 	manifest
@@ -244,6 +200,7 @@ pub fn build_release_requests(
 		.iter()
 		.filter(|target| target.release)
 		.map(|target| GitHubReleaseRequest {
+			provider: SourceProvider::GitHub,
 			repository: format!("{}/{}", github.owner, github.repo),
 			owner: github.owner.clone(),
 			repo: github.repo.clone(),
@@ -261,12 +218,13 @@ pub fn build_release_requests(
 
 #[must_use]
 pub fn build_release_pull_request_request(
-	github: &GitHubConfiguration,
+	github: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> GitHubPullRequestRequest {
 	let repository = format!("{}/{}", github.owner, github.repo);
 	let title = github.pull_requests.title.clone();
 	GitHubPullRequestRequest {
+		provider: SourceProvider::GitHub,
 		repository: repository.clone(),
 		owner: github.owner.clone(),
 		repo: github.repo.clone(),
@@ -284,17 +242,19 @@ pub fn build_release_pull_request_request(
 }
 
 pub fn publish_release_requests(
+	source: &SourceConfiguration,
 	requests: &[GitHubReleaseRequest],
 ) -> MonochangeResult<Vec<GitHubReleaseOutcome>> {
 	let runtime = github_runtime()?;
 	runtime.block_on(async {
-		let client = github_client_from_env()?;
+		let client = github_client_from_env(source)?;
 		let outcome = publish_release_requests_with_client(&client, requests).await;
 		outcome
 	})
 }
 
 pub fn publish_release_pull_request(
+	source: &SourceConfiguration,
 	root: &Path,
 	request: &GitHubPullRequestRequest,
 	tracked_paths: &[PathBuf],
@@ -306,7 +266,7 @@ pub fn publish_release_pull_request(
 
 	let runtime = github_runtime()?;
 	runtime.block_on(async {
-		let client = github_client_from_env()?;
+		let client = github_client_from_env(source)?;
 		let outcome = publish_release_pull_request_with_client(&client, request).await;
 		outcome
 	})
@@ -360,10 +320,11 @@ async fn publish_release_request_with_client(
 		),
 	};
 	Ok(GitHubReleaseOutcome {
+		provider: SourceProvider::GitHub,
 		repository: request.repository.clone(),
 		tag_name: request.tag_name.clone(),
 		operation,
-		html_url: response.html_url,
+		url: response.html_url,
 	})
 }
 
@@ -422,6 +383,7 @@ async fn publish_release_pull_request_with_client(
 		enable_pull_request_auto_merge_with_client(client, &pull_request.node_id).await?;
 	}
 	Ok(GitHubPullRequestOutcome {
+		provider: SourceProvider::GitHub,
 		repository: request.repository.clone(),
 		number: pull_request.number,
 		head_branch: request.head_branch.clone(),
@@ -498,7 +460,7 @@ fn github_runtime() -> MonochangeResult<tokio::runtime::Runtime> {
 		.map_err(|error| MonochangeError::Io(format!("failed to build GitHub runtime: {error}")))
 }
 
-fn github_client_from_env() -> MonochangeResult<Octocrab> {
+fn github_client_from_env(source: &SourceConfiguration) -> MonochangeResult<Octocrab> {
 	let token = env::var("GITHUB_TOKEN")
 		.or_else(|_| env::var("GH_TOKEN"))
 		.map_err(|_| {
@@ -506,7 +468,9 @@ fn github_client_from_env() -> MonochangeResult<Octocrab> {
 				"set `GITHUB_TOKEN` (or `GH_TOKEN`) before running GitHub automation".to_string(),
 			)
 		})?;
-	build_github_client(&token, env::var("GITHUB_API_URL").ok().as_deref())
+	let env_api_url = env::var("GITHUB_API_URL").ok();
+	let api_url = source.api_url.as_deref().or(env_api_url.as_deref());
+	build_github_client(&token, api_url)
 }
 
 fn build_github_client(token: &str, base_uri: Option<&str>) -> MonochangeResult<Octocrab> {
@@ -653,13 +617,13 @@ fn release_name(target: &ReleaseManifestTarget) -> String {
 }
 
 fn release_body(
-	github: &GitHubConfiguration,
+	github: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 	target: &ReleaseManifestTarget,
 ) -> Option<String> {
 	match github.releases.source {
-		GitHubReleaseNotesSource::GitHubGenerated => None,
-		GitHubReleaseNotesSource::Monochange => manifest
+		ReleaseNotesSource::GitHubGenerated => None,
+		ReleaseNotesSource::Monochange => manifest
 			.changelogs
 			.iter()
 			.find(|changelog| {

@@ -39,25 +39,28 @@ version_format = "primary"
 path = "docs/sdk-changelog.md"
 format = "monochange"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 source = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 branch_prefix = "monochange/release"
 base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[changesets.verify]
+[source.bot.changesets]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
+changed_paths = ["crates/**", "packages/**"]
+ignored_paths = ["docs/**", "*.md"]
 
 [[deployments]]
 name = "production"
@@ -146,7 +149,7 @@ type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
-help_text = "Prepare a release and publish GitHub releases"
+help_text = "Prepare a release and publish provider releases"
 
 [[cli.publish-release.inputs]]
 name = "format"
@@ -158,10 +161,10 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 
 [cli.release-pr]
-help_text = "Prepare a release and open or update a GitHub release pull request"
+help_text = "Prepare a release and open or update a provider release request"
 
 [[cli.release-pr.inputs]]
 name = "format"
@@ -173,7 +176,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
-type = "OpenReleasePullRequest"
+type = "OpenReleaseRequest"
 
 [cli.release-deploy]
 help_text = "Prepare a release and emit deployment intents"
@@ -191,7 +194,7 @@ type = "PrepareRelease"
 type = "Deploy"
 
 [cli.verify]
-help_text = "Verify that changed files are covered by attached changesets"
+help_text = "Evaluate pull-request changeset policy"
 
 [[cli.verify.inputs]]
 name = "format"
@@ -200,7 +203,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.verify.inputs]]
-name = "changed_paths"
+name = "changed_path"
 type = "string_list"
 required = true
 
@@ -218,7 +221,7 @@ type = "VerifyChangesets"
 
 This guide shows the preferred package/group configuration model together with an expanded CLI command surface.
 
-`mc init` emits the default `validate`, `discover`, `change`, `release`, and `verify` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, and `release-deploy` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
+`mc init` emits the default `validate`, `discover`, `change`, and `release` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 

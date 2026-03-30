@@ -18,7 +18,7 @@ fn publish_github_release_dry_run_renders_group_release_payloads() {
 	seed_group_release_fixture(tempdir.path());
 
 	let json = run_json_workflow(tempdir.path(), "publish-release");
-	let github_releases = json["githubReleases"]
+	let github_releases = json["releases"]
 		.as_array()
 		.unwrap_or_else(|| panic!("expected github releases array"));
 	assert_eq!(github_releases.len(), 1);
@@ -48,7 +48,7 @@ fn publish_github_release_dry_run_renders_package_release_payloads() {
 	seed_ungrouped_release_fixture(tempdir.path());
 
 	let json = run_json_workflow(tempdir.path(), "publish-release");
-	let github_releases = json["githubReleases"]
+	let github_releases = json["releases"]
 		.as_array()
 		.unwrap_or_else(|| panic!("expected github releases array"));
 	assert_eq!(github_releases.len(), 2);
@@ -82,7 +82,7 @@ fn publish_github_release_dry_run_supports_custom_sections_and_templates() {
 	seed_custom_release_notes_fixture(tempdir.path());
 
 	let json = run_json_workflow(tempdir.path(), "publish-release");
-	let github_releases = json["githubReleases"]
+	let github_releases = json["releases"]
 		.as_array()
 		.unwrap_or_else(|| panic!("expected github releases array"));
 	assert_eq!(github_releases.len(), 1);
@@ -208,7 +208,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 "#,
 	);
 	write_file(
@@ -302,7 +302,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 "#,
 	);
 	write_file(
@@ -377,7 +377,7 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
-type = "PublishGitHubRelease"
+type = "PublishRelease"
 "#####,
 	);
 	write_file(

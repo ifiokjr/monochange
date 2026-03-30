@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use semver::Version;
+use serde_json::json;
 
 use crate::default_cli_commands;
 use crate::materialize_dependency_edges;
@@ -162,6 +163,21 @@ fn default_cli_commands_expose_validate_discover_change_release_and_verify() {
 }
 
 #[test]
+fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
+	let publish_release: CliStepDefinition = serde_json::from_value(json!({
+		"type": "PublishGitHubRelease"
+	}))
+	.unwrap_or_else(|error| panic!("deserialize publish alias: {error}"));
+	let open_release_request: CliStepDefinition = serde_json::from_value(json!({
+		"type": "OpenReleasePullRequest"
+	}))
+	.unwrap_or_else(|error| panic!("deserialize request alias: {error}"));
+
+	assert_eq!(publish_release, CliStepDefinition::PublishRelease);
+	assert_eq!(open_release_request, CliStepDefinition::OpenReleaseRequest);
+}
+
+#[test]
 fn render_release_notes_supports_monochange_and_keep_a_changelog_formats() {
 	let document = ReleaseNotesDocument {
 		title: "1.2.3".to_string(),
@@ -308,6 +324,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		cli: Vec::new(),
 		changesets: crate::ChangesetSettings::default(),
 		github: None,
+		source: None,
 		cargo: EcosystemSettings::default(),
 		npm: EcosystemSettings::default(),
 		deno: EcosystemSettings::default(),

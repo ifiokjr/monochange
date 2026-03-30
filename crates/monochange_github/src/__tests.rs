@@ -6,10 +6,9 @@ use httpmock::Method::GET;
 use httpmock::Method::PATCH;
 use httpmock::Method::POST;
 use httpmock::MockServer;
-use monochange_core::GitHubConfiguration;
-use monochange_core::GitHubPullRequestSettings;
+use monochange_core::BotSettings;
+use monochange_core::ChangeRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
-use monochange_core::GitHubReleaseSettings;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestPlan;
@@ -17,6 +16,9 @@ use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::ReleaseProviderSettings;
+use monochange_core::SourceConfiguration;
+use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
 use tempfile::tempdir;
 
@@ -24,11 +26,15 @@ use super::*;
 
 #[test]
 fn build_release_requests_uses_matching_monochange_changelog_bodies() {
-	let github = GitHubConfiguration {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: GitHubReleaseSettings::default(),
-		pull_requests: GitHubPullRequestSettings::default(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -50,15 +56,19 @@ fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 
 #[test]
 fn build_release_requests_can_defer_to_github_generated_notes() {
-	let github = GitHubConfiguration {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: GitHubReleaseSettings {
+		releases: ReleaseProviderSettings {
 			source: GitHubReleaseNotesSource::GitHubGenerated,
 			generate_notes: true,
-			..GitHubReleaseSettings::default()
+			..ReleaseProviderSettings::default()
 		},
-		pull_requests: GitHubPullRequestSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -74,11 +84,15 @@ fn build_release_requests_can_defer_to_github_generated_notes() {
 
 #[test]
 fn build_release_requests_fall_back_to_minimal_release_bodies() {
-	let github = GitHubConfiguration {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: GitHubReleaseSettings::default(),
-		pull_requests: GitHubPullRequestSettings::default(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
 	};
 	let manifest = ReleaseManifest {
 		command: "release".to_string(),
@@ -137,18 +151,22 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 
 #[test]
 fn build_release_pull_request_request_renders_branch_and_body() {
-	let github = GitHubConfiguration {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: GitHubReleaseSettings::default(),
-		pull_requests: GitHubPullRequestSettings {
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings {
 			branch_prefix: "automation/release".to_string(),
 			base: "develop".to_string(),
 			title: "chore(release): prepare release".to_string(),
 			labels: vec!["release".to_string(), "automated".to_string()],
 			auto_merge: true,
-			..GitHubPullRequestSettings::default()
+			..ChangeRequestSettings::default()
 		},
+		bot: BotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -202,7 +220,7 @@ fn publish_release_requests_creates_release_via_octocrab() {
 		.unwrap_or_else(|| panic!("expected release outcome"));
 	assert_eq!(outcome.operation, GitHubReleaseOperation::Created);
 	assert_eq!(
-		outcome.html_url.as_deref(),
+		outcome.url.as_deref(),
 		Some("https://example.com/releases/1")
 	);
 }
@@ -242,7 +260,7 @@ fn publish_release_requests_updates_existing_release_via_octocrab() {
 		.unwrap_or_else(|| panic!("expected release outcome"));
 	assert_eq!(outcome.operation, GitHubReleaseOperation::Updated);
 	assert_eq!(
-		outcome.html_url.as_deref(),
+		outcome.url.as_deref(),
 		Some("https://example.com/releases/42")
 	);
 }
@@ -515,6 +533,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 
 fn sample_release_request() -> GitHubReleaseRequest {
 	GitHubReleaseRequest {
+		provider: SourceProvider::GitHub,
 		repository: "ifiokjr/monochange".to_string(),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
@@ -534,6 +553,7 @@ fn sample_release_request() -> GitHubReleaseRequest {
 
 fn sample_pull_request_request() -> GitHubPullRequestRequest {
 	GitHubPullRequestRequest {
+		provider: SourceProvider::GitHub,
 		repository: "ifiokjr/monochange".to_string(),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),

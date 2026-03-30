@@ -45,7 +45,7 @@ jobs:
           args=(verify --format json)
 
           for path in $CHANGED_FILES; do
-            args+=(--changed-path "$path")
+            args+=(--changed-paths "$path")
           done
 
           for label in "${labels[@]}"; do
