@@ -12,7 +12,10 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 ```
 
 <!-- {/configurationDefaultsSnippet} -->
@@ -26,7 +29,10 @@ Declare every release-managed package explicitly.
 ```toml
 [defaults]
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
@@ -34,6 +40,10 @@ versioned_files = ["crates/sdk_core/extra.toml"]
 tag = false
 release = false
 version_format = "namespaced"
+
+[package.sdk-core.changelog]
+path = "crates/sdk_core/CHANGELOG.md"
+format = "monochange"
 ```
 
 <!-- {/configurationVersionGroupsSnippet} -->
@@ -151,6 +161,13 @@ Workflows are user-defined top-level commands. In this milestone, a workflow nam
 <!-- {=configurationWorkflowsSnippet} -->
 
 ```toml
+[release_notes]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
+
+[package.core]
+path = "crates/core"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+
 [[workflows]]
 name = "discover"
 help_text = "Discover packages across supported ecosystems"
@@ -178,6 +195,58 @@ default = "text"
 type = "PrepareRelease"
 
 [[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+
+[[workflows]]
+name = "publish-release"
+help_text = "Prepare a release and publish GitHub releases"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
+
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
+
+[[workflows]]
+name = "release-deploy"
+help_text = "Prepare a release and emit deployment intents"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
+
+[[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
 dry_run = "cargo test --workspace --all-features"
@@ -196,6 +265,42 @@ Workflow command interpolation variables:
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 
 <!-- {/configurationWorkflowVariables} -->
+
+## GitHub release settings
+
+Use `[github]` plus `[github.releases]` when you want workflow steps such as `PublishGitHubRelease` to derive repository release payloads from the prepared release.
+
+<!-- {=configurationGitHubSnippet} -->
+
+```toml
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[github.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[[deployments]]
+name = "production"
+trigger = "release_pr_merge"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
+```
+
+<!-- {/configurationGitHubSnippet} -->
 
 ## Ecosystem settings
 
@@ -237,6 +342,15 @@ changelog = "crates/sdk_core/changelog.md"
 
 Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
 
+MonoChange currently supports two changelog formats:
+
+- `monochange` keeps the current heading-and-bullets layout
+- `keep_a_changelog` renders section headings such as `### Features`, `### Fixes`, and `### Breaking changes`
+
+Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
+
+You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`. Git-derived template variables are planned next.
+
 <!-- {/configurationPackageOverridesSnippet} -->
 
 ## Package references
@@ -257,7 +371,10 @@ Current implementation notes:
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, and `Command`
+- GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
+- GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
+- deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository workflows can decide when and how to execute them
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 

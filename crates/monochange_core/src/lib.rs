@@ -25,29 +25,31 @@
 //! - normalized package and dependency records
 //! - version-group definitions and planned group outcomes
 //! - change signals and compatibility assessments
-//! - release-plan domain types
+//! - changelog formats, changelog targets, structured release-note types, release-manifest types, and GitHub automation config types
 //! - shared error and result types
 //!
 //! ## Example
 //!
 //! ```rust
-//! use monochange_core::Ecosystem;
-//! use monochange_core::PackageRecord;
-//! use monochange_core::PublishState;
-//! use semver::Version;
-//! use std::path::PathBuf;
+//! use monochange_core::render_release_notes;
+//! use monochange_core::ChangelogFormat;
+//! use monochange_core::ReleaseNotesDocument;
+//! use monochange_core::ReleaseNotesSection;
 //!
-//! let package = PackageRecord::new(
-//!     Ecosystem::Cargo,
-//!     "demo",
-//!     PathBuf::from("crates/demo/Cargo.toml"),
-//!     PathBuf::from("."),
-//!     Some(Version::new(1, 2, 3)),
-//!     PublishState::Public,
-//! );
+//! let notes = ReleaseNotesDocument {
+//!     title: "1.2.3".to_string(),
+//!     summary: vec!["Grouped release for `sdk`.".to_string()],
+//!     sections: vec![ReleaseNotesSection {
+//!         title: "Features".to_string(),
+//!         entries: vec!["- add keep-a-changelog output".to_string()],
+//!     }],
+//! };
 //!
-//! assert_eq!(package.name, "demo");
-//! assert_eq!(package.current_version, Some(Version::new(1, 2, 3)));
+//! let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
+//!
+//! assert!(rendered.contains("## [1.2.3]"));
+//! assert!(rendered.contains("### Features"));
+//! assert!(rendered.contains("- add keep-a-changelog output"));
 //! ```
 //! <!-- {/monochangeCoreCrateDocs} -->
 
@@ -350,12 +352,54 @@ pub enum ChangelogDefinition {
 	PathPattern(String),
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ChangelogFormat {
+	#[default]
+	Monochange,
+	KeepAChangelog,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ChangelogTarget {
+	pub path: PathBuf,
+	#[serde(default)]
+	pub format: ChangelogFormat,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ReleaseNotesSection {
+	pub title: String,
+	pub entries: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ReleaseNotesDocument {
+	pub title: String,
+	pub summary: Vec<String>,
+	pub sections: Vec<ReleaseNotesSection>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ExtraChangelogSection {
+	pub name: String,
+	#[serde(default)]
+	pub types: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct ReleaseNotesSettings {
+	#[serde(default)]
+	pub change_templates: Vec<String>,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PackageDefinition {
 	pub id: String,
 	pub path: PathBuf,
 	pub package_type: PackageType,
-	pub changelog: Option<PathBuf>,
+	pub changelog: Option<ChangelogTarget>,
+	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
@@ -367,7 +411,8 @@ pub struct PackageDefinition {
 pub struct GroupDefinition {
 	pub id: String,
 	pub packages: Vec<String>,
-	pub changelog: Option<PathBuf>,
+	pub changelog: Option<ChangelogTarget>,
+	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
@@ -382,6 +427,7 @@ pub struct WorkspaceDefaults {
 	pub warn_on_group_mismatch: bool,
 	pub package_type: Option<PackageType>,
 	pub changelog: Option<ChangelogDefinition>,
+	pub changelog_format: ChangelogFormat,
 	pub empty_update_message: Option<String>,
 }
 
@@ -393,6 +439,7 @@ impl Default for WorkspaceDefaults {
 			warn_on_group_mismatch: true,
 			package_type: None,
 			changelog: None,
+			changelog_format: ChangelogFormat::Monochange,
 			empty_update_message: None,
 		}
 	}
@@ -449,6 +496,16 @@ pub enum WorkflowStepDefinition {
 	Discover,
 	CreateChangeFile,
 	PrepareRelease,
+	RenderReleaseManifest {
+		#[serde(default)]
+		path: Option<PathBuf>,
+	},
+	PublishGitHubRelease,
+	OpenReleasePullRequest,
+	Deploy {
+		#[serde(default)]
+		names: Vec<String>,
+	},
 	Command {
 		command: String,
 		#[serde(default)]
@@ -458,6 +515,47 @@ pub enum WorkflowStepDefinition {
 		#[serde(default)]
 		variables: Option<BTreeMap<String, CommandVariable>>,
 	},
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DeploymentTrigger {
+	#[default]
+	Workflow,
+	ReleasePrMerge,
+	ReleasePublished,
+}
+
+impl DeploymentTrigger {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Workflow => "workflow",
+			Self::ReleasePrMerge => "release_pr_merge",
+			Self::ReleasePublished => "release_published",
+		}
+	}
+}
+
+impl fmt::Display for DeploymentTrigger {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DeploymentDefinition {
+	pub name: String,
+	pub trigger: DeploymentTrigger,
+	pub workflow: String,
+	#[serde(default)]
+	pub environment: Option<String>,
+	#[serde(default)]
+	pub release_targets: Vec<String>,
+	#[serde(default)]
+	pub requires: Vec<String>,
+	#[serde(default)]
+	pub metadata: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -471,11 +569,271 @@ pub struct WorkflowDefinition {
 	pub steps: Vec<WorkflowStepDefinition>,
 }
 
+#[must_use]
+pub fn render_release_notes(format: ChangelogFormat, document: &ReleaseNotesDocument) -> String {
+	match format {
+		ChangelogFormat::Monochange => render_monochange_release_notes(document),
+		ChangelogFormat::KeepAChangelog => render_keep_a_changelog_release_notes(document),
+	}
+}
+
+fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
+	let mut lines = vec![format!("## {}", document.title), String::new()];
+	for (index, paragraph) in document.summary.iter().enumerate() {
+		if index > 0 {
+			lines.push(String::new());
+		}
+		lines.push(paragraph.clone());
+	}
+	let include_section_headings = document.sections.len() > 1
+		|| document
+			.sections
+			.iter()
+			.any(|section| section.title != "Changed");
+	for section in &document.sections {
+		if section.entries.is_empty() {
+			continue;
+		}
+		if !lines.last().is_some_and(String::is_empty) {
+			lines.push(String::new());
+		}
+		if include_section_headings {
+			lines.push(format!("### {}", section.title));
+			lines.push(String::new());
+		}
+		push_release_note_entries(&mut lines, &section.entries);
+	}
+	lines.join("\n")
+}
+
+fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> String {
+	let mut lines = vec![format!("## [{}]", document.title), String::new()];
+	for (index, paragraph) in document.summary.iter().enumerate() {
+		if index > 0 {
+			lines.push(String::new());
+		}
+		lines.push(paragraph.clone());
+	}
+	for section in &document.sections {
+		if section.entries.is_empty() {
+			continue;
+		}
+		if !lines.last().is_some_and(String::is_empty) {
+			lines.push(String::new());
+		}
+		lines.push(format!("### {}", section.title));
+		lines.push(String::new());
+		push_release_note_entries(&mut lines, &section.entries);
+	}
+	lines.join("\n")
+}
+
+fn push_release_note_entries(lines: &mut Vec<String>, entries: &[String]) {
+	for (index, entry) in entries.iter().enumerate() {
+		let trimmed = entry.trim();
+		if trimmed.contains('\n') {
+			lines.extend(trimmed.lines().map(ToString::to_string));
+			if index + 1 < entries.len() {
+				lines.push(String::new());
+			}
+			continue;
+		}
+		if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with('#') {
+			lines.push(trimmed.to_string());
+		} else {
+			lines.push(format!("- {trimmed}"));
+		}
+	}
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseOwnerKind {
 	Package,
 	Group,
+}
+
+impl ReleaseOwnerKind {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Package => "package",
+			Self::Group => "group",
+		}
+	}
+}
+
+impl fmt::Display for ReleaseOwnerKind {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestTarget {
+	pub id: String,
+	pub kind: ReleaseOwnerKind,
+	pub version: String,
+	pub tag: bool,
+	pub release: bool,
+	pub version_format: VersionFormat,
+	pub tag_name: String,
+	pub members: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestChangelog {
+	pub owner_id: String,
+	pub owner_kind: ReleaseOwnerKind,
+	pub path: PathBuf,
+	pub format: ChangelogFormat,
+	pub notes: ReleaseNotesDocument,
+	pub rendered: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestPlanDecision {
+	pub package: String,
+	pub bump: BumpSeverity,
+	pub trigger: String,
+	pub planned_version: Option<String>,
+	pub reasons: Vec<String>,
+	pub upstream_sources: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestPlanGroup {
+	pub id: String,
+	pub planned_version: Option<String>,
+	pub members: Vec<String>,
+	pub bump: BumpSeverity,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestCompatibilityEvidence {
+	pub package: String,
+	pub provider: String,
+	pub severity: BumpSeverity,
+	pub summary: String,
+	pub confidence: String,
+	pub evidence_location: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifestPlan {
+	pub workspace_root: PathBuf,
+	pub decisions: Vec<ReleaseManifestPlanDecision>,
+	pub groups: Vec<ReleaseManifestPlanGroup>,
+	pub warnings: Vec<String>,
+	pub unresolved_items: Vec<String>,
+	pub compatibility_evidence: Vec<ReleaseManifestCompatibilityEvidence>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseDeploymentIntent {
+	pub name: String,
+	pub trigger: DeploymentTrigger,
+	pub workflow: String,
+	#[serde(default)]
+	pub environment: Option<String>,
+	#[serde(default)]
+	pub release_targets: Vec<String>,
+	#[serde(default)]
+	pub requires: Vec<String>,
+	#[serde(default)]
+	pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseManifest {
+	pub workflow: String,
+	pub dry_run: bool,
+	#[serde(default)]
+	pub version: Option<String>,
+	#[serde(default)]
+	pub group_version: Option<String>,
+	pub release_targets: Vec<ReleaseManifestTarget>,
+	pub released_packages: Vec<String>,
+	pub changed_files: Vec<PathBuf>,
+	pub changelogs: Vec<ReleaseManifestChangelog>,
+	#[serde(default)]
+	pub deleted_changesets: Vec<PathBuf>,
+	#[serde(default)]
+	pub deployments: Vec<ReleaseDeploymentIntent>,
+	pub plan: ReleaseManifestPlan,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GitHubReleaseNotesSource {
+	#[default]
+	Monochange,
+	#[serde(rename = "github_generated")]
+	GitHubGenerated,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubReleaseSettings {
+	pub enabled: bool,
+	pub draft: bool,
+	pub prerelease: bool,
+	pub generate_notes: bool,
+	pub source: GitHubReleaseNotesSource,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubPullRequestSettings {
+	pub enabled: bool,
+	pub branch_prefix: String,
+	pub base: String,
+	pub title: String,
+	pub labels: Vec<String>,
+	pub auto_merge: bool,
+}
+
+impl Default for GitHubReleaseSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			draft: false,
+			prerelease: false,
+			generate_notes: false,
+			source: GitHubReleaseNotesSource::Monochange,
+		}
+	}
+}
+
+impl Default for GitHubPullRequestSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			branch_prefix: "monochange/release".to_string(),
+			base: "main".to_string(),
+			title: "chore(release): prepare release".to_string(),
+			labels: vec!["release".to_string(), "automated".to_string()],
+			auto_merge: false,
+		}
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubConfiguration {
+	pub owner: String,
+	pub repo: String,
+	#[serde(default)]
+	pub releases: GitHubReleaseSettings,
+	#[serde(default)]
+	pub pull_requests: GitHubPullRequestSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -493,9 +851,12 @@ pub struct EffectiveReleaseIdentity {
 pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
 	pub defaults: WorkspaceDefaults,
+	pub release_notes: ReleaseNotesSettings,
+	pub deployments: Vec<DeploymentDefinition>,
 	pub packages: Vec<PackageDefinition>,
 	pub groups: Vec<GroupDefinition>,
 	pub workflows: Vec<WorkflowDefinition>,
+	pub github: Option<GitHubConfiguration>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,
@@ -598,8 +959,26 @@ pub fn default_workflows() -> Vec<WorkflowDefinition> {
 				WorkflowInputDefinition {
 					name: "reason".to_string(),
 					kind: WorkflowInputKind::String,
-					help_text: Some("Why this change is being recorded".to_string()),
+					help_text: Some("Short release-note summary for this change".to_string()),
 					required: true,
+					default: None,
+					choices: Vec::new(),
+				},
+				WorkflowInputDefinition {
+					name: "type".to_string(),
+					kind: WorkflowInputKind::String,
+					help_text: Some(
+						"Optional release-note type such as `security` or `note`".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+				WorkflowInputDefinition {
+					name: "details".to_string(),
+					kind: WorkflowInputKind::String,
+					help_text: Some("Optional multi-line release-note details".to_string()),
+					required: false,
 					default: None,
 					choices: Vec::new(),
 				},
@@ -665,6 +1044,8 @@ pub struct ChangeSignal {
 	pub change_origin: String,
 	pub evidence_refs: Vec<String>,
 	pub notes: Option<String>,
+	pub details: Option<String>,
+	pub change_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

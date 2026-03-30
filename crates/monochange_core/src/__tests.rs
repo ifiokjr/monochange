@@ -4,8 +4,12 @@ use semver::Version;
 
 use crate::default_workflows;
 use crate::materialize_dependency_edges;
+use crate::render_release_notes;
 use crate::BumpSeverity;
+use crate::ChangelogFormat;
+use crate::ChangelogTarget;
 use crate::DependencyKind;
+use crate::DeploymentTrigger;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
 use crate::GroupDefinition;
@@ -14,6 +18,9 @@ use crate::PackageDependency;
 use crate::PackageRecord;
 use crate::PackageType;
 use crate::PublishState;
+use crate::ReleaseNotesDocument;
+use crate::ReleaseNotesSection;
+use crate::ReleaseNotesSettings;
 use crate::ReleaseOwnerKind;
 use crate::VersionFormat;
 use crate::WorkflowStepDefinition;
@@ -136,6 +143,29 @@ fn default_workflows_expose_validate_discover_change_and_release() {
 }
 
 #[test]
+fn render_release_notes_supports_monochange_and_keep_a_changelog_formats() {
+	let document = ReleaseNotesDocument {
+		title: "1.2.3".to_string(),
+		summary: vec!["Grouped release for `sdk`.".to_string()],
+		sections: vec![ReleaseNotesSection {
+			title: "Changed".to_string(),
+			entries: vec!["add release automation".to_string()],
+		}],
+	};
+
+	let monochange = render_release_notes(ChangelogFormat::Monochange, &document);
+	let keep_a_changelog = render_release_notes(ChangelogFormat::KeepAChangelog, &document);
+
+	assert!(monochange.contains("## 1.2.3"));
+	assert!(monochange.contains("Grouped release for `sdk`."));
+	assert!(monochange.contains("- add release automation"));
+	assert!(!monochange.contains("## [1.2.3]"));
+	assert!(keep_a_changelog.contains("## [1.2.3]"));
+	assert!(keep_a_changelog.contains("### Changed"));
+	assert!(keep_a_changelog.contains("- add release automation"));
+}
+
+#[test]
 fn workspace_configuration_can_find_group_membership_for_a_package() {
 	let configuration = sample_workspace_configuration();
 	let group = configuration
@@ -182,12 +212,26 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 	WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
 		defaults: WorkspaceDefaults::default(),
+		release_notes: ReleaseNotesSettings::default(),
+		deployments: vec![crate::DeploymentDefinition {
+			name: "production".to_string(),
+			trigger: DeploymentTrigger::ReleasePrMerge,
+			workflow: "deploy-production".to_string(),
+			environment: Some("production".to_string()),
+			release_targets: vec!["workspace".to_string()],
+			requires: vec!["main".to_string()],
+			metadata: std::collections::BTreeMap::new(),
+		}],
 		packages: vec![
 			PackageDefinition {
 				id: "monochange".to_string(),
 				path: PathBuf::from("crates/monochange"),
 				package_type: PackageType::Cargo,
-				changelog: Some(PathBuf::from("crates/monochange/changelog.md")),
+				changelog: Some(ChangelogTarget {
+					path: PathBuf::from("crates/monochange/changelog.md"),
+					format: ChangelogFormat::Monochange,
+				}),
+				extra_changelog_sections: Vec::new(),
 				empty_update_message: None,
 				versioned_files: Vec::new(),
 				tag: false,
@@ -198,7 +242,11 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				id: "monochange_core".to_string(),
 				path: PathBuf::from("crates/monochange_core"),
 				package_type: PackageType::Cargo,
-				changelog: Some(PathBuf::from("crates/monochange_core/changelog.md")),
+				changelog: Some(ChangelogTarget {
+					path: PathBuf::from("crates/monochange_core/changelog.md"),
+					format: ChangelogFormat::Monochange,
+				}),
+				extra_changelog_sections: Vec::new(),
 				empty_update_message: None,
 				versioned_files: Vec::new(),
 				tag: false,
@@ -210,6 +258,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				path: PathBuf::from("crates/monochange_graph"),
 				package_type: PackageType::Cargo,
 				changelog: None,
+				extra_changelog_sections: Vec::new(),
 				empty_update_message: None,
 				versioned_files: Vec::new(),
 				tag: false,
@@ -220,7 +269,11 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		groups: vec![GroupDefinition {
 			id: "workspace".to_string(),
 			packages: vec!["monochange".to_string(), "monochange_core".to_string()],
-			changelog: Some(PathBuf::from("changelog.md")),
+			changelog: Some(ChangelogTarget {
+				path: PathBuf::from("changelog.md"),
+				format: ChangelogFormat::Monochange,
+			}),
+			extra_changelog_sections: Vec::new(),
 			empty_update_message: None,
 			versioned_files: Vec::new(),
 			tag: true,
@@ -228,6 +281,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 			version_format: VersionFormat::Primary,
 		}],
 		workflows: Vec::new(),
+		github: None,
 		cargo: EcosystemSettings::default(),
 		npm: EcosystemSettings::default(),
 		deno: EcosystemSettings::default(),

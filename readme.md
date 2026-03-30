@@ -44,6 +44,10 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - compute release plans from explicit change input
 - expose top-level CLI commands from workflow definitions
 - run config-defined release workflows from `.changeset/*.md`
+- render changelogs through structured release notes and configurable formats
+- emit stable release-manifest JSON for downstream automation
+- preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
+- model deployment intents for downstream automation and merge-driven release workflows
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -61,6 +65,8 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust)](https://crates.io/crates/monochange_config) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs)](https://docs.rs/monochange_config/)
 - `monochange_graph` — propagates release impact through dependency edges and synchronized groups.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust)](https://crates.io/crates/monochange_graph) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs)](https://docs.rs/monochange_graph/)
+- `monochange_github` — converts release manifests into GitHub release payloads and publishing operations.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__github-orange?logo=rust)](https://crates.io/crates/monochange_github) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__github-1f425f?logo=docs.rs)](https://docs.rs/monochange_github/)
 - `monochange_semver` — merges requested bumps with compatibility-provider evidence.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust)](https://crates.io/crates/monochange_semver) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs)](https://docs.rs/monochange_semver/)
 - `monochange_cargo` — Cargo discovery plus Rust semver evidence integration.
@@ -87,6 +93,9 @@ mc validate
 mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
 mc release --dry-run --format json
+mc publish-release --dry-run --format json
+mc release-pr --dry-run --format json
+mc release-deploy --dry-run --format json
 mc release
 ```
 

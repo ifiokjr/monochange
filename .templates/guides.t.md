@@ -26,7 +26,10 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 ```
 
 <!-- {/configurationDefaultsSnippet} -->
@@ -36,7 +39,10 @@ changelog = "{path}/changelog.md"
 ```toml
 [defaults]
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
@@ -44,6 +50,10 @@ versioned_files = ["crates/sdk_core/extra.toml"]
 tag = false
 release = false
 version_format = "namespaced"
+
+[package.sdk-core.changelog]
+path = "crates/sdk_core/CHANGELOG.md"
+format = "monochange"
 ```
 
 <!-- {/configurationVersionGroupsSnippet} -->
@@ -60,11 +70,27 @@ changelog = "crates/sdk_core/changelog.md"
 
 Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
 
+MonoChange currently supports two changelog formats:
+
+- `monochange` keeps the current heading-and-bullets layout
+- `keep_a_changelog` renders section headings such as `### Features`, `### Fixes`, and `### Breaking changes`
+
+Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
+
+You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`. Git-derived template variables are planned next.
+
 <!-- {/configurationPackageOverridesSnippet} -->
 
 <!-- {@configurationWorkflowsSnippet} -->
 
 ```toml
+[release_notes]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
+
+[package.core]
+path = "crates/core"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+
 [[workflows]]
 name = "discover"
 help_text = "Discover packages across supported ecosystems"
@@ -92,6 +118,58 @@ default = "text"
 type = "PrepareRelease"
 
 [[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+
+[[workflows]]
+name = "publish-release"
+help_text = "Prepare a release and publish GitHub releases"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
+
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
+
+[[workflows]]
+name = "release-deploy"
+help_text = "Prepare a release and emit deployment intents"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
+
+[[workflows.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
 dry_run = "cargo test --workspace --all-features"
@@ -108,6 +186,38 @@ shell = true
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 
 <!-- {/configurationWorkflowVariables} -->
+
+<!-- {@configurationGitHubSnippet} -->
+
+```toml
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[github.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[[deployments]]
+name = "production"
+trigger = "release_pr_merge"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
+```
+
+<!-- {/configurationGitHubSnippet} -->
 
 <!-- {@configurationEcosystemSettingsSnippet} -->
 
@@ -145,7 +255,10 @@ Current implementation notes:
 - `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
 - `[ecosystems.*].enabled/roots/exclude` are parsed and documented as the ecosystem control surface
 - `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
-- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, and `Command`
+- GitHub release publication currently expects `[github]` plus `[github.releases]` and uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN` for live API calls outside dry-run mode
+- GitHub release pull requests currently expect `[github.pull_requests]` and use `git` for local branch/commit/push operations plus `octocrab` for live GitHub API calls
+- deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository workflows can decide when and how to execute them
+- supported workflow steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishGitHubRelease`, `OpenReleasePullRequest`, `Deploy`, and `Command`
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -194,6 +307,7 @@ Legacy `version_groups.strategy` is no longer the primary authoring model. The c
 
 ```bash
 mc change --package sdk-core --bump minor --reason "public API addition"
+mc change --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -202,10 +316,14 @@ mc change --package sdk-core --bump minor --reason "public API addition"
 
 ```markdown
 ---
-sdk-core: minor
+sdk-core: patch
+type:
+  sdk-core: security
 ---
 
-#### public API addition
+#### rotate signing keys
+
+Roll the signing key before the release window closes.
 ```
 
 <!-- {/releaseManualChangesetExample} -->
@@ -229,10 +347,16 @@ evidence:
 
 - `mc change` defaults `--bump` to `patch`
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
+- optional change `type` values can route entries into custom changelog sections without changing semver impact
+- change templates support detailed multi-line release-note entries through `$details`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
+- release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
+- `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
+- `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
+- `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
@@ -248,8 +372,16 @@ Current `PrepareRelease` behavior:
 - reads `.changeset/*.md`
 - computes one synchronized release plan from discovered change files
 - updates native manifests plus configured changelogs and versioned files
+- renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
+- groups release notes into default `Breaking changes`, `Features`, `Fixes`, and `Notes` sections, with package/group overrides available through `extra_changelog_sections`
+- applies workspace-wide release-note templates from `[release_notes].change_templates`
+- can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
+- can preview or publish GitHub releases via `PublishGitHubRelease`
+- can preview or open/update release pull requests via `OpenReleasePullRequest`
+- can emit deployment intents via `Deploy` for merge-driven or workflow-driven deploy orchestration
+- includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
-- leaves the workspace untouched during `--dry-run`
+- leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or GitHub release preview
 
 <!-- {/releaseWorkflowBehavior} -->

@@ -6,6 +6,7 @@ Create a changeset with the CLI:
 
 ```bash
 mc change --package sdk-core --bump minor --reason "public API addition"
+mc change --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -16,10 +17,14 @@ Or write one manually with configured package or group ids:
 
 ```markdown
 ---
-sdk-core: minor
+sdk-core: patch
+type:
+  sdk-core: security
 ---
 
-#### public API addition
+#### rotate signing keys
+
+Roll the signing key before the release window closes.
 ```
 
 <!-- {/releaseManualChangesetExample} -->
@@ -96,9 +101,17 @@ Current `PrepareRelease` behavior:
 - reads `.changeset/*.md`
 - computes one synchronized release plan from discovered change files
 - updates native manifests plus configured changelogs and versioned files
+- renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
+- groups release notes into default `Breaking changes`, `Features`, `Fixes`, and `Notes` sections, with package/group overrides available through `extra_changelog_sections`
+- applies workspace-wide release-note templates from `[release_notes].change_templates`
+- can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
+- can preview or publish GitHub releases via `PublishGitHubRelease`
+- can preview or open/update release pull requests via `OpenReleasePullRequest`
+- can emit deployment intents via `Deploy` for merge-driven or workflow-driven deploy orchestration
+- includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
-- leaves the workspace untouched during `--dry-run`
+- leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or GitHub release preview
 
 <!-- {/releaseWorkflowBehavior} -->
 
@@ -108,10 +121,16 @@ Planning rules in this milestone:
 
 - `mc change` defaults `--bump` to `patch`
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
+- optional change `type` values can route entries into custom changelog sections without changing semver impact
+- change templates support detailed multi-line release-note entries through `$details`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
+- release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
+- `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
+- `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
+- `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->

@@ -40,7 +40,47 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 - load `monochange.toml`
 - validate version groups and workflows
 - resolve package references against discovered packages
-- parse change-input files, evidence, and changelog overrides
+- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, and workflow GitHub/manifest steps
+
+## Example
+
+```rust
+use monochange_config::load_workspace_configuration;
+use monochange_core::ChangelogFormat;
+
+let root = std::env::temp_dir().join("monochange-config-changelog-format-docs");
+let _ = std::fs::remove_dir_all(&root);
+std::fs::create_dir_all(root.join("crates/core")).unwrap();
+std::fs::write(
+    root.join("crates/core/Cargo.toml"),
+    "[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+)
+.unwrap();
+std::fs::write(
+    root.join("monochange.toml"),
+    r#"
+[defaults]
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{path}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+"#,
+)
+.unwrap();
+
+let configuration = load_workspace_configuration(&root).unwrap();
+let package = configuration.package_by_id("core").unwrap();
+
+assert_eq!(configuration.defaults.changelog_format, ChangelogFormat::KeepAChangelog);
+assert_eq!(package.changelog.as_ref().unwrap().format, ChangelogFormat::KeepAChangelog);
+assert_eq!(package.changelog.as_ref().unwrap().path, std::path::PathBuf::from("crates/core/CHANGELOG.md"));
+
+let _ = std::fs::remove_dir_all(&root);
+```
 
 <!-- {/monochangeConfigCrateDocs} -->
 

@@ -45,6 +45,7 @@ mc release --dry-run --format json
 - resolve change input files
 - render discovery and release workflow output in text or JSON
 - execute configured release workflows
+- preview or publish GitHub releases from prepared release data
 
 <!-- {/monochangeCrateDocs} -->
 
