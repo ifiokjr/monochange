@@ -6,7 +6,6 @@ use httpmock::Method::GET;
 use httpmock::Method::PATCH;
 use httpmock::Method::POST;
 use httpmock::MockServer;
-use monochange_core::GitHubBotSettings;
 use monochange_core::GitHubConfiguration;
 use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
@@ -30,7 +29,6 @@ fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 		repo: "monochange".to_string(),
 		releases: GitHubReleaseSettings::default(),
 		pull_requests: GitHubPullRequestSettings::default(),
-		bot: GitHubBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -61,7 +59,6 @@ fn build_release_requests_can_defer_to_github_generated_notes() {
 			..GitHubReleaseSettings::default()
 		},
 		pull_requests: GitHubPullRequestSettings::default(),
-		bot: GitHubBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -82,7 +79,6 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 		repo: "monochange".to_string(),
 		releases: GitHubReleaseSettings::default(),
 		pull_requests: GitHubPullRequestSettings::default(),
-		bot: GitHubBotSettings::default(),
 	};
 	let manifest = ReleaseManifest {
 		command: "release".to_string(),
@@ -153,7 +149,6 @@ fn build_release_pull_request_request_renders_branch_and_body() {
 			auto_merge: true,
 			..GitHubPullRequestSettings::default()
 		},
-		bot: GitHubBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 

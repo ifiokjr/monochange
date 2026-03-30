@@ -363,7 +363,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 }
 
 #[test]
-fn changeset_policy_cli_json_reports_failure_comment() {
+fn verify_cli_json_reports_failure_comment() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
@@ -371,7 +371,7 @@ fn changeset_policy_cli_json_reports_failure_comment() {
 	assert_cmd_snapshot!(
 		cli()
 			.current_dir(tempdir.path())
-			.arg("changeset-check")
+			.arg("verify")
 			.arg("--format")
 			.arg("json")
 			.arg("--changed-path")
@@ -383,8 +383,8 @@ fn changeset_policy_cli_json_reports_failure_comment() {
 	{
 	  "status": "failed",
 	  "required": true,
-	  "summary": "changeset policy failed: a changeset is required for the matched paths",
-	  "comment": "### MonoChange changeset policy failed\n\nchangeset policy failed: a changeset is required for the matched paths\n\nMatched changed paths:\n- `crates/core/src/lib.rs`\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add a `.changeset/*.md` file, for example with `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
+	  "summary": "changeset verification failed: attached changesets do not cover 1 changed package",
+	  "comment": "### MonoChange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `crates/core/src/lib.rs`\n\nAffected packages:\n- `core`\n\nErrors:\n- changed packages are not covered by attached changesets: core\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
 	  "labels": [],
 	  "matchedSkipLabels": [],
 	  "changedPaths": [
@@ -395,7 +395,16 @@ fn changeset_policy_cli_json_reports_failure_comment() {
 	  ],
 	  "ignoredPaths": [],
 	  "changesetPaths": [],
-	  "errors": []
+	  "affectedPackageIds": [
+	    "core"
+	  ],
+	  "coveredPackageIds": [],
+	  "uncoveredPackageIds": [
+	    "core"
+	  ],
+	  "errors": [
+	    "changed packages are not covered by attached changesets: core"
+	  ]
 	}
 	
 	----- stderr -----
@@ -933,40 +942,34 @@ resolver = "2"
 [defaults]
 package_type = "cargo"
 
-[package.core]
-path = "crates/core"
-
-[github]
-owner = "ifiokjr"
-repo = "monochange"
-
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = ["crates/**"]
-ignored_paths = ["docs/**", "*.md"]
 
-[cli.changeset-check]
+[package.core]
+path = "crates/core"
 
-[[cli.changeset-check.inputs]]
+[cli.verify]
+
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 "#,
 	);
 	if with_changeset {

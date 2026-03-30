@@ -83,30 +83,11 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = [
-	"crates/**",
-	".github/**",
-	"Cargo.toml",
-	"Cargo.lock",
-	"devenv.nix",
-	"devenv.yaml",
-	"devenv.lock",
-	"monochange.toml",
-	"codecov.yml",
-	"deny.toml",
-	"scripts/**",
-]
-ignored_paths = [
-	".changeset/**",
-	"docs/**",
-	"**/*.md",
-	"license",
-]
 
 [[deployments]]
 name = "docs"
@@ -246,23 +227,23 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.changeset-check]
-help_text = "Evaluate pull-request changeset policy"
+[cli.verify]
+help_text = "Verify that changed files are covered by attached changesets"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"

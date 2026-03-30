@@ -141,7 +141,7 @@ mc release --dry-run --format json
 - render discovery and release command output in text or JSON
 - execute configured CLI commands
 - preview or publish GitHub releases from prepared release data
-- evaluate pull-request changeset policy from CI-supplied changed paths and labels
+- verify that changed files are covered by attached changesets from CI-supplied changed paths and labels
 
 <!-- {/monochangeCrateDocs} -->
 
@@ -364,7 +364,6 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 ## Example
 
 ```rust
-use monochange_core::GitHubBotSettings;
 use monochange_core::GitHubConfiguration;
 use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseSettings;
@@ -409,7 +408,6 @@ let github = GitHubConfiguration {
     repo: "monochange".to_string(),
     releases: GitHubReleaseSettings::default(),
     pull_requests: GitHubPullRequestSettings::default(),
-    bot: GitHubBotSettings::default(),
 };
 
 let requests = build_release_requests(&github, &manifest);

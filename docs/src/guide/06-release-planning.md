@@ -109,7 +109,7 @@ Current `PrepareRelease` behavior:
 - can preview or publish GitHub releases via `PublishGitHubRelease`
 - can preview or open/update release pull requests via `OpenReleasePullRequest`
 - can emit deployment intents via `Deploy` for merge-driven or CI-driven deploy orchestration
-- can evaluate pull-request changeset policy via `EnforceChangesetPolicy` using changed paths and labels supplied by CI
+- can verify changed files via `VerifyChangesets` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
@@ -166,7 +166,7 @@ jobs:
           set -euo pipefail
 
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(changeset-check --format json)
+          args=(verify --format json)
 
           for path in $CHANGED_FILES; do
             args+=(--changed-path "$path")
@@ -200,7 +200,7 @@ Planning rules in this milestone:
 - `PublishGitHubRelease` reuses the same structured release data to build GitHub release requests for grouped and package-owned releases
 - `OpenReleasePullRequest` reuses the same structured release data to render release-PR summaries, branch names, and idempotent PR updates
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
-- `EnforceChangesetPolicy` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
+- `VerifyChangesets` maps changed files onto configured packages, applies package-level `ignored_paths` / `additional_paths`, and checks that attached `.changeset/*.md` files cover every changed package or owning group
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->

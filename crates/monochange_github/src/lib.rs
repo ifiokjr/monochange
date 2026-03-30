@@ -30,7 +30,6 @@
 //! ## Example
 //!
 //! ```rust
-//! use monochange_core::GitHubBotSettings;
 //! use monochange_core::GitHubConfiguration;
 //! use monochange_core::GitHubPullRequestSettings;
 //! use monochange_core::GitHubReleaseSettings;
@@ -75,7 +74,6 @@
 //!     repo: "monochange".to_string(),
 //!     releases: GitHubReleaseSettings::default(),
 //!     pull_requests: GitHubPullRequestSettings::default(),
-//!     bot: GitHubBotSettings::default(),
 //! };
 //!
 //! let requests = build_release_requests(&github, &manifest);

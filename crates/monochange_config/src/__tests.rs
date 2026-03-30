@@ -34,7 +34,9 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 4);
+	assert!(configuration.changesets.verify.enabled);
+	assert!(configuration.changesets.verify.required);
+	assert_eq!(configuration.cli.len(), 5);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -42,7 +44,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 		.collect::<Vec<_>>();
 	assert_eq!(
 		cli_command_names,
-		vec!["validate", "discover", "change", "release"]
+		vec!["validate", "discover", "change", "release", "verify"]
 	);
 	assert_eq!(configuration.cargo.enabled, None);
 	assert_eq!(configuration.npm.enabled, None);
@@ -214,7 +216,7 @@ auto_merge = true
 }
 
 #[test]
-fn load_workspace_configuration_parses_github_changeset_bot_settings() {
+fn load_workspace_configuration_parses_changeset_verification_settings() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
 	fs::write(
@@ -223,39 +225,37 @@ fn load_workspace_configuration_parses_github_changeset_bot_settings() {
 [defaults]
 package_type = "cargo"
 
-[package.core]
-path = "crates/core"
-
-[github]
-owner = "ifiokjr"
-repo = "monochange"
-
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required", "internal"]
 comment_on_failure = true
-changed_paths = ["crates/**"]
-ignored_paths = ["docs/**", "*.md"]
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
 
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let github = configuration
-		.github
-		.unwrap_or_else(|| panic!("expected github config"));
 
-	assert!(github.bot.changesets.enabled);
-	assert!(github.bot.changesets.required);
-	assert!(github.bot.changesets.comment_on_failure);
+	assert!(configuration.changesets.verify.enabled);
+	assert!(configuration.changesets.verify.required);
+	assert!(configuration.changesets.verify.comment_on_failure);
 	assert_eq!(
-		github.bot.changesets.skip_labels,
+		configuration.changesets.verify.skip_labels,
 		vec!["no-changeset-required", "internal"]
 	);
-	assert_eq!(github.bot.changesets.changed_paths, vec!["crates/**"]);
-	assert_eq!(github.bot.changesets.ignored_paths, vec!["docs/**", "*.md"]);
+	let package = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "core")
+		.unwrap_or_else(|| panic!("expected package config"));
+	assert_eq!(package.ignored_paths, vec!["tests/**"]);
+	assert_eq!(package.additional_paths, vec!["Cargo.lock"]);
 }
 
 #[test]
@@ -1752,7 +1752,7 @@ type = "OpenReleasePullRequest"
 }
 
 #[test]
-fn load_workspace_configuration_rejects_enforce_changeset_policy_without_github_bot_config() {
+fn load_workspace_configuration_rejects_verify_changesets_without_verify_config() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
 	fs::write(
@@ -1764,29 +1764,32 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[cli.changeset-check]
+[changesets.verify]
+enabled = false
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[cli.verify]
+
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
 
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
-		.unwrap_or_else(|| panic!("expected changeset policy CLI command config error"));
+		.unwrap_or_else(|| panic!("expected verification CLI command config error"));
 	assert!(error
 		.to_string()
-		.contains("uses `EnforceChangesetPolicy` but `[github]` is not configured"));
+		.contains("uses `VerifyChangesets` but `[changesets.verify].enabled` is false"));
 }
 
 #[test]
-fn load_workspace_configuration_rejects_enforce_changeset_policy_without_changed_path_input() {
+fn load_workspace_configuration_rejects_verify_changesets_without_changed_paths_input() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
 	fs::write(
@@ -1798,28 +1801,23 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[github]
-owner = "ifiokjr"
-repo = "monochange"
-
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
-changed_paths = ["crates/**"]
 
-[cli.changeset-check]
+[cli.verify]
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
 
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
-		.unwrap_or_else(|| panic!("expected changeset policy CLI command config error"));
+		.unwrap_or_else(|| panic!("expected verification CLI command config error"));
 	assert!(error
 		.to_string()
-		.contains("does not declare a `changed_path` input"));
+		.contains("does not declare a `changed_paths` input"));
 }
 
 #[test]

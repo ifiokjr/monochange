@@ -10,7 +10,7 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 - `mc publish-release` previews or publishes GitHub releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent release pull request
 - `mc release-deploy` emits deployment intents for later workflow execution
-- `mc changeset-check` evaluates pull-request changeset policy from CI-supplied changed paths and labels
+- `mc verify` checks whether changed files are covered by attached changesets
 
 <!-- {/githubAutomationOverview} -->
 
@@ -24,7 +24,7 @@ mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-deploy --dry-run --format json
-mc changeset-check --format json --changed-path crates/monochange/src/lib.rs
+mc verify --format json --changed-path crates/monochange/src/lib.rs
 ```
 
 <!-- {/githubAutomationWorkflowCommands} -->
@@ -109,30 +109,16 @@ type = "OpenReleasePullRequest"
 <!-- {=githubAutomationPolicyAndDeployConfigExample} -->
 
 ```toml
-[github.bot.changesets]
+[changesets.verify]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = [
-	"crates/**",
-	".github/**",
-	"Cargo.toml",
-	"Cargo.lock",
-	"devenv.nix",
-	"devenv.yaml",
-	"devenv.lock",
-	"monochange.toml",
-	"codecov.yml",
-	"deny.toml",
-	"scripts/**",
-]
-ignored_paths = [
-	".changeset/**",
-	"docs/**",
-	"**/*.md",
-	"license",
-]
+
+[package.monochange]
+path = "crates/monochange"
+ignored_paths = ["tests/fixtures/**"]
+additional_paths = ["scripts/**"]
 
 [[deployments]]
 name = "docs"
@@ -158,26 +144,26 @@ type = "PrepareRelease"
 [[cli.release-deploy.steps]]
 type = "Deploy"
 
-[cli.changeset-check]
-help_text = "Evaluate pull-request changeset policy"
+[cli.verify]
+help_text = "Verify that changed files are covered by attached changesets"
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.changeset-check.inputs]]
-name = "changed_path"
+[[cli.verify.inputs]]
+name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.changeset-check.inputs]]
+[[cli.verify.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.changeset-check.steps]]
-type = "EnforceChangesetPolicy"
+[[cli.verify.steps]]
+type = "VerifyChangesets"
 ```
 
 <!-- {/githubAutomationPolicyAndDeployConfigExample} -->
@@ -231,7 +217,7 @@ jobs:
           set -euo pipefail
 
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(changeset-check --format json)
+          args=(verify --format json)
 
           for path in $CHANGED_FILES; do
             args+=(--changed-path "$path")
@@ -255,8 +241,8 @@ jobs:
 The MonoChange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
-- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `changeset-check` as top-level CLI commands
-- running a real `changeset-policy` GitHub Actions workflow that shells into `mc changeset-check`
+- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` as top-level CLI commands
+- running a real `changeset-policy` GitHub Actions workflow that shells into `mc verify`
 - keeping docs deployment represented as a deployment intent so downstream workflows can reason about it from the release manifest
 
 <!-- {/githubAutomationDogfoodNotes} -->
