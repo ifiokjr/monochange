@@ -275,18 +275,19 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	        "title": "1.1.0",
 	        "summary": [
 	          "Grouped release for `sdk`.",
-	          "Members: core, app"
+	          "Changed members: core",
+	          "Synchronized members: app"
 	        ],
 	        "sections": [
 	          {
 	            "title": "Features",
 	            "entries": [
-	              "- add feature"
+	              "- **core**: add feature"
 	            ]
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n### Features\n\n- add feature"
+	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
 	    },
 	    {
 	      "ownerId": "core",
@@ -526,18 +527,19 @@ fn release_manifest_workflow_writes_manifest_json() {
 	        "title": "1.1.0",
 	        "summary": [
 	          "Grouped release for `sdk`.",
-	          "Members: core, app"
+	          "Changed members: core",
+	          "Synchronized members: app"
 	        ],
 	        "sections": [
 	          {
 	            "title": "Features",
 	            "entries": [
-	              "- add feature"
+	              "- **core**: add feature"
 	            ]
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nMembers: core, app\n\n### Features\n\n- add feature"
+	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
 	    },
 	    {
 	      "ownerId": "core",
@@ -672,7 +674,8 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 		.unwrap_or_else(|error| panic!("group versioned file: {error}"));
 
 	assert!(root_changelog.contains("Grouped release for `sdk`."));
-	assert!(root_changelog.contains("Members: core, app"));
+	assert!(root_changelog.contains("Changed members: core"));
+	assert!(root_changelog.contains("Synchronized members: app"));
 	assert!(core_changelog.contains("## 1.1.0"));
 	assert!(core_changelog.contains("- add feature"));
 	assert!(!tempdir.path().join("crates/app/CHANGELOG.md").exists());

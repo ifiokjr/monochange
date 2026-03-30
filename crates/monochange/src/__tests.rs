@@ -687,7 +687,8 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 	assert!(app_changelog.contains("## 1.1.0"));
 	assert!(app_changelog.contains("No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
-	assert!(group_changelog.contains("Members: core, app"));
+	assert!(group_changelog.contains("Changed members: core"));
+	assert!(group_changelog.contains("Synchronized members: app"));
 	assert!(group_versioned_file.contains("version = \"1.1.0\""));
 	assert!(package_versioned_file.contains("version = \"1.1.0\""));
 	assert_eq!(release_version, "1.1.0");

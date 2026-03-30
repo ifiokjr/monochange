@@ -71,12 +71,16 @@ type = "PrepareRelease"
 	assert!(core_changelog.contains("## [1.1.0]"));
 	assert!(core_changelog.contains("### Features"));
 	assert!(core_changelog.contains("- add keep a changelog support"));
+	assert!(!core_changelog.contains("- **core**: add keep a changelog support"));
 	assert!(app_changelog.contains("## [1.1.0]"));
 	assert!(app_changelog.contains("### Features"));
 	assert!(group_changelog.contains("## [1.1.0]"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
-	assert!(group_changelog.contains("Members: core, app"));
+	assert!(group_changelog.contains("Changed members: core"));
+	assert!(group_changelog.contains("Synchronized members: app"));
+	assert!(!group_changelog.contains("Members: core, app"));
 	assert!(group_changelog.contains("### Features"));
+	assert!(group_changelog.contains("- **core**: add keep a changelog support"));
 }
 
 #[test]
@@ -143,6 +147,7 @@ type = "PrepareRelease"
 
 	assert!(core_changelog.contains("## [1.1.0]"));
 	assert!(core_changelog.contains("### Features"));
+	assert!(!core_changelog.contains("- **core**: add keep a changelog support"));
 	assert!(app_changelog.contains("## 1.1.0"));
 	assert!(!app_changelog.contains("## [1.1.0]"));
 	assert!(app_changelog.contains("### Features"));
@@ -152,7 +157,152 @@ type = "PrepareRelease"
 	assert!(group_changelog.contains("## 1.1.0"));
 	assert!(!group_changelog.contains("## [1.1.0]"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
+	assert!(group_changelog.contains("Changed members: core"));
+	assert!(group_changelog.contains("Synchronized members: app"));
 	assert!(group_changelog.contains("### Features"));
+	assert!(group_changelog.contains("- **core**: add keep a changelog support"));
+}
+
+#[test]
+fn release_uses_alert_syntax_for_group_entries_with_multiline_content() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(
+		tempdir.path(),
+		r#"
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{path}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+release = true
+tag = true
+version_format = "primary"
+
+[group.sdk.changelog]
+path = "docs/sdk-CHANGELOG.md"
+format = "monochange"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		tempdir.path().join(".changeset/feature.md"),
+		r"---
+core: minor
+---
+
+#### explain grouped changelog formatting
+
+This release note needs more than one line.
+",
+	);
+
+	let output = cli()
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+	assert!(group_changelog.contains("> [!NOTE]"));
+	assert!(group_changelog.contains("> *core*"));
+	assert!(group_changelog.contains("#### explain grouped changelog formatting"));
+	assert!(group_changelog.contains("This release note needs more than one line."));
+	assert!(!group_changelog.contains("- **core**: explain grouped changelog formatting"));
+}
+
+#[test]
+fn release_uses_alert_syntax_for_group_entries_with_multiple_packages_in_one_changeset() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(
+		tempdir.path(),
+		r#"
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{path}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+release = true
+tag = true
+version_format = "primary"
+
+[group.sdk.changelog]
+path = "docs/sdk-CHANGELOG.md"
+format = "monochange"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		tempdir.path().join(".changeset/feature.md"),
+		r"---
+core: minor
+app: minor
+---
+
+add shared release note
+",
+	);
+
+	let output = cli()
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+	assert!(group_changelog.contains("Changed members: core, app"));
+	assert!(!group_changelog.contains("Synchronized members:"));
+	assert!(group_changelog.contains("> [!NOTE]"));
+	assert!(group_changelog.contains("> *core*, *app*"));
+	assert!(group_changelog.contains("- add shared release note"));
+	assert!(!group_changelog.contains("- **core**: add shared release note"));
 }
 
 fn seed_release_fixture(root: &Path, config: &str) {
