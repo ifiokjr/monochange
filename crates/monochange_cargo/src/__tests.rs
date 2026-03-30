@@ -91,6 +91,8 @@ fn rust_semver_provider_parses_compatibility_evidence() {
 		change_origin: "direct-change".to_string(),
 		evidence_refs: vec!["rust-semver:major:public API break detected".to_string()],
 		notes: Some("breaking change".to_string()),
+		details: None,
+		change_type: None,
 	};
 	let provider = RustSemverProvider;
 	let assessment = provider

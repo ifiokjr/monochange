@@ -12,6 +12,10 @@ The current milestone focuses on:
 - compute release plans from explicit change input
 - expose top-level CLI commands from workflow definitions
 - run config-defined release workflows from `.changeset/*.md`
+- render changelogs through structured release notes and configurable formats
+- emit stable release-manifest JSON for downstream automation
+- preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
+- model deployment intents for downstream automation and merge-driven release workflows
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 

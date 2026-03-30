@@ -12,6 +12,7 @@ monochange_config = { workspace = true }
 monochange_core = { workspace = true }
 monochange_dart = { workspace = true }
 monochange_deno = { workspace = true }
+monochange_github = { workspace = true }
 monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }

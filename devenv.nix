@@ -113,7 +113,7 @@ in
     "test:cargo" = {
       exec = ''
         set -e
-        cargo nextest run --workspace --all-features --no-tests pass
+        cargo bin cargo-nextest run --workspace --all-features --no-tests pass
       '';
       description = "Run cargo tests with nextest.";
       binary = "bash";
@@ -130,10 +130,10 @@ in
       exec = ''
         set -euo pipefail
         mkdir -p target/coverage
-        cargo llvm-cov clean --workspace
-        cargo llvm-cov nextest --workspace --all-features --all-targets --no-report
-        cargo llvm-cov report --summary-only --fail-under-lines 70
-        cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
+        cargo bin cargo-llvm-cov clean --workspace
+        cargo bin cargo-llvm-cov test --workspace --all-features --all-targets --no-report
+        cargo bin cargo-llvm-cov report --summary-only --fail-under-lines 70
+        cargo bin cargo-llvm-cov report --lcov --output-path target/coverage/lcov.info
       '';
       description = "Run workspace coverage, enforce a 70% line-coverage floor, and write target/coverage/lcov.info.";
       binary = "bash";
@@ -226,7 +226,7 @@ in
     "snapshot:update" = {
       exec = ''
         set -e
-        cargo nextest run --workspace --all-features --no-tests pass
+        cargo bin cargo-nextest run --workspace --all-features --no-tests pass
         cargo insta accept
       '';
       description = "Update insta snapshots.";

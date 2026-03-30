@@ -310,6 +310,41 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 }
 
 #[test]
+fn changes_add_supports_release_note_type_and_details() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let output_path = tempdir.path().join("security.md");
+
+	run_cli(
+		&fixture_root,
+		[
+			OsString::from("mc"),
+			OsString::from("change"),
+			OsString::from("--package"),
+			OsString::from("sdk-core"),
+			OsString::from("--bump"),
+			OsString::from("patch"),
+			OsString::from("--reason"),
+			OsString::from("rotate signing keys"),
+			OsString::from("--type"),
+			OsString::from("security"),
+			OsString::from("--details"),
+			OsString::from("Roll the signing key before the release window closes."),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+	let content = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read change file: {error}"));
+
+	assert!(content.contains("type:"));
+	assert!(content.contains("sdk-core: security"));
+	assert!(content.contains("#### rotate signing keys"));
+	assert!(content.contains("Roll the signing key before the release window closes."));
+}
+
+#[test]
 fn changes_add_canonicalizes_package_references_to_package_names() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_file(
@@ -349,6 +384,8 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 		&["sdk-core".to_string()],
 		monochange_core::BumpSeverity::Patch,
 		"default output",
+		None,
+		None,
 		&[],
 		None,
 	)
@@ -491,6 +528,88 @@ sdk: minor
 		.filter(|decision| decision.recommended_bump.to_string() == "minor")
 		.count();
 	assert_eq!(direct_count, 2);
+}
+
+#[test]
+fn workflow_release_dry_run_json_includes_deployment_intents() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = "{path}/changelog.md"
+
+[package.core]
+path = "crates/core"
+versioned_files = ["crates/core/extra.toml"]
+
+[package.app]
+path = "crates/app"
+changelog = "crates/app/changelog.md"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+versioned_files = ["group.toml"]
+tag = true
+release = true
+version_format = "primary"
+
+[[deployments]]
+name = "production"
+trigger = "workflow"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
+
+[deployments.metadata]
+channel = "stable"
+
+[ecosystems.cargo]
+enabled = true
+
+[[workflows]]
+name = "release"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("workflow output: {error}"));
+	let json = serde_json::from_str::<serde_json::Value>(&output)
+		.unwrap_or_else(|error| panic!("parse workflow json: {error}"));
+
+	assert_eq!(json["deployments"][0]["name"], "production");
+	assert_eq!(json["deployments"][0]["trigger"], "workflow");
+	assert_eq!(json["deployments"][0]["workflow"], "deploy-production");
+	assert_eq!(json["deployments"][0]["environment"], "production");
+	assert_eq!(json["deployments"][0]["releaseTargets"][0], "sdk");
+	assert_eq!(json["deployments"][0]["requires"][0], "main");
+	assert_eq!(json["deployments"][0]["metadata"]["channel"], "stable");
 }
 
 #[test]

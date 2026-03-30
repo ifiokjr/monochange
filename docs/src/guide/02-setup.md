@@ -9,10 +9,17 @@ Add a `monochange.toml` file at the repository root.
 parent_bump = "patch"
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
+
+[release_notes]
+change_templates = ["#### $summary\n\n$details", "- $summary"]
 
 [package.sdk-core]
 path = "crates/sdk_core"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
 
 [package.web-sdk]
 path = "packages/web-sdk"
@@ -27,6 +34,32 @@ packages = ["sdk-core", "web-sdk", "mobile-sdk"]
 tag = true
 release = true
 version_format = "primary"
+
+[group.sdk.changelog]
+path = "docs/sdk-changelog.md"
+format = "monochange"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+source = "monochange"
+
+[github.pull_requests]
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[[deployments]]
+name = "production"
+trigger = "release_pr_merge"
+workflow = "deploy-production"
+environment = "production"
+release_targets = ["sdk"]
+requires = ["main"]
 
 [[workflows]]
 name = "validate"
@@ -68,6 +101,14 @@ name = "reason"
 type = "string"
 required = true
 
+[[workflows.inputs]]
+name = "type"
+type = "string"
+
+[[workflows.inputs]]
+name = "details"
+type = "string"
+
 [[workflows.steps]]
 type = "CreateChangeFile"
 
@@ -83,6 +124,65 @@ default = "text"
 
 [[workflows.steps]]
 type = "PrepareRelease"
+
+[[workflows]]
+name = "release-manifest"
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+
+[[workflows]]
+name = "publish-release"
+help_text = "Prepare a release and publish GitHub releases"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "PublishGitHubRelease"
+
+[[workflows]]
+name = "release-pr"
+help_text = "Prepare a release and open or update a GitHub release pull request"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "OpenReleasePullRequest"
+
+[[workflows]]
+name = "release-deploy"
+help_text = "Prepare a release and emit deployment intents"
+
+[[workflows.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Deploy"
 ```
 
 <!-- {/projectSetupConfig} -->
