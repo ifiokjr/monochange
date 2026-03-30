@@ -18,6 +18,8 @@ The current milestone focuses on:
 - model deployment intents for downstream automation and merge-driven release commands
 - enforce pull-request changeset policy through typed command steps and reusable diagnostics
 - apply Rust semver evidence when provided
+- expose built-in assistant setup guidance with `mc assist` and a stdio MCP server with `mc mcp`
+- publish the CLI as `@monochange/cli` and the bundled agent skill as `@monochange/skill`
 - publish end-user documentation through the mdBook in `docs/`
 
 <!-- {/projectMilestoneCapabilities} -->
@@ -79,6 +81,49 @@ mc release
 ```
 
 <!-- {/projectCoreWorkflow} -->
+
+## Assistant setup and MCP
+
+Install the prebuilt CLI with npm:
+
+```bash
+npm install -g @monochange/cli
+monochange --help
+mc --help
+```
+
+Install the bundled skill package when you want reusable agent guidance:
+
+```bash
+npm install -g @monochange/skill
+monochange-skill --print-install
+monochange-skill --copy ~/.pi/agent/skills/monochange
+```
+
+Print an assistant profile with install instructions, repo-local guidance, and MCP configuration:
+
+```bash
+mc assist pi
+```
+
+Start the MCP server over stdin/stdout:
+
+```bash
+mc mcp
+```
+
+Typical MCP client config:
+
+```json
+{
+	"mcpServers": {
+		"monochange": {
+			"command": "monochange",
+			"args": ["mcp"]
+		}
+	}
+}
+```
 
 Run the full validation suite:
 

@@ -12,3 +12,4 @@
 - [Release planning](guide/06-release-planning.md)
 - [Migrating from legacy config](guide/07-migration.md)
 - [GitHub automation](guide/08-github-automation.md)
+- [Assistant setup and MCP](guide/09-assistant-setup.md)
