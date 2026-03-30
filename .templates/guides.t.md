@@ -290,6 +290,7 @@ version_format = "primary"
 - the group owns outward release identity
 - member package changelogs can still be updated individually
 - group changelog and group `versioned_files` can also be updated
+- grouped packages can use `empty_update_message` when their own changelog needs a version-only update with no direct notes
 - dependents of newly synced members still receive propagated parent bumps
 - unmatched members produce warnings during discovery
 - mismatched current versions produce warnings when `warn_on_group_mismatch = true`

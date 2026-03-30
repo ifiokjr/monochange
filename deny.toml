@@ -9,6 +9,11 @@ exclude = ["monochange_book"]
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
+ignore = [
+	# Pulled in by octocrab/jsonwebtoken. monochange uses personal-token auth only,
+	# and there is no patched release available yet.
+	"RUSTSEC-2023-0071",
+]
 
 [licenses]
 allow = [
@@ -17,6 +22,8 @@ allow = [
 	"Unlicense",
 	"Unicode-3.0",
 	"BSL-1.0",
+	"BSD-3-Clause",
+	"ISC",
 ]
 confidence-threshold = 0.8
 

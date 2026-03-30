@@ -1447,6 +1447,22 @@ fn build_changelog_updates(
 			},
 		);
 
+	let group_definitions_by_id = configuration
+		.groups
+		.iter()
+		.map(|group| (group.id.as_str(), group))
+		.collect::<BTreeMap<_, _>>();
+	let package_definitions_by_record_id = packages
+		.iter()
+		.filter_map(|package| {
+			package.metadata.get("config_id").and_then(|config_id| {
+				configuration
+					.package_by_id(config_id)
+					.map(|definition| (package.id.as_str(), definition))
+			})
+		})
+		.collect::<BTreeMap<_, _>>();
+
 	let mut updates = Vec::new();
 	let package_changelog_targets = &changelog_targets.0;
 	let group_changelog_targets = &changelog_targets.1;
@@ -1468,20 +1484,29 @@ fn build_changelog_updates(
 			continue;
 		};
 		let package_id = config_package_id(package);
+		let package_definition = package_definitions_by_record_id
+			.get(decision.package_id.as_str())
+			.copied();
+		let group_definition = decision
+			.group_id
+			.as_deref()
+			.and_then(|group_id| group_definitions_by_id.get(group_id).copied());
 		let changes = package_release_note_changes(
+			configuration,
+			package_definition,
+			group_definition,
 			decision,
 			package,
 			release_note_changes.get(&decision.package_id),
+			&planned_version.to_string(),
 		);
 		let document = build_release_notes_document(
 			&package_id,
 			&planned_version.to_string(),
 			Vec::new(),
-			configuration
-				.package_by_id(&package_id)
-				.map_or(&[][..], |package| {
-					package.extra_changelog_sections.as_slice()
-				}),
+			package_definition.map_or(&[][..], |package| {
+				package.extra_changelog_sections.as_slice()
+			}),
 			&configuration.release_notes.change_templates,
 			&changes,
 		);
@@ -1516,14 +1541,22 @@ fn build_changelog_updates(
 			.find(|group| group.id == planned_group.group_id)
 			.map(|group| group.packages.clone())
 			.unwrap_or_default();
-		let changes = group_release_note_changes(planned_group, &release_note_changes);
+		let group_definition = group_definitions_by_id
+			.get(planned_group.group_id.as_str())
+			.copied();
+		let changes = group_release_note_changes(
+			configuration,
+			group_definition,
+			planned_group,
+			&release_note_changes,
+			packages,
+			&planned_version.to_string(),
+		);
 		let document = build_release_notes_document(
 			&planned_group.group_id,
 			&planned_version.to_string(),
 			group_release_summary(&planned_group.group_id, &member_ids),
-			configuration
-				.group_by_id(&planned_group.group_id)
-				.map_or(&[][..], |group| group.extra_changelog_sections.as_slice()),
+			group_definition.map_or(&[][..], |group| group.extra_changelog_sections.as_slice()),
 			&configuration.release_notes.change_templates,
 			&changes,
 		);
@@ -1579,6 +1612,7 @@ fn build_release_note_change(
 	signal: &ChangeSignal,
 	packages: &[PackageRecord],
 ) -> Option<ReleaseNoteChange> {
+	let summary = signal.notes.clone()?;
 	let package = packages
 		.iter()
 		.find(|package| package.id == signal.package_id)?;
@@ -1586,32 +1620,173 @@ fn build_release_note_change(
 	Some(ReleaseNoteChange {
 		package_id: signal.package_id.clone(),
 		package_name: package_id.clone(),
-		summary: signal
-			.notes
-			.clone()
-			.unwrap_or_else(|| format!("prepare release for `{package_id}`")),
+		summary,
 		details: signal.details.clone(),
 		bump: signal.requested_bump.unwrap_or(BumpSeverity::Patch),
 		change_type: signal.change_type.clone(),
 	})
 }
 
+fn render_package_empty_update_message(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	package_definition: Option<&monochange_core::PackageDefinition>,
+	group_definition: Option<&monochange_core::GroupDefinition>,
+	package: &PackageRecord,
+	decision: &monochange_core::ReleaseDecision,
+	planned_version: &str,
+) -> String {
+	let template = select_empty_update_message(
+		package_definition.and_then(|definition| definition.empty_update_message.as_deref()),
+		group_definition.and_then(|definition| definition.empty_update_message.as_deref()),
+		configuration.defaults.empty_update_message.as_deref(),
+		if group_definition.is_some() {
+			"No package-specific changes were recorded; `{package}` was updated to {version} as part of group `{group}`."
+		} else {
+			"No package-specific changes were recorded; `{package}` was updated to {version}."
+		},
+	);
+	let mut metadata = BTreeMap::new();
+	metadata.insert("package", package.name.clone());
+	metadata.insert("package_name", package.name.clone());
+	metadata.insert("package_id", decision.package_id.clone());
+	metadata.insert("group", decision.group_id.clone().unwrap_or_default());
+	metadata.insert("group_name", decision.group_id.clone().unwrap_or_default());
+	metadata.insert("group_id", decision.group_id.clone().unwrap_or_default());
+	metadata.insert("version", planned_version.to_string());
+	metadata.insert("new_version", planned_version.to_string());
+	metadata.insert(
+		"previous_version",
+		package
+			.current_version
+			.as_ref()
+			.map_or_else(String::new, ToString::to_string),
+	);
+	metadata.insert(
+		"current_version",
+		package
+			.current_version
+			.as_ref()
+			.map_or_else(String::new, ToString::to_string),
+	);
+	metadata.insert("bump", decision.recommended_bump.to_string());
+	metadata.insert("trigger", decision.trigger_type.clone());
+	metadata.insert("ecosystem", package.ecosystem.to_string());
+	metadata.insert(
+		"release_owner",
+		decision
+			.group_id
+			.clone()
+			.unwrap_or_else(|| decision.package_id.clone()),
+	);
+	metadata.insert(
+		"release_owner_kind",
+		if decision.group_id.is_some() {
+			"group".to_string()
+		} else {
+			"package".to_string()
+		},
+	);
+	metadata.insert("reasons", decision.reasons.join("; "));
+	render_message_template(template, &metadata)
+}
+
+fn render_group_empty_update_message(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	group_definition: Option<&monochange_core::GroupDefinition>,
+	planned_group: &monochange_core::PlannedVersionGroup,
+	planned_version: &str,
+	packages: &[PackageRecord],
+) -> String {
+	let template = select_empty_update_message(
+		group_definition.and_then(|definition| definition.empty_update_message.as_deref()),
+		None,
+		configuration.defaults.empty_update_message.as_deref(),
+		"No package-specific changes were recorded; group `{group}` was updated to {version}.",
+	);
+	let previous_version = planned_group.members.iter().find_map(|member_id| {
+		packages
+			.iter()
+			.find(|package| package.id == *member_id)
+			.and_then(|package| package.current_version.as_ref())
+			.map(ToString::to_string)
+	});
+	let mut metadata = BTreeMap::new();
+	metadata.insert("group", planned_group.group_id.clone());
+	metadata.insert("group_name", planned_group.group_id.clone());
+	metadata.insert("group_id", planned_group.group_id.clone());
+	metadata.insert("version", planned_version.to_string());
+	metadata.insert("new_version", planned_version.to_string());
+	metadata.insert(
+		"previous_version",
+		previous_version.clone().unwrap_or_default(),
+	);
+	metadata.insert("current_version", previous_version.unwrap_or_default());
+	metadata.insert("bump", planned_group.recommended_bump.to_string());
+	metadata.insert("members", planned_group.members.join(", "));
+	metadata.insert("member_count", planned_group.members.len().to_string());
+	metadata.insert("release_owner", planned_group.group_id.clone());
+	metadata.insert("release_owner_kind", "group".to_string());
+	render_message_template(template, &metadata)
+}
+
+fn select_empty_update_message<'value>(
+	primary: Option<&'value str>,
+	secondary: Option<&'value str>,
+	default_value: Option<&'value str>,
+	built_in_default: &'value str,
+) -> &'value str {
+	primary
+		.filter(|message| !message.trim().is_empty())
+		.or_else(|| secondary.filter(|message| !message.trim().is_empty()))
+		.or_else(|| default_value.filter(|message| !message.trim().is_empty()))
+		.unwrap_or(built_in_default)
+}
+
+fn render_message_template(template: &str, metadata: &BTreeMap<&str, String>) -> String {
+	let mut rendered = String::new();
+	let mut remaining = template;
+	while let Some(start) = remaining.find('{') {
+		rendered.push_str(&remaining[..start]);
+		let Some(end) = remaining[start + 1..].find('}') else {
+			rendered.push_str(&remaining[start..]);
+			return rendered;
+		};
+		let key = &remaining[start + 1..start + 1 + end];
+		if let Some(value) = metadata.get(key) {
+			rendered.push_str(value);
+		} else {
+			rendered.push('{');
+			rendered.push_str(key);
+			rendered.push('}');
+		}
+		remaining = &remaining[start + end + 2..];
+	}
+	rendered.push_str(remaining);
+	rendered
+}
+
 fn package_release_note_changes(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	package_definition: Option<&monochange_core::PackageDefinition>,
+	group_definition: Option<&monochange_core::GroupDefinition>,
 	decision: &monochange_core::ReleaseDecision,
 	package: &PackageRecord,
 	direct_changes: Option<&Vec<ReleaseNoteChange>>,
+	planned_version: &str,
 ) -> Vec<ReleaseNoteChange> {
 	let mut changes = direct_changes.cloned().unwrap_or_default();
 	if changes.is_empty() {
-		let package_id = config_package_id(package);
 		changes.push(ReleaseNoteChange {
 			package_id: decision.package_id.clone(),
-			package_name: package_id.clone(),
-			summary: if decision.reasons.is_empty() {
-				format!("prepare release for `{package_id}`")
-			} else {
-				decision.reasons.join("; ")
-			},
+			package_name: config_package_id(package),
+			summary: render_package_empty_update_message(
+				configuration,
+				package_definition,
+				group_definition,
+				package,
+				decision,
+				planned_version,
+			),
 			details: None,
 			bump: decision.recommended_bump,
 			change_type: None,
@@ -1621,8 +1796,12 @@ fn package_release_note_changes(
 }
 
 fn group_release_note_changes(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	group_definition: Option<&monochange_core::GroupDefinition>,
 	planned_group: &monochange_core::PlannedVersionGroup,
 	release_note_changes: &BTreeMap<String, Vec<ReleaseNoteChange>>,
+	packages: &[PackageRecord],
+	planned_version: &str,
 ) -> Vec<ReleaseNoteChange> {
 	let mut changes = planned_group
 		.members
@@ -1639,7 +1818,13 @@ fn group_release_note_changes(
 		changes.push(ReleaseNoteChange {
 			package_id: planned_group.group_id.clone(),
 			package_name: planned_group.group_id.clone(),
-			summary: format!("prepare grouped release for `{}`", planned_group.group_id),
+			summary: render_group_empty_update_message(
+				configuration,
+				group_definition,
+				planned_group,
+				planned_version,
+				packages,
+			),
 			details: None,
 			bump: planned_group.recommended_bump,
 			change_type: None,

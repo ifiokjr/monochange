@@ -65,6 +65,7 @@ Optional package fields:
 
 - `type`, when `[defaults].package_type` is set
 - `changelog`
+- `empty_update_message`
 - `versioned_files`
 - `tag`
 - `release`
@@ -83,6 +84,38 @@ Optional package fields:
 - `"{path}/changelog.md"` or another pattern → replace `{path}` with each package path
 
 A package-level `changelog` value overrides the default for that package.
+
+`empty_update_message` lets changelog targets render a readable fallback entry when a version update is required but no direct release notes were recorded for that target. This is especially useful for grouped packages that keep their own changelog entries even when only another member of the group changed.
+
+`empty_update_message` can be set on:
+
+- `[defaults]`
+- `[package.<id>]`
+- `[group.<id>]`
+
+Template placeholders may include:
+
+- `{package}` / `{package_name}`
+- `{package_id}`
+- `{group}` / `{group_name}`
+- `{group_id}`
+- `{version}` / `{new_version}`
+- `{current_version}` / `{previous_version}`
+- `{bump}`
+- `{trigger}`
+- `{ecosystem}`
+- `{release_owner}` / `{release_owner_kind}`
+- `{members}` / `{member_count}` for group changelogs
+- `{reasons}`
+
+Fallback order:
+
+- package changelog entries: package → group → defaults → built-in message
+- group changelog entries: group → defaults → built-in message
+
+The built-in grouped-package fallback reads:
+
+> No package-specific changes were recorded; `{package}` was updated to {version} as part of group `{group}`.
 
 ## Groups
 
@@ -106,6 +139,7 @@ Rules:
 - only one package or group may use `version_format = "primary"`
 - group `tag`, `release`, and `version_format` override member package release identity
 - package changelogs and package `versioned_files` still apply when grouped
+- grouped packages can customize fallback changelog entries with `empty_update_message` when no direct package notes are present
 
 ## Versioned files
 

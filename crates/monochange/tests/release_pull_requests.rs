@@ -54,7 +54,9 @@ fn open_release_pull_request_dry_run_renders_package_release_preview() {
 		.unwrap_or_else(|| panic!("expected pull request body"));
 	assert!(body.contains("### app 1.0.1"));
 	assert!(body.contains("### core 1.1.0"));
-	assert!(body.contains("depends on `cargo:crates/core/Cargo.toml`"));
+	assert!(body.contains(
+		"No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
+	));
 	assert!(body.contains("add feature"));
 
 	let manifest = &json["manifest"];

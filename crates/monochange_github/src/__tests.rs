@@ -416,7 +416,7 @@ fn publish_release_requests_reports_github_api_errors() {
 		.err()
 		.unwrap_or_else(|| panic!("expected GitHub API error"));
 
-	assert!(release_lookup.hits() >= 1);
+	assert!(release_lookup.calls() >= 1);
 	assert!(error.to_string().contains("GitHub API GET"));
 }
 

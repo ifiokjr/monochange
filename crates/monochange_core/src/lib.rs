@@ -400,6 +400,7 @@ pub struct PackageDefinition {
 	pub package_type: PackageType,
 	pub changelog: Option<ChangelogTarget>,
 	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -412,6 +413,7 @@ pub struct GroupDefinition {
 	pub packages: Vec<String>,
 	pub changelog: Option<ChangelogTarget>,
 	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -426,6 +428,7 @@ pub struct WorkspaceDefaults {
 	pub package_type: Option<PackageType>,
 	pub changelog: Option<ChangelogDefinition>,
 	pub changelog_format: ChangelogFormat,
+	pub empty_update_message: Option<String>,
 }
 
 impl Default for WorkspaceDefaults {
@@ -437,6 +440,7 @@ impl Default for WorkspaceDefaults {
 			package_type: None,
 			changelog: None,
 			changelog_format: ChangelogFormat::Monochange,
+			empty_update_message: None,
 		}
 	}
 }

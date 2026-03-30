@@ -148,7 +148,9 @@ type = "PrepareRelease"
 	assert!(app_changelog.contains("## 1.1.0"));
 	assert!(!app_changelog.contains("## [1.1.0]"));
 	assert!(app_changelog.contains("### Features"));
-	assert!(app_changelog.contains("shares version group `sdk`"));
+	assert!(app_changelog.contains(
+		"No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
+	));
 	assert!(group_changelog.contains("## 1.1.0"));
 	assert!(!group_changelog.contains("## [1.1.0]"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
