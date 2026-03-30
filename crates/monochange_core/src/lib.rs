@@ -25,29 +25,31 @@
 //! - normalized package and dependency records
 //! - version-group definitions and planned group outcomes
 //! - change signals and compatibility assessments
-//! - release-plan domain types
+//! - changelog formats, changelog targets, and structured release-note types
 //! - shared error and result types
 //!
 //! ## Example
 //!
 //! ```rust
-//! use monochange_core::Ecosystem;
-//! use monochange_core::PackageRecord;
-//! use monochange_core::PublishState;
-//! use semver::Version;
-//! use std::path::PathBuf;
+//! use monochange_core::render_release_notes;
+//! use monochange_core::ChangelogFormat;
+//! use monochange_core::ReleaseNotesDocument;
+//! use monochange_core::ReleaseNotesSection;
 //!
-//! let package = PackageRecord::new(
-//!     Ecosystem::Cargo,
-//!     "demo",
-//!     PathBuf::from("crates/demo/Cargo.toml"),
-//!     PathBuf::from("."),
-//!     Some(Version::new(1, 2, 3)),
-//!     PublishState::Public,
-//! );
+//! let notes = ReleaseNotesDocument {
+//!     title: "1.2.3".to_string(),
+//!     summary: vec!["Grouped release for `sdk`.".to_string()],
+//!     sections: vec![ReleaseNotesSection {
+//!         title: "Changed".to_string(),
+//!         entries: vec!["add keep-a-changelog output".to_string()],
+//!     }],
+//! };
 //!
-//! assert_eq!(package.name, "demo");
-//! assert_eq!(package.current_version, Some(Version::new(1, 2, 3)));
+//! let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
+//!
+//! assert!(rendered.contains("## [1.2.3]"));
+//! assert!(rendered.contains("### Changed"));
+//! assert!(rendered.contains("- add keep-a-changelog output"));
 //! ```
 //! <!-- {/monochangeCoreCrateDocs} -->
 
@@ -350,12 +352,40 @@ pub enum ChangelogDefinition {
 	PathPattern(String),
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ChangelogFormat {
+	#[default]
+	Monochange,
+	KeepAChangelog,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ChangelogTarget {
+	pub path: PathBuf,
+	#[serde(default)]
+	pub format: ChangelogFormat,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ReleaseNotesSection {
+	pub title: String,
+	pub entries: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ReleaseNotesDocument {
+	pub title: String,
+	pub summary: Vec<String>,
+	pub sections: Vec<ReleaseNotesSection>,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PackageDefinition {
 	pub id: String,
 	pub path: PathBuf,
 	pub package_type: PackageType,
-	pub changelog: Option<PathBuf>,
+	pub changelog: Option<ChangelogTarget>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -366,7 +396,7 @@ pub struct PackageDefinition {
 pub struct GroupDefinition {
 	pub id: String,
 	pub packages: Vec<String>,
-	pub changelog: Option<PathBuf>,
+	pub changelog: Option<ChangelogTarget>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -380,6 +410,7 @@ pub struct WorkspaceDefaults {
 	pub warn_on_group_mismatch: bool,
 	pub package_type: Option<PackageType>,
 	pub changelog: Option<ChangelogDefinition>,
+	pub changelog_format: ChangelogFormat,
 }
 
 impl Default for WorkspaceDefaults {
@@ -390,6 +421,7 @@ impl Default for WorkspaceDefaults {
 			warn_on_group_mismatch: true,
 			package_type: None,
 			changelog: None,
+			changelog_format: ChangelogFormat::Monochange,
 		}
 	}
 }
@@ -465,6 +497,69 @@ pub struct WorkflowDefinition {
 	pub inputs: Vec<WorkflowInputDefinition>,
 	#[serde(default)]
 	pub steps: Vec<WorkflowStepDefinition>,
+}
+
+#[must_use]
+pub fn render_release_notes(format: ChangelogFormat, document: &ReleaseNotesDocument) -> String {
+	match format {
+		ChangelogFormat::Monochange => render_monochange_release_notes(document),
+		ChangelogFormat::KeepAChangelog => render_keep_a_changelog_release_notes(document),
+	}
+}
+
+fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
+	let mut lines = vec![format!("## {}", document.title), String::new()];
+	for (index, paragraph) in document.summary.iter().enumerate() {
+		if index > 0 {
+			lines.push(String::new());
+		}
+		lines.push(paragraph.clone());
+	}
+	let include_section_headings = document.sections.len() > 1
+		|| document
+			.sections
+			.iter()
+			.any(|section| section.title != "Changed");
+	for section in &document.sections {
+		if section.entries.is_empty() {
+			continue;
+		}
+		if !lines.last().is_some_and(String::is_empty) {
+			lines.push(String::new());
+		}
+		if include_section_headings {
+			lines.push(format!("### {}", section.title));
+			lines.push(String::new());
+		}
+		for entry in &section.entries {
+			lines.push(format!("- {entry}"));
+		}
+	}
+	lines.join("\n")
+}
+
+fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> String {
+	let mut lines = vec![format!("## [{}]", document.title), String::new()];
+	for (index, paragraph) in document.summary.iter().enumerate() {
+		if index > 0 {
+			lines.push(String::new());
+		}
+		lines.push(paragraph.clone());
+	}
+	for section in &document.sections {
+		if section.entries.is_empty() {
+			continue;
+		}
+		if !lines.last().is_some_and(String::is_empty) {
+			lines.push(String::new());
+		}
+		lines.push(format!("### {}", section.title));
+		lines.push(String::new());
+		for entry in &section.entries {
+			lines.push(format!("- {entry}"));
+		}
+	}
+	lines.join("\n")
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]

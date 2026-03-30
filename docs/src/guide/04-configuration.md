@@ -12,7 +12,10 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 ```
 
 <!-- {/configurationDefaultsSnippet} -->
@@ -26,7 +29,10 @@ Declare every release-managed package explicitly.
 ```toml
 [defaults]
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
@@ -34,6 +40,10 @@ versioned_files = ["crates/sdk_core/extra.toml"]
 tag = false
 release = false
 version_format = "namespaced"
+
+[package.sdk-core.changelog]
+path = "crates/sdk_core/CHANGELOG.md"
+format = "monochange"
 ```
 
 <!-- {/configurationVersionGroupsSnippet} -->
@@ -202,6 +212,13 @@ changelog = "crates/sdk_core/changelog.md"
 ```
 
 Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
+
+MonoChange currently supports two changelog formats:
+
+- `monochange` keeps the current heading-and-bullets layout
+- `keep_a_changelog` renders section headings such as `### Changed`
+
+Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 

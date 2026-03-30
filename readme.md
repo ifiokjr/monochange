@@ -44,6 +44,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - compute release plans from explicit change input
 - expose top-level CLI commands from workflow definitions
 - run config-defined release workflows from `.changeset/*.md`
+- render changelogs through structured release notes and configurable formats
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 

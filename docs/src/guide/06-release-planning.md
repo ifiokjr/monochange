@@ -96,6 +96,7 @@ Current `PrepareRelease` behavior:
 - reads `.changeset/*.md`
 - computes one synchronized release plan from discovered change files
 - updates native manifests plus configured changelogs and versioned files
+- renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run`

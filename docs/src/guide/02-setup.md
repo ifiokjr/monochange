@@ -9,7 +9,10 @@ Add a `monochange.toml` file at the repository root.
 parent_bump = "patch"
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
@@ -27,6 +30,10 @@ packages = ["sdk-core", "web-sdk", "mobile-sdk"]
 tag = true
 release = true
 version_format = "primary"
+
+[group.sdk.changelog]
+path = "docs/sdk-changelog.md"
+format = "monochange"
 
 [[workflows]]
 name = "validate"

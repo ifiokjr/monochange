@@ -157,29 +157,31 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 - normalized package and dependency records
 - version-group definitions and planned group outcomes
 - change signals and compatibility assessments
-- release-plan domain types
+- changelog formats, changelog targets, and structured release-note types
 - shared error and result types
 
 ## Example
 
 ```rust
-use monochange_core::Ecosystem;
-use monochange_core::PackageRecord;
-use monochange_core::PublishState;
-use semver::Version;
-use std::path::PathBuf;
+use monochange_core::render_release_notes;
+use monochange_core::ChangelogFormat;
+use monochange_core::ReleaseNotesDocument;
+use monochange_core::ReleaseNotesSection;
 
-let package = PackageRecord::new(
-    Ecosystem::Cargo,
-    "demo",
-    PathBuf::from("crates/demo/Cargo.toml"),
-    PathBuf::from("."),
-    Some(Version::new(1, 2, 3)),
-    PublishState::Public,
-);
+let notes = ReleaseNotesDocument {
+    title: "1.2.3".to_string(),
+    summary: vec!["Grouped release for `sdk`.".to_string()],
+    sections: vec![ReleaseNotesSection {
+        title: "Changed".to_string(),
+        entries: vec!["add keep-a-changelog output".to_string()],
+    }],
+};
 
-assert_eq!(package.name, "demo");
-assert_eq!(package.current_version, Some(Version::new(1, 2, 3)));
+let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
+
+assert!(rendered.contains("## [1.2.3]"));
+assert!(rendered.contains("### Changed"));
+assert!(rendered.contains("- add keep-a-changelog output"));
 ```
 
 <!-- {/monochangeCoreCrateDocs} -->
@@ -247,7 +249,47 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 - load `monochange.toml`
 - validate version groups and workflows
 - resolve package references against discovered packages
-- parse change-input files, evidence, and changelog overrides
+- parse change-input files, evidence, changelog paths, and changelog format overrides
+
+## Example
+
+```rust
+use monochange_config::load_workspace_configuration;
+use monochange_core::ChangelogFormat;
+
+let root = std::env::temp_dir().join("monochange-config-changelog-format-docs");
+let _ = std::fs::remove_dir_all(&root);
+std::fs::create_dir_all(root.join("crates/core")).unwrap();
+std::fs::write(
+    root.join("crates/core/Cargo.toml"),
+    "[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+)
+.unwrap();
+std::fs::write(
+    root.join("monochange.toml"),
+    r#"
+[defaults]
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{path}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+"#,
+)
+.unwrap();
+
+let configuration = load_workspace_configuration(&root).unwrap();
+let package = configuration.package_by_id("core").unwrap();
+
+assert_eq!(configuration.defaults.changelog_format, ChangelogFormat::KeepAChangelog);
+assert_eq!(package.changelog.as_ref().unwrap().format, ChangelogFormat::KeepAChangelog);
+assert_eq!(package.changelog.as_ref().unwrap().path, std::path::PathBuf::from("crates/core/CHANGELOG.md"));
+
+let _ = std::fs::remove_dir_all(&root);
+```
 
 <!-- {/monochangeConfigCrateDocs} -->
 

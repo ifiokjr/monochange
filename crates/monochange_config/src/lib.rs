@@ -33,7 +33,47 @@
 //! - load `monochange.toml`
 //! - validate version groups and workflows
 //! - resolve package references against discovered packages
-//! - parse change-input files, evidence, and changelog overrides
+//! - parse change-input files, evidence, changelog paths, and changelog format overrides
+//!
+//! ## Example
+//!
+//! ```rust
+//! use monochange_config::load_workspace_configuration;
+//! use monochange_core::ChangelogFormat;
+//!
+//! let root = std::env::temp_dir().join("monochange-config-changelog-format-docs");
+//! let _ = std::fs::remove_dir_all(&root);
+//! std::fs::create_dir_all(root.join("crates/core")).unwrap();
+//! std::fs::write(
+//!     root.join("crates/core/Cargo.toml"),
+//!     "[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+//! )
+//! .unwrap();
+//! std::fs::write(
+//!     root.join("monochange.toml"),
+//!     r#"
+//! [defaults]
+//! package_type = "cargo"
+//!
+//! [defaults.changelog]
+//! path = "{path}/CHANGELOG.md"
+//! format = "keep_a_changelog"
+//!
+//! [package.core]
+//! path = "crates/core"
+//! "#,
+//! )
+//! .unwrap();
+//!
+//! let configuration = load_workspace_configuration(&root).unwrap();
+//! let package = configuration.package_by_id("core").unwrap();
+//!
+//! assert_eq!(configuration.defaults.changelog_format, ChangelogFormat::KeepAChangelog);
+//! assert_eq!(package.changelog.as_ref().unwrap().format, ChangelogFormat::KeepAChangelog);
+//! assert_eq!(package.changelog.as_ref().unwrap().path, std::path::PathBuf::from("crates/core/CHANGELOG.md"));
+//!
+//! let _ = std::fs::remove_dir_all(&root);
+//! ```
 //! <!-- {/monochangeConfigCrateDocs} -->
 
 use std::collections::BTreeMap;
@@ -53,6 +93,8 @@ use monochange_core::relative_to_root;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
+use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogTarget;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::GroupDefinition;
@@ -101,7 +143,7 @@ struct RawWorkspaceDefaults {
 	#[serde(default)]
 	package_type: Option<PackageType>,
 	#[serde(default)]
-	changelog: Option<RawChangelogDefinition>,
+	changelog: Option<RawChangelogConfig>,
 }
 
 impl Default for RawWorkspaceDefaults {
@@ -123,13 +165,30 @@ enum RawChangelogDefinition {
 	Path(String),
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum RawChangelogConfig {
+	Legacy(RawChangelogDefinition),
+	Detailed(RawChangelogTable),
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+struct RawChangelogTable {
+	#[serde(default)]
+	enabled: Option<bool>,
+	#[serde(default)]
+	path: Option<String>,
+	#[serde(default)]
+	format: Option<ChangelogFormat>,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawPackageDefinition {
 	path: PathBuf,
 	#[serde(rename = "type")]
 	package_type: Option<PackageType>,
 	#[serde(default)]
-	changelog: Option<RawChangelogDefinition>,
+	changelog: Option<RawChangelogConfig>,
 	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
@@ -144,7 +203,7 @@ struct RawPackageDefinition {
 struct RawGroupDefinition {
 	packages: Vec<String>,
 	#[serde(default)]
-	changelog: Option<PathBuf>,
+	changelog: Option<RawChangelogConfig>,
 	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
@@ -211,12 +270,39 @@ fn default_change_origin() -> String {
 	"direct-change".to_string()
 }
 
-impl RawChangelogDefinition {
+impl RawChangelogConfig {
 	fn as_defaults_definition(&self) -> ChangelogDefinition {
 		match self {
-			Self::Enabled(false) => ChangelogDefinition::Disabled,
-			Self::Enabled(true) => ChangelogDefinition::PackageDefault,
-			Self::Path(path_pattern) => ChangelogDefinition::PathPattern(path_pattern.clone()),
+			Self::Legacy(definition) => match definition {
+				RawChangelogDefinition::Enabled(false) => ChangelogDefinition::Disabled,
+				RawChangelogDefinition::Enabled(true) => ChangelogDefinition::PackageDefault,
+				RawChangelogDefinition::Path(path_pattern) => {
+					ChangelogDefinition::PathPattern(path_pattern.clone())
+				}
+			},
+			Self::Detailed(table) => match (table.enabled.unwrap_or(true), &table.path) {
+				(false, _) => ChangelogDefinition::Disabled,
+				(true, Some(path_pattern)) => {
+					ChangelogDefinition::PathPattern(path_pattern.clone())
+				}
+				(true, None) => ChangelogDefinition::PackageDefault,
+			},
+		}
+	}
+
+	fn format(&self) -> Option<ChangelogFormat> {
+		match self {
+			Self::Legacy(_) => None,
+			Self::Detailed(table) => table.format,
+		}
+	}
+
+	fn is_disabled(&self) -> bool {
+		match self {
+			Self::Legacy(definition) => {
+				matches!(definition, RawChangelogDefinition::Enabled(false))
+			}
+			Self::Detailed(table) => matches!(table.enabled, Some(false)),
 		}
 	}
 
@@ -226,15 +312,48 @@ impl RawChangelogDefinition {
 		treat_string_as_pattern: bool,
 	) -> Option<PathBuf> {
 		match self {
-			Self::Enabled(false) => None,
-			Self::Enabled(true) => Some(package_path.join("CHANGELOG.md")),
-			Self::Path(path) => {
-				if treat_string_as_pattern {
-					let package_path = package_path.to_string_lossy();
-					Some(PathBuf::from(path.replace("{path}", &package_path)))
-				} else {
-					Some(PathBuf::from(path))
+			Self::Legacy(definition) => match definition {
+				RawChangelogDefinition::Enabled(false) => None,
+				RawChangelogDefinition::Enabled(true) => Some(package_path.join("CHANGELOG.md")),
+				RawChangelogDefinition::Path(path) => {
+					if treat_string_as_pattern {
+						let package_path = package_path.to_string_lossy();
+						Some(PathBuf::from(path.replace("{path}", &package_path)))
+					} else {
+						Some(PathBuf::from(path))
+					}
 				}
+			},
+			Self::Detailed(table) => {
+				if matches!(table.enabled, Some(false)) {
+					return None;
+				}
+				match &table.path {
+					Some(path) => {
+						if treat_string_as_pattern {
+							let package_path = package_path.to_string_lossy();
+							Some(PathBuf::from(path.replace("{path}", &package_path)))
+						} else {
+							Some(PathBuf::from(path))
+						}
+					}
+					None => Some(package_path.join("CHANGELOG.md")),
+				}
+			}
+		}
+	}
+
+	fn resolve_for_group(&self) -> Option<PathBuf> {
+		match self {
+			Self::Legacy(definition) => match definition {
+				RawChangelogDefinition::Enabled(false | true) => None,
+				RawChangelogDefinition::Path(path) => Some(PathBuf::from(path)),
+			},
+			Self::Detailed(table) => {
+				if matches!(table.enabled, Some(false)) {
+					return None;
+				}
+				table.path.as_ref().map(PathBuf::from)
 			}
 		}
 	}
@@ -279,7 +398,12 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	let defaults_changelog_policy = defaults
 		.changelog
 		.as_ref()
-		.map(RawChangelogDefinition::as_defaults_definition);
+		.map(RawChangelogConfig::as_defaults_definition);
+	let default_changelog_format = defaults
+		.changelog
+		.as_ref()
+		.and_then(RawChangelogConfig::format)
+		.unwrap_or_default();
 	let packages = package
 		.into_iter()
 		.map(|(id, package)| {
@@ -304,11 +428,19 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			let changelog = package
 				.changelog
 				.as_ref()
-				.and_then(|definition| definition.resolve_for_package(&package.path, false))
+				.and_then(|definition| {
+					definition.resolve_for_package(&package.path, false).map(|path| ChangelogTarget {
+						path,
+						format: definition.format().unwrap_or(default_changelog_format),
+					})
+				})
 				.or_else(|| {
-					default_package_changelog
-						.as_ref()
-						.and_then(|definition| definition.resolve_for_package(&package.path, true))
+					default_package_changelog.as_ref().and_then(|definition| {
+						definition.resolve_for_package(&package.path, true).map(|path| ChangelogTarget {
+							path,
+							format: definition.format().unwrap_or(default_changelog_format),
+						})
+					})
 				});
 			Ok::<_, MonochangeError>(PackageDefinition {
 				id,
@@ -324,16 +456,46 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		.collect::<Result<Vec<_>, _>>()?;
 	let groups = group
 		.into_iter()
-		.map(|(id, group)| GroupDefinition {
-			id,
-			packages: group.packages,
-			changelog: group.changelog,
-			versioned_files: group.versioned_files,
-			tag: group.tag,
-			release: group.release,
-			version_format: group.version_format,
+		.map(|(id, group)| {
+			let changelog = match group.changelog.as_ref() {
+				None => None,
+				Some(definition) => match definition.resolve_for_group() {
+					Some(path) => Some(ChangelogTarget {
+						path,
+						format: definition.format().unwrap_or(default_changelog_format),
+					}),
+					None if definition.is_disabled() => None,
+					None => {
+						return Err(config_diagnostic(
+							&contents,
+							format!(
+								"group `{id}` changelog must declare a `path` when changelog output is enabled"
+							),
+							vec![config_section_label(
+								&contents,
+								"group",
+								&id,
+								"group changelog missing path",
+							)],
+							Some(
+								"set `changelog = \"changelog.md\"` or `[group.<id>.changelog].path` when enabling grouped changelog output"
+									.to_string(),
+							),
+						));
+					}
+				},
+			};
+			Ok::<_, MonochangeError>(GroupDefinition {
+				id,
+				packages: group.packages,
+				changelog,
+				versioned_files: group.versioned_files,
+				tag: group.tag,
+				release: group.release,
+				version_format: group.version_format,
+			})
 		})
-		.collect::<Vec<_>>();
+		.collect::<Result<Vec<_>, _>>()?;
 
 	validate_workflows(&workflows)?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
@@ -346,6 +508,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			warn_on_group_mismatch: defaults.warn_on_group_mismatch,
 			package_type: defaults.package_type,
 			changelog: defaults_changelog_policy,
+			changelog_format: default_changelog_format,
 		},
 		packages,
 		groups,

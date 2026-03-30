@@ -64,8 +64,10 @@ use monochange_config::validate_workspace;
 use monochange_core::default_workflows;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
+use monochange_core::render_release_notes;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
+use monochange_core::ChangelogTarget;
 use monochange_core::CommandVariable;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
@@ -73,6 +75,8 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
+use monochange_core::ReleaseNotesDocument;
+use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleasePlan;
 use monochange_core::VersionFormat;
 use monochange_core::VersionedFileDefinition;
@@ -1104,8 +1108,8 @@ fn released_package_names(packages: &[PackageRecord], plan: &ReleasePlan) -> Vec
 	released_packages
 }
 
-type PackageChangelogTargets = BTreeMap<String, PathBuf>;
-type GroupChangelogTargets = BTreeMap<String, PathBuf>;
+type PackageChangelogTargets = BTreeMap<String, ChangelogTarget>;
+type GroupChangelogTargets = BTreeMap<String, ChangelogTarget>;
 
 fn resolve_changelog_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -1122,7 +1126,10 @@ fn resolve_changelog_targets(
 			resolve_package_reference(&package_definition.id, &configuration.root_path, packages)?;
 		package_targets.insert(
 			package_id,
-			resolve_config_path(&configuration.root_path, changelog_path),
+			ChangelogTarget {
+				path: resolve_config_path(&configuration.root_path, &changelog_path.path),
+				format: changelog_path.format,
+			},
 		);
 	}
 	for group_definition in &configuration.groups {
@@ -1131,7 +1138,10 @@ fn resolve_changelog_targets(
 		};
 		group_targets.insert(
 			group_definition.id.clone(),
-			resolve_config_path(&configuration.root_path, changelog_path),
+			ChangelogTarget {
+				path: resolve_config_path(&configuration.root_path, &changelog_path.path),
+				format: changelog_path.format,
+			},
 		);
 	}
 
@@ -1172,7 +1182,7 @@ fn build_changelog_updates(
 		.iter()
 		.filter(|decision| decision.recommended_bump.is_release())
 	{
-		let Some(changelog_path) = package_changelog_targets.get(&decision.package_id) else {
+		let Some(changelog_target) = package_changelog_targets.get(&decision.package_id) else {
 			continue;
 		};
 		let Some(package) = packages
@@ -1189,11 +1199,12 @@ fn build_changelog_updates(
 			.map(|notes| notes.iter().cloned().collect::<Vec<_>>())
 			.filter(|notes| !notes.is_empty())
 			.unwrap_or_else(|| decision.reasons.clone());
+		let document = package_release_notes(&package.name, &planned_version.to_string(), &notes);
 		updates.push(FileUpdate {
-			path: changelog_path.clone(),
+			path: changelog_target.path.clone(),
 			content: append_changelog_section(
-				changelog_path,
-				&render_changelog_section(&package.name, &planned_version.to_string(), &notes),
+				&changelog_target.path,
+				&render_release_notes(changelog_target.format, &document),
 			)?,
 		});
 	}
@@ -1203,7 +1214,7 @@ fn build_changelog_updates(
 		.iter()
 		.filter(|group| group.recommended_bump.is_release())
 	{
-		let Some(changelog_path) = group_changelog_targets.get(&planned_group.group_id) else {
+		let Some(changelog_target) = group_changelog_targets.get(&planned_group.group_id) else {
 			continue;
 		};
 		let Some(planned_version) = planned_group.planned_version.as_ref() else {
@@ -1232,16 +1243,17 @@ fn build_changelog_updates(
 		} else {
 			member_notes
 		};
+		let document = group_release_notes(
+			&planned_group.group_id,
+			&planned_version.to_string(),
+			&member_ids,
+			&notes,
+		);
 		updates.push(FileUpdate {
-			path: changelog_path.clone(),
+			path: changelog_target.path.clone(),
 			content: append_changelog_section(
-				changelog_path,
-				&render_group_changelog_section(
-					&planned_group.group_id,
-					&planned_version.to_string(),
-					&member_ids,
-					&notes,
-				),
+				&changelog_target.path,
+				&render_release_notes(changelog_target.format, &document),
 			)?,
 		});
 	}
@@ -1278,34 +1290,43 @@ fn dedup_file_updates(updates: Vec<FileUpdate>) -> Vec<FileUpdate> {
 		.collect()
 }
 
-fn render_changelog_section(package_name: &str, version: &str, notes: &[String]) -> String {
-	let mut lines = vec![format!("## {version}"), String::new()];
-	if notes.is_empty() {
-		lines.push(format!("- prepare release for `{package_name}`"));
-	} else {
-		for note in notes {
-			lines.push(format!("- {note}"));
-		}
+fn package_release_notes(
+	package_name: &str,
+	version: &str,
+	notes: &[String],
+) -> ReleaseNotesDocument {
+	ReleaseNotesDocument {
+		title: version.to_string(),
+		summary: Vec::new(),
+		sections: vec![ReleaseNotesSection {
+			title: "Changed".to_string(),
+			entries: if notes.is_empty() {
+				vec![format!("prepare release for `{package_name}`")]
+			} else {
+				notes.to_vec()
+			},
+		}],
 	}
-	lines.join("\n")
 }
 
-fn render_group_changelog_section(
+fn group_release_notes(
 	group_name: &str,
 	version: &str,
 	members: &[String],
 	notes: &[String],
-) -> String {
-	let mut lines = vec![format!("## {version}"), String::new()];
-	lines.push(format!("Grouped release for `{group_name}`."));
+) -> ReleaseNotesDocument {
+	let mut summary = vec![format!("Grouped release for `{group_name}`.")];
 	if !members.is_empty() {
-		lines.push(format!("Members: {}", members.join(", ")));
-		lines.push(String::new());
+		summary.push(format!("Members: {}", members.join(", ")));
 	}
-	for note in notes {
-		lines.push(format!("- {note}"));
+	ReleaseNotesDocument {
+		title: version.to_string(),
+		summary,
+		sections: vec![ReleaseNotesSection {
+			title: "Changed".to_string(),
+			entries: notes.to_vec(),
+		}],
 	}
-	lines.join("\n")
 }
 
 struct VersionedFileUpdateContext<'a> {

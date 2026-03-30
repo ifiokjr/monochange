@@ -26,7 +26,10 @@ parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 ```
 
 <!-- {/configurationDefaultsSnippet} -->
@@ -36,7 +39,10 @@ changelog = "{path}/changelog.md"
 ```toml
 [defaults]
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
@@ -44,6 +50,10 @@ versioned_files = ["crates/sdk_core/extra.toml"]
 tag = false
 release = false
 version_format = "namespaced"
+
+[package.sdk-core.changelog]
+path = "crates/sdk_core/CHANGELOG.md"
+format = "monochange"
 ```
 
 <!-- {/configurationVersionGroupsSnippet} -->
@@ -59,6 +69,13 @@ changelog = "crates/sdk_core/changelog.md"
 ```
 
 Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
+
+MonoChange currently supports two changelog formats:
+
+- `monochange` keeps the current heading-and-bullets layout
+- `keep_a_changelog` renders section headings such as `### Changed`
+
+Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 
@@ -247,6 +264,7 @@ Current `PrepareRelease` behavior:
 - reads `.changeset/*.md`
 - computes one synchronized release plan from discovered change files
 - updates native manifests plus configured changelogs and versioned files
+- renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run`

@@ -2,6 +2,8 @@ use std::fs;
 
 use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
+use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogTarget;
 use monochange_core::Ecosystem;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
@@ -24,6 +26,10 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert!(configuration.defaults.warn_on_group_mismatch);
 	assert_eq!(configuration.defaults.package_type, None);
 	assert_eq!(configuration.defaults.changelog, None);
+	assert_eq!(
+		configuration.defaults.changelog_format,
+		ChangelogFormat::Monochange
+	);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
 	assert_eq!(configuration.workflows.len(), 4);
@@ -98,6 +104,10 @@ type = "PrepareRelease"
 			"{path}/CHANGELOG.md".to_string()
 		))
 	);
+	assert_eq!(
+		configuration.defaults.changelog_format,
+		ChangelogFormat::Monochange
+	);
 	assert_eq!(configuration.packages.len(), 2);
 	assert_eq!(configuration.groups.len(), 1);
 	assert_eq!(configuration.workflows.len(), 1);
@@ -109,7 +119,10 @@ type = "PrepareRelease"
 	assert_eq!(first_package.id, "core");
 	assert_eq!(
 		first_package.changelog,
-		Some(std::path::PathBuf::from("crates/core/changelog.md"))
+		Some(ChangelogTarget {
+			path: std::path::PathBuf::from("crates/core/changelog.md"),
+			format: ChangelogFormat::Monochange,
+		})
 	);
 	assert_eq!(
 		configuration
@@ -178,7 +191,10 @@ path = "crates/core"
 	);
 	assert_eq!(
 		package.changelog,
-		Some(std::path::PathBuf::from("crates/core/changelog.md"))
+		Some(ChangelogTarget {
+			path: std::path::PathBuf::from("crates/core/changelog.md"),
+			format: ChangelogFormat::Monochange,
+		})
 	);
 }
 
@@ -228,13 +244,125 @@ changelog = "docs/tool-release-notes.md"
 	);
 	assert_eq!(
 		core.changelog,
-		Some(std::path::PathBuf::from("crates/core/CHANGELOG.md"))
+		Some(ChangelogTarget {
+			path: std::path::PathBuf::from("crates/core/CHANGELOG.md"),
+			format: ChangelogFormat::Monochange,
+		})
 	);
 	assert_eq!(app.changelog, None);
 	assert_eq!(
 		tool.changelog,
-		Some(std::path::PathBuf::from("docs/tool-release-notes.md"))
+		Some(ChangelogTarget {
+			path: std::path::PathBuf::from("docs/tool-release-notes.md"),
+			format: ChangelogFormat::Monochange,
+		})
 	);
+}
+
+#[test]
+fn load_workspace_configuration_supports_changelog_format_tables_and_overrides() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	write_cargo_package(tempdir.path(), "crates/app", "app");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{path}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[package.app.changelog]
+path = "docs/app-release-notes.md"
+format = "monochange"
+
+[group.sdk]
+packages = ["core", "app"]
+
+[group.sdk.changelog]
+path = "docs/group-release-notes.md"
+format = "keep_a_changelog"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let core = configuration
+		.package_by_id("core")
+		.unwrap_or_else(|| panic!("expected core package"));
+	let app = configuration
+		.package_by_id("app")
+		.unwrap_or_else(|| panic!("expected app package"));
+	let group = configuration
+		.groups
+		.first()
+		.unwrap_or_else(|| panic!("expected group"));
+
+	assert_eq!(
+		configuration.defaults.changelog_format,
+		ChangelogFormat::KeepAChangelog
+	);
+	assert_eq!(
+		core.changelog,
+		Some(ChangelogTarget {
+			path: std::path::PathBuf::from("crates/core/CHANGELOG.md"),
+			format: ChangelogFormat::KeepAChangelog,
+		})
+	);
+	assert_eq!(
+		app.changelog,
+		Some(ChangelogTarget {
+			path: std::path::PathBuf::from("docs/app-release-notes.md"),
+			format: ChangelogFormat::Monochange,
+		})
+	);
+	assert_eq!(
+		group.changelog,
+		Some(ChangelogTarget {
+			path: std::path::PathBuf::from("docs/group-release-notes.md"),
+			format: ChangelogFormat::KeepAChangelog,
+		})
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_group_changelog_tables_without_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[group.sdk]
+packages = ["core"]
+
+[group.sdk.changelog]
+enabled = true
+format = "keep_a_changelog"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+	assert!(rendered.contains("group `sdk` changelog must declare a `path`"));
+	assert!(rendered.contains("group changelog missing path"));
 }
 
 #[test]

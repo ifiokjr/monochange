@@ -49,6 +49,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - compute release plans from explicit change input
 - expose top-level CLI commands from workflow definitions
 - run config-defined release workflows from `.changeset/*.md`
+- render changelogs through structured release notes and configurable formats
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -114,7 +115,10 @@ build:book
 parent_bump = "patch"
 warn_on_group_mismatch = true
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+
+[defaults.changelog]
+path = "{path}/changelog.md"
+format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
@@ -132,6 +136,10 @@ packages = ["sdk-core", "web-sdk", "mobile-sdk"]
 tag = true
 release = true
 version_format = "primary"
+
+[group.sdk.changelog]
+path = "docs/sdk-changelog.md"
+format = "monochange"
 
 [[workflows]]
 name = "validate"
