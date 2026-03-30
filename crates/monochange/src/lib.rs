@@ -205,6 +205,17 @@ struct ChangelogUpdate {
 struct ReleaseNoteChange {
 	package_id: String,
 	package_name: String,
+	package_labels: Vec<String>,
+	source_path: Option<String>,
+	summary: String,
+	details: Option<String>,
+	bump: BumpSeverity,
+	change_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+struct GroupReleaseNoteKey {
+	source_path: Option<String>,
 	summary: String,
 	details: Option<String>,
 	bump: BumpSeverity,
@@ -1932,10 +1943,11 @@ fn build_changelog_updates(
 			packages,
 			&planned_version.to_string(),
 		);
+		let changed_members = group_changed_members(planned_group, &release_note_changes, packages);
 		let document = build_release_notes_document(
 			&planned_group.group_id,
 			&planned_version.to_string(),
-			group_release_summary(&planned_group.group_id, &member_ids),
+			group_release_summary(&planned_group.group_id, &member_ids, &changed_members),
 			group_definition.map_or(&[][..], |group| group.extra_changelog_sections.as_slice()),
 			&configuration.release_notes.change_templates,
 			&changes,
@@ -2000,6 +2012,8 @@ fn build_release_note_change(
 	Some(ReleaseNoteChange {
 		package_id: signal.package_id.clone(),
 		package_name: package_id.clone(),
+		package_labels: Vec::new(),
+		source_path: signal.source_path.clone(),
 		summary,
 		details: signal.details.clone(),
 		bump: signal.requested_bump.unwrap_or(BumpSeverity::Patch),
@@ -2159,6 +2173,8 @@ fn package_release_note_changes(
 		changes.push(ReleaseNoteChange {
 			package_id: decision.package_id.clone(),
 			package_name: config_package_id(package),
+			package_labels: Vec::new(),
+			source_path: None,
 			summary: render_package_empty_update_message(
 				configuration,
 				package_definition,
@@ -2198,6 +2214,8 @@ fn group_release_note_changes(
 		changes.push(ReleaseNoteChange {
 			package_id: planned_group.group_id.clone(),
 			package_name: planned_group.group_id.clone(),
+			package_labels: Vec::new(),
+			source_path: None,
 			summary: render_group_empty_update_message(
 				configuration,
 				group_definition,
@@ -2209,14 +2227,94 @@ fn group_release_note_changes(
 			bump: planned_group.recommended_bump,
 			change_type: None,
 		});
+	} else {
+		changes = aggregate_group_release_note_changes(changes);
 	}
 	changes
 }
 
-fn group_release_summary(group_name: &str, members: &[String]) -> Vec<String> {
+fn aggregate_group_release_note_changes(changes: Vec<ReleaseNoteChange>) -> Vec<ReleaseNoteChange> {
+	let mut aggregated = Vec::<ReleaseNoteChange>::new();
+	let mut indexes = BTreeMap::<GroupReleaseNoteKey, usize>::new();
+	for change in changes {
+		let key = GroupReleaseNoteKey {
+			source_path: change.source_path.clone(),
+			summary: change.summary.clone(),
+			details: change.details.clone(),
+			bump: change.bump,
+			change_type: change.change_type.clone(),
+		};
+		if let Some(index) = indexes.get(&key).copied() {
+			let entry = &mut aggregated[index];
+			if !entry
+				.package_labels
+				.iter()
+				.any(|label| label == &change.package_name)
+			{
+				entry.package_labels.push(change.package_name.clone());
+				entry.package_name = entry.package_labels.join(", ");
+			}
+			continue;
+		}
+		let mut change = change;
+		change.package_labels = vec![change.package_name.clone()];
+		change.package_name = change.package_labels.join(", ");
+		indexes.insert(key, aggregated.len());
+		aggregated.push(change);
+	}
+	aggregated
+}
+
+fn group_changed_members(
+	planned_group: &monochange_core::PlannedVersionGroup,
+	release_note_changes: &BTreeMap<String, Vec<ReleaseNoteChange>>,
+	packages: &[PackageRecord],
+) -> BTreeSet<String> {
+	planned_group
+		.members
+		.iter()
+		.filter(|member_id| {
+			release_note_changes
+				.get(*member_id)
+				.is_some_and(|changes| !changes.is_empty())
+		})
+		.filter_map(|member_id| {
+			packages
+				.iter()
+				.find(|package| package.id == *member_id)
+				.map(config_package_id)
+		})
+		.collect()
+}
+
+fn group_release_summary(
+	group_name: &str,
+	members: &[String],
+	changed_members: &BTreeSet<String>,
+) -> Vec<String> {
 	let mut summary = vec![format!("Grouped release for `{group_name}`.")];
-	if !members.is_empty() {
+	if members.is_empty() {
+		return summary;
+	}
+	if changed_members.is_empty() {
 		summary.push(format!("Members: {}", members.join(", ")));
+		return summary;
+	}
+	let changed = members
+		.iter()
+		.filter(|member| changed_members.contains(member.as_str()))
+		.cloned()
+		.collect::<Vec<_>>();
+	let synchronized = members
+		.iter()
+		.filter(|member| !changed_members.contains(member.as_str()))
+		.cloned()
+		.collect::<Vec<_>>();
+	if !changed.is_empty() {
+		summary.push(format!("Changed members: {}", changed.join(", ")));
+	}
+	if !synchronized.is_empty() {
+		summary.push(format!("Synchronized members: {}", synchronized.join(", ")));
 	}
 	summary
 }
@@ -2367,10 +2465,28 @@ fn render_change_entry(
 		.chain(DEFAULT_CHANGE_TEMPLATES)
 	{
 		if let Some(rendered) = apply_change_template(template, change, target_id, version) {
-			return rendered;
+			return format_group_labeled_entry(change, &rendered);
 		}
 	}
-	format!("- {}", change.summary)
+	format_group_labeled_entry(change, &format!("- {}", change.summary))
+}
+
+fn format_group_labeled_entry(change: &ReleaseNoteChange, rendered: &str) -> String {
+	if change.package_labels.is_empty() {
+		return rendered.to_string();
+	}
+	if change.package_labels.len() == 1 && !rendered.contains('\n') {
+		if let Some(entry) = rendered.strip_prefix("- ") {
+			return format!("- **{}**: {}", change.package_labels[0], entry);
+		}
+	}
+	let labels = change
+		.package_labels
+		.iter()
+		.map(|package| format!("*{package}*"))
+		.collect::<Vec<_>>()
+		.join(", ");
+	format!("> [!NOTE]\n> {labels}\n\n{rendered}")
 }
 
 const DEFAULT_CHANGE_TEMPLATES: [&str; 2] = ["#### $summary\n\n$details", "- $summary"];

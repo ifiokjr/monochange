@@ -1327,6 +1327,8 @@ pub struct ChangeSignal {
 	pub notes: Option<String>,
 	pub details: Option<String>,
 	pub change_type: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub source_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

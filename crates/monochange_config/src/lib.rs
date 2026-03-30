@@ -1021,6 +1021,7 @@ pub fn load_change_signals(
 					notes: change.reason.clone(),
 					details: change.details.clone(),
 					change_type: change.change_type.clone(),
+					source_path: Some(changes_path.display().to_string()),
 				});
 			}
 		} else {
@@ -1050,6 +1051,7 @@ pub fn load_change_signals(
 				notes: change.reason,
 				details: change.details,
 				change_type: change.change_type,
+				source_path: Some(changes_path.display().to_string()),
 			});
 		}
 	}

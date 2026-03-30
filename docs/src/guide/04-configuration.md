@@ -380,7 +380,7 @@ MonoChange currently supports two changelog formats:
 
 Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
 
-You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`. Git-derived template variables are planned next.
+You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`. Group changelogs also prefix direct member entries with the source package id by default so grouped notes stay easy to scan, switch to GitHub alert syntax when a labeled grouped note spans multiple lines or covers multiple packages from one changeset, and distinguish directly changed members from synchronized-only members when relevant. Git-derived template variables are planned next.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 
