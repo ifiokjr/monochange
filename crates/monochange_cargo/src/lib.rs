@@ -41,6 +41,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
+use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
@@ -256,6 +257,7 @@ fn glob_pattern_paths(root: &Path, pattern: &str) -> Vec<PathBuf> {
 	glob(&joined_pattern)
 		.into_iter()
 		.flat_map(|paths| paths.filter_map(Result::ok))
+		.map(|path| normalize_path(&path))
 		.collect()
 }
 
@@ -404,6 +406,7 @@ fn find_all_manifests(root: &Path) -> Vec<PathBuf> {
 		.filter_map(Result::ok)
 		.filter(|entry| entry.file_name() == CARGO_MANIFEST_FILE)
 		.map(DirEntry::into_path)
+		.map(|path| normalize_path(&path))
 		.collect()
 }
 

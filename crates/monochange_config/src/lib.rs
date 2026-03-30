@@ -49,6 +49,7 @@ use miette::NamedSource;
 use miette::Report;
 use miette::SourceSpan;
 use monochange_core::default_workflows;
+use monochange_core::relative_to_root;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
@@ -984,6 +985,7 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 	Ok(())
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn config_diagnostic(
 	config_contents: &str,
 	message: String,
@@ -991,12 +993,18 @@ fn config_diagnostic(
 	help: Option<String>,
 ) -> MonochangeError {
 	let report = Report::new(SourceDiagnostic {
-		message,
+		message: message.clone(),
 		source_code: NamedSource::new(CONFIG_FILE, config_contents.to_string()),
-		labels,
-		help,
+		labels: labels.clone(),
+		help: help.clone(),
 	});
-	MonochangeError::Diagnostic(format!("{report:?}"))
+	let _ = report;
+	MonochangeError::Diagnostic(render_source_diagnostic(
+		CONFIG_FILE,
+		&message,
+		&labels,
+		help.as_deref(),
+	))
 }
 
 fn config_section_label(
@@ -1057,6 +1065,27 @@ fn config_primary_label(config_contents: &str, owner_id: &str) -> LabeledSpan {
 		Some("primary release identity".to_string()),
 		range_to_span(span),
 	)
+}
+
+fn render_source_diagnostic(
+	source_name: &str,
+	message: &str,
+	labels: &[LabeledSpan],
+	help: Option<&str>,
+) -> String {
+	let mut lines = vec![format!("error: {message}"), format!("--> {source_name}")];
+	if !labels.is_empty() {
+		lines.push("labels:".to_string());
+		for label in labels {
+			let label_text = label.label().unwrap_or("source");
+			let end = label.offset().saturating_add(label.len());
+			lines.push(format!("- {label_text} @ bytes {}..{end}", label.offset()));
+		}
+	}
+	if let Some(help) = help {
+		lines.push(format!("help: {help}"));
+	}
+	lines.join("\n")
 }
 
 fn range_to_span(range: Range<usize>) -> SourceSpan {
@@ -1125,6 +1154,7 @@ fn section_patterns(kind: &str, id: &str) -> [String; 2] {
 	[format!("[{kind}.{id}]"), format!("[{kind}.\"{id}\"]")]
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn changeset_diagnostic(
 	contents: &str,
 	changeset_path: &Path,
@@ -1132,13 +1162,20 @@ fn changeset_diagnostic(
 	labels: Vec<LabeledSpan>,
 	help: Option<String>,
 ) -> MonochangeError {
+	let source_name = changeset_path.display().to_string();
 	let report = Report::new(SourceDiagnostic {
-		message,
-		source_code: NamedSource::new(changeset_path.display().to_string(), contents.to_string()),
-		labels,
-		help,
+		message: message.clone(),
+		source_code: NamedSource::new(source_name.clone(), contents.to_string()),
+		labels: labels.clone(),
+		help: help.clone(),
 	});
-	MonochangeError::Diagnostic(format!("{report:?}"))
+	let _ = report;
+	MonochangeError::Diagnostic(render_source_diagnostic(
+		&source_name,
+		&message,
+		&labels,
+		help.as_deref(),
+	))
 }
 
 fn changeset_key_label(contents: &str, key: &str, label: &'static str) -> LabeledSpan {
@@ -1304,17 +1341,14 @@ fn find_matching_package_ids(
 }
 
 fn package_matches_reference(package: &PackageRecord, root: &Path, reference: &str) -> bool {
-	let manifest_match = package
-		.manifest_path
-		.strip_prefix(root)
-		.ok()
-		.and_then(|path| path.to_str())
+	let manifest_match = relative_to_root(root, &package.manifest_path)
+		.and_then(|path| path.to_str().map(ToString::to_string))
 		.is_some_and(|path| path == reference);
 	let directory_match = package
 		.manifest_path
 		.parent()
-		.and_then(|path| path.strip_prefix(root).ok())
-		.and_then(|path| path.to_str())
+		.and_then(|path| relative_to_root(root, path))
+		.and_then(|path| path.to_str().map(ToString::to_string))
 		.is_some_and(|path| path == reference);
 	let name_match = package.name == reference;
 	let id_match = package.id == reference;
@@ -1334,8 +1368,8 @@ fn package_matches_definition(
 	let Some(directory) = package.manifest_path.parent() else {
 		return false;
 	};
-	let relative_directory = directory.strip_prefix(root).ok();
-	relative_directory == Some(definition.path.as_path())
+	let relative_directory = relative_to_root(root, directory);
+	relative_directory.as_deref() == Some(definition.path.as_path())
 		&& ecosystem_matches_package_type(package.ecosystem, definition.package_type)
 }
 

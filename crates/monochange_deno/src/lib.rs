@@ -39,6 +39,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
+use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
@@ -261,6 +262,7 @@ fn find_all_manifests(root: &Path) -> Vec<PathBuf> {
 		.filter_map(Result::ok)
 		.filter(|entry| DENO_MANIFEST_FILES.contains(&entry.file_name().to_string_lossy().as_ref()))
 		.map(DirEntry::into_path)
+		.map(|path| normalize_path(&path))
 		.collect()
 }
 
