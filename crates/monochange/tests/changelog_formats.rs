@@ -43,10 +43,9 @@ path = "docs/sdk-CHANGELOG.md"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 "#,
 	);
@@ -117,10 +116,9 @@ format = "monochange"
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 "#,
 	);

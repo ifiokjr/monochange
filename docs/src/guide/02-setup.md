@@ -69,127 +69,119 @@ environment = "production"
 release_targets = ["sdk"]
 requires = ["main"]
 
-[[workflows]]
-name = "validate"
+[cli.validate]
 help_text = "Validate monochange configuration and changesets"
 
-[[workflows.steps]]
+[[cli.validate.steps]]
 type = "Validate"
 
-[[workflows]]
-name = "discover"
+[cli.discover]
 help_text = "Discover packages across supported ecosystems"
 
-[[workflows.inputs]]
+[[cli.discover.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.discover.steps]]
 type = "Discover"
 
-[[workflows]]
-name = "change"
+[cli.change]
 help_text = "Create a change file for one or more packages"
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "package"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "bump"
 type = "choice"
 choices = ["patch", "minor", "major"]
 default = "patch"
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "reason"
 type = "string"
 required = true
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "type"
 type = "string"
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "details"
 type = "string"
 
-[[workflows.steps]]
+[[cli.change.steps]]
 type = "CreateChangeFile"
 
-[[workflows]]
-name = "release"
+[cli.release]
 help_text = "Prepare a release from discovered change files"
 
-[[workflows.inputs]]
+[[cli.release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 
-[[workflows]]
-name = "release-manifest"
+[cli.release-manifest]
 help_text = "Prepare a release and write a stable JSON manifest"
 
-[[workflows.steps]]
+[[cli.release-manifest.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-manifest.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
-[[workflows]]
-name = "publish-release"
+[cli.publish-release]
 help_text = "Prepare a release and publish GitHub releases"
 
-[[workflows.inputs]]
+[[cli.publish-release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.publish-release.steps]]
 type = "PublishGitHubRelease"
 
-[[workflows]]
-name = "release-pr"
+[cli.release-pr]
 help_text = "Prepare a release and open or update a GitHub release pull request"
 
-[[workflows.inputs]]
+[[cli.release-pr.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "OpenReleasePullRequest"
 
-[[workflows]]
-name = "release-deploy"
+[cli.release-deploy]
 help_text = "Prepare a release and emit deployment intents"
 
-[[workflows.inputs]]
+[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-deploy.steps]]
 type = "Deploy"
 
 [[workflows]]
@@ -219,9 +211,9 @@ type = "EnforceChangesetPolicy"
 
 <!-- {=projectSetupConfigNote} -->
 
-This guide shows the preferred package/group configuration model together with the default top-level workflows emitted by `mc init`.
+This guide shows the preferred package/group configuration model together with the default top-level CLI commands emitted by `mc init`.
 
-If you omit `[[workflows]]`, MonoChange synthesizes the default `validate`, `discover`, `change`, and `release` workflows automatically. Repositories can then customize those commands by declaring workflows explicitly in `monochange.toml`.
+If you omit `[cli.<command>]` entries, MonoChange synthesizes the default `validate`, `discover`, `change`, and `release` commands automatically. Repositories can then customize those commands by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 

@@ -5,7 +5,7 @@
 //! # `monochange_config`
 //!
 //! <!-- {=monochangeConfigCrateDocs|trim|linePrefix:"//! ":true} -->
-//! `monochange_config` parses and validates the inputs that drive planning and release workflows.
+//! `monochange_config` parses and validates the inputs that drive planning and release commands.
 //!
 //! Reach for this crate when you need to load `monochange.toml`, resolve package references, or turn `.changeset/*.md` files into validated change signals for the planner.
 //!
@@ -13,7 +13,7 @@
 //!
 //! - centralize config parsing and validation rules in one place
 //! - resolve package references against discovered workspace packages
-//! - keep workflow definitions, version groups, and change files aligned with the planner's expectations
+//! - keep CLI command definitions, version groups, and change files aligned with the planner's expectations
 //!
 //! ## Best for
 //!
@@ -31,9 +31,9 @@
 //! ## Responsibilities
 //!
 //! - load `monochange.toml`
-//! - validate version groups and workflows
+//! - validate version groups and CLI commands
 //! - resolve package references against discovered packages
-//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and workflow GitHub/manifest/policy steps
+//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, GitHub release config, GitHub changeset-bot policy config, and command GitHub/manifest/policy steps
 //!
 //! ## Example
 //!
@@ -89,13 +89,17 @@ use miette::LabeledSpan;
 use miette::NamedSource;
 use miette::Report;
 use miette::SourceSpan;
-use monochange_core::default_workflows;
+use monochange_core::default_cli_commands;
 use monochange_core::relative_to_root;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
+use monochange_core::CliCommandDefinition;
+use monochange_core::CliInputDefinition;
+use monochange_core::CliInputKind;
+use monochange_core::CliStepDefinition;
 use monochange_core::DeploymentDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
@@ -116,9 +120,6 @@ use monochange_core::ReleaseNotesSettings;
 use monochange_core::VersionFormat;
 use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
-use monochange_core::WorkflowDefinition;
-use monochange_core::WorkflowInputKind;
-use monochange_core::WorkflowStepDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
 use serde::Deserialize;
@@ -126,7 +127,7 @@ use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value as YamlValue;
 
 const CONFIG_FILE: &str = "monochange.toml";
-const RESERVED_WORKFLOW_NAMES: &[&str] = &["init", "help", "version"];
+const RESERVED_CLI_COMMAND_NAMES: &[&str] = &["init", "help", "version"];
 const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"summary",
 	"details",
@@ -150,7 +151,9 @@ struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	group: BTreeMap<String, RawGroupDefinition>,
 	#[serde(default)]
-	workflows: Vec<WorkflowDefinition>,
+	cli: BTreeMap<String, RawCliCommandDefinition>,
+	#[serde(default)]
+	workflows: Vec<CliCommandDefinition>,
 	#[serde(default)]
 	github: Option<RawGitHubConfiguration>,
 	#[serde(default)]
@@ -248,6 +251,16 @@ struct RawGroupDefinition {
 	release: bool,
 	#[serde(default)]
 	version_format: VersionFormat,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawCliCommandDefinition {
+	#[serde(default)]
+	help_text: Option<String>,
+	#[serde(default)]
+	inputs: Vec<CliInputDefinition>,
+	#[serde(default)]
+	steps: Vec<CliStepDefinition>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -558,14 +571,27 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		deployments,
 		package,
 		group,
+		cli,
 		workflows,
 		github,
 		ecosystems,
 	} = raw;
-	let workflows = if workflows.is_empty() {
-		default_workflows()
+	if !workflows.is_empty() {
+		return Err(MonochangeError::Config(
+			"legacy `[[workflows]]` configuration is no longer supported; use `[cli.<command>]` with `[[cli.<command>.steps]]` instead".to_string(),
+		));
+	}
+	let cli = if cli.is_empty() {
+		default_cli_commands()
 	} else {
-		workflows
+		cli.into_iter()
+			.map(|(name, definition)| CliCommandDefinition {
+				name,
+				help_text: definition.help_text,
+				inputs: definition.inputs,
+				steps: definition.steps,
+			})
+			.collect::<Vec<_>>()
 	};
 	let default_package_type = defaults.package_type;
 	let default_package_changelog = defaults.changelog.clone();
@@ -704,12 +730,12 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		},
 	});
 
-	validate_workflows(&workflows)?;
+	validate_cli(&cli)?;
 	validate_release_notes_configuration(&contents, &release_notes, &packages, &groups)?;
 	validate_deployments_configuration(&contents, &deployments)?;
 	validate_github_configuration(github.as_ref())?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
-	validate_workflow_runtime_requirements(&workflows, github.as_ref(), &deployments)?;
+	validate_cli_runtime_requirements(&cli, github.as_ref(), &deployments)?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -728,7 +754,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		deployments,
 		packages,
 		groups,
-		workflows,
+		cli,
 		github,
 		cargo: ecosystems.cargo,
 		npm: ecosystems.npm,
@@ -1576,101 +1602,103 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 	Ok(())
 }
 
-fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> {
+fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 	let mut seen_names = BTreeSet::new();
 
-	for workflow in workflows {
-		if !seen_names.insert(workflow.name.clone()) {
+	for cli_command in cli {
+		if !seen_names.insert(cli_command.name.clone()) {
 			return Err(MonochangeError::Config(format!(
-				"duplicate workflow `{}`",
-				workflow.name
+				"duplicate CLI command `{}`",
+				cli_command.name
 			)));
 		}
-		if RESERVED_WORKFLOW_NAMES.contains(&workflow.name.as_str()) {
+		if RESERVED_CLI_COMMAND_NAMES.contains(&cli_command.name.as_str()) {
 			return Err(MonochangeError::Config(format!(
-				"workflow `{}` collides with a reserved built-in command",
-				workflow.name
+				"CLI command `{}` collides with a reserved built-in command",
+				cli_command.name
 			)));
 		}
-		if workflow.steps.is_empty() {
+		if cli_command.steps.is_empty() {
 			return Err(MonochangeError::Config(format!(
-				"workflow `{}` must define at least one step",
-				workflow.name
+				"CLI command `{}` must define at least one step",
+				cli_command.name
 			)));
 		}
 
 		let mut seen_inputs = BTreeSet::new();
-		for input in &workflow.inputs {
+		for input in &cli_command.inputs {
 			if input.name.trim().is_empty() {
 				return Err(MonochangeError::Config(format!(
-					"workflow `{}` has an input with an empty name",
-					workflow.name
+					"CLI command `{}` has an input with an empty name",
+					cli_command.name
 				)));
 			}
 			if !seen_inputs.insert(input.name.clone()) {
 				return Err(MonochangeError::Config(format!(
-					"workflow `{}` defines duplicate input `{}`",
-					workflow.name, input.name
+					"CLI command `{}` defines duplicate input `{}`",
+					cli_command.name, input.name
 				)));
 			}
 			if matches!(input.name.as_str(), "help" | "dry-run") {
 				return Err(MonochangeError::Config(format!(
-					"workflow `{}` input `{}` collides with an implicit workflow flag",
-					workflow.name, input.name
+					"CLI command `{}` input `{}` collides with an implicit command flag",
+					cli_command.name, input.name
 				)));
 			}
-			if matches!(input.kind, WorkflowInputKind::Choice) && input.choices.is_empty() {
+			if matches!(input.kind, CliInputKind::Choice) && input.choices.is_empty() {
 				return Err(MonochangeError::Config(format!(
-					"workflow `{}` input `{}` must define at least one choice",
-					workflow.name, input.name
+					"CLI command `{}` input `{}` must define at least one choice",
+					cli_command.name, input.name
 				)));
 			}
 			if let Some(default) = &input.default {
-				if matches!(input.kind, WorkflowInputKind::Choice)
+				if matches!(input.kind, CliInputKind::Choice)
 					&& !input.choices.iter().any(|choice| choice == default)
 				{
 					return Err(MonochangeError::Config(format!(
-						"workflow `{}` input `{}` default `{default}` is not one of the configured choices",
-						workflow.name, input.name
+						"CLI command `{}` input `{}` default `{default}` is not one of the configured choices",
+						cli_command.name, input.name
 					)));
 				}
 			}
 		}
 
-		for step in &workflow.steps {
+		for step in &cli_command.steps {
 			match step {
-				WorkflowStepDefinition::Command {
-					command, dry_run, ..
+				CliStepDefinition::Command {
+					command,
+					dry_run_command,
+					..
 				} => {
 					if command.trim().is_empty() {
 						return Err(MonochangeError::Config(format!(
-							"workflow `{}` command steps must provide a non-empty command",
-							workflow.name
+							"CLI command `{}` command steps must provide a non-empty command",
+							cli_command.name
 						)));
 					}
-					if matches!(dry_run, Some(value) if value.trim().is_empty()) {
+					if matches!(dry_run_command, Some(value) if value.trim().is_empty()) {
 						return Err(MonochangeError::Config(format!(
-							"workflow `{}` command steps with `dry_run` must provide a non-empty command",
-							workflow.name
+							"CLI command `{}` command steps with `dry_run_command` must provide a non-empty command",
+							cli_command.name
 						)));
 					}
 				}
-				WorkflowStepDefinition::RenderReleaseManifest { path } => {
+				CliStepDefinition::RenderReleaseManifest { path } => {
 					if matches!(path, Some(path) if path.as_os_str().is_empty()) {
 						return Err(MonochangeError::Config(format!(
-							"workflow `{}` render-manifest steps must provide a non-empty path when `path` is set",
-							workflow.name
+							"CLI command `{}` render-manifest steps must provide a non-empty path when `path` is set",
+							cli_command.name
 						)));
 					}
 				}
-				WorkflowStepDefinition::Validate
-				| WorkflowStepDefinition::Discover
-				| WorkflowStepDefinition::CreateChangeFile
-				| WorkflowStepDefinition::PrepareRelease
-				| WorkflowStepDefinition::PublishGitHubRelease
-				| WorkflowStepDefinition::OpenReleasePullRequest
-				| WorkflowStepDefinition::Deploy { .. }
-				| WorkflowStepDefinition::EnforceChangesetPolicy => {}
+				CliStepDefinition::Validate
+				| CliStepDefinition::Discover
+				| CliStepDefinition::CreateChangeFile
+				| CliStepDefinition::PrepareRelease
+				| CliStepDefinition::PublishGitHubRelease
+				| CliStepDefinition::OpenReleasePullRequest
+				| CliStepDefinition::Deploy { .. }
+				| CliStepDefinition::EnforceChangesetPolicy => {}
 			}
 		}
 	}
@@ -1678,55 +1706,55 @@ fn validate_workflows(workflows: &[WorkflowDefinition]) -> MonochangeResult<()> 
 	Ok(())
 }
 
-fn validate_workflow_runtime_requirements(
-	workflows: &[WorkflowDefinition],
+fn validate_cli_runtime_requirements(
+	cli: &[CliCommandDefinition],
 	github: Option<&GitHubConfiguration>,
 	deployments: &[DeploymentDefinition],
 ) -> MonochangeResult<()> {
-	for workflow in workflows {
-		if workflow
+	for cli_command in cli {
+		if cli_command
 			.steps
 			.iter()
-			.any(|step| matches!(step, WorkflowStepDefinition::PublishGitHubRelease))
+			.any(|step| matches!(step, CliStepDefinition::PublishGitHubRelease))
 		{
 			let github = github.ok_or_else(|| {
 				MonochangeError::Config(format!(
-					"workflow `{}` uses `PublishGitHubRelease` but `[github]` is not configured",
-					workflow.name
+					"CLI command `{}` uses `PublishGitHubRelease` but `[github]` is not configured",
+					cli_command.name
 				))
 			})?;
 			if !github.releases.enabled {
 				return Err(MonochangeError::Config(format!(
-					"workflow `{}` uses `PublishGitHubRelease` but `[github.releases].enabled` is false",
-					workflow.name
+					"CLI command `{}` uses `PublishGitHubRelease` but `[github.releases].enabled` is false",
+					cli_command.name
 				)));
 			}
 		}
-		if workflow
+		if cli_command
 			.steps
 			.iter()
-			.any(|step| matches!(step, WorkflowStepDefinition::OpenReleasePullRequest))
+			.any(|step| matches!(step, CliStepDefinition::OpenReleasePullRequest))
 		{
 			let github = github.ok_or_else(|| {
 				MonochangeError::Config(format!(
-					"workflow `{}` uses `OpenReleasePullRequest` but `[github]` is not configured",
-					workflow.name
+					"CLI command `{}` uses `OpenReleasePullRequest` but `[github]` is not configured",
+					cli_command.name
 				))
 			})?;
 			if !github.pull_requests.enabled {
 				return Err(MonochangeError::Config(format!(
-					"workflow `{}` uses `OpenReleasePullRequest` but `[github.pull_requests].enabled` is false",
-					workflow.name
+					"CLI command `{}` uses `OpenReleasePullRequest` but `[github.pull_requests].enabled` is false",
+					cli_command.name
 				)));
 			}
 		}
-		for step in &workflow.steps {
+		for step in &cli_command.steps {
 			match step {
-				WorkflowStepDefinition::Deploy { names } => {
+				CliStepDefinition::Deploy { names } => {
 					if deployments.is_empty() {
 						return Err(MonochangeError::Config(format!(
-							"workflow `{}` uses `Deploy` but no `[[deployments]]` are configured",
-							workflow.name
+							"CLI command `{}` uses `Deploy` but no `[[deployments]]` are configured",
+							cli_command.name
 						)));
 					}
 					for name in names {
@@ -1735,43 +1763,43 @@ fn validate_workflow_runtime_requirements(
 							.any(|deployment| deployment.name == *name)
 						{
 							return Err(MonochangeError::Config(format!(
-								"workflow `{}` deploy step references unknown deployment `{name}`",
-								workflow.name
+								"CLI command `{}` deploy step references unknown deployment `{name}`",
+								cli_command.name
 							)));
 						}
 					}
 				}
-				WorkflowStepDefinition::EnforceChangesetPolicy => {
+				CliStepDefinition::EnforceChangesetPolicy => {
 					let github = github.ok_or_else(|| {
 						MonochangeError::Config(format!(
-							"workflow `{}` uses `EnforceChangesetPolicy` but `[github]` is not configured",
-							workflow.name
+							"CLI command `{}` uses `EnforceChangesetPolicy` but `[github]` is not configured",
+							cli_command.name
 						))
 					})?;
 					if !github.bot.changesets.enabled {
 						return Err(MonochangeError::Config(format!(
-							"workflow `{}` uses `EnforceChangesetPolicy` but `[github.bot.changesets].enabled` is false",
-							workflow.name
+							"CLI command `{}` uses `EnforceChangesetPolicy` but `[github.bot.changesets].enabled` is false",
+							cli_command.name
 						)));
 					}
-					let changed_path_input =
-						workflow_input(workflow, "changed_path").ok_or_else(|| {
+					let changed_path_input = cli_command_input(cli_command, "changed_path")
+						.ok_or_else(|| {
 							MonochangeError::Config(format!(
-							"workflow `{}` uses `EnforceChangesetPolicy` but does not declare a `changed_path` input",
-							workflow.name
-						))
+								"CLI command `{}` uses `EnforceChangesetPolicy` but does not declare a `changed_path` input",
+								cli_command.name
+							))
 						})?;
-					if !matches!(changed_path_input.kind, WorkflowInputKind::StringList) {
+					if !matches!(changed_path_input.kind, CliInputKind::StringList) {
 						return Err(MonochangeError::Config(format!(
-							"workflow `{}` input `changed_path` must use type `string_list` for `EnforceChangesetPolicy`",
-							workflow.name
+							"CLI command `{}` input `changed_path` must use type `string_list` for `EnforceChangesetPolicy`",
+							cli_command.name
 						)));
 					}
-					if let Some(label_input) = workflow_input(workflow, "label") {
-						if !matches!(label_input.kind, WorkflowInputKind::StringList) {
+					if let Some(label_input) = cli_command_input(cli_command, "label") {
+						if !matches!(label_input.kind, CliInputKind::StringList) {
 							return Err(MonochangeError::Config(format!(
-								"workflow `{}` input `label` must use type `string_list` when used with `EnforceChangesetPolicy`",
-								workflow.name
+								"CLI command `{}` input `label` must use type `string_list` when used with `EnforceChangesetPolicy`",
+								cli_command.name
 							)));
 						}
 					}
@@ -1784,11 +1812,11 @@ fn validate_workflow_runtime_requirements(
 	Ok(())
 }
 
-fn workflow_input<'a>(
-	workflow: &'a WorkflowDefinition,
+fn cli_command_input<'a>(
+	cli_command: &'a CliCommandDefinition,
 	name: &str,
-) -> Option<&'a monochange_core::WorkflowInputDefinition> {
-	workflow.inputs.iter().find(|input| input.name == name)
+) -> Option<&'a CliInputDefinition> {
+	cli_command.inputs.iter().find(|input| input.name == name)
 }
 
 #[allow(clippy::needless_pass_by_value)]

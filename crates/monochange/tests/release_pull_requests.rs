@@ -35,7 +35,7 @@ fn open_release_pull_request_dry_run_renders_group_release_preview() {
 		.contains("#### Features"));
 
 	let manifest = &json["manifest"];
-	assert_eq!(manifest["workflow"], "release-pr");
+	assert_eq!(manifest["command"], "release-pr");
 	assert_eq!(manifest["releaseTargets"][0]["id"], "sdk");
 }
 
@@ -154,19 +154,18 @@ enabled = true
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release-pr"
+[cli.release-pr]
 
-[[workflows.inputs]]
+[[cli.release-pr.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "OpenReleasePullRequest"
 "#,
 	);
@@ -250,19 +249,18 @@ labels = ["release", "automated", "preview"]
 [ecosystems.cargo]
 enabled = true
 
-[[workflows]]
-name = "release-pr"
+[cli.release-pr]
 
-[[workflows.inputs]]
+[[cli.release-pr.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "PrepareRelease"
 
-[[workflows.steps]]
+[[cli.release-pr.steps]]
 type = "OpenReleasePullRequest"
 "#,
 	);

@@ -49,56 +49,52 @@ enabled = true
 [ecosystems.dart]
 enabled = true
 
-[[workflows]]
-name = "validate"
+[cli.validate]
 
-[[workflows.steps]]
+[[cli.validate.steps]]
 type = "Validate"
 
-[[workflows]]
-name = "discover"
+[cli.discover]
 
-[[workflows.inputs]]
+[[cli.discover.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.discover.steps]]
 type = "Discover"
 
-[[workflows]]
-name = "change"
+[cli.change]
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "package"
 type = "string_list"
 required = true
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "bump"
 type = "choice"
 choices = ["patch", "minor", "major"]
 default = "patch"
 
-[[workflows.inputs]]
+[[cli.change.inputs]]
 name = "reason"
 type = "string"
 required = true
 
-[[workflows.steps]]
+[[cli.change.steps]]
 type = "CreateChangeFile"
 
-[[workflows]]
-name = "release"
+[cli.release]
 
-[[workflows.inputs]]
+[[cli.release.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[workflows.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 ```
 
@@ -150,7 +146,7 @@ Expected outcome:
 - transitive dependents receive at least the configured parent bump
 - grouped packages share one planned version
 - package and group metadata drive release targets
-- the workflow updates manifests, changelogs, and configured `versioned_files`
+- the release command updates manifests, changelogs, and configured `versioned_files`
 - consumed `.changeset/*.md` files are deleted only after a fully successful prepare run
 
 ## 5. Run repository validation

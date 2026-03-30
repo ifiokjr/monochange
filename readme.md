@@ -16,7 +16,7 @@
 
 `monochange` is a release-planning toolkit for monorepos that span more than one package ecosystem.
 
-It discovers packages, normalizes dependency data, applies group rules, turns explicit change files into release plans, and can run workflow-driven release preparation from those same inputs.
+It discovers packages, normalizes dependency data, applies group rules, turns explicit change files into release plans, and can run config-defined release preparation from those same inputs.
 
 Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter.
 
@@ -30,7 +30,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - replace ad hoc scripts with explicit change files and deterministic release output
 - keep related packages synchronized with `[group.<id>]`
 - propagate dependent bumps through one normalized dependency graph
-- expose top-level CLI commands from workflows declared in `monochange.toml`
+- expose top-level CLI commands from `[cli.<command>]` entries in `monochange.toml`
 
 <!-- {/projectWhyUse} -->
 
@@ -42,13 +42,13 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - normalize dependency edges across ecosystems
 - coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input
-- expose top-level CLI commands from workflow definitions
-- run config-defined release workflows from `.changeset/*.md`
+- expose top-level CLI commands from `[cli.<command>]` definitions
+- run config-defined release commands from `.changeset/*.md`
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
-- preview or publish GitHub releases and release pull requests from typed workflow steps and shared release data
-- model deployment intents for downstream automation and merge-driven release workflows
-- enforce pull-request changeset policy through typed workflow steps and reusable diagnostics
+- preview or publish GitHub releases and release pull requests from typed command steps and shared release data
+- model deployment intents for downstream automation and merge-driven release commands
+- enforce pull-request changeset policy through typed command steps and reusable diagnostics
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -68,17 +68,15 @@ MonoChange can promote one prepared release into several GitHub-facing automatio
 
 <!-- {/projectGitHubAutomationOverview} -->
 
-See [`docs/src/guide/08-github-automation.md`](docs/src/guide/08-github-automation.md) for a complete configuration and workflow example.
-
 ## Workspace crates
 
 <!-- {=projectCrateCatalog} -->
 
-- `monochange` — end-user CLI and orchestration layer for discovery, planning, and workflow-driven releases.
+- `monochange` — end-user CLI and orchestration layer for discovery, planning, and CLI-defined release commands.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange-orange?logo=rust)](https://crates.io/crates/monochange) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange-1f425f?logo=docs.rs)](https://docs.rs/monochange/)
 - `monochange_core` — shared domain model for packages, dependency edges, groups, change signals, and release plans.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust)](https://crates.io/crates/monochange_core) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs)](https://docs.rs/monochange_core/)
-- `monochange_config` — loads `monochange.toml`, parses `.changeset/*.md`, and validates workflow inputs.
+- `monochange_config` — loads `monochange.toml`, parses `.changeset/*.md`, and validates CLI command inputs.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust)](https://crates.io/crates/monochange_config) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs)](https://docs.rs/monochange_config/)
 - `monochange_graph` — propagates release impact through dependency edges and synchronized groups.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust)](https://crates.io/crates/monochange_graph) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs)](https://docs.rs/monochange_graph/)
@@ -120,7 +118,7 @@ mc release
 
 <!-- {=projectCoreWorkflow} -->
 
-Initialize the repository with detected packages, groups, and default workflows:
+Initialize the repository with detected packages, groups, and default CLI commands:
 
 ```bash
 mc init
@@ -146,7 +144,7 @@ Create a change file:
 mc change --package monochange --bump minor --reason "add release planning"
 ```
 
-Preview the release workflow:
+Preview the release command:
 
 ```bash
 mc release --dry-run --format json
@@ -183,7 +181,7 @@ build:book
 
 <!-- {/repoCommonDevelopmentCommands} -->
 
-See `docs/` for user-facing guides and `CONTRIBUTING.md` for workflow expectations.
+See `docs/` for user-facing guides and `CONTRIBUTING.md` for contribution expectations.
 
 <!-- {=monochangeBadgeLinks} -->
 
