@@ -20,7 +20,7 @@ fn verify_skips_required_changes_when_allowed_label_is_present() {
 	let json = run_json_workflow(
 		tempdir.path(),
 		&[
-			"--changed-path",
+			"--changed-paths",
 			"crates/core/src/lib.rs",
 			"--label",
 			"no-changeset-required",
@@ -36,7 +36,7 @@ fn verify_does_not_require_changesets_for_non_package_changes() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_policy_fixture(tempdir.path(), false, false, "core");
 
-	let json = run_json_workflow(tempdir.path(), &["--changed-path", "docs/readme.md"]);
+	let json = run_json_workflow(tempdir.path(), &["--changed-paths", "docs/readme.md"]);
 	assert_eq!(json["status"], "not_required");
 	assert_eq!(json["matchedPaths"].as_array().map(Vec::len), Some(0));
 	assert_eq!(json["affectedPackageIds"].as_array().map(Vec::len), Some(0));
@@ -49,7 +49,7 @@ fn verify_respects_package_ignored_paths() {
 
 	let json = run_json_workflow(
 		tempdir.path(),
-		&["--changed-path", "crates/core/tests/smoke.rs"],
+		&["--changed-paths", "crates/core/tests/smoke.rs"],
 	);
 	assert_eq!(json["status"], "not_required");
 	assert_eq!(json["ignoredPaths"][0], "crates/core/tests/smoke.rs");
@@ -60,7 +60,7 @@ fn verify_respects_package_additional_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_policy_fixture(tempdir.path(), false, false, "core");
 
-	let json = run_json_workflow(tempdir.path(), &["--changed-path", "Cargo.lock"]);
+	let json = run_json_workflow(tempdir.path(), &["--changed-paths", "Cargo.lock"]);
 	assert_eq!(json["status"], "failed");
 	assert_eq!(json["affectedPackageIds"][0], "core");
 }
@@ -73,9 +73,9 @@ fn verify_fails_when_attached_changeset_targets_the_wrong_package() {
 	let json = run_json_workflow(
 		tempdir.path(),
 		&[
-			"--changed-path",
+			"--changed-paths",
 			"crates/core/src/lib.rs",
-			"--changed-path",
+			"--changed-paths",
 			".changeset/feature.md",
 		],
 	);
@@ -91,9 +91,9 @@ fn verify_accepts_attached_changesets_that_cover_changed_packages() {
 	let json = run_json_workflow(
 		tempdir.path(),
 		&[
-			"--changed-path",
+			"--changed-paths",
 			"crates/core/src/lib.rs",
-			"--changed-path",
+			"--changed-paths",
 			".changeset/feature.md",
 		],
 	);
@@ -110,9 +110,9 @@ fn verify_reports_invalid_attached_changesets() {
 	let json = run_json_workflow(
 		tempdir.path(),
 		&[
-			"--changed-path",
+			"--changed-paths",
 			"crates/core/src/lib.rs",
-			"--changed-path",
+			"--changed-paths",
 			".changeset/feature.md",
 		],
 	);

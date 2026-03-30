@@ -374,7 +374,7 @@ fn verify_cli_json_reports_failure_comment() {
 			.arg("verify")
 			.arg("--format")
 			.arg("json")
-			.arg("--changed-path")
+			.arg("--changed-paths")
 			.arg("crates/core/src/lib.rs"),
 		@r####"
 	success: true

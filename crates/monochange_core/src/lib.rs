@@ -512,6 +512,7 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		names: Vec<String>,
 	},
+	#[serde(alias = "EnforceChangesetPolicy")]
 	VerifyChangesets,
 	Command {
 		command: String,
@@ -810,6 +811,23 @@ pub struct GitHubPullRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitHubChangesetBotSettings {
+	pub enabled: bool,
+	pub required: bool,
+	pub skip_labels: Vec<String>,
+	pub comment_on_failure: bool,
+	pub changed_paths: Vec<String>,
+	pub ignored_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct GitHubBotSettings {
+	#[serde(default)]
+	pub changesets: GitHubChangesetBotSettings,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangesetVerificationSettings {
 	pub enabled: bool,
 	pub required: bool,
@@ -905,6 +923,19 @@ impl Default for GitHubPullRequestSettings {
 	}
 }
 
+impl Default for GitHubChangesetBotSettings {
+	fn default() -> Self {
+		Self {
+			enabled: false,
+			required: true,
+			skip_labels: Vec::new(),
+			comment_on_failure: true,
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
+		}
+	}
+}
+
 impl Default for ChangesetVerificationSettings {
 	fn default() -> Self {
 		Self {
@@ -924,6 +955,8 @@ pub struct GitHubConfiguration {
 	pub releases: GitHubReleaseSettings,
 	#[serde(default)]
 	pub pull_requests: GitHubPullRequestSettings,
+	#[serde(default)]
+	pub bot: GitHubBotSettings,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]

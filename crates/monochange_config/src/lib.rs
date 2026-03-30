@@ -96,6 +96,8 @@ use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
+use monochange_core::ChangesetSettings;
+use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
@@ -156,6 +158,8 @@ struct RawWorkspaceConfiguration {
 	cli: BTreeMap<String, RawCliCommandDefinition>,
 	#[serde(default)]
 	workflows: Vec<CliCommandDefinition>,
+	#[serde(default)]
+	changesets: RawChangesetSettings,
 	#[serde(default)]
 	source: Option<RawSourceConfiguration>,
 	#[serde(default)]
@@ -231,6 +235,10 @@ struct RawPackageDefinition {
 	#[serde(default)]
 	versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
+	ignored_paths: Vec<String>,
+	#[serde(default)]
+	additional_paths: Vec<String>,
+	#[serde(default)]
 	tag: bool,
 	#[serde(default)]
 	release: bool,
@@ -283,6 +291,36 @@ struct RawEcosystems {
 struct RawReleaseNotesSettings {
 	#[serde(default)]
 	change_templates: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawChangesetSettings {
+	#[serde(default)]
+	verify: RawChangesetVerificationSettings,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Deserialize)]
+struct RawChangesetVerificationSettings {
+	#[serde(default = "default_true")]
+	enabled: bool,
+	#[serde(default = "default_true")]
+	required: bool,
+	#[serde(default)]
+	skip_labels: Vec<String>,
+	#[serde(default = "default_true")]
+	comment_on_failure: bool,
+}
+
+impl Default for RawChangesetVerificationSettings {
+	fn default() -> Self {
+		Self {
+			enabled: default_true(),
+			required: default_true(),
+			skip_labels: Vec::new(),
+			comment_on_failure: default_true(),
+		}
+	}
 }
 
 #[derive(Debug, Deserialize)]
@@ -595,6 +633,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		group,
 		cli,
 		workflows,
+		changesets,
 		source,
 		github,
 		ecosystems,
@@ -673,6 +712,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				extra_changelog_sections: package.extra_changelog_sections,
 				empty_update_message: package.empty_update_message,
 				versioned_files: package.versioned_files,
+				ignored_paths: package.ignored_paths,
+				additional_paths: package.additional_paths,
 				tag: package.tag,
 				release: package.release,
 				version_format: package.version_format,
@@ -728,6 +769,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			"configure either `[source]` or legacy `[github]`, but not both".to_string(),
 		));
 	}
+	let changesets = ChangesetSettings {
+		verify: ChangesetVerificationSettings {
+			enabled: changesets.verify.enabled,
+			required: changesets.verify.required,
+			skip_labels: changesets.verify.skip_labels,
+			comment_on_failure: changesets.verify.comment_on_failure,
+		},
+	};
 	let source = source.map(|source| SourceConfiguration {
 		provider: source.provider,
 		owner: source.owner,
@@ -815,10 +864,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	validate_cli(&cli)?;
 	validate_release_notes_configuration(&contents, &release_notes, &packages, &groups)?;
 	validate_deployments_configuration(&contents, &deployments)?;
+	validate_changesets_configuration(&changesets, &packages)?;
 	validate_github_configuration(github.as_ref())?;
 	validate_source_configuration(source.as_ref())?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
-	validate_cli_runtime_requirements(&cli, source.as_ref(), &deployments)?;
+	validate_cli_runtime_requirements(&cli, &changesets, source.as_ref(), &deployments)?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -838,6 +888,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		packages,
 		groups,
 		cli,
+		changesets,
 		github,
 		source,
 		cargo: ecosystems.cargo,
@@ -1766,6 +1817,44 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 	}
 }
 
+fn validate_changesets_configuration(
+	changesets: &ChangesetSettings,
+	packages: &[PackageDefinition],
+) -> MonochangeResult<()> {
+	if changesets
+		.verify
+		.skip_labels
+		.iter()
+		.any(|label| label.trim().is_empty())
+	{
+		return Err(MonochangeError::Config(
+			"[changesets.verify].skip_labels must not include empty values".to_string(),
+		));
+	}
+	for package in packages {
+		for (field, patterns) in [
+			("ignored_paths", &package.ignored_paths),
+			("additional_paths", &package.additional_paths),
+		] {
+			for pattern in patterns {
+				if pattern.trim().is_empty() {
+					return Err(MonochangeError::Config(format!(
+						"[package.{}].{field} must not include empty values",
+						package.id
+					)));
+				}
+				Pattern::new(pattern).map_err(|error| {
+					MonochangeError::Config(format!(
+						"[package.{}].{field} contains invalid glob pattern `{pattern}`: {error}",
+						package.id
+					))
+				})?;
+			}
+		}
+	}
+	Ok(())
+}
+
 fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 	let mut seen_names = BTreeSet::new();
 
@@ -1862,7 +1951,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::PublishRelease
 				| CliStepDefinition::OpenReleaseRequest
 				| CliStepDefinition::Deploy { .. }
-				| CliStepDefinition::EnforceChangesetPolicy => {}
+				| CliStepDefinition::VerifyChangesets => {}
 			}
 		}
 	}
@@ -1872,6 +1961,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 
 fn validate_cli_runtime_requirements(
 	cli: &[CliCommandDefinition],
+	changesets: &ChangesetSettings,
 	source: Option<&SourceConfiguration>,
 	deployments: &[DeploymentDefinition],
 ) -> MonochangeResult<()> {
@@ -1933,42 +2023,30 @@ fn validate_cli_runtime_requirements(
 						}
 					}
 				}
-				CliStepDefinition::EnforceChangesetPolicy => {
-					let source = source.ok_or_else(|| {
-						MonochangeError::Config(format!(
-							"CLI command `{}` uses `EnforceChangesetPolicy` but `[source]` is not configured",
-							cli_command.name
-						))
-					})?;
-					if source.provider != SourceProvider::GitHub {
+				CliStepDefinition::VerifyChangesets => {
+					if !changesets.verify.enabled {
 						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` uses `EnforceChangesetPolicy` but only `provider = \"github\"` is currently supported",
+							"CLI command `{}` uses `VerifyChangesets` but `[changesets.verify].enabled` is false",
 							cli_command.name
 						)));
 					}
-					if !source.bot.changesets.enabled {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` uses `EnforceChangesetPolicy` but `[source.bot.changesets].enabled` is false",
-							cli_command.name
-						)));
-					}
-					let changed_path_input = cli_command_input(cli_command, "changed_path")
+					let changed_paths_input = cli_command_input(cli_command, "changed_paths")
 						.ok_or_else(|| {
 							MonochangeError::Config(format!(
-								"CLI command `{}` uses `EnforceChangesetPolicy` but does not declare a `changed_path` input",
+								"CLI command `{}` uses `VerifyChangesets` but does not declare a `changed_paths` input",
 								cli_command.name
 							))
 						})?;
-					if !matches!(changed_path_input.kind, CliInputKind::StringList) {
+					if !matches!(changed_paths_input.kind, CliInputKind::StringList) {
 						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` input `changed_path` must use type `string_list` for `EnforceChangesetPolicy`",
+							"CLI command `{}` input `changed_paths` must use type `string_list` for `VerifyChangesets`",
 							cli_command.name
 						)));
 					}
 					if let Some(label_input) = cli_command_input(cli_command, "label") {
 						if !matches!(label_input.kind, CliInputKind::StringList) {
 							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` input `label` must use type `string_list` when used with `EnforceChangesetPolicy`",
+								"CLI command `{}` input `label` must use type `string_list` when used with `VerifyChangesets`",
 								cli_command.name
 							)));
 						}

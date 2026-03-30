@@ -16,7 +16,7 @@ The current milestone focuses on:
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
 - model deployment intents for downstream automation and merge-driven release commands
-- verify changeset coverage for changed files through typed command steps and reusable diagnostics
+- enforce pull-request changeset policy through typed command steps and reusable diagnostics
 - apply Rust semver evidence when provided
 - publish end-user documentation through the mdBook in `docs/`
 
@@ -32,7 +32,7 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
-- `mc verify --format json --changed-path ...` verifies that changed files are covered by attached changesets
+- `mc changeset-check --format json --changed-path ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
 <!-- {/projectGitHubAutomationOverview} -->
 
