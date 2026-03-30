@@ -146,7 +146,10 @@ Example configuration:
 
 ```toml
 [release_notes]
-change_templates = ["#### $package — $summary\n\n$details", "- **$package**: $summary"]
+change_templates = [
+	"#### $package — $summary\n\n$details",
+	"- **$package**: $summary",
+]
 ```
 
 ### Example grouped output
@@ -224,8 +227,7 @@ This is the recommended first implementation step.
 
 Grouped release for `sdk`.
 
-Changed members: core
-Synchronized members: app
+Changed members: core Synchronized members: app
 
 ### Features
 
@@ -281,12 +283,10 @@ Preferred formatting:
 ```md
 Grouped release for `sdk`.
 
-Changed members: core
-Synchronized members: app
+Changed members: core Synchronized members: app
 ```
 
-If every member changed directly, omit the synchronized line.
-If no direct notes exist, fall back to the current group-level empty update message behavior.
+If every member changed directly, omit the synchronized line. If no direct notes exist, fall back to the current group-level empty update message behavior.
 
 ## Proposed Markdown Shapes
 
@@ -327,8 +327,7 @@ Members: core, app
 
 Grouped release for `sdk`.
 
-Changed members: core
-Synchronized members: app
+Changed members: core Synchronized members: app
 
 ### Features
 
@@ -358,8 +357,7 @@ Members: core, app
 
 Grouped release for `sdk`.
 
-Changed members: core
-Synchronized members: app
+Changed members: core Synchronized members: app
 
 ### Features
 
