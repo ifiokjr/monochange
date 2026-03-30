@@ -93,6 +93,7 @@ fn rust_semver_provider_parses_compatibility_evidence() {
 		notes: Some("breaking change".to_string()),
 		details: None,
 		change_type: None,
+		source_path: None,
 	};
 	let provider = RustSemverProvider;
 	let assessment = provider
