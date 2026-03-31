@@ -43,8 +43,9 @@ fn ungrouped_transitive_bump_writes_empty_update_message_to_dependent_changelog(
 
 	// app got a transitive patch bump with the built-in fallback
 	assert!(app_changelog.contains("## 1.0.1"));
-	assert!(app_changelog
-		.contains("No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."));
+	assert!(app_changelog.contains(
+		"No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
+	));
 }
 
 #[test]
@@ -336,16 +337,16 @@ fn transitive_dependency_json_plan_includes_trigger_reasons_and_upstream_sources
 	let reasons = app_decision["reasons"]
 		.as_array()
 		.unwrap_or_else(|| panic!("reasons array"));
-	assert!(reasons
-		.iter()
-		.any(|reason| reason.as_str().is_some_and(|text| text.contains("depends on"))));
+	assert!(reasons.iter().any(|reason| reason
+		.as_str()
+		.is_some_and(|text| text.contains("depends on"))));
 
 	let upstream_sources = app_decision["upstreamSources"]
 		.as_array()
 		.unwrap_or_else(|| panic!("upstream sources array"));
-	assert!(upstream_sources.iter().any(
-		|source| source.as_str().is_some_and(|text| text.contains("core"))
-	));
+	assert!(upstream_sources
+		.iter()
+		.any(|source| source.as_str().is_some_and(|text| text.contains("core"))));
 }
 
 // ---------------------------------------------------------------------------
