@@ -47,10 +47,6 @@ path = "crates/monochange_gitlab"
 [package.monochange_gitea]
 path = "crates/monochange_gitea"
 
-[package.monochange-skill]
-path = "npm/skill"
-type = "npm"
-
 [group.main]
 packages = [
 	"monochange",
@@ -65,7 +61,6 @@ packages = [
 	"monochange_github",
 	"monochange_gitlab",
 	"monochange_gitea",
-	"monochange-skill",
 ]
 tag = true
 release = true
@@ -76,6 +71,9 @@ path = "changelog.md"
 format = "monochange"
 
 [ecosystems.cargo]
+enabled = true
+
+[ecosystems.npm]
 enabled = true
 
 [source]
