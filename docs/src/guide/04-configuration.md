@@ -320,7 +320,13 @@ required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
 changed_paths = ["crates/**", "packages/**", "npm/**", "skills/**"]
-ignored_paths = ["docs/**", "specs/**", "readme.md", "CONTRIBUTING.md", "license"]
+ignored_paths = [
+	"docs/**",
+	"specs/**",
+	"readme.md",
+	"CONTRIBUTING.md",
+	"license",
+]
 
 [[deployments]]
 name = "production"
