@@ -70,6 +70,12 @@ version_format = "primary"
 path = "changelog.md"
 format = "monochange"
 
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
 [ecosystems.cargo]
 enabled = true
 
