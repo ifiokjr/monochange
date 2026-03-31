@@ -19,6 +19,7 @@ in
       extra.mdt
       mdbook
       nixfmt
+      nodejs
       rustup
       shfmt
     ]
@@ -106,8 +107,9 @@ in
         set -e
         test:cargo
         test:docs
+        test:node
       '';
-      description = "Run all tests across the crates.";
+      description = "Run all tests across the crates and npm helper scripts.";
       binary = "bash";
     };
     "test:cargo" = {
@@ -124,6 +126,14 @@ in
         cargo test --doc --workspace --all-features
       '';
       description = "Run documentation tests.";
+      binary = "bash";
+    };
+    "test:node" = {
+      exec = ''
+        set -e
+        node --test npm/tests/*.test.mjs
+      '';
+      description = "Run npm helper and launcher tests with the built-in Node test runner.";
       binary = "bash";
     };
     "coverage:all" = {

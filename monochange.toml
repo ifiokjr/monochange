@@ -73,6 +73,9 @@ format = "monochange"
 [ecosystems.cargo]
 enabled = true
 
+[ecosystems.npm]
+enabled = true
+
 [source]
 provider = "github"
 owner = "ifiokjr"
@@ -109,11 +112,15 @@ changed_paths = [
 	"codecov.yml",
 	"deny.toml",
 	"scripts/**",
+	"npm/**",
+	"skills/**",
 ]
 ignored_paths = [
 	".changeset/**",
 	"docs/**",
-	"**/*.md",
+	"specs/**",
+	"readme.md",
+	"CONTRIBUTING.md",
 	"license",
 ]
 
