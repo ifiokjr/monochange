@@ -132,11 +132,15 @@ changed_paths = [
 	"codecov.yml",
 	"deny.toml",
 	"scripts/**",
+	"npm/**",
+	"skills/**",
 ]
 ignored_paths = [
 	".changeset/**",
 	"docs/**",
-	"**/*.md",
+	"specs/**",
+	"readme.md",
+	"CONTRIBUTING.md",
 	"license",
 ]
 
@@ -174,7 +178,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.verify.inputs]]
-name = "changed_path"
+name = "changed_paths"
 type = "string_list"
 required = true
 
@@ -187,6 +191,15 @@ type = "VerifyChangesets"
 ```
 
 <!-- {/githubAutomationPolicyAndDeployConfigExample} -->
+
+## Release and npm publish workflows
+
+MonoChange now includes a release workflow modeled after the latest `mdt` pattern:
+
+- `.github/workflows/release.yml` builds tagged release archives for the `monochange` binary across supported targets and uploads them to the GitHub release
+- `.github/workflows/npm-publish.yml` runs after a successful release workflow, downloads those exact release assets, repackages them into `@monochange/cli` platform packages plus the `@monochange/cli` root package, and publishes `@monochange/skill`
+
+That split keeps npm publication tied to the exact binaries shipped in the GitHub release instead of rebuilding them separately.
 
 ## GitHub Actions policy workflow
 

@@ -59,8 +59,14 @@ enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = ["crates/**", "packages/**"]
-ignored_paths = ["docs/**", "*.md"]
+changed_paths = ["crates/**", "packages/**", "npm/**", "skills/**"]
+ignored_paths = [
+	"docs/**",
+	"specs/**",
+	"readme.md",
+	"CONTRIBUTING.md",
+	"license",
+]
 
 [[deployments]]
 name = "production"
@@ -203,7 +209,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.verify.inputs]]
-name = "changed_path"
+name = "changed_paths"
 type = "string_list"
 required = true
 

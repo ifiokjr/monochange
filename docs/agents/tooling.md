@@ -9,10 +9,13 @@
 
 - `monochange --help`
 - `mc --help`
+- `mc assist pi`
+- `mc mcp`
 - `mc validate`
 - `build:all`
 - `lint:all`
 - `test:all`
+- `test:node`
 - `coverage:all`
 - `build:book`
 

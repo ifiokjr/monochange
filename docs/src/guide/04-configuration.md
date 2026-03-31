@@ -263,7 +263,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.verify.inputs]]
-name = "changed_path"
+name = "changed_paths"
 type = "string_list"
 required = true
 
@@ -319,8 +319,14 @@ enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = ["crates/**", "packages/**"]
-ignored_paths = ["docs/**", "*.md"]
+changed_paths = ["crates/**", "packages/**", "npm/**", "skills/**"]
+ignored_paths = [
+	"docs/**",
+	"specs/**",
+	"readme.md",
+	"CONTRIBUTING.md",
+	"license",
+]
 
 [[deployments]]
 name = "production"
@@ -406,7 +412,7 @@ Current implementation notes:
 - source automation expects `[source]` with provider-specific settings under `[source.releases]`, `[source.pull_requests]`, and `[source.bot.changesets]`; GitHub remains the default provider
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
-- changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_path` command input, and reusable diagnostics for GitHub Actions consumption
+- changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
 - supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `Deploy`, `VerifyChangesets`, and `Command`
 - legacy `PublishGitHubRelease` and `OpenReleasePullRequest` step names are still accepted as migration aliases

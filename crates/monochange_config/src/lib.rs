@@ -132,7 +132,7 @@ use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value as YamlValue;
 
 const CONFIG_FILE: &str = "monochange.toml";
-const RESERVED_CLI_COMMAND_NAMES: &[&str] = &["init", "help", "version"];
+const RESERVED_CLI_COMMAND_NAMES: &[&str] = &["assist", "help", "init", "mcp", "version"];
 const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"summary",
 	"details",
