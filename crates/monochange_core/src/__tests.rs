@@ -38,6 +38,82 @@ fn bump_severity_orders_from_none_to_major() {
 }
 
 #[test]
+fn apply_to_version_bumps_stable_versions_normally() {
+	let version = Version::new(1, 2, 3);
+	assert_eq!(
+		BumpSeverity::Patch.apply_to_version(&version),
+		Version::new(1, 2, 4)
+	);
+	assert_eq!(
+		BumpSeverity::Minor.apply_to_version(&version),
+		Version::new(1, 3, 0)
+	);
+	assert_eq!(
+		BumpSeverity::Major.apply_to_version(&version),
+		Version::new(2, 0, 0)
+	);
+	assert_eq!(
+		BumpSeverity::None.apply_to_version(&version),
+		Version::new(1, 2, 3)
+	);
+}
+
+#[test]
+fn apply_to_version_shifts_bumps_for_pre_stable_versions() {
+	let version = Version::new(0, 1, 0);
+
+	// major becomes minor for pre-1.0
+	assert_eq!(
+		BumpSeverity::Major.apply_to_version(&version),
+		Version::new(0, 2, 0)
+	);
+
+	// minor becomes patch for pre-1.0
+	assert_eq!(
+		BumpSeverity::Minor.apply_to_version(&version),
+		Version::new(0, 1, 1)
+	);
+
+	// patch stays patch
+	assert_eq!(
+		BumpSeverity::Patch.apply_to_version(&version),
+		Version::new(0, 1, 1)
+	);
+
+	// none stays none
+	assert_eq!(
+		BumpSeverity::None.apply_to_version(&version),
+		Version::new(0, 1, 0)
+	);
+}
+
+#[test]
+fn apply_to_version_pre_stable_at_zero_zero() {
+	let version = Version::new(0, 0, 1);
+	assert_eq!(
+		BumpSeverity::Major.apply_to_version(&version),
+		Version::new(0, 1, 0)
+	);
+	assert_eq!(
+		BumpSeverity::Minor.apply_to_version(&version),
+		Version::new(0, 0, 2)
+	);
+	assert_eq!(
+		BumpSeverity::Patch.apply_to_version(&version),
+		Version::new(0, 0, 2)
+	);
+}
+
+#[test]
+fn is_pre_stable_returns_true_for_zero_major() {
+	assert!(BumpSeverity::is_pre_stable(&Version::new(0, 1, 0)));
+	assert!(BumpSeverity::is_pre_stable(&Version::new(0, 0, 1)));
+	assert!(BumpSeverity::is_pre_stable(&Version::new(0, 99, 99)));
+	assert!(!BumpSeverity::is_pre_stable(&Version::new(1, 0, 0)));
+	assert!(!BumpSeverity::is_pre_stable(&Version::new(2, 0, 0)));
+}
+
+#[test]
 fn package_record_uses_manifest_path_for_stable_id() {
 	let package = PackageRecord::new(
 		Ecosystem::Cargo,

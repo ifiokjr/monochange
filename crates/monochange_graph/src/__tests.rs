@@ -212,6 +212,51 @@ fn build_release_plan_synchronizes_version_groups() {
 }
 
 #[test]
+fn build_release_plan_shifts_major_to_minor_for_pre_stable_versions() {
+	let packages = vec![
+		package("cargo:core", Version::new(0, 1, 0)),
+		package("cargo:app", Version::new(0, 1, 0)),
+	];
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[edge("cargo:app", "cargo:core")],
+		&[],
+		&[ChangeSignal {
+			package_id: "cargo:core".to_string(),
+			requested_bump: Some(BumpSeverity::Major),
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: Some("breaking change".to_string()),
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/feature.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+	);
+
+	let core = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == "cargo:core")
+		.unwrap_or_else(|| panic!("expected core decision"));
+	let app = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == "cargo:app")
+		.unwrap_or_else(|| panic!("expected app decision"));
+
+	// major requested on 0.1.0 → planned version should be 0.2.0
+	assert_eq!(core.recommended_bump, BumpSeverity::Major);
+	assert_eq!(core.planned_version, Some(Version::new(0, 2, 0)));
+
+	// transitive dependent gets patch on 0.1.0 → 0.1.1
+	assert_eq!(app.recommended_bump, BumpSeverity::Patch);
+	assert_eq!(app.planned_version, Some(Version::new(0, 1, 1)));
+}
+
+#[test]
 fn build_release_plan_uses_compatibility_assessments_to_escalate_parents() {
 	let packages = vec![
 		package("cargo:core", Version::new(1, 0, 0)),
