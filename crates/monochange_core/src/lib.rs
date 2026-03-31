@@ -105,10 +105,29 @@ impl BumpSeverity {
 		self != Self::None
 	}
 
+	/// Returns `true` when the version is below `1.0.0`.
+	///
+	/// Pre-1.0 packages use a shifted bump policy where major changes bump
+	/// the minor component and minor changes bump the patch component.
+	#[must_use]
+	pub fn is_pre_stable(version: &Version) -> bool {
+		version.major == 0
+	}
+
 	#[must_use]
 	pub fn apply_to_version(self, version: &Version) -> Version {
+		let effective = if Self::is_pre_stable(version) {
+			match self {
+				Self::Major => Self::Minor,
+				Self::Minor => Self::Patch,
+				other => other,
+			}
+		} else {
+			self
+		};
+
 		let mut next = version.clone();
-		match self {
+		match effective {
 			Self::None => next,
 			Self::Patch => {
 				next.patch += 1;
