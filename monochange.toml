@@ -122,6 +122,9 @@ ignored_paths = [
 	"readme.md",
 	"CONTRIBUTING.md",
 	"license",
+	"**/tests/**",
+	"**/__tests.rs",
+	"**/snapshots/**",
 ]
 
 [[deployments]]
