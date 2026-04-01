@@ -9,6 +9,7 @@
 devenv.local.nix
 
 **/dist/**
+node_modules/
 
 # insta snapshots
 *.pending-snap
