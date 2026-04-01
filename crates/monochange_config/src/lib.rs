@@ -141,7 +141,21 @@ const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"target_id",
 	"bump",
 	"type",
+	"context",
 	"provenance",
+	"changeset_path",
+	"change_owner",
+	"change_owner_link",
+	"review_request",
+	"review_request_link",
+	"introduced_commit",
+	"introduced_commit_link",
+	"last_updated_commit",
+	"last_updated_commit_link",
+	"related_issues",
+	"related_issue_links",
+	"closed_issues",
+	"closed_issue_links",
 ];
 
 #[derive(Debug, Deserialize, Default)]

@@ -13,7 +13,7 @@ fn cli() -> Command {
 }
 
 #[test]
-fn release_manifest_records_git_changeset_provenance_and_renders_provenance_templates() {
+fn release_manifest_records_git_changeset_context_and_renders_context_templates() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_git_release_fixture(tempdir.path());
 
@@ -35,7 +35,7 @@ fn release_manifest_records_git_changeset_provenance_and_renders_provenance_temp
 core: minor
 ---
 
-#### add provenance context
+#### add changeset context
 ",
 	)
 	.unwrap_or_else(|error| panic!("changeset write: {error}"));
@@ -51,7 +51,7 @@ core: minor
 core: minor
 ---
 
-#### add provenance context
+#### add changeset context
 
 Track the commit history in release notes.
 ",
@@ -89,21 +89,21 @@ Track the commit history in release notes.
 		Some(".changeset/feature.md")
 	);
 	assert_eq!(
-		parsed["changesets"][0]["provenance"]["provider"].as_str(),
+		parsed["changesets"][0]["context"]["provider"].as_str(),
 		Some("generic_git")
 	);
 	assert_eq!(
-		parsed["changesets"][0]["provenance"]["introduced"]["commit"]["shortSha"].as_str(),
+		parsed["changesets"][0]["context"]["introduced"]["commit"]["shortSha"].as_str(),
 		Some(&introduced_sha[..7])
 	);
 	assert_eq!(
-		parsed["changesets"][0]["provenance"]["lastUpdated"]["commit"]["shortSha"].as_str(),
+		parsed["changesets"][0]["context"]["lastUpdated"]["commit"]["shortSha"].as_str(),
 		Some(&updated_sha[..7])
 	);
 	let rendered = parsed["changelogs"][0]["rendered"]
 		.as_str()
 		.unwrap_or_else(|| panic!("expected rendered changelog"));
-	assert!(rendered.contains("> Changeset: `.changeset/feature.md`"));
+	assert!(rendered.contains("> _Changeset:_ `.changeset/feature.md`"));
 	assert!(rendered.contains(&introduced_sha[..7]));
 	assert!(rendered.contains(&updated_sha[..7]));
 }
@@ -143,7 +143,7 @@ path = "{path}/CHANGELOG.md"
 format = "monochange"
 
 [release_notes]
-change_templates = ["#### $summary\n\n$details\n\n$provenance", "#### $summary\n\n$provenance", "- $summary"]
+change_templates = ["#### $summary\n\n$details\n\n$context", "#### $summary\n\n$context", "- $summary"]
 
 [package.core]
 path = "crates/core"

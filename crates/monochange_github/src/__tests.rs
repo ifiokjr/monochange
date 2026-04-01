@@ -8,7 +8,7 @@ use httpmock::Method::POST;
 use httpmock::MockServer;
 use monochange_core::BotSettings;
 use monochange_core::ChangeRequestSettings;
-use monochange_core::ChangesetProvenance;
+use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
 use monochange_core::GitHubBotSettings;
 use monochange_core::GitHubConfiguration;
@@ -547,7 +547,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 }
 
 #[test]
-fn enrich_changeset_provenance_resolves_pull_requests_and_related_issues() {
+fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 	let server = MockServer::start();
 	let lookup_pull_request = server.mock(|when, then| {
 		when.method(GET)
@@ -578,7 +578,7 @@ fn enrich_changeset_provenance_resolves_pull_requests_and_related_issues() {
 		summary: Some("add release context".to_string()),
 		details: None,
 		targets: Vec::new(),
-		provenance: Some(ChangesetProvenance {
+		context: Some(ChangesetContext {
 			provider: HostingProviderKind::GenericGit,
 			host: None,
 			capabilities: HostingCapabilities::default(),
@@ -615,27 +615,27 @@ fn enrich_changeset_provenance_resolves_pull_requests_and_related_issues() {
 			.unwrap_or_else(|error| panic!("runtime: {error}"))
 			.block_on(async {
 				let client = build_test_client(&server);
-				enrich_changeset_provenance_with_client(&client, &github, &mut changesets).await;
+				enrich_changeset_context_with_client(&client, &github, &mut changesets).await;
 			});
 	});
 
 	lookup_pull_request.assert();
 	lookup_closing_issues.assert();
-	let provenance = changesets
+	let context = changesets
 		.first()
-		.and_then(|changeset| changeset.provenance.as_ref())
-		.unwrap_or_else(|| panic!("expected provenance"));
-	assert_eq!(provenance.provider, HostingProviderKind::GitHub);
-	assert_eq!(provenance.host.as_deref(), Some("example.com"));
-	assert_eq!(provenance.related_issues.len(), 2);
-	assert!(provenance.related_issues.iter().any(|issue| {
+		.and_then(|changeset| changeset.context.as_ref())
+		.unwrap_or_else(|| panic!("expected context"));
+	assert_eq!(context.provider, HostingProviderKind::GitHub);
+	assert_eq!(context.host.as_deref(), Some("example.com"));
+	assert_eq!(context.related_issues.len(), 2);
+	assert!(context.related_issues.iter().any(|issue| {
 		issue.id == "#7" && issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest
 	}));
-	assert!(provenance.related_issues.iter().any(|issue| {
+	assert!(context.related_issues.iter().any(|issue| {
 		issue.id == "#8"
 			&& issue.relationship == HostedIssueRelationshipKind::ReferencedByReviewRequest
 	}));
-	let introduced = provenance
+	let introduced = context
 		.introduced
 		.as_ref()
 		.unwrap_or_else(|| panic!("expected introduced revision"));
@@ -701,7 +701,7 @@ fn comment_released_issues_skips_existing_markers_and_posts_missing_comments() {
 		summary: Some("add release context".to_string()),
 		details: None,
 		targets: Vec::new(),
-		provenance: Some(ChangesetProvenance {
+		context: Some(ChangesetContext {
 			provider: HostingProviderKind::GitHub,
 			host: Some("example.com".to_string()),
 			capabilities: github_hosting_capabilities(),
