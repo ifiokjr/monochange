@@ -32,8 +32,10 @@ macro_rules! apply_common_filters {
 #[test]
 fn validate_cli_succeeds_for_valid_workspace() {
 	apply_common_filters!();
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/cargo/workspace-versioned-grouped-release");
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_ungrouped_release_fixture(tempdir.path());
+	copy_directory(&fixture_root, tempdir.path());
 
 	assert_cmd_snapshot!(
 		cli().current_dir(tempdir.path()).arg("validate"),
@@ -787,6 +789,36 @@ packages = ["core"]
 	help: move the package into exactly one [group.<id>] declaration
 	"###
 	);
+}
+
+fn copy_directory(source: &Path, destination: &Path) {
+	fs::create_dir_all(destination)
+		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
+	for entry in fs::read_dir(source)
+		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
+	{
+		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
+		let source_path = entry.path();
+		let destination_path = destination.join(entry.file_name());
+		let file_type = entry
+			.file_type()
+			.unwrap_or_else(|error| panic!("file type {}: {error}", source_path.display()));
+		if file_type.is_dir() {
+			copy_directory(&source_path, &destination_path);
+		} else if file_type.is_file() {
+			if let Some(parent) = destination_path.parent() {
+				fs::create_dir_all(parent)
+					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+			}
+			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
+				panic!(
+					"copy {} -> {}: {error}",
+					source_path.display(),
+					destination_path.display()
+				)
+			});
+		}
+	}
 }
 
 fn seed_ungrouped_release_fixture(root: &Path) {

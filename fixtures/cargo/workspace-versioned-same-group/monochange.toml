@@ -1,0 +1,11 @@
+[defaults]
+package_type = "cargo"
+
+[package.alpha]
+path = "crates/alpha"
+
+[package.beta]
+path = "crates/beta"
+
+[group.sdk]
+packages = ["alpha", "beta"]
