@@ -77,7 +77,19 @@ MonoChange currently supports two changelog formats:
 
 Defaults can set a repository-wide changelog path pattern and format, while package and group changelog tables can override either field.
 
-You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions. Templates currently support `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`. Git-derived template variables are planned next.
+You can also customize release-note rendering with a workspace-wide `[release_notes]` table plus per-package or per-group `extra_changelog_sections` definitions.
+
+Supported template variables include:
+
+- core release-note values: `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`
+- pre-rendered metadata block: `$context` (preferred) or legacy alias `$provenance`
+- authored file path: `$changeset_path`
+- change owner / actor: `$change_owner`, `$change_owner_link`
+- linked review request: `$review_request`, `$review_request_link`
+- linked commits: `$introduced_commit`, `$introduced_commit_link`, `$last_updated_commit`, `$last_updated_commit_link`
+- linked issues: `$closed_issues`, `$closed_issue_links`, `$related_issues`, `$related_issue_links`
+
+The `*_link` variants render markdown links when the hosting provider exposes URLs. The `$context` block is the easiest default because it collapses available metadata into a compact, human-readable note without forcing every template to handle missing fields explicitly.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 
@@ -85,7 +97,12 @@ You can also customize release-note rendering with a workspace-wide `[release_no
 
 ```toml
 [release_notes]
-change_templates = ["#### $summary\n\n$details", "- $summary"]
+change_templates = [
+	"#### $summary\n\n$details\n\n$context",
+	"#### $summary\n\n$context",
+	"#### $summary\n\n$details",
+	"- $summary",
+]
 
 [package.core]
 path = "crates/core"
@@ -139,6 +156,9 @@ type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
+
+[[cli.publish-release.steps]]
+type = "CommentReleasedIssues"
 
 [cli.release-pr]
 help_text = "Prepare a release and open or update a provider release request"
@@ -298,8 +318,8 @@ Current implementation notes:
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
 - deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `Deploy`, `VerifyChangesets`, and `Command`
-- legacy `PublishGitHubRelease` and `OpenReleasePullRequest` step names are still accepted as migration aliases
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Deploy`, `VerifyChangesets`, and `Command`
+- legacy `PublishGitHubRelease`, `OpenReleasePullRequest`, and `EnforceChangesetPolicy` step names are still accepted as migration aliases
 
 <!-- {/configurationCurrentStatus} -->
 
@@ -391,14 +411,15 @@ evidence:
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
 - `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
-- change templates support detailed multi-line release-note entries through `$details`
+- change templates support detailed multi-line release-note entries through `$details`, compact metadata blocks through `$context`, and fine-grained linked metadata like `$change_owner_link`, `$review_request_link`, and `$closed_issue_links`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
-- release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
+- release-manifest JSON captures release targets, changelog payloads, authored changesets, linked changeset context metadata, changed files, and the synchronized release plan for downstream automation
 - `PublishRelease` reuses the same structured release data to build provider release requests for grouped and package-owned releases
 - `OpenReleaseRequest` reuses the same structured release data to render release-request summaries, branch names, and idempotent provider updates
+- `CommentReleasedIssues` can use linked changeset context metadata to add follow-up comments to closed issues after a release is published
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
 - `VerifyChangesets` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
@@ -422,6 +443,7 @@ Current `PrepareRelease` behavior:
 - can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
 - can preview or publish provider releases via `PublishRelease`
 - can preview or open/update release requests via `OpenReleaseRequest`
+- can comment on released issues via `CommentReleasedIssues`
 - can emit deployment intents via `Deploy` for merge-driven or CI-driven deploy orchestration
 - can evaluate pull-request changeset policy via `VerifyChangesets` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
@@ -532,7 +554,12 @@ path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
-change_templates = ["#### $summary\n\n$details", "- $summary"]
+change_templates = [
+	"#### $summary\n\n$details\n\n$context",
+	"#### $summary\n\n$context",
+	"#### $summary\n\n$details",
+	"- $summary",
+]
 
 [group.main.changelog]
 path = "changelog.md"
@@ -579,6 +606,9 @@ type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
+
+[[cli.publish-release.steps]]
+type = "CommentReleasedIssues"
 
 [cli.release-pr]
 help_text = "Prepare a release and open or update a provider release request"

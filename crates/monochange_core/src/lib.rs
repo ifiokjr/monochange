@@ -901,7 +901,7 @@ pub struct ChangesetRevision {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangesetProvenance {
+pub struct ChangesetContext {
 	pub provider: HostingProviderKind,
 	#[serde(default)]
 	pub host: Option<String>,
@@ -914,6 +914,8 @@ pub struct ChangesetProvenance {
 	#[serde(default)]
 	pub related_issues: Vec<HostedIssueRef>,
 }
+
+pub type ChangesetProvenance = ChangesetContext;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -961,8 +963,8 @@ pub struct PreparedChangeset {
 	#[serde(default)]
 	pub details: Option<String>,
 	pub targets: Vec<PreparedChangesetTarget>,
-	#[serde(default)]
-	pub provenance: Option<ChangesetProvenance>,
+	#[serde(default, alias = "provenance")]
+	pub context: Option<ChangesetContext>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

@@ -67,9 +67,10 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
-- `mc release-manifest` writes a stable JSON artifact for downstream jobs
+- `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
+- changelog templates can render linked change owners, review requests, commits, and closed issues through `$context` or fine-grained metadata variables
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
 - `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
@@ -145,7 +146,12 @@ path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
-change_templates = ["#### $summary\n\n$details", "- $summary"]
+change_templates = [
+	"#### $summary\n\n$details\n\n$context",
+	"#### $summary\n\n$context",
+	"#### $summary\n\n$details",
+	"- $summary",
+]
 
 [package.sdk-core]
 path = "crates/sdk_core"

@@ -110,6 +110,7 @@ Current `PrepareRelease` behavior:
 - can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
 - can preview or publish provider releases via `PublishRelease`
 - can preview or open/update release requests via `OpenReleaseRequest`
+- can comment on released issues via `CommentReleasedIssues`
 - can emit deployment intents via `Deploy` for merge-driven or CI-driven deploy orchestration
 - can evaluate pull-request changeset policy via `VerifyChangesets` using changed paths and labels supplied by CI
 - includes any emitted deployment intents in manifest JSON so downstream CI can gate or fan out deployments safely
@@ -193,14 +194,15 @@ Planning rules in this milestone:
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
 - `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
-- change templates support detailed multi-line release-note entries through `$details`
+- change templates support detailed multi-line release-note entries through `$details`, compact metadata blocks through `$context`, and fine-grained linked metadata like `$change_owner_link`, `$review_request_link`, and `$closed_issue_links`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
-- release-manifest JSON captures release targets, changelog payloads, changed files, and the synchronized release plan for downstream automation
+- release-manifest JSON captures release targets, changelog payloads, authored changesets, linked changeset context metadata, changed files, and the synchronized release plan for downstream automation
 - `PublishRelease` reuses the same structured release data to build provider release requests for grouped and package-owned releases
 - `OpenReleaseRequest` reuses the same structured release data to render release-request summaries, branch names, and idempotent provider updates
+- `CommentReleasedIssues` can use linked changeset context metadata to add follow-up comments to closed issues after a release is published
 - `Deploy` turns configured `[[deployments]]` entries into structured deployment intents for release manifests and downstream automation
 - `VerifyChangesets` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation

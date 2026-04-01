@@ -324,7 +324,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	          "changeType": null
 	        }
 	      ],
-	      "provenance": {
+	      "context": {
 	        "provider": "generic_git",
 	        "host": null,
 	        "capabilities": {
@@ -607,7 +607,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	          "changeType": null
 	        }
 	      ],
-	      "provenance": {
+	      "context": {
 	        "provider": "generic_git",
 	        "host": null,
 	        "capabilities": {

@@ -15,7 +15,12 @@ path = "{path}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
-change_templates = ["#### $summary\n\n$details", "- $summary"]
+change_templates = [
+	"#### $summary\n\n$details\n\n$context",
+	"#### $summary\n\n$context",
+	"#### $summary\n\n$details",
+	"- $summary",
+]
 
 [package.sdk-core]
 path = "crates/sdk_core"
