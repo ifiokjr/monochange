@@ -1,0 +1,4 @@
+[package]
+name = "workspace-core"
+version = { workspace = true }
+edition = "2021"

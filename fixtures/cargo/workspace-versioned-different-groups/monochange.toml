@@ -1,0 +1,17 @@
+[defaults]
+package_type = "cargo"
+
+[package.alpha]
+path = "crates/alpha"
+
+[package.beta]
+path = "crates/beta"
+
+[package.gamma]
+path = "crates/gamma"
+
+[group.group-a]
+packages = ["alpha", "beta"]
+
+[group.group-b]
+packages = ["gamma"]

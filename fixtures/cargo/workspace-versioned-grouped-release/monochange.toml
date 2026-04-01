@@ -1,0 +1,15 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+
+[ecosystems.cargo]
+enabled = true

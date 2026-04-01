@@ -778,6 +778,7 @@ fn execute_cli_command(
 		match step {
 			CliStepDefinition::Validate => {
 				validate_workspace(root)?;
+				validate_cargo_workspace_version_groups(root)?;
 				output = Some(format!(
 					"workspace validation passed for {}",
 					root_relative(root, root).display()
@@ -1790,6 +1791,67 @@ fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 		Ecosystem::Dart => PackageType::Dart,
 		Ecosystem::Flutter => PackageType::Flutter,
 	}
+}
+
+fn validate_cargo_workspace_version_groups(root: &Path) -> MonochangeResult<()> {
+	let configuration = load_workspace_configuration(root)?;
+	if configuration.packages.is_empty() {
+		return Ok(());
+	}
+
+	let cargo_discovery = discover_cargo_packages(root)?;
+	let mut packages = cargo_discovery.packages;
+	if packages.is_empty() {
+		return Ok(());
+	}
+
+	apply_version_groups(&mut packages, &configuration)?;
+
+	let mut workspace_versioned = BTreeMap::<PathBuf, Vec<usize>>::new();
+	for (index, package) in packages.iter().enumerate() {
+		if package.ecosystem == Ecosystem::Cargo
+			&& package.metadata.contains_key("config_id")
+			&& package
+				.metadata
+				.get("uses_workspace_version")
+				.map(String::as_str)
+				== Some("true")
+		{
+			workspace_versioned
+				.entry(package.workspace_root.clone())
+				.or_default()
+				.push(index);
+		}
+	}
+
+	for indices in workspace_versioned.values() {
+		if indices.len() < 2 {
+			continue;
+		}
+
+		let group_ids = indices
+			.iter()
+			.filter_map(|index| packages.get(*index))
+			.map(|package| package.version_group_id.as_deref())
+			.collect::<BTreeSet<_>>();
+
+		if group_ids.len() > 1 || group_ids.contains(&None) {
+			let details = indices
+				.iter()
+				.filter_map(|index| packages.get(*index))
+				.map(|package| match &package.version_group_id {
+					Some(group_id) => format!("`{}` in group `{}`", package.name, group_id),
+					None => format!("`{}` not in any group", package.name),
+				})
+				.collect::<Vec<_>>();
+			return Err(MonochangeError::Config(format!(
+				"cargo packages using `version.workspace = true` must belong to the same version group, but found mismatched assignments: {}",
+				details.join(", ")
+			)));
+		}
+	}
+
+	Ok(())
 }
 
 pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {

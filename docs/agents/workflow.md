@@ -10,4 +10,5 @@
 - Implement the smallest change that makes the tests pass.
 - After making changes, run `fix:all` so formatting and clippy autofixes are applied before final validation.
 - Update docs, READMEs, fixtures, changeset examples, and templates when behavior changes.
+- Always include a `.changeset/*.md` file in feature and fix branches that change behavior in any published crate. Use `mc change` to generate the file, targeting the affected packages or groups with the appropriate bump level.
 - Run the full local validation suite before opening a PR.

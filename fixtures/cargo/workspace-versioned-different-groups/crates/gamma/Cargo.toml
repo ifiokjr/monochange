@@ -1,0 +1,3 @@
+[package]
+name = "gamma"
+version = { workspace = true }
