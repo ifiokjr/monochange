@@ -1,11 +1,9 @@
-use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
 use monochange_core::materialize_dependency_edges;
 use monochange_core::ChangeSignal;
 use monochange_semver::CompatibilityProvider;
-use tempfile::tempdir;
 
 use crate::discover_cargo_packages;
 use crate::RustSemverProvider;
@@ -34,37 +32,15 @@ fn discovers_cargo_workspace_members() {
 
 #[test]
 fn cargo_workspace_members_inherit_workspace_package_versions() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	fs::create_dir_all(tempdir.path().join("crates/core"))
-		.unwrap_or_else(|error| panic!("create core dir: {error}"));
-	fs::write(
-		tempdir.path().join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-
-[workspace.package]
-version = "2.3.4"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
-	fs::write(
-		tempdir.path().join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workspace-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("package manifest: {error}"));
-
-	let discovery = discover_cargo_packages(tempdir.path())
+	let fixture_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/cargo/workspace-versioned");
+	let discovery = discover_cargo_packages(&fixture_root)
 		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
 	let package = discovery
 		.packages
-		.first()
-		.unwrap_or_else(|| panic!("expected one package"));
+		.iter()
+		.find(|package| package.name == "workspace-core")
+		.unwrap_or_else(|| panic!("expected workspace-core package"));
 
 	assert_eq!(
 		package
@@ -73,6 +49,40 @@ edition = "2021"
 			.map(ToString::to_string)
 			.as_deref(),
 		Some("2.3.4")
+	);
+}
+
+#[test]
+fn cargo_workspace_members_mark_uses_workspace_version_metadata() {
+	let fixture_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/cargo/workspace-versioned");
+	let discovery = discover_cargo_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
+
+	let core_package = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "workspace-core")
+		.unwrap_or_else(|| panic!("expected workspace-core package"));
+	assert_eq!(
+		core_package
+			.metadata
+			.get("uses_workspace_version")
+			.map(String::as_str),
+		Some("true")
+	);
+
+	let app_package = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "workspace-app")
+		.unwrap_or_else(|| panic!("expected workspace-app package"));
+	assert_eq!(
+		app_package
+			.metadata
+			.get("uses_workspace_version")
+			.map(String::as_str),
+		None
 	);
 }
 

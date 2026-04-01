@@ -305,6 +305,17 @@ fn parse_package_manifest(
 		version,
 		publish_state,
 	);
+	let uses_workspace_version = package
+		.get("version")
+		.and_then(Value::as_table)
+		.and_then(|table| table.get("workspace"))
+		.and_then(Value::as_bool)
+		.unwrap_or(false);
+	if uses_workspace_version {
+		package_record
+			.metadata
+			.insert("uses_workspace_version".to_string(), "true".to_string());
+	}
 	package_record.declared_dependencies = parse_dependencies(&parsed);
 	Ok(Some(package_record))
 }

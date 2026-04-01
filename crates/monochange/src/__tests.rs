@@ -1411,6 +1411,75 @@ type = "PrepareRelease"
 	);
 }
 
+#[test]
+fn validate_rejects_workspace_versioned_packages_in_different_groups() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/cargo/workspace-versioned-different-groups");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected validation failure"));
+	let rendered = error.to_string();
+
+	assert!(rendered.contains("version.workspace = true"));
+	assert!(rendered.contains("same version group"));
+}
+
+#[test]
+fn validate_rejects_workspace_versioned_packages_not_in_any_group() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/cargo/workspace-versioned-ungrouped");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected validation failure"));
+	let rendered = error.to_string();
+
+	assert!(rendered.contains("version.workspace = true"));
+	assert!(rendered.contains("same version group"));
+	assert!(rendered.contains("not in any group"));
+}
+
+#[test]
+fn validate_accepts_workspace_versioned_packages_in_same_group() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/cargo/workspace-versioned-same-group");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
+	)
+	.unwrap_or_else(|error| panic!("validate output: {error}"));
+	assert!(output.contains("workspace validation passed"));
+}
+
+#[test]
+fn validate_accepts_single_workspace_versioned_package_without_group() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/cargo/workspace-versioned-single");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
+	)
+	.unwrap_or_else(|error| panic!("validate output: {error}"));
+	assert!(output.contains("workspace validation passed"));
+}
+
 fn write_file(path: impl AsRef<Path>, content: &str) {
 	let path = path.as_ref();
 	if let Some(parent) = path.parent() {
