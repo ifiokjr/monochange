@@ -2537,7 +2537,7 @@ fn build_rendered_changeset_context(
 		changeset_path: changeset_path.clone(),
 		..RenderedChangesetContext::default()
 	};
-	let mut lines = vec![format!("> _Changeset:_ `{changeset_path}`")];
+	let mut lines = Vec::new();
 	let Some(context) = changeset.context.as_ref() else {
 		rendered.context = lines.join("\n");
 		return rendered;

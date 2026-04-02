@@ -398,15 +398,32 @@ You can also customize release-note rendering with a workspace-wide `[release_no
 
 Supported template variables include:
 
-- core release-note values: `$summary`, `$details`, `$package`, `$version`, `$target_id`, `$bump`, and `$type`
-- pre-rendered metadata block: `$context` (preferred) or legacy alias `$provenance`
-- authored file path: `$changeset_path`
-- change owner / actor: `$change_owner`, `$change_owner_link`
-- linked review request: `$review_request`, `$review_request_link`
-- linked commits: `$introduced_commit`, `$introduced_commit_link`, `$last_updated_commit`, `$last_updated_commit_link`
-- linked issues: `$closed_issues`, `$closed_issue_links`, `$related_issues`, `$related_issue_links`
+| Variable                    | Meaning                                                               | Notes                                                                                                 |
+| --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `$summary`                  | rendered release-note summary heading                                 | always available                                                                                      |
+| `$details`                  | optional long-form details body                                       | omitted when the changeset has no details                                                             |
+| `$package`                  | owning package id for the rendered entry                              | useful in shared templates                                                                            |
+| `$version`                  | release version for the current target                                | package or group version                                                                              |
+| `$target_id`                | release target id                                                     | package id or group id                                                                                |
+| `$bump`                     | resolved bump severity                                                | `patch`, `minor`, or `major`                                                                          |
+| `$type`                     | changeset note type                                                   | e.g. `feature`, `fix`, `security`; omitted when absent                                                |
+| `$context`                  | compact default metadata block                                        | preferred rendered block for human-readable notes                                                     |
+| `$provenance`               | legacy alias for `$context`                                           | kept for backward compatibility                                                                       |
+| `$changeset_path`           | source `.changeset/*.md` path                                         | tracked in manifests and still available for custom templates, but not shown by default in `$context` |
+| `$change_owner`             | plain-text hosted actor label                                         | usually something like `@ifiokjr`                                                                     |
+| `$change_owner_link`        | markdown link to the hosted actor                                     | falls back to plain text when no URL is available                                                     |
+| `$review_request`           | plain-text PR/MR label                                                | e.g. `PR #31` or `MR !42`                                                                             |
+| `$review_request_link`      | markdown link to the PR/MR                                            | falls back to plain text when no URL is available                                                     |
+| `$introduced_commit`        | short SHA for the commit that first introduced the changeset          | plain text only                                                                                       |
+| `$introduced_commit_link`   | markdown link to the introducing commit                               | preferred for changelog output                                                                        |
+| `$last_updated_commit`      | short SHA for the most recent commit that changed the changeset       | only populated when different from `$introduced_commit`                                               |
+| `$last_updated_commit_link` | markdown link to the most recent commit that changed the changeset    | only populated when different from `$introduced_commit`                                               |
+| `$closed_issues`            | plain-text list of issues closed by the linked review request         | typically `#12, #18`                                                                                  |
+| `$closed_issue_links`       | markdown links to issues closed by the linked review request          | preferred for changelog output                                                                        |
+| `$related_issues`           | plain-text list of related issues that were referenced but not closed | host support may vary                                                                                 |
+| `$related_issue_links`      | markdown links to related issues that were referenced but not closed  | host support may vary                                                                                 |
 
-The `*_link` variants render markdown links when the hosting provider exposes URLs. The `$context` block is the easiest default because it collapses available metadata into a compact, human-readable note without forcing every template to handle missing fields explicitly.
+The `*_link` variants render markdown links when the hosting provider exposes URLs. By default `$context` renders the highest-value metadata for readers — owner, review request, introduced commit, last updated commit when different, and linked issues — without exposing the transient `.changeset/*.md` path unless you explicitly reference `$changeset_path` in your template.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 
