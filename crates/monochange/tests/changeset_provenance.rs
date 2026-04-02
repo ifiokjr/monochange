@@ -103,7 +103,7 @@ Track the commit history in release notes.
 	let rendered = parsed["changelogs"][0]["rendered"]
 		.as_str()
 		.unwrap_or_else(|| panic!("expected rendered changelog"));
-	assert!(rendered.contains("> _Changeset:_ `.changeset/feature.md`"));
+	assert!(!rendered.contains("> _Changeset:_ `.changeset/feature.md`"));
 	assert!(rendered.contains(&introduced_sha[..7]));
 	assert!(rendered.contains(&updated_sha[..7]));
 }
