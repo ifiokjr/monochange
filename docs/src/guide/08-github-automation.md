@@ -113,7 +113,7 @@ type = "OpenReleaseRequest"
 
 <!-- {/githubAutomationReleaseConfigExample} -->
 
-When you want fine-grained changelog formatting instead of the default `$context` block, GitHub-backed release notes can reference individual metadata fields such as `$change_owner_link`, `$review_request_link`, `$introduced_commit_link`, `$closed_issue_links`, and `$related_issue_links`. Those variables render markdown links when host URLs are available, so generated changelogs can point directly at the responsible actor, the PR, and linked issues.
+When you want fine-grained changelog formatting instead of the default `$context` block, GitHub-backed release notes can reference individual metadata fields such as `$change_owner_link`, `$review_request_link`, `$introduced_commit_link`, `$closed_issue_links`, and `$related_issue_links`. Those variables render markdown links when host URLs are available, so generated changelogs can point directly at the responsible actor, the PR, and linked issues. The source changeset path stays available through `$changeset_path`, but `$context` keeps that transient file path out of the default rendered note.
 
 ## Deployment intents and changeset policy
 
