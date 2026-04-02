@@ -1,0 +1,20 @@
+[defaults]
+package_type = "cargo"
+
+[package.alpha]
+path = "workspace-a/crates/alpha"
+
+[package.beta]
+path = "workspace-a/crates/beta"
+
+[package.gamma]
+path = "workspace-b/crates/gamma"
+
+[package.delta]
+path = "workspace-b/crates/delta"
+
+[group.sdk-a]
+packages = ["alpha", "beta"]
+
+[group.sdk-b]
+packages = ["gamma", "delta"]

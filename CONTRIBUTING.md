@@ -38,7 +38,8 @@ Shared documentation blocks live in `.templates/` and are synchronized with `mdt
 2. Write failing tests first for non-trivial behavior.
 3. Implement the smallest change that makes the tests pass.
 4. Update docs, READMEs, fixtures, changeset examples, and templates when behavior changes.
-5. Run the full local validation suite before opening a PR.
+5. Add or update a `.changeset/*.md` file for behavior changes in published crates. Prefer `mc change --package <id-or-group> --bump <patch|minor|major> --reason "..."` so the changeset targets configured package or group ids.
+6. Run the full local validation suite before opening a PR.
 
 ## Core commands
 

@@ -62,6 +62,7 @@ use walkdir::WalkDir;
 
 pub const CARGO_MANIFEST_FILE: &str = "Cargo.toml";
 pub const RUST_SEMVER_PROVIDER_ID: &str = "rust-semver";
+pub const USES_WORKSPACE_VERSION_METADATA_KEY: &str = "uses_workspace_version";
 
 pub struct CargoAdapter;
 
@@ -312,9 +313,10 @@ fn parse_package_manifest(
 		.and_then(Value::as_bool)
 		.unwrap_or(false);
 	if uses_workspace_version {
-		package_record
-			.metadata
-			.insert("uses_workspace_version".to_string(), "true".to_string());
+		package_record.metadata.insert(
+			USES_WORKSPACE_VERSION_METADATA_KEY.to_string(),
+			"true".to_string(),
+		);
 	}
 	package_record.declared_dependencies = parse_dependencies(&parsed);
 	Ok(Some(package_record))

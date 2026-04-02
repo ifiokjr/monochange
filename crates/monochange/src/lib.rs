@@ -63,6 +63,7 @@ use clap::ValueEnum;
 use glob::Pattern;
 use monochange_cargo::discover_cargo_packages;
 use monochange_cargo::RustSemverProvider;
+use monochange_cargo::USES_WORKSPACE_VERSION_METADATA_KEY;
 use monochange_config::apply_version_groups;
 use monochange_config::load_change_signals;
 use monochange_config::load_changeset_file;
@@ -777,8 +778,7 @@ fn execute_cli_command(
 	for step in &cli_command.steps {
 		match step {
 			CliStepDefinition::Validate => {
-				validate_workspace(root)?;
-				validate_cargo_workspace_version_groups(root)?;
+				validate_repository(root)?;
 				output = Some(format!(
 					"workspace validation passed for {}",
 					root_relative(root, root).display()
@@ -1793,6 +1793,11 @@ fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 	}
 }
 
+pub fn validate_repository(root: &Path) -> MonochangeResult<()> {
+	validate_workspace(root)?;
+	validate_cargo_workspace_version_groups(root)
+}
+
 fn validate_cargo_workspace_version_groups(root: &Path) -> MonochangeResult<()> {
 	let configuration = load_workspace_configuration(root)?;
 	if configuration.packages.is_empty() {
@@ -1808,12 +1813,16 @@ fn validate_cargo_workspace_version_groups(root: &Path) -> MonochangeResult<()> 
 	apply_version_groups(&mut packages, &configuration)?;
 
 	let mut workspace_versioned = BTreeMap::<PathBuf, Vec<usize>>::new();
+	// Only packages declared in `monochange.toml` participate in release validation.
+	// Unconfigured crates may still inherit a workspace version, but monochange does not
+	// manage their release identity. A stronger future rule could validate an explicit
+	// set of "release-managed" packages rather than inferring scope from config presence.
 	for (index, package) in packages.iter().enumerate() {
 		if package.ecosystem == Ecosystem::Cargo
 			&& package.metadata.contains_key("config_id")
 			&& package
 				.metadata
-				.get("uses_workspace_version")
+				.get(USES_WORKSPACE_VERSION_METADATA_KEY)
 				.map(String::as_str)
 				== Some("true")
 		{
@@ -1844,8 +1853,15 @@ fn validate_cargo_workspace_version_groups(root: &Path) -> MonochangeResult<()> 
 					None => format!("`{}` not in any group", package.name),
 				})
 				.collect::<Vec<_>>();
+			let workspace_root = indices
+				.first()
+				.and_then(|index| packages.get(*index))
+				.map_or_else(
+					|| ".".to_string(),
+					|package| root_relative(root, &package.workspace_root).display().to_string(),
+				);
 			return Err(MonochangeError::Config(format!(
-				"cargo packages using `version.workspace = true` must belong to the same version group, but found mismatched assignments: {}",
+				"cargo packages using `version.workspace = true` under `{workspace_root}` must belong to the same version group, but found mismatched assignments: {}",
 				details.join(", ")
 			)));
 		}

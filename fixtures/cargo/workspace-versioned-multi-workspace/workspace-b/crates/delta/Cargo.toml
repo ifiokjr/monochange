@@ -1,0 +1,3 @@
+[package]
+name = "delta"
+version = { workspace = true }

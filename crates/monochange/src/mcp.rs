@@ -1,7 +1,6 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use monochange_config::validate_workspace;
 use monochange_core::CliCommandDefinition;
 use monochange_core::ReleaseManifest;
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -17,6 +16,7 @@ use rmcp::ServiceExt;
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::validate_repository;
 use crate::ChangeBump;
 use crate::PreparedRelease;
 
@@ -159,7 +159,7 @@ impl MonochangeMcpServer {
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		match validate_workspace(&root) {
+		match validate_repository(&root) {
 			Ok(()) => Ok(json_result(json!({
 				"ok": true,
 				"action": "validate",
@@ -351,8 +351,14 @@ pub async fn run_server() {
 mod __tests {
 	use std::fs;
 
+	mod test_support {
+		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/test_support.rs"));
+	}
+
 	use rmcp::handler::server::wrapper::Parameters;
 	use tempfile::tempdir;
+	use test_support::copy_directory;
+	use test_support::fixture_root;
 
 	use super::ChangeParam;
 	use super::McpChangeBump;
@@ -390,6 +396,25 @@ mod __tests {
 			.unwrap_or_else(|error| panic!("discover: {error}"));
 
 		assert!(content_text(&result).contains("Discovered 1 package(s)"));
+	}
+
+	#[tokio::test]
+	async fn validate_reports_workspace_version_group_mismatches() {
+		let fixture_root = fixture_root(
+			env!("CARGO_MANIFEST_DIR"),
+			"../../fixtures/cargo/workspace-versioned-different-groups",
+		);
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_directory(&fixture_root, tempdir.path());
+
+		let result = MonochangeMcpServer::new()
+			.validate(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate: {error}"));
+
+		assert!(content_text(&result).contains("version.workspace = true"));
 	}
 
 	#[tokio::test]

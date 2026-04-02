@@ -65,6 +65,10 @@ Validate before planning:
 mc validate
 ```
 
+For behavior changes in published crates, include a `.changeset/*.md` file in the branch or PR. Prefer `mc change` so the changeset uses configured package or group ids consistently.
+
+Cargo workspace-version validation currently applies only to packages declared in `monochange.toml`. Unconfigured crates are ignored, even when they inherit `version = { workspace = true }` from a Cargo workspace root.
+
 Generate a plan directly when you want to inspect the raw planner output:
 
 <!-- {=projectPlanCommand} -->

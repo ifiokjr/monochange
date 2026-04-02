@@ -5,6 +5,9 @@ use std::path::Path;
 use monochange_core::Ecosystem;
 use tempfile::tempdir;
 
+#[path = "../tests/test_support.rs"]
+mod test_support;
+
 use crate::add_change_file;
 use crate::build_command_for_root;
 use crate::discover_workspace;
@@ -12,6 +15,8 @@ use crate::plan_release;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 use crate::verify_changesets;
+use test_support::copy_directory;
+use test_support::fixture_root;
 
 fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
@@ -1042,7 +1047,7 @@ fn assert_simple_release_pattern(
 	direct_manifest_suffix: &str,
 	dependent_manifest_suffix: &str,
 ) {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
+	let fixture_root = fixture_root(env!("CARGO_MANIFEST_DIR"), relative_fixture_root);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
 	let changes_path = tempdir.path().join("changes.generated.md");
@@ -1080,7 +1085,7 @@ fn assert_cli_release_pattern(
 	direct_manifest_suffix: &str,
 	dependent_manifest_suffix: &str,
 ) {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
+	let fixture_root = fixture_root(env!("CARGO_MANIFEST_DIR"), relative_fixture_root);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
 	write_file(
@@ -1123,36 +1128,6 @@ fn assert_cli_release_pattern(
 
 	assert_eq!(direct["bump"].as_str(), Some("minor"));
 	assert_eq!(dependent["bump"].as_str(), Some("patch"));
-}
-
-fn copy_directory(source: &Path, destination: &Path) {
-	fs::create_dir_all(destination)
-		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
-	for entry in fs::read_dir(source)
-		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
-	{
-		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
-		let source_path = entry.path();
-		let destination_path = destination.join(entry.file_name());
-		let file_type = entry
-			.file_type()
-			.unwrap_or_else(|error| panic!("file type {}: {error}", source_path.display()));
-		if file_type.is_dir() {
-			copy_directory(&source_path, &destination_path);
-		} else if file_type.is_file() {
-			if let Some(parent) = destination_path.parent() {
-				fs::create_dir_all(parent)
-					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
-			}
-			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
-				panic!(
-					"copy {} -> {}: {error}",
-					source_path.display(),
-					destination_path.display()
-				)
-			});
-		}
-	}
 }
 
 fn seed_changeset_policy_fixture(root: &Path, with_changeset: bool) {
@@ -1413,8 +1388,10 @@ type = "PrepareRelease"
 
 #[test]
 fn validate_rejects_workspace_versioned_packages_in_different_groups() {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/cargo/workspace-versioned-different-groups");
+	let fixture_root = fixture_root(
+		env!("CARGO_MANIFEST_DIR"),
+		"../../fixtures/cargo/workspace-versioned-different-groups",
+	);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
 
@@ -1432,8 +1409,10 @@ fn validate_rejects_workspace_versioned_packages_in_different_groups() {
 
 #[test]
 fn validate_rejects_workspace_versioned_packages_not_in_any_group() {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/cargo/workspace-versioned-ungrouped");
+	let fixture_root = fixture_root(
+		env!("CARGO_MANIFEST_DIR"),
+		"../../fixtures/cargo/workspace-versioned-ungrouped",
+	);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
 
@@ -1452,8 +1431,10 @@ fn validate_rejects_workspace_versioned_packages_not_in_any_group() {
 
 #[test]
 fn validate_accepts_workspace_versioned_packages_in_same_group() {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/cargo/workspace-versioned-same-group");
+	let fixture_root = fixture_root(
+		env!("CARGO_MANIFEST_DIR"),
+		"../../fixtures/cargo/workspace-versioned-same-group",
+	);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
 
@@ -1467,8 +1448,44 @@ fn validate_accepts_workspace_versioned_packages_in_same_group() {
 
 #[test]
 fn validate_accepts_single_workspace_versioned_package_without_group() {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/cargo/workspace-versioned-single");
+	let fixture_root = fixture_root(
+		env!("CARGO_MANIFEST_DIR"),
+		"../../fixtures/cargo/workspace-versioned-single",
+	);
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
+	)
+	.unwrap_or_else(|error| panic!("validate output: {error}"));
+	assert!(output.contains("workspace validation passed"));
+}
+
+#[test]
+fn validate_ignores_unconfigured_workspace_versioned_packages() {
+	let fixture_root = fixture_root(
+		env!("CARGO_MANIFEST_DIR"),
+		"../../fixtures/cargo/workspace-versioned-ignores-unconfigured",
+	);
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&fixture_root, tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
+	)
+	.unwrap_or_else(|error| panic!("validate output: {error}"));
+	assert!(output.contains("workspace validation passed"));
+}
+
+#[test]
+fn validate_accepts_multiple_cargo_workspaces_when_each_is_grouped_consistently() {
+	let fixture_root = fixture_root(
+		env!("CARGO_MANIFEST_DIR"),
+		"../../fixtures/cargo/workspace-versioned-multi-workspace",
+	);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
 

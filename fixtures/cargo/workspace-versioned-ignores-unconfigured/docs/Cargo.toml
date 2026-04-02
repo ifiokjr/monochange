@@ -1,0 +1,4 @@
+[package]
+name = "workspace-docs"
+version = { workspace = true }
+publish = false

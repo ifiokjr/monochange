@@ -7,6 +7,7 @@ use monochange_semver::CompatibilityProvider;
 
 use crate::discover_cargo_packages;
 use crate::RustSemverProvider;
+use crate::USES_WORKSPACE_VERSION_METADATA_KEY;
 
 #[test]
 fn discovers_cargo_workspace_members() {
@@ -67,7 +68,7 @@ fn cargo_workspace_members_mark_uses_workspace_version_metadata() {
 	assert_eq!(
 		core_package
 			.metadata
-			.get("uses_workspace_version")
+			.get(USES_WORKSPACE_VERSION_METADATA_KEY)
 			.map(String::as_str),
 		Some("true")
 	);
@@ -80,7 +81,7 @@ fn cargo_workspace_members_mark_uses_workspace_version_metadata() {
 	assert_eq!(
 		app_package
 			.metadata
-			.get("uses_workspace_version")
+			.get(USES_WORKSPACE_VERSION_METADATA_KEY)
 			.map(String::as_str),
 		None
 	);

@@ -2,10 +2,14 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+mod test_support;
+
 use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
 use insta_cmd::get_cargo_bin;
 use tempfile::tempdir;
+use test_support::copy_directory;
+use test_support::fixture_root;
 
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
@@ -32,8 +36,10 @@ macro_rules! apply_common_filters {
 #[test]
 fn validate_cli_succeeds_for_valid_workspace() {
 	apply_common_filters!();
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/cargo/workspace-versioned-grouped-release");
+	let fixture_root = fixture_root(
+		env!("CARGO_MANIFEST_DIR"),
+		"../../fixtures/cargo/workspace-versioned-grouped-release",
+	);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
 
@@ -789,36 +795,6 @@ packages = ["core"]
 	help: move the package into exactly one [group.<id>] declaration
 	"###
 	);
-}
-
-fn copy_directory(source: &Path, destination: &Path) {
-	fs::create_dir_all(destination)
-		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
-	for entry in fs::read_dir(source)
-		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
-	{
-		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
-		let source_path = entry.path();
-		let destination_path = destination.join(entry.file_name());
-		let file_type = entry
-			.file_type()
-			.unwrap_or_else(|error| panic!("file type {}: {error}", source_path.display()));
-		if file_type.is_dir() {
-			copy_directory(&source_path, &destination_path);
-		} else if file_type.is_file() {
-			if let Some(parent) = destination_path.parent() {
-				fs::create_dir_all(parent)
-					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
-			}
-			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
-				panic!(
-					"copy {} -> {}: {error}",
-					source_path.display(),
-					destination_path.display()
-				)
-			});
-		}
-	}
 }
 
 fn seed_ungrouped_release_fixture(root: &Path) {
