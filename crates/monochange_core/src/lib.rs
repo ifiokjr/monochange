@@ -503,6 +503,8 @@ pub struct CliInputDefinition {
 	pub default: Option<String>,
 	#[serde(default)]
 	pub choices: Vec<String>,
+	#[serde(default)]
+	pub short: Option<char>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -1383,6 +1385,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				required: false,
 				default: Some("text".to_string()),
 				choices: vec!["text".to_string(), "json".to_string()],
+				short: None,
 			}],
 			steps: vec![CliStepDefinition::Discover],
 		},
@@ -1391,12 +1394,24 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			help_text: Some("Create a change file for one or more packages".to_string()),
 			inputs: vec![
 				CliInputDefinition {
+					name: "interactive".to_string(),
+					kind: CliInputKind::Boolean,
+					help_text: Some(
+						"Select packages, bumps, and options interactively".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+					short: Some('i'),
+				},
+				CliInputDefinition {
 					name: "package".to_string(),
 					kind: CliInputKind::StringList,
 					help_text: Some("Package or group to include in the change".to_string()),
-					required: true,
+					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "bump".to_string(),
@@ -1409,6 +1424,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 						"minor".to_string(),
 						"major".to_string(),
 					],
+					short: None,
 				},
 				CliInputDefinition {
 					name: "version".to_string(),
@@ -1417,6 +1433,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "reason".to_string(),
@@ -1425,6 +1442,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: true,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "type".to_string(),
@@ -1435,6 +1453,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "details".to_string(),
@@ -1443,6 +1462,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "evidence".to_string(),
@@ -1451,6 +1471,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "output".to_string(),
@@ -1461,6 +1482,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 			],
 			steps: vec![CliStepDefinition::CreateChangeFile],
@@ -1475,6 +1497,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				required: false,
 				default: Some("text".to_string()),
 				choices: vec!["text".to_string(), "json".to_string()],
+				short: None,
 			}],
 			steps: vec![CliStepDefinition::PrepareRelease],
 		},
@@ -1491,6 +1514,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: Some("text".to_string()),
 					choices: vec!["text".to_string(), "json".to_string()],
+					short: None,
 				},
 				CliInputDefinition {
 					name: "changed_paths".to_string(),
@@ -1501,6 +1525,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "since".to_string(),
@@ -1512,6 +1537,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "verify".to_string(),
@@ -1523,6 +1549,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 				CliInputDefinition {
 					name: "label".to_string(),
@@ -1531,6 +1558,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: None,
 					choices: Vec::new(),
+					short: None,
 				},
 			],
 			steps: vec![CliStepDefinition::AffectedPackages],

@@ -460,9 +460,13 @@ type = "Discover"
 help_text = "Create a change file for one or more packages"
 
 [[cli.change.inputs]]
+name = "interactive"
+type = "boolean"
+short = "i"
+
+[[cli.change.inputs]]
 name = "package"
 type = "string_list"
-required = true
 
 [[cli.change.inputs]]
 name = "bump"
