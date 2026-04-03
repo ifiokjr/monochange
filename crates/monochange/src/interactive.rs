@@ -52,11 +52,19 @@ pub struct InteractiveTarget {
 	pub change_type: Option<String>,
 }
 
+/// CLI-provided values that bypass their interactive prompts when present.
+#[derive(Debug, Default)]
+pub struct InteractiveOptions {
+	pub reason: Option<String>,
+	pub details: Option<String>,
+}
+
 /// Run the interactive change wizard.
 ///
 /// Returns the user's selections or an error if the user cancels.
 pub fn run_interactive_change(
 	configuration: &WorkspaceConfiguration,
+	options: &InteractiveOptions,
 ) -> MonochangeResult<InteractiveChangeResult> {
 	let targets = build_selectable_targets(configuration);
 	if targets.is_empty() {
@@ -87,12 +95,19 @@ pub fn run_interactive_change(
 		});
 	}
 
-	// Step 3: Reason (required)
-	let reason = prompt_reason()?;
+	// Step 3: Reason (required) — use CLI value if provided
+	let reason = if let Some(reason) = &options.reason {
+		reason.clone()
+	} else {
+		prompt_reason()?
+	};
 
-	// Step 4: Details (optional)
-	let details =
-		prompt_optional("Details (optional long-form release notes — leave empty to skip)")?;
+	// Step 4: Details (optional) — use CLI value if provided
+	let details = if let Some(details) = &options.details {
+		Some(details.clone())
+	} else {
+		prompt_optional("Details (optional long-form release notes — leave empty to skip)")?
+	};
 
 	Ok(InteractiveChangeResult {
 		targets: interactive_targets,
