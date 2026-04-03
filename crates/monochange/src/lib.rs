@@ -142,6 +142,7 @@ use serde::Serialize;
 use serde_json::json;
 use toml::Value;
 
+mod interactive;
 mod mcp;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -429,6 +430,10 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 				))
 		}
 	};
+
+	if let Some(short) = input.short {
+		arg = arg.short(short);
+	}
 
 	if let Some(default) = &input.default {
 		arg = arg.default_value(leak_string(default.clone()));
@@ -745,63 +750,84 @@ fn execute_cli_command(
 				output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
 			}
 			CliStepDefinition::CreateChangeFile => {
-				let package_refs = context.inputs.get("package").cloned().unwrap_or_default();
-				if package_refs.is_empty() {
-					return Err(MonochangeError::Config(
-						"command `change` requires at least one `--package` value".to_string(),
+				let is_interactive = context
+					.inputs
+					.get("interactive")
+					.and_then(|values| values.first())
+					.is_some_and(|value| value == "true");
+
+				if is_interactive {
+					let configuration = load_workspace_configuration(root)?;
+					let result = interactive::run_interactive_change(&configuration)?;
+					let output_path = context
+						.inputs
+						.get("output")
+						.and_then(|values| values.first())
+						.map(PathBuf::from);
+					let path = add_interactive_change_file(root, &result, output_path.as_deref())?;
+					output = Some(format!(
+						"wrote change file {}",
+						root_relative(root, &path).display()
+					));
+				} else {
+					let package_refs = context.inputs.get("package").cloned().unwrap_or_default();
+					if package_refs.is_empty() {
+						return Err(MonochangeError::Config(
+							"command `change` requires at least one `--package` value or `--interactive` mode".to_string(),
+						));
+					}
+					let bump = context
+						.inputs
+						.get("bump")
+						.and_then(|values| values.first())
+						.map_or(Ok(ChangeBump::Patch), |value| parse_change_bump(value))?;
+					let version = context
+						.inputs
+						.get("version")
+						.and_then(|values| values.first())
+						.cloned();
+					let reason = context
+						.inputs
+						.get("reason")
+						.and_then(|values| values.first())
+						.cloned()
+						.ok_or_else(|| {
+							MonochangeError::Config(
+								"command `change` requires a `--reason` value".to_string(),
+							)
+						})?;
+					let change_type = context
+						.inputs
+						.get("type")
+						.and_then(|values| values.first())
+						.cloned();
+					let details = context
+						.inputs
+						.get("details")
+						.and_then(|values| values.first())
+						.cloned();
+					let evidence = context.inputs.get("evidence").cloned().unwrap_or_default();
+					let output_path = context
+						.inputs
+						.get("output")
+						.and_then(|values| values.first())
+						.map(PathBuf::from);
+					let path = add_change_file(
+						root,
+						&package_refs,
+						bump.into(),
+						version.as_deref(),
+						&reason,
+						change_type.as_deref(),
+						details.as_deref(),
+						&evidence,
+						output_path.as_deref(),
+					)?;
+					output = Some(format!(
+						"wrote change file {}",
+						root_relative(root, &path).display()
 					));
 				}
-				let bump = context
-					.inputs
-					.get("bump")
-					.and_then(|values| values.first())
-					.map_or(Ok(ChangeBump::Patch), |value| parse_change_bump(value))?;
-				let version = context
-					.inputs
-					.get("version")
-					.and_then(|values| values.first())
-					.cloned();
-				let reason = context
-					.inputs
-					.get("reason")
-					.and_then(|values| values.first())
-					.cloned()
-					.ok_or_else(|| {
-						MonochangeError::Config(
-							"command `change` requires a `--reason` value".to_string(),
-						)
-					})?;
-				let change_type = context
-					.inputs
-					.get("type")
-					.and_then(|values| values.first())
-					.cloned();
-				let details = context
-					.inputs
-					.get("details")
-					.and_then(|values| values.first())
-					.cloned();
-				let evidence = context.inputs.get("evidence").cloned().unwrap_or_default();
-				let output_path = context
-					.inputs
-					.get("output")
-					.and_then(|values| values.first())
-					.map(PathBuf::from);
-				let path = add_change_file(
-					root,
-					&package_refs,
-					bump.into(),
-					version.as_deref(),
-					&reason,
-					change_type.as_deref(),
-					details.as_deref(),
-					&evidence,
-					output_path.as_deref(),
-				)?;
-				output = Some(format!(
-					"wrote change file {}",
-					root_relative(root, &path).display()
-				));
 			}
 			CliStepDefinition::PrepareRelease => {
 				context.prepared_release = Some(prepare_release(root, dry_run)?);
@@ -2013,6 +2039,75 @@ pub fn add_change_file(
 		))
 	})?;
 	Ok(output_path)
+}
+
+fn add_interactive_change_file(
+	root: &Path,
+	result: &interactive::InteractiveChangeResult,
+	output: Option<&Path>,
+) -> MonochangeResult<PathBuf> {
+	let package_refs = result
+		.targets
+		.iter()
+		.map(|target| target.id.clone())
+		.collect::<Vec<_>>();
+	let output_path = output.map_or_else(
+		|| default_change_path(root, &package_refs),
+		Path::to_path_buf,
+	);
+	if let Some(parent) = output_path.parent() {
+		fs::create_dir_all(parent).map_err(|error| {
+			MonochangeError::Io(format!("failed to create {}: {error}", parent.display()))
+		})?;
+	}
+
+	let content = render_interactive_changeset_markdown(result);
+	fs::write(&output_path, content).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write {}: {error}",
+			output_path.display()
+		))
+	})?;
+	Ok(output_path)
+}
+
+fn render_interactive_changeset_markdown(result: &interactive::InteractiveChangeResult) -> String {
+	let mut lines = vec!["---".to_string()];
+	for target in &result.targets {
+		if let Some(version) = &target.version {
+			lines.push(format!("{}:", target.id));
+			lines.push(format!("  bump: {}", target.bump));
+			lines.push(format!("  version: \"{version}\""));
+		} else {
+			lines.push(format!("{}: {}", target.id, target.bump));
+		}
+	}
+	let typed_targets = result
+		.targets
+		.iter()
+		.filter(|target| target.change_type.is_some())
+		.collect::<Vec<_>>();
+	if !typed_targets.is_empty() {
+		lines.push("type:".to_string());
+		for target in &typed_targets {
+			if let Some(change_type) = &target.change_type {
+				lines.push(format!("  {}: {change_type}", target.id));
+			}
+		}
+	}
+	lines.push("---".to_string());
+	lines.push(String::new());
+	lines.push(format!("#### {}", result.reason));
+	if let Some(details) = result
+		.details
+		.as_deref()
+		.filter(|value| !value.trim().is_empty())
+	{
+		lines.push(String::new());
+		lines.push(details.trim().to_string());
+	}
+	lines.push(String::new());
+	lines.join("\n")
 }
 
 pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<ReleasePlan> {

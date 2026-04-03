@@ -378,6 +378,14 @@ mc change --package sdk-core --bump patch --type security --reason "rotate signi
 mc change --package sdk-core --bump major --version 2.0.0 --reason "break the public API" --evidence rust-semver:major:public API break detected --output .changeset/sdk-core-major.md
 ```
 
+Or use interactive mode to select packages, bumps, and options from a guided wizard:
+
+```bash
+mc change -i
+```
+
+Interactive mode automatically prevents conflicting selections (a group and one of its members) and lets you pick per-package bumps and optional explicit versions.
+
 <!-- {/releaseChangesAddCommand} -->
 
 <!-- {@releaseManualChangesetExample} -->

@@ -49,6 +49,7 @@ clap = { version = "4", features = ["derive"] }
 derive_more = "0.99"
 doc-comment = "0.3"
 glob = "0.3"
+inquire = "0.9"
 insta = { version = "1", features = ["filters", "json"] }
 insta-cmd = "0.6"
 markdown = "1.0.0-alpha.9"
