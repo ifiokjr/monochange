@@ -267,7 +267,7 @@ workflow-core = { workspace = true }
 [defaults]
 parent_bump = "patch"
 package_type = "cargo"
-changelog = "{path}/CHANGELOG.md"
+changelog = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
@@ -344,10 +344,10 @@ edition = "2021"
 [defaults]
 parent_bump = "patch"
 package_type = "cargo"
-changelog = "{path}/CHANGELOG.md"
+changelog = "{{ path }}/CHANGELOG.md"
 
 [release_notes]
-change_templates = ["#### $summary ($package $bump)\n\n$details", "- $summary"]
+change_templates = ["#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details }}", "- {{ summary }}"]
 
 [package.core]
 path = "crates/core"

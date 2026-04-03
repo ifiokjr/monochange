@@ -14,7 +14,7 @@ warn_on_group_mismatch = true
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 ```
 
@@ -31,7 +31,7 @@ Declare every release-managed package explicitly.
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
 [package.sdk-core]
@@ -73,15 +73,15 @@ Optional package fields:
 
 `changelog` accepts three forms on packages:
 
-- `true` → use `{path}/CHANGELOG.md`
+- `true` → use `{{ path }}/CHANGELOG.md`
 - `false` → disable the package changelog
 - `"some/path.md"` → use that exact path
 
 `[defaults].changelog` also accepts three forms:
 
-- `true` → default every package to `{path}/CHANGELOG.md`
+- `true` → default every package to `{{ path }}/CHANGELOG.md`
 - `false` → default every package to no changelog
-- `"{path}/changelog.md"` or another pattern → replace `{path}` with each package path
+- `"{{ path }}/changelog.md"` or another pattern → replace `{path}` with each package path
 
 A package-level `changelog` value overrides the default for that package.
 
@@ -95,18 +95,18 @@ A package-level `changelog` value overrides the default for that package.
 
 Template placeholders may include:
 
-- `{package}` / `{package_name}`
-- `{package_id}`
-- `{group}` / `{group_name}`
-- `{group_id}`
-- `{version}` / `{new_version}`
-- `{current_version}` / `{previous_version}`
-- `{bump}`
-- `{trigger}`
-- `{ecosystem}`
-- `{release_owner}` / `{release_owner_kind}`
-- `{members}` / `{member_count}` for group changelogs
-- `{reasons}`
+- `{{ package }}` / `{{ package_name }}`
+- `{{ package_id }}`
+- `{{ group }}` / `{{ group_name }}`
+- `{{ group_id }}`
+- `{{ version }}` / `{{ new_version }}`
+- `{{ current_version }}` / `{{ previous_version }}`
+- `{{ bump }}`
+- `{{ trigger }}`
+- `{{ ecosystem }}`
+- `{{ release_owner }}` / `{{ release_owner_kind }}`
+- `{{ members }}` / `{{ member_count }}` for group changelogs
+- `{{ reasons }}`
 
 Fallback order:
 
@@ -115,7 +115,7 @@ Fallback order:
 
 The built-in grouped-package fallback reads:
 
-> No package-specific changes were recorded; `{package}` was updated to {version} as part of group `{group}`.
+> No package-specific changes were recorded; `{{ package }}` was updated to {{ version }} as part of group `{{ group }}`.
 
 ## Groups
 
@@ -163,10 +163,10 @@ CLI commands are user-defined top-level commands. Each `[cli.<command>]` entry b
 ```toml
 [release_notes]
 change_templates = [
-	"#### $summary\n\n$details\n\n$context",
-	"#### $summary\n\n$context",
-	"#### $summary\n\n$details",
-	"- $summary",
+	"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ details }}",
+	"- {{ summary }}",
 ]
 
 [package.core]
@@ -289,7 +289,7 @@ CLI command interpolation variables:
 
 <!-- {=configurationWorkflowVariables} -->
 
-- default command substitution when `variables` is omitted: `$version`, `$group_version`, `$released_packages`, `$changed_files`, and `$changesets`
+- default command substitution when `variables` is omitted: `{{ version }}`, `$group_version`, `$released_packages`, `$changed_files`, and `$changesets`
 - custom command substitution when `variables` is present: map your own replacement strings to variable names such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
 - `dry_run_command` on a `Command` step replaces `command` only when the CLI command is run with `--dry-run`
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
@@ -398,32 +398,32 @@ You can also customize release-note rendering with a workspace-wide `[release_no
 
 Supported template variables include:
 
-| Variable                    | Meaning                                                               | Notes                                                                                                 |
-| --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `$summary`                  | rendered release-note summary heading                                 | always available                                                                                      |
-| `$details`                  | optional long-form details body                                       | omitted when the changeset has no details                                                             |
-| `$package`                  | owning package id for the rendered entry                              | useful in shared templates                                                                            |
-| `$version`                  | release version for the current target                                | package or group version                                                                              |
-| `$target_id`                | release target id                                                     | package id or group id                                                                                |
-| `$bump`                     | resolved bump severity                                                | `patch`, `minor`, or `major`                                                                          |
-| `$type`                     | changeset note type                                                   | e.g. `feature`, `fix`, `security`; omitted when absent                                                |
-| `$context`                  | compact default metadata block                                        | preferred rendered block for human-readable notes                                                     |
-| `$provenance`               | legacy alias for `$context`                                           | kept for backward compatibility                                                                       |
-| `$changeset_path`           | source `.changeset/*.md` path                                         | tracked in manifests and still available for custom templates, but not shown by default in `$context` |
-| `$change_owner`             | plain-text hosted actor label                                         | usually something like `@ifiokjr`                                                                     |
-| `$change_owner_link`        | markdown link to the hosted actor                                     | falls back to plain text when no URL is available                                                     |
-| `$review_request`           | plain-text PR/MR label                                                | e.g. `PR #31` or `MR !42`                                                                             |
-| `$review_request_link`      | markdown link to the PR/MR                                            | falls back to plain text when no URL is available                                                     |
-| `$introduced_commit`        | short SHA for the commit that first introduced the changeset          | plain text only                                                                                       |
-| `$introduced_commit_link`   | markdown link to the introducing commit                               | preferred for changelog output                                                                        |
-| `$last_updated_commit`      | short SHA for the most recent commit that changed the changeset       | only populated when different from `$introduced_commit`                                               |
-| `$last_updated_commit_link` | markdown link to the most recent commit that changed the changeset    | only populated when different from `$introduced_commit`                                               |
-| `$closed_issues`            | plain-text list of issues closed by the linked review request         | typically `#12, #18`                                                                                  |
-| `$closed_issue_links`       | markdown links to issues closed by the linked review request          | preferred for changelog output                                                                        |
-| `$related_issues`           | plain-text list of related issues that were referenced but not closed | host support may vary                                                                                 |
-| `$related_issue_links`      | markdown links to related issues that were referenced but not closed  | host support may vary                                                                                 |
+| Variable                         | Meaning                                                               | Notes                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `{{ summary }}`                  | rendered release-note summary heading                                 | always available                                                                                           |
+| `{{ details }}`                  | optional long-form details body                                       | omitted when the changeset has no details                                                                  |
+| `{{ package }}`                  | owning package id for the rendered entry                              | useful in shared templates                                                                                 |
+| `{{ version }}`                  | release version for the current target                                | package or group version                                                                                   |
+| `{{ target_id }}`                | release target id                                                     | package id or group id                                                                                     |
+| `{{ bump }}`                     | resolved bump severity                                                | `patch`, `minor`, or `major`                                                                               |
+| `{{ type }}`                     | changeset note type                                                   | e.g. `feature`, `fix`, `security`; omitted when absent                                                     |
+| `{{ context }}`                  | compact default metadata block                                        | preferred rendered block for human-readable notes                                                          |
+| `{{ provenance }}`               | legacy alias for `{{ context }}`                                      | kept for backward compatibility                                                                            |
+| `{{ changeset_path }}`           | source `.changeset/*.md` path                                         | tracked in manifests and still available for custom templates, but not shown by default in `{{ context }}` |
+| `{{ change_owner }}`             | plain-text hosted actor label                                         | usually something like `@ifiokjr`                                                                          |
+| `{{ change_owner_link }}`        | markdown link to the hosted actor                                     | falls back to plain text when no URL is available                                                          |
+| `{{ review_request }}`           | plain-text PR/MR label                                                | e.g. `PR #31` or `MR !42`                                                                                  |
+| `{{ review_request_link }}`      | markdown link to the PR/MR                                            | falls back to plain text when no URL is available                                                          |
+| `{{ introduced_commit }}`        | short SHA for the commit that first introduced the changeset          | plain text only                                                                                            |
+| `{{ introduced_commit_link }}`   | markdown link to the introducing commit                               | preferred for changelog output                                                                             |
+| `{{ last_updated_commit }}`      | short SHA for the most recent commit that changed the changeset       | only populated when different from `{{ introduced_commit }}`                                               |
+| `{{ last_updated_commit_link }}` | markdown link to the most recent commit that changed the changeset    | only populated when different from `{{ introduced_commit }}`                                               |
+| `{{ closed_issues }}`            | plain-text list of issues closed by the linked review request         | typically `#12, #18`                                                                                       |
+| `{{ closed_issue_links }}`       | markdown links to issues closed by the linked review request          | preferred for changelog output                                                                             |
+| `{{ related_issues }}`           | plain-text list of related issues that were referenced but not closed | host support may vary                                                                                      |
+| `{{ related_issue_links }}`      | markdown links to related issues that were referenced but not closed  | host support may vary                                                                                      |
 
-The `*_link` variants render markdown links when the hosting provider exposes URLs. By default `$context` renders the highest-value metadata for readers — owner, review request, introduced commit, last updated commit when different, and linked issues — without exposing the transient `.changeset/*.md` path unless you explicitly reference `$changeset_path` in your template.
+The `*_link` variants render markdown links when the hosting provider exposes URLs. By default `{{ context }}` renders the highest-value metadata for readers — owner, review request, introduced commit, last updated commit when different, and linked issues — without exposing the transient `.changeset/*.md` path unless you explicitly reference `{{ changeset_path }}` in your template.
 
 <!-- {/configurationPackageOverridesSnippet} -->
 

@@ -56,7 +56,7 @@
 //! package_type = "cargo"
 //!
 //! [defaults.changelog]
-//! path = "{path}/CHANGELOG.md"
+//! path = "{{ path }}/CHANGELOG.md"
 //! format = "keep_a_changelog"
 //!
 //! [package.core]
@@ -89,6 +89,8 @@ use miette::LabeledSpan;
 use miette::NamedSource;
 use miette::Report;
 use miette::SourceSpan;
+use minijinja::Environment;
+use minijinja::UndefinedBehavior;
 use monochange_core::default_cli_commands;
 use monochange_core::relative_to_root;
 use monochange_core::BumpSeverity;
@@ -549,6 +551,15 @@ fn default_pull_request_labels() -> Vec<String> {
 	vec!["release".to_string(), "automated".to_string()]
 }
 
+fn render_changelog_path_template(template: &str, package_path: &Path) -> String {
+	let package_path_str = package_path.to_string_lossy();
+	let mut env = Environment::new();
+	env.set_undefined_behavior(UndefinedBehavior::Lenient);
+	let context = minijinja::context! { path => package_path_str.as_ref() };
+	env.render_str(template, context)
+		.unwrap_or_else(|_| template.replace("{{ path }}", &package_path_str))
+}
+
 impl RawChangelogConfig {
 	fn as_defaults_definition(&self) -> ChangelogDefinition {
 		match self {
@@ -596,8 +607,10 @@ impl RawChangelogConfig {
 				RawChangelogDefinition::Enabled(true) => Some(package_path.join("CHANGELOG.md")),
 				RawChangelogDefinition::Path(path) => {
 					if treat_string_as_pattern {
-						let package_path = package_path.to_string_lossy();
-						Some(PathBuf::from(path.replace("{path}", &package_path)))
+						Some(PathBuf::from(render_changelog_path_template(
+							path,
+							package_path,
+						)))
 					} else {
 						Some(PathBuf::from(path))
 					}
@@ -610,8 +623,10 @@ impl RawChangelogConfig {
 				match &table.path {
 					Some(path) => {
 						if treat_string_as_pattern {
-							let package_path = package_path.to_string_lossy();
-							Some(PathBuf::from(path.replace("{path}", &package_path)))
+							Some(PathBuf::from(render_changelog_path_template(
+								path,
+								package_path,
+							)))
 						} else {
 							Some(PathBuf::from(path))
 						}
@@ -1708,20 +1723,22 @@ fn validate_deployments_configuration(
 
 fn change_template_variables(template: &str) -> Vec<String> {
 	let mut variables = BTreeSet::new();
-	let mut characters = template.chars().peekable();
-	while let Some(character) = characters.next() {
-		if character != '$' {
-			continue;
-		}
-		let mut variable = String::new();
-		while let Some(next) =
-			characters.next_if(|next| next.is_ascii_alphanumeric() || *next == '_')
-		{
-			variable.push(next);
-		}
+	let mut remaining = template;
+	while let Some(start) = remaining.find("{{") {
+		let after_open = &remaining[start + 2..];
+		let Some(end) = after_open.find("}}") else {
+			break;
+		};
+		let expression = after_open[..end].trim();
+		// Extract the simple variable name (first identifier in the expression)
+		let variable: String = expression
+			.chars()
+			.take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+			.collect();
 		if !variable.is_empty() {
 			variables.insert(variable);
 		}
+		remaining = &after_open[end + 2..];
 	}
 	variables.into_iter().collect()
 }

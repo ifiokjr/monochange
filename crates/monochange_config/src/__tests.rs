@@ -63,7 +63,7 @@ fn load_workspace_configuration_parses_package_group_and_cli_command_declaration
 parent_bump = "minor"
 include_private = true
 package_type = "cargo"
-changelog = "{path}/CHANGELOG.md"
+changelog = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
@@ -107,7 +107,7 @@ path = ".monochange/release-manifest.json"
 	assert_eq!(
 		configuration.defaults.changelog,
 		Some(ChangelogDefinition::PathPattern(
-			"{path}/CHANGELOG.md".to_string()
+			"{{ path }}/CHANGELOG.md".to_string()
 		))
 	);
 	assert_eq!(
@@ -725,7 +725,7 @@ fn load_workspace_configuration_uses_defaults_changelog_pattern_when_package_cha
 		r#"
 [defaults]
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+changelog = "{{ path }}/changelog.md"
 
 [package.core]
 path = "crates/core"
@@ -742,7 +742,7 @@ path = "crates/core"
 	assert_eq!(
 		configuration.defaults.changelog,
 		Some(ChangelogDefinition::PathPattern(
-			"{path}/changelog.md".to_string()
+			"{{ path }}/changelog.md".to_string()
 		))
 	);
 	assert_eq!(
@@ -827,7 +827,7 @@ fn load_workspace_configuration_supports_changelog_format_tables_and_overrides()
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/CHANGELOG.md"
+path = "{{ path }}/CHANGELOG.md"
 format = "keep_a_changelog"
 
 [package.core]
@@ -900,18 +900,18 @@ fn load_workspace_configuration_supports_empty_update_messages() {
 		r#"
 [defaults]
 package_type = "cargo"
-empty_update_message = "No package-specific changes for {package}; version is now {version}."
+empty_update_message = "No package-specific changes for {{ package }}; version is now {{ version }}."
 
 [package.core]
 path = "crates/core"
-empty_update_message = "Package override for {package}@{version}"
+empty_update_message = "Package override for {{ package }}@{{ version }}"
 
 [package.app]
 path = "crates/app"
 
 [group.sdk]
 packages = ["core", "app"]
-empty_update_message = "Group fallback for {package} from {group}"
+empty_update_message = "Group fallback for {{ package }} from {{ group }}"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -927,15 +927,15 @@ empty_update_message = "Group fallback for {package} from {group}"
 
 	assert_eq!(
 		configuration.defaults.empty_update_message.as_deref(),
-		Some("No package-specific changes for {package}; version is now {version}.")
+		Some("No package-specific changes for {{ package }}; version is now {{ version }}.")
 	);
 	assert_eq!(
 		core.empty_update_message.as_deref(),
-		Some("Package override for {package}@{version}")
+		Some("Package override for {{ package }}@{{ version }}")
 	);
 	assert_eq!(
 		group.empty_update_message.as_deref(),
-		Some("Group fallback for {package} from {group}")
+		Some("Group fallback for {{ package }} from {{ group }}")
 	);
 }
 
@@ -1944,9 +1944,9 @@ package_type = "cargo"
 
 [release_notes]
 change_templates = [
-    "#### $summary ($package $bump)\n\n$details\n\n$context",
-    "#### $summary\n\n_Owner:_ $change_owner_link\n_PR:_ $review_request_link\n_Closed issues:_ $closed_issue_links",
-    "- $summary"
+    "#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details }}\n\n{{ context }}",
+    "#### {{ summary }}\n\n_Owner:_ {{ change_owner_link }}\n_PR:_ {{ review_request_link }}\n_Closed issues:_ {{ closed_issue_links }}",
+    "- {{ summary }}"
 ]
 
 [package.core]
@@ -2056,7 +2056,7 @@ fn load_workspace_configuration_rejects_unknown_change_template_variables() {
 package_type = "cargo"
 
 [release_notes]
-change_templates = ["- $summary ($commit_hash)"]
+change_templates = ["- {{ summary }} ({{ commit_hash }})"]
 
 [package.core]
 path = "crates/core"

@@ -194,7 +194,7 @@ Planning rules in this milestone:
 - markdown change files require an explicit `patch`, `minor`, or `major` entry per package
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
 - `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
-- change templates support detailed multi-line release-note entries through `$details`, compact metadata blocks through `$context`, and fine-grained linked metadata like `$change_owner_link`, `$review_request_link`, and `$closed_issue_links`
+- change templates support detailed multi-line release-note entries through `{{ details }}`, compact metadata blocks through `{{ context }}`, and fine-grained linked metadata like `{{ change_owner_link }}`, `{{ review_request_link }}`, and `{{ closed_issue_links }}`
 - dependents default to the configured `parent_bump`
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered

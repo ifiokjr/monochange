@@ -16,6 +16,7 @@ description = "Configuration parsing and validation for monochange"
 doc-comment = { workspace = true }
 glob = { workspace = true }
 miette = { workspace = true }
+minijinja = { workspace = true }
 monochange_core = { workspace = true }
 serde = { workspace = true }
 serde_yaml_ng = { workspace = true }

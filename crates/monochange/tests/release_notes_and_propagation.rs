@@ -135,17 +135,17 @@ fn custom_empty_update_message_on_package_overrides_default() {
 [defaults]
 parent_bump = "patch"
 package_type = "cargo"
-empty_update_message = "Default fallback for {package} at {version}."
+empty_update_message = "Default fallback for {{ package }} at {{ version }}."
 
 [defaults.changelog]
-path = "{path}/CHANGELOG.md"
+path = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
 
 [package.app]
 path = "crates/app"
-empty_update_message = "Bumped {package} to {version} because: {reasons}."
+empty_update_message = "Bumped {{ package }} to {{ version }} because: {{ reasons }}."
 
 [ecosystems.cargo]
 enabled = true
@@ -191,10 +191,10 @@ fn custom_empty_update_message_on_defaults_applies_when_no_package_override() {
 [defaults]
 parent_bump = "patch"
 package_type = "cargo"
-empty_update_message = "Automated bump for {package} ({bump} -> {version})."
+empty_update_message = "Automated bump for {{ package }} ({{ bump }} -> {{ version }})."
 
 [defaults.changelog]
-path = "{path}/CHANGELOG.md"
+path = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
@@ -238,7 +238,7 @@ fn custom_empty_update_message_on_group_overrides_defaults_for_grouped_packages(
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_grouped_changelog_fixture(
 		tempdir.path(),
-		Some("Release driven by group {group}, version {version}."),
+		Some("Release driven by group {{ group }}, version {{ version }}."),
 		None,
 	);
 
@@ -270,7 +270,7 @@ fn custom_change_templates_render_in_changelog_entries() {
 	seed_grouped_changelog_fixture(
 		tempdir.path(),
 		None,
-		Some(r#"change_templates = ["- [$bump] $summary"]"#),
+		Some(r#"change_templates = ["- [{{ bump }}] {{ summary }}"]"#),
 	);
 
 	let output = cli()
@@ -366,7 +366,7 @@ parent_bump = "{parent_bump}"
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{{path}}/CHANGELOG.md"
+path = "{{{{ path }}}}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
@@ -441,7 +441,7 @@ parent_bump = "patch"
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{{path}}/CHANGELOG.md"
+path = "{{{{ path }}}}/CHANGELOG.md"
 
 {release_notes}
 
