@@ -45,7 +45,8 @@
 		"**/snapshots",
 		"**/target",
 		"**/node_modules",
-		".bin/"
+		".bin/",
+		"**/*.init.toml"
 	],
 	"plugins": [
 		"https://plugins.dprint.dev/typescript-0.95.13.wasm",
