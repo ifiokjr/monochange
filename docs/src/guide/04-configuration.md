@@ -11,6 +11,7 @@ Repository configuration lives in `monochange.toml`.
 parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
+strict_version_conflicts = false
 package_type = "cargo"
 
 [defaults.changelog]

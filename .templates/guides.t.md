@@ -25,6 +25,7 @@
 parent_bump = "patch"
 include_private = false
 warn_on_group_mismatch = true
+strict_version_conflicts = false
 package_type = "cargo"
 
 [defaults.changelog]
@@ -383,9 +384,7 @@ mc change --package sdk-core --bump major --version 2.0.0 --reason "break the pu
 
 ```markdown
 ---
-sdk-core:
-  bump: major
-  version: 2.0.0
+sdk-core: patch
 type:
   sdk-core: security
 ---
@@ -396,6 +395,24 @@ Roll the signing key before the release window closes.
 ```
 
 <!-- {/releaseManualChangesetExample} -->
+
+<!-- {@releaseExplicitVersionChangesetExample} -->
+
+To pin an exact version, use the object syntax with `bump` and/or `version`:
+
+```markdown
+---
+sdk-core:
+  bump: major
+  version: "2.0.0"
+---
+
+#### promote to stable
+```
+
+When `version` is provided without `bump`, the bump is inferred from the current version. If the package belongs to a version group, the explicit version propagates to the whole group.
+
+<!-- {/releaseExplicitVersionChangesetExample} -->
 
 <!-- {@releaseEvidenceExample} -->
 
@@ -414,8 +431,10 @@ evidence:
 
 <!-- {@releasePlanningRules} -->
 
-- `mc change` defaults `--bump` to `patch`
-- markdown change files require an explicit `patch`, `minor`, or `major` entry per package
+- `mc change` defaults `--bump` to `patch`; pass `--version` to pin an explicit release version
+- markdown change files require a `patch`/`minor`/`major` entry per package, or an object with `bump` and/or `version`
+- when `version` is given without `bump`, the bump is inferred by comparing the current and target versions
+- explicit versions from grouped members propagate to the group version; conflicts take the highest semver or fail when `defaults.strict_version_conflicts = true`
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
 - `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
 - change templates support detailed multi-line release-note entries through `{{ details }}`, compact metadata blocks through `{{ context }}`, and fine-grained linked metadata like `{{ change_owner_link }}`, `{{ review_request_link }}`, and `{{ closed_issue_links }}`
