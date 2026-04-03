@@ -17,9 +17,9 @@ in
       deno
       dprint
       extra.mdt
+      extra.pnpm-standalone
       mdbook
       nixfmt
-      nodejs
       rustup
       shfmt
     ]
@@ -33,6 +33,7 @@ in
     rustup update stable --no-self-update 2>/dev/null || true
 
     export PATH="$DEVENV_ROOT/scripts:$PATH"
+    eval "$(pnpm-activate-env)"
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
