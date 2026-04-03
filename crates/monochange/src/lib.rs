@@ -416,6 +416,7 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 		CliInputKind::String => arg.value_name(value_name),
 		CliInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
 		CliInputKind::Path => arg.value_name("PATH"),
+		CliInputKind::Boolean => arg.action(ArgAction::SetTrue),
 		CliInputKind::Choice => {
 			arg.value_name(value_name)
 				.value_parser(clap::builder::PossibleValuesParser::new(
@@ -685,6 +686,13 @@ fn collect_cli_command_inputs(
 				.get_many::<String>(input.name.as_str())
 				.map(|values| values.cloned().collect::<Vec<_>>())
 				.unwrap_or_default(),
+			CliInputKind::Boolean => {
+				if matches.get_flag(input.name.as_str()) {
+					vec!["true".to_string()]
+				} else {
+					Vec::new()
+				}
+			}
 			CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => matches
 				.get_one::<String>(input.name.as_str())
 				.map(|value| vec![value.clone()])
@@ -938,15 +946,32 @@ fn execute_cli_command(
 				}
 				output = None;
 			}
-			CliStepDefinition::VerifyChangesets => {
-				let changed_paths = context
+			CliStepDefinition::AffectedPackages => {
+				let since = context
+					.inputs
+					.get("since")
+					.and_then(|values| values.first().cloned());
+				let explicit_paths = context
 					.inputs
 					.get("changed_paths")
 					.cloned()
 					.unwrap_or_default();
+				let changed_paths = if let Some(rev) = &since {
+					if !explicit_paths.is_empty() {
+						eprintln!("warning: --since takes priority; --changed-paths was ignored");
+					}
+					compute_changed_paths_since(root, rev)?
+				} else {
+					explicit_paths
+				};
 				let labels = context.inputs.get("label").cloned().unwrap_or_default();
-				context.changeset_policy_evaluation =
-					Some(verify_changesets(root, &changed_paths, &labels)?);
+				let enforce = context
+					.inputs
+					.get("verify")
+					.is_some_and(|values| values.iter().any(|v| v == "true"));
+				let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
+				evaluation.enforce = enforce;
+				context.changeset_policy_evaluation = Some(evaluation);
 				output = None;
 			}
 			CliStepDefinition::Command {
@@ -990,14 +1015,19 @@ fn execute_cli_command(
 			.get("format")
 			.and_then(|values| values.first())
 			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
-		return match format {
+		let rendered = match format {
 			OutputFormat::Json => serde_json::to_string_pretty(evaluation).map_err(|error| {
 				MonochangeError::Config(format!(
 					"failed to render changeset policy evaluation as json: {error}"
 				))
-			}),
-			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
+			})?,
+			OutputFormat::Text => render_cli_command_result(cli_command, &context),
 		};
+		if evaluation.enforce && evaluation.status == ChangesetPolicyStatus::Failed {
+			println!("{rendered}");
+			return Err(MonochangeError::Config(evaluation.summary.clone()));
+		}
+		return Ok(rendered);
 	}
 	if !context.command_logs.is_empty() {
 		return Ok(render_cli_command_result(cli_command, &context));
@@ -1332,7 +1362,7 @@ fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 	}
 }
 
-pub fn verify_changesets(
+pub fn affected_packages(
 	root: &Path,
 	changed_paths: &[String],
 	labels: &[String],
@@ -1491,6 +1521,7 @@ pub fn verify_changesets(
 	let mut evaluation = ChangesetPolicyEvaluation {
 		status,
 		required,
+		enforce: false,
 		summary,
 		comment: None,
 		labels,
@@ -1511,12 +1542,60 @@ pub fn verify_changesets(
 	Ok(evaluation)
 }
 
+pub fn verify_changesets(
+	root: &Path,
+	changed_paths: &[String],
+	labels: &[String],
+) -> MonochangeResult<ChangesetPolicyEvaluation> {
+	affected_packages(root, changed_paths, labels)
+}
+
 pub fn evaluate_changeset_policy(
 	root: &Path,
 	changed_paths: &[String],
 	labels: &[String],
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
-	verify_changesets(root, changed_paths, labels)
+	affected_packages(root, changed_paths, labels)
+}
+
+fn compute_changed_paths_since(root: &Path, since_rev: &str) -> MonochangeResult<Vec<String>> {
+	let diff_output = ProcessCommand::new("git")
+		.args(["diff", "--name-only", since_rev])
+		.current_dir(root)
+		.output()
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to run git diff --name-only {since_rev}: {error}"
+			))
+		})?;
+	if !diff_output.status.success() {
+		let stderr = String::from_utf8_lossy(&diff_output.stderr);
+		return Err(MonochangeError::Config(format!(
+			"git diff --name-only {since_rev} failed: {stderr}"
+		)));
+	}
+	let mut paths: Vec<String> = String::from_utf8_lossy(&diff_output.stdout)
+		.lines()
+		.map(|line| line.trim().to_string())
+		.filter(|line| !line.is_empty())
+		.collect();
+
+	let untracked_output = ProcessCommand::new("git")
+		.args(["ls-files", "--others", "--exclude-standard"])
+		.current_dir(root)
+		.output()
+		.map_err(|error| MonochangeError::Config(format!("failed to run git ls-files: {error}")))?;
+	if untracked_output.status.success() {
+		for line in String::from_utf8_lossy(&untracked_output.stdout).lines() {
+			let path = line.trim().to_string();
+			if !path.is_empty() && !paths.contains(&path) {
+				paths.push(path);
+			}
+		}
+	}
+
+	paths.sort();
+	Ok(paths)
 }
 
 fn normalize_changed_path(path: &str) -> String {

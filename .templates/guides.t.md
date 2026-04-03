@@ -204,26 +204,26 @@ command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
 shell = true
 
-[cli.verify]
+[cli.affected]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -322,7 +322,7 @@ Current implementation notes:
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `VerifyChangesets`, and `Command`
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `AffectedPackages`, and `Command`
 - legacy `PublishGitHubRelease`, `OpenReleasePullRequest`, and `EnforceChangesetPolicy` step names are still accepted as migration aliases
 
 <!-- {/configurationCurrentStatus} -->
@@ -424,7 +424,7 @@ evidence:
 - `PublishRelease` reuses the same structured release data to build provider release requests for grouped and package-owned releases
 - `OpenReleaseRequest` reuses the same structured release data to render release-request summaries, branch names, and idempotent provider updates
 - `CommentReleasedIssues` can use linked changeset context metadata to add follow-up comments to closed issues after a release is published
-- `VerifyChangesets` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
+- `AffectedPackages` evaluates changed paths, skip labels, and changed `.changeset/*.md` files into reusable pass/skip/fail diagnostics and optional failure comments
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
@@ -447,7 +447,7 @@ Current `PrepareRelease` behavior:
 - can preview or publish provider releases via `PublishRelease`
 - can preview or open/update release requests via `OpenReleaseRequest`
 - can comment on released issues via `CommentReleasedIssues`
-- can evaluate pull-request changeset policy via `VerifyChangesets` using changed paths and labels supplied by CI
+- can evaluate pull-request changeset policy via `AffectedPackages` using changed paths and labels supplied by CI
 - applies group-owned release identity for outward `tag`, `release`, and `version_format`
 - deletes consumed change files only after a successful non-dry-run execution
 - leaves the workspace untouched during `--dry-run` except for explicitly requested outputs such as a rendered release manifest or release preview
@@ -529,7 +529,7 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 - `mc release-manifest` writes a stable JSON artifact for downstream automation
 - `mc publish-release` previews or publishes provider releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent provider release request
-- `mc verify` evaluates pull-request changeset policy from CI-supplied changed paths and labels
+- `mc affected` evaluates pull-request changeset policy from CI-supplied changed paths and labels
 
 <!-- {/githubAutomationOverview} -->
 
@@ -540,7 +540,7 @@ mc release --dry-run --format json
 mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
-mc verify --format json --changed-paths crates/monochange/src/lib.rs
+mc affected --format json --changed-paths crates/monochange/src/lib.rs
 ```
 
 <!-- {/githubAutomationWorkflowCommands} -->
@@ -677,26 +677,26 @@ default = "text"
 
 type = "PrepareRelease"
 
-[cli.verify]
+[cli.affected]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 ```
 
 <!-- {@githubAutomationDogfoodNotes} -->
@@ -704,6 +704,6 @@ type = "VerifyChangesets"
 The MonoChange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
-- running a real `changeset-policy` GitHub Actions workflow that shells into `mc verify`
+- running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`
 
 <!-- {/githubAutomationDogfoodNotes} -->

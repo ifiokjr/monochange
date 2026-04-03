@@ -40,7 +40,7 @@ pub struct ChangeParam {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct VerifyParam {
+pub struct AffectedParam {
 	pub path: Option<String>,
 	pub changed_paths: Vec<String>,
 	#[serde(default)]
@@ -306,24 +306,24 @@ impl MonochangeMcpServer {
 	}
 
 	#[tool(
-		name = "monochange_verify_changesets",
+		name = "monochange_affected_packages",
 		description = "Evaluate changeset policy from changed paths and optional labels."
 	)]
-	async fn verify_changesets(
+	async fn affected_packages(
 		&self,
-		Parameters(params): Parameters<VerifyParam>,
+		Parameters(params): Parameters<AffectedParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		match crate::verify_changesets(&root, &params.changed_paths, &params.labels) {
+		match crate::affected_packages(&root, &params.changed_paths, &params.labels) {
 			Ok(evaluation) => Ok(json_result(json!({
 				"ok": evaluation.status != monochange_core::ChangesetPolicyStatus::Failed,
-				"action": "verify_changesets",
+				"action": "affected_packages",
 				"summary": evaluation.summary,
 				"evaluation": evaluation,
 			}))),
 			Err(error) => Ok(json_error_result(json!({
 				"ok": false,
-				"action": "verify_changesets",
+				"action": "affected_packages",
 				"root": root,
 				"summary": error.render(),
 				"error": error.render()
@@ -354,11 +354,11 @@ mod __tests {
 	use rmcp::handler::server::wrapper::Parameters;
 	use tempfile::tempdir;
 
+	use super::AffectedParam;
 	use super::ChangeParam;
 	use super::McpChangeBump;
 	use super::MonochangeMcpServer;
 	use super::PathParam;
-	use super::VerifyParam;
 
 	fn content_text(result: &rmcp::model::CallToolResult) -> String {
 		result
@@ -439,7 +439,7 @@ type = "cargo"
 	}
 
 	#[tokio::test]
-	async fn verify_changesets_reports_success_for_documentation_only_changes() {
+	async fn affected_packages_reports_success_for_documentation_only_changes() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		fs::write(
 			tempdir.path().join("monochange.toml"),
@@ -452,38 +452,38 @@ comment_on_failure = true
 changed_paths = ["crates/**"]
 ignored_paths = ["docs/**"]
 
-[cli.verify]
+[cli.affected]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 "#,
 		)
 		.unwrap_or_else(|error| panic!("config write: {error}"));
 
 		let result = MonochangeMcpServer::new()
-			.verify_changesets(Parameters(VerifyParam {
+			.affected_packages(Parameters(AffectedParam {
 				path: Some(tempdir.path().display().to_string()),
 				changed_paths: vec!["docs/readme.md".to_string()],
 				labels: Vec::new(),
 			}))
 			.await
-			.unwrap_or_else(|error| panic!("verify: {error}"));
+			.unwrap_or_else(|error| panic!("affected: {error}"));
 
 		let text = content_text(&result);
 		assert!(text.contains("\"ok\": true"));

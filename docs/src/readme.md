@@ -33,7 +33,7 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
-- `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
+- `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
 <!-- {/projectGitHubAutomationOverview} -->
 

@@ -1981,7 +1981,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::PublishRelease
 				| CliStepDefinition::OpenReleaseRequest
 				| CliStepDefinition::CommentReleasedIssues
-				| CliStepDefinition::VerifyChangesets => {}
+				| CliStepDefinition::AffectedPackages => {}
 			}
 		}
 	}
@@ -2050,32 +2050,28 @@ fn validate_cli_runtime_requirements(
 			}
 		}
 		for step in &cli_command.steps {
-			if step == &CliStepDefinition::VerifyChangesets {
+			if step == &CliStepDefinition::AffectedPackages {
 				if !changesets.verify.enabled {
 					return Err(MonochangeError::Config(format!(
-   							"CLI command `{}` uses `VerifyChangesets` but `[changesets.verify].enabled` is false",
-   							cli_command.name
-   						)));
+						"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",
+						cli_command.name
+					)));
 				}
-				let changed_paths_input = cli_command_input(cli_command, "changed_paths")
-					.ok_or_else(|| {
-						MonochangeError::Config(format!(
-   								"CLI command `{}` uses `VerifyChangesets` but does not declare a `changed_paths` input",
-   								cli_command.name
-   							))
-					})?;
-				if !matches!(changed_paths_input.kind, CliInputKind::StringList) {
+				let has_changed_paths = cli_command_input(cli_command, "changed_paths")
+					.is_some_and(|input| matches!(input.kind, CliInputKind::StringList));
+				let has_since = cli_command_input(cli_command, "since").is_some();
+				if !has_changed_paths && !has_since {
 					return Err(MonochangeError::Config(format!(
-   							"CLI command `{}` input `changed_paths` must use type `string_list` for `VerifyChangesets`",
-   							cli_command.name
-   						)));
+						"CLI command `{}` uses `AffectedPackages` but declares neither a `changed_paths` nor a `since` input",
+						cli_command.name
+					)));
 				}
 				if let Some(label_input) = cli_command_input(cli_command, "label") {
 					if !matches!(label_input.kind, CliInputKind::StringList) {
 						return Err(MonochangeError::Config(format!(
-   								"CLI command `{}` input `label` must use type `string_list` when used with `VerifyChangesets`",
-   								cli_command.name
-   							)));
+							"CLI command `{}` input `label` must use type `string_list` when used with `AffectedPackages`",
+							cli_command.name
+						)));
 					}
 				}
 			}
