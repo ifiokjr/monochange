@@ -1439,7 +1439,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					name: "reason".to_string(),
 					kind: CliInputKind::String,
 					help_text: Some("Short release-note summary for this change".to_string()),
-					required: true,
+					required: false,
 					default: None,
 					choices: Vec::new(),
 					short: None,
