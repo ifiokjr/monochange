@@ -18,6 +18,7 @@ glob = { workspace = true }
 miette = { workspace = true }
 minijinja = { workspace = true }
 monochange_core = { workspace = true }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true }
@@ -26,7 +27,6 @@ toml = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 rstest = { workspace = true }
-semver = { workspace = true }
 similar-asserts = { workspace = true }
 tempfile = "3"
 

@@ -425,6 +425,7 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 		&fixture_root,
 		&["sdk-core".to_string()],
 		monochange_core::BumpSeverity::Patch,
+		None,
 		"default output",
 		None,
 		None,

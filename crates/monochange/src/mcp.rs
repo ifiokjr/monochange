@@ -30,6 +30,7 @@ pub struct ChangeParam {
 	pub path: Option<String>,
 	pub package: Vec<String>,
 	pub bump: McpChangeBump,
+	pub version: Option<String>,
 	pub reason: String,
 	#[serde(rename = "type")]
 	pub change_type: Option<String>,
@@ -221,6 +222,7 @@ impl MonochangeMcpServer {
 			&root,
 			&params.package,
 			bump.into(),
+			params.version.as_deref(),
 			&params.reason,
 			params.change_type.as_deref(),
 			params.details.as_deref(),
@@ -417,6 +419,7 @@ type = "cargo"
 				path: Some(tempdir.path().display().to_string()),
 				package: vec!["core".to_string()],
 				bump: McpChangeBump::Patch,
+				version: None,
 				reason: "add test coverage".to_string(),
 				change_type: None,
 				details: None,

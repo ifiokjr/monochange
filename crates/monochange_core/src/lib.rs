@@ -448,6 +448,7 @@ pub struct WorkspaceDefaults {
 	pub parent_bump: BumpSeverity,
 	pub include_private: bool,
 	pub warn_on_group_mismatch: bool,
+	pub strict_version_conflicts: bool,
 	pub package_type: Option<PackageType>,
 	pub changelog: Option<ChangelogDefinition>,
 	pub changelog_format: ChangelogFormat,
@@ -460,6 +461,7 @@ impl Default for WorkspaceDefaults {
 			parent_bump: BumpSeverity::Patch,
 			include_private: false,
 			warn_on_group_mismatch: true,
+			strict_version_conflicts: false,
 			package_type: None,
 			changelog: None,
 			changelog_format: ChangelogFormat::Monochange,
@@ -1409,6 +1411,14 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					],
 				},
 				CliInputDefinition {
+					name: "version".to_string(),
+					kind: CliInputKind::String,
+					help_text: Some("Pin an explicit version for this release".to_string()),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+				CliInputDefinition {
 					name: "reason".to_string(),
 					kind: CliInputKind::String,
 					help_text: Some("Short release-note summary for this change".to_string()),
@@ -1550,6 +1560,7 @@ pub struct PlannedVersionGroup {
 pub struct ChangeSignal {
 	pub package_id: String,
 	pub requested_bump: Option<BumpSeverity>,
+	pub explicit_version: Option<Version>,
 	pub change_origin: String,
 	pub evidence_refs: Vec<String>,
 	pub notes: Option<String>,

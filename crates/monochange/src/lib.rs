@@ -756,6 +756,11 @@ fn execute_cli_command(
 					.get("bump")
 					.and_then(|values| values.first())
 					.map_or(Ok(ChangeBump::Patch), |value| parse_change_bump(value))?;
+				let version = context
+					.inputs
+					.get("version")
+					.and_then(|values| values.first())
+					.cloned();
 				let reason = context
 					.inputs
 					.get("reason")
@@ -786,6 +791,7 @@ fn execute_cli_command(
 					root,
 					&package_refs,
 					bump.into(),
+					version.as_deref(),
 					&reason,
 					change_type.as_deref(),
 					details.as_deref(),
@@ -1964,6 +1970,7 @@ pub fn add_change_file(
 	root: &Path,
 	package_refs: &[String],
 	bump: BumpSeverity,
+	version: Option<&str>,
 	reason: &str,
 	change_type: Option<&str>,
 	details: Option<&str>,
@@ -1982,8 +1989,23 @@ pub fn add_change_file(
 		})?;
 	}
 
-	let content =
-		render_changeset_markdown(&packages, bump, reason, change_type, details, evidence);
+	if let Some(version) = version {
+		semver::Version::parse(version).map_err(|error| {
+			MonochangeError::Config(format!(
+				"invalid explicit version `{version}` passed to `change`: {error}"
+			))
+		})?;
+	}
+
+	let content = render_changeset_markdown(
+		&packages,
+		bump,
+		version,
+		reason,
+		change_type,
+		details,
+		evidence,
+	);
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write {}: {error}",
@@ -1997,11 +2019,7 @@ pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<Releas
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
 	let change_signals = load_change_signals(changes_path, &configuration, &discovery.packages)?;
-	Ok(build_release_plan_from_signals(
-		&configuration,
-		&discovery,
-		&change_signals,
-	))
+	build_release_plan_from_signals(&configuration, &discovery, &change_signals)
 }
 
 pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
@@ -2020,7 +2038,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	if let Some(github) = configuration.github.as_ref() {
 		github_provider::enrich_changeset_context(github, &mut changesets);
 	}
-	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals);
+	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals)?;
 	let released_packages = released_package_names(&discovery.packages, &plan);
 	if released_packages.is_empty() {
 		return Err(MonochangeError::Config(
@@ -2240,7 +2258,7 @@ fn build_release_plan_from_signals(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	discovery: &DiscoveryReport,
 	change_signals: &[ChangeSignal],
-) -> ReleasePlan {
+) -> MonochangeResult<ReleasePlan> {
 	let rust_provider = RustSemverProvider;
 	let providers: [&dyn CompatibilityProvider; 1] = [&rust_provider];
 	let compatibility_evidence =
@@ -2254,6 +2272,7 @@ fn build_release_plan_from_signals(
 		change_signals,
 		&compatibility_evidence,
 		configuration.defaults.parent_bump,
+		configuration.defaults.strict_version_conflicts,
 	)
 }
 
@@ -4238,6 +4257,7 @@ fn default_change_path(root: &Path, package_refs: &[String]) -> PathBuf {
 fn render_changeset_markdown(
 	package_refs: &[String],
 	bump: BumpSeverity,
+	version: Option<&str>,
 	reason: &str,
 	change_type: Option<&str>,
 	details: Option<&str>,
@@ -4245,7 +4265,13 @@ fn render_changeset_markdown(
 ) -> String {
 	let mut lines = vec!["---".to_string()];
 	for package in package_refs {
-		lines.push(format!("{package}: {bump}"));
+		if let Some(version) = version {
+			lines.push(format!("{package}:"));
+			lines.push(format!("  bump: {bump}"));
+			lines.push(format!("  version: \"{version}\""));
+		} else {
+			lines.push(format!("{package}: {bump}"));
+		}
 	}
 	if let Some(change_type) = change_type.filter(|value| !value.trim().is_empty()) {
 		lines.push("type:".to_string());

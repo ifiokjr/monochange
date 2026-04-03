@@ -15,11 +15,11 @@ description = "Dependency graph and propagation logic for monochange"
 [dependencies]
 monochange_core = { workspace = true }
 monochange_semver = { workspace = true }
+semver = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
 rstest = { workspace = true }
-semver = { workspace = true }
 similar-asserts = { workspace = true }
 
 [lints]
