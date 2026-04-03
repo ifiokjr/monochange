@@ -188,6 +188,50 @@ core: minor
 }
 
 #[test]
+fn change_cli_writes_explicit_versions_when_requested() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_ungrouped_release_fixture(tempdir.path());
+	let output_path = tempdir.path().join("versioned.md");
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(tempdir.path())
+			.arg("change")
+			.arg("--package")
+			.arg("core")
+			.arg("--bump")
+			.arg("major")
+			.arg("--version")
+			.arg("2.0.0")
+			.arg("--reason")
+			.arg("promote to stable")
+			.arg("--output")
+			.arg(&output_path),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	wrote change file versioned.md
+	
+	----- stderr -----
+	"###
+	);
+
+	let change_file =
+		fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("change file: {error}"));
+	assert_snapshot!(change_file, @r###"
+---
+core:
+  bump: major
+  version: "2.0.0"
+---
+
+#### promote to stable
+"###);
+}
+
+#[test]
 fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -212,6 +256,52 @@ fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	changed files:
 	- crates/app/Cargo.toml
 	- crates/core/Cargo.toml
+	
+	----- stderr -----
+	"###
+	);
+}
+
+#[test]
+fn release_dry_run_cli_uses_explicit_group_versions_from_member_changes() {
+	apply_common_filters!();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_group_release_fixture(tempdir.path());
+	write_file(
+		tempdir.path().join(".changeset/feature.md"),
+		r"---
+core:
+  bump: major
+  version: 2.0.0
+---
+
+#### promote sdk to stable
+",
+	);
+
+	assert_cmd_snapshot!(
+		cli()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("text"),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	command `release` completed (dry-run)
+	version: 2.0.0
+	released packages: workflow-app, workflow-core
+	release targets:
+	- group sdk -> v2.0.0 (tag: true, release: true)
+	changed files:
+	- Cargo.toml
+	- changelog.md
+	- crates/app/Cargo.toml
+	- crates/core/CHANGELOG.md
+	- crates/core/Cargo.toml
+	- group.toml
 	
 	----- stderr -----
 	"###

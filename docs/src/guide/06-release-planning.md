@@ -7,7 +7,7 @@ Create a changeset with the CLI:
 ```bash
 mc change --package sdk-core --bump minor --reason "public API addition"
 mc change --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
-mc change --package sdk-core --bump major --reason "break the public API" --evidence rust-semver:major:public API break detected --output .changeset/sdk-core-major.md
+mc change --package sdk-core --bump major --version 2.0.0 --reason "break the public API" --evidence rust-semver:major:public API break detected --output .changeset/sdk-core-major.md
 ```
 
 <!-- {/releaseChangesAddCommand} -->
@@ -18,7 +18,9 @@ Or write one manually with configured package or group ids:
 
 ```markdown
 ---
-sdk-core: patch
+sdk-core:
+  bump: major
+  version: 2.0.0
 type:
   sdk-core: security
 ---
@@ -40,7 +42,11 @@ sdk: minor
 #### coordinated SDK release
 ```
 
-MonoChange keeps its own changeset standard rather than reusing a narrower external parser. In addition to package/group bump entries, MonoChange changesets can include reserved metadata keys such as `evidence`, `origin`, and `type`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs.
+When you need to pin an exact release number, changesets may also declare `version`. If the package belongs to a version group, that explicit version propagates to the whole group because grouped packages cannot release at different versions.
+
+If multiple changesets specify conflicting explicit versions for the same package or group, monochange uses the highest semver version and emits a warning by default. Set `defaults.strict_version_conflicts = true` to fail instead.
+
+MonoChange keeps its own changeset standard rather than reusing a narrower external parser. In addition to package/group bump entries, MonoChange changesets can include reserved metadata keys such as `evidence`, `origin`, `type`, and explicit `version`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs.
 
 Optionally include Rust semver evidence:
 

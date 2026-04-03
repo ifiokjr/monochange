@@ -32,6 +32,7 @@ monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }
 rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shlex = { workspace = true }

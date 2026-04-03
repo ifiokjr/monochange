@@ -26,6 +26,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.parent_bump, BumpSeverity::Patch);
 	assert!(!configuration.defaults.include_private);
 	assert!(configuration.defaults.warn_on_group_mismatch);
+	assert!(!configuration.defaults.strict_version_conflicts);
 	assert_eq!(configuration.defaults.package_type, None);
 	assert_eq!(configuration.defaults.changelog, None);
 	assert_eq!(
@@ -100,6 +101,7 @@ path = ".monochange/release-manifest.json"
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert_eq!(configuration.defaults.parent_bump, BumpSeverity::Minor);
 	assert!(configuration.defaults.include_private);
+	assert!(!configuration.defaults.strict_version_conflicts);
 	assert_eq!(
 		configuration.defaults.package_type,
 		Some(monochange_core::PackageType::Cargo)
@@ -1134,12 +1136,68 @@ evidence:
 		.unwrap_or_else(|| panic!("expected discovered package"));
 	assert_eq!(signal.package_id, package.id);
 	assert_eq!(signal.requested_bump, Some(BumpSeverity::Minor));
+	assert_eq!(signal.explicit_version, None);
 	assert_eq!(signal.notes.as_deref(), Some("public API addition"));
 	assert_eq!(signal.source_path, tempdir.path().join("change.md"));
 	assert_eq!(
 		signal.evidence_refs,
 		vec!["rust-semver:major:public API break detected"]
 	);
+}
+
+#[test]
+fn load_change_signals_parses_explicit_versions_and_infers_bumps() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+	fs::write(
+		tempdir.path().join("change.md"),
+		r"---
+core:
+  version: 1.2.0
+---
+
+#### explicit version
+",
+	)
+	.unwrap_or_else(|error| panic!("changes write: {error}"));
+	let mut packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-core",
+		tempdir.path().join("crates/core/Cargo.toml"),
+		tempdir.path().to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let changeset =
+		load_changeset_file(&tempdir.path().join("change.md"), &configuration, &packages)
+			.unwrap_or_else(|error| panic!("changeset file: {error}"));
+	let target = changeset
+		.targets
+		.first()
+		.unwrap_or_else(|| panic!("expected target"));
+	let signal = changeset
+		.signals
+		.first()
+		.unwrap_or_else(|| panic!("expected signal"));
+
+	assert_eq!(target.bump, Some(BumpSeverity::Minor));
+	assert_eq!(target.explicit_version, Some(Version::new(1, 2, 0)));
+	assert_eq!(signal.requested_bump, Some(BumpSeverity::Minor));
+	assert_eq!(signal.explicit_version, Some(Version::new(1, 2, 0)));
 }
 
 #[test]
@@ -1420,6 +1478,48 @@ sdk: minor
 }
 
 #[test]
+fn load_change_signals_rejects_invalid_explicit_versions() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+	fs::write(
+		tempdir.path().join("change.md"),
+		r"---
+core:
+  bump: minor
+  version: nope
+---
+
+#### invalid version
+",
+	)
+	.unwrap_or_else(|error| panic!("changes write: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		tempdir.path().join("crates/core/Cargo.toml"),
+		tempdir.path().to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&tempdir.path().join("change.md"), &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid version error"));
+	assert!(error.to_string().contains("invalid version `nope`"));
+}
+
+#[test]
 fn load_changeset_file_preserves_group_targets_and_source_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
@@ -1489,6 +1589,7 @@ origin:
 	assert_eq!(target.id, "sdk");
 	assert_eq!(target.kind.as_str(), "group");
 	assert_eq!(target.origin, "pull-request");
+	assert_eq!(target.explicit_version, None);
 	assert_eq!(changeset.signals.len(), 2);
 	assert!(changeset
 		.signals
