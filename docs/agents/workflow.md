@@ -11,4 +11,5 @@
 - After making changes, run `fix:all` so formatting and clippy autofixes are applied before final validation.
 - Update docs, READMEs, fixtures, changeset examples, and templates when behavior changes.
 - Always include a `.changeset/*.md` file in feature and fix branches that change behavior in any published crate. Use `mc change` to generate the file, targeting the affected packages or groups with the appropriate bump level.
+- When adding or changing configuration options in any crate, update the annotations in `monochange.toml` to reflect the new option, its defaults, available values, and purpose. Use the existing comment style as a guide. Where possible, use mdt shared blocks in `.templates/` so the same documentation propagates to the guide, README, and config file.
 - Run the full local validation suite before opening a PR.
