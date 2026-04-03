@@ -249,7 +249,6 @@ type = "string"
 [[cli.change.inputs]]
 name = "reason"
 type = "string"
-required = true
 
 [[cli.change.inputs]]
 name = "type"
