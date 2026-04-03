@@ -1,0 +1,541 @@
+{#
+  monochange.init.toml -- minijinja template for mc init
+
+  Compiled into the binary via include_str! and rendered at runtime with
+  context from package discovery.  Edit this file directly when config
+  options change.
+
+  Template context:
+    packages         -- list of { id, path, type, changelog? }
+    has_group        -- true when more than one package was discovered
+    package_ids_toml -- pre-formatted TOML array contents
+    has_cargo / has_npm / has_deno / has_dart -- ecosystem detected flags
+#}
+# =============================================================================
+# monochange.toml — repository configuration for monochange
+# =============================================================================
+#
+# This file is the single source of truth for release planning, CLI commands,
+# changelog generation, and automation flows in this monorepo.
+#
+# Run `mc validate` to check this file against the workspace.
+# Run `mc init` to generate a starter config from detected packages.
+
+# =============================================================================
+# [defaults] — repository-wide defaults applied to every package unless
+# overridden at the package or group level.
+# =============================================================================
+
+[defaults]
+# Bump severity applied to transitive dependents when a dependency changes.
+# When package A depends on package B, and B gets a minor bump, A receives
+# whichever bump is configured here.
+#
+# Options: "none", "patch", "minor", "major"
+# Default: "patch"
+parent_bump = "patch"
+
+# Whether to include private packages (publish = false) in discovery and
+# release planning. When false, private packages are discovered but excluded
+# from release plans and version bumps.
+#
+# Default: false
+include_private = false
+
+# Emit a warning when version-group members have mismatched current versions.
+# Helps catch accidental version drift in grouped packages.
+#
+# Default: true
+warn_on_group_mismatch = true
+
+# Default package type for all packages that don't declare their own `type`.
+# Setting this avoids repeating `type = "cargo"` on every [package.*] entry.
+#
+# Options: "cargo", "npm", "deno", "dart", "flutter"
+# Default: none (each package must declare its own type)
+# package_type = "cargo"
+
+# Default changelog configuration applied to every package that doesn't
+# declare its own `changelog` field.
+#
+# Accepts three forms:
+{% raw -%}
+#   true                           → use "{{ path }}/CHANGELOG.md" for every package
+#   false                          → disable changelogs by default
+#   "{{ path }}/changelog.md"      → pattern where {{ path }} is replaced with each package path
+#
+# As a table, you can set both path and format:
+#   [defaults.changelog]
+#   path = "{{ path }}/changelog.md"
+#   format = "keep_a_changelog"
+{% endraw -%}
+#
+# Supported formats: "monochange" (default), "keep_a_changelog"
+# Default: none (changelogs are disabled unless configured)
+# [defaults.changelog]
+{% raw -%}
+# path = "{{ path }}/changelog.md"
+{% endraw -%}
+# format = "keep_a_changelog"
+
+# Default empty_update_message applied when a package is bumped but has no
+# direct changeset entries (e.g. transitive dependency bumps or group
+# synchronization). Template placeholders are interpolated at render time
+# using minijinja syntax.
+#
+# Available placeholders:
+{% raw -%}
+#   {{ package }}, {{ package_name }}, {{ package_id }}
+#   {{ group }}, {{ group_name }}, {{ group_id }}
+#   {{ version }}, {{ new_version }}, {{ current_version }}, {{ previous_version }}
+#   {{ bump }}, {{ trigger }}, {{ ecosystem }}
+#   {{ release_owner }}, {{ release_owner_kind }}
+#   {{ members }}, {{ member_count }}  (group changelogs only)
+#   {{ reasons }}
+{% endraw -%}
+#
+# Precedence: package → group → defaults → built-in message
+# Default: built-in message varies by grouped/ungrouped context
+#
+{% raw -%}
+# empty_update_message = "No direct changes; {{ package }} updated to {{ version }}."
+{% endraw %}
+
+# =============================================================================
+# [release_notes] — workspace-wide release-note rendering settings
+# =============================================================================
+
+# [release_notes]
+# Templates that control how individual change entries render in changelogs.
+# Each template is tried in order; the first one whose required variables are
+# all present wins (uses minijinja strict mode — all referenced variables must
+{% raw -%}
+# be defined). If none match, falls back to "- {{ summary }}".
+#
+# Available variables:
+#   {{ summary }}       — the change summary from the changeset
+#   {{ details }}       — optional multi-line details block
+#   {{ package }}       — package name
+#   {{ version }}       — planned version
+#   {{ target_id }}     — release owner id (package or group)
+#   {{ bump }}          — bump severity (patch, minor, major)
+#   {{ type }}          — optional change type (e.g. "security", "note")
+#   {{ context }}       — rendered provenance context block
+#   {{ provenance }}    — alias for {{ context }}
+#   {{ changeset_path }} — path to the changeset file
+#   {{ change_owner }}, {{ change_owner_link }}
+#   {{ review_request }}, {{ review_request_link }}
+#   {{ introduced_commit }}, {{ introduced_commit_link }}
+#   {{ last_updated_commit }}, {{ last_updated_commit_link }}
+#   {{ related_issues }}, {{ related_issue_links }}
+#   {{ closed_issues }}, {{ closed_issue_links }}
+#
+# Default: ["#### {{ summary }}\n\n{{ details }}", "- {{ summary }}"]
+# change_templates = [
+#   "#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+#   "#### {{ summary }}\n\n{{ context }}",
+#   "#### {{ summary }}\n\n{{ details }}",
+#   "- {{ summary }}",
+# ]
+{% endraw %}
+
+# =============================================================================
+# [package.*] — declare each release-managed package explicitly
+# =============================================================================
+#
+# Required fields:
+#   path  — relative path from repo root to the package directory
+#
+# Optional fields:
+#   type                    — "cargo", "npm", "deno", "dart", "flutter"
+#                             (not needed when defaults.package_type is set)
+#   changelog               — true, false, "path/to/changelog.md", or a table
+#                             with { path, format }; overrides [defaults.changelog]
+#   extra_changelog_sections — custom changelog sections with type routing
+#   empty_update_message    — per-package fallback text for transitive bumps
+#   versioned_files         — additional files to update with the new version
+#                             e.g. ["Cargo.lock"] or [{ path = "group.toml", dependency = "core" }]
+#   ignored_paths           — glob patterns for paths within this package to
+#                             exclude from changeset verification
+#   additional_paths        — glob patterns for paths outside the package
+#                             directory that should trigger changeset verification
+#   tag                     — whether to create a git tag for this package (default: false)
+#   release                 — whether to create a provider release (default: false)
+#   version_format          — "namespaced" (default: "pkg/v1.0.0") or
+#                             "primary" (just "v1.0.0"); only one package/group
+#                             may use "primary"
+
+{% for pkg in packages %}
+[package.{{ pkg.id }}]
+path = "{{ pkg.path }}"
+type = "{{ pkg.type }}"
+{% if pkg.changelog %}
+changelog = "{{ pkg.changelog }}"
+{% endif %}
+
+{% endfor %}
+# =============================================================================
+# [group.*] — version groups that share a single release identity
+# =============================================================================
+#
+# When packages belong to a group, they share a synchronized version and a
+# single release tag/identity. If any member bumps, all members bump to the
+# group's highest severity.
+#
+# Required fields:
+#   packages — list of [package.*] ids that belong to this group
+#
+# Optional fields:
+#   changelog               — path or table for the group-level changelog
+#   extra_changelog_sections — custom changelog sections with type routing
+#   empty_update_message    — fallback text when the group bumps but a
+#                             specific member has no direct changeset entries
+#   versioned_files         — additional files to version-bump with the group
+#   tag                     — create a git tag for the group release (default: false)
+#   release                 — create a provider release for the group (default: false)
+#   version_format          — "namespaced" (default) or "primary"
+#
+# Rules:
+#   - group members must be declared under [package.*]
+#   - package and group ids share one namespace (no collisions)
+#   - a package may belong to only one group
+#   - only one package or group may use version_format = "primary"
+#   - group tag/release/version_format override member package settings
+
+{% if has_group %}
+[group.main]
+packages = [{{ package_ids_toml }}]
+tag = true
+release = true
+version_format = "primary"
+{% endif %}
+
+# =============================================================================
+# [[deployments]] — deployment intent definitions
+# =============================================================================
+#
+# Deployments are structured intents emitted in the release manifest so
+# downstream CI can decide when and how to execute them. Monochange does not
+# run deployments directly — it declares them.
+#
+# Fields:
+#   name            — unique deployment name
+#   trigger         — when to deploy: "workflow" (manual), "release_pr_merge",
+#                     or "release_published"
+#   workflow        — CI workflow to trigger
+#   environment     — target environment name (optional)
+#   release_targets — which release targets activate this deployment (default: all)
+#   requires        — dependencies that must be met before deploying
+#   metadata        — arbitrary key-value pairs passed to the workflow
+#
+# Example:
+# [[deployments]]
+# name = "docs"
+# trigger = "release_published"
+# workflow = "docs-release"
+# environment = "github-pages"
+# release_targets = ["main"]
+# requires = ["main"]
+# metadata = { site = "github-pages" }
+
+# =============================================================================
+# [ecosystems.*] — per-ecosystem discovery and publishing settings
+# =============================================================================
+#
+# Each supported ecosystem can be configured independently.
+#
+# Fields:
+#   enabled  — opt-in/opt-out of discovery for this ecosystem (default: none,
+#              meaning discovery runs when manifests are found)
+#   roots    — restrict discovery to specific directories (default: scan entire repo)
+#   exclude  — glob patterns to exclude from discovery
+
+{% if has_cargo %}
+[ecosystems.cargo]
+enabled = true
+{% else %}
+# [ecosystems.cargo]
+# enabled = true
+{% endif %}
+
+{% if has_npm %}
+[ecosystems.npm]
+enabled = true
+{% else %}
+# [ecosystems.npm]
+# enabled = true
+{% endif %}
+
+{% if has_deno %}
+[ecosystems.deno]
+enabled = true
+{% else %}
+# [ecosystems.deno]
+# enabled = true
+{% endif %}
+
+{% if has_dart %}
+[ecosystems.dart]
+enabled = true
+{% else %}
+# [ecosystems.dart]
+# enabled = true
+{% endif %}
+
+# =============================================================================
+# [source] — source-control provider configuration
+# =============================================================================
+#
+# Configures the repository host for release automation: creating releases,
+# opening release pull requests, and evaluating changeset policy.
+#
+# Required fields:
+#   provider — "github", "gitlab", or "gitea"
+#   owner    — repository owner or organization
+#   repo     — repository name
+#
+# Optional fields:
+#   host    — custom host URL for self-hosted instances
+#   api_url — custom API URL (e.g. for GitHub Enterprise)
+#
+# [source]
+# provider = "github"
+# owner = "your-org"
+# repo = "your-repo"
+
+# [source.releases] — provider release settings
+#
+# Controls whether and how releases are created on the provider when the
+# PublishRelease CLI step runs.
+#
+# Fields:
+#   enabled        — enable/disable release creation (default: true)
+#   draft          — create releases as drafts (default: false)
+#   prerelease     — mark releases as pre-releases (default: false)
+#   generate_notes — ask the provider to auto-generate release notes (default: false)
+#   source         — release notes source: "monochange" (use monochange-rendered
+#                    notes) or "github_generated" (use provider-generated notes)
+#                    Default: "monochange"
+#
+# [source.releases]
+# enabled = true
+# draft = false
+# prerelease = false
+# source = "monochange"
+
+# [source.pull_requests] — release pull request settings
+#
+# Controls the OpenReleaseRequest CLI step which creates or updates a release
+# PR with version bumps, changelog updates, and changeset cleanup.
+#
+# Fields:
+#   enabled       — enable/disable release PR creation (default: true)
+#   branch_prefix — branch name prefix for release PRs (default: "monochange/release")
+#   base          — target branch for the release PR (default: "main")
+#   title         — PR title template (default: "chore(release): prepare release")
+#   labels        — labels applied to the release PR (default: ["release", "automated"])
+#   auto_merge    — enable auto-merge on the PR when supported (default: false)
+#
+# [source.pull_requests]
+# enabled = true
+# branch_prefix = "monochange/release"
+# base = "main"
+# title = "chore(release): prepare release"
+# labels = ["release", "automated"]
+# auto_merge = false
+
+# [source.bot.changesets] — legacy changeset bot settings (source-provider-aware)
+#
+# This is the legacy location for changeset policy settings that are aware of
+# the source provider's changed-file detection. These settings feed the
+# VerifyChangesets step when it needs to know which paths matter.
+#
+# For skip_labels, prefer [changesets.verify].skip_labels instead.
+#
+# Fields:
+#   enabled          — enable the legacy changeset bot (default: false)
+#   required         — treat missing changesets as errors (default: true)
+#   skip_labels      — PR labels that skip enforcement (default: [])
+#   comment_on_failure — render a failure comment for CI (default: true)
+#   changed_paths    — glob patterns for paths that require changeset coverage;
+#                      only files matching at least one pattern trigger verification
+#   ignored_paths    — glob patterns for paths to exclude from verification even
+#                      when they match changed_paths
+#
+# [source.bot.changesets]
+# enabled = false
+# required = true
+# skip_labels = []
+# comment_on_failure = true
+# changed_paths = []
+# ignored_paths = []
+
+# =============================================================================
+# [changesets.verify] — changeset verification settings
+# =============================================================================
+#
+# Controls the `VerifyChangesets` CLI step which checks whether pull requests
+# include changeset files that cover all changed packages.
+#
+# This is the config-driven replacement for the legacy [source.bot.changesets]
+# section and works independently of any source provider.
+
+[changesets.verify]
+# Whether changeset verification is enabled. When false, the VerifyChangesets
+# step will refuse to run.
+# Default: true
+enabled = true
+
+# Whether a missing changeset is treated as a failure (true) or just a
+# warning (false).
+# Default: true
+required = true
+
+# Pull-request labels that skip verification entirely. When any label on the
+# PR matches an entry here, the verify step returns "skipped" instead of
+# evaluating coverage.
+# Default: []
+skip_labels = []
+
+# Whether to render a failure comment body in the evaluation output for
+# CI integrations to post back to the pull request.
+# Default: true
+comment_on_failure = true
+
+# =============================================================================
+# [cli.*] — user-defined CLI commands
+# =============================================================================
+#
+# Each [cli.<name>] table becomes a top-level `mc <name>` command.
+# Legacy [[workflows]] tables are no longer supported.
+#
+# Reserved names that cannot be used: "init", "help", "version"
+#
+# Fields:
+#   help_text — description shown in `mc --help`
+#   inputs    — command-line arguments/flags
+#   steps     — ordered list of step definitions to execute
+#
+# Input types:
+#   "string"      — single string value
+#   "string_list" — repeatable string value (--flag a --flag b)
+#   "path"        — file path value
+#   "choice"      — constrained to a set of choices
+#
+# Available step types:
+#   Validate             — validate monochange.toml and changesets
+#   Discover             — discover packages across ecosystems
+#   CreateChangeFile     — create a .changeset/*.md file
+#   PrepareRelease       — compute release plan, update versions, changelogs
+#   RenderReleaseManifest — write release-manifest.json (requires PrepareRelease)
+#   PublishRelease       — create provider releases (requires PrepareRelease)
+#   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
+#   CommentReleasedIssues — comment on issues referenced in changesets
+#   Deploy               — emit deployment intents (requires PrepareRelease)
+#   VerifyChangesets     — evaluate changeset policy from CI-supplied paths/labels
+#   Command              — run an arbitrary shell command
+#
+# Command step fields:
+#   command         — the command to run (supports minijinja interpolation)
+#   dry_run_command — alternative command for --dry-run mode (optional;
+#                     if omitted, the step is skipped in dry-run)
+#   shell           — run through sh -c (default: false)
+#   variables       — map of placeholder → variable for interpolation
+#
+{% raw -%}
+# Built-in command variables (available as {{ var }} in command templates):
+#   {{ version }}, {{ group_version }}, {{ released_packages }},
+#   {{ changed_files }}, {{ changesets }}
+#   {{ released_packages_list }}  — array form, supports filters like
+#                                   {{ released_packages_list | join(", ") }}
+{% endraw -%}
+# All CLI inputs are also injected as template variables by name.
+
+[cli.validate]
+help_text = "Validate monochange configuration and changesets"
+
+[[cli.validate.steps]]
+type = "Validate"
+
+[cli.discover]
+help_text = "Discover packages across supported ecosystems"
+
+[[cli.discover.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.discover.steps]]
+type = "Discover"
+
+[cli.change]
+help_text = "Create a change file for one or more packages"
+
+[[cli.change.inputs]]
+name = "package"
+type = "string_list"
+required = true
+
+[[cli.change.inputs]]
+name = "bump"
+type = "choice"
+choices = ["patch", "minor", "major"]
+default = "patch"
+
+[[cli.change.inputs]]
+name = "reason"
+type = "string"
+required = true
+
+[[cli.change.inputs]]
+name = "type"
+type = "string"
+
+[[cli.change.inputs]]
+name = "details"
+type = "string"
+
+[[cli.change.inputs]]
+name = "evidence"
+type = "string_list"
+
+[[cli.change.inputs]]
+name = "output"
+type = "path"
+
+[[cli.change.steps]]
+type = "CreateChangeFile"
+
+[cli.release]
+help_text = "Prepare a release from discovered change files"
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[cli.verify]
+help_text = "Evaluate pull-request changeset policy"
+
+[[cli.verify.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.verify.inputs]]
+name = "changed_paths"
+type = "string_list"
+required = true
+
+[[cli.verify.inputs]]
+name = "label"
+type = "string_list"
+
+[[cli.verify.steps]]
+type = "VerifyChangesets"
