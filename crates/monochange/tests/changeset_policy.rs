@@ -131,7 +131,7 @@ fn verify_reports_invalid_attached_changesets() {
 fn run_json_workflow(root: &Path, args: &[&str]) -> Value {
 	let output = cli()
 		.current_dir(root)
-		.arg("verify")
+		.arg("affected")
 		.arg("--format")
 		.arg("json")
 		.args(args)
@@ -191,25 +191,25 @@ additional_paths = ["Cargo.lock"]
 [package.other]
 path = "crates/other"
 
-[cli.verify]
+[cli.affected]
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 "#,
 	);
 	if with_changeset {

@@ -349,50 +349,40 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-# [source.bot.changesets] — legacy changeset bot settings (source-provider-aware)
+# [source.bot.changesets] — changeset policy for the AffectedPackages / `mc affected` step
 #
-# This is the legacy location for changeset policy settings that are aware of
-# the source provider's changed-file detection. These settings feed the
-# VerifyChangesets step when it needs to know which paths matter.
+# By default, every configured package path is automatically included: any file
+# change within a package's configured `path` directory triggers a changeset
+# requirement for that package. You do NOT need to list package directories here.
 #
-# For skip_labels, prefer [changesets.verify].skip_labels instead.
+# `changed_paths` below adds ADDITIONAL non-package root-level paths that should
+# also trigger changeset requirements when changed. For example, workspace-level
+# Cargo.toml or Cargo.lock changes affect all packages.
+#
+# `ignored_paths` filters out files within package directories that should NOT
+# trigger changeset requirements (e.g. test files, snapshots).
+#
+# Per-package `ignored_paths` and `additional_paths` in [package.<id>] tables
+# can further customize which files matter on a package-by-package basis.
 #
 # Fields:
-#   enabled          — enable the legacy changeset bot (default: false)
+#   enabled          — enable changeset policy (default: false)
 #   required         — treat missing changesets as errors (default: true)
 #   skip_labels      — PR labels that skip enforcement (default: [])
 #   comment_on_failure — render a failure comment for CI (default: true)
-#   changed_paths    — glob patterns for paths that require changeset coverage;
-#                      only files matching at least one pattern trigger verification
-#   ignored_paths    — glob patterns for paths to exclude from verification even
-#                      when they match changed_paths
+#   changed_paths    — additional non-package paths that trigger requirements
+#   ignored_paths    — glob patterns to exclude from all package matching
 [source.bot.changesets]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
 changed_paths = [
-	"crates/**",
-	".github/**",
 	"Cargo.toml",
 	"Cargo.lock",
-	"devenv.nix",
-	"devenv.yaml",
-	"devenv.lock",
-	"monochange.toml",
 	"codecov.yml",
-	"deny.toml",
-	"scripts/**",
-	"npm/**",
-	"skills/**",
 ]
 ignored_paths = [
-	".changeset/**",
-	"docs/**",
-	"specs/**",
-	"readme.md",
-	"CONTRIBUTING.md",
-	"license",
 	"**/tests/**",
 	"**/__tests.rs",
 	"**/snapshots/**",
@@ -552,23 +542,30 @@ type = "PrepareRelease"
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
 
-[cli.verify]
-help_text = "Evaluate pull-request changeset policy"
+[cli.affected]
+help_text = "Show packages affected by file changes and their changeset coverage"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
-required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
+name = "since"
+type = "string"
+
+[[cli.affected.inputs]]
+name = "verify"
+type = "boolean"
+
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
