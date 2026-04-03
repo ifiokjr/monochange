@@ -582,7 +582,7 @@ fn command_release_dry_run_json_includes_deployment_intents() {
 [defaults]
 parent_bump = "patch"
 package_type = "cargo"
-changelog = "{path}/changelog.md"
+changelog = "{{ path }}/changelog.md"
 
 [package.core]
 path = "crates/core"
@@ -696,7 +696,7 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(
 		tempdir.path(),
-		Some("printf '%s' \"$version\" > release-version.txt"),
+		Some("printf '%s' \"{{ version }}\" > release-version.txt"),
 		false,
 	);
 
@@ -1294,7 +1294,7 @@ workflow-core = { workspace = true }
 [defaults]
 parent_bump = "patch"
 package_type = "cargo"
-changelog = "{{path}}/changelog.md"
+changelog = "{{{{ path }}}}/changelog.md"
 
 [package.core]
 path = "crates/core"
@@ -1378,12 +1378,12 @@ edition = "2021"
 		r#"
 [defaults]
 package_type = "cargo"
-changelog = "{path}/changelog.md"
-empty_update_message = "Default update for {package} -> {version}."
+changelog = "{{ path }}/changelog.md"
+empty_update_message = "Default update for {{ package }} -> {{ version }}."
 
 [package.core]
 path = "crates/core"
-empty_update_message = "Package override for {package} -> {version}"
+empty_update_message = "Package override for {{ package }} -> {{ version }}"
 
 [package.app]
 path = "crates/app"
@@ -1391,7 +1391,7 @@ path = "crates/app"
 [group.sdk]
 packages = ["core", "app"]
 changelog = "changelog.md"
-empty_update_message = "Update triggered by group {group}; version {version}."
+empty_update_message = "Update triggered by group {{ group }}; version {{ version }}."
 tag = true
 release = true
 version_format = "primary"

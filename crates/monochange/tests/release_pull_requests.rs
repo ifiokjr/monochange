@@ -225,7 +225,7 @@ workflow-core = { workspace = true }
 [defaults]
 parent_bump = "patch"
 package_type = "cargo"
-changelog = "{path}/CHANGELOG.md"
+changelog = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"

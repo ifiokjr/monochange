@@ -70,7 +70,7 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
-- changelog templates can render linked change owners, review requests, commits, and closed issues through `$context` or fine-grained metadata variables
+- changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
 - `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
 - `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
@@ -142,15 +142,15 @@ warn_on_group_mismatch = true
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
 change_templates = [
-	"#### $summary\n\n$details\n\n$context",
-	"#### $summary\n\n$context",
-	"#### $summary\n\n$details",
-	"- $summary",
+	"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ details }}",
+	"- {{ summary }}",
 ]
 
 [package.sdk-core]

@@ -11,15 +11,15 @@ warn_on_group_mismatch = true
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
 [release_notes]
 change_templates = [
-	"#### $summary\n\n$details\n\n$context",
-	"#### $summary\n\n$context",
-	"#### $summary\n\n$details",
-	"- $summary",
+	"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ details }}",
+	"- {{ summary }}",
 ]
 
 [package.sdk-core]

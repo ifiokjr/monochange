@@ -63,7 +63,7 @@ std::fs::write(
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/CHANGELOG.md"
+path = "{{ path }}/CHANGELOG.md"
 format = "keep_a_changelog"
 
 [package.core]

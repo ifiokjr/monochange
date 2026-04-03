@@ -86,7 +86,7 @@ edition = "2021"
 		r#"
 [defaults]
 package_type = "cargo"
-changelog = "{path}/CHANGELOG.md"
+changelog = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
@@ -161,7 +161,7 @@ edition = "2021"
 		r#"
 [defaults]
 package_type = "cargo"
-changelog = "{path}/CHANGELOG.md"
+changelog = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
