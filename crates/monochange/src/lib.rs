@@ -61,6 +61,8 @@ use clap::ArgMatches;
 use clap::Command;
 use clap::ValueEnum;
 use glob::Pattern;
+use minijinja::Environment;
+use minijinja::UndefinedBehavior;
 use monochange_cargo::discover_cargo_packages;
 use monochange_cargo::RustSemverProvider;
 use monochange_config::apply_version_groups;
@@ -1173,36 +1175,89 @@ fn interpolate_cli_command_command(
 	command: &str,
 	variables: Option<&BTreeMap<String, CommandVariable>>,
 ) -> String {
-	if let Some(variables) = variables {
-		let mut interpolated = command.to_string();
-		for (needle, variable) in variables {
-			interpolated =
-				interpolated.replace(needle, &cli_command_variable_value(context, *variable));
-		}
-		return interpolated;
+	let mut template_context = BTreeMap::<String, minijinja::Value>::new();
+
+	// Inject release variables
+	template_context.insert(
+		"version".to_string(),
+		minijinja::Value::from(cli_command_variable_value(
+			context,
+			CommandVariable::Version,
+		)),
+	);
+	template_context.insert(
+		"group_version".to_string(),
+		minijinja::Value::from(cli_command_variable_value(
+			context,
+			CommandVariable::GroupVersion,
+		)),
+	);
+	template_context.insert(
+		"released_packages".to_string(),
+		minijinja::Value::from(cli_command_variable_value(
+			context,
+			CommandVariable::ReleasedPackages,
+		)),
+	);
+	template_context.insert(
+		"changed_files".to_string(),
+		minijinja::Value::from(cli_command_variable_value(
+			context,
+			CommandVariable::ChangedFiles,
+		)),
+	);
+	template_context.insert(
+		"changesets".to_string(),
+		minijinja::Value::from(cli_command_variable_value(
+			context,
+			CommandVariable::Changesets,
+		)),
+	);
+
+	// Inject released_packages_list as an array for filters like join()
+	if let Some(prepared) = &context.prepared_release {
+		template_context.insert(
+			"released_packages_list".to_string(),
+			minijinja::Value::from_serialize(&prepared.released_packages),
+		);
 	}
 
-	command
-		.replace(
-			"$group_version",
-			&cli_command_variable_value(context, CommandVariable::GroupVersion),
-		)
-		.replace(
-			"$released_packages",
-			&cli_command_variable_value(context, CommandVariable::ReleasedPackages),
-		)
-		.replace(
-			"$changed_files",
-			&cli_command_variable_value(context, CommandVariable::ChangedFiles),
-		)
-		.replace(
-			"$changesets",
-			&cli_command_variable_value(context, CommandVariable::Changesets),
-		)
-		.replace(
-			"$version",
-			&cli_command_variable_value(context, CommandVariable::Version),
-		)
+	// Inject all CLI inputs as template variables
+	for (input_name, input_values) in &context.inputs {
+		if input_values.len() == 1 {
+			let value = input_values.first().map_or("", String::as_str);
+			// Detect boolean-like values
+			if value == "true" || value == "false" {
+				template_context
+					.insert(input_name.clone(), minijinja::Value::from(value == "true"));
+			} else {
+				template_context.insert(
+					input_name.clone(),
+					minijinja::Value::from(value.to_string()),
+				);
+			}
+		} else if input_values.is_empty() {
+			template_context.insert(input_name.clone(), minijinja::Value::from(false));
+		} else {
+			template_context.insert(
+				input_name.clone(),
+				minijinja::Value::from_serialize(input_values),
+			);
+		}
+	}
+
+	// Inject explicit variable aliases if configured
+	if let Some(variables) = variables {
+		for (needle, variable) in variables {
+			template_context.insert(
+				needle.clone(),
+				minijinja::Value::from(cli_command_variable_value(context, *variable)),
+			);
+		}
+	}
+
+	let jinja_context = minijinja::Value::from_serialize(&template_context);
+	render_jinja_template(command, &jinja_context).unwrap_or_else(|_| command.to_string())
 }
 
 fn cli_command_variable_value(context: &CliContext, variable: CommandVariable) -> String {
@@ -2687,9 +2742,9 @@ fn render_package_empty_update_message(
 		group_definition.and_then(|definition| definition.empty_update_message.as_deref()),
 		configuration.defaults.empty_update_message.as_deref(),
 		if group_definition.is_some() {
-			"No package-specific changes were recorded; `{package}` was updated to {version} as part of group `{group}`."
+			"No package-specific changes were recorded; `{{ package }}` was updated to {{ version }} as part of group `{{ group }}`."
 		} else {
-			"No package-specific changes were recorded; `{package}` was updated to {version}."
+			"No package-specific changes were recorded; `{{ package }}` was updated to {{ version }}."
 		},
 	);
 	let mut metadata = BTreeMap::new();
@@ -2748,7 +2803,7 @@ fn render_group_empty_update_message(
 		group_definition.and_then(|definition| definition.empty_update_message.as_deref()),
 		None,
 		configuration.defaults.empty_update_message.as_deref(),
-		"No package-specific changes were recorded; group `{group}` was updated to {version}.",
+		"No package-specific changes were recorded; group `{{ group }}` was updated to {{ version }}.",
 	);
 	let previous_version = planned_group.members.iter().find_map(|member_id| {
 		packages
@@ -2789,27 +2844,33 @@ fn select_empty_update_message<'value>(
 		.unwrap_or(built_in_default)
 }
 
+fn render_jinja_template(template: &str, context: &minijinja::Value) -> MonochangeResult<String> {
+	render_jinja_template_with_behavior(template, context, UndefinedBehavior::Lenient)
+}
+
+fn render_jinja_template_strict(
+	template: &str,
+	context: &minijinja::Value,
+) -> MonochangeResult<String> {
+	render_jinja_template_with_behavior(template, context, UndefinedBehavior::Strict)
+}
+
+fn render_jinja_template_with_behavior(
+	template: &str,
+	context: &minijinja::Value,
+	undefined_behavior: UndefinedBehavior,
+) -> MonochangeResult<String> {
+	let mut env = Environment::new();
+	env.set_undefined_behavior(undefined_behavior);
+	let rendered = env
+		.render_str(template, context)
+		.map_err(|error| MonochangeError::Config(format!("template rendering failed: {error}")))?;
+	Ok(rendered)
+}
+
 fn render_message_template(template: &str, metadata: &BTreeMap<&str, String>) -> String {
-	let mut rendered = String::new();
-	let mut remaining = template;
-	while let Some(start) = remaining.find('{') {
-		rendered.push_str(&remaining[..start]);
-		let Some(end) = remaining[start + 1..].find('}') else {
-			rendered.push_str(&remaining[start..]);
-			return rendered;
-		};
-		let key = &remaining[start + 1..start + 1 + end];
-		if let Some(value) = metadata.get(key) {
-			rendered.push_str(value);
-		} else {
-			rendered.push('{');
-			rendered.push_str(key);
-			rendered.push('}');
-		}
-		remaining = &remaining[start + end + 2..];
-	}
-	rendered.push_str(remaining);
-	rendered
+	let context = minijinja::Value::from_serialize(metadata);
+	render_jinja_template(template, &context).unwrap_or_else(|_| template.to_string())
 }
 
 fn package_release_note_changes(
@@ -3172,9 +3233,9 @@ fn format_group_labeled_entry(change: &ReleaseNoteChange, rendered: &str) -> Str
 }
 
 const DEFAULT_CHANGE_TEMPLATES: [&str; 3] = [
-	"#### $summary\n\n$details\n\n$context",
-	"#### $summary\n\n$details",
-	"- $summary",
+	"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ details }}",
+	"- {{ summary }}",
 ];
 
 fn apply_change_template(
@@ -3184,51 +3245,63 @@ fn apply_change_template(
 	version: &str,
 ) -> Option<String> {
 	let bump = change.bump.to_string();
-	let mut rendered = template.to_string();
-	for (needle, value) in [
-		("$summary", Some(change.summary.as_str())),
-		("$details", change.details.as_deref()),
-		("$package", Some(change.package_name.as_str())),
-		("$version", Some(version)),
-		("$target_id", Some(target_id)),
-		("$bump", Some(bump.as_str())),
-		("$type", change.change_type.as_deref()),
-		("$context", change.context.as_deref()),
-		("$provenance", change.context.as_deref()),
-		("$changeset_path", change.changeset_path.as_deref()),
-		("$change_owner", change.change_owner.as_deref()),
-		("$change_owner_link", change.change_owner_link.as_deref()),
-		("$review_request", change.review_request.as_deref()),
-		(
-			"$review_request_link",
-			change.review_request_link.as_deref(),
-		),
-		("$introduced_commit", change.introduced_commit.as_deref()),
-		(
-			"$introduced_commit_link",
-			change.introduced_commit_link.as_deref(),
-		),
-		(
-			"$last_updated_commit",
-			change.last_updated_commit.as_deref(),
-		),
-		(
-			"$last_updated_commit_link",
-			change.last_updated_commit_link.as_deref(),
-		),
-		("$related_issues", change.related_issues.as_deref()),
-		(
-			"$related_issue_links",
-			change.related_issue_links.as_deref(),
-		),
-		("$closed_issues", change.closed_issues.as_deref()),
-		("$closed_issue_links", change.closed_issue_links.as_deref()),
-	] {
-		if rendered.contains(needle) {
-			let value = value?;
-			rendered = rendered.replace(needle, value);
-		}
+	let mut context = BTreeMap::<&str, &str>::new();
+	context.insert("summary", &change.summary);
+	context.insert("package", &change.package_name);
+	context.insert("version", version);
+	context.insert("target_id", target_id);
+	context.insert("bump", &bump);
+	if let Some(value) = change.details.as_deref() {
+		context.insert("details", value);
 	}
+	if let Some(value) = change.change_type.as_deref() {
+		context.insert("type", value);
+	}
+	if let Some(value) = change.context.as_deref() {
+		context.insert("context", value);
+		context.insert("provenance", value);
+	}
+	if let Some(value) = change.changeset_path.as_deref() {
+		context.insert("changeset_path", value);
+	}
+	if let Some(value) = change.change_owner.as_deref() {
+		context.insert("change_owner", value);
+	}
+	if let Some(value) = change.change_owner_link.as_deref() {
+		context.insert("change_owner_link", value);
+	}
+	if let Some(value) = change.review_request.as_deref() {
+		context.insert("review_request", value);
+	}
+	if let Some(value) = change.review_request_link.as_deref() {
+		context.insert("review_request_link", value);
+	}
+	if let Some(value) = change.introduced_commit.as_deref() {
+		context.insert("introduced_commit", value);
+	}
+	if let Some(value) = change.introduced_commit_link.as_deref() {
+		context.insert("introduced_commit_link", value);
+	}
+	if let Some(value) = change.last_updated_commit.as_deref() {
+		context.insert("last_updated_commit", value);
+	}
+	if let Some(value) = change.last_updated_commit_link.as_deref() {
+		context.insert("last_updated_commit_link", value);
+	}
+	if let Some(value) = change.related_issues.as_deref() {
+		context.insert("related_issues", value);
+	}
+	if let Some(value) = change.related_issue_links.as_deref() {
+		context.insert("related_issue_links", value);
+	}
+	if let Some(value) = change.closed_issues.as_deref() {
+		context.insert("closed_issues", value);
+	}
+	if let Some(value) = change.closed_issue_links.as_deref() {
+		context.insert("closed_issue_links", value);
+	}
+	let jinja_context = minijinja::Value::from_serialize(&context);
+	let rendered = render_jinja_template_strict(template, &jinja_context).ok()?;
 	let rendered = rendered.trim().to_string();
 	if rendered.is_empty() {
 		None

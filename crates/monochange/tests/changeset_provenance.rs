@@ -139,11 +139,11 @@ fn seed_git_release_fixture(root: &Path) {
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/CHANGELOG.md"
+path = "{{ path }}/CHANGELOG.md"
 format = "monochange"
 
 [release_notes]
-change_templates = ["#### $summary\n\n$details\n\n$context", "#### $summary\n\n$context", "- $summary"]
+change_templates = ["#### {{ summary }}\n\n{{ details }}\n\n{{ context }}", "#### {{ summary }}\n\n{{ context }}", "- {{ summary }}"]
 
 [package.core]
 path = "crates/core"

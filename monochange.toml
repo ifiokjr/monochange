@@ -46,18 +46,18 @@ package_type = "cargo"
 # declare its own `changelog` field.
 #
 # Accepts three forms:
-#   true                  → use "{path}/CHANGELOG.md" for every package
+#   true                  → use "{{ path }}/CHANGELOG.md" for every package
 #   false                 → disable changelogs by default
-#   "{path}/changelog.md" → pattern where {path} is replaced with each package path
+#   "{{ path }}/changelog.md" → pattern where {{ path }} is replaced with each package path
 #
 # As a table, you can set both path and format:
 #   [defaults.changelog]
-#   path = "{path}/changelog.md"
+#   path = "{{ path }}/changelog.md"
 #   format = "keep_a_changelog"
 #
 # Supported formats: "monochange" (default), "keep_a_changelog"
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
 # Default empty_update_message applied when a package is bumped but has no
@@ -65,18 +65,18 @@ format = "keep_a_changelog"
 # synchronization). Template placeholders are interpolated at render time.
 #
 # Available placeholders:
-#   {package}, {package_name}, {package_id}
-#   {group}, {group_name}, {group_id}
-#   {version}, {new_version}, {current_version}, {previous_version}
-#   {bump}, {trigger}, {ecosystem}
-#   {release_owner}, {release_owner_kind}
-#   {members}, {member_count}  (group changelogs only)
-#   {reasons}
+#   {{ package }}, {{ package_name }}, {{ package_id }}
+#   {{ group }}, {{ group_name }}, {{ group_id }}
+#   {{ version }}, {{ new_version }}, {{ current_version }}, {{ previous_version }}
+#   {{ bump }}, {{ trigger }}, {{ ecosystem }}
+#   {{ release_owner }}, {{ release_owner_kind }}
+#   {{ members }}, {{ member_count }}  (group changelogs only)
+#   {{ reasons }}
 #
 # Precedence: package → group → defaults → built-in message
 # Default: built-in message varies by grouped/ungrouped context
 #
-# empty_update_message = "No direct changes; {package} updated to {version}."
+# empty_update_message = "No direct changes; {{ package }} updated to {{ version }}."
 
 # =============================================================================
 # [release_notes] — workspace-wide release-note rendering settings
@@ -85,32 +85,32 @@ format = "keep_a_changelog"
 [release_notes]
 # Templates that control how individual change entries render in changelogs.
 # Each template is tried in order; the first one whose required variables are
-# all present wins. If none match, falls back to "- $summary".
+# all present wins. If none match, falls back to "- {{ summary }}".
 #
 # Available variables:
-#   $summary       — the change summary from the changeset
-#   $details       — optional multi-line details block
-#   $package       — package name
-#   $version       — planned version
-#   $target_id     — release owner id (package or group)
-#   $bump          — bump severity (patch, minor, major)
-#   $type          — optional change type (e.g. "security", "note")
-#   $context       — rendered provenance context block
-#   $provenance    — alias for $context
-#   $changeset_path — path to the changeset file
-#   $change_owner, $change_owner_link
-#   $review_request, $review_request_link
-#   $introduced_commit, $introduced_commit_link
-#   $last_updated_commit, $last_updated_commit_link
-#   $related_issues, $related_issue_links
-#   $closed_issues, $closed_issue_links
+#   {{ summary }}       — the change summary from the changeset
+#   {{ details }}       — optional multi-line details block
+#   {{ package }}       — package name
+#   {{ version }}       — planned version
+#   {{ target_id }}     — release owner id (package or group)
+#   {{ bump }}          — bump severity (patch, minor, major)
+#   {{ type }}          — optional change type (e.g. "security", "note")
+#   {{ context }}       — rendered provenance context block
+#   {{ provenance }}    — alias for {{ context }}
+#   {{ changeset_path }} — path to the changeset file
+#   {{ change_owner }}, {{ change_owner_link }}
+#   {{ review_request }}, {{ review_request_link }}
+#   {{ introduced_commit }}, {{ introduced_commit_link }}
+#   {{ last_updated_commit }}, {{ last_updated_commit_link }}
+#   {{ related_issues }}, {{ related_issue_links }}
+#   {{ closed_issues }}, {{ closed_issue_links }}
 #
-# Default: ["#### $summary\n\n$details", "- $summary"]
+# Default: ["#### {{ summary }}\n\n{{ details }}", "- {{ summary }}"]
 change_templates = [
-	"#### $summary\n\n$details\n\n$context",
-	"#### $summary\n\n$context",
-	"#### $summary\n\n$details",
-	"- $summary",
+	"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ context }}",
+	"#### {{ summary }}\n\n{{ details }}",
+	"- {{ summary }}",
 ]
 
 # =============================================================================
@@ -466,7 +466,7 @@ metadata = { site = "github-pages" }
 #   variables       — map of placeholder → variable for interpolation
 #
 # Command variables: Version, GroupVersion, ReleasedPackages, ChangedFiles, Changesets
-# Legacy $-prefixed interpolation: $version, $group_version, $released_packages,
+# Legacy $-prefixed interpolation: {{ version }}, $group_version, $released_packages,
 #   $changed_files, $changesets
 
 [cli.validate]

@@ -51,7 +51,7 @@ In monochange, every package gets a named `[package.<id>]` entry. Use `[defaults
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
 [package.my-crate]
@@ -95,7 +95,7 @@ In monochange, use `[package.<id>]` entries with a `path` field. MonoChange upda
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 
 [package.sdk_core]
 path = "crates/sdk_core"
@@ -160,7 +160,7 @@ command = "git add --all"
 
 [[workflows.steps]]
 type = "Command"
-command = 'git commit -m "chore: prepare releases $version"'
+command = 'git commit -m "chore: prepare releases {{ version }}"'
 
 [[workflows.steps]]
 type = "Command"
@@ -408,7 +408,7 @@ MonoChange does not currently support regex-based version file updates. For now,
 ```toml
 [[cli.release.steps]]
 type = "Command"
-command = "sed -i 's/my_crate = \"[0-9.]*\"/my_crate = \"$version\"/' readme.md"
+command = "sed -i 's/my_crate = \"[0-9.]*\"/my_crate = \"{{ version }}\"/' readme.md"
 shell = true
 ```
 
@@ -487,7 +487,7 @@ command = "git add --all"
 
 [[workflows.steps]]
 type = "Command"
-command = 'git commit -m "chore: prepare releases $version"'
+command = 'git commit -m "chore: prepare releases {{ version }}"'
 
 [[workflows.steps]]
 type = "Command"
@@ -518,7 +518,7 @@ repo = "my-repo"
 package_type = "cargo"
 
 [defaults.changelog]
-path = "{path}/changelog.md"
+path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
 [package.my_core]
