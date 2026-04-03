@@ -54,7 +54,6 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
-- model deployment intents for downstream automation and merge-driven release commands
 - enforce pull-request changeset policy through typed command steps and reusable diagnostics
 - apply Rust semver evidence when provided
 - expose built-in assistant setup guidance with `mc assist` and a stdio MCP server with `mc mcp`
@@ -71,7 +70,6 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
-- `mc release-deploy --dry-run --format json` emits deployment intents for configured release targets
 - `mc verify --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 
 <!-- {/projectGitHubAutomationOverview} -->
@@ -88,7 +86,6 @@ mc release --dry-run --format json
 mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
-mc release-deploy --dry-run --format json
 mc release
 ```
 
@@ -204,11 +201,8 @@ ignored_paths = [
 	"license",
 ]
 
-[[deployments]]
 name = "production"
 trigger = "release_pr_merge"
-workflow = "deploy-production"
-environment = "production"
 release_targets = ["sdk"]
 requires = ["main"]
 
@@ -320,20 +314,12 @@ type = "PrepareRelease"
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
 
-[cli.release-deploy]
-help_text = "Prepare a release and emit deployment intents"
-
-[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.release-deploy.steps]]
 type = "PrepareRelease"
-
-[[cli.release-deploy.steps]]
-type = "Deploy"
 
 [cli.verify]
 help_text = "Evaluate pull-request changeset policy"
@@ -362,8 +348,6 @@ type = "VerifyChangesets"
 <!-- {@projectSetupConfigNote} -->
 
 This guide shows the preferred package/group configuration model together with an expanded CLI command surface.
-
-`mc init` emits the default `validate`, `discover`, `change`, and `release` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 

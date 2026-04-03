@@ -399,33 +399,6 @@ ignored_paths = [
 ]
 
 # =============================================================================
-# [[deployments]] — deployment intent definitions
-# =============================================================================
-#
-# Deployments are structured intents emitted in the release manifest so
-# downstream CI can decide when and how to execute them. Monochange does not
-# run deployments directly — it declares them.
-#
-# Fields:
-#   name            — unique deployment name
-#   trigger         — when to deploy: "workflow" (manual), "release_pr_merge",
-#                     or "release_published"
-#   workflow        — CI workflow to trigger
-#   environment     — target environment name (optional)
-#   release_targets — which release targets activate this deployment (default: all)
-#   requires        — dependencies that must be met before deploying
-#   metadata        — arbitrary key-value pairs passed to the workflow
-
-[[deployments]]
-name = "docs"
-trigger = "release_published"
-workflow = "docs-release"
-environment = "github-pages"
-release_targets = ["main"]
-requires = ["main"]
-metadata = { site = "github-pages" }
-
-# =============================================================================
 # [cli.*] — user-defined CLI commands
 # =============================================================================
 #
@@ -454,7 +427,6 @@ metadata = { site = "github-pages" }
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
-#   Deploy               — emit deployment intents (requires PrepareRelease)
 #   VerifyChangesets     — evaluate changeset policy from CI-supplied paths/labels
 #   Command              — run an arbitrary shell command
 #
@@ -579,27 +551,6 @@ type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
-
-[cli.release-deploy]
-help_text = "Prepare a release and emit deployment intents"
-
-[[cli.release-deploy.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release-deploy.steps]]
-type = "PrepareRelease"
-
-[[cli.release-deploy.steps]]
-type = "Deploy"
-
-[[cli.release-deploy.steps]]
-type = "Command"
-command = "cargo test --workspace --all-features"
-dry_run_command = "cargo test --workspace --all-features"
-shell = true
 
 [cli.verify]
 help_text = "Evaluate pull-request changeset policy"

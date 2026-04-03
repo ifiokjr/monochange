@@ -399,7 +399,6 @@ fn sample_manifest() -> ReleaseManifest {
 					.to_string(),
 		}],
 		deleted_changesets: Vec::new(),
-		deployments: Vec::new(),
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: vec![ReleaseManifestPlanDecision {
