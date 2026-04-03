@@ -129,7 +129,6 @@ use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
 use monochange_core::VersionFormat;
 use monochange_core::VersionedFileDefinition;
-use monochange_core::WorkspaceDefaults;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
 use monochange_gitea as gitea_provider;
@@ -322,61 +321,7 @@ struct CliContext {
 	command_logs: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct InitWorkspaceConfiguration {
-	defaults: WorkspaceDefaults,
-	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
-	package: BTreeMap<String, InitPackageDefinition>,
-	#[serde(skip_serializing_if = "BTreeMap::is_empty")]
-	group: BTreeMap<String, InitGroupDefinition>,
-	cli: BTreeMap<String, InitCliCommandDefinition>,
-}
-
-#[derive(Debug, Serialize)]
-struct InitCliCommandDefinition {
-	#[serde(skip_serializing_if = "Option::is_none")]
-	help_text: Option<String>,
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	inputs: Vec<CliInputDefinition>,
-	steps: Vec<CliStepDefinition>,
-}
-
-#[derive(Debug, Serialize)]
-struct InitPackageDefinition {
-	path: PathBuf,
-	#[serde(rename = "type")]
-	package_type: PackageType,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	changelog: Option<PathBuf>,
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	versioned_files: Vec<VersionedFileDefinition>,
-}
-
-#[derive(Debug, Serialize)]
-struct InitGroupDefinition {
-	packages: Vec<String>,
-	tag: bool,
-	release: bool,
-	version_format: VersionFormat,
-}
-
 const CHANGESET_DIR: &str = ".changeset";
-
-fn default_cli_command_map() -> BTreeMap<String, InitCliCommandDefinition> {
-	default_cli_commands()
-		.into_iter()
-		.map(|cli_command| {
-			(
-				cli_command.name,
-				InitCliCommandDefinition {
-					help_text: cli_command.help_text,
-					inputs: cli_command.inputs,
-					steps: cli_command.steps,
-				},
-			)
-		})
-		.collect()
-}
 
 pub fn build_command(bin_name: &'static str) -> Command {
 	let root = current_dir_or_dot();
@@ -1693,22 +1638,30 @@ fn init_workspace(root: &Path, force: bool) -> MonochangeResult<PathBuf> {
 		)));
 	}
 
-	let config = synthesize_init_configuration(root)?;
-	let content = toml::to_string_pretty(&config)
-		.map_err(|error| MonochangeError::Config(error.to_string()))?;
+	let content = render_annotated_init_config(root)?;
 	fs::write(&path, content).map_err(|error| {
 		MonochangeError::Io(format!("failed to write {}: {error}", path.display()))
 	})?;
 	Ok(path)
 }
 
-fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceConfiguration> {
+/// The minijinja template for `mc init`, loaded at compile time.
+///
+/// SYNC: when configuration options are added, removed, or changed in
+/// `monochange_core` or `monochange_config`, update `monochange.init.toml`
+/// to document the new options.  See the `product-rules.md` agent rule
+/// "keep init template in sync".
+const INIT_TEMPLATE: &str = include_str!("monochange.init.toml");
+
+/// Render a fully annotated `monochange.toml` from the init template with
+/// discovered packages injected as context.
+fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
 	let packages = discover_packages(root)?;
-	let mut package_configs = BTreeMap::new();
-	let mut package_ids = Vec::new();
+	let mut template_packages = Vec::new();
+	let mut package_ids = Vec::<String>::new();
 	let mut name_counts = BTreeMap::<String, usize>::new();
 
-	for package in packages {
+	for package in &packages {
 		let count = name_counts.entry(package.name.clone()).or_default();
 		*count += 1;
 		let id = if *count == 1 {
@@ -1719,37 +1672,68 @@ fn synthesize_init_configuration(root: &Path) -> MonochangeResult<InitWorkspaceC
 		package_ids.push(id.clone());
 		let manifest_dir = package.manifest_path.parent().unwrap_or(root).to_path_buf();
 		let relative_dir = root_relative(root, &manifest_dir);
+		let pkg_type = package_type_for_ecosystem(package.ecosystem);
 		let changelog = detect_default_changelog(root, &manifest_dir);
-		package_configs.insert(
-			id,
-			InitPackageDefinition {
-				path: relative_dir,
-				package_type: package_type_for_ecosystem(package.ecosystem),
-				changelog,
-				versioned_files: Vec::new(),
-			},
-		);
+		let type_str = match pkg_type {
+			PackageType::Cargo => "cargo",
+			PackageType::Npm => "npm",
+			PackageType::Deno => "deno",
+			PackageType::Dart => "dart",
+			PackageType::Flutter => "flutter",
+		};
+		let mut entry = BTreeMap::new();
+		entry.insert("id", json!(id));
+		entry.insert("path", json!(relative_dir.display().to_string()));
+		entry.insert("type", json!(type_str));
+		if let Some(cl) = changelog {
+			entry.insert("changelog", json!(cl.display().to_string()));
+		}
+		template_packages.push(json!(entry));
 	}
 
-	let mut group_configs = BTreeMap::new();
-	if package_ids.len() > 1 {
-		group_configs.insert(
-			"main".to_string(),
-			InitGroupDefinition {
-				packages: package_ids,
-				tag: true,
-				release: true,
-				version_format: VersionFormat::Primary,
-			},
-		);
+	let has_cargo = packages.iter().any(|p| p.ecosystem == Ecosystem::Cargo);
+	let has_npm = packages.iter().any(|p| p.ecosystem == Ecosystem::Npm);
+	let has_deno = packages.iter().any(|p| p.ecosystem == Ecosystem::Deno);
+	let has_dart = packages
+		.iter()
+		.any(|p| p.ecosystem == Ecosystem::Dart || p.ecosystem == Ecosystem::Flutter);
+
+	let package_ids_toml = package_ids
+		.iter()
+		.map(|id| format!("\"{id}\""))
+		.collect::<Vec<_>>()
+		.join(", ");
+
+	let context = json!({
+		"packages": template_packages,
+		"has_group": package_ids.len() > 1,
+		"package_ids_toml": package_ids_toml,
+		"has_cargo": has_cargo,
+		"has_npm": has_npm,
+		"has_deno": has_deno,
+		"has_dart": has_dart,
+	});
+
+	let jinja_context = minijinja::Value::from_serialize(&context);
+	let rendered = render_jinja_template(INIT_TEMPLATE, &jinja_context)?;
+
+	// Collapse runs of 3+ blank lines down to 2 (one visual blank line)
+	let mut collapsed = String::with_capacity(rendered.len());
+	let mut consecutive_blanks = 0u32;
+	for line in rendered.lines() {
+		if line.trim().is_empty() {
+			consecutive_blanks += 1;
+			if consecutive_blanks <= 2 {
+				collapsed.push('\n');
+			}
+		} else {
+			consecutive_blanks = 0;
+			collapsed.push_str(line);
+			collapsed.push('\n');
+		}
 	}
 
-	Ok(InitWorkspaceConfiguration {
-		defaults: WorkspaceDefaults::default(),
-		package: package_configs,
-		group: group_configs,
-		cli: default_cli_command_map(),
-	})
+	Ok(collapsed.trim_start().to_string())
 }
 
 fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
