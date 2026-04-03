@@ -1111,26 +1111,26 @@ path = "crates/core"
 ignored_paths = ["tests/**"]
 additional_paths = ["Cargo.lock"]
 
-[cli.verify]
+[cli.affected]
 help_text = "Verify that changed files are covered by attached changesets"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 "#,
 	);
 	if with_changeset {

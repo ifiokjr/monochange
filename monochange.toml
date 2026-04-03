@@ -230,14 +230,14 @@ format = "monochange"
 # [changesets.verify] — changeset verification settings
 # =============================================================================
 #
-# Controls the `VerifyChangesets` CLI step which checks whether pull requests
+# Controls the `AffectedPackages` CLI step which checks whether pull requests
 # include changeset files that cover all changed packages.
 #
 # This is the config-driven replacement for the legacy [github.bot.changesets]
 # section and works independently of any source provider.
 
 [changesets.verify]
-# Whether changeset verification is enabled. When false, the VerifyChangesets
+# Whether changeset verification is enabled. When false, the AffectedPackages
 # step will refuse to run.
 # Default: true
 enabled = true
