@@ -86,6 +86,7 @@ fn build_release_plan_patches_direct_parents_when_a_dependency_changes() {
 		&[ChangeSignal {
 			package_id: "cargo:core".to_string(),
 			requested_bump: Some(BumpSeverity::Minor),
+			explicit_version: None,
 			change_origin: "direct-change".to_string(),
 			evidence_refs: Vec::new(),
 			notes: Some("feature".to_string()),
@@ -95,7 +96,9 @@ fn build_release_plan_patches_direct_parents_when_a_dependency_changes() {
 		}],
 		&[],
 		BumpSeverity::Patch,
-	);
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
 
 	let app = plan
 		.decisions
@@ -125,6 +128,7 @@ fn build_release_plan_propagates_direct_and_transitive_dependency_impact() {
 		&[ChangeSignal {
 			package_id: "cargo:core".to_string(),
 			requested_bump: Some(BumpSeverity::Minor),
+			explicit_version: None,
 			change_origin: "direct-change".to_string(),
 			evidence_refs: Vec::new(),
 			notes: Some("public API addition".to_string()),
@@ -134,7 +138,9 @@ fn build_release_plan_propagates_direct_and_transitive_dependency_impact() {
 		}],
 		&[],
 		BumpSeverity::Patch,
-	);
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
 
 	let core = plan
 		.decisions
@@ -179,6 +185,7 @@ fn build_release_plan_synchronizes_version_groups() {
 		&[ChangeSignal {
 			package_id: core.id.clone(),
 			requested_bump: Some(BumpSeverity::Minor),
+			explicit_version: None,
 			change_origin: "direct-change".to_string(),
 			evidence_refs: Vec::new(),
 			notes: Some("feature".to_string()),
@@ -188,7 +195,9 @@ fn build_release_plan_synchronizes_version_groups() {
 		}],
 		&[],
 		BumpSeverity::Patch,
-	);
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
 
 	let synced_member = plan
 		.decisions
@@ -225,6 +234,7 @@ fn build_release_plan_shifts_major_to_minor_for_pre_stable_versions() {
 		&[ChangeSignal {
 			package_id: "cargo:core".to_string(),
 			requested_bump: Some(BumpSeverity::Major),
+			explicit_version: None,
 			change_origin: "direct-change".to_string(),
 			evidence_refs: Vec::new(),
 			notes: Some("breaking change".to_string()),
@@ -234,7 +244,9 @@ fn build_release_plan_shifts_major_to_minor_for_pre_stable_versions() {
 		}],
 		&[],
 		BumpSeverity::Patch,
-	);
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
 
 	let core = plan
 		.decisions
@@ -270,6 +282,7 @@ fn build_release_plan_uses_compatibility_assessments_to_escalate_parents() {
 		&[ChangeSignal {
 			package_id: "cargo:core".to_string(),
 			requested_bump: None,
+			explicit_version: None,
 			change_origin: "direct-change".to_string(),
 			evidence_refs: vec!["rust-semver:major:public API break detected".to_string()],
 			notes: Some("breaking change".to_string()),
@@ -286,7 +299,9 @@ fn build_release_plan_uses_compatibility_assessments_to_escalate_parents() {
 			evidence_location: None,
 		}],
 		BumpSeverity::Patch,
-	);
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
 
 	let web = plan
 		.decisions
@@ -294,4 +309,207 @@ fn build_release_plan_uses_compatibility_assessments_to_escalate_parents() {
 		.find(|decision| decision.package_id == "cargo:web")
 		.unwrap_or_else(|| panic!("expected web decision"));
 	assert_eq!(web.recommended_bump, BumpSeverity::Major);
+}
+
+#[test]
+fn build_release_plan_uses_explicit_package_versions() {
+	let packages = vec![package("cargo:core", Version::new(1, 0, 0))];
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[],
+		&[],
+		&[ChangeSignal {
+			package_id: "cargo:core".to_string(),
+			requested_bump: Some(BumpSeverity::Patch),
+			explicit_version: Some(Version::new(1, 2, 0)),
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: Some("pin release".to_string()),
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/pin.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	let decision = plan
+		.decisions
+		.first()
+		.unwrap_or_else(|| panic!("expected one decision"));
+	assert_eq!(decision.planned_version, Some(Version::new(1, 2, 0)));
+}
+
+#[test]
+fn build_release_plan_propagates_explicit_member_versions_to_group_version() {
+	let mut core = package("cargo:core", Version::new(1, 0, 0));
+	core.version_group_id = Some("sdk".to_string());
+	let mut web = package("npm:web", Version::new(1, 0, 0));
+	web.version_group_id = Some("sdk".to_string());
+	let version_group = VersionGroup {
+		group_id: "sdk".to_string(),
+		display_name: "sdk".to_string(),
+		members: vec![core.id.clone(), web.id.clone()],
+		mismatch_detected: false,
+	};
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/mixed").as_path(),
+		&[core.clone(), web.clone()],
+		&[],
+		&[version_group],
+		&[ChangeSignal {
+			package_id: core.id.clone(),
+			requested_bump: Some(BumpSeverity::Major),
+			explicit_version: Some(Version::new(2, 0, 0)),
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: Some("promote sdk".to_string()),
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/group-pin.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	let group = plan
+		.groups
+		.first()
+		.unwrap_or_else(|| panic!("expected one group"));
+	assert_eq!(group.planned_version, Some(Version::new(2, 0, 0)));
+	assert!(plan
+		.decisions
+		.iter()
+		.all(|decision| decision.planned_version == Some(Version::new(2, 0, 0))));
+}
+
+#[test]
+fn build_release_plan_uses_highest_conflicting_explicit_version_with_warning() {
+	let packages = vec![package("cargo:core", Version::new(1, 0, 0))];
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[],
+		&[],
+		&[
+			ChangeSignal {
+				package_id: "cargo:core".to_string(),
+				requested_bump: Some(BumpSeverity::Minor),
+				explicit_version: Some(Version::new(1, 1, 0)),
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("first pin".to_string()),
+				details: None,
+				change_type: None,
+				source_path: PathBuf::from(".changeset/001-first.md"),
+			},
+			ChangeSignal {
+				package_id: "cargo:core".to_string(),
+				requested_bump: Some(BumpSeverity::Major),
+				explicit_version: Some(Version::new(2, 0, 0)),
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("second pin".to_string()),
+				details: None,
+				change_type: None,
+				source_path: PathBuf::from(".changeset/002-second.md"),
+			},
+		],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	let decision = plan
+		.decisions
+		.first()
+		.unwrap_or_else(|| panic!("expected one decision"));
+	let warning = plan
+		.warnings
+		.first()
+		.unwrap_or_else(|| panic!("expected one warning"));
+	assert_eq!(decision.planned_version, Some(Version::new(2, 0, 0)));
+	assert_eq!(plan.warnings.len(), 1);
+	assert!(warning.contains("conflicting explicit versions"));
+	assert!(warning.contains("001-first.md"));
+	assert!(warning.contains("002-second.md"));
+}
+
+#[test]
+fn build_release_plan_rejects_conflicting_explicit_versions_in_strict_mode() {
+	let packages = vec![package("cargo:core", Version::new(1, 0, 0))];
+	let error = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[],
+		&[],
+		&[
+			ChangeSignal {
+				package_id: "cargo:core".to_string(),
+				requested_bump: Some(BumpSeverity::Minor),
+				explicit_version: Some(Version::new(1, 1, 0)),
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("first pin".to_string()),
+				details: None,
+				change_type: None,
+				source_path: PathBuf::from(".changeset/001-first.md"),
+			},
+			ChangeSignal {
+				package_id: "cargo:core".to_string(),
+				requested_bump: Some(BumpSeverity::Major),
+				explicit_version: Some(Version::new(2, 0, 0)),
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("second pin".to_string()),
+				details: None,
+				change_type: None,
+				source_path: PathBuf::from(".changeset/002-second.md"),
+			},
+		],
+		&[],
+		BumpSeverity::Patch,
+		true,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected strict conflict error"));
+
+	assert!(error.to_string().contains("conflicting explicit versions"));
+}
+
+#[test]
+fn build_release_plan_rejects_explicit_versions_not_greater_than_current() {
+	let packages = vec![package("cargo:core", Version::new(1, 0, 0))];
+	let error = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[],
+		&[],
+		&[ChangeSignal {
+			package_id: "cargo:core".to_string(),
+			requested_bump: Some(BumpSeverity::Patch),
+			explicit_version: Some(Version::new(1, 0, 0)),
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: Some("same version".to_string()),
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/same.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid explicit version error"));
+
+	assert!(error
+		.to_string()
+		.contains("must be greater than current version"));
 }

@@ -129,6 +129,7 @@ use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
+use semver::Version;
 use serde::Deserialize;
 use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value as YamlValue;
@@ -193,6 +194,8 @@ struct RawWorkspaceDefaults {
 	#[serde(default = "default_warn_on_group_mismatch")]
 	warn_on_group_mismatch: bool,
 	#[serde(default)]
+	strict_version_conflicts: bool,
+	#[serde(default)]
 	package_type: Option<PackageType>,
 	#[serde(default)]
 	changelog: Option<RawChangelogConfig>,
@@ -206,6 +209,7 @@ impl Default for RawWorkspaceDefaults {
 			parent_bump: default_parent_bump(),
 			include_private: false,
 			warn_on_group_mismatch: default_warn_on_group_mismatch(),
+			strict_version_conflicts: false,
 			package_type: None,
 			changelog: None,
 			empty_update_message: None,
@@ -474,6 +478,8 @@ struct RawChangeEntry {
 	#[serde(default)]
 	bump: Option<BumpSeverity>,
 	#[serde(default)]
+	version: Option<Version>,
+	#[serde(default)]
 	reason: Option<String>,
 	#[serde(default)]
 	details: Option<String>,
@@ -490,6 +496,7 @@ pub struct LoadedChangesetTarget {
 	pub id: String,
 	pub kind: ChangesetTargetKind,
 	pub bump: Option<BumpSeverity>,
+	pub explicit_version: Option<Version>,
 	pub origin: String,
 	pub evidence_refs: Vec<String>,
 	pub change_type: Option<String>,
@@ -922,6 +929,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			parent_bump: defaults.parent_bump,
 			include_private: defaults.include_private,
 			warn_on_group_mismatch: defaults.warn_on_group_mismatch,
+			strict_version_conflicts: defaults.strict_version_conflicts,
 			package_type: defaults.package_type,
 			changelog: defaults_changelog_policy,
 			changelog_format: default_changelog_format,
@@ -1053,10 +1061,20 @@ pub fn load_changeset_file(
 	let mut targets = Vec::new();
 	for change in raw.changes {
 		if let Some(group) = groups_by_id.get(change.package.as_str()) {
+			let explicit_version = change.version.clone();
+			let inferred_bump = change.bump.or_else(|| {
+				infer_group_bump_from_explicit_version(
+					group,
+					&configuration.root_path,
+					packages,
+					explicit_version.as_ref(),
+				)
+			});
 			targets.push(LoadedChangesetTarget {
 				id: change.package.clone(),
 				kind: ChangesetTargetKind::Group,
-				bump: change.bump,
+				bump: inferred_bump,
+				explicit_version: explicit_version.clone(),
 				origin: change.origin.clone(),
 				evidence_refs: change.evidence.clone(),
 				change_type: change.change_type.clone(),
@@ -1082,7 +1100,8 @@ pub fn load_changeset_file(
 				}
 				signals.push(ChangeSignal {
 					package_id,
-					requested_bump: change.bump,
+					requested_bump: inferred_bump,
+					explicit_version: explicit_version.clone(),
 					change_origin: change.origin.clone(),
 					evidence_refs: change.evidence.clone(),
 					notes: change.reason.clone(),
@@ -1092,16 +1111,25 @@ pub fn load_changeset_file(
 				});
 			}
 		} else {
+			let package_id =
+				resolve_package_reference(&change.package, &configuration.root_path, packages)?;
+			let explicit_version = change.version;
+			let inferred_bump = change.bump.or_else(|| {
+				infer_package_bump_from_explicit_version(
+					&package_id,
+					packages,
+					explicit_version.as_ref(),
+				)
+			});
 			targets.push(LoadedChangesetTarget {
 				id: change.package.clone(),
 				kind: ChangesetTargetKind::Package,
-				bump: change.bump,
+				bump: inferred_bump,
+				explicit_version: explicit_version.clone(),
 				origin: change.origin.clone(),
 				evidence_refs: change.evidence.clone(),
 				change_type: change.change_type.clone(),
 			});
-			let package_id =
-				resolve_package_reference(&change.package, &configuration.root_path, packages)?;
 			if !seen_package_ids.insert(package_id.clone()) {
 				return Err(changeset_diagnostic(
 					&contents,
@@ -1120,7 +1148,8 @@ pub fn load_changeset_file(
 			}
 			signals.push(ChangeSignal {
 				package_id,
-				requested_bump: change.bump,
+				requested_bump: inferred_bump,
+				explicit_version,
 				change_origin: change.origin,
 				evidence_refs: change.evidence,
 				notes: change.reason,
@@ -1138,6 +1167,55 @@ pub fn load_changeset_file(
 		targets,
 		signals,
 	})
+}
+
+fn infer_package_bump_from_explicit_version(
+	package_id: &str,
+	packages: &[PackageRecord],
+	explicit_version: Option<&Version>,
+) -> Option<BumpSeverity> {
+	let explicit_version = explicit_version?;
+	packages
+		.iter()
+		.find(|package| package.id == package_id)
+		.and_then(|package| package.current_version.as_ref())
+		.map(|current_version| infer_bump_from_versions(current_version, explicit_version))
+}
+
+fn infer_group_bump_from_explicit_version(
+	group: &GroupDefinition,
+	workspace_root: &Path,
+	packages: &[PackageRecord],
+	explicit_version: Option<&Version>,
+) -> Option<BumpSeverity> {
+	let explicit_version = explicit_version?;
+	group
+		.packages
+		.iter()
+		.filter_map(|member_id| resolve_package_reference(member_id, workspace_root, packages).ok())
+		.filter_map(|package_id| {
+			packages
+				.iter()
+				.find(|package| package.id == package_id)
+				.and_then(|package| package.current_version.as_ref())
+		})
+		.max()
+		.map(|current_version| infer_bump_from_versions(current_version, explicit_version))
+}
+
+fn infer_bump_from_versions(current_version: &Version, explicit_version: &Version) -> BumpSeverity {
+	if explicit_version.major > current_version.major {
+		BumpSeverity::Major
+	} else if explicit_version.minor > current_version.minor {
+		BumpSeverity::Minor
+	} else if explicit_version.patch > current_version.patch
+		|| explicit_version.pre != current_version.pre
+		|| explicit_version.build != current_version.build
+	{
+		BumpSeverity::Patch
+	} else {
+		BumpSeverity::None
+	}
 }
 
 pub fn resolve_package_reference(
@@ -1194,18 +1272,12 @@ fn parse_markdown_change_file(
 		if matches!(package, "evidence" | "origin" | "type") {
 			continue;
 		}
-		let requested_bump = value
-			.as_str()
-			.and_then(parse_bump_severity)
-			.ok_or_else(|| {
-				MonochangeError::Config(format!(
-					"failed to parse {}: package `{package}` must map to `patch`, `minor`, or `major`",
-					changes_path.display()
-				))
-			})?;
+		let (requested_bump, explicit_version) =
+			parse_markdown_change_target(value, changes_path, package)?;
 		changes.push(RawChangeEntry {
 			package: package.to_string(),
-			bump: Some(requested_bump),
+			bump: requested_bump,
+			version: explicit_version,
 			reason: reason.clone(),
 			details: details.clone(),
 			change_type: type_mapping.and_then(|mapping| yaml_string(mapping, package)),
@@ -1257,6 +1329,57 @@ fn markdown_change_text(body: &str) -> (Option<String>, Option<String>) {
 			Some(details)
 		},
 	)
+}
+
+fn parse_markdown_change_target(
+	value: &serde_yaml_ng::Value,
+	changes_path: &Path,
+	package: &str,
+) -> MonochangeResult<(Option<BumpSeverity>, Option<Version>)> {
+	if let Some(bump) = value.as_str().and_then(parse_bump_severity) {
+		return Ok((Some(bump), None));
+	}
+
+	let Some(mapping) = value.as_mapping() else {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: package `{package}` must map to `patch`, `minor`, or `major`, or to a table with `bump` and/or `version`",
+			changes_path.display()
+		)));
+	};
+
+	let bump = mapping
+		.get(serde_yaml_ng::Value::String("bump".to_string()))
+		.and_then(serde_yaml_ng::Value::as_str)
+		.map(|value| {
+			parse_bump_severity(value).ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: package `{package}` has invalid bump `{value}`; expected `patch`, `minor`, or `major`",
+					changes_path.display()
+				))
+			})
+		})
+		.transpose()?;
+	let version = mapping
+		.get(serde_yaml_ng::Value::String("version".to_string()))
+		.and_then(serde_yaml_ng::Value::as_str)
+		.map(|value| {
+			Version::parse(value).map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: package `{package}` has invalid version `{value}`: {error}",
+					changes_path.display()
+				))
+			})
+		})
+		.transpose()?;
+
+	if bump.is_none() && version.is_none() {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: package `{package}` must declare `bump`, `version`, or both",
+			changes_path.display()
+		)));
+	}
+
+	Ok((bump, version))
 }
 
 fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {

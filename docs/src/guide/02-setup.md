@@ -111,6 +111,10 @@ choices = ["patch", "minor", "major"]
 default = "patch"
 
 [[cli.change.inputs]]
+name = "version"
+type = "string"
+
+[[cli.change.inputs]]
 name = "reason"
 type = "string"
 required = true

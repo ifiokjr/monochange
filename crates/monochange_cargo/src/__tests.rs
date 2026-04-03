@@ -99,6 +99,7 @@ fn rust_semver_provider_parses_compatibility_evidence() {
 	let signal = ChangeSignal {
 		package_id: package.id.clone(),
 		requested_bump: None,
+		explicit_version: None,
 		change_origin: "direct-change".to_string(),
 		evidence_refs: vec!["rust-semver:major:public API break detected".to_string()],
 		notes: Some("breaking change".to_string()),

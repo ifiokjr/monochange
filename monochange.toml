@@ -60,6 +60,13 @@ package_type = "cargo"
 path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
+# Whether conflicting explicit versions from multiple changesets should fail
+# validation/planning instead of warning and using the highest semver version.
+#
+# When false (default), monochange keeps the highest explicit version and emits
+# a warning listing the conflicting changesets.
+# strict_version_conflicts = false
+#
 # Default empty_update_message applied when a package is bumped but has no
 # direct changeset entries (e.g. transitive dependency bumps or group
 # synchronization). Template placeholders are interpolated at render time.
@@ -462,6 +469,10 @@ name = "bump"
 type = "choice"
 choices = ["patch", "minor", "major"]
 default = "patch"
+
+[[cli.change.inputs]]
+name = "version"
+type = "string"
 
 [[cli.change.inputs]]
 name = "reason"

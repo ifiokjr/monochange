@@ -37,11 +37,14 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::VecDeque;
 use std::path::Path;
+use std::path::PathBuf;
 
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::CompatibilityAssessment;
 use monochange_core::DependencyEdge;
+use monochange_core::MonochangeError;
+use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::PlannedVersionGroup;
 use monochange_core::ReleaseDecision;
@@ -50,6 +53,7 @@ use monochange_core::VersionGroup;
 use monochange_semver::direct_release_severity;
 use monochange_semver::propagated_release_severity;
 use monochange_semver::strongest_assessment_for_package;
+use semver::Version;
 
 #[derive(Debug, Clone)]
 pub struct NormalizedGraph {
@@ -127,7 +131,7 @@ impl NormalizedGraph {
 	}
 }
 
-#[must_use]
+#[allow(clippy::too_many_arguments)]
 pub fn build_release_plan(
 	workspace_root: &Path,
 	packages: &[PackageRecord],
@@ -136,7 +140,8 @@ pub fn build_release_plan(
 	change_signals: &[ChangeSignal],
 	compatibility_evidence: &[CompatibilityAssessment],
 	default_parent_bump: BumpSeverity,
-) -> ReleasePlan {
+	strict_version_conflicts: bool,
+) -> MonochangeResult<ReleasePlan> {
 	let graph = NormalizedGraph::new(packages, dependency_edges);
 	let package_by_id = packages
 		.iter()
@@ -146,6 +151,12 @@ pub fn build_release_plan(
 		.iter()
 		.map(|group| (group.group_id.clone(), group))
 		.collect::<BTreeMap<_, _>>();
+	let (explicit_package_versions, explicit_group_versions, warnings) = resolve_explicit_versions(
+		&package_by_id,
+		&group_by_id,
+		change_signals,
+		strict_version_conflicts,
+	)?;
 	let mut states = packages
 		.iter()
 		.map(|package| {
@@ -245,7 +256,7 @@ pub fn build_release_plan(
 
 	let planned_groups = version_groups
 		.iter()
-		.filter_map(|group| planned_group(group, &package_by_id, &states))
+		.filter_map(|group| planned_group(group, &package_by_id, &states, &explicit_group_versions))
 		.collect::<Vec<_>>();
 
 	let decisions = packages
@@ -260,10 +271,15 @@ pub fn build_release_plan(
 			});
 			let standalone_planned_version =
 				if planned_version.is_none() && state.severity.is_release() {
-					package
-						.current_version
-						.as_ref()
-						.map(|version| state.severity.apply_to_version(version))
+					explicit_package_versions
+						.get(&package.id)
+						.cloned()
+						.or_else(|| {
+							package
+								.current_version
+								.as_ref()
+								.map(|version| state.severity.apply_to_version(version))
+						})
 				} else {
 					None
 				};
@@ -281,14 +297,157 @@ pub fn build_release_plan(
 		})
 		.collect();
 
-	ReleasePlan {
+	Ok(ReleasePlan {
 		workspace_root: workspace_root.to_path_buf(),
 		decisions,
 		groups: planned_groups,
-		warnings: Vec::new(),
+		warnings,
 		unresolved_items: Vec::new(),
 		compatibility_evidence: compatibility_evidence.to_vec(),
+	})
+}
+
+type ExplicitVersionResolution = (
+	BTreeMap<String, Version>,
+	BTreeMap<String, Version>,
+	Vec<String>,
+);
+
+fn resolve_explicit_versions(
+	package_by_id: &BTreeMap<String, &PackageRecord>,
+	group_by_id: &BTreeMap<String, &VersionGroup>,
+	change_signals: &[ChangeSignal],
+	strict_version_conflicts: bool,
+) -> MonochangeResult<ExplicitVersionResolution> {
+	let mut package_inputs = BTreeMap::<String, Vec<ExplicitVersionInput>>::new();
+	let mut group_inputs = BTreeMap::<String, Vec<ExplicitVersionInput>>::new();
+	let mut warnings = Vec::new();
+
+	for signal in change_signals {
+		let Some(version) = signal.explicit_version.clone() else {
+			continue;
+		};
+		let input = ExplicitVersionInput {
+			package_id: signal.package_id.clone(),
+			source_path: signal.source_path.clone(),
+			version,
+		};
+		if let Some(group_id) = package_by_id
+			.get(&signal.package_id)
+			.and_then(|package| package.version_group_id.as_ref())
+		{
+			group_inputs
+				.entry(group_id.clone())
+				.or_default()
+				.push(input);
+		} else {
+			package_inputs
+				.entry(signal.package_id.clone())
+				.or_default()
+				.push(input);
+		}
 	}
+
+	let package_versions = package_inputs
+		.into_iter()
+		.map(|(package_id, inputs)| {
+			let package = package_by_id.get(&package_id).unwrap_or_else(|| {
+				panic!("package `{package_id}` missing while resolving explicit versions")
+			});
+			let owner = format!("package `{package_id}`");
+			resolve_explicit_version_choice(
+				&owner,
+				&inputs,
+				package.current_version.as_ref(),
+				strict_version_conflicts,
+				&mut warnings,
+			)
+			.map(|version| (package_id, version))
+		})
+		.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
+
+	let group_versions = group_inputs
+		.into_iter()
+		.map(|(group_id, inputs)| {
+			let group = group_by_id.get(&group_id).unwrap_or_else(|| {
+				panic!("group `{group_id}` missing while resolving explicit versions")
+			});
+			let current_version = group
+				.members
+				.iter()
+				.filter_map(|member| package_by_id.get(member))
+				.filter_map(|package| package.current_version.as_ref())
+				.max();
+			let owner = format!(
+				"group `{group_id}` (packages: {})",
+				group.members.join(", ")
+			);
+			resolve_explicit_version_choice(
+				&owner,
+				&inputs,
+				current_version,
+				strict_version_conflicts,
+				&mut warnings,
+			)
+			.map(|version| (group_id, version))
+		})
+		.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
+
+	Ok((package_versions, group_versions, warnings))
+}
+
+fn resolve_explicit_version_choice(
+	owner: &str,
+	inputs: &[ExplicitVersionInput],
+	current_version: Option<&Version>,
+	strict_version_conflicts: bool,
+	warnings: &mut Vec<String>,
+) -> MonochangeResult<Version> {
+	let chosen_version = inputs
+		.iter()
+		.map(|input| input.version.clone())
+		.max()
+		.unwrap_or_else(|| panic!("explicit version inputs cannot be empty"));
+	let distinct_versions = inputs
+		.iter()
+		.map(|input| input.version.clone())
+		.collect::<BTreeSet<_>>();
+	if distinct_versions.len() > 1 {
+		let details = inputs
+			.iter()
+			.map(|input| {
+				format!(
+					"{} @ {} [{}]",
+					input.version,
+					input.source_path.display(),
+					input.package_id
+				)
+			})
+			.collect::<Vec<_>>()
+			.join(", ");
+		let message = format!(
+			"conflicting explicit versions for {owner}; using highest version `{chosen_version}` from: {details}"
+		);
+		if strict_version_conflicts {
+			return Err(MonochangeError::Config(message));
+		}
+		warnings.push(message);
+	}
+	if let Some(current_version) = current_version {
+		if chosen_version <= *current_version {
+			return Err(MonochangeError::Config(format!(
+				"explicit version `{chosen_version}` for {owner} must be greater than current version `{current_version}`"
+			)));
+		}
+	}
+	Ok(chosen_version)
+}
+
+#[derive(Debug, Clone)]
+struct ExplicitVersionInput {
+	package_id: String,
+	source_path: PathBuf,
+	version: Version,
 }
 
 fn apply_decision(
@@ -330,6 +489,7 @@ fn planned_group(
 	group: &VersionGroup,
 	package_by_id: &BTreeMap<String, &PackageRecord>,
 	states: &BTreeMap<String, DecisionState>,
+	explicit_group_versions: &BTreeMap<String, Version>,
 ) -> Option<PlannedVersionGroup> {
 	let recommended_bump = group
 		.members
@@ -348,9 +508,14 @@ fn planned_group(
 		.filter_map(|member| package_by_id.get(member))
 		.filter_map(|package| package.current_version.clone())
 		.max();
-	let planned_version = base_version
-		.as_ref()
-		.map(|version| recommended_bump.apply_to_version(version));
+	let planned_version = explicit_group_versions
+		.get(&group.group_id)
+		.cloned()
+		.or_else(|| {
+			base_version
+				.as_ref()
+				.map(|version| recommended_bump.apply_to_version(version))
+		});
 
 	Some(PlannedVersionGroup {
 		group_id: group.group_id.clone(),

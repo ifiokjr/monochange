@@ -1447,6 +1447,7 @@ dependencies = [
  "monochange_semver",
  "rmcp",
  "rstest",
+ "semver",
  "serde",
  "serde_json",
  "shlex",
