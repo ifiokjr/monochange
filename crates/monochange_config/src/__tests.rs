@@ -260,55 +260,6 @@ ignored_paths = ["docs/**", "*.md"]
 }
 
 #[test]
-fn load_workspace_configuration_parses_deployments() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[[deployments]]
-name = "production"
-trigger = "release_pr_merge"
-workflow = "deploy-production"
-environment = "production"
-release_targets = ["core"]
-requires = ["main"]
-
-[deployments.metadata]
-channel = "stable"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let configuration = load_workspace_configuration(tempdir.path())
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let deployment = configuration
-		.deployments
-		.first()
-		.unwrap_or_else(|| panic!("expected deployment"));
-
-	assert_eq!(deployment.name, "production");
-	assert_eq!(
-		deployment.trigger,
-		monochange_core::DeploymentTrigger::ReleasePrMerge
-	);
-	assert_eq!(deployment.workflow, "deploy-production");
-	assert_eq!(deployment.environment.as_deref(), Some("production"));
-	assert_eq!(deployment.release_targets, vec!["core"]);
-	assert_eq!(deployment.requires, vec!["main"]);
-	assert_eq!(
-		deployment.metadata.get("channel").map(String::as_str),
-		Some("stable")
-	);
-}
-
-#[test]
 fn load_workspace_configuration_rejects_missing_package_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
@@ -508,125 +459,6 @@ title = ""
 		.unwrap_or_else(|| panic!("expected config error"))
 		.to_string()
 		.contains("[github.pull_requests].title must not be empty"));
-}
-
-#[test]
-fn load_workspace_configuration_rejects_invalid_deployment_settings() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[[deployments]]
-name = "production"
-trigger = "workflow"
-workflow = ""
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	assert!(load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.render()
-		.contains("must declare a non-empty workflow"));
-}
-
-#[test]
-fn load_workspace_configuration_rejects_duplicate_deployment_names() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[[deployments]]
-name = "production"
-trigger = "workflow"
-workflow = "deploy-production"
-
-[[deployments]]
-name = "production"
-trigger = "workflow"
-workflow = "deploy-production-again"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	assert!(load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("duplicate deployment `production`"));
-}
-
-#[test]
-fn load_workspace_configuration_rejects_empty_deployment_requirements() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[[deployments]]
-name = "production"
-trigger = "workflow"
-workflow = "deploy-production"
-requires = [""]
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	assert!(load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("must not include empty `requires` entries"));
-}
-
-#[test]
-fn load_workspace_configuration_rejects_empty_deployment_release_targets() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[[deployments]]
-name = "production"
-trigger = "workflow"
-workflow = "deploy-production"
-release_targets = [""]
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	assert!(load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("must not include empty `release_targets` entries"));
 }
 
 #[test]
@@ -1763,43 +1595,6 @@ type = "PublishRelease"
 }
 
 #[test]
-fn load_workspace_configuration_rejects_deploy_with_unknown_named_deployments() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[[deployments]]
-name = "production"
-trigger = "workflow"
-workflow = "deploy-production"
-
-[cli.deploy-release]
-
-[[cli.deploy-release.steps]]
-type = "PrepareRelease"
-
-[[cli.deploy-release.steps]]
-type = "Deploy"
-names = ["staging"]
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	assert!(load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("references unknown deployment `staging`"));
-}
-
-#[test]
 fn load_workspace_configuration_rejects_open_release_pull_request_without_github_config() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
@@ -1898,38 +1693,6 @@ type = "VerifyChangesets"
 	assert!(error
 		.to_string()
 		.contains("does not declare a `changed_paths` input"));
-}
-
-#[test]
-fn load_workspace_configuration_rejects_deploy_without_deployments() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.deploy-release]
-
-[[cli.deploy-release.steps]]
-type = "PrepareRelease"
-
-[[cli.deploy-release.steps]]
-type = "Deploy"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected deployment CLI command config error"));
-	assert!(error
-		.to_string()
-		.contains("uses `Deploy` but no `[[deployments]]` are configured"));
 }
 
 #[test]

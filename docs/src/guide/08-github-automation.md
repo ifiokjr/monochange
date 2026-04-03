@@ -9,7 +9,6 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 - `mc release-manifest` writes a stable JSON artifact for downstream automation
 - `mc publish-release` previews or publishes provider releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent provider release request
-- `mc release-deploy` emits deployment intents for later workflow execution
 - `mc verify` evaluates pull-request changeset policy from CI-supplied changed paths and labels
 
 <!-- {/githubAutomationOverview} -->
@@ -23,7 +22,6 @@ mc release --dry-run --format json
 mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
-mc release-deploy --dry-run --format json
 mc verify --format json --changed-paths crates/monochange/src/lib.rs
 ```
 
@@ -115,10 +113,6 @@ type = "OpenReleaseRequest"
 
 When you want fine-grained changelog formatting instead of the default `{{ context }}` block, GitHub-backed release notes can reference individual metadata fields such as `{{ change_owner_link }}`, `{{ review_request_link }}`, `{{ introduced_commit_link }}`, `{{ closed_issue_links }}`, and `{{ related_issue_links }}`. Those variables render markdown links when host URLs are available, so generated changelogs can point directly at the responsible actor, the PR, and linked issues. The source changeset path stays available through `{{ changeset_path }}`, but `{{ context }}` keeps that transient file path out of the default rendered note.
 
-## Deployment intents and changeset policy
-
-<!-- {=githubAutomationPolicyAndDeployConfigExample} -->
-
 ```toml
 [source]
 provider = "github"
@@ -154,7 +148,6 @@ ignored_paths = [
 	"license",
 ]
 
-[[deployments]]
 name = "docs"
 trigger = "release_published"
 workflow = "docs-release"
@@ -163,20 +156,12 @@ release_targets = ["main"]
 requires = ["main"]
 metadata = { site = "github-pages" }
 
-[cli.release-deploy]
-help_text = "Prepare a release and emit deployment intents"
-
-[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.release-deploy.steps]]
 type = "PrepareRelease"
-
-[[cli.release-deploy.steps]]
-type = "Deploy"
 
 [cli.verify]
 help_text = "Evaluate pull-request changeset policy"
@@ -199,8 +184,6 @@ type = "string_list"
 [[cli.verify.steps]]
 type = "VerifyChangesets"
 ```
-
-<!-- {/githubAutomationPolicyAndDeployConfigExample} -->
 
 ## Release and npm publish workflows
 
@@ -284,8 +267,6 @@ jobs:
 The MonoChange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
-- exposing `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` as top-level CLI commands
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc verify`
-- keeping docs deployment represented as a deployment intent so downstream workflows can reason about it from the release manifest
 
 <!-- {/githubAutomationDogfoodNotes} -->

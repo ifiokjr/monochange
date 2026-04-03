@@ -89,8 +89,7 @@ use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CommandVariable;
-use monochange_core::DeploymentDefinition;
-use monochange_core::DeploymentTrigger;
+
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::ExtraChangelogSection;
@@ -108,7 +107,7 @@ use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::PreparedChangeset;
 use monochange_core::PreparedChangesetTarget;
-use monochange_core::ReleaseDeploymentIntent;
+
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestCompatibilityEvidence;
@@ -319,7 +318,6 @@ struct CliContext {
 	release_request_result: Option<String>,
 	issue_comment_plans: Vec<github_provider::GitHubIssueCommentPlan>,
 	issue_comment_results: Vec<String>,
-	deployment_intents: Vec<ReleaseDeploymentIntent>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
 	command_logs: Vec<String>,
 }
@@ -770,7 +768,6 @@ fn execute_cli_command(
 		release_request_result: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
-		deployment_intents: Vec::new(),
 		changeset_policy_evaluation: None,
 		command_logs: Vec::new(),
 	};
@@ -858,12 +855,8 @@ fn execute_cli_command(
 							.to_string(),
 					)
 				})?;
-				let manifest = build_release_manifest(
-					cli_command,
-					prepared_release,
-					&context.deployment_intents,
-					&context.command_logs,
-				);
+				let manifest =
+					build_release_manifest(cli_command, prepared_release, &context.command_logs);
 				if let Some(path) = path {
 					let resolved_path = resolve_config_path(root, path);
 					let rendered = render_release_manifest_json(&manifest)?;
@@ -886,12 +879,8 @@ fn execute_cli_command(
 						"`PublishRelease` requires `[source]` configuration".to_string(),
 					)
 				})?;
-				let manifest = build_release_manifest(
-					cli_command,
-					prepared_release,
-					&context.deployment_intents,
-					&context.command_logs,
-				);
+				let manifest =
+					build_release_manifest(cli_command, prepared_release, &context.command_logs);
 				context.release_requests = build_source_release_requests(&source, &manifest);
 				if context.dry_run {
 					context.release_results = context
@@ -936,12 +925,8 @@ fn execute_cli_command(
 						"`OpenReleaseRequest` requires `[source]` configuration".to_string(),
 					)
 				})?;
-				let manifest = build_release_manifest(
-					cli_command,
-					prepared_release,
-					&context.deployment_intents,
-					&context.command_logs,
-				);
+				let manifest =
+					build_release_manifest(cli_command, prepared_release, &context.command_logs);
 				let request = build_source_change_request(&source, &manifest);
 				if context.dry_run {
 					context.release_request_result = Some(format!(
@@ -978,12 +963,8 @@ fn execute_cli_command(
 						"`CommentReleasedIssues` requires `[github]` configuration".to_string(),
 					)
 				})?;
-				let manifest = build_release_manifest(
-					cli_command,
-					prepared_release,
-					&context.deployment_intents,
-					&context.command_logs,
-				);
+				let manifest =
+					build_release_manifest(cli_command, prepared_release, &context.command_logs);
 				context.issue_comment_plans =
 					github_provider::plan_released_issue_comments(&github, &manifest);
 				if context.dry_run {
@@ -1010,20 +991,6 @@ fn execute_cli_command(
 							})
 							.collect();
 				}
-				output = None;
-			}
-			CliStepDefinition::Deploy { names } => {
-				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-					MonochangeError::Config(
-						"`Deploy` requires a previous `PrepareRelease` step".to_string(),
-					)
-				})?;
-				let configuration = load_workspace_configuration(root)?;
-				context.deployment_intents = resolve_deployment_intents(
-					&configuration.deployments,
-					&prepared_release.release_targets,
-					names,
-				)?;
 				output = None;
 			}
 			CliStepDefinition::VerifyChangesets => {
@@ -1060,12 +1027,8 @@ fn execute_cli_command(
 			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 		return match format {
 			OutputFormat::Json => {
-				let manifest = build_release_manifest(
-					cli_command,
-					prepared_release,
-					&context.deployment_intents,
-					&context.command_logs,
-				);
+				let manifest =
+					build_release_manifest(cli_command, prepared_release, &context.command_logs);
 				render_release_cli_command_json(
 					&manifest,
 					&context.release_requests,
@@ -1348,15 +1311,6 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 			lines.push("issue comments:".to_string());
 			for issue_comment in &context.issue_comment_results {
 				lines.push(format!("- {issue_comment}"));
-			}
-		}
-		if !context.deployment_intents.is_empty() {
-			lines.push("deployments:".to_string());
-			for deployment in &context.deployment_intents {
-				lines.push(format!(
-					"- {} -> {} ({})",
-					deployment.name, deployment.workflow, deployment.trigger
-				));
 			}
 		}
 		if !prepared_release.changed_files.is_empty() {
@@ -3934,69 +3888,9 @@ fn render_discovery_report(
 	}
 }
 
-fn resolve_deployment_intents(
-	deployments: &[DeploymentDefinition],
-	release_targets: &[ReleaseTarget],
-	names: &[String],
-) -> MonochangeResult<Vec<ReleaseDeploymentIntent>> {
-	let selected_deployments = if names.is_empty() {
-		deployments
-			.iter()
-			.filter(|deployment| deployment.trigger == DeploymentTrigger::Workflow)
-			.collect::<Vec<_>>()
-	} else {
-		names
-			.iter()
-			.map(|name| {
-				deployments
-					.iter()
-					.find(|deployment| deployment.name == *name)
-					.ok_or_else(|| {
-						MonochangeError::Config(format!(
-							"unknown deployment `{name}` requested by command deploy step"
-						))
-					})
-			})
-			.collect::<Result<Vec<_>, _>>()?
-	};
-	let release_target_ids = release_targets
-		.iter()
-		.map(|target| target.id.as_str())
-		.collect::<BTreeSet<_>>();
-	Ok(selected_deployments
-		.into_iter()
-		.map(|deployment| {
-			let deployment_release_targets = if deployment.release_targets.is_empty() {
-				release_targets
-					.iter()
-					.filter(|target| target.release)
-					.map(|target| target.id.clone())
-					.collect::<Vec<_>>()
-			} else {
-				deployment
-					.release_targets
-					.iter()
-					.filter(|target| release_target_ids.contains(target.as_str()))
-					.cloned()
-					.collect::<Vec<_>>()
-			};
-			ReleaseDeploymentIntent {
-				name: deployment.name.clone(),
-				trigger: deployment.trigger,
-				workflow: deployment.workflow.clone(),
-				environment: deployment.environment.clone(),
-				release_targets: deployment_release_targets,
-				requires: deployment.requires.clone(),
-				metadata: deployment.metadata.clone(),
-			}
-		})
-		.collect())
-}
-
 fn build_release_manifest(
 	cli_command: &CliCommandDefinition,
 	prepared_release: &PreparedRelease,
-	deployment_intents: &[ReleaseDeploymentIntent],
 	_command_logs: &[String],
 ) -> ReleaseManifest {
 	ReleaseManifest {
@@ -4034,7 +3928,6 @@ fn build_release_manifest(
 			.collect(),
 		changesets: prepared_release.changesets.clone(),
 		deleted_changesets: prepared_release.deleted_changesets.clone(),
-		deployments: deployment_intents.to_vec(),
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: prepared_release

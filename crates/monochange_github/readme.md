@@ -70,7 +70,6 @@ let manifest = ReleaseManifest {
     changesets: Vec::new(),
     changelogs: Vec::new(),
     deleted_changesets: Vec::new(),
-    deployments: Vec::new(),
     plan: ReleaseManifestPlan {
         workspace_root: std::path::PathBuf::from("."),
         decisions: Vec::new(),

@@ -128,7 +128,6 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 		changelogs: Vec::new(),
 		changesets: Vec::new(),
 		deleted_changesets: Vec::new(),
-		deployments: Vec::new(),
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: vec![monochange_core::ReleaseManifestPlanDecision {
@@ -860,7 +859,6 @@ fn sample_manifest() -> ReleaseManifest {
 		}],
 		changesets: Vec::new(),
 		deleted_changesets: Vec::new(),
-		deployments: Vec::new(),
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),
