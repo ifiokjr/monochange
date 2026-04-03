@@ -13,7 +13,7 @@ use crate::ChangesetPolicyStatus;
 use crate::ChangesetVerificationSettings;
 use crate::CliStepDefinition;
 use crate::DependencyKind;
-use crate::DeploymentTrigger;
+
 use crate::Ecosystem;
 use crate::EcosystemSettings;
 use crate::GroupDefinition;
@@ -324,15 +324,6 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
 		defaults: WorkspaceDefaults::default(),
 		release_notes: ReleaseNotesSettings::default(),
-		deployments: vec![crate::DeploymentDefinition {
-			name: "production".to_string(),
-			trigger: DeploymentTrigger::ReleasePrMerge,
-			workflow: "deploy-production".to_string(),
-			environment: Some("production".to_string()),
-			release_targets: vec!["workspace".to_string()],
-			requires: vec!["main".to_string()],
-			metadata: std::collections::BTreeMap::new(),
-		}],
 		packages: vec![
 			PackageDefinition {
 				id: "monochange".to_string(),

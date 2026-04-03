@@ -343,7 +343,6 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	    }
 	  ],
 	  "deletedChangesets": [],
-	  "deployments": [],
 	  "plan": {
 	    "workspaceRoot": ".",
 	    "decisions": [
@@ -626,7 +625,6 @@ fn release_manifest_workflow_writes_manifest_json() {
 	    }
 	  ],
 	  "deletedChangesets": [],
-	  "deployments": [],
 	  "plan": {
 	    "workspaceRoot": ".",
 	    "decisions": [

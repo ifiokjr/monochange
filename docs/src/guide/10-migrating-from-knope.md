@@ -206,7 +206,6 @@ type = "PublishRelease"
 | `Command`          | `Command`               | Same name; monochange adds `dry_run_command` and `shell = true`                                                   |
 | —                  | `OpenReleaseRequest`    | New: open/update a release PR                                                                                     |
 | —                  | `RenderReleaseManifest` | New: write structured JSON for downstream CI                                                                      |
-| —                  | `Deploy`                | New: emit deployment intents                                                                                      |
 | —                  | `VerifyChangesets`      | New: PR changeset policy enforcement                                                                              |
 | —                  | `Validate`              | New: validate config and changesets                                                                               |
 | —                  | `Discover`              | New: list workspace packages                                                                                      |

@@ -240,22 +240,13 @@ type = "PrepareRelease"
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
 
-[cli.release-deploy]
-help_text = "Prepare a release and emit deployment intents"
-
-[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.release-deploy.steps]]
 type = "PrepareRelease"
 
-[[cli.release-deploy.steps]]
-type = "Deploy"
-
-[[cli.release-deploy.steps]]
 type = "Command"
 command = "cargo test --workspace --all-features"
 dry_run_command = "cargo test --workspace --all-features"
@@ -336,11 +327,8 @@ ignored_paths = [
 	"license",
 ]
 
-[[deployments]]
 name = "production"
 trigger = "release_pr_merge"
-workflow = "deploy-production"
-environment = "production"
 release_targets = ["sdk"]
 requires = ["main"]
 ```
@@ -450,8 +438,7 @@ Current implementation notes:
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
-- deployment definitions in `[[deployments]]` are rendered as structured release-manifest intents so repository automation can decide when and how to execute them
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Deploy`, `VerifyChangesets`, and `Command`
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `VerifyChangesets`, and `Command`
 - legacy `PublishGitHubRelease`, `OpenReleasePullRequest`, and `EnforceChangesetPolicy` step names are still accepted as migration aliases
 
 <!-- {/configurationCurrentStatus} -->

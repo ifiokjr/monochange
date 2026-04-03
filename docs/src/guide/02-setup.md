@@ -73,11 +73,8 @@ ignored_paths = [
 	"license",
 ]
 
-[[deployments]]
 name = "production"
 trigger = "release_pr_merge"
-workflow = "deploy-production"
-environment = "production"
 release_targets = ["sdk"]
 requires = ["main"]
 
@@ -189,20 +186,12 @@ type = "PrepareRelease"
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
 
-[cli.release-deploy]
-help_text = "Prepare a release and emit deployment intents"
-
-[[cli.release-deploy.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.release-deploy.steps]]
 type = "PrepareRelease"
-
-[[cli.release-deploy.steps]]
-type = "Deploy"
 
 [cli.verify]
 help_text = "Evaluate pull-request changeset policy"
@@ -231,8 +220,6 @@ type = "VerifyChangesets"
 <!-- {=projectSetupConfigNote} -->
 
 This guide shows the preferred package/group configuration model together with an expanded CLI command surface.
-
-`mc init` emits the default `validate`, `discover`, `change`, and `release` commands using the same `[cli.<command>]` shape. Repositories can then customize those commands — or add commands such as `release-manifest`, `publish-release`, `release-pr`, `release-deploy`, and `verify` — by declaring `[cli.<command>]` tables explicitly in `monochange.toml`.
 
 <!-- {/projectSetupConfigNote} -->
 

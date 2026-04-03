@@ -124,7 +124,7 @@ fn manifest_for_prepared_release(prepared_release: &PreparedRelease) -> ReleaseM
 		inputs: Vec::new(),
 		steps: Vec::new(),
 	};
-	super::build_release_manifest(&cli_command, prepared_release, &[], &[])
+	super::build_release_manifest(&cli_command, prepared_release, &[])
 }
 
 fn prepared_release_value(prepared_release: &PreparedRelease) -> serde_json::Value {

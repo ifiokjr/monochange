@@ -105,7 +105,7 @@ use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
-use monochange_core::DeploymentDefinition;
+
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::ExtraChangelogSection;
@@ -166,8 +166,6 @@ struct RawWorkspaceConfiguration {
 	defaults: RawWorkspaceDefaults,
 	#[serde(default)]
 	release_notes: RawReleaseNotesSettings,
-	#[serde(default)]
-	deployments: Vec<DeploymentDefinition>,
 	#[serde(default)]
 	package: BTreeMap<String, RawPackageDefinition>,
 	#[serde(default)]
@@ -678,7 +676,6 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	let RawWorkspaceConfiguration {
 		defaults,
 		release_notes,
-		deployments,
 		package,
 		group,
 		cli,
@@ -913,12 +910,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 
 	validate_cli(&cli)?;
 	validate_release_notes_configuration(&contents, &release_notes, &packages, &groups)?;
-	validate_deployments_configuration(&contents, &deployments)?;
 	validate_changesets_configuration(&changesets, &packages)?;
 	validate_github_configuration(github.as_ref())?;
 	validate_source_configuration(source.as_ref())?;
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
-	validate_cli_runtime_requirements(&cli, &changesets, source.as_ref(), &deployments)?;
+	validate_cli_runtime_requirements(&cli, &changesets, source.as_ref())?;
 
 	Ok(WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
@@ -934,7 +930,6 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		release_notes: ReleaseNotesSettings {
 			change_templates: release_notes.change_templates,
 		},
-		deployments,
 		packages,
 		groups,
 		cli,
@@ -1666,61 +1661,6 @@ fn validate_extra_changelog_sections(
 	Ok(())
 }
 
-fn validate_deployments_configuration(
-	contents: &str,
-	deployments: &[DeploymentDefinition],
-) -> MonochangeResult<()> {
-	let mut seen_names = BTreeSet::new();
-	for deployment in deployments {
-		if deployment.name.trim().is_empty() {
-			return Err(MonochangeError::Config(
-				"deployment names must not be empty".to_string(),
-			));
-		}
-		if !seen_names.insert(deployment.name.clone()) {
-			return Err(MonochangeError::Config(format!(
-				"duplicate deployment `{}`",
-				deployment.name
-			)));
-		}
-		if deployment.workflow.trim().is_empty() {
-			return Err(config_diagnostic(
-				contents,
-				format!(
-					"deployment `{}` must declare a non-empty workflow",
-					deployment.name
-				),
-				Vec::new(),
-				Some(
-					"set `workflow = \"deploy-production\"` or remove the deployment entry"
-						.to_string(),
-				),
-			));
-		}
-		if deployment
-			.requires
-			.iter()
-			.any(|required| required.trim().is_empty())
-		{
-			return Err(MonochangeError::Config(format!(
-				"deployment `{}` must not include empty `requires` entries",
-				deployment.name
-			)));
-		}
-		if deployment
-			.release_targets
-			.iter()
-			.any(|target| target.trim().is_empty())
-		{
-			return Err(MonochangeError::Config(format!(
-				"deployment `{}` must not include empty `release_targets` entries",
-				deployment.name
-			)));
-		}
-	}
-	Ok(())
-}
-
 fn change_template_variables(template: &str) -> Vec<String> {
 	let mut variables = BTreeSet::new();
 	let mut remaining = template;
@@ -2041,7 +1981,6 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::PublishRelease
 				| CliStepDefinition::OpenReleaseRequest
 				| CliStepDefinition::CommentReleasedIssues
-				| CliStepDefinition::Deploy { .. }
 				| CliStepDefinition::VerifyChangesets => {}
 			}
 		}
@@ -2054,7 +1993,6 @@ fn validate_cli_runtime_requirements(
 	cli: &[CliCommandDefinition],
 	changesets: &ChangesetSettings,
 	source: Option<&SourceConfiguration>,
-	deployments: &[DeploymentDefinition],
 ) -> MonochangeResult<()> {
 	for cli_command in cli {
 		if cli_command
@@ -2112,56 +2050,34 @@ fn validate_cli_runtime_requirements(
 			}
 		}
 		for step in &cli_command.steps {
-			match step {
-				CliStepDefinition::Deploy { names } => {
-					if deployments.is_empty() {
+			if step == &CliStepDefinition::VerifyChangesets {
+				if !changesets.verify.enabled {
+					return Err(MonochangeError::Config(format!(
+   							"CLI command `{}` uses `VerifyChangesets` but `[changesets.verify].enabled` is false",
+   							cli_command.name
+   						)));
+				}
+				let changed_paths_input = cli_command_input(cli_command, "changed_paths")
+					.ok_or_else(|| {
+						MonochangeError::Config(format!(
+   								"CLI command `{}` uses `VerifyChangesets` but does not declare a `changed_paths` input",
+   								cli_command.name
+   							))
+					})?;
+				if !matches!(changed_paths_input.kind, CliInputKind::StringList) {
+					return Err(MonochangeError::Config(format!(
+   							"CLI command `{}` input `changed_paths` must use type `string_list` for `VerifyChangesets`",
+   							cli_command.name
+   						)));
+				}
+				if let Some(label_input) = cli_command_input(cli_command, "label") {
+					if !matches!(label_input.kind, CliInputKind::StringList) {
 						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` uses `Deploy` but no `[[deployments]]` are configured",
-							cli_command.name
-						)));
-					}
-					for name in names {
-						if !deployments
-							.iter()
-							.any(|deployment| deployment.name == *name)
-						{
-							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` deploy step references unknown deployment `{name}`",
-								cli_command.name
-							)));
-						}
+   								"CLI command `{}` input `label` must use type `string_list` when used with `VerifyChangesets`",
+   								cli_command.name
+   							)));
 					}
 				}
-				CliStepDefinition::VerifyChangesets => {
-					if !changesets.verify.enabled {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` uses `VerifyChangesets` but `[changesets.verify].enabled` is false",
-							cli_command.name
-						)));
-					}
-					let changed_paths_input = cli_command_input(cli_command, "changed_paths")
-						.ok_or_else(|| {
-							MonochangeError::Config(format!(
-								"CLI command `{}` uses `VerifyChangesets` but does not declare a `changed_paths` input",
-								cli_command.name
-							))
-						})?;
-					if !matches!(changed_paths_input.kind, CliInputKind::StringList) {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` input `changed_paths` must use type `string_list` for `VerifyChangesets`",
-							cli_command.name
-						)));
-					}
-					if let Some(label_input) = cli_command_input(cli_command, "label") {
-						if !matches!(label_input.kind, CliInputKind::StringList) {
-							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` input `label` must use type `string_list` when used with `VerifyChangesets`",
-								cli_command.name
-							)));
-						}
-					}
-				}
-				_ => {}
 			}
 		}
 	}
