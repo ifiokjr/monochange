@@ -758,7 +758,19 @@ fn execute_cli_command(
 
 				if is_interactive {
 					let configuration = load_workspace_configuration(root)?;
-					let result = interactive::run_interactive_change(&configuration)?;
+					let options = interactive::InteractiveOptions {
+						reason: context
+							.inputs
+							.get("reason")
+							.and_then(|values| values.first())
+							.cloned(),
+						details: context
+							.inputs
+							.get("details")
+							.and_then(|values| values.first())
+							.cloned(),
+					};
+					let result = interactive::run_interactive_change(&configuration, &options)?;
 					let output_path = context
 						.inputs
 						.get("output")
