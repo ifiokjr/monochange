@@ -404,7 +404,7 @@ fn verify_cli_json_reports_failure_comment() {
 	assert_cmd_snapshot!(
 		cli()
 			.current_dir(tempdir.path())
-			.arg("verify")
+			.arg("affected")
 			.arg("--format")
 			.arg("json")
 			.arg("--changed-paths")
@@ -416,6 +416,7 @@ fn verify_cli_json_reports_failure_comment() {
 	{
 	  "status": "failed",
 	  "required": true,
+	  "enforce": false,
 	  "summary": "changeset verification failed: attached changesets do not cover 1 changed package",
 	  "comment": "### MonoChange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `crates/core/src/lib.rs`\n\nAffected packages:\n- `core`\n\nErrors:\n- changed packages are not covered by attached changesets: core\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
 	  "labels": [],
@@ -1046,25 +1047,32 @@ comment_on_failure = true
 [package.core]
 path = "crates/core"
 
-[cli.verify]
+[cli.affected]
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
-required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
+name = "since"
+type = "string"
+
+[[cli.affected.inputs]]
+name = "verify"
+type = "boolean"
+
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 "#,
 	);
 	if with_changeset {

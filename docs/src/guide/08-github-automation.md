@@ -9,7 +9,7 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 - `mc release-manifest` writes a stable JSON artifact for downstream automation
 - `mc publish-release` previews or publishes provider releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent provider release request
-- `mc verify` evaluates pull-request changeset policy from CI-supplied changed paths and labels
+- `mc affected` evaluates pull-request changeset policy from CI-supplied changed paths and labels
 
 <!-- {/githubAutomationOverview} -->
 
@@ -22,7 +22,7 @@ mc release --dry-run --format json
 mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
-mc verify --format json --changed-paths crates/monochange/src/lib.rs
+mc affected --format json --changed-paths crates/monochange/src/lib.rs
 ```
 
 <!-- {/githubAutomationWorkflowCommands} -->
@@ -163,26 +163,26 @@ default = "text"
 
 type = "PrepareRelease"
 
-[cli.verify]
+[cli.affected]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 ```
 
 ## Release and npm publish workflows
@@ -267,6 +267,6 @@ jobs:
 The MonoChange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
-- running a real `changeset-policy` GitHub Actions workflow that shells into `mc verify`
+- running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`
 
 <!-- {/githubAutomationDogfoodNotes} -->

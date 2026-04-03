@@ -485,6 +485,7 @@ pub enum CliInputKind {
 	StringList,
 	Path,
 	Choice,
+	Boolean,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -528,8 +529,8 @@ pub enum CliStepDefinition {
 	#[serde(alias = "OpenReleasePullRequest")]
 	OpenReleaseRequest,
 	CommentReleasedIssues,
-	#[serde(alias = "EnforceChangesetPolicy")]
-	VerifyChangesets,
+	#[serde(alias = "EnforceChangesetPolicy", alias = "VerifyChangesets")]
+	AffectedPackages,
 	Command {
 		command: String,
 		#[serde(default, alias = "dry_run")]
@@ -1078,6 +1079,8 @@ impl fmt::Display for ChangesetPolicyStatus {
 pub struct ChangesetPolicyEvaluation {
 	pub status: ChangesetPolicyStatus,
 	pub required: bool,
+	#[serde(default)]
+	pub enforce: bool,
 	pub summary: String,
 	#[serde(default)]
 	pub comment: Option<String>,
@@ -1466,9 +1469,9 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::PrepareRelease],
 		},
 		CliCommandDefinition {
-			name: "verify".to_string(),
+			name: "affected".to_string(),
 			help_text: Some(
-				"Verify that changed files are covered by attached changesets".to_string(),
+				"Show packages affected by file changes and their changeset coverage".to_string(),
 			),
 			inputs: vec![
 				CliInputDefinition {
@@ -1483,10 +1486,31 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					name: "changed_paths".to_string(),
 					kind: CliInputKind::StringList,
 					help_text: Some(
-						"Changed repository paths to verify against attached changesets"
+						"Explicit changed paths (mutually exclusive with --since)".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+				CliInputDefinition {
+					name: "since".to_string(),
+					kind: CliInputKind::String,
+					help_text: Some(
+						"Git revision to compare against (branch, tag, commit, or HEAD)"
 							.to_string(),
 					),
-					required: true,
+					required: false,
+					default: None,
+					choices: Vec::new(),
+				},
+				CliInputDefinition {
+					name: "verify".to_string(),
+					kind: CliInputKind::Boolean,
+					help_text: Some(
+						"Enforce that affected packages are covered by changesets (exit non-zero if not)"
+							.to_string(),
+					),
+					required: false,
 					default: None,
 					choices: Vec::new(),
 				},
@@ -1499,7 +1523,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					choices: Vec::new(),
 				},
 			],
-			steps: vec![CliStepDefinition::VerifyChangesets],
+			steps: vec![CliStepDefinition::AffectedPackages],
 		},
 	]
 }

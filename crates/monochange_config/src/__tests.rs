@@ -43,7 +43,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 		.collect::<Vec<_>>();
 	assert_eq!(
 		cli_command_names,
-		vec!["validate", "discover", "change", "release", "verify"]
+		vec!["validate", "discover", "change", "release", "affected"]
 	);
 	assert_eq!(configuration.cargo.enabled, None);
 	assert_eq!(configuration.npm.enabled, None);
@@ -1642,15 +1642,15 @@ path = "crates/core"
 [changesets.verify]
 enabled = false
 
-[cli.verify]
+[cli.affected]
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -1660,11 +1660,11 @@ type = "VerifyChangesets"
 		.unwrap_or_else(|| panic!("expected verification CLI command config error"));
 	assert!(error
 		.to_string()
-		.contains("uses `VerifyChangesets` but `[changesets.verify].enabled` is false"));
+		.contains("uses `AffectedPackages` but `[changesets.verify].enabled` is false"));
 }
 
 #[test]
-fn load_workspace_configuration_rejects_verify_changesets_without_changed_paths_input() {
+fn load_workspace_configuration_rejects_affected_packages_without_path_inputs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
 	fs::write(
@@ -1679,10 +1679,10 @@ path = "crates/core"
 [changesets.verify]
 enabled = true
 
-[cli.verify]
+[cli.affected]
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -1692,7 +1692,7 @@ type = "VerifyChangesets"
 		.unwrap_or_else(|| panic!("expected verification CLI command config error"));
 	assert!(error
 		.to_string()
-		.contains("does not declare a `changed_paths` input"));
+		.contains("declares neither a `changed_paths` nor a `since` input"));
 }
 
 #[test]

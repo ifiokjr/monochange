@@ -6,12 +6,12 @@ use monochange_core::Ecosystem;
 use tempfile::tempdir;
 
 use crate::add_change_file;
+use crate::affected_packages;
 use crate::build_command_for_root;
 use crate::discover_workspace;
 use crate::plan_release;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
-use crate::verify_changesets;
 
 fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
@@ -772,11 +772,11 @@ shell = true
 }
 
 #[test]
-fn verify_changesets_requires_attached_coverage_for_changed_packages() {
+fn affected_packages_requires_attached_coverage_for_changed_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
 
-	let evaluation = verify_changesets(
+	let evaluation = affected_packages(
 		tempdir.path(),
 		&["crates/core/src/lib.rs".to_string()],
 		&Vec::new(),
@@ -794,11 +794,11 @@ fn verify_changesets_requires_attached_coverage_for_changed_packages() {
 }
 
 #[test]
-fn verify_changesets_skips_when_allowed_label_is_present() {
+fn affected_packages_skips_when_allowed_label_is_present() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
 
-	let evaluation = verify_changesets(
+	let evaluation = affected_packages(
 		tempdir.path(),
 		&["crates/core/src/lib.rs".to_string()],
 		&["no-changeset-required".to_string()],
@@ -1111,26 +1111,26 @@ path = "crates/core"
 ignored_paths = ["tests/**"]
 additional_paths = ["Cargo.lock"]
 
-[cli.verify]
+[cli.affected]
 help_text = "Verify that changed files are covered by attached changesets"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"
 "#,
 	);
 	if with_changeset {

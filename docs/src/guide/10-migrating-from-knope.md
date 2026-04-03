@@ -206,7 +206,7 @@ type = "PublishRelease"
 | `Command`          | `Command`               | Same name; monochange adds `dry_run_command` and `shell = true`                                                   |
 | —                  | `OpenReleaseRequest`    | New: open/update a release PR                                                                                     |
 | —                  | `RenderReleaseManifest` | New: write structured JSON for downstream CI                                                                      |
-| —                  | `VerifyChangesets`      | New: PR changeset policy enforcement                                                                              |
+| —                  | `AffectedPackages`      | New: PR changeset policy enforcement                                                                              |
 | —                  | `Validate`              | New: validate config and changesets                                                                               |
 | —                  | `Discover`              | New: list workspace packages                                                                                      |
 | —                  | `CommentReleasedIssues` | New: comment on closed issues referenced in changesets                                                            |
@@ -440,7 +440,7 @@ For PR-based release flows with monochange, add a changeset policy workflow:
 ```yaml
 - name: run changeset policy
   run: |
-    mc verify --format json \
+    mc affected --format json \
       --changed-paths file1.rs \
       --changed-paths file2.rs
 ```

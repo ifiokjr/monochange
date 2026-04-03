@@ -348,7 +348,7 @@ enabled = true
 #
 # This is the legacy location for changeset policy settings that are aware of
 # the source provider's changed-file detection. These settings feed the
-# VerifyChangesets step when it needs to know which paths matter.
+# AffectedPackages step when it needs to know which paths matter.
 #
 # For skip_labels, prefer [changesets.verify].skip_labels instead.
 #
@@ -381,7 +381,7 @@ enabled = true
 # section and works independently of any source provider.
 
 [changesets.verify]
-# Whether changeset verification is enabled. When false, the VerifyChangesets
+# Whether changeset verification is enabled. When false, the AffectedPackages
 # step will refuse to run.
 # Default: true
 enabled = true
@@ -432,7 +432,7 @@ comment_on_failure = true
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
 #   Deploy               — emit deployment intents (requires PrepareRelease)
-#   VerifyChangesets     — evaluate changeset policy from CI-supplied paths/labels
+#   AffectedPackages     — show affected packages and evaluate changeset coverage
 #   Command              — run an arbitrary shell command
 #
 # Command step fields:
@@ -519,23 +519,23 @@ default = "text"
 [[cli.release.steps]]
 type = "PrepareRelease"
 
-[cli.verify]
+[cli.affected]
 help_text = "Evaluate pull-request changeset policy"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "format"
 type = "choice"
 choices = ["text", "json"]
 default = "text"
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "changed_paths"
 type = "string_list"
 required = true
 
-[[cli.verify.inputs]]
+[[cli.affected.inputs]]
 name = "label"
 type = "string_list"
 
-[[cli.verify.steps]]
-type = "VerifyChangesets"
+[[cli.affected.steps]]
+type = "AffectedPackages"

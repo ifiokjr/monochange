@@ -219,7 +219,7 @@ fn changeset_verification_settings_default_to_enabled_enforcement() {
 }
 
 #[test]
-fn default_cli_commands_expose_validate_discover_change_release_and_verify() {
+fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 	let cli = default_cli_commands();
 	let cli_command_names = cli
 		.iter()
@@ -227,7 +227,7 @@ fn default_cli_commands_expose_validate_discover_change_release_and_verify() {
 		.collect::<Vec<_>>();
 	assert_eq!(
 		cli_command_names,
-		vec!["validate", "discover", "change", "release", "verify"]
+		vec!["validate", "discover", "change", "release", "affected"]
 	);
 	let validate_cli_command = cli
 		.first()
