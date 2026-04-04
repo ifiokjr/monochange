@@ -47,7 +47,10 @@ format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-versioned_files = [{ path = "crates/sdk_core/extra.toml", type = "cargo" }]
+versioned_files = [
+	"Cargo.lock",
+	{ path = "crates/sdk_core/extra.toml", type = "cargo" },
+]
 tag = false
 release = false
 version_format = "namespaced"
@@ -289,17 +292,24 @@ requires = ["main"]
 enabled = true
 roots = ["crates/*"]
 exclude = ["crates/experimental/*"]
+versioned_files = ["Cargo.lock"]
 
 [ecosystems.npm]
 enabled = true
 roots = ["packages/*"]
 exclude = ["packages/legacy/*"]
+dependency_version_prefix = "^"
+versioned_files = ["**/packages/*/package.json"]
+# npm-family lockfiles can include package-lock.json, pnpm-lock.yaml,
+# bun.lock, and bun.lockb depending on the workspace manager.
 
 [ecosystems.deno]
 enabled = true
+versioned_files = ["deno.lock"]
 
 [ecosystems.dart]
 enabled = true
+versioned_files = ["pubspec.lock"]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

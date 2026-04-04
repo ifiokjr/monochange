@@ -33,6 +33,7 @@
 //! - normalized dependency extraction
 //! <!-- {/monochangeNpmCrateDocs} -->
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::fs;
@@ -58,6 +59,219 @@ use walkdir::WalkDir;
 
 pub const PACKAGE_JSON_FILE: &str = "package.json";
 pub const PNPM_WORKSPACE_FILE: &str = "pnpm-workspace.yaml";
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum NpmVersionedFileKind {
+	Manifest,
+	PackageLock,
+	PnpmLock,
+	BunLock,
+	BunLockBinary,
+}
+
+pub fn supported_versioned_file_kind(path: &Path) -> Option<NpmVersionedFileKind> {
+	let file_name = path
+		.file_name()
+		.and_then(|name| name.to_str())
+		.unwrap_or_default();
+	match file_name {
+		"package-lock.json" => Some(NpmVersionedFileKind::PackageLock),
+		"pnpm-lock.yaml" => Some(NpmVersionedFileKind::PnpmLock),
+		"bun.lock" => Some(NpmVersionedFileKind::BunLock),
+		"bun.lockb" => Some(NpmVersionedFileKind::BunLockBinary),
+		_ if path.extension().and_then(|ext| ext.to_str()) == Some("json") => {
+			Some(NpmVersionedFileKind::Manifest)
+		}
+		_ => None,
+	}
+}
+
+pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
+	let manifest_dir = package
+		.manifest_path
+		.parent()
+		.map_or_else(|| package.workspace_root.clone(), Path::to_path_buf);
+	let scope = if manifest_dir == package.workspace_root {
+		manifest_dir.clone()
+	} else {
+		package.workspace_root.clone()
+	};
+	let candidate_names = [
+		"pnpm-lock.yaml",
+		"package-lock.json",
+		"bun.lock",
+		"bun.lockb",
+	];
+	let mut discovered = candidate_names
+		.iter()
+		.map(|name| scope.join(name))
+		.filter(|path| path.exists())
+		.collect::<Vec<_>>();
+	if discovered.is_empty() && scope != manifest_dir {
+		discovered.extend(
+			candidate_names
+				.iter()
+				.map(|name| manifest_dir.join(name))
+				.filter(|path| path.exists()),
+		);
+	}
+	discovered
+}
+
+pub fn update_json_dependency_fields(
+	value: &mut Value,
+	fields: &[&str],
+	versioned_deps: &BTreeMap<String, String>,
+) {
+	for field in fields {
+		if let Some(section) = value.get_mut(*field).and_then(Value::as_object_mut) {
+			for (dep_name, dep_version) in versioned_deps {
+				if section.contains_key(dep_name) {
+					section.insert(dep_name.clone(), Value::String(dep_version.clone()));
+				}
+			}
+		}
+	}
+}
+
+pub fn update_package_lock(
+	value: &mut Value,
+	package_paths_by_name: &BTreeMap<String, PathBuf>,
+	raw_versions: &BTreeMap<String, String>,
+) {
+	if let Some(root_name) = value.get("name").and_then(Value::as_str) {
+		if let Some(version) = raw_versions.get(root_name) {
+			if let Some(obj) = value.as_object_mut() {
+				obj.insert("version".to_string(), Value::String(version.clone()));
+			}
+		}
+	}
+	if let Some(packages) = value.get_mut("packages").and_then(Value::as_object_mut) {
+		for (entry_path, entry_value) in packages {
+			let Some(entry_object) = entry_value.as_object_mut() else {
+				continue;
+			};
+			if let Some(name) = entry_object.get("name").and_then(Value::as_str) {
+				if let Some(version) = raw_versions.get(name) {
+					entry_object.insert("version".to_string(), Value::String(version.clone()));
+				}
+				continue;
+			}
+			for (name, package_dir) in package_paths_by_name {
+				if entry_path == &package_dir.to_string_lossy() {
+					if let Some(version) = raw_versions.get(name) {
+						entry_object.insert("version".to_string(), Value::String(version.clone()));
+					}
+				}
+			}
+		}
+	}
+	if let Some(dependencies) = value.get_mut("dependencies").and_then(Value::as_object_mut) {
+		for (name, version) in raw_versions {
+			if let Some(entry) = dependencies.get_mut(name).and_then(Value::as_object_mut) {
+				entry.insert("version".to_string(), Value::String(version.clone()));
+			}
+		}
+	}
+}
+
+pub fn update_pnpm_lock(
+	mapping: &mut serde_yaml_ng::Mapping,
+	raw_versions: &BTreeMap<String, String>,
+) {
+	for section_name in ["importers", "packages", "snapshots"] {
+		let Some(serde_yaml_ng::Value::Mapping(section)) =
+			mapping.get_mut(serde_yaml_ng::Value::String(section_name.to_string()))
+		else {
+			continue;
+		};
+		for value in section.values_mut() {
+			let Some(entry_mapping) = value.as_mapping_mut() else {
+				continue;
+			};
+			for dependency_field in [
+				"dependencies",
+				"devDependencies",
+				"optionalDependencies",
+				"peerDependencies",
+			] {
+				let Some(serde_yaml_ng::Value::Mapping(dependencies)) = entry_mapping
+					.get_mut(serde_yaml_ng::Value::String(dependency_field.to_string()))
+				else {
+					continue;
+				};
+				for (name, version) in raw_versions {
+					let key = serde_yaml_ng::Value::String(name.clone());
+					let Some(entry) = dependencies.get_mut(&key) else {
+						continue;
+					};
+					if let Some(text) = entry.as_str() {
+						if !text.starts_with("link:") && !text.starts_with("workspace:") {
+							*entry = serde_yaml_ng::Value::String(version.clone());
+						}
+					} else if let Some(entry_mapping) = entry.as_mapping_mut() {
+						let version_key = serde_yaml_ng::Value::String("version".to_string());
+						if let Some(version_value) = entry_mapping.get_mut(&version_key) {
+							if let Some(text) = version_value.as_str() {
+								if !text.starts_with("link:") && !text.starts_with("workspace:") {
+									*version_value = serde_yaml_ng::Value::String(version.clone());
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+pub fn update_bun_lock(contents: &str, raw_versions: &BTreeMap<String, String>) -> String {
+	let mut updated = contents.to_string();
+	for (name, version) in raw_versions {
+		let pattern = format!("\"{name}\": \"");
+		if let Some(start) = updated.find(&pattern) {
+			let value_start = start + pattern.len();
+			if let Some(end_offset) = updated[value_start..].find('"') {
+				updated.replace_range(value_start..value_start + end_offset, version);
+			}
+		}
+	}
+	updated
+}
+
+pub fn update_bun_lock_binary(
+	contents: &[u8],
+	old_versions: &BTreeMap<String, String>,
+	raw_versions: &BTreeMap<String, String>,
+) -> Vec<u8> {
+	let mut updated = contents.to_vec();
+	for (name, old_version) in old_versions {
+		let Some(new_version) = raw_versions.get(name) else {
+			continue;
+		};
+		let old_bytes = old_version.as_bytes();
+		let new_bytes = new_version.as_bytes();
+		if old_bytes == new_bytes {
+			continue;
+		}
+		if old_bytes.is_empty() {
+			continue;
+		}
+		let mut cursor = 0usize;
+		while let Some(remaining) = updated.get(cursor..) {
+			let Some(relative_index) = remaining
+				.windows(old_bytes.len())
+				.position(|window| window == old_bytes)
+			else {
+				break;
+			};
+			let index = cursor + relative_index;
+			updated.splice(index..index + old_bytes.len(), new_bytes.iter().copied());
+			cursor = index + new_bytes.len();
+		}
+	}
+	updated
+}
 
 pub struct NpmAdapter;
 

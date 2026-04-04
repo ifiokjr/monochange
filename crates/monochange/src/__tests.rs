@@ -657,6 +657,86 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 }
 
 #[test]
+fn command_release_auto_discovers_and_updates_cargo_lockfiles() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_cargo_lock_release_fixture(tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let cargo_lock = fs::read_to_string(tempdir.path().join("Cargo.lock"))
+		.unwrap_or_else(|error| panic!("cargo lock: {error}"));
+
+	assert!(cargo_lock.contains("version = \"1.1.0\""));
+}
+
+#[test]
+fn command_release_auto_discovers_and_updates_package_lockfiles() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_npm_lock_release_fixture(tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let package_lock = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
+		.unwrap_or_else(|error| panic!("package lock: {error}"));
+
+	assert!(package_lock.contains("\"version\": \"1.1.0\""));
+}
+
+#[test]
+fn command_release_auto_discovers_and_updates_bun_lockb_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_bun_lockb_release_fixture(tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let bun_lock = fs::read(tempdir.path().join("packages/app/bun.lockb"))
+		.unwrap_or_else(|error| panic!("bun lockb: {error}"));
+
+	assert!(String::from_utf8_lossy(&bun_lock).contains("1.1.0"));
+}
+
+#[test]
+fn command_release_auto_discovers_and_updates_deno_lockfiles() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_deno_lock_release_fixture(tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let deno_lock = fs::read_to_string(tempdir.path().join("packages/app/deno.lock"))
+		.unwrap_or_else(|error| panic!("deno lock: {error}"));
+
+	assert!(deno_lock.contains("npm:app@1.1.0"));
+}
+
+#[test]
+fn command_release_honors_explicit_lockfile_paths_in_versioned_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_explicit_lockfile_override_fixture(tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let shared_lock = fs::read_to_string(tempdir.path().join("lockfiles/shared/package-lock.json"))
+		.unwrap_or_else(|error| panic!("shared package lock: {error}"));
+
+	assert!(shared_lock.contains("\"version\": \"1.1.0\""));
+}
+
+#[test]
 fn command_release_uses_empty_update_message_precedence_for_grouped_changelogs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_group_empty_update_message_fixture(tempdir.path());
@@ -1256,6 +1336,254 @@ core: minor
 ---
 
 #### add release command
+",
+	);
+}
+
+fn seed_cargo_lock_release_fixture(root: &Path) {
+	write_file(
+		root.join("Cargo.toml"),
+		r#"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+"#,
+	);
+	write_file(
+		root.join("crates/core/Cargo.toml"),
+		r#"
+[package]
+name = "workflow-core"
+version = { workspace = true }
+edition = "2021"
+"#,
+	);
+	write_file(
+		root.join("Cargo.lock"),
+		"[[package]]\nname = \"workflow-core\"\nversion = \"1.0.0\"\n",
+	);
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+changelog = false
+
+[package.core]
+path = "crates/core"
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		root.join(".changeset/feature.md"),
+		r"---
+core: minor
+---
+
+#### add feature
+",
+	);
+}
+
+fn seed_npm_lock_release_fixture(root: &Path) {
+	write_file(
+		root.join("packages/app/package.json"),
+		r#"{
+  "name": "app",
+  "version": "1.0.0"
+}
+"#,
+	);
+	write_file(
+		root.join("packages/app/package-lock.json"),
+		r#"{
+  "name": "app",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "packages": {
+    "": {
+      "name": "app",
+      "version": "1.0.0"
+    }
+  },
+  "dependencies": {
+    "app": {
+      "version": "1.0.0"
+    }
+  }
+}
+"#,
+	);
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "npm"
+changelog = false
+
+[package.app]
+path = "packages/app"
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		root.join(".changeset/feature.md"),
+		r"---
+app: minor
+---
+
+#### add feature
+",
+	);
+}
+
+fn seed_bun_lockb_release_fixture(root: &Path) {
+	write_file(
+		root.join("packages/app/package.json"),
+		r#"{
+  "name": "app",
+  "version": "1.0.0"
+}
+"#,
+	);
+	write_file(root.join("packages/app/bun.lockb"), "binary-version:1.0.0");
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "npm"
+changelog = false
+
+[package.app]
+path = "packages/app"
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		root.join(".changeset/feature.md"),
+		r"---
+app: minor
+---
+
+#### add feature
+",
+	);
+}
+
+fn seed_deno_lock_release_fixture(root: &Path) {
+	write_file(
+		root.join("packages/app/deno.json"),
+		r#"{
+  "name": "app",
+  "version": "1.0.0"
+}
+"#,
+	);
+	write_file(
+		root.join("packages/app/deno.lock"),
+		r#"{
+  "version": "4",
+  "specifiers": {
+    "npm:app@1.0.0": "1.0.0"
+  }
+}
+"#,
+	);
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "deno"
+changelog = false
+
+[package.app]
+path = "packages/app"
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		root.join(".changeset/feature.md"),
+		r"---
+app: minor
+---
+
+#### add feature
+",
+	);
+}
+
+fn seed_explicit_lockfile_override_fixture(root: &Path) {
+	write_file(
+		root.join("packages/app/package.json"),
+		r#"{
+  "name": "app",
+  "version": "1.0.0"
+}
+"#,
+	);
+	write_file(
+		root.join("packages/app/package-lock.json"),
+		r#"{
+  "name": "app",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "packages": { "": { "name": "app", "version": "1.0.0" } }
+}
+"#,
+	);
+	write_file(
+		root.join("lockfiles/shared/package-lock.json"),
+		r#"{
+  "name": "app",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "packages": { "": { "name": "app", "version": "1.0.0" } }
+}
+"#,
+	);
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "npm"
+changelog = false
+
+[package.app]
+path = "packages/app"
+versioned_files = [{ path = "lockfiles/shared/package-lock.json", type = "npm" }]
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+"#,
+	);
+	write_file(
+		root.join(".changeset/feature.md"),
+		r"---
+app: minor
+---
+
+#### add feature
 ",
 	);
 }

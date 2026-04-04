@@ -5,6 +5,7 @@ use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::Ecosystem;
+use monochange_core::EcosystemType;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use semver::Version;
@@ -1014,6 +1015,148 @@ versioned_files = [{ path = "Cargo.lock", type = "cargo", name = "missing" }]
 	assert!(rendered.contains(
 		"reference a declared package id from `versioned_files` or remove the name entry"
 	));
+}
+
+#[test]
+fn load_workspace_configuration_infers_package_versioned_file_types_from_string_entries() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+versioned_files = ["Cargo.toml", "**/crates/*/Cargo.toml"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.packages
+		.first()
+		.unwrap_or_else(|| panic!("expected package"));
+
+	assert_eq!(package.versioned_files.len(), 2);
+	assert!(package
+		.versioned_files
+		.iter()
+		.all(|definition| definition.ecosystem_type == EcosystemType::Cargo));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_group_string_versioned_files_without_explicit_type() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[group.sdk]
+packages = ["core"]
+versioned_files = ["group.toml"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("bare-string `versioned_files`"));
+	assert!(rendered.contains("use `versioned_files = [{ path = \"...\", type = \"cargo\" }]`"));
+}
+
+#[test]
+fn load_workspace_configuration_inherits_ecosystem_versioned_files_unless_package_opt_outs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_npm_package(tempdir.path(), "packages/app", "app");
+	write_npm_package(tempdir.path(), "packages/web", "web");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "npm"
+
+[ecosystems.npm]
+versioned_files = ["**/package.json"]
+
+[package.app]
+path = "packages/app"
+
+[package.web]
+path = "packages/web"
+ignore_ecosystem_versioned_files = true
+versioned_files = ["package.json"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let app = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "app")
+		.unwrap_or_else(|| panic!("expected app package"));
+	let web = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "web")
+		.unwrap_or_else(|| panic!("expected web package"));
+
+	assert_eq!(app.versioned_files.len(), 1);
+	assert_eq!(
+		app.versioned_files
+			.first()
+			.map(|definition| definition.path.as_str()),
+		Some("**/package.json")
+	);
+	assert!(web.ignore_ecosystem_versioned_files);
+	assert_eq!(web.versioned_files.len(), 1);
+	assert_eq!(
+		web.versioned_files
+			.first()
+			.map(|definition| definition.path.as_str()),
+		Some("package.json")
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_globs_that_match_unsupported_files_for_an_ecosystem() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	write_npm_package(tempdir.path(), "packages/web", "web");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+versioned_files = [{ path = "**/*", type = "cargo" }]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("matched unsupported file"));
+	assert!(rendered.contains("narrow the glob"));
 }
 
 #[test]
