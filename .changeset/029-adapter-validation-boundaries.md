@@ -1,4 +1,6 @@
 ---
+monochange: patch
+monochange_cargo: patch
 monochange_core: patch
 monochange_config: patch
 monochange_github: patch
