@@ -37,7 +37,7 @@ format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-versioned_files = ["crates/sdk_core/extra.toml"]
+versioned_files = [{ path = "crates/sdk_core/extra.toml", type = "cargo" }]
 tag = false
 release = false
 version_format = "namespaced"
@@ -126,7 +126,7 @@ Groups own outward release identity for their member packages.
 [group.sdk]
 packages = ["sdk-core", "web-sdk", "mobile-sdk"]
 changelog = "changelog.md"
-versioned_files = ["group.toml"]
+versioned_files = [{ path = "group.toml", type = "cargo" }]
 tag = true
 release = true
 version_format = "primary"
@@ -149,8 +149,8 @@ Rules:
 Examples:
 
 ```toml
-versioned_files = ["Cargo.lock"]
-versioned_files = [{ path = "group.toml", dependency = "sdk-core" }]
+versioned_files = [{ path = "Cargo.lock", type = "cargo" }]
+versioned_files = [{ path = "group.toml", type = "cargo", name = "sdk-core" }]
 ```
 
 Dependency targets in `versioned_files` must reference declared package ids.

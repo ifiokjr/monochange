@@ -1218,7 +1218,7 @@ changelog = "{{{{ path }}}}/changelog.md"
 
 [package.core]
 path = "crates/core"
-versioned_files = ["crates/core/extra.toml"]
+versioned_files = [{{ path = "crates/core/extra.toml", type = "cargo" }}]
 
 [package.app]
 path = "crates/app"
@@ -1227,7 +1227,7 @@ changelog = "{app_changelog}"
 [group.sdk]
 packages = ["core", "app"]
 changelog = "changelog.md"
-versioned_files = ["group.toml"]
+versioned_files = [{{ path = "group.toml", type = "cargo" }}]
 tag = true
 release = true
 version_format = "primary"

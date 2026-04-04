@@ -47,7 +47,7 @@ format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-versioned_files = ["crates/sdk_core/extra.toml"]
+versioned_files = [{ path = "crates/sdk_core/extra.toml", type = "cargo" }]
 tag = false
 release = false
 version_format = "namespaced"

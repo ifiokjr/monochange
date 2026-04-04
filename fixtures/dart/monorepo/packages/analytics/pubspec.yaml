@@ -1,0 +1,14 @@
+name: dart_analytics
+version: 1.0.0
+resolution: workspace
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  dart_core: ^1.0.0
+  dart_logging: ^1.0.0
+  dart_networking: ^1.0.0
+  dart_models: ^1.0.0
+
+dev_dependencies: {}

@@ -1000,7 +1000,7 @@ package_type = "cargo"
 
 [package.core]
 path = "crates/core"
-versioned_files = [{ path = "Cargo.lock", dependency = "missing" }]
+versioned_files = [{ path = "Cargo.lock", type = "cargo", name = "missing" }]
 "#,
 	)
 	.unwrap_or_else(|error| panic!("config write: {error}"));
@@ -1010,8 +1010,10 @@ versioned_files = [{ path = "Cargo.lock", dependency = "missing" }]
 		.unwrap_or_else(|| panic!("expected configuration error"));
 	let rendered = error.render();
 
-	assert!(rendered.contains("unknown versioned file dependency `missing`"));
-	assert!(rendered.contains("reference a declared package id from `versioned_files`"));
+	assert!(rendered.contains("unknown versioned file name `missing`"));
+	assert!(rendered.contains(
+		"reference a declared package id from `versioned_files` or remove the name entry"
+	));
 }
 
 #[test]
