@@ -357,11 +357,44 @@ pub enum VersionFormat {
 	Primary,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EcosystemType {
+	Cargo,
+	Npm,
+	Dart,
+}
+
+impl EcosystemType {
+	#[must_use]
+	pub fn default_prefix(self) -> &'static str {
+		match self {
+			Self::Cargo => "",
+			Self::Npm | Self::Dart => "^",
+		}
+	}
+
+	#[must_use]
+	pub fn default_fields(self) -> &'static [&'static str] {
+		match self {
+			Self::Cargo => &["dependencies", "dev-dependencies", "build-dependencies"],
+			Self::Npm => &["dependencies", "devDependencies", "peerDependencies"],
+			Self::Dart => &["dependencies", "dev_dependencies"],
+		}
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum VersionedFileDefinition {
-	Path(PathBuf),
-	Dependency { path: PathBuf, dependency: String },
+pub struct VersionedFileDefinition {
+	pub path: String,
+	#[serde(rename = "type")]
+	pub ecosystem_type: EcosystemType,
+	#[serde(default)]
+	pub prefix: Option<String>,
+	#[serde(default)]
+	pub fields: Option<Vec<String>>,
+	#[serde(default)]
+	pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -478,6 +511,8 @@ pub struct EcosystemSettings {
 	pub roots: Vec<String>,
 	#[serde(default)]
 	pub exclude: Vec<String>,
+	#[serde(default)]
+	pub dependency_version_prefix: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]

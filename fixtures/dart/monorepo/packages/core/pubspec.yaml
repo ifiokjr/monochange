@@ -1,0 +1,10 @@
+name: dart_core
+version: 1.0.0
+resolution: workspace
+
+environment:
+  sdk: ^3.7.0
+
+dependencies: {}
+
+dev_dependencies: {}

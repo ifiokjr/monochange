@@ -2154,7 +2154,10 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	}
 
 	let changelog_targets = resolve_changelog_targets(&configuration, &discovery.packages)?;
-	let manifest_updates = build_cargo_manifest_updates(&discovery.packages, &plan)?;
+	let cargo_updates = build_cargo_manifest_updates(&discovery.packages, &plan)?;
+	let npm_updates = build_npm_manifest_updates(&discovery.packages, &plan)?;
+	let dart_updates = build_dart_manifest_updates(&discovery.packages, &plan)?;
+	let manifest_updates = [cargo_updates, npm_updates, dart_updates].concat();
 	let versioned_file_updates =
 		build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)?;
 	let changelog_updates = build_changelog_updates(
@@ -3505,9 +3508,16 @@ fn builtin_release_sections() -> [BuiltinReleaseSection; 4] {
 }
 
 struct VersionedFileUpdateContext<'a> {
-	package_definitions_by_id: BTreeMap<&'a str, &'a monochange_core::PackageDefinition>,
 	package_by_record_id: BTreeMap<&'a str, &'a PackageRecord>,
 	released_versions_by_native_name: BTreeMap<String, String>,
+	configuration: &'a monochange_core::WorkspaceConfiguration,
+}
+
+#[derive(Debug)]
+enum CachedDocument {
+	Toml(Value),
+	Json(serde_json::Value),
+	Yaml(serde_yaml_ng::Mapping),
 }
 
 fn build_versioned_file_updates(
@@ -3521,11 +3531,6 @@ fn build_versioned_file_updates(
 	}
 	let released_versions_by_record_id = released_versions_by_record_id(plan);
 	let package_by_record_id = packages
-		.iter()
-		.map(|package| (package.id.as_str(), package))
-		.collect::<BTreeMap<_, _>>();
-	let package_definitions_by_id = configuration
-		.packages
 		.iter()
 		.map(|package| (package.id.as_str(), package))
 		.collect::<BTreeMap<_, _>>();
@@ -3549,17 +3554,33 @@ fn build_versioned_file_updates(
 		.collect::<BTreeMap<_, _>>();
 	let shared_release_version = shared_release_version(plan);
 	let context = VersionedFileUpdateContext {
-		package_definitions_by_id,
 		package_by_record_id,
 		released_versions_by_native_name,
+		configuration,
 	};
-	let mut updates = BTreeMap::<PathBuf, Value>::new();
+	let mut updates = BTreeMap::<PathBuf, CachedDocument>::new();
 
 	for package_definition in &configuration.packages {
 		let Some(version) = released_versions_by_config_id.get(&package_definition.id) else {
 			continue;
 		};
+		// Determine native name for this package
+		let dep_names = if let Some(name) = context
+			.package_by_record_id
+			.values()
+			.find(|package| package.metadata.get("config_id") == Some(&package_definition.id))
+			.map(|package| package.name.clone())
+		{
+			vec![name]
+		} else {
+			vec![package_definition.id.clone()]
+		};
 		for versioned_file in &package_definition.versioned_files {
+			let effective_dep_names = if let Some(override_name) = &versioned_file.name {
+				vec![override_name.clone()]
+			} else {
+				dep_names.clone()
+			};
 			apply_versioned_file_definition(
 				root,
 				&mut updates,
@@ -3567,6 +3588,7 @@ fn build_versioned_file_updates(
 				package_definition.id.as_str(),
 				version,
 				shared_release_version.as_ref(),
+				&effective_dep_names,
 				&context,
 			)?;
 		}
@@ -3582,6 +3604,18 @@ fn build_versioned_file_updates(
 		else {
 			continue;
 		};
+		// For groups, collect all member native names
+		let group_dep_names = group_definition
+			.packages
+			.iter()
+			.map(|member_id| {
+				context
+					.package_by_record_id
+					.values()
+					.find(|package| package.metadata.get("config_id") == Some(member_id))
+					.map_or_else(|| member_id.clone(), |package| package.name.clone())
+			})
+			.collect::<Vec<_>>();
 		for versioned_file in &group_definition.versioned_files {
 			apply_versioned_file_definition(
 				root,
@@ -3590,6 +3624,7 @@ fn build_versioned_file_updates(
 				group_definition.id.as_str(),
 				&group_version,
 				Some(&group_version),
+				&group_dep_names,
 				&context,
 			)?;
 		}
@@ -3597,127 +3632,248 @@ fn build_versioned_file_updates(
 
 	updates
 		.into_iter()
-		.map(|(path, document)| {
-			toml::to_string_pretty(&document)
-				.map(|content| FileUpdate { path, content })
-				.map_err(|error| MonochangeError::Config(error.to_string()))
-		})
+		.map(|(path, document)| serialize_cached_document(&path, document))
 		.collect()
 }
 
+fn serialize_cached_document(
+	path: &Path,
+	document: CachedDocument,
+) -> MonochangeResult<FileUpdate> {
+	let content = match document {
+		CachedDocument::Toml(value) => toml::to_string_pretty(&value)
+			.map_err(|error| MonochangeError::Config(error.to_string()))?,
+		CachedDocument::Json(value) => {
+			let mut rendered = serde_json::to_string_pretty(&value)
+				.map_err(|error| MonochangeError::Config(error.to_string()))?;
+			rendered.push('\n');
+			rendered
+		}
+		CachedDocument::Yaml(mapping) => serde_yaml_ng::to_string(&mapping)
+			.map_err(|error| MonochangeError::Config(error.to_string()))?,
+	};
+	Ok(FileUpdate {
+		path: path.to_path_buf(),
+		content,
+	})
+}
+
+fn read_cached_document(
+	updates: &mut BTreeMap<PathBuf, CachedDocument>,
+	path: &Path,
+	ecosystem_type: monochange_core::EcosystemType,
+) -> MonochangeResult<CachedDocument> {
+	if let Some(cached) = updates.remove(path) {
+		return Ok(cached);
+	}
+	let contents = fs::read_to_string(path).map_err(|error| {
+		MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
+	})?;
+	match ecosystem_type {
+		monochange_core::EcosystemType::Cargo => {
+			let value = toml::from_str::<Value>(&contents).map_err(|error| {
+				MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
+			})?;
+			Ok(CachedDocument::Toml(value))
+		}
+		monochange_core::EcosystemType::Npm => {
+			let value = serde_json::from_str::<serde_json::Value>(&contents).map_err(|error| {
+				MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
+			})?;
+			Ok(CachedDocument::Json(value))
+		}
+		monochange_core::EcosystemType::Dart => {
+			let mapping =
+				serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&contents).map_err(|error| {
+					MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
+				})?;
+			Ok(CachedDocument::Yaml(mapping))
+		}
+	}
+}
+
+fn resolve_versioned_prefix(
+	definition: &VersionedFileDefinition,
+	context: &VersionedFileUpdateContext<'_>,
+) -> String {
+	if let Some(prefix) = &definition.prefix {
+		return prefix.clone();
+	}
+	let ecosystem_prefix = match definition.ecosystem_type {
+		monochange_core::EcosystemType::Cargo => context
+			.configuration
+			.cargo
+			.dependency_version_prefix
+			.clone(),
+		monochange_core::EcosystemType::Npm => {
+			context.configuration.npm.dependency_version_prefix.clone()
+		}
+		monochange_core::EcosystemType::Dart => {
+			context.configuration.dart.dependency_version_prefix.clone()
+		}
+	};
+	ecosystem_prefix.unwrap_or_else(|| definition.ecosystem_type.default_prefix().to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
 fn apply_versioned_file_definition(
 	root: &Path,
-	updates: &mut BTreeMap<PathBuf, Value>,
+	updates: &mut BTreeMap<PathBuf, CachedDocument>,
 	definition: &VersionedFileDefinition,
-	owner_id: &str,
+	_owner_id: &str,
 	owner_version: &str,
 	shared_release_version: Option<&String>,
+	dep_names: &[String],
 	context: &VersionedFileUpdateContext<'_>,
 ) -> MonochangeResult<()> {
-	match definition {
-		VersionedFileDefinition::Path(path) => {
-			let resolved_path = resolve_config_path(root, path);
-			let mut document = if let Some(document) = updates.remove(&resolved_path) {
-				document
-			} else {
-				read_toml_document(&resolved_path)?
-			};
-			update_document_for_release_file(
-				&mut document,
-				owner_id,
-				owner_version,
-				&context.released_versions_by_native_name,
-				shared_release_version.map(String::as_str),
-			);
-			updates.insert(resolved_path, document);
-		}
-		VersionedFileDefinition::Dependency { path, dependency } => {
-			let Some(package_definition) =
-				context.package_definitions_by_id.get(dependency.as_str())
-			else {
-				return Err(MonochangeError::Config(format!(
-					"versioned file dependency `{dependency}` is not a declared package"
-				)));
-			};
-			let dependency_native_name = context
-				.package_by_record_id
-				.values()
-				.find(|package| package.metadata.get("config_id") == Some(&package_definition.id))
-				.map_or_else(|| dependency.clone(), |package| package.name.clone());
-			let Some(version) = context
+	let prefix = resolve_versioned_prefix(definition, context);
+	let fields = definition.fields.as_deref().map_or_else(
+		|| definition.ecosystem_type.default_fields().to_vec(),
+		|fields| fields.iter().map(String::as_str).collect::<Vec<_>>(),
+	);
+	let versioned_deps: BTreeMap<String, String> = dep_names
+		.iter()
+		.filter_map(|name| {
+			context
 				.released_versions_by_native_name
-				.get(&dependency_native_name)
-			else {
-				return Ok(());
-			};
-			let resolved_path = resolve_config_path(root, path);
-			let mut document = if let Some(document) = updates.remove(&resolved_path) {
-				document
-			} else {
-				read_toml_document(&resolved_path)?
-			};
-			let single_dependency = BTreeMap::from([(dependency_native_name, version.clone())]);
-			update_document_dependencies(&mut document, &single_dependency);
-			updates.insert(resolved_path, document);
-		}
+				.get(name)
+				.map(|version| (name.clone(), format!("{prefix}{version}")))
+		})
+		.collect();
+	if versioned_deps.is_empty()
+		&& !context
+			.released_versions_by_native_name
+			.values()
+			.any(|_| true)
+	{
+		return Ok(());
 	}
-	Ok(())
-}
 
-fn update_document_for_release_file(
-	document: &mut Value,
-	owner_id: &str,
-	owner_version: &str,
-	released_versions_by_native_name: &BTreeMap<String, String>,
-	shared_release_version: Option<&str>,
-) {
-	if let Some(package_table) = document.get_mut("package").and_then(Value::as_table_mut) {
-		package_table.insert(
-			"version".to_string(),
-			Value::String(owner_version.to_string()),
-		);
-		let _ = owner_id;
-	}
-	if let Some(workspace_table) = document.get_mut("workspace").and_then(Value::as_table_mut) {
-		if let Some(workspace_package_table) = workspace_table
-			.get_mut("package")
-			.and_then(Value::as_table_mut)
-		{
-			if let Some(shared_release_version) = shared_release_version {
-				workspace_package_table.insert(
-					"version".to_string(),
-					Value::String(shared_release_version.to_string()),
-				);
+	let glob_pattern = root.join(&definition.path).to_string_lossy().to_string();
+	let matched_paths = glob::glob(&glob_pattern)
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"invalid glob pattern `{}`: {error}",
+				definition.path
+			))
+		})?
+		.filter_map(Result::ok)
+		.collect::<Vec<_>>();
+
+	for resolved_path in matched_paths {
+		let mut document =
+			read_cached_document(updates, &resolved_path, definition.ecosystem_type)?;
+		match &mut document {
+			CachedDocument::Toml(value) => {
+				// Update [package].version for the owner when releasing
+				if let Some(package_table) = value.get_mut("package").and_then(Value::as_table_mut)
+				{
+					let uses_workspace_version = package_table
+						.get("version")
+						.and_then(Value::as_table)
+						.and_then(|t| t.get("workspace"))
+						.and_then(Value::as_bool)
+						== Some(true);
+					if !uses_workspace_version {
+						package_table.insert(
+							"version".to_string(),
+							Value::String(owner_version.to_string()),
+						);
+					}
+				}
+				for field in &fields {
+					if let Some(table) = value.get_mut(*field).and_then(Value::as_table_mut) {
+						for (dep_name, dep_version) in &versioned_deps {
+							if let Some(entry) = table.get_mut(dep_name) {
+								if entry.is_str() {
+									*entry = Value::String(dep_version.clone());
+								} else if let Some(entry_table) = entry.as_table_mut() {
+									let uses_workspace = entry_table
+										.get("workspace")
+										.and_then(Value::as_bool) == Some(true);
+									if !uses_workspace {
+										entry_table.insert(
+											"version".to_string(),
+											Value::String(dep_version.clone()),
+										);
+									}
+								}
+							}
+						}
+					}
+				}
+				// Also handle workspace.dependencies for cargo
+				if definition.ecosystem_type == monochange_core::EcosystemType::Cargo {
+					if let Some(workspace_table) =
+						value.get_mut("workspace").and_then(Value::as_table_mut)
+					{
+						// Update workspace.package.version
+						if let Some(workspace_package) = workspace_table
+							.get_mut("package")
+							.and_then(Value::as_table_mut)
+						{
+							if let Some(shared) = shared_release_version {
+								workspace_package
+									.insert("version".to_string(), Value::String(shared.clone()));
+							}
+						}
+						// Update workspace.dependencies
+						if let Some(workspace_deps) = workspace_table
+							.get_mut("dependencies")
+							.and_then(Value::as_table_mut)
+						{
+							for (dep_name, dep_version) in &versioned_deps {
+								if let Some(entry) = workspace_deps.get_mut(dep_name) {
+									if let Some(entry_table) = entry.as_table_mut() {
+										entry_table.insert(
+											"version".to_string(),
+											Value::String(dep_version.clone()),
+										);
+									} else {
+										*entry = Value::String(dep_version.clone());
+									}
+								}
+							}
+						}
+					}
+				}
 			}
-		}
-	}
-	update_document_dependencies(document, released_versions_by_native_name);
-}
-
-fn update_document_dependencies(
-	document: &mut Value,
-	released_versions_by_native_name: &BTreeMap<String, String>,
-) {
-	for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
-		update_dependency_table(document, section, released_versions_by_native_name);
-	}
-	if let Some(workspace_table) = document.get_mut("workspace").and_then(Value::as_table_mut) {
-		if let Some(workspace_dependency_table) = workspace_table
-			.get_mut("dependencies")
-			.and_then(Value::as_table_mut)
-		{
-			for (package_name, version) in released_versions_by_native_name {
-				let Some(entry) = workspace_dependency_table.get_mut(package_name) else {
-					continue;
-				};
-				if let Some(entry_table) = entry.as_table_mut() {
-					entry_table.insert("version".to_string(), Value::String(version.clone()));
-				} else {
-					*entry = Value::String(version.clone());
+			CachedDocument::Json(value) => {
+				for field in &fields {
+					if let Some(section) = value
+						.get_mut(*field)
+						.and_then(serde_json::Value::as_object_mut)
+					{
+						for (dep_name, dep_version) in &versioned_deps {
+							if section.contains_key(dep_name) {
+								section.insert(
+									dep_name.clone(),
+									serde_json::Value::String(dep_version.clone()),
+								);
+							}
+						}
+					}
+				}
+			}
+			CachedDocument::Yaml(mapping) => {
+				for field in &fields {
+					if let Some(serde_yaml_ng::Value::Mapping(section)) =
+						mapping.get_mut(serde_yaml_ng::Value::String(field.to_string()))
+					{
+						for (dep_name, dep_version) in &versioned_deps {
+							let key = serde_yaml_ng::Value::String(dep_name.clone());
+							if section.contains_key(&key) {
+								section
+									.insert(key, serde_yaml_ng::Value::String(dep_version.clone()));
+							}
+						}
+					}
 				}
 			}
 		}
+		updates.insert(resolved_path, document);
 	}
+	Ok(())
 }
 
 fn released_versions_by_record_id(plan: &ReleasePlan) -> BTreeMap<String, String> {
@@ -3917,6 +4073,87 @@ fn build_cargo_manifest_updates(
 				.map_err(|error| MonochangeError::Config(error.to_string()))
 		})
 		.collect()
+}
+
+fn build_npm_manifest_updates(
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let released_versions = released_versions_by_record_id(plan);
+	let mut updates = Vec::new();
+	for package in packages
+		.iter()
+		.filter(|package| package.ecosystem == Ecosystem::Npm)
+	{
+		let Some(version) = released_versions.get(&package.id) else {
+			continue;
+		};
+		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
+		let mut parsed = serde_json::from_str::<serde_json::Value>(&contents).map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to parse {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
+		if let Some(obj) = parsed.as_object_mut() {
+			obj.insert(
+				"version".to_string(),
+				serde_json::Value::String(version.clone()),
+			);
+		}
+		let mut rendered = serde_json::to_string_pretty(&parsed)
+			.map_err(|error| MonochangeError::Config(error.to_string()))?;
+		rendered.push('\n');
+		updates.push(FileUpdate {
+			path: package.manifest_path.clone(),
+			content: rendered,
+		});
+	}
+	Ok(updates)
+}
+
+fn build_dart_manifest_updates(
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let released_versions = released_versions_by_record_id(plan);
+	let mut updates = Vec::new();
+	for package in packages.iter().filter(|package| {
+		package.ecosystem == Ecosystem::Dart || package.ecosystem == Ecosystem::Flutter
+	}) {
+		let Some(version) = released_versions.get(&package.id) else {
+			continue;
+		};
+		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
+		let mut mapping =
+			serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&contents).map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+		mapping.insert(
+			serde_yaml_ng::Value::String("version".to_string()),
+			serde_yaml_ng::Value::String(version.clone()),
+		);
+		let rendered = serde_yaml_ng::to_string(&mapping)
+			.map_err(|error| MonochangeError::Config(error.to_string()))?;
+		updates.push(FileUpdate {
+			path: package.manifest_path.clone(),
+			content: rendered,
+		});
+	}
+	Ok(updates)
 }
 
 fn read_toml_document(path: &Path) -> MonochangeResult<Value> {

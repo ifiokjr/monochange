@@ -1,0 +1,14 @@
+name: dart_monorepo_workspace
+publish_to: none
+
+workspace:
+  - packages/core
+  - packages/utils
+  - packages/logging
+  - packages/auth
+  - packages/networking
+  - packages/models
+  - packages/storage
+  - packages/ui_kit
+  - packages/analytics
+  - packages/app

@@ -1,0 +1,37 @@
+[defaults]
+parent_bump = "patch"
+package_type = "dart"
+
+[package.dart_core]
+path = "packages/core"
+
+[package.dart_utils]
+path = "packages/utils"
+
+[package.dart_logging]
+path = "packages/logging"
+
+[package.dart_models]
+path = "packages/models"
+
+[package.dart_auth]
+path = "packages/auth"
+
+[package.dart_networking]
+path = "packages/networking"
+
+[package.dart_storage]
+path = "packages/storage"
+
+[package.dart_ui_kit]
+path = "packages/ui_kit"
+
+[package.dart_analytics]
+path = "packages/analytics"
+
+[package.dart_app]
+path = "packages/app"
+
+[ecosystems.dart]
+enabled = true
+roots = ["packages/*"]

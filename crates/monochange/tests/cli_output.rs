@@ -1036,7 +1036,7 @@ changelog = false
 [group.sdk]
 packages = ["core", "app"]
 changelog = "changelog.md"
-versioned_files = ["group.toml"]
+versioned_files = [{ path = "group.toml", type = "cargo" }]
 tag = true
 release = true
 version_format = "primary"
@@ -1088,7 +1088,7 @@ changelog = false
 [group.sdk]
 packages = ["core", "app"]
 changelog = "changelog.md"
-versioned_files = ["group.toml"]
+versioned_files = [{ path = "group.toml", type = "cargo" }]
 tag = true
 release = true
 version_format = "primary"
@@ -1199,7 +1199,7 @@ changelog = false
 [group.sdk]
 packages = ["core", "app"]
 changelog = "changelog.md"
-versioned_files = ["group.toml"]
+versioned_files = [{ path = "group.toml", type = "cargo" }]
 tag = true
 release = true
 version_format = "primary"

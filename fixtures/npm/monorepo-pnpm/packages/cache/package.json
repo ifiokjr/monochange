@@ -1,0 +1,9 @@
+{
+  "name": "@monorepo/cache",
+  "version": "1.0.0",
+  "dependencies": {
+    "@monorepo/core": "^1.0.0",
+    "@monorepo/logger": "^1.0.0",
+    "@monorepo/models": "^1.0.0"
+  }
+}

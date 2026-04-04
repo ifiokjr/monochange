@@ -1,0 +1,9 @@
+{
+  "name": "@monorepo/http-client",
+  "version": "1.0.0",
+  "dependencies": {
+    "@monorepo/core": "^1.0.0",
+    "@monorepo/logger": "^1.0.0",
+    "@monorepo/config": "^1.0.0"
+  }
+}

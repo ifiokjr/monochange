@@ -1637,21 +1637,21 @@ fn validate_versioned_files(
 	owner_id: &str,
 ) -> MonochangeResult<()> {
 	for versioned_file in versioned_files {
-		if let VersionedFileDefinition::Dependency { dependency, .. } = versioned_file {
-			if !declared_packages.contains(dependency.as_str()) {
+		if let Some(name) = &versioned_file.name {
+			if !declared_packages.contains(name.as_str()) {
 				return Err(config_diagnostic(
 					config_contents,
 					format!(
-						"{owner_id} references unknown versioned file dependency `{dependency}`"
+						"{owner_id} references unknown versioned file name `{name}`"
 					),
 					vec![config_dependency_label(
 						config_contents,
 						owner_kind,
 						owner_id,
-						dependency,
-						"unknown versioned file dependency",
+						name,
+						"unknown versioned file name",
 					)],
-					Some("reference a declared package id from `versioned_files` or remove the dependency entry".to_string()),
+					Some("reference a declared package id from `versioned_files` or remove the name entry".to_string()),
 				));
 			}
 		}
