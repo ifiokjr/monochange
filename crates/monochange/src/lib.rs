@@ -955,15 +955,19 @@ fn execute_cli_command(
 							.to_string(),
 					)
 				})?;
-				let github = load_workspace_configuration(root)?.github.ok_or_else(|| {
-					MonochangeError::Config(
-						"`CommentReleasedIssues` requires `[github]` configuration".to_string(),
-					)
-				})?;
+				let source = load_workspace_configuration(root)?
+					.source
+					.filter(|source| source.provider == SourceProvider::GitHub)
+					.ok_or_else(|| {
+						MonochangeError::Config(
+							"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
+								.to_string(),
+						)
+					})?;
 				let manifest =
 					build_release_manifest(cli_command, prepared_release, &context.command_logs);
 				context.issue_comment_plans =
-					github_provider::plan_released_issue_comments(&github, &manifest);
+					github_provider::plan_released_issue_comments(&source, &manifest);
 				if context.dry_run {
 					context.issue_comment_results = context
 						.issue_comment_plans
@@ -972,7 +976,7 @@ fn execute_cli_command(
 						.collect();
 				} else {
 					context.issue_comment_results =
-						github_provider::comment_released_issues(&github, &manifest)?
+						github_provider::comment_released_issues(&source, &manifest)?
 							.into_iter()
 							.map(|result| {
 								format!(
@@ -2096,8 +2100,12 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		.flat_map(|changeset| changeset.signals.clone())
 		.collect::<Vec<_>>();
 	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
-	if let Some(github) = configuration.github.as_ref() {
-		github_provider::enrich_changeset_context(github, &mut changesets);
+	if let Some(source) = configuration
+		.source
+		.as_ref()
+		.filter(|source| source.provider == SourceProvider::GitHub)
+	{
+		github_provider::enrich_changeset_context(source, &mut changesets);
 	}
 	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals)?;
 	let released_packages = released_package_names(&discovery.packages, &plan);

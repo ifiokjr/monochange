@@ -95,7 +95,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use monochange_core::GitHubConfiguration;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedIssueRef;
@@ -339,40 +338,40 @@ pub fn github_host() -> Option<String> {
 }
 
 #[must_use]
-pub fn github_commit_url(github: &GitHubConfiguration, sha: &str) -> String {
+pub fn github_commit_url(source: &SourceConfiguration, sha: &str) -> String {
 	format!(
 		"{}/{}/{}/commit/{}",
 		github_web_base_url().trim_end_matches('/'),
-		github.owner,
-		github.repo,
+		source.owner,
+		source.repo,
 		sha
 	)
 }
 
 #[must_use]
-pub fn github_pull_request_url(github: &GitHubConfiguration, number: u64) -> String {
+pub fn github_pull_request_url(source: &SourceConfiguration, number: u64) -> String {
 	format!(
 		"{}/{}/{}/pull/{}",
 		github_web_base_url().trim_end_matches('/'),
-		github.owner,
-		github.repo,
+		source.owner,
+		source.repo,
 		number
 	)
 }
 
 #[must_use]
-pub fn github_issue_url(github: &GitHubConfiguration, number: u64) -> String {
+pub fn github_issue_url(source: &SourceConfiguration, number: u64) -> String {
 	format!(
 		"{}/{}/{}/issues/{}",
 		github_web_base_url().trim_end_matches('/'),
-		github.owner,
-		github.repo,
+		source.owner,
+		source.repo,
 		number
 	)
 }
 
 pub fn enrich_changeset_context(
-	github: &GitHubConfiguration,
+	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
 ) {
 	let host = github_host();
@@ -391,7 +390,7 @@ pub fn enrich_changeset_context(
 			if let Some(commit) = revision.commit.as_mut() {
 				commit.provider = HostingProviderKind::GitHub;
 				commit.host.clone_from(&host);
-				commit.url = Some(github_commit_url(github, &commit.sha));
+				commit.url = Some(github_commit_url(source, &commit.sha));
 			}
 			if let Some(actor) = revision.actor.as_mut() {
 				actor.provider = HostingProviderKind::GitHub;
@@ -411,13 +410,13 @@ pub fn enrich_changeset_context(
 		let Ok(client) = build_github_client(&token, api_base_url.as_deref()) else {
 			return;
 		};
-		enrich_changeset_context_with_client(&client, github, changesets).await;
+		enrich_changeset_context_with_client(&client, source, changesets).await;
 	});
 }
 
 #[must_use]
 pub fn build_release_requests(
-	github: &SourceConfiguration,
+	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> Vec<GitHubReleaseRequest> {
 	manifest
@@ -426,49 +425,49 @@ pub fn build_release_requests(
 		.filter(|target| target.release)
 		.map(|target| GitHubReleaseRequest {
 			provider: SourceProvider::GitHub,
-			repository: format!("{}/{}", github.owner, github.repo),
-			owner: github.owner.clone(),
-			repo: github.repo.clone(),
+			repository: format!("{}/{}", source.owner, source.repo),
+			owner: source.owner.clone(),
+			repo: source.repo.clone(),
 			target_id: target.id.clone(),
 			target_kind: target.kind,
 			tag_name: target.tag_name.clone(),
 			name: release_name(target),
-			body: release_body(github, manifest, target),
-			draft: github.releases.draft,
-			prerelease: github.releases.prerelease,
-			generate_release_notes: github.releases.generate_notes,
+			body: release_body(source, manifest, target),
+			draft: source.releases.draft,
+			prerelease: source.releases.prerelease,
+			generate_release_notes: source.releases.generate_notes,
 		})
 		.collect()
 }
 
 #[must_use]
 pub fn build_release_pull_request_request(
-	github: &SourceConfiguration,
+	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> GitHubPullRequestRequest {
-	let repository = format!("{}/{}", github.owner, github.repo);
-	let title = github.pull_requests.title.clone();
+	let repository = format!("{}/{}", source.owner, source.repo);
+	let title = source.pull_requests.title.clone();
 	GitHubPullRequestRequest {
 		provider: SourceProvider::GitHub,
 		repository: repository.clone(),
-		owner: github.owner.clone(),
-		repo: github.repo.clone(),
-		base_branch: github.pull_requests.base.clone(),
+		owner: source.owner.clone(),
+		repo: source.repo.clone(),
+		base_branch: source.pull_requests.base.clone(),
 		head_branch: release_pull_request_branch(
-			&github.pull_requests.branch_prefix,
+			&source.pull_requests.branch_prefix,
 			&manifest.command,
 		),
 		title: title.clone(),
 		body: release_pull_request_body(manifest),
-		labels: github.pull_requests.labels.clone(),
-		auto_merge: github.pull_requests.auto_merge,
+		labels: source.pull_requests.labels.clone(),
+		auto_merge: source.pull_requests.auto_merge,
 		commit_message: title,
 	}
 }
 
 async fn enrich_changeset_context_with_client(
 	client: &Octocrab,
-	github: &GitHubConfiguration,
+	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
 ) {
 	let host = github_host();
@@ -487,7 +486,7 @@ async fn enrich_changeset_context_with_client(
 			if let Some(commit) = revision.commit.as_mut() {
 				commit.provider = HostingProviderKind::GitHub;
 				commit.host.clone_from(&host);
-				commit.url = Some(github_commit_url(github, &commit.sha));
+				commit.url = Some(github_commit_url(source, &commit.sha));
 			}
 			if let Some(actor) = revision.actor.as_mut() {
 				actor.provider = HostingProviderKind::GitHub;
@@ -515,7 +514,7 @@ async fn enrich_changeset_context_with_client(
 			{
 				cached.clone()
 			} else {
-				let loaded = lookup_commit_review_request_with_client(client, github, &commit_sha)
+				let loaded = lookup_commit_review_request_with_client(client, source, &commit_sha)
 					.await
 					.ok()
 					.flatten();
@@ -542,12 +541,12 @@ async fn enrich_changeset_context_with_client(
 
 async fn lookup_commit_review_request_with_client(
 	client: &Octocrab,
-	github: &GitHubConfiguration,
+	source: &SourceConfiguration,
 	sha: &str,
 ) -> MonochangeResult<Option<GitHubRelatedReviewRequest>> {
 	let path = format!(
 		"/repos/{}/{}/commits/{}/pulls",
-		github.owner, github.repo, sha
+		source.owner, source.repo, sha
 	);
 	let pull_requests = get_json::<Vec<GitHubCommitPullRequestResponse>>(client, &path).await?;
 	let Some(pull_request) = pull_requests.into_iter().next() else {
@@ -570,12 +569,12 @@ async fn lookup_commit_review_request_with_client(
 		title: Some(pull_request.title),
 		url: pull_request
 			.html_url
-			.or_else(|| Some(github_pull_request_url(github, pull_request.number))),
+			.or_else(|| Some(github_pull_request_url(source, pull_request.number))),
 		author,
 	};
 	let issues = load_pull_request_issues_with_client(
 		client,
-		github,
+		source,
 		pull_request.number,
 		pull_request.body.as_deref(),
 	)
@@ -589,15 +588,15 @@ async fn lookup_commit_review_request_with_client(
 
 async fn load_pull_request_issues_with_client(
 	client: &Octocrab,
-	github: &GitHubConfiguration,
+	source: &SourceConfiguration,
 	number: u64,
 	body: Option<&str>,
 ) -> MonochangeResult<Vec<HostedIssueRef>> {
 	let response = client
 		.graphql::<GraphqlPullRequestIssuesResponse>(&json!({
 			"query": "query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { closingIssuesReferences(first: 50) { nodes { number title url } } } } }",
-			"owner": github.owner,
-			"repo": github.repo,
+			"owner": source.owner,
+			"repo": source.repo,
 			"number": number,
 		}))
 		.await
@@ -633,7 +632,7 @@ async fn load_pull_request_issues_with_client(
 				host: github_host(),
 				id: format!("#{issue_number}"),
 				title: None,
-				url: Some(github_issue_url(github, issue_number)),
+				url: Some(github_issue_url(source, issue_number)),
 				relationship: HostedIssueRelationshipKind::ReferencedByReviewRequest,
 			});
 	}
@@ -668,7 +667,7 @@ fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
 
 #[must_use]
 pub fn plan_released_issue_comments(
-	github: &GitHubConfiguration,
+	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> Vec<GitHubIssueCommentPlan> {
 	let release_tags = manifest
@@ -693,7 +692,7 @@ pub fn plan_released_issue_comments(
 		plans_by_issue
 			.entry(issue.id.clone())
 			.or_insert_with(|| GitHubIssueCommentPlan {
-				repository: format!("{}/{}", github.owner, github.repo),
+				repository: format!("{}/{}", source.owner, source.repo),
 				issue_id: issue.id.clone(),
 				issue_url: issue.url.clone(),
 				body: body.clone(),
@@ -703,25 +702,24 @@ pub fn plan_released_issue_comments(
 }
 
 pub fn comment_released_issues(
-	github: &GitHubConfiguration,
+	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<Vec<GitHubIssueCommentOutcome>> {
-	let plans = plan_released_issue_comments(github, manifest);
+	let plans = plan_released_issue_comments(source, manifest);
 	if plans.is_empty() {
 		return Ok(Vec::new());
 	}
-	let source = github_source_configuration(github);
 	let runtime = github_runtime()?;
 	runtime.block_on(async {
-		let client = github_client_from_env(&source)?;
-		let outcome = comment_released_issues_with_client(&client, github, &plans).await;
+		let client = github_client_from_env(source)?;
+		let outcome = comment_released_issues_with_client(&client, source, &plans).await;
 		outcome
 	})
 }
 
 async fn comment_released_issues_with_client(
 	client: &Octocrab,
-	github: &GitHubConfiguration,
+	source: &SourceConfiguration,
 	plans: &[GitHubIssueCommentPlan],
 ) -> MonochangeResult<Vec<GitHubIssueCommentOutcome>> {
 	let mut outcomes = Vec::with_capacity(plans.len());
@@ -738,7 +736,7 @@ async fn comment_released_issues_with_client(
 			})?;
 		let path = format!(
 			"/repos/{}/{}/issues/{}/comments",
-			github.owner, github.repo, issue_number
+			source.owner, source.repo, issue_number
 		);
 		let existing_comments = get_json::<Vec<GitHubIssueCommentResponse>>(client, &path).await?;
 		if existing_comments.iter().any(|comment| {
@@ -1000,19 +998,6 @@ fn github_runtime() -> MonochangeResult<tokio::runtime::Runtime> {
 		.enable_all()
 		.build()
 		.map_err(|error| MonochangeError::Io(format!("failed to build GitHub runtime: {error}")))
-}
-
-fn github_source_configuration(github: &GitHubConfiguration) -> SourceConfiguration {
-	SourceConfiguration {
-		provider: SourceProvider::GitHub,
-		owner: github.owner.clone(),
-		repo: github.repo.clone(),
-		host: None,
-		api_url: None,
-		releases: github.releases.clone(),
-		pull_requests: github.pull_requests.clone(),
-		bot: github.bot.clone(),
-	}
 }
 
 fn github_client_from_env(source: &SourceConfiguration) -> MonochangeResult<Octocrab> {
