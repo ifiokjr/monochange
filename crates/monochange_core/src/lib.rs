@@ -1363,7 +1363,6 @@ pub struct WorkspaceConfiguration {
 	pub groups: Vec<GroupDefinition>,
 	pub cli: Vec<CliCommandDefinition>,
 	pub changesets: ChangesetSettings,
-	pub github: Option<GitHubConfiguration>,
 	pub source: Option<SourceConfiguration>,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,

@@ -393,7 +393,6 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		}],
 		cli: Vec::new(),
 		changesets: crate::ChangesetSettings::default(),
-		github: None,
 		source: None,
 		cargo: EcosystemSettings::default(),
 		npm: EcosystemSettings::default(),
