@@ -34,7 +34,10 @@ knope uses a bare `[package]` table for single-package repos:
 ```toml
 # knope.toml
 [package]
-versioned_files = ["Cargo.toml", "Cargo.lock"]
+versioned_files = [
+	{ path = "Cargo.toml", type = "cargo" },
+	{ path = "Cargo.lock", type = "cargo" },
+]
 changelog = "changelog.md"
 scopes = ["core", "cli"]
 extra_changelog_sections = [
@@ -56,7 +59,7 @@ format = "keep_a_changelog"
 
 [package.my-crate]
 path = "."
-versioned_files = ["Cargo.lock"]
+versioned_files = [{ path = "Cargo.lock", type = "cargo" }]
 extra_changelog_sections = [
 	{ name = "Notes", types = ["note"] },
 	{ name = "Documentation", types = ["docs"] },
@@ -107,7 +110,7 @@ versioned_files = [
 [package.sdk_cli]
 path = "crates/sdk_cli"
 versioned_files = [
-	"Cargo.lock",
+	{ path = "Cargo.lock", type = "cargo" },
 ]
 ```
 
