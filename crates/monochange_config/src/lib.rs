@@ -995,7 +995,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			},
 		},
 	});
-	let github = if let Some(source) = &source {
+	let legacy_github = if let Some(source) = &source {
 		(source.provider == SourceProvider::GitHub).then(|| GitHubConfiguration {
 			owner: source.owner.clone(),
 			repo: source.repo.clone(),
@@ -1035,7 +1035,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		})
 	};
 	let source = source.or_else(|| {
-		github.as_ref().map(|github| SourceConfiguration {
+		legacy_github.as_ref().map(|github| SourceConfiguration {
 			provider: SourceProvider::GitHub,
 			owner: github.owner.clone(),
 			repo: github.repo.clone(),
@@ -1050,7 +1050,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	validate_cli(&cli)?;
 	validate_release_notes_configuration(&contents, &release_notes, &packages, &groups)?;
 	validate_changesets_configuration(&changesets, &packages)?;
-	validate_github_configuration(github.as_ref())?;
+	validate_github_configuration(legacy_github.as_ref())?;
 	validate_source_configuration(source.as_ref())?;
 	for (ecosystem_id, versioned_files) in [
 		("cargo", &cargo_ecosystem.versioned_files),
@@ -1093,7 +1093,6 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		groups,
 		cli,
 		changesets,
-		github,
 		source,
 		cargo: cargo_ecosystem,
 		npm: npm_ecosystem,
