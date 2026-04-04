@@ -31,6 +31,7 @@ use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleaseProviderSettings;
+use monochange_core::SourceCapabilities;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
@@ -94,6 +95,44 @@ fn build_release_requests_can_defer_to_github_generated_notes() {
 		.unwrap_or_else(|| panic!("expected request"));
 	assert_eq!(request.body, None);
 	assert!(request.generate_release_notes);
+}
+
+#[test]
+fn github_source_capabilities_cover_github_automation_features() {
+	assert_eq!(
+		source_capabilities(),
+		SourceCapabilities {
+			draft_releases: true,
+			prereleases: true,
+			generated_release_notes: true,
+			auto_merge_change_requests: true,
+			released_issue_comments: true,
+			requires_host: false,
+		}
+	);
+}
+
+#[test]
+fn validate_source_configuration_rejects_conflicting_release_note_modes() {
+	let error = validate_source_configuration(&SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings {
+			generate_notes: true,
+			source: GitHubReleaseNotesSource::Monochange,
+			..ReleaseProviderSettings::default()
+		},
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	})
+	.err()
+	.unwrap_or_else(|| panic!("expected validation error"));
+	assert!(error
+		.to_string()
+		.contains("[source.releases].generate_notes cannot be true"));
 }
 
 #[test]

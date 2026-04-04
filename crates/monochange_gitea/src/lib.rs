@@ -12,6 +12,7 @@ use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOperation;
 use monochange_core::SourceChangeRequestOutcome;
@@ -29,6 +30,41 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
 use urlencoding::encode;
+
+#[must_use]
+pub const fn source_capabilities() -> SourceCapabilities {
+	SourceCapabilities {
+		draft_releases: true,
+		prereleases: true,
+		generated_release_notes: false,
+		auto_merge_change_requests: false,
+		released_issue_comments: false,
+		requires_host: true,
+	}
+}
+
+pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
+	if source.host.as_deref().is_none_or(str::is_empty) {
+		return Err(MonochangeError::Config(
+			"[source].host must be set for `provider = \"gitea\"`".to_string(),
+		));
+	}
+	if source.releases.generate_notes
+		|| matches!(source.releases.source, ReleaseNotesSource::GitHubGenerated)
+	{
+		return Err(MonochangeError::Config(
+			"provider-generated release notes are not supported for `provider = \"gitea\"`; use `source = \"monochange\"`"
+				.to_string(),
+		));
+	}
+	if source.pull_requests.auto_merge {
+		return Err(MonochangeError::Config(
+			"[source.pull_requests].auto_merge is not supported for `provider = \"gitea\"`"
+				.to_string(),
+		));
+	}
+	Ok(())
+}
 
 #[derive(Debug, Serialize)]
 struct GiteaReleasePayload<'a> {

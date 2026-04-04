@@ -3,9 +3,13 @@ use std::path::PathBuf;
 
 use monochange_core::materialize_dependency_edges;
 use monochange_core::ChangeSignal;
+use monochange_core::Ecosystem;
+use monochange_core::PackageRecord;
+use monochange_core::PublishState;
 use monochange_semver::CompatibilityProvider;
 
 use crate::discover_cargo_packages;
+use crate::validate_workspace_version_groups;
 use crate::RustSemverProvider;
 
 #[test]
@@ -84,6 +88,79 @@ fn cargo_workspace_members_mark_uses_workspace_version_metadata() {
 			.map(String::as_str),
 		None
 	);
+}
+
+#[test]
+fn validate_workspace_version_groups_rejects_mismatched_workspace_version_groups() {
+	let workspace_root = PathBuf::from("/tmp/workspace");
+	let mut core = PackageRecord::new(
+		Ecosystem::Cargo,
+		"workspace-core",
+		workspace_root.join("crates/core/Cargo.toml"),
+		workspace_root.clone(),
+		None,
+		PublishState::Public,
+	);
+	core.metadata
+		.insert("config_id".to_string(), "core".to_string());
+	core.metadata
+		.insert("uses_workspace_version".to_string(), "true".to_string());
+	core.version_group_id = Some("sdk".to_string());
+
+	let mut app = PackageRecord::new(
+		Ecosystem::Cargo,
+		"workspace-app",
+		workspace_root.join("crates/app/Cargo.toml"),
+		workspace_root,
+		None,
+		PublishState::Public,
+	);
+	app.metadata
+		.insert("config_id".to_string(), "app".to_string());
+	app.metadata
+		.insert("uses_workspace_version".to_string(), "true".to_string());
+
+	let error = validate_workspace_version_groups(&[core, app])
+		.err()
+		.unwrap_or_else(|| panic!("expected validation error"));
+	assert!(error.to_string().contains(
+		"cargo packages using `version.workspace = true` must belong to the same version group"
+	));
+}
+
+#[test]
+fn validate_workspace_version_groups_accepts_matching_workspace_version_groups() {
+	let workspace_root = PathBuf::from("/tmp/workspace");
+	let mut core = PackageRecord::new(
+		Ecosystem::Cargo,
+		"workspace-core",
+		workspace_root.join("crates/core/Cargo.toml"),
+		workspace_root.clone(),
+		None,
+		PublishState::Public,
+	);
+	core.metadata
+		.insert("config_id".to_string(), "core".to_string());
+	core.metadata
+		.insert("uses_workspace_version".to_string(), "true".to_string());
+	core.version_group_id = Some("sdk".to_string());
+
+	let mut app = PackageRecord::new(
+		Ecosystem::Cargo,
+		"workspace-app",
+		workspace_root.join("crates/app/Cargo.toml"),
+		workspace_root,
+		None,
+		PublishState::Public,
+	);
+	app.metadata
+		.insert("config_id".to_string(), "app".to_string());
+	app.metadata
+		.insert("uses_workspace_version".to_string(), "true".to_string());
+	app.version_group_id = Some("sdk".to_string());
+
+	validate_workspace_version_groups(&[core, app])
+		.unwrap_or_else(|error| panic!("validation: {error}"));
 }
 
 #[test]
