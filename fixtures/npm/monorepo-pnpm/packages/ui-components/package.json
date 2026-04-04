@@ -1,0 +1,9 @@
+{
+  "name": "@monorepo/ui-components",
+  "version": "1.0.0",
+  "dependencies": {
+    "@monorepo/core": "^1.0.0",
+    "@monorepo/models": "^1.0.0",
+    "@monorepo/utils": "^1.0.0"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@monorepo/config",
+  "version": "1.0.0",
+  "dependencies": {
+    "@monorepo/core": "^1.0.0",
+    "@monorepo/utils": "^1.0.0"
+  }
+}

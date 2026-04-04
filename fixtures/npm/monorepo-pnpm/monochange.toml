@@ -1,0 +1,37 @@
+[defaults]
+parent_bump = "patch"
+package_type = "npm"
+
+[package."@monorepo/core"]
+path = "packages/core"
+
+[package."@monorepo/utils"]
+path = "packages/utils"
+
+[package."@monorepo/logger"]
+path = "packages/logger"
+
+[package."@monorepo/config"]
+path = "packages/config"
+
+[package."@monorepo/models"]
+path = "packages/models"
+
+[package."@monorepo/http-client"]
+path = "packages/http-client"
+
+[package."@monorepo/cache"]
+path = "packages/cache"
+
+[package."@monorepo/ui-components"]
+path = "packages/ui-components"
+
+[package."@monorepo/telemetry"]
+path = "packages/telemetry"
+
+[package."@monorepo/app"]
+path = "packages/app"
+
+[ecosystems.npm]
+enabled = true
+roots = ["packages/*"]
