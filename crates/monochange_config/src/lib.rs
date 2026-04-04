@@ -1795,6 +1795,14 @@ fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -
 	}
 }
 
+fn source_capabilities(provider: SourceProvider) -> monochange_core::SourceCapabilities {
+	match provider {
+		SourceProvider::GitHub => monochange_github::source_capabilities(),
+		SourceProvider::GitLab => monochange_gitlab::source_capabilities(),
+		SourceProvider::Gitea => monochange_gitea::source_capabilities(),
+	}
+}
+
 fn validate_versioned_files(
 	root: &Path,
 	config_contents: &str,
@@ -2027,14 +2035,6 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 			"[github].repo must not be empty".to_string(),
 		));
 	}
-	if github.releases.generate_notes
-		&& matches!(github.releases.source, GitHubReleaseNotesSource::Monochange)
-	{
-		return Err(MonochangeError::Config(
-			"[github.releases].generate_notes cannot be true when `source = \"monochange\"`; choose one release-note source"
-				.to_string(),
-		));
-	}
 	if github.pull_requests.branch_prefix.trim().is_empty() {
 		return Err(MonochangeError::Config(
 			"[github.pull_requests].branch_prefix must not be empty".to_string(),
@@ -2094,7 +2094,17 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 			})?;
 		}
 	}
-	Ok(())
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		owner: github.owner.clone(),
+		repo: github.repo.clone(),
+		host: None,
+		api_url: None,
+		releases: github.releases.clone(),
+		pull_requests: github.pull_requests.clone(),
+		bot: github.bot.clone(),
+	};
+	monochange_github::validate_source_configuration(&source)
 }
 
 fn validate_source_configuration(source: Option<&SourceConfiguration>) -> MonochangeResult<()> {
@@ -2112,68 +2122,9 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 		));
 	}
 	match source.provider {
-		SourceProvider::GitHub => validate_github_configuration(Some(&GitHubConfiguration {
-			owner: source.owner.clone(),
-			repo: source.repo.clone(),
-			releases: source.releases.clone(),
-			pull_requests: source.pull_requests.clone(),
-			bot: source.bot.clone(),
-		})),
-		SourceProvider::GitLab => {
-			if source.releases.draft {
-				return Err(MonochangeError::Config(
-					"[source.releases].draft is not supported for `provider = \"gitlab\"`"
-						.to_string(),
-				));
-			}
-			if source.releases.prerelease {
-				return Err(MonochangeError::Config(
-					"[source.releases].prerelease is not supported for `provider = \"gitlab\"`"
-						.to_string(),
-				));
-			}
-			if source.releases.generate_notes
-				|| matches!(
-					source.releases.source,
-					GitHubReleaseNotesSource::GitHubGenerated
-				) {
-				return Err(MonochangeError::Config(
-					"provider-generated release notes are not supported for `provider = \"gitlab\"`; use `source = \"monochange\"`"
-						.to_string(),
-				));
-			}
-			if source.pull_requests.auto_merge {
-				return Err(MonochangeError::Config(
-					"[source.pull_requests].auto_merge is not supported for `provider = \"gitlab\"`"
-						.to_string(),
-				));
-			}
-			Ok(())
-		}
-		SourceProvider::Gitea => {
-			if source.host.as_deref().is_none_or(str::is_empty) {
-				return Err(MonochangeError::Config(
-					"[source].host must be set for `provider = \"gitea\"`".to_string(),
-				));
-			}
-			if source.releases.generate_notes
-				|| matches!(
-					source.releases.source,
-					GitHubReleaseNotesSource::GitHubGenerated
-				) {
-				return Err(MonochangeError::Config(
-					"provider-generated release notes are not supported for `provider = \"gitea\"`; use `source = \"monochange\"`"
-						.to_string(),
-				));
-			}
-			if source.pull_requests.auto_merge {
-				return Err(MonochangeError::Config(
-					"[source.pull_requests].auto_merge is not supported for `provider = \"gitea\"`"
-						.to_string(),
-				));
-			}
-			Ok(())
-		}
+		SourceProvider::GitHub => monochange_github::validate_source_configuration(source),
+		SourceProvider::GitLab => monochange_gitlab::validate_source_configuration(source),
+		SourceProvider::Gitea => monochange_gitea::validate_source_configuration(source),
 	}
 }
 
@@ -2372,10 +2323,11 @@ fn validate_cli_runtime_requirements(
 					cli_command.name
 				))
 			})?;
-			if source.provider != SourceProvider::GitHub {
+			if !source_capabilities(source.provider).released_issue_comments {
 				return Err(MonochangeError::Config(format!(
-					"CLI command `{}` uses `CommentReleasedIssues` but `[source].provider` must be `github`",
-					cli_command.name
+					"CLI command `{}` uses `CommentReleasedIssues` but `[source].provider = \"{}\"` does not support released-issue comments",
+					cli_command.name,
+					source.provider
 				)));
 			}
 		}

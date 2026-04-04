@@ -1873,6 +1873,110 @@ type = "OpenReleaseRequest"
 }
 
 #[test]
+fn load_workspace_configuration_rejects_comment_released_issues_for_unsupported_provider() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[source]
+provider = "gitlab"
+owner = "group"
+repo = "monochange"
+
+[cli.comment]
+
+[[cli.comment.steps]]
+type = "PrepareRelease"
+
+[[cli.comment.steps]]
+type = "CommentReleasedIssues"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected provider capability error"));
+	assert!(error.to_string().contains(
+		"uses `CommentReleasedIssues` but `[source].provider = \"gitlab\"` does not support released-issue comments"
+	));
+
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[source]
+provider = "gitea"
+owner = "org"
+repo = "monochange"
+host = "https://codeberg.org"
+
+[cli.comment]
+
+[[cli.comment.steps]]
+type = "PrepareRelease"
+
+[[cli.comment.steps]]
+type = "CommentReleasedIssues"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected provider capability error"));
+	assert!(error.to_string().contains(
+		"uses `CommentReleasedIssues` but `[source].provider = \"gitea\"` does not support released-issue comments"
+	));
+}
+
+#[test]
+fn load_workspace_configuration_accepts_comment_released_issues_for_github() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+
+[cli.comment]
+
+[[cli.comment.steps]]
+type = "PrepareRelease"
+
+[[cli.comment.steps]]
+type = "CommentReleasedIssues"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	assert_eq!(configuration.cli.len(), 1);
+}
+
+#[test]
 fn load_workspace_configuration_rejects_enforce_changeset_policy_without_github_bot_config() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");

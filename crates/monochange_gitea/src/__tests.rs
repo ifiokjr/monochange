@@ -19,6 +19,7 @@ use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleaseProviderSettings;
+use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequestOperation;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
@@ -59,6 +60,57 @@ fn build_release_pull_request_request_uses_gitea_provider_and_sanitized_branch()
 	assert_eq!(request.head_branch, "monochange/release/release-pr");
 	assert!(request.body.contains("## Prepared release"));
 	assert!(request.body.contains("## Changed files"));
+}
+
+#[test]
+fn gitea_source_capabilities_capture_provider_limits() {
+	assert_eq!(
+		source_capabilities(),
+		SourceCapabilities {
+			draft_releases: true,
+			prereleases: true,
+			generated_release_notes: false,
+			auto_merge_change_requests: false,
+			released_issue_comments: false,
+			requires_host: true,
+		}
+	);
+}
+
+#[test]
+fn validate_source_configuration_rejects_missing_host_and_unsupported_features() {
+	let error = validate_source_configuration(&sample_source(None, None))
+		.err()
+		.unwrap_or_else(|| panic!("expected validation error"));
+	assert!(error
+		.to_string()
+		.contains("[source].host must be set for `provider = \"gitea\"`"));
+
+	let error = validate_source_configuration(&SourceConfiguration {
+		pull_requests: ChangeRequestSettings {
+			auto_merge: true,
+			..ChangeRequestSettings::default()
+		},
+		..sample_source(None, Some("https://codeberg.org".to_string()))
+	})
+	.err()
+	.unwrap_or_else(|| panic!("expected validation error"));
+	assert!(error
+		.to_string()
+		.contains("[source.pull_requests].auto_merge is not supported"));
+
+	let error = validate_source_configuration(&SourceConfiguration {
+		releases: ReleaseProviderSettings {
+			source: ReleaseNotesSource::GitHubGenerated,
+			..ReleaseProviderSettings::default()
+		},
+		..sample_source(None, Some("https://codeberg.org".to_string()))
+	})
+	.err()
+	.unwrap_or_else(|| panic!("expected validation error"));
+	assert!(error
+		.to_string()
+		.contains("provider-generated release notes are not supported"));
 }
 
 #[test]

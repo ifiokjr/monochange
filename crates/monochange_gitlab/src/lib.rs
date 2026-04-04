@@ -12,6 +12,7 @@ use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOperation;
 use monochange_core::SourceChangeRequestOutcome;
@@ -28,6 +29,46 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
 use urlencoding::encode;
+
+#[must_use]
+pub const fn source_capabilities() -> SourceCapabilities {
+	SourceCapabilities {
+		draft_releases: false,
+		prereleases: false,
+		generated_release_notes: false,
+		auto_merge_change_requests: false,
+		released_issue_comments: false,
+		requires_host: false,
+	}
+}
+
+pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
+	if source.releases.draft {
+		return Err(MonochangeError::Config(
+			"[source.releases].draft is not supported for `provider = \"gitlab\"`".to_string(),
+		));
+	}
+	if source.releases.prerelease {
+		return Err(MonochangeError::Config(
+			"[source.releases].prerelease is not supported for `provider = \"gitlab\"`".to_string(),
+		));
+	}
+	if source.releases.generate_notes
+		|| matches!(source.releases.source, ReleaseNotesSource::GitHubGenerated)
+	{
+		return Err(MonochangeError::Config(
+			"provider-generated release notes are not supported for `provider = \"gitlab\"`; use `source = \"monochange\"`"
+				.to_string(),
+		));
+	}
+	if source.pull_requests.auto_merge {
+		return Err(MonochangeError::Config(
+			"[source.pull_requests].auto_merge is not supported for `provider = \"gitlab\"`"
+				.to_string(),
+		));
+	}
+	Ok(())
+}
 
 #[derive(Debug, Serialize)]
 struct GitLabReleaseCreatePayload<'a> {

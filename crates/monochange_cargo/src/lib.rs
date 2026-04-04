@@ -125,6 +125,50 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	discovered
 }
 
+pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> MonochangeResult<()> {
+	let mut workspace_versioned = BTreeMap::<PathBuf, Vec<&PackageRecord>>::new();
+	for package in packages {
+		if package.ecosystem == Ecosystem::Cargo
+			&& package.metadata.contains_key("config_id")
+			&& package
+				.metadata
+				.get("uses_workspace_version")
+				.map(String::as_str)
+				== Some("true")
+		{
+			workspace_versioned
+				.entry(package.workspace_root.clone())
+				.or_default()
+				.push(package);
+		}
+	}
+
+	for packages in workspace_versioned.values() {
+		if packages.len() < 2 {
+			continue;
+		}
+		let group_ids = packages
+			.iter()
+			.map(|package| package.version_group_id.as_deref())
+			.collect::<BTreeSet<_>>();
+		if group_ids.len() > 1 || group_ids.contains(&None) {
+			let details = packages
+				.iter()
+				.map(|package| match &package.version_group_id {
+					Some(group_id) => format!("`{}` in group `{}`", package.name, group_id),
+					None => format!("`{}` not in any group", package.name),
+				})
+				.collect::<Vec<_>>();
+			return Err(MonochangeError::Config(format!(
+				"cargo packages using `version.workspace = true` must belong to the same version group, but found mismatched assignments: {}",
+				details.join(", ")
+			)));
+		}
+	}
+
+	Ok(())
+}
+
 pub fn update_versioned_file(
 	value: &mut Value,
 	kind: CargoVersionedFileKind,

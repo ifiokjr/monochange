@@ -1,0 +1,39 @@
+[defaults]
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+tag = true
+release = true
+
+[source]
+provider = "gitlab"
+owner = "group"
+repo = "monochange"
+host = "https://gitlab.com"
+
+[source.releases]
+source = "monochange"
+
+[source.pull_requests]
+base = "main"
+branch_prefix = "monochange/release"
+labels = ["release"]
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.publish-release]
+
+[[cli.publish-release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.publish-release.steps]]
+type = "PrepareRelease"
+
+[[cli.publish-release.steps]]
+type = "PublishRelease"
