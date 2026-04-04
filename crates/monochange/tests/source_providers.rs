@@ -54,7 +54,7 @@ fn source_provider_fixtures_support_configured_commands() {
 }
 
 #[test]
-fn github_source_fixture_supports_release_and_pull_request_dry_runs() {
+fn github_source_fixture_supports_release_pull_request_and_issue_comment_dry_runs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/source/github");
 	copy_directory(&fixture_root, tempdir.path());
@@ -72,6 +72,9 @@ fn github_source_fixture_supports_release_and_pull_request_dry_runs() {
 		pr_json["releaseRequest"]["repository"],
 		"ifiokjr/monochange"
 	);
+
+	let comments_json = run_json_command(tempdir.path(), "release-comments");
+	assert!(comments_json.is_object());
 }
 
 fn run_json_command(root: &Path, command: &str) -> Value {
