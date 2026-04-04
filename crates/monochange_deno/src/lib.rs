@@ -32,6 +32,7 @@
 //! - normalized dependency and import extraction
 //! <!-- {/monochangeDenoCrateDocs} -->
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::fs;
@@ -55,6 +56,84 @@ use walkdir::DirEntry;
 use walkdir::WalkDir;
 
 pub const DENO_MANIFEST_FILES: [&str; 2] = ["deno.json", "deno.jsonc"];
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum DenoVersionedFileKind {
+	Manifest,
+	Lock,
+}
+
+pub fn supported_versioned_file_kind(path: &Path) -> Option<DenoVersionedFileKind> {
+	let file_name = path
+		.file_name()
+		.and_then(|name| name.to_str())
+		.unwrap_or_default();
+	match file_name {
+		"deno.lock" => Some(DenoVersionedFileKind::Lock),
+		_ if path.extension().and_then(|ext| ext.to_str()) == Some("json")
+			|| path.extension().and_then(|ext| ext.to_str()) == Some("jsonc") =>
+		{
+			Some(DenoVersionedFileKind::Manifest)
+		}
+		_ => None,
+	}
+}
+
+fn rewrite_dependency_reference(text: &str, package_name: &str, version: &str) -> String {
+	let mut updated = text.to_string();
+	for prefix in [format!("npm:{package_name}@"), format!("{package_name}@")] {
+		let mut cursor = 0usize;
+		while let Some(found) = updated[cursor..].find(&prefix) {
+			let start = cursor + found + prefix.len();
+			let end = updated[start..]
+				.char_indices()
+				.find_map(|(index, ch)| {
+					(!ch.is_ascii_alphanumeric() && ch != '.' && ch != '-' && ch != '+')
+						.then_some(start + index)
+				})
+				.unwrap_or(updated.len());
+			updated.replace_range(start..end, version);
+			cursor = start + version.len();
+		}
+	}
+	updated
+}
+
+pub fn update_lockfile(value: &mut Value, raw_versions: &BTreeMap<String, String>) {
+	let Ok(mut rendered) = serde_json::to_string(value) else {
+		return;
+	};
+	for (package_name, version) in raw_versions {
+		rendered = rewrite_dependency_reference(&rendered, package_name, version);
+	}
+	if let Ok(updated) = serde_json::from_str::<Value>(&rendered) {
+		*value = updated;
+	}
+}
+
+pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
+	let manifest_dir = package
+		.manifest_path
+		.parent()
+		.map_or_else(|| package.workspace_root.clone(), Path::to_path_buf);
+	let scope = if manifest_dir == package.workspace_root {
+		manifest_dir.clone()
+	} else {
+		package.workspace_root.clone()
+	};
+	let mut discovered = [scope.join("deno.lock")]
+		.into_iter()
+		.filter(|path| path.exists())
+		.collect::<Vec<_>>();
+	if discovered.is_empty() && scope != manifest_dir {
+		discovered.extend(
+			[manifest_dir.join("deno.lock")]
+				.into_iter()
+				.filter(|path| path.exists()),
+		);
+	}
+	discovered
+}
 
 pub struct DenoAdapter;
 

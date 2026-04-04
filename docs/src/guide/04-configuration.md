@@ -37,7 +37,10 @@ format = "keep_a_changelog"
 
 [package.sdk-core]
 path = "crates/sdk_core"
-versioned_files = [{ path = "crates/sdk_core/extra.toml", type = "cargo" }]
+versioned_files = [
+	"Cargo.lock",
+	{ path = "crates/sdk_core/extra.toml", type = "cargo" },
+]
 tag = false
 release = false
 version_format = "namespaced"
@@ -149,11 +152,26 @@ Rules:
 Examples:
 
 ```toml
+# package-scoped shorthand infers the package ecosystem
+versioned_files = ["Cargo.lock"]
+versioned_files = ["**/crates/*/Cargo.toml"]
+
+# explicit typed entries remain available
 versioned_files = [{ path = "Cargo.lock", type = "cargo" }]
 versioned_files = [{ path = "group.toml", type = "cargo", name = "sdk-core" }]
+versioned_files = [{ path = "bun.lockb", type = "npm" }]
+
+# ecosystem-level defaults inherited by matching packages
+[ecosystems.npm]
+versioned_files = ["**/packages/*/package.json"]
+
+[package.web]
+path = "packages/web"
+ignore_ecosystem_versioned_files = true
+versioned_files = ["package-lock.json"]
 ```
 
-Dependency targets in `versioned_files` must reference declared package ids.
+Dependency targets in `versioned_files` must reference declared package ids. Groups must use explicit typed entries because monochange cannot infer a group ecosystem from a bare string.
 
 ## CLI commands
 
@@ -347,17 +365,24 @@ These settings are parsed from config and document intended control points for d
 enabled = true
 roots = ["crates/*"]
 exclude = ["crates/experimental/*"]
+versioned_files = ["Cargo.lock"]
 
 [ecosystems.npm]
 enabled = true
 roots = ["packages/*"]
 exclude = ["packages/legacy/*"]
+dependency_version_prefix = "^"
+versioned_files = ["**/packages/*/package.json"]
+# npm-family lockfiles can include package-lock.json, pnpm-lock.yaml,
+# bun.lock, and bun.lockb depending on the workspace manager.
 
 [ecosystems.deno]
 enabled = true
+versioned_files = ["deno.lock"]
 
 [ecosystems.dart]
 enabled = true
+versioned_files = ["pubspec.lock"]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

@@ -17,7 +17,11 @@ doc-comment = { workspace = true }
 glob = { workspace = true }
 miette = { workspace = true }
 minijinja = { workspace = true }
+monochange_cargo = { workspace = true }
 monochange_core = { workspace = true }
+monochange_dart = { workspace = true }
+monochange_deno = { workspace = true }
+monochange_npm = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 serde_yaml_ng = { workspace = true }
