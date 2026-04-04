@@ -52,3 +52,17 @@ type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
+
+[cli.release-comments]
+
+[[cli.release-comments.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release-comments.steps]]
+type = "PrepareRelease"
+
+[[cli.release-comments.steps]]
+type = "CommentReleasedIssues"

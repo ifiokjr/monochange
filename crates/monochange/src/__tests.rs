@@ -926,6 +926,27 @@ fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
 }
 
 #[test]
+fn source_github_release_comments_command_supports_provider_neutral_source_config() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/source/github");
+	copy_directory(&fixture_root, tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("release-comments"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("release comments output: {error}"));
+
+	assert!(output.contains("released_packages") || output.contains("releaseTargets"));
+}
+
+#[test]
 fn command_release_dry_run_is_consistent_across_ecosystem_fixtures() {
 	assert_cli_release_pattern(
 		"../../fixtures/cargo/workspace",

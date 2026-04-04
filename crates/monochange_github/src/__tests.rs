@@ -10,11 +10,7 @@ use monochange_core::BotSettings;
 use monochange_core::ChangeRequestSettings;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
-use monochange_core::GitHubBotSettings;
-use monochange_core::GitHubConfiguration;
-use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
-use monochange_core::GitHubReleaseSettings;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
@@ -113,6 +109,31 @@ fn github_source_capabilities_cover_github_automation_features() {
 }
 
 #[test]
+fn github_url_helpers_use_source_configuration_coordinates() {
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+
+	temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
+		assert_eq!(
+			github_pull_request_url(&source, 42),
+			"https://example.com/ifiokjr/monochange/pull/42"
+		);
+		assert_eq!(
+			github_issue_url(&source, 7),
+			"https://example.com/ifiokjr/monochange/issues/7"
+		);
+	});
+}
+
+#[test]
 fn validate_source_configuration_rejects_conflicting_release_note_modes() {
 	let error = validate_source_configuration(&SourceConfiguration {
 		provider: SourceProvider::GitHub,
@@ -133,6 +154,77 @@ fn validate_source_configuration_rejects_conflicting_release_note_modes() {
 	assert!(error
 		.to_string()
 		.contains("[source.releases].generate_notes cannot be true"));
+}
+
+#[test]
+fn comment_released_issues_public_api_uses_source_configuration() {
+	let server = MockServer::start();
+	let list_issue_comments = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let create_issue_comment = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body("{\"html_url\":\"https://example.com/issues/7#comment-1\"}");
+	});
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+	let mut manifest = sample_manifest();
+	manifest.changesets = vec![PreparedChangeset {
+		path: PathBuf::from(".changeset/feature.md"),
+		summary: Some("add release context".to_string()),
+		details: None,
+		targets: Vec::new(),
+		context: Some(ChangesetContext {
+			provider: HostingProviderKind::GitHub,
+			host: Some("example.com".to_string()),
+			capabilities: github_hosting_capabilities(),
+			introduced: None,
+			last_updated: None,
+			related_issues: vec![HostedIssueRef {
+				provider: HostingProviderKind::GitHub,
+				host: Some("example.com".to_string()),
+				id: "#7".to_string(),
+				title: Some("Track release context".to_string()),
+				url: Some("https://example.com/issues/7".to_string()),
+				relationship: HostedIssueRelationshipKind::ClosedByReviewRequest,
+			}],
+		}),
+	}];
+
+	let outcomes = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_SERVER_URL", Some("https://example.com")),
+		],
+		|| comment_released_issues(&source, &manifest),
+	)
+	.unwrap_or_else(|error| panic!("comment released issues: {error}"));
+
+	list_issue_comments.assert();
+	create_issue_comment.assert();
+	assert_eq!(outcomes.len(), 1);
+	assert_eq!(
+		outcomes
+			.first()
+			.unwrap_or_else(|| panic!("expected one issue comment outcome"))
+			.issue_id,
+		"#7"
+	);
 }
 
 #[test]
@@ -604,12 +696,15 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 				r#"{"repository":{"pullRequest":{"closingIssuesReferences":{"nodes":[{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}}}"#,
 			);
 	});
-	let github = GitHubConfiguration {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: GitHubReleaseSettings::default(),
-		pull_requests: GitHubPullRequestSettings::default(),
-		bot: GitHubBotSettings::default(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
 	};
 	let mut changesets = vec![PreparedChangeset {
 		path: PathBuf::from(".changeset/feature.md"),
@@ -701,6 +796,70 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 }
 
 #[test]
+fn enrich_changeset_context_public_api_uses_source_configuration() {
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+	let mut changesets = vec![PreparedChangeset {
+		path: PathBuf::from(".changeset/feature.md"),
+		summary: Some("add release context".to_string()),
+		details: None,
+		targets: Vec::new(),
+		context: Some(ChangesetContext {
+			provider: HostingProviderKind::GenericGit,
+			host: None,
+			capabilities: HostingCapabilities::default(),
+			introduced: Some(ChangesetRevision {
+				actor: None,
+				commit: Some(HostedCommitRef {
+					provider: HostingProviderKind::GenericGit,
+					host: None,
+					sha: "abc1234567890".to_string(),
+					short_sha: "abc1234".to_string(),
+					url: None,
+					authored_at: None,
+					committed_at: None,
+					author_name: None,
+					author_email: None,
+				}),
+				review_request: None,
+			}),
+			last_updated: None,
+			related_issues: Vec::new(),
+		}),
+	}];
+
+	temp_env::with_vars(
+		[
+			("GITHUB_SERVER_URL", Some("https://example.com")),
+			("GITHUB_TOKEN", None::<&str>),
+		],
+		|| enrich_changeset_context(&source, &mut changesets),
+	);
+
+	let commit_url = changesets
+		.first()
+		.unwrap_or_else(|| panic!("expected one changeset"))
+		.context
+		.as_ref()
+		.and_then(|context| context.introduced.as_ref())
+		.and_then(|revision| revision.commit.as_ref())
+		.and_then(|commit| commit.url.as_deref())
+		.unwrap_or_else(|| panic!("expected commit url"));
+	assert_eq!(
+		commit_url,
+		"https://example.com/ifiokjr/monochange/commit/abc1234567890"
+	);
+}
+
+#[test]
 fn comment_released_issues_skips_existing_markers_and_posts_missing_comments() {
 	let server = MockServer::start();
 	let list_issue_seven_comments = server.mock(|when, then| {
@@ -726,12 +885,15 @@ fn comment_released_issues_skips_existing_markers_and_posts_missing_comments() {
 				r#"[{"html_url":"https://example.com/issues/8#comment-1","body":"Released in v1.2.0.\n\n<!-- monochange:released-in:v1.2.0 -->"}]"#,
 			);
 	});
-	let github = GitHubConfiguration {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: GitHubReleaseSettings::default(),
-		pull_requests: GitHubPullRequestSettings::default(),
-		bot: GitHubBotSettings::default(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
 	};
 	let mut manifest = sample_manifest();
 	manifest.changesets = vec![PreparedChangeset {
