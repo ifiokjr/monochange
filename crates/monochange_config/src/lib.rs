@@ -108,6 +108,7 @@ use monochange_core::CliStepDefinition;
 
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
+use monochange_core::EcosystemType;
 use monochange_core::ExtraChangelogSection;
 use monochange_core::GitHubBotSettings;
 use monochange_core::GitHubChangesetBotSettings;
@@ -253,7 +254,9 @@ struct RawPackageDefinition {
 	#[serde(default)]
 	empty_update_message: Option<String>,
 	#[serde(default)]
-	versioned_files: Vec<VersionedFileDefinition>,
+	versioned_files: Vec<RawVersionedFileDefinition>,
+	#[serde(default)]
+	ignore_ecosystem_versioned_files: bool,
 	#[serde(default)]
 	ignored_paths: Vec<String>,
 	#[serde(default)]
@@ -276,7 +279,7 @@ struct RawGroupDefinition {
 	#[serde(default)]
 	empty_update_message: Option<String>,
 	#[serde(default)]
-	versioned_files: Vec<VersionedFileDefinition>,
+	versioned_files: Vec<RawVersionedFileDefinition>,
 	#[serde(default)]
 	tag: bool,
 	#[serde(default)]
@@ -298,13 +301,34 @@ struct RawCliCommandDefinition {
 #[derive(Debug, Deserialize, Default)]
 struct RawEcosystems {
 	#[serde(default)]
-	cargo: EcosystemSettings,
+	cargo: RawEcosystemSettings,
 	#[serde(default)]
-	npm: EcosystemSettings,
+	npm: RawEcosystemSettings,
 	#[serde(default)]
-	deno: EcosystemSettings,
+	deno: RawEcosystemSettings,
 	#[serde(default)]
-	dart: EcosystemSettings,
+	dart: RawEcosystemSettings,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawEcosystemSettings {
+	#[serde(default)]
+	enabled: Option<bool>,
+	#[serde(default)]
+	roots: Vec<String>,
+	#[serde(default)]
+	exclude: Vec<String>,
+	#[serde(default)]
+	dependency_version_prefix: Option<String>,
+	#[serde(default)]
+	versioned_files: Vec<RawVersionedFileDefinition>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum RawVersionedFileDefinition {
+	Path(String),
+	Detailed(VersionedFileDefinition),
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -663,6 +687,78 @@ pub fn config_path(root: &Path) -> PathBuf {
 	root.join(CONFIG_FILE)
 }
 
+fn package_type_to_ecosystem_type(package_type: PackageType) -> EcosystemType {
+	match package_type {
+		PackageType::Cargo => EcosystemType::Cargo,
+		PackageType::Npm => EcosystemType::Npm,
+		PackageType::Deno => EcosystemType::Deno,
+		PackageType::Dart | PackageType::Flutter => EcosystemType::Dart,
+	}
+}
+
+fn normalize_versioned_files(
+	contents: &str,
+	versioned_files: Vec<RawVersionedFileDefinition>,
+	inferred_ecosystem_type: EcosystemType,
+	owner_kind: &str,
+	owner_id: &str,
+	allow_shorthand: bool,
+) -> MonochangeResult<Vec<VersionedFileDefinition>> {
+	versioned_files
+		.into_iter()
+		.map(|versioned_file| match versioned_file {
+			RawVersionedFileDefinition::Detailed(definition) => Ok(definition),
+			RawVersionedFileDefinition::Path(path) if allow_shorthand => {
+				Ok(VersionedFileDefinition {
+					path,
+					ecosystem_type: inferred_ecosystem_type,
+					prefix: None,
+					fields: None,
+					name: None,
+				})
+			}
+			RawVersionedFileDefinition::Path(_) => Err(config_diagnostic(
+				contents,
+				format!(
+					"{owner_kind} `{owner_id}` uses bare-string `versioned_files`, but the ecosystem cannot be inferred here"
+				),
+				vec![config_section_label(
+					contents,
+					owner_kind,
+					owner_id,
+					"bare-string versioned_files not allowed here",
+				)],
+				Some(
+					"use `versioned_files = [{ path = \"...\", type = \"cargo\" }]` (or another explicit ecosystem type) for groups"
+						.to_string(),
+				),
+			)),
+		})
+		.collect()
+}
+
+fn normalize_ecosystem_settings(
+	contents: &str,
+	owner_id: &str,
+	inferred_ecosystem_type: EcosystemType,
+	raw: RawEcosystemSettings,
+) -> MonochangeResult<EcosystemSettings> {
+	Ok(EcosystemSettings {
+		enabled: raw.enabled,
+		roots: raw.roots,
+		exclude: raw.exclude,
+		dependency_version_prefix: raw.dependency_version_prefix,
+		versioned_files: normalize_versioned_files(
+			contents,
+			raw.versioned_files,
+			inferred_ecosystem_type,
+			"ecosystems",
+			owner_id,
+			true,
+		)?,
+	})
+}
+
 pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceConfiguration> {
 	let path = config_path(root);
 	let contents = if path.exists() {
@@ -711,6 +807,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	};
 	let default_package_type = defaults.package_type;
 	let default_package_changelog = defaults.changelog.clone();
+	let cargo_ecosystem =
+		normalize_ecosystem_settings(&contents, "cargo", EcosystemType::Cargo, ecosystems.cargo)?;
+	let npm_ecosystem =
+		normalize_ecosystem_settings(&contents, "npm", EcosystemType::Npm, ecosystems.npm)?;
+	let deno_ecosystem =
+		normalize_ecosystem_settings(&contents, "deno", EcosystemType::Deno, ecosystems.deno)?;
+	let dart_ecosystem =
+		normalize_ecosystem_settings(&contents, "dart", EcosystemType::Dart, ecosystems.dart)?;
 	let defaults_changelog_policy = defaults
 		.changelog
 		.as_ref()
@@ -758,6 +862,26 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 						})
 					})
 				});
+			let inferred_ecosystem_type = package_type_to_ecosystem_type(package_type);
+			let inherited_versioned_files = if package.ignore_ecosystem_versioned_files {
+				Vec::new()
+			} else {
+				match inferred_ecosystem_type {
+					EcosystemType::Cargo => cargo_ecosystem.versioned_files.clone(),
+					EcosystemType::Npm => npm_ecosystem.versioned_files.clone(),
+					EcosystemType::Deno => deno_ecosystem.versioned_files.clone(),
+					EcosystemType::Dart => dart_ecosystem.versioned_files.clone(),
+				}
+			};
+			let mut versioned_files = inherited_versioned_files;
+			versioned_files.extend(normalize_versioned_files(
+				&contents,
+				package.versioned_files,
+				inferred_ecosystem_type,
+				"package",
+				&id,
+				true,
+			)?);
 			Ok::<_, MonochangeError>(PackageDefinition {
 				id,
 				path: package.path,
@@ -765,7 +889,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				changelog,
 				extra_changelog_sections: package.extra_changelog_sections,
 				empty_update_message: package.empty_update_message,
-				versioned_files: package.versioned_files,
+				versioned_files,
+				ignore_ecosystem_versioned_files: package.ignore_ecosystem_versioned_files,
 				ignored_paths: package.ignored_paths,
 				additional_paths: package.additional_paths,
 				tag: package.tag,
@@ -806,12 +931,19 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				},
 			};
 			Ok::<_, MonochangeError>(GroupDefinition {
-				id,
+				id: id.clone(),
 				packages: group.packages,
 				changelog,
 				extra_changelog_sections: group.extra_changelog_sections,
 				empty_update_message: group.empty_update_message,
-				versioned_files: group.versioned_files,
+				versioned_files: normalize_versioned_files(
+					&contents,
+					group.versioned_files,
+					EcosystemType::Cargo,
+					"group",
+					&id,
+					false,
+				)?,
 				tag: group.tag,
 				release: group.release,
 				version_format: group.version_format,
@@ -920,6 +1052,25 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	validate_changesets_configuration(&changesets, &packages)?;
 	validate_github_configuration(github.as_ref())?;
 	validate_source_configuration(source.as_ref())?;
+	for (ecosystem_id, versioned_files) in [
+		("cargo", &cargo_ecosystem.versioned_files),
+		("npm", &npm_ecosystem.versioned_files),
+		("deno", &deno_ecosystem.versioned_files),
+		("dart", &dart_ecosystem.versioned_files),
+	] {
+		let declared_packages = packages
+			.iter()
+			.map(|package| package.id.as_str())
+			.collect::<BTreeSet<_>>();
+		validate_versioned_files(
+			root,
+			&contents,
+			versioned_files,
+			&declared_packages,
+			"ecosystems",
+			ecosystem_id,
+		)?;
+	}
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
 	validate_cli_runtime_requirements(&cli, &changesets, source.as_ref())?;
 
@@ -944,10 +1095,10 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		changesets,
 		github,
 		source,
-		cargo: ecosystems.cargo,
-		npm: ecosystems.npm,
-		deno: ecosystems.deno,
-		dart: ecosystems.dart,
+		cargo: cargo_ecosystem,
+		npm: npm_ecosystem,
+		deno: deno_ecosystem,
+		dart: dart_ecosystem,
 	})
 }
 
@@ -1534,6 +1685,7 @@ fn validate_package_and_group_definitions(
 		.collect::<BTreeSet<_>>();
 	for package in packages {
 		validate_versioned_files(
+			root,
 			config_contents,
 			&package.versioned_files,
 			&declared_packages,
@@ -1544,6 +1696,7 @@ fn validate_package_and_group_definitions(
 	let mut assigned_packages = BTreeMap::<String, String>::new();
 	for group in groups {
 		validate_versioned_files(
+			root,
 			config_contents,
 			&group.versioned_files,
 			&declared_packages,
@@ -1629,7 +1782,21 @@ fn validate_package_and_group_definitions(
 	Ok(())
 }
 
+fn path_uses_glob(path: &str) -> bool {
+	path.contains('*') || path.contains('?') || path.contains('[')
+}
+
+fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -> bool {
+	match ecosystem_type {
+		EcosystemType::Cargo => monochange_cargo::supported_versioned_file_kind(path).is_some(),
+		EcosystemType::Npm => monochange_npm::supported_versioned_file_kind(path).is_some(),
+		EcosystemType::Deno => monochange_deno::supported_versioned_file_kind(path).is_some(),
+		EcosystemType::Dart => monochange_dart::supported_versioned_file_kind(path).is_some(),
+	}
+}
+
 fn validate_versioned_files(
+	root: &Path,
 	config_contents: &str,
 	versioned_files: &[VersionedFileDefinition],
 	declared_packages: &BTreeSet<&str>,
@@ -1652,6 +1819,46 @@ fn validate_versioned_files(
 						"unknown versioned file name",
 					)],
 					Some("reference a declared package id from `versioned_files` or remove the name entry".to_string()),
+				));
+			}
+		}
+		if path_uses_glob(&versioned_file.path) {
+			let pattern = root
+				.join(&versioned_file.path)
+				.to_string_lossy()
+				.to_string();
+			let matches = glob::glob(&pattern)
+				.map_err(|error| {
+					MonochangeError::Config(format!(
+						"invalid glob pattern `{}`: {error}",
+						versioned_file.path
+					))
+				})?
+				.filter_map(Result::ok)
+				.collect::<Vec<_>>();
+			if let Some(unsupported_path) = matches.into_iter().find(|matched_path| {
+				!path_is_supported_for_ecosystem(matched_path, versioned_file.ecosystem_type)
+			}) {
+				return Err(config_diagnostic(
+					config_contents,
+					format!(
+						"{owner_kind} `{owner_id}` versioned_files glob `{}` matched unsupported file `{}` for ecosystem `{}`",
+						versioned_file.path,
+						unsupported_path.display(),
+						match versioned_file.ecosystem_type {
+							EcosystemType::Cargo => "cargo",
+							EcosystemType::Npm => "npm",
+							EcosystemType::Deno => "deno",
+							EcosystemType::Dart => "dart",
+						}
+					),
+					vec![config_section_label(
+						config_contents,
+						owner_kind,
+						owner_id,
+						"versioned_files glob matched unsupported file type",
+					)],
+					Some("narrow the glob so it only matches files for that ecosystem, or change the `type` to match the files you want to update".to_string()),
 				));
 			}
 		}

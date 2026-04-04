@@ -58,6 +58,89 @@ use walkdir::WalkDir;
 
 pub const PUBSPEC_FILE: &str = "pubspec.yaml";
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum DartVersionedFileKind {
+	Manifest,
+	Lock,
+}
+
+pub fn supported_versioned_file_kind(path: &Path) -> Option<DartVersionedFileKind> {
+	let file_name = path
+		.file_name()
+		.and_then(|name| name.to_str())
+		.unwrap_or_default();
+	match file_name {
+		"pubspec.lock" => Some(DartVersionedFileKind::Lock),
+		_ if path.extension().and_then(|ext| ext.to_str()) == Some("yaml")
+			|| path.extension().and_then(|ext| ext.to_str()) == Some("yml") =>
+		{
+			Some(DartVersionedFileKind::Manifest)
+		}
+		_ => None,
+	}
+}
+
+pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
+	let manifest_dir = package
+		.manifest_path
+		.parent()
+		.map_or_else(|| package.workspace_root.clone(), Path::to_path_buf);
+	let scope = if manifest_dir == package.workspace_root {
+		manifest_dir.clone()
+	} else {
+		package.workspace_root.clone()
+	};
+	let mut discovered = [scope.join("pubspec.lock")]
+		.into_iter()
+		.filter(|path| path.exists())
+		.collect::<Vec<_>>();
+	if discovered.is_empty() && scope != manifest_dir {
+		discovered.extend(
+			[manifest_dir.join("pubspec.lock")]
+				.into_iter()
+				.filter(|path| path.exists()),
+		);
+	}
+	discovered
+}
+
+pub fn update_dependency_fields(
+	mapping: &mut Mapping,
+	fields: &[&str],
+	versioned_deps: &std::collections::BTreeMap<String, String>,
+) {
+	for field in fields {
+		if let Some(Value::Mapping(section)) = mapping.get_mut(Value::String(field.to_string())) {
+			for (dep_name, dep_version) in versioned_deps {
+				let key = Value::String(dep_name.clone());
+				if section.contains_key(&key) {
+					section.insert(key, Value::String(dep_version.clone()));
+				}
+			}
+		}
+	}
+}
+
+pub fn update_pubspec_lock(
+	mapping: &mut Mapping,
+	raw_versions: &std::collections::BTreeMap<String, String>,
+) {
+	let Some(Value::Mapping(packages)) = mapping.get_mut(Value::String("packages".to_string()))
+	else {
+		return;
+	};
+	for (name, version) in raw_versions {
+		let key = Value::String(name.clone());
+		let Some(Value::Mapping(entry)) = packages.get_mut(&key) else {
+			continue;
+		};
+		entry.insert(
+			Value::String("version".to_string()),
+			Value::String(version.clone()),
+		);
+	}
+}
+
 pub struct DartAdapter;
 
 #[must_use]

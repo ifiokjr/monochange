@@ -224,7 +224,7 @@ pub struct PreparedRelease {
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct FileUpdate {
 	path: PathBuf,
-	content: String,
+	content: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -859,7 +859,7 @@ fn execute_cli_command(
 					let rendered = render_release_manifest_json(&manifest)?;
 					apply_file_updates(&[FileUpdate {
 						path: resolved_path.clone(),
-						content: rendered,
+						content: rendered.into_bytes(),
 					}])?;
 					context.release_manifest_path = Some(root_relative(root, &resolved_path));
 				}
@@ -2590,7 +2590,7 @@ fn build_changelog_updates(
 		updates.push(ChangelogUpdate {
 			file: FileUpdate {
 				path: changelog_target.path.clone(),
-				content: append_changelog_section(&changelog_target.path, &rendered)?,
+				content: append_changelog_section(&changelog_target.path, &rendered)?.into_bytes(),
 			},
 			owner_id: package_id,
 			owner_kind: ReleaseOwnerKind::Package,
@@ -2641,7 +2641,7 @@ fn build_changelog_updates(
 		updates.push(ChangelogUpdate {
 			file: FileUpdate {
 				path: changelog_target.path.clone(),
-				content: append_changelog_section(&changelog_target.path, &rendered)?,
+				content: append_changelog_section(&changelog_target.path, &rendered)?.into_bytes(),
 			},
 			owner_id: planned_group.group_id.clone(),
 			owner_kind: ReleaseOwnerKind::Group,
@@ -3518,6 +3518,87 @@ enum CachedDocument {
 	Toml(Value),
 	Json(serde_json::Value),
 	Yaml(serde_yaml_ng::Mapping),
+	Text(String),
+	Bytes(Vec<u8>),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum VersionedFileKind {
+	Cargo(monochange_cargo::CargoVersionedFileKind),
+	Npm(monochange_npm::NpmVersionedFileKind),
+	Deno(monochange_deno::DenoVersionedFileKind),
+	Dart(monochange_dart::DartVersionedFileKind),
+}
+
+fn versioned_file_kind(
+	ecosystem_type: monochange_core::EcosystemType,
+	path: &Path,
+) -> Option<VersionedFileKind> {
+	match ecosystem_type {
+		monochange_core::EcosystemType::Cargo => {
+			monochange_cargo::supported_versioned_file_kind(path).map(VersionedFileKind::Cargo)
+		}
+		monochange_core::EcosystemType::Npm => {
+			monochange_npm::supported_versioned_file_kind(path).map(VersionedFileKind::Npm)
+		}
+		monochange_core::EcosystemType::Deno => {
+			monochange_deno::supported_versioned_file_kind(path).map(VersionedFileKind::Deno)
+		}
+		monochange_core::EcosystemType::Dart => {
+			monochange_dart::supported_versioned_file_kind(path).map(VersionedFileKind::Dart)
+		}
+	}
+}
+
+fn auto_discovered_lockfile_definitions(
+	root: &Path,
+	package: &PackageRecord,
+) -> Vec<VersionedFileDefinition> {
+	let ecosystem_type = match package.ecosystem {
+		Ecosystem::Cargo => monochange_core::EcosystemType::Cargo,
+		Ecosystem::Npm => monochange_core::EcosystemType::Npm,
+		Ecosystem::Deno => monochange_core::EcosystemType::Deno,
+		Ecosystem::Dart | Ecosystem::Flutter => monochange_core::EcosystemType::Dart,
+	};
+	let discovered = match package.ecosystem {
+		Ecosystem::Cargo => monochange_cargo::discover_lockfiles(package),
+		Ecosystem::Npm => monochange_npm::discover_lockfiles(package),
+		Ecosystem::Deno => monochange_deno::discover_lockfiles(package),
+		Ecosystem::Dart | Ecosystem::Flutter => monochange_dart::discover_lockfiles(package),
+	};
+	discovered
+		.into_iter()
+		.filter_map(|path| {
+			relative_to_root(root, &path).map(|relative_path| VersionedFileDefinition {
+				path: relative_path.to_string_lossy().to_string(),
+				ecosystem_type,
+				prefix: None,
+				fields: None,
+				name: None,
+			})
+		})
+		.collect()
+}
+
+fn dedup_versioned_file_definitions(
+	versioned_files: Vec<VersionedFileDefinition>,
+) -> Vec<VersionedFileDefinition> {
+	let mut seen = BTreeSet::<String>::new();
+	let mut deduped = Vec::new();
+	for definition in versioned_files {
+		let key = format!(
+			"{}::{:?}::{:?}::{:?}::{:?}",
+			definition.path,
+			definition.ecosystem_type,
+			definition.prefix,
+			definition.fields,
+			definition.name,
+		);
+		if seen.insert(key) {
+			deduped.push(definition);
+		}
+	}
+	deduped
 }
 
 fn build_versioned_file_updates(
@@ -3564,18 +3645,20 @@ fn build_versioned_file_updates(
 		let Some(version) = released_versions_by_config_id.get(&package_definition.id) else {
 			continue;
 		};
-		// Determine native name for this package
-		let dep_names = if let Some(name) = context
+		let matched_package = context
 			.package_by_record_id
 			.values()
-			.find(|package| package.metadata.get("config_id") == Some(&package_definition.id))
-			.map(|package| package.name.clone())
-		{
+			.find(|package| package.metadata.get("config_id") == Some(&package_definition.id));
+		let dep_names = if let Some(name) = matched_package.map(|package| package.name.clone()) {
 			vec![name]
 		} else {
 			vec![package_definition.id.clone()]
 		};
-		for versioned_file in &package_definition.versioned_files {
+		let mut effective_versioned_files = package_definition.versioned_files.clone();
+		if let Some(package) = matched_package {
+			effective_versioned_files.extend(auto_discovered_lockfile_definitions(root, package));
+		}
+		for versioned_file in dedup_versioned_file_definitions(effective_versioned_files) {
 			let effective_dep_names = if let Some(override_name) = &versioned_file.name {
 				vec![override_name.clone()]
 			} else {
@@ -3584,7 +3667,7 @@ fn build_versioned_file_updates(
 			apply_versioned_file_definition(
 				root,
 				&mut updates,
-				versioned_file,
+				&versioned_file,
 				package_definition.id.as_str(),
 				version,
 				shared_release_version.as_ref(),
@@ -3642,15 +3725,19 @@ fn serialize_cached_document(
 ) -> MonochangeResult<FileUpdate> {
 	let content = match document {
 		CachedDocument::Toml(value) => toml::to_string_pretty(&value)
+			.map(String::into_bytes)
 			.map_err(|error| MonochangeError::Config(error.to_string()))?,
 		CachedDocument::Json(value) => {
 			let mut rendered = serde_json::to_string_pretty(&value)
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;
 			rendered.push('\n');
-			rendered
+			rendered.into_bytes()
 		}
 		CachedDocument::Yaml(mapping) => serde_yaml_ng::to_string(&mapping)
+			.map(String::into_bytes)
 			.map_err(|error| MonochangeError::Config(error.to_string()))?,
+		CachedDocument::Text(contents) => contents.into_bytes(),
+		CachedDocument::Bytes(contents) => contents,
 	};
 	Ok(FileUpdate {
 		path: path.to_path_buf(),
@@ -3666,28 +3753,101 @@ fn read_cached_document(
 	if let Some(cached) = updates.remove(path) {
 		return Ok(cached);
 	}
-	let contents = fs::read_to_string(path).map_err(|error| {
+	let Some(kind) = versioned_file_kind(ecosystem_type, path) else {
+		return Err(MonochangeError::Config(format!(
+			"unsupported versioned file `{}` for ecosystem `{}`",
+			path.display(),
+			match ecosystem_type {
+				monochange_core::EcosystemType::Cargo => "cargo",
+				monochange_core::EcosystemType::Npm => "npm",
+				monochange_core::EcosystemType::Deno => "deno",
+				monochange_core::EcosystemType::Dart => "dart",
+			},
+		)));
+	};
+	let contents = fs::read(path).map_err(|error| {
 		MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
 	})?;
-	match ecosystem_type {
-		monochange_core::EcosystemType::Cargo => {
-			let value = toml::from_str::<Value>(&contents).map_err(|error| {
+	let text_contents = String::from_utf8(contents.clone())
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to parse {} as utf-8 text: {error}",
+				path.display()
+			))
+		})
+		.ok();
+	match kind {
+		VersionedFileKind::Cargo(_) => {
+			let Some(contents) = text_contents.as_ref() else {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {} as text",
+					path.display()
+				)));
+			};
+			let value = toml::from_str::<Value>(contents).map_err(|error| {
 				MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
 			})?;
 			Ok(CachedDocument::Toml(value))
 		}
-		monochange_core::EcosystemType::Npm => {
-			let value = serde_json::from_str::<serde_json::Value>(&contents).map_err(|error| {
+		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::PnpmLock)
+		| VersionedFileKind::Dart(_) => {
+			let Some(contents) = text_contents.as_ref() else {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {} as text",
+					path.display()
+				)));
+			};
+			let mapping =
+				serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(contents).map_err(|error| {
+					MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
+				})?;
+			Ok(CachedDocument::Yaml(mapping))
+		}
+		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::BunLock) => {
+			let Some(contents) = text_contents else {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {} as text",
+					path.display()
+				)));
+			};
+			Ok(CachedDocument::Text(contents))
+		}
+		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::BunLockBinary) => {
+			Ok(CachedDocument::Bytes(contents))
+		}
+		VersionedFileKind::Npm(_) | VersionedFileKind::Deno(_) => {
+			let Some(contents) = text_contents.as_ref() else {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {} as text",
+					path.display()
+				)));
+			};
+			let value = serde_json::from_str::<serde_json::Value>(contents).map_err(|error| {
 				MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
 			})?;
 			Ok(CachedDocument::Json(value))
 		}
-		monochange_core::EcosystemType::Dart => {
-			let mapping =
-				serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&contents).map_err(|error| {
-					MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
-				})?;
-			Ok(CachedDocument::Yaml(mapping))
+	}
+}
+
+fn update_json_dependency_fields(
+	value: &mut serde_json::Value,
+	fields: &[&str],
+	versioned_deps: &BTreeMap<String, String>,
+) {
+	for field in fields {
+		if let Some(section) = value
+			.get_mut(*field)
+			.and_then(serde_json::Value::as_object_mut)
+		{
+			for (dep_name, dep_version) in versioned_deps {
+				if section.contains_key(dep_name) {
+					section.insert(
+						dep_name.clone(),
+						serde_json::Value::String(dep_version.clone()),
+					);
+				}
+			}
 		}
 	}
 }
@@ -3707,6 +3867,9 @@ fn resolve_versioned_prefix(
 			.clone(),
 		monochange_core::EcosystemType::Npm => {
 			context.configuration.npm.dependency_version_prefix.clone()
+		}
+		monochange_core::EcosystemType::Deno => {
+			context.configuration.deno.dependency_version_prefix.clone()
 		}
 		monochange_core::EcosystemType::Dart => {
 			context.configuration.dart.dependency_version_prefix.clone()
@@ -3740,12 +3903,16 @@ fn apply_versioned_file_definition(
 				.map(|version| (name.clone(), format!("{prefix}{version}")))
 		})
 		.collect();
-	if versioned_deps.is_empty()
-		&& !context
-			.released_versions_by_native_name
-			.values()
-			.any(|_| true)
-	{
+	let raw_versions: BTreeMap<String, String> = dep_names
+		.iter()
+		.filter_map(|name| {
+			context
+				.released_versions_by_native_name
+				.get(name)
+				.map(|version| (name.clone(), version.clone()))
+		})
+		.collect();
+	if versioned_deps.is_empty() && raw_versions.is_empty() {
 		return Ok(());
 	}
 
@@ -3757,119 +3924,129 @@ fn apply_versioned_file_definition(
 				definition.path
 			))
 		})?
-		.filter_map(Result::ok)
-		.collect::<Vec<_>>();
+		.collect::<Result<Vec<_>, _>>()
+		.map_err(|error| MonochangeError::Config(error.to_string()))?;
 
 	for resolved_path in matched_paths {
+		let Some(kind) = versioned_file_kind(definition.ecosystem_type, &resolved_path) else {
+			return Err(MonochangeError::Config(format!(
+				"versioned_files glob `{}` matched unsupported file `{}` for ecosystem `{}`; narrow the glob or change the `type`",
+				definition.path,
+				resolved_path.display(),
+				match definition.ecosystem_type {
+					monochange_core::EcosystemType::Cargo => "cargo",
+					monochange_core::EcosystemType::Npm => "npm",
+					monochange_core::EcosystemType::Deno => "deno",
+					monochange_core::EcosystemType::Dart => "dart",
+				},
+			)));
+		};
+		let package_paths_by_name = dep_names
+			.iter()
+			.filter_map(|name| {
+				context.package_by_record_id.values().find_map(|package| {
+					(package.name == *name).then(|| {
+						(
+							name.clone(),
+							relative_to_root(
+								resolved_path.parent().unwrap_or(root),
+								package
+									.manifest_path
+									.parent()
+									.unwrap_or(&package.workspace_root),
+							)
+							.unwrap_or_else(|| {
+								package
+									.manifest_path
+									.parent()
+									.unwrap_or(&package.workspace_root)
+									.to_path_buf()
+							}),
+						)
+					})
+				})
+			})
+			.collect::<BTreeMap<_, _>>();
 		let mut document =
 			read_cached_document(updates, &resolved_path, definition.ecosystem_type)?;
-		match &mut document {
-			CachedDocument::Toml(value) => {
-				// Update [package].version for the owner when releasing
-				if let Some(package_table) = value.get_mut("package").and_then(Value::as_table_mut)
-				{
-					let uses_workspace_version = package_table
-						.get("version")
-						.and_then(Value::as_table)
-						.and_then(|t| t.get("workspace"))
-						.and_then(Value::as_bool)
-						== Some(true);
-					if !uses_workspace_version {
-						package_table.insert(
-							"version".to_string(),
-							Value::String(owner_version.to_string()),
-						);
-					}
+		match (&mut document, kind) {
+			(CachedDocument::Toml(value), VersionedFileKind::Cargo(kind)) => {
+				monochange_cargo::update_versioned_file(
+					value,
+					kind,
+					&fields,
+					owner_version,
+					shared_release_version,
+					&versioned_deps,
+					&raw_versions,
+				);
+			}
+			(CachedDocument::Json(value), VersionedFileKind::Npm(kind)) => match kind {
+				monochange_npm::NpmVersionedFileKind::Manifest => {
+					monochange_npm::update_json_dependency_fields(value, &fields, &versioned_deps);
 				}
-				for field in &fields {
-					if let Some(table) = value.get_mut(*field).and_then(Value::as_table_mut) {
-						for (dep_name, dep_version) in &versioned_deps {
-							if let Some(entry) = table.get_mut(dep_name) {
-								if entry.is_str() {
-									*entry = Value::String(dep_version.clone());
-								} else if let Some(entry_table) = entry.as_table_mut() {
-									let uses_workspace = entry_table
-										.get("workspace")
-										.and_then(Value::as_bool) == Some(true);
-									if !uses_workspace {
-										entry_table.insert(
-											"version".to_string(),
-											Value::String(dep_version.clone()),
-										);
-									}
-								}
-							}
-						}
-					}
+				monochange_npm::NpmVersionedFileKind::PackageLock => {
+					monochange_npm::update_package_lock(
+						value,
+						&package_paths_by_name,
+						&raw_versions,
+					);
 				}
-				// Also handle workspace.dependencies for cargo
-				if definition.ecosystem_type == monochange_core::EcosystemType::Cargo {
-					if let Some(workspace_table) =
-						value.get_mut("workspace").and_then(Value::as_table_mut)
-					{
-						// Update workspace.package.version
-						if let Some(workspace_package) = workspace_table
-							.get_mut("package")
-							.and_then(Value::as_table_mut)
-						{
-							if let Some(shared) = shared_release_version {
-								workspace_package
-									.insert("version".to_string(), Value::String(shared.clone()));
-							}
-						}
-						// Update workspace.dependencies
-						if let Some(workspace_deps) = workspace_table
-							.get_mut("dependencies")
-							.and_then(Value::as_table_mut)
-						{
-							for (dep_name, dep_version) in &versioned_deps {
-								if let Some(entry) = workspace_deps.get_mut(dep_name) {
-									if let Some(entry_table) = entry.as_table_mut() {
-										entry_table.insert(
-											"version".to_string(),
-											Value::String(dep_version.clone()),
-										);
-									} else {
-										*entry = Value::String(dep_version.clone());
-									}
-								}
-							}
-						}
-					}
+				monochange_npm::NpmVersionedFileKind::PnpmLock
+				| monochange_npm::NpmVersionedFileKind::BunLock
+				| monochange_npm::NpmVersionedFileKind::BunLockBinary => {}
+			},
+			(CachedDocument::Yaml(mapping), VersionedFileKind::Npm(kind)) => {
+				if kind == monochange_npm::NpmVersionedFileKind::PnpmLock {
+					monochange_npm::update_pnpm_lock(mapping, &raw_versions);
 				}
 			}
-			CachedDocument::Json(value) => {
-				for field in &fields {
-					if let Some(section) = value
-						.get_mut(*field)
-						.and_then(serde_json::Value::as_object_mut)
-					{
-						for (dep_name, dep_version) in &versioned_deps {
-							if section.contains_key(dep_name) {
-								section.insert(
-									dep_name.clone(),
-									serde_json::Value::String(dep_version.clone()),
-								);
-							}
-						}
-					}
+			(CachedDocument::Text(contents), VersionedFileKind::Npm(kind)) => {
+				if kind == monochange_npm::NpmVersionedFileKind::BunLock {
+					*contents = monochange_npm::update_bun_lock(contents, &raw_versions);
 				}
 			}
-			CachedDocument::Yaml(mapping) => {
-				for field in &fields {
-					if let Some(serde_yaml_ng::Value::Mapping(section)) =
-						mapping.get_mut(serde_yaml_ng::Value::String(field.to_string()))
-					{
-						for (dep_name, dep_version) in &versioned_deps {
-							let key = serde_yaml_ng::Value::String(dep_name.clone());
-							if section.contains_key(&key) {
-								section
-									.insert(key, serde_yaml_ng::Value::String(dep_version.clone()));
-							}
-						}
-					}
+			(CachedDocument::Bytes(contents), VersionedFileKind::Npm(kind)) => {
+				if kind == monochange_npm::NpmVersionedFileKind::BunLockBinary {
+					let old_versions = dep_names
+						.iter()
+						.filter_map(|name| {
+							context.package_by_record_id.values().find_map(|package| {
+								(package.name == *name)
+									.then_some(
+										package
+											.current_version
+											.as_ref()
+											.map(|version| (name.clone(), version.to_string())),
+									)
+									.flatten()
+							})
+						})
+						.collect::<BTreeMap<_, _>>();
+					*contents = monochange_npm::update_bun_lock_binary(
+						contents,
+						&old_versions,
+						&raw_versions,
+					);
 				}
 			}
+			(CachedDocument::Json(value), VersionedFileKind::Deno(kind)) => match kind {
+				monochange_deno::DenoVersionedFileKind::Manifest => {
+					update_json_dependency_fields(value, &fields, &versioned_deps);
+				}
+				monochange_deno::DenoVersionedFileKind::Lock => {
+					monochange_deno::update_lockfile(value, &raw_versions);
+				}
+			},
+			(CachedDocument::Yaml(mapping), VersionedFileKind::Dart(kind)) => match kind {
+				monochange_dart::DartVersionedFileKind::Manifest => {
+					monochange_dart::update_dependency_fields(mapping, &fields, &versioned_deps);
+				}
+				monochange_dart::DartVersionedFileKind::Lock => {
+					monochange_dart::update_pubspec_lock(mapping, &raw_versions);
+				}
+			},
+			_ => {}
 		}
 		updates.insert(resolved_path, document);
 	}
@@ -4069,7 +4246,10 @@ fn build_cargo_manifest_updates(
 		.into_iter()
 		.map(|(path, document)| {
 			toml::to_string_pretty(&document)
-				.map(|content| FileUpdate { path, content })
+				.map(|content| FileUpdate {
+					path,
+					content: content.into_bytes(),
+				})
 				.map_err(|error| MonochangeError::Config(error.to_string()))
 		})
 		.collect()
@@ -4111,7 +4291,7 @@ fn build_npm_manifest_updates(
 		rendered.push('\n');
 		updates.push(FileUpdate {
 			path: package.manifest_path.clone(),
-			content: rendered,
+			content: rendered.into_bytes(),
 		});
 	}
 	Ok(updates)
@@ -4150,7 +4330,7 @@ fn build_dart_manifest_updates(
 			.map_err(|error| MonochangeError::Config(error.to_string()))?;
 		updates.push(FileUpdate {
 			path: package.manifest_path.clone(),
-			content: rendered,
+			content: rendered.into_bytes(),
 		});
 	}
 	Ok(updates)

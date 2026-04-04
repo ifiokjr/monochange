@@ -34,6 +34,7 @@
 //! - Rust semver provider integration for release planning
 //! <!-- {/monochangeCargoCrateDocs} -->
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::fs;
@@ -77,6 +78,145 @@ impl EcosystemAdapter for CargoAdapter {
 
 	fn discover(&self, root: &Path) -> MonochangeResult<AdapterDiscovery> {
 		discover_cargo_packages(root)
+	}
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum CargoVersionedFileKind {
+	Manifest,
+	Lock,
+}
+
+pub fn supported_versioned_file_kind(path: &Path) -> Option<CargoVersionedFileKind> {
+	let file_name = path
+		.file_name()
+		.and_then(|name| name.to_str())
+		.unwrap_or_default();
+	if file_name == "Cargo.lock" {
+		Some(CargoVersionedFileKind::Lock)
+	} else if path.extension().and_then(|ext| ext.to_str()) == Some("toml") {
+		Some(CargoVersionedFileKind::Manifest)
+	} else {
+		None
+	}
+}
+
+pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
+	let manifest_dir = package
+		.manifest_path
+		.parent()
+		.map_or_else(|| package.workspace_root.clone(), Path::to_path_buf);
+	let scope = if manifest_dir == package.workspace_root {
+		manifest_dir.clone()
+	} else {
+		package.workspace_root.clone()
+	};
+	let mut discovered = [scope.join("Cargo.lock")]
+		.into_iter()
+		.filter(|path| path.exists())
+		.collect::<Vec<_>>();
+	if discovered.is_empty() && scope != manifest_dir {
+		discovered.extend(
+			[manifest_dir.join("Cargo.lock")]
+				.into_iter()
+				.filter(|path| path.exists()),
+		);
+	}
+	discovered
+}
+
+pub fn update_versioned_file(
+	value: &mut Value,
+	kind: CargoVersionedFileKind,
+	fields: &[&str],
+	owner_version: &str,
+	shared_release_version: Option<&String>,
+	versioned_deps: &BTreeMap<String, String>,
+	raw_versions: &BTreeMap<String, String>,
+) {
+	match kind {
+		CargoVersionedFileKind::Lock => {
+			if let Some(packages) = value.get_mut("package").and_then(Value::as_array_mut) {
+				for package in packages {
+					let Some(package_table) = package.as_table_mut() else {
+						continue;
+					};
+					let Some(package_name) = package_table.get("name").and_then(Value::as_str)
+					else {
+						continue;
+					};
+					if let Some(version) = raw_versions.get(package_name) {
+						package_table.insert("version".to_string(), Value::String(version.clone()));
+					}
+				}
+			}
+		}
+		CargoVersionedFileKind::Manifest => {
+			if let Some(package_table) = value.get_mut("package").and_then(Value::as_table_mut) {
+				let uses_workspace_version = package_table
+					.get("version")
+					.and_then(Value::as_table)
+					.and_then(|t| t.get("workspace"))
+					.and_then(Value::as_bool)
+					== Some(true);
+				if !uses_workspace_version {
+					package_table.insert(
+						"version".to_string(),
+						Value::String(owner_version.to_string()),
+					);
+				}
+			}
+			for field in fields {
+				if let Some(table) = value.get_mut(*field).and_then(Value::as_table_mut) {
+					for (dep_name, dep_version) in versioned_deps {
+						if let Some(entry) = table.get_mut(dep_name) {
+							if entry.is_str() {
+								*entry = Value::String(dep_version.clone());
+							} else if let Some(entry_table) = entry.as_table_mut() {
+								let uses_workspace = entry_table
+									.get("workspace")
+									.and_then(Value::as_bool) == Some(true);
+								if !uses_workspace {
+									entry_table.insert(
+										"version".to_string(),
+										Value::String(dep_version.clone()),
+									);
+								}
+							}
+						}
+					}
+				}
+			}
+			if let Some(workspace_table) = value.get_mut("workspace").and_then(Value::as_table_mut)
+			{
+				if let Some(workspace_package) = workspace_table
+					.get_mut("package")
+					.and_then(Value::as_table_mut)
+				{
+					if let Some(shared) = shared_release_version {
+						workspace_package
+							.insert("version".to_string(), Value::String(shared.clone()));
+					}
+				}
+				if let Some(workspace_deps) = workspace_table
+					.get_mut("dependencies")
+					.and_then(Value::as_table_mut)
+				{
+					for (dep_name, dep_version) in versioned_deps {
+						if let Some(entry) = workspace_deps.get_mut(dep_name) {
+							if let Some(entry_table) = entry.as_table_mut() {
+								entry_table.insert(
+									"version".to_string(),
+									Value::String(dep_version.clone()),
+								);
+							} else {
+								*entry = Value::String(dep_version.clone());
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 }
 

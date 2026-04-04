@@ -154,7 +154,14 @@ warn_on_group_mismatch = true
 #   extra_changelog_sections — custom changelog sections with type routing
 #   empty_update_message    — per-package fallback text for transitive bumps
 #   versioned_files         — additional files to update with the new version
-#                             e.g. ["Cargo.lock"] or [{ path = "group.toml", dependency = "core" }]
+#                             package-scoped string entries infer the package ecosystem,
+#                             e.g. ["Cargo.lock"] or ["**/Cargo.toml"]
+#                             explicit typed entries remain supported, e.g.
+#                             [{ path = "lockfiles/shared/package-lock.json", type = "npm" }]
+#                             npm-family lockfiles include package-lock.json,
+#                             pnpm-lock.yaml, bun.lock, and bun.lockb
+#   ignore_ecosystem_versioned_files — opt out of inherited [ecosystems.<name>].versioned_files
+#                             defaults for this package (default: false)
 #   ignored_paths           — glob patterns for paths within this package to
 #                             exclude from changeset verification
 #   additional_paths        — glob patterns for paths outside the package
@@ -191,6 +198,8 @@ changelog = "{{ pkg.changelog }}"
 #   empty_update_message    — fallback text when the group bumps but a
 #                             specific member has no direct changeset entries
 #   versioned_files         — additional files to version-bump with the group
+#                             groups must use explicit typed entries because the
+#                             ecosystem cannot be inferred from a bare string
 #   tag                     — create a git tag for the group release (default: false)
 #   release                 — create a provider release for the group (default: false)
 #   version_format          — "namespaced" (default) or "primary"
@@ -249,6 +258,8 @@ version_format = "primary"
 #              meaning discovery runs when manifests are found)
 #   roots    — restrict discovery to specific directories (default: scan entire repo)
 #   exclude  — glob patterns to exclude from discovery
+#   dependency_version_prefix — default dependency prefix for typed versioned_files
+#   versioned_files — ecosystem-wide default versioned_files inherited by matching packages
 
 {% if has_cargo %}
 [ecosystems.cargo]

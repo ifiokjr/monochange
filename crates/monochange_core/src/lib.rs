@@ -362,6 +362,7 @@ pub enum VersionFormat {
 pub enum EcosystemType {
 	Cargo,
 	Npm,
+	Deno,
 	Dart,
 }
 
@@ -370,7 +371,7 @@ impl EcosystemType {
 	pub fn default_prefix(self) -> &'static str {
 		match self {
 			Self::Cargo => "",
-			Self::Npm | Self::Dart => "^",
+			Self::Npm | Self::Deno | Self::Dart => "^",
 		}
 	}
 
@@ -379,6 +380,7 @@ impl EcosystemType {
 		match self {
 			Self::Cargo => &["dependencies", "dev-dependencies", "build-dependencies"],
 			Self::Npm => &["dependencies", "devDependencies", "peerDependencies"],
+			Self::Deno => &["imports"],
 			Self::Dart => &["dependencies", "dev_dependencies"],
 		}
 	}
@@ -455,6 +457,8 @@ pub struct PackageDefinition {
 	pub empty_update_message: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
+	pub ignore_ecosystem_versioned_files: bool,
+	#[serde(default)]
 	pub ignored_paths: Vec<String>,
 	#[serde(default)]
 	pub additional_paths: Vec<String>,
@@ -513,6 +517,8 @@ pub struct EcosystemSettings {
 	pub exclude: Vec<String>,
 	#[serde(default)]
 	pub dependency_version_prefix: Option<String>,
+	#[serde(default)]
+	pub versioned_files: Vec<VersionedFileDefinition>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
