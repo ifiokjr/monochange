@@ -38,6 +38,42 @@ fn release_pr_dry_run_supports_gitea_sources() {
 	assert_eq!(release_request["baseBranch"], "main");
 }
 
+#[test]
+fn source_provider_fixtures_support_configured_commands() {
+	for (relative_fixture, command) in [
+		("../../fixtures/source/github", "publish-release"),
+		("../../fixtures/source/gitlab", "publish-release"),
+		("../../fixtures/source/gitea", "release-pr"),
+	] {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture);
+		copy_directory(&fixture_root, tempdir.path());
+		let json = run_json_command(tempdir.path(), command);
+		assert!(json.is_object(), "expected json object output");
+	}
+}
+
+#[test]
+fn github_source_fixture_supports_release_and_pull_request_dry_runs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/source/github");
+	copy_directory(&fixture_root, tempdir.path());
+
+	let publish_json = run_json_command(tempdir.path(), "publish-release");
+	let releases = publish_json["releases"]
+		.as_array()
+		.unwrap_or_else(|| panic!("expected releases array"));
+	assert_eq!(releases[0]["provider"], "github");
+	assert_eq!(releases[0]["repository"], "ifiokjr/monochange");
+
+	let pr_json = run_json_command(tempdir.path(), "release-pr");
+	assert_eq!(pr_json["releaseRequest"]["provider"], "github");
+	assert_eq!(
+		pr_json["releaseRequest"]["repository"],
+		"ifiokjr/monochange"
+	);
+}
+
 fn run_json_command(root: &Path, command: &str) -> Value {
 	let output = cli()
 		.current_dir(root)
@@ -206,6 +242,27 @@ core: patch
 #### add gitea support
 ",
 	);
+}
+
+fn copy_directory(source: &Path, destination: &Path) {
+	fs::create_dir_all(destination).unwrap_or_else(|error| panic!("create dir: {error}"));
+	for entry in fs::read_dir(source).unwrap_or_else(|error| panic!("read dir: {error}")) {
+		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
+		let file_type = entry
+			.file_type()
+			.unwrap_or_else(|error| panic!("file type: {error}"));
+		let source_path = entry.path();
+		let destination_path = destination.join(entry.file_name());
+		if file_type.is_dir() {
+			copy_directory(&source_path, &destination_path);
+		} else {
+			if let Some(parent) = destination_path.parent() {
+				fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
+			}
+			fs::copy(&source_path, &destination_path)
+				.unwrap_or_else(|error| panic!("copy file: {error}"));
+		}
+	}
 }
 
 fn write_file(path: impl AsRef<Path>, content: &str) {

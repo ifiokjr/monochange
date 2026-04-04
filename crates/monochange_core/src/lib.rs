@@ -1240,6 +1240,17 @@ impl fmt::Display for SourceProvider {
 	}
 }
 
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct SourceCapabilities {
+	pub draft_releases: bool,
+	pub prereleases: bool,
+	pub generated_release_notes: bool,
+	pub auto_merge_change_requests: bool,
+	pub released_issue_comments: bool,
+	pub requires_host: bool,
+}
+
 pub type ReleaseNotesSource = GitHubReleaseNotesSource;
 pub type ReleaseProviderSettings = GitHubReleaseSettings;
 pub type ChangeRequestSettings = GitHubPullRequestSettings;

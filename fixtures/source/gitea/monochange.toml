@@ -1,0 +1,39 @@
+[defaults]
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+tag = true
+release = true
+
+[source]
+provider = "gitea"
+owner = "org"
+repo = "monochange"
+host = "https://codeberg.org"
+
+[source.releases]
+source = "monochange"
+
+[source.pull_requests]
+base = "main"
+branch_prefix = "monochange/release"
+labels = ["release"]
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release-pr]
+
+[[cli.release-pr.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release-pr.steps]]
+type = "PrepareRelease"
+
+[[cli.release-pr.steps]]
+type = "OpenReleaseRequest"

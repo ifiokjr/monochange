@@ -111,6 +111,7 @@ use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOperation;
 use monochange_core::SourceChangeRequestOutcome;
@@ -133,6 +134,30 @@ pub type GitHubReleaseOutcome = SourceReleaseOutcome;
 pub type GitHubPullRequestRequest = SourceChangeRequest;
 pub type GitHubPullRequestOperation = SourceChangeRequestOperation;
 pub type GitHubPullRequestOutcome = SourceChangeRequestOutcome;
+
+#[must_use]
+pub const fn source_capabilities() -> SourceCapabilities {
+	SourceCapabilities {
+		draft_releases: true,
+		prereleases: true,
+		generated_release_notes: true,
+		auto_merge_change_requests: true,
+		released_issue_comments: true,
+		requires_host: false,
+	}
+}
+
+pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
+	if source.releases.generate_notes
+		&& matches!(source.releases.source, ReleaseNotesSource::Monochange)
+	{
+		return Err(MonochangeError::Config(
+			"[source.releases].generate_notes cannot be true when `source = \"monochange\"`; choose one release-note source"
+				.to_string(),
+		));
+	}
+	Ok(())
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
