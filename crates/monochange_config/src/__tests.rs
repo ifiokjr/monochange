@@ -190,31 +190,32 @@ auto_merge = true
 
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let github = configuration
-		.github
-		.unwrap_or_else(|| panic!("expected github config"));
-	assert_eq!(github.owner, "ifiokjr");
-	assert_eq!(github.repo, "monochange");
-	assert!(github.releases.enabled);
-	assert!(github.releases.draft);
-	assert!(github.releases.prerelease);
-	assert!(github.releases.generate_notes);
+	let source = configuration
+		.source
+		.unwrap_or_else(|| panic!("expected source config"));
+	assert_eq!(source.provider, monochange_core::SourceProvider::GitHub);
+	assert_eq!(source.owner, "ifiokjr");
+	assert_eq!(source.repo, "monochange");
+	assert!(source.releases.enabled);
+	assert!(source.releases.draft);
+	assert!(source.releases.prerelease);
+	assert!(source.releases.generate_notes);
 	assert_eq!(
-		github.releases.source,
+		source.releases.source,
 		monochange_core::GitHubReleaseNotesSource::GitHubGenerated
 	);
-	assert!(github.pull_requests.enabled);
-	assert_eq!(github.pull_requests.branch_prefix, "automation/release");
-	assert_eq!(github.pull_requests.base, "develop");
+	assert!(source.pull_requests.enabled);
+	assert_eq!(source.pull_requests.branch_prefix, "automation/release");
+	assert_eq!(source.pull_requests.base, "develop");
 	assert_eq!(
-		github.pull_requests.title,
+		source.pull_requests.title,
 		"chore(release): prepare release"
 	);
 	assert_eq!(
-		github.pull_requests.labels,
+		source.pull_requests.labels,
 		vec!["release", "automated", "bot"]
 	);
-	assert!(github.pull_requests.auto_merge);
+	assert!(source.pull_requests.auto_merge);
 }
 
 #[test]
@@ -247,19 +248,20 @@ ignored_paths = ["docs/**", "*.md"]
 
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let github = configuration
-		.github
-		.unwrap_or_else(|| panic!("expected github config"));
+	let source = configuration
+		.source
+		.unwrap_or_else(|| panic!("expected source config"));
 
-	assert!(github.bot.changesets.enabled);
-	assert!(github.bot.changesets.required);
-	assert!(github.bot.changesets.comment_on_failure);
+	assert_eq!(source.provider, monochange_core::SourceProvider::GitHub);
+	assert!(source.bot.changesets.enabled);
+	assert!(source.bot.changesets.required);
+	assert!(source.bot.changesets.comment_on_failure);
 	assert_eq!(
-		github.bot.changesets.skip_labels,
+		source.bot.changesets.skip_labels,
 		vec!["no-changeset-required", "internal"]
 	);
-	assert_eq!(github.bot.changesets.changed_paths, vec!["crates/**"]);
-	assert_eq!(github.bot.changesets.ignored_paths, vec!["docs/**", "*.md"]);
+	assert_eq!(source.bot.changesets.changed_paths, vec!["crates/**"]);
+	assert_eq!(source.bot.changesets.ignored_paths, vec!["docs/**", "*.md"]);
 }
 
 #[test]
