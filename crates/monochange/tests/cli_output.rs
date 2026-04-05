@@ -7,6 +7,9 @@ use insta_cmd::assert_cmd_snapshot;
 use insta_cmd::get_cargo_bin;
 use tempfile::tempdir;
 
+mod test_support;
+use test_support::{copy_directory, fixture_path};
+
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
@@ -44,7 +47,51 @@ fn validate_cli_succeeds_for_valid_workspace() {
 	exit_code: 0
 	----- stdout -----
 	workspace validation passed for .
-	
+
+	----- stderr -----
+	"###
+	);
+}
+
+#[test]
+fn change_cli_help_documents_package_and_group_targeting_rules() {
+	apply_common_filters!();
+
+	assert_cmd_snapshot!(
+		cli().arg("change").arg("--help"),
+		@r###"
+	success: true
+	exit_code: 0
+	----- stdout -----
+	Create a change file for one or more packages
+
+	Usage: mc change [OPTIONS]
+
+	Options:
+	      --dry-run              Run the command in dry-run mode when supported
+	  -i, --interactive          Select packages, bumps, and options interactively
+	      --package <PACKAGE>    Package or group to include in the change
+	      --bump <BUMP>          Requested semantic version bump [default: patch] [possible values: patch, minor, major]
+	      --version <VERSION>    Pin an explicit version for this release
+	      --reason <REASON>      Short release-note summary for this change
+	      --type <TYPE>          Optional release-note type such as `security` or `note`
+	      --details <DETAILS>    Optional multi-line release-note details
+	      --evidence <EVIDENCE>  Additional evidence strings to include
+	      --output <PATH>        Write the generated change file to a specific path
+	  -h, --help                 Print help
+
+	Examples:
+	  mc change --package sdk-core --bump patch --reason "fix panic"
+	  mc change --package sdk-core --bump minor --reason "add API" --output .changeset/sdk-core.md
+	  mc change --package sdk --bump minor --reason "coordinated release"
+
+	Rules:
+	  - Prefer configured package ids in change files whenever a leaf package changed.
+	  - Use a group id only when the change is intentionally owned by the whole group.
+	  - Dependents and grouped members are propagated automatically during planning.
+	  - Legacy manifest paths may still resolve during migration, but declared ids are the stable interface.
+
+
 	----- stderr -----
 	"###
 	);
@@ -141,7 +188,7 @@ fn discover_cli_json_reports_relative_paths_and_stable_ids() {
 	  "warnings": [],
 	  "workspaceRoot": "."
 	}
-	
+
 	----- stderr -----
 	"###
 	);
@@ -151,7 +198,7 @@ fn discover_cli_json_reports_relative_paths_and_stable_ids() {
 fn change_cli_writes_requested_file_contents() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_ungrouped_release_fixture(tempdir.path());
+	copy_directory(&fixture_path("cli-output/ungrouped-basic"), tempdir.path());
 	let output_path = tempdir.path().join("feature.md");
 
 	assert_cmd_snapshot!(
@@ -171,7 +218,7 @@ fn change_cli_writes_requested_file_contents() {
 	exit_code: 0
 	----- stdout -----
 	wrote change file feature.md
-	
+
 	----- stderr -----
 	"###
 	);
@@ -191,7 +238,7 @@ core: minor
 fn change_cli_writes_explicit_versions_when_requested() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_ungrouped_release_fixture(tempdir.path());
+	copy_directory(&fixture_path("cli-output/ungrouped-basic"), tempdir.path());
 	let output_path = tempdir.path().join("versioned.md");
 
 	assert_cmd_snapshot!(
@@ -213,7 +260,7 @@ fn change_cli_writes_explicit_versions_when_requested() {
 	exit_code: 0
 	----- stdout -----
 	wrote change file versioned.md
-	
+
 	----- stderr -----
 	"###
 	);
@@ -235,7 +282,7 @@ core:
 fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_ungrouped_release_fixture(tempdir.path());
+	copy_directory(&fixture_path("cli-output/ungrouped-basic"), tempdir.path());
 
 	assert_cmd_snapshot!(
 		cli()
@@ -256,7 +303,7 @@ fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	changed files:
 	- crates/app/Cargo.toml
 	- crates/core/Cargo.toml
-	
+
 	----- stderr -----
 	"###
 	);
@@ -266,17 +313,9 @@ fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 fn release_dry_run_cli_uses_explicit_group_versions_from_member_changes() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_group_release_fixture(tempdir.path());
-	write_file(
-		tempdir.path().join(".changeset/feature.md"),
-		r"---
-core:
-  bump: major
-  version: 2.0.0
----
-
-#### promote sdk to stable
-",
+	copy_directory(
+		&fixture_path("cli-output/group-explicit-version"),
+		tempdir.path(),
 	);
 
 	assert_cmd_snapshot!(
@@ -302,7 +341,7 @@ core:
 	- crates/core/CHANGELOG.md
 	- crates/core/Cargo.toml
 	- group.toml
-	
+
 	----- stderr -----
 	"###
 	);
@@ -312,7 +351,7 @@ core:
 fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_group_release_fixture(tempdir.path());
+	copy_directory(&fixture_path("cli-output/group-basic"), tempdir.path());
 
 	assert_cmd_snapshot!(
 		cli()
@@ -479,7 +518,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	    "compatibilityEvidence": []
 	  }
 	}
-	
+
 	----- stderr -----
 	"###
 	);
@@ -489,7 +528,10 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 fn verify_cli_json_reports_failure_comment() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_changeset_policy_fixture(tempdir.path(), false);
+	copy_directory(
+		&fixture_path("cli-output/changeset-policy-no-changeset"),
+		tempdir.path(),
+	);
 
 	assert_cmd_snapshot!(
 		cli()
@@ -530,7 +572,7 @@ fn verify_cli_json_reports_failure_comment() {
 	    "changed packages are not covered by attached changesets: core"
 	  ]
 	}
-	
+
 	----- stderr -----
 	"####
 	);
@@ -540,7 +582,10 @@ fn verify_cli_json_reports_failure_comment() {
 fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_release_pr_workflow_fixture(tempdir.path());
+	copy_directory(
+		&fixture_path("cli-output/release-pr-workflow"),
+		tempdir.path(),
+	);
 
 	assert_cmd_snapshot!(
 		cli()
@@ -575,7 +620,10 @@ fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 fn release_manifest_workflow_writes_manifest_json() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_manifest_workflow_fixture(tempdir.path());
+	copy_directory(
+		&fixture_path("cli-output/release-manifest-workflow"),
+		tempdir.path(),
+	);
 
 	assert_cmd_snapshot!(
 		cli()
@@ -599,7 +647,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	- crates/core/CHANGELOG.md
 	- crates/core/Cargo.toml
 	- group.toml
-	
+
 	----- stderr -----
 	"###
 	);
@@ -769,9 +817,10 @@ fn release_manifest_workflow_writes_manifest_json() {
 fn release_cli_reports_missing_changesets_cleanly() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_ungrouped_release_fixture(tempdir.path());
-	fs::remove_file(tempdir.path().join(".changeset/feature.md"))
-		.unwrap_or_else(|error| panic!("remove changeset: {error}"));
+	copy_directory(
+		&fixture_path("cli-output/ungrouped-no-changeset"),
+		tempdir.path(),
+	);
 
 	assert_cmd_snapshot!(
 		cli().current_dir(tempdir.path()).arg("release"),
@@ -779,7 +828,7 @@ fn release_cli_reports_missing_changesets_cleanly() {
 	success: false
 	exit_code: 1
 	----- stdout -----
-	
+
 	----- stderr -----
 	config error: no markdown changesets found under .changeset
 	"###
@@ -790,7 +839,7 @@ fn release_cli_reports_missing_changesets_cleanly() {
 fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_group_release_fixture(tempdir.path());
+	copy_directory(&fixture_path("cli-output/group-basic"), tempdir.path());
 
 	assert_cmd_snapshot!(
 		cli().current_dir(tempdir.path()).arg("release"),
@@ -812,7 +861,7 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 	- group.toml
 	deleted changesets:
 	- .changeset/feature.md
-	
+
 	----- stderr -----
 	"###
 	);
@@ -841,25 +890,9 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 fn validate_cli_rejects_packages_in_multiple_groups() {
 	apply_common_filters!();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("crates/core/Cargo.toml"),
-		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
-	);
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[group.sdk]
-packages = ["core"]
-
-[group.cli]
-packages = ["core"]
-"#,
+	copy_directory(
+		&fixture_path("cli-output/multiple-groups-validation"),
+		tempdir.path(),
 	);
 
 	assert_cmd_snapshot!(
@@ -868,7 +901,7 @@ packages = ["core"]
 	success: false
 	exit_code: 1
 	----- stdout -----
-	
+
 	----- stderr -----
 	error: package `core` belongs to multiple groups: `cli` and `sdk`
 	--> monochange.toml
@@ -878,360 +911,4 @@ packages = ["core"]
 	help: move the package into exactly one [group.<id>] declaration
 	"###
 	);
-}
-
-fn copy_directory(source: &Path, destination: &Path) {
-	fs::create_dir_all(destination)
-		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
-	for entry in fs::read_dir(source)
-		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
-	{
-		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
-		let source_path = entry.path();
-		let destination_path = destination.join(entry.file_name());
-		let file_type = entry
-			.file_type()
-			.unwrap_or_else(|error| panic!("file type {}: {error}", source_path.display()));
-		if file_type.is_dir() {
-			copy_directory(&source_path, &destination_path);
-		} else if file_type.is_file() {
-			if let Some(parent) = destination_path.parent() {
-				fs::create_dir_all(parent)
-					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
-			}
-			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
-				panic!(
-					"copy {} -> {}: {error}",
-					source_path.display(),
-					destination_path.display()
-				)
-			});
-		}
-	}
-}
-
-fn seed_ungrouped_release_fixture(root: &Path) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "1.0.0"
-
-[workspace.dependencies]
-workflow-core = { path = "./crates/core", version = "1.0.0" }
-workflow-app = { path = "./crates/app", version = "1.0.0" }
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(
-		root.join("crates/app/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-app"
-version = { workspace = true }
-edition = "2021"
-
-[dependencies]
-workflow-core = { workspace = true }
-"#,
-	);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-parent_bump = "patch"
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[package.app]
-path = "crates/app"
-
-[ecosystems.cargo]
-enabled = true
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### add feature
-",
-	);
-}
-
-fn seed_group_release_fixture(root: &Path) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "1.0.0"
-
-[workspace.dependencies]
-workflow-core = { path = "./crates/core", version = "1.0.0" }
-workflow-app = { path = "./crates/app", version = "1.0.0" }
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(
-		root.join("crates/app/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-app"
-version = { workspace = true }
-edition = "2021"
-
-[dependencies]
-workflow-core = { workspace = true }
-"#,
-	);
-	write_file(root.join("changelog.md"), "# Changelog\n");
-	write_file(
-		root.join("group.toml"),
-		"[workspace.package]\nversion = \"1.0.0\"\n[workspace.dependencies]\nworkflow-core = { version = \"1.0.0\" }\nworkflow-app = { version = \"1.0.0\" }\n",
-	);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-parent_bump = "patch"
-package_type = "cargo"
-changelog = false
-
-[package.core]
-path = "crates/core"
-changelog = true
-
-[package.app]
-path = "crates/app"
-changelog = false
-
-[group.sdk]
-packages = ["core", "app"]
-changelog = "changelog.md"
-versioned_files = [{ path = "group.toml", type = "cargo" }]
-tag = true
-release = true
-version_format = "primary"
-
-[ecosystems.cargo]
-enabled = true
-
-[cli.release]
-
-[[cli.release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### add feature
-",
-	);
-}
-
-fn seed_manifest_workflow_fixture(root: &Path) {
-	seed_group_release_fixture(root);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-parent_bump = "patch"
-package_type = "cargo"
-changelog = false
-
-[package.core]
-path = "crates/core"
-changelog = true
-
-[package.app]
-path = "crates/app"
-changelog = false
-
-[group.sdk]
-packages = ["core", "app"]
-changelog = "changelog.md"
-versioned_files = [{ path = "group.toml", type = "cargo" }]
-tag = true
-release = true
-version_format = "primary"
-
-[ecosystems.cargo]
-enabled = true
-
-[cli.release-manifest]
-
-[[cli.release-manifest.steps]]
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-"#,
-	);
-}
-
-fn seed_changeset_policy_fixture(root: &Path, with_changeset: bool) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
-	);
-	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[changesets.verify]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required"]
-comment_on_failure = true
-
-[package.core]
-path = "crates/core"
-
-[cli.affected]
-
-[[cli.affected.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.affected.inputs]]
-name = "changed_paths"
-type = "string_list"
-
-[[cli.affected.inputs]]
-name = "since"
-type = "string"
-
-[[cli.affected.inputs]]
-name = "verify"
-type = "boolean"
-
-[[cli.affected.inputs]]
-name = "label"
-type = "string_list"
-
-[[cli.affected.steps]]
-type = "AffectedPackages"
-"#,
-	);
-	if with_changeset {
-		write_file(
-			root.join(".changeset/feature.md"),
-			r"---
-core: patch
----
-
-#### add feature
-",
-		);
-	}
-}
-
-fn seed_release_pr_workflow_fixture(root: &Path) {
-	seed_group_release_fixture(root);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-parent_bump = "patch"
-package_type = "cargo"
-changelog = false
-
-[package.core]
-path = "crates/core"
-changelog = true
-
-[package.app]
-path = "crates/app"
-changelog = false
-
-[group.sdk]
-packages = ["core", "app"]
-changelog = "changelog.md"
-versioned_files = [{ path = "group.toml", type = "cargo" }]
-tag = true
-release = true
-version_format = "primary"
-
-[github]
-owner = "ifiokjr"
-repo = "monochange"
-
-[github.pull_requests]
-branch_prefix = "monochange/release"
-base = "main"
-labels = ["release", "automated"]
-
-[ecosystems.cargo]
-enabled = true
-
-[cli.release-pr]
-
-[[cli.release-pr.steps]]
-type = "PrepareRelease"
-
-[[cli.release-pr.steps]]
-type = "OpenReleaseRequest"
-"#,
-	);
-}
-
-fn write_file(path: impl AsRef<Path>, content: &str) {
-	let path = path.as_ref();
-	if let Some(parent) = path.parent() {
-		fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
-	}
-	fs::write(path, content)
-		.unwrap_or_else(|error| panic!("write file {}: {error}", path.display()));
 }

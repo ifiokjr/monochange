@@ -1,0 +1,4 @@
+[package]
+name = "workflow-core"
+version = { workspace = true }
+edition = "2021"

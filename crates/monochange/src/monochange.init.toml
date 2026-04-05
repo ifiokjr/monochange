@@ -210,6 +210,9 @@ changelog = "{{ pkg.changelog }}"
 #   - a package may belong to only one group
 #   - only one package or group may use version_format = "primary"
 #   - group tag/release/version_format override member package settings
+#   - prefer package ids in authored changesets when possible; dependents and
+#     grouped members propagate automatically, so group ids are best for
+#     intentionally group-owned releases
 
 {% if has_group %}
 [group.main]

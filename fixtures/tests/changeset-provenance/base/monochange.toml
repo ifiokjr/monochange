@@ -1,0 +1,22 @@
+[defaults]
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "monochange"
+
+[release_notes]
+change_templates = ["#### {{ summary }}\n\n{{ details }}\n\n{{ context }}", "#### {{ summary }}\n\n{{ context }}", "- {{ summary }}"]
+
+[package.core]
+path = "crates/core"
+
+[cli.release-manifest]
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[cli.release-manifest.steps]]
+type = "PrepareRelease"
+
+[[cli.release-manifest.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"

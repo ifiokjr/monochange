@@ -1,0 +1,32 @@
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
+
+[cli.affected]
+
+[[cli.affected.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.affected.inputs]]
+name = "changed_paths"
+type = "string_list"
+
+[[cli.affected.inputs]]
+name = "label"
+type = "string_list"
+
+[[cli.affected.steps]]
+type = "AffectedPackages"

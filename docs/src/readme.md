@@ -67,6 +67,8 @@ Create a change file:
 mc change --package monochange --bump minor --reason "add release planning"
 ```
 
+Prefer package ids for authored changes whenever a leaf package changed. MonoChange will propagate bumps to dependents and synchronize configured groups for you, so group ids are best reserved for intentionally group-owned changes.
+
 Preview the release command:
 
 ```bash
