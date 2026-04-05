@@ -398,11 +398,54 @@ fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
 				.action(ArgAction::SetTrue),
 		);
 
+	if let Some(after_help) = cli_command_after_help(cli_command) {
+		command = command.after_help(after_help);
+	}
+
 	for input in &cli_command.inputs {
 		command = command.arg(build_cli_command_input_arg(input));
 	}
 
 	command
+}
+
+fn cli_command_after_help(cli_command: &CliCommandDefinition) -> Option<&'static str> {
+	match cli_command.name.as_str() {
+		"change" => Some(
+			r#"Examples:
+  mc change --package sdk-core --bump patch --reason "fix panic"
+  mc change --package sdk-core --bump minor --reason "add API" --output .changeset/sdk-core.md
+  mc change --package sdk --bump minor --reason "coordinated release"
+
+Rules:
+  - Prefer configured package ids in change files whenever a leaf package changed.
+  - Use a group id only when the change is intentionally owned by the whole group.
+  - Dependents and grouped members are propagated automatically during planning.
+  - Legacy manifest paths may still resolve during migration, but declared ids are the stable interface."#,
+		),
+		"release" => Some(
+			r#"Examples:
+  mc release --dry-run --format text
+  mc release --dry-run --format json
+  mc release
+
+Planning reminders:
+  - Direct package changes propagate to dependents using defaults.parent_bump.
+  - Group synchronization happens before final output is rendered.
+  - Explicit versions on grouped members propagate to the whole group."#,
+		),
+		"affected" => Some(
+			r#"Examples:
+  mc affected --changed-paths crates/core/src/lib.rs --format json
+  mc affected --since origin/main --verify
+
+Verification reminders:
+  - Prefer package ids in .changeset files.
+  - Group-owned changesets cover all members of that group.
+  - Ignored paths and skip labels are controlled from [changesets.verify]."#,
+		),
+		_ => None,
+	}
 }
 
 fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {

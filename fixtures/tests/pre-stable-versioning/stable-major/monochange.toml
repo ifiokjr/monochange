@@ -1,0 +1,23 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"

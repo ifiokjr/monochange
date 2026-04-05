@@ -1,0 +1,4 @@
+name: mobile_sdk
+version: 1.0.0
+dependencies:
+  web-sdk: ^1.0.0

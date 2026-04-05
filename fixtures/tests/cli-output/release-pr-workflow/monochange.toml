@@ -1,0 +1,40 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = false
+
+[package.core]
+path = "crates/core"
+changelog = true
+
+[package.app]
+path = "crates/app"
+changelog = false
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+versioned_files = [{ path = "group.toml", type = "cargo" }]
+tag = true
+release = true
+version_format = "primary"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.pull_requests]
+branch_prefix = "monochange/release"
+base = "main"
+labels = ["release", "automated"]
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release-pr]
+
+[[cli.release-pr.steps]]
+type = "PrepareRelease"
+
+[[cli.release-pr.steps]]
+type = "OpenReleaseRequest"

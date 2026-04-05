@@ -1,0 +1,34 @@
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**", "**/__tests.rs"]
+
+[package.other]
+path = "crates/other"
+
+[cli.affected]
+[[cli.affected.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+[[cli.affected.inputs]]
+name = "changed_paths"
+type = "string_list"
+[[cli.affected.inputs]]
+name = "since"
+type = "string"
+[[cli.affected.inputs]]
+name = "verify"
+type = "boolean"
+[[cli.affected.inputs]]
+name = "label"
+type = "string_list"
+[[cli.affected.steps]]
+type = "AffectedPackages"

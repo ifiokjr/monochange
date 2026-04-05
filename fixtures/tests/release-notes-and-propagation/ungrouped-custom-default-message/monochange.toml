@@ -1,0 +1,21 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+empty_update_message = "Automated bump for {{ package }} ({{ bump }} -> {{ version }})."
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"

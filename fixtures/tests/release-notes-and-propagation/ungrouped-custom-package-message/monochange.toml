@@ -1,0 +1,37 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+
+[release_notes]
+change_templates = ["This entry appears in changelog via `group.sdk.changelog.text`\n\n### Features\n- **{{ package }}**: {{ summary }}"]
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+empty_update_message = "No changes were recorded for some group members; as a result, package changelogs were synchronized to version {{ version }}."
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"

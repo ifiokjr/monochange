@@ -1,0 +1,30 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+
+[release_notes]
+change_templates = ["- [{{ bump }}] {{ summary }}"]
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"

@@ -1,0 +1,34 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+tag = true
+release = true
+version_format = "primary"
+empty_update_message = "Release driven by group {{ group }}, version {{ version }}."
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"
