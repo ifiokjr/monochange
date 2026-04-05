@@ -3,10 +3,39 @@ monochange: minor
 monochange_config: minor
 monochange_core: minor
 monochange_github: minor
+monochange_cargo: minor
+monochange_graph: minor
 ---
 
 #### add release pull request automation workflows
 
-Add typed GitHub release pull request configuration through `[github.pull_requests]`, a first-class `OpenReleasePullRequest` workflow step, and deterministic release-PR branch/body rendering derived from the shared release manifest.
+The `OpenReleasePullRequest` step (formerly `OpenGitHubReleasePullRequest`) automates the release PR lifecycle from a single workflow:
 
-Dry-run workflows now preview release pull request payloads as structured JSON, while live runs can create or update a dedicated release branch, commit the prepared release changes, push that branch, and open or refresh the GitHub pull request through `git` and `gh`.
+```toml
+[cli.release-pr]
+[[cli.release-pr.steps]]
+type = "PrepareRelease"
+
+[[cli.release-pr.steps]]
+type = "OpenReleasePullRequest"
+```
+
+```bash
+mc release-pr --dry-run --format json   # preview branch name, title, and PR body
+mc release-pr                           # commit prepared changes, push branch, open/refresh PR
+```
+
+Live runs perform all steps in sequence: commit the prepared release changes to a release branch (e.g. `release/next`), push the branch, and call `gh pr create` (or update if one already exists). The PR body is rendered deterministically from the shared release manifest, so re-running `mc release-pr` on an existing PR refreshes the body without creating duplicates.
+
+Pull-request behaviour is configured through `[source.pull_requests]`:
+
+```toml
+[source.pull_requests]
+enabled = true
+branch_prefix = "release/"
+base = "main"
+title = "chore: release {{ version }}"
+labels = ["release"]
+```
+
+**`monochange_github`** owns the PR-request building and `gh` wrapper. **`monochange_core`** adds the graph-level `source_path` field on `ChangeSignal` that lets the step track which changeset files belong to the prepared commit.
