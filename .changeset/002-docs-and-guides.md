@@ -1,9 +1,31 @@
 ---
 monochange: patch
+monochange_cargo: patch
+monochange_config: patch
+monochange_core: patch
+monochange_dart: patch
+monochange_deno: patch
+monochange_graph: patch
+monochange_npm: patch
+monochange_semver: patch
 ---
 
 #### document discovery, release planning, and contributor workflow
 
-Expand the project documentation to make the first `monochange` milestone much more approachable for contributors and early adopters. This update adds and refines the mdBook guides, repository readme content, quickstart material, and supporting specification artifacts so the documented workflow matches the implemented CLI behavior.
+Expand the project documentation to cover the full first milestone workflow with concrete CLI examples. The updated guides walk through every step a new contributor needs:
 
-The updated docs explain how to configure `monochange.toml`, discover packages, create markdown changesets, inspect release plans, and understand version-group behavior across multiple ecosystems. Contributor-facing guidance was also improved so the local validation and development workflow is clearer.
+```bash
+# discover all packages across ecosystems
+mc workspace discover --root . --format json
+
+# create a change file for a specific package
+mc changes add --root . --package my-lib --bump minor --reason "add new helper"
+
+# inspect the release plan before committing
+mc plan release --root . --changes .changeset/*.md --format json
+
+# execute the release
+mc release --dry-run
+```
+
+The mdBook guides were updated to document how `monochange.toml` configures packages and groups, how the graph propagation works when a dependency bumps its version, and how version-group synchronization keeps multi-ecosystem packages in step with each other.

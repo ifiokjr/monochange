@@ -1,9 +1,23 @@
 ---
-main: minor
+monochange: minor
+monochange_cargo: minor
 ---
 
 #### validate that cargo workspace-versioned packages share the same group
 
-`mc validate` now checks that all Cargo packages using `version.workspace = true` within the same Cargo workspace are assigned to the same version group. This prevents configuration mistakes where workspace-versioned packages are split across different groups or left ungrouped, which would cause version drift since they share a single `[workspace.package].version` field.
+`mc validate` now errors when Cargo packages that share `version.workspace = true` are placed in different version groups or left ungrouped. All workspace-versioned packages must belong to the same group because they share a single `[workspace.package].version` field — putting them in separate groups would cause version drift.
 
-The cargo adapter now marks discovered packages with `uses_workspace_version` metadata when they inherit their version from the workspace root, enabling the validation step to identify them without re-parsing manifests.
+```bash
+mc validate
+# error: cargo workspace-versioned packages must belong to the same group
+#   "core" → group "sdk"
+#   "cli"  → group "tools"   ← conflict
+```
+
+```toml
+# correct – all workspace-versioned crates in the same group
+[group.sdk]
+packages = ["core", "cli"]
+```
+
+**`monochange_cargo`** marks each discovered package with `uses_workspace_version = true` when its `Cargo.toml` contains `version.workspace = true`. **`monochange`** (the top-level crate) reads this metadata during `mc validate` to identify the constraint violation without re-parsing manifests.
