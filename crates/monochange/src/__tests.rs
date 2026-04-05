@@ -2356,7 +2356,7 @@ fn template_value_to_input_values_number_returns_string() {
 	use serde_json::json;
 	use super::template_value_to_input_values;
 	assert_eq!(template_value_to_input_values(&json!(42)), vec!["42".to_string()]);
-	assert_eq!(template_value_to_input_values(&json!(3.14)), vec!["3.14".to_string()]);
+	assert_eq!(template_value_to_input_values(&json!(1.5)), vec!["1.5".to_string()]);
 }
 
 #[test]
