@@ -1,0 +1,5 @@
+[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+workflow-core = { version = "1.0.0" }
