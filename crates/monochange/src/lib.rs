@@ -318,6 +318,7 @@ struct CliContext {
 	root: PathBuf,
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
+	last_step_inputs: BTreeMap<String, Vec<String>>,
 	prepared_release: Option<PreparedRelease>,
 	release_manifest_path: Option<PathBuf>,
 	release_requests: Vec<SourceReleaseRequest>,
@@ -876,6 +877,7 @@ fn execute_cli_command(
 	let mut context = CliContext {
 		root: root.to_path_buf(),
 		dry_run,
+		last_step_inputs: inputs.clone(),
 		inputs,
 		prepared_release: None,
 		release_manifest_path: None,
@@ -893,6 +895,7 @@ fn execute_cli_command(
 
 	for step in &cli_command.steps {
 		let step_inputs = resolve_step_inputs(&context, step)?;
+		context.last_step_inputs = step_inputs.clone();
 		match step {
 			CliStepDefinition::Validate { .. } => {
 				validate_workspace(root)?;
@@ -1194,11 +1197,7 @@ fn execute_cli_command(
 	}
 
 	if let Some(prepared_release) = &context.prepared_release {
-		let format = context
-			.inputs
-			.get("format")
-			.and_then(|values| values.first())
-			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+		let format = cli_command_output_format(&context.last_step_inputs)?;
 		return match format {
 			OutputFormat::Json => {
 				let manifest =
@@ -1214,11 +1213,7 @@ fn execute_cli_command(
 		};
 	}
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
-		let format = context
-			.inputs
-			.get("format")
-			.and_then(|values| values.first())
-			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
 			OutputFormat::Json => serde_json::to_string_pretty(evaluation).map_err(|error| {
 				MonochangeError::Config(format!(
@@ -1592,6 +1587,15 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 		"
 ",
 	)
+}
+
+fn cli_command_output_format(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<OutputFormat> {
+	inputs
+		.get("format")
+		.and_then(|values| values.first())
+		.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))
 }
 
 fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
