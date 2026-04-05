@@ -68,6 +68,7 @@ Keep instructions like these close to your project guidance:
 - Read `monochange.toml` before proposing release workflow changes.
 - Run `mc validate` before and after release-affecting edits.
 - Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
+- Use `mc diagnostics --format json` to get a structured view of all pending changesets with git and review context — useful for auditing what has changed before a release or PR review.
 - Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
 - Use `mc release --dry-run --format json` before mutating release state.
 
@@ -83,3 +84,5 @@ The first MCP slice is JSON-first and focuses on reviewable operations:
 - `monochange_verify_changesets`
 
 These tools are designed to help assistants inspect the workspace, write explicit release intent, and preview release effects before a human or CI system performs mutating follow-up commands.
+
+When you need full changeset context — introduced commit, linked PR, related issues — use `mc diagnostics --format json` directly. It returns stable workspace-relative paths and structured records that agents can parse without reading raw markdown files.
