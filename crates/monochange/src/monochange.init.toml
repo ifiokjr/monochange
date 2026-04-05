@@ -450,6 +450,15 @@ comment_on_failure = true
 #   Deploy               — emit deployment intents (reserved, currently unsupported)
 #   Command              — run an arbitrary shell command
 #
+# Common step fields:
+#   inputs          — optional map of step-local input overrides. Values can be
+#                     strings, booleans, or string arrays.
+{% raw -%}
+#                     Use direct template references like "{{ inputs.label }}"
+{% endraw -%}
+#                     to forward values from command inputs without losing
+#                     list/boolean types.
+#
 # Command step fields:
 #   command         — the command to run (supports minijinja interpolation)
 #   dry_run_command — alternative command for --dry-run mode (optional;
@@ -463,8 +472,12 @@ comment_on_failure = true
 #   {{ changed_files }}, {{ changesets }}
 #   {{ released_packages_list }}  — array form, supports filters like
 #                                   {{ released_packages_list | join(", ") }}
+#   {{ inputs.name }}             — namespaced CLI inputs for any step override
 {% endraw -%}
-# All CLI inputs are also injected as template variables by name.
+{% raw -%}
+# CLI inputs are available as {{ inputs.name }} in command templates.
+{% endraw -%}
+# For backward compatibility they are also injected by bare name.
 
 [cli.validate]
 help_text = "Validate monochange configuration and changesets"
@@ -554,6 +567,9 @@ type = "string_list"
 
 [[cli.affected.steps]]
 type = "AffectedPackages"
+{% raw -%}
+# inputs = { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
+{% endraw -%}
 
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"

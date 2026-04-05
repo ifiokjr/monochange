@@ -1040,6 +1040,42 @@ shell = true
 }
 
 #[test]
+fn cli_command_command_steps_expose_namespaced_inputs_and_step_overrides() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[cli.announce]
+
+[[cli.announce.inputs]]
+name = "message"
+type = "string"
+
+[[cli.announce.steps]]
+type = "Command"
+command = "printf '%s' '{{ inputs.announcement }}' > command-output.txt"
+shell = true
+inputs = { announcement = "{{ inputs.message }}" }
+"#,
+	);
+
+	run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("announce"),
+			OsString::from("--message"),
+			OsString::from("hello-world"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let command_output = fs::read_to_string(tempdir.path().join("command-output.txt"))
+		.unwrap_or_else(|error| panic!("command output file: {error}"));
+
+	assert_eq!(command_output, "hello-world");
+}
+
+#[test]
 fn affected_packages_requires_attached_coverage_for_changed_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
@@ -1082,6 +1118,67 @@ fn affected_packages_skips_when_allowed_label_is_present() {
 		evaluation.matched_skip_labels,
 		vec!["no-changeset-required"]
 	);
+}
+
+#[test]
+fn affected_packages_step_can_override_built_in_inputs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_changeset_policy_fixture(tempdir.path(), false);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
+
+[cli.pr-check]
+help_text = "Verify that changed files are covered by attached changesets"
+
+[[cli.pr-check.inputs]]
+name = "paths"
+type = "string_list"
+required = true
+
+[[cli.pr-check.inputs]]
+name = "labels"
+type = "string_list"
+
+[[cli.pr-check.inputs]]
+name = "enforce"
+type = "boolean"
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = "{{ inputs.paths }}", label = "{{ inputs.labels }}", verify = "{{ inputs.enforce }}" }
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("pr-check"),
+			OsString::from("--paths"),
+			OsString::from("crates/core/src/lib.rs"),
+			OsString::from("--labels"),
+			OsString::from("no-changeset-required"),
+			OsString::from("--enforce"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+
+	assert!(output.contains("changeset policy: skipped"));
+	assert!(output.contains("matched skip labels: no-changeset-required"));
 }
 
 #[test]

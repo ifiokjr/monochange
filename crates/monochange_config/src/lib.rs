@@ -105,6 +105,7 @@ use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
+use monochange_core::CliStepInputValue;
 
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
@@ -2227,6 +2228,15 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 		}
 
 		for step in &cli_command.steps {
+			for input_name in step.inputs().keys() {
+				if input_name.trim().is_empty() {
+					return Err(MonochangeError::Config(format!(
+						"CLI command `{}` step `{}` has an input override with an empty name",
+						cli_command.name,
+						step.kind_name()
+					)));
+				}
+			}
 			match step {
 				CliStepDefinition::Command {
 					command,
@@ -2246,7 +2256,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 						)));
 					}
 				}
-				CliStepDefinition::RenderReleaseManifest { path } => {
+				CliStepDefinition::RenderReleaseManifest { path, .. } => {
 					if matches!(path, Some(path) if path.as_os_str().is_empty()) {
 						return Err(MonochangeError::Config(format!(
 							"CLI command `{}` render-manifest steps must provide a non-empty path when `path` is set",
@@ -2254,15 +2264,15 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 						)));
 					}
 				}
-				CliStepDefinition::Validate
-				| CliStepDefinition::Discover
-				| CliStepDefinition::CreateChangeFile
-				| CliStepDefinition::PrepareRelease
-				| CliStepDefinition::PublishRelease
-				| CliStepDefinition::OpenReleaseRequest
-				| CliStepDefinition::CommentReleasedIssues
-				| CliStepDefinition::AffectedPackages
-				| CliStepDefinition::DiagnoseChangesets => {}
+				CliStepDefinition::Validate { .. }
+				| CliStepDefinition::Discover { .. }
+				| CliStepDefinition::CreateChangeFile { .. }
+				| CliStepDefinition::PrepareRelease { .. }
+				| CliStepDefinition::PublishRelease { .. }
+				| CliStepDefinition::OpenReleaseRequest { .. }
+				| CliStepDefinition::CommentReleasedIssues { .. }
+				| CliStepDefinition::AffectedPackages { .. }
+				| CliStepDefinition::DiagnoseChangesets { .. } => {}
 			}
 		}
 	}
@@ -2279,7 +2289,7 @@ fn validate_cli_runtime_requirements(
 		if cli_command
 			.steps
 			.iter()
-			.any(|step| matches!(step, CliStepDefinition::PublishRelease))
+			.any(|step| matches!(step, CliStepDefinition::PublishRelease { .. }))
 		{
 			let source = source.ok_or_else(|| {
 				MonochangeError::Config(format!(
@@ -2297,7 +2307,7 @@ fn validate_cli_runtime_requirements(
 		if cli_command
 			.steps
 			.iter()
-			.any(|step| matches!(step, CliStepDefinition::OpenReleaseRequest))
+			.any(|step| matches!(step, CliStepDefinition::OpenReleaseRequest { .. }))
 		{
 			let source = source.ok_or_else(|| {
 				MonochangeError::Config(format!(
@@ -2315,7 +2325,7 @@ fn validate_cli_runtime_requirements(
 		if cli_command
 			.steps
 			.iter()
-			.any(|step| matches!(step, CliStepDefinition::CommentReleasedIssues))
+			.any(|step| matches!(step, CliStepDefinition::CommentReleasedIssues { .. }))
 		{
 			let source = source.ok_or_else(|| {
 				MonochangeError::Config(format!(
@@ -2332,19 +2342,21 @@ fn validate_cli_runtime_requirements(
 			}
 		}
 		for step in &cli_command.steps {
-			if step == &CliStepDefinition::AffectedPackages {
+			if let CliStepDefinition::AffectedPackages { inputs } = step {
 				if !changesets.verify.enabled {
 					return Err(MonochangeError::Config(format!(
 						"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",
 						cli_command.name
 					)));
 				}
-				let has_changed_paths = cli_command_input(cli_command, "changed_paths")
-					.is_some_and(|input| matches!(input.kind, CliInputKind::StringList));
-				let has_since = cli_command_input(cli_command, "since").is_some();
+				let has_changed_paths = inputs.contains_key("changed_paths")
+					|| cli_command_input(cli_command, "changed_paths")
+						.is_some_and(|input| matches!(input.kind, CliInputKind::StringList));
+				let has_since = inputs.contains_key("since")
+					|| cli_command_input(cli_command, "since").is_some();
 				if !has_changed_paths && !has_since {
 					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` uses `AffectedPackages` but declares neither a `changed_paths` nor a `since` input",
+						"CLI command `{}` uses `AffectedPackages` but declares neither a `changed_paths` nor a `since` input and does not override either on the step",
 						cli_command.name
 					)));
 				}
@@ -2356,6 +2368,34 @@ fn validate_cli_runtime_requirements(
 						)));
 					}
 				}
+				validate_step_override_kind(
+					cli_command,
+					step,
+					"changed_paths",
+					inputs.get("changed_paths"),
+					false,
+				)?;
+				validate_step_override_kind(
+					cli_command,
+					step,
+					"since",
+					inputs.get("since"),
+					false,
+				)?;
+				validate_step_override_kind(
+					cli_command,
+					step,
+					"label",
+					inputs.get("label"),
+					false,
+				)?;
+				validate_step_override_kind(
+					cli_command,
+					step,
+					"verify",
+					inputs.get("verify"),
+					true,
+				)?;
 			}
 		}
 	}
@@ -2368,6 +2408,43 @@ fn cli_command_input<'a>(
 	name: &str,
 ) -> Option<&'a CliInputDefinition> {
 	cli_command.inputs.iter().find(|input| input.name == name)
+}
+
+fn validate_step_override_kind(
+	cli_command: &CliCommandDefinition,
+	step: &CliStepDefinition,
+	input_name: &str,
+	value: Option<&CliStepInputValue>,
+	expect_boolean: bool,
+) -> MonochangeResult<()> {
+	let Some(value) = value else {
+		return Ok(());
+	};
+	let valid = if expect_boolean {
+		matches!(
+			value,
+			CliStepInputValue::Boolean(_) | CliStepInputValue::String(_)
+		)
+	} else {
+		matches!(
+			value,
+			CliStepInputValue::String(_) | CliStepInputValue::List(_)
+		)
+	};
+	if valid {
+		return Ok(());
+	}
+	Err(MonochangeError::Config(format!(
+		"CLI command `{}` step `{}` override `{}` must use a {} value",
+		cli_command.name,
+		step.kind_name(),
+		input_name,
+		if expect_boolean {
+			"boolean or string template"
+		} else {
+			"string or string_list value"
+		}
+	)))
 }
 
 #[allow(clippy::needless_pass_by_value)]
