@@ -227,7 +227,14 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 		.collect::<Vec<_>>();
 	assert_eq!(
 		cli_command_names,
-		vec!["validate", "discover", "change", "release", "affected"]
+		vec![
+			"validate",
+			"discover",
+			"change",
+			"release",
+			"affected",
+			"diagnostics"
+		]
 	);
 	let validate_cli_command = cli
 		.first()

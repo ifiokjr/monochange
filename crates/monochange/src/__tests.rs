@@ -39,6 +39,7 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("assist"));
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
+	assert!(output.contains("diagnostics"));
 }
 
 #[test]
@@ -776,6 +777,192 @@ fn command_release_failures_do_not_delete_changesets() {
 }
 
 #[test]
+fn command_diagnostics_reports_requested_changeset_text() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), false);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("diagnostics"),
+			OsString::from("--changeset"),
+			OsString::from(".changeset/feature.md"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+
+	assert!(output.contains("changeset: .changeset/feature.md"));
+	assert!(output.contains("summary: Add feature"));
+	assert!(output.contains("targets:"));
+	assert!(output.contains("core"));
+}
+
+#[test]
+fn command_diagnostics_reports_multiple_changesets_in_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), true);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("diagnostics"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let parsed: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("diagnostics json: {error}"));
+
+	let requested = parsed["requestedChangesets"]
+		.as_array()
+		.unwrap_or_else(|| panic!("requested"));
+	assert_eq!(requested.len(), 2);
+	assert_eq!(requested[0].as_str(), Some(".changeset/feature.md"));
+	assert_eq!(requested[1].as_str(), Some(".changeset/performance.md"));
+	let changesets = parsed["changesets"]
+		.as_array()
+		.unwrap_or_else(|| panic!("changesets"));
+	assert_eq!(changesets.len(), 2);
+	assert_eq!(changesets[0]["targets"][0]["id"], "core");
+}
+
+#[test]
+fn command_diagnostics_deduplicates_duplicate_requested_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), false);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("diagnostics"),
+			OsString::from("--changeset"),
+			OsString::from(".changeset/feature.md"),
+			OsString::from("--changeset"),
+			OsString::from(".changeset/feature.md"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let parsed: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("diagnostics json: {error}"));
+	let requested = parsed["requestedChangesets"]
+		.as_array()
+		.unwrap_or_else(|| panic!("requested"));
+
+	assert_eq!(requested.len(), 1);
+	assert_eq!(requested[0].as_str(), Some(".changeset/feature.md"));
+}
+
+#[test]
+fn command_diagnostics_reports_unknown_changeset_path() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), false);
+
+	let error = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("diagnostics"),
+			OsString::from("--changeset"),
+			OsString::from(".changeset/does-not-exist.md"),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing changeset failure"));
+
+	assert!(error.to_string().contains("does not exist"));
+}
+
+#[test]
+fn command_diagnostics_resolves_changeset_fallback_for_short_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), false);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("diagnostics"),
+			OsString::from("--changeset"),
+			OsString::from("feature.md"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+
+	assert!(output.contains("changeset: .changeset/feature.md"));
+}
+
+#[test]
+fn command_diagnostics_supports_absolute_changeset_path() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), false);
+	let absolute = tempdir.path().join(".changeset/feature.md");
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("diagnostics"),
+			OsString::from("--format"),
+			OsString::from("text"),
+			OsString::from("--changeset"),
+			OsString::from(absolute.to_string_lossy().into_owned()),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+
+	assert!(output.contains("changeset: .changeset/feature.md"));
+}
+
+#[test]
+fn resolve_changeset_path_accepts_short_names_with_fallback_to_changeset_dir() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), false);
+
+	let absolute = tempdir.path().join(".changeset/feature.md");
+	let from_short = crate::resolve_changeset_path(tempdir.path(), "feature.md")
+		.unwrap_or_else(|error| panic!("resolve short path: {error}"));
+	let from_absolute =
+		crate::resolve_changeset_path(tempdir.path(), absolute.to_string_lossy().as_ref())
+			.unwrap_or_else(|error| panic!("resolve absolute path: {error}"));
+
+	assert_eq!(from_short, absolute);
+	assert_eq!(from_absolute, absolute);
+}
+
+#[test]
+fn resolve_changeset_path_rejects_invalid_inputs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_diagnostics_fixture(tempdir.path(), false);
+
+	let missing = crate::resolve_changeset_path(tempdir.path(), ".changeset/does-not-exist.md")
+		.err()
+		.unwrap_or_else(|| panic!("expected missing path failure"));
+	assert!(missing.to_string().contains("does not exist"));
+
+	let empty = crate::resolve_changeset_path(tempdir.path(), "")
+		.err()
+		.unwrap_or_else(|| panic!("expected empty path failure"));
+	assert!(empty.to_string().contains("cannot be empty"));
+}
+
+#[test]
+fn render_changeset_diagnostics_reports_empty_set() {
+	let report = crate::ChangesetDiagnosticsReport {
+		requested_changesets: Vec::new(),
+		changesets: Vec::new(),
+	};
+	let rendered = crate::render_changeset_diagnostics(&report);
+
+	assert_eq!(rendered, "no matching changesets found");
+}
+
+#[test]
 fn command_unknown_commands_suggest_available_cli() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
@@ -1173,6 +1360,63 @@ fn copy_directory(source: &Path, destination: &Path) {
 				)
 			});
 		}
+	}
+}
+
+fn seed_diagnostics_fixture(root: &Path, with_second_changeset: bool) {
+	write_file(
+		root.join("Cargo.toml"),
+		r#"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+"#,
+	);
+	write_file(
+		root.join("crates/core/Cargo.toml"),
+		r#"
+[package]
+name = "core"
+version = "1.0.0"
+edition = "2021"
+"#,
+	);
+	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
+	write_file(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.diagnostics]
+help_text = "Show changeset diagnostics and provenance"
+
+[[cli.diagnostics.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.diagnostics.inputs]]
+name = "changeset"
+type = "string_list"
+
+[[cli.diagnostics.steps]]
+type = "DiagnoseChangesets"
+"#,
+	);
+	write_file(
+		root.join(".changeset/feature.md"),
+		"---\ncore: patch\n---\n\n#### Add feature\n",
+	);
+	if with_second_changeset {
+		write_file(
+			root.join(".changeset/performance.md"),
+			"---\ncore: minor\n---\n\n#### Improve perf\n",
+		);
 	}
 }
 

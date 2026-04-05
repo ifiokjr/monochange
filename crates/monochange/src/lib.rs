@@ -305,6 +305,13 @@ enum BuiltinReleaseSection {
 	Note,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChangesetDiagnosticsReport {
+	requested_changesets: Vec<PathBuf>,
+	changesets: Vec<PreparedChangeset>,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct CliContext {
 	root: PathBuf,
@@ -319,6 +326,7 @@ struct CliContext {
 	issue_comment_plans: Vec<github_provider::GitHubIssueCommentPlan>,
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
+	changeset_diagnostics: Option<ChangesetDiagnosticsReport>,
 	command_logs: Vec<String>,
 }
 
@@ -443,6 +451,17 @@ Verification reminders:
   - Prefer package ids in .changeset files.
   - Group-owned changesets cover all members of that group.
   - Ignored paths and skip labels are controlled from [changesets.verify]."#,
+		),
+		"diagnostics" => Some(
+			r#"Examples:
+  mc diagnostics --format json
+  mc diagnostics --changeset .changeset/feature.md
+
+Diagnostics include:
+  - Target packages/groups and requested bump
+  - commit SHA that introduced and last updated each changeset
+  - linked review request (when detected)
+  - related issue references"#,
 		),
 		_ => None,
 	}
@@ -770,6 +789,7 @@ fn execute_cli_command(
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
 		command_logs: Vec::new(),
 	};
 	let mut output = None;
@@ -1065,6 +1085,12 @@ fn execute_cli_command(
 				context.changeset_policy_evaluation = Some(evaluation);
 				output = None;
 			}
+			CliStepDefinition::DiagnoseChangesets => {
+				let requested = context.inputs.get("changeset").cloned().unwrap_or_default();
+				let report = diagnose_changesets(root, &requested)?;
+				context.changeset_diagnostics = Some(report);
+				output = None;
+			}
 			CliStepDefinition::Command {
 				command,
 				dry_run_command,
@@ -1118,6 +1144,22 @@ fn execute_cli_command(
 			println!("{rendered}");
 			return Err(MonochangeError::Config(evaluation.summary.clone()));
 		}
+		return Ok(rendered);
+	}
+	if let Some(report) = &context.changeset_diagnostics {
+		let format = context
+			.inputs
+			.get("format")
+			.and_then(|values| values.first())
+			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+		let rendered = match format {
+			OutputFormat::Json => serde_json::to_string_pretty(report).map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to render changeset diagnostics as json: {error}"
+				))
+			})?,
+			OutputFormat::Text => render_changeset_diagnostics(report),
+		};
 		return Ok(rendered);
 	}
 	if !context.command_logs.is_empty() {
@@ -1451,6 +1493,170 @@ fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 			"unsupported bump `{other}`"
 		))),
 	}
+}
+
+fn diagnose_changesets(
+	root: &Path,
+	requested: &[String],
+) -> MonochangeResult<ChangesetDiagnosticsReport> {
+	let configuration = load_workspace_configuration(root)?;
+	let discovery = discover_workspace(root)?;
+	let changeset_paths = if requested.is_empty() {
+		discover_changeset_paths(root)?
+			.into_iter()
+			.map(|path| root.join(path))
+			.collect::<Vec<_>>()
+	} else {
+		let mut resolved = Vec::new();
+		for path in requested {
+			resolved.push(resolve_changeset_path(root, path)?);
+		}
+		resolved.sort();
+		resolved.dedup();
+		resolved
+	};
+
+	let loaded_changesets = changeset_paths
+		.iter()
+		.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
+		.collect::<MonochangeResult<Vec<_>>>()?;
+	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
+	if let Some(source) = configuration
+		.source
+		.as_ref()
+		.filter(|source| source.provider == SourceProvider::GitHub)
+	{
+		github_provider::enrich_changeset_context(source, &mut changesets);
+	}
+
+	let requested_changesets = changeset_paths
+		.iter()
+		.map(|path| root_relative(root, path))
+		.collect();
+	Ok(ChangesetDiagnosticsReport {
+		requested_changesets,
+		changesets,
+	})
+}
+
+fn resolve_changeset_path(root: &Path, requested: &str) -> MonochangeResult<PathBuf> {
+	let requested_is_absolute = Path::new(requested).is_absolute();
+	let normalized = if requested_is_absolute {
+		requested.to_string()
+	} else {
+		normalize_changed_path(requested)
+	};
+	if normalized.is_empty() {
+		return Err(MonochangeError::Config(
+			"changeset path cannot be empty".to_string(),
+		));
+	}
+
+	let candidate = if requested_is_absolute {
+		Path::new(requested)
+	} else {
+		Path::new(&normalized)
+	};
+	let candidates = if candidate.is_absolute() {
+		vec![candidate.to_path_buf()]
+	} else {
+		let mut candidates = vec![root.join(&candidate)];
+		if !normalized.starts_with(CHANGESET_DIR) {
+			candidates.push(root.join(CHANGESET_DIR).join(&candidate));
+		}
+		candidates
+	};
+
+	for candidate in candidates {
+		let Some(relative_candidate) = relative_to_root(root, &candidate) else {
+			continue;
+		};
+		if !is_changeset_markdown_path(&relative_candidate.to_string_lossy()) {
+			continue;
+		}
+		if candidate.exists() {
+			return Ok(candidate);
+		}
+	}
+	Err(MonochangeError::Config(format!(
+		"requested changeset `{requested}` does not exist"
+	)))
+}
+
+fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) -> String {
+	if report.changesets.is_empty() {
+		return "no matching changesets found".to_string();
+	}
+
+	let mut lines = Vec::new();
+	for changeset in &report.changesets {
+		let change_summary = changeset.summary.as_deref().unwrap_or("<missing summary>");
+		lines.push(format!("changeset: {}", changeset.path.display()));
+		lines.push(format!("  summary: {change_summary}"));
+		if let Some(details) = &changeset.details {
+			lines.push(format!("  details: {details}"));
+		}
+		if !changeset.targets.is_empty() {
+			lines.push("  targets:".to_string());
+			for target in &changeset.targets {
+				let bump = target
+					.bump
+					.map_or_else(|| "auto".to_string(), |bump| bump.to_string());
+				lines.push(format!(
+					"  - {} {} (bump: {}, origin: {})",
+					target.kind, target.id, bump, target.origin,
+				));
+				if !target.evidence_refs.is_empty() {
+					lines.push(format!("    evidence: {}", target.evidence_refs.join(", ")));
+				}
+			}
+		}
+		if let Some(context) = &changeset.context {
+			if let Some(introduced) = context
+				.introduced
+				.as_ref()
+				.and_then(|revision| revision.commit.as_ref())
+			{
+				lines.push(format!("  introduced: {}", introduced.short_sha));
+			}
+			if let Some(last_updated) = context
+				.last_updated
+				.as_ref()
+				.and_then(|revision| revision.commit.as_ref())
+			{
+				lines.push(format!("  last-updated: {}", last_updated.short_sha));
+			}
+			let review_request = context
+				.introduced
+				.as_ref()
+				.and_then(|revision| revision.review_request.as_ref())
+				.or_else(|| {
+					context
+						.last_updated
+						.as_ref()
+						.and_then(|revision| revision.review_request.as_ref())
+				});
+			if let Some(review_request) = review_request {
+				if let Some(url) = &review_request.url {
+					lines.push(format!("  review request: {} ({})", review_request.id, url));
+				} else {
+					lines.push(format!("  review request: {}", review_request.id));
+				}
+			}
+			if !context.related_issues.is_empty() {
+				let issues = context
+					.related_issues
+					.iter()
+					.map(|issue| issue.id.as_str())
+					.collect::<Vec<_>>()
+					.join(", ");
+				lines.push(format!("  related issues: {issues}"));
+			}
+		}
+		lines.push(String::new());
+	}
+	lines.pop();
+	lines.join("\n")
 }
 
 pub fn affected_packages(

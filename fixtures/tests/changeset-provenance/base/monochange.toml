@@ -20,3 +20,19 @@ type = "PrepareRelease"
 [[cli.release-manifest.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
+
+[cli.diagnostics]
+help_text = "Show changeset diagnostics and provenance"
+
+[[cli.diagnostics.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.diagnostics.inputs]]
+name = "changeset"
+type = "string_list"
+
+[[cli.diagnostics.steps]]
+type = "DiagnoseChangesets"

@@ -445,8 +445,9 @@ comment_on_failure = true
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
-#   Deploy               — emit deployment intents (requires PrepareRelease)
 #   AffectedPackages     — show affected packages and evaluate changeset coverage
+#   DiagnoseChangesets   — render per-changeset commit/PR/context diagnostics
+#   Deploy               — emit deployment intents (reserved, currently unsupported)
 #   Command              — run an arbitrary shell command
 #
 # Command step fields:
@@ -553,3 +554,20 @@ type = "string_list"
 
 [[cli.affected.steps]]
 type = "AffectedPackages"
+
+[cli.diagnostics]
+help_text = "Show changeset diagnostics and provenance"
+
+[[cli.diagnostics.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.diagnostics.inputs]]
+name = "changeset"
+type = "string_list"
+help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)"
+
+[[cli.diagnostics.steps]]
+type = "DiagnoseChangesets"

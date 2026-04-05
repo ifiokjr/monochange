@@ -576,6 +576,7 @@ pub enum CliStepDefinition {
 	CommentReleasedIssues,
 	#[serde(alias = "EnforceChangesetPolicy", alias = "VerifyChangesets")]
 	AffectedPackages,
+	DiagnoseChangesets,
 	Command {
 		command: String,
 		#[serde(default, alias = "dry_run")]
@@ -1613,6 +1614,36 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::AffectedPackages],
+		},
+		CliCommandDefinition {
+			name: "diagnostics".to_string(),
+			help_text: Some(
+				"Show per-changeset diagnostics including provenance and commit/PR context"
+					.to_string(),
+			),
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Output format".to_string()),
+					required: false,
+					default: Some("text".to_string()),
+					choices: vec!["text".to_string(), "json".to_string()],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "changeset".to_string(),
+					kind: CliInputKind::StringList,
+					help_text: Some(
+						"Changeset path(s) to inspect, relative to .changeset (omit for all changesets)".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+					short: None,
+				},
+			],
+			steps: vec![CliStepDefinition::DiagnoseChangesets],
 		},
 	]
 }
