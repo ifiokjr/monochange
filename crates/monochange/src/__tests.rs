@@ -2098,3 +2098,287 @@ fn write_file(path: impl AsRef<Path>, content: &str) {
 	fs::write(path, content)
 		.unwrap_or_else(|error| panic!("write file {}: {error}", path.display()));
 }
+
+#[test]
+fn step_override_with_literal_list_uses_list_as_changed_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_changeset_policy_fixture(tempdir.path(), false);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
+
+[cli.pr-check]
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = false, format = "json" }
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("pr-check")],
+	)
+	.unwrap_or_else(|error| panic!("pr-check output: {error}"));
+
+	let json: serde_json::Value = serde_json::from_str(&output)
+		.unwrap_or_else(|error| panic!("json parse: {error}; output={output}"));
+	assert_eq!(json["affectedPackageIds"][0], "core");
+}
+
+#[test]
+fn step_override_with_non_direct_jinja_template_renders_correctly() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[cli.announce]
+
+[[cli.announce.inputs]]
+name = "prefix"
+type = "string"
+default = "hello"
+
+[[cli.announce.steps]]
+type = "Command"
+command = "printf '%s' '{{ inputs.message }}' > output.txt"
+shell = true
+inputs = { message = "{{ inputs.prefix }}-world" }
+"#,
+	);
+
+	run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("announce"),
+			OsString::from("--prefix"),
+			OsString::from("goodbye"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("announce output: {error}"));
+	let output = fs::read_to_string(tempdir.path().join("output.txt"))
+		.unwrap_or_else(|error| panic!("output file: {error}"));
+	assert_eq!(output, "goodbye-world");
+}
+
+#[test]
+fn step_override_forwards_multi_value_list_reference_as_list() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_changeset_policy_fixture(tempdir.path(), false);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
+
+[cli.pr-check]
+
+[[cli.pr-check.inputs]]
+name = "paths"
+type = "string_list"
+required = true
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = "{{ inputs.paths }}", verify = false, format = "json" }
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("pr-check"),
+			OsString::from("--paths"),
+			OsString::from("crates/core/src/lib.rs"),
+			OsString::from("--paths"),
+			OsString::from("docs/readme.md"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("pr-check output: {error}"));
+
+	let json: serde_json::Value = serde_json::from_str(&output)
+		.unwrap_or_else(|error| panic!("json parse: {error}; output={output}"));
+	assert!(json["matchedPaths"]
+		.as_array()
+		.is_some_and(|paths| paths.iter().any(|p| p == "crates/core/src/lib.rs")));
+}
+
+#[test]
+fn step_override_missing_template_reference_produces_empty_changed_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_changeset_policy_fixture(tempdir.path(), false);
+	write_file(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = false
+skip_labels = ["no-changeset-required"]
+comment_on_failure = false
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
+
+[cli.pr-check]
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = "{{ inputs.nonexistent }}", verify = false, format = "json" }
+"#,
+	);
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("pr-check")],
+	)
+	.unwrap_or_else(|error| panic!("pr-check output: {error}"));
+
+	let json: serde_json::Value = serde_json::from_str(&output)
+		.unwrap_or_else(|error| panic!("json parse: {error}; output={output}"));
+	assert_eq!(
+		json["affectedPackageIds"].as_array().map(Vec::len),
+		Some(0)
+	);
+}
+
+// Unit tests for private helper functions in the input-override pipeline.
+// These tests cover branches not reached by integration paths (e.g.
+// Null/Number/Object JSON types, invalid template reference forms).
+
+#[test]
+fn parse_direct_template_reference_returns_inner_path_for_valid_refs() {
+	use super::parse_direct_template_reference;
+	assert_eq!(
+		parse_direct_template_reference("{{ inputs.message }}"),
+		Some("inputs.message")
+	);
+	assert_eq!(
+		parse_direct_template_reference("  {{ foo.bar_baz }}  "),
+		Some("foo.bar_baz")
+	);
+}
+
+#[test]
+fn parse_direct_template_reference_returns_none_for_empty_inner() {
+	use super::parse_direct_template_reference;
+	assert_eq!(parse_direct_template_reference("{{  }}"), None);
+	assert_eq!(parse_direct_template_reference("{{}}"), None);
+}
+
+#[test]
+fn parse_direct_template_reference_returns_none_for_invalid_chars() {
+	use super::parse_direct_template_reference;
+	assert_eq!(parse_direct_template_reference("{{ foo-bar }}"), None);
+	assert_eq!(parse_direct_template_reference("{{ foo bar }}"), None);
+}
+
+#[test]
+fn parse_direct_template_reference_returns_none_when_not_a_bare_ref() {
+	use super::parse_direct_template_reference;
+	assert_eq!(parse_direct_template_reference("prefix-{{ foo }}"), None);
+	assert_eq!(parse_direct_template_reference("hello world"), None);
+}
+
+#[test]
+fn lookup_template_value_traverses_nested_objects() {
+	use serde_json::json;
+	use super::lookup_template_value;
+	let v = json!({"inputs": {"message": "hello"}});
+	assert_eq!(lookup_template_value(&v, "inputs.message"), Some(&json!("hello")));
+}
+
+#[test]
+fn lookup_template_value_traverses_array_by_index() {
+	use serde_json::json;
+	use super::lookup_template_value;
+	let v = json!({"items": ["a", "b", "c"]});
+	assert_eq!(lookup_template_value(&v, "items.1"), Some(&json!("b")));
+}
+
+#[test]
+fn lookup_template_value_returns_none_for_missing_key() {
+	use serde_json::json;
+	use super::lookup_template_value;
+	let v = json!({"inputs": {}});
+	assert_eq!(lookup_template_value(&v, "inputs.missing"), None);
+}
+
+#[test]
+fn lookup_template_value_returns_none_for_primitive_descent() {
+	use serde_json::json;
+	use super::lookup_template_value;
+	let v = json!({"foo": "string_value"});
+	assert_eq!(lookup_template_value(&v, "foo.nested"), None);
+}
+
+#[test]
+fn template_value_to_input_values_null_returns_empty() {
+	use super::template_value_to_input_values;
+	assert_eq!(
+		template_value_to_input_values(&serde_json::Value::Null),
+		Vec::<String>::new()
+	);
+}
+
+#[test]
+fn template_value_to_input_values_number_returns_string() {
+	use serde_json::json;
+	use super::template_value_to_input_values;
+	assert_eq!(template_value_to_input_values(&json!(42)), vec!["42".to_string()]);
+	assert_eq!(template_value_to_input_values(&json!(3.14)), vec!["3.14".to_string()]);
+}
+
+#[test]
+fn template_value_to_input_values_array_flattens_elements() {
+	use serde_json::json;
+	use super::template_value_to_input_values;
+	assert_eq!(
+		template_value_to_input_values(&json!(["a", "b", "c"])),
+		vec!["a", "b", "c"]
+	);
+	assert_eq!(
+		template_value_to_input_values(&json!([true, false])),
+		vec!["true", "false"]
+	);
+}
+
+#[test]
+fn template_value_to_input_values_object_returns_json_serialization() {
+	use serde_json::json;
+	use super::template_value_to_input_values;
+	let obj = json!({"k": "v"});
+	let result = template_value_to_input_values(&obj);
+	assert_eq!(result.len(), 1);
+	assert!(result[0].contains('"'));
+}
