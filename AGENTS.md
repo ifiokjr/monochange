@@ -17,3 +17,4 @@
 - [Documentation workflow](docs/agents/documentation.md)
 - [Product and architecture rules](docs/agents/product-rules.md)
 - [Rust quality and safety](docs/agents/rust-quality.md)
+- [Changeset quality](docs/agents/changeset-quality.md)
