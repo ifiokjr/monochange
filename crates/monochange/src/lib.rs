@@ -822,7 +822,7 @@ fn resolve_step_input_template(
 	}
 
 	let jinja_context =
-		minijinja::Value::from_serialize(&serde_json::Value::Object(template_context.clone()));
+		minijinja::Value::from_serialize(serde_json::Value::Object(template_context.clone()));
 	Ok(vec![render_jinja_template(template, &jinja_context)?])
 }
 
@@ -1442,7 +1442,7 @@ fn interpolate_cli_command_command(
 ) -> String {
 	let template_context = build_cli_template_context(context, step_inputs, variables);
 	let jinja_context =
-		minijinja::Value::from_serialize(&serde_json::Value::Object(template_context));
+		minijinja::Value::from_serialize(serde_json::Value::Object(template_context));
 	render_jinja_template(command, &jinja_context).unwrap_or_else(|_| command.to_string())
 }
 
