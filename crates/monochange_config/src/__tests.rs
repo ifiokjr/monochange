@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
@@ -194,7 +195,7 @@ path = ".monochange/release-manifest.json"
 	assert_eq!(
 		first_package.changelog,
 		Some(ChangelogTarget {
-			path: std::path::PathBuf::from("crates/core/changelog.md"),
+			path: PathBuf::from("crates/core/changelog.md"),
 			format: ChangelogFormat::Monochange,
 		})
 	);
@@ -640,7 +641,7 @@ path = "crates/core"
 	assert_eq!(
 		package.changelog,
 		Some(ChangelogTarget {
-			path: std::path::PathBuf::from("crates/core/changelog.md"),
+			path: PathBuf::from("crates/core/changelog.md"),
 			format: ChangelogFormat::Monochange,
 		})
 	);
@@ -693,7 +694,7 @@ changelog = "docs/tool-release-notes.md"
 	assert_eq!(
 		core.changelog,
 		Some(ChangelogTarget {
-			path: std::path::PathBuf::from("crates/core/CHANGELOG.md"),
+			path: PathBuf::from("crates/core/CHANGELOG.md"),
 			format: ChangelogFormat::Monochange,
 		})
 	);
@@ -701,7 +702,7 @@ changelog = "docs/tool-release-notes.md"
 	assert_eq!(
 		tool.changelog,
 		Some(ChangelogTarget {
-			path: std::path::PathBuf::from("docs/tool-release-notes.md"),
+			path: PathBuf::from("docs/tool-release-notes.md"),
 			format: ChangelogFormat::Monochange,
 		})
 	);
@@ -762,21 +763,21 @@ format = "keep_a_changelog"
 	assert_eq!(
 		core.changelog,
 		Some(ChangelogTarget {
-			path: std::path::PathBuf::from("crates/core/CHANGELOG.md"),
+			path: PathBuf::from("crates/core/CHANGELOG.md"),
 			format: ChangelogFormat::KeepAChangelog,
 		})
 	);
 	assert_eq!(
 		app.changelog,
 		Some(ChangelogTarget {
-			path: std::path::PathBuf::from("docs/app-release-notes.md"),
+			path: PathBuf::from("docs/app-release-notes.md"),
 			format: ChangelogFormat::Monochange,
 		})
 	);
 	assert_eq!(
 		group.changelog,
 		Some(ChangelogTarget {
-			path: std::path::PathBuf::from("docs/group-release-notes.md"),
+			path: PathBuf::from("docs/group-release-notes.md"),
 			format: ChangelogFormat::KeepAChangelog,
 		})
 	);
@@ -2277,27 +2278,8 @@ inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = ["true"] }
 
 #[test]
 fn load_workspace_configuration_rejects_unknown_step_input_override() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.discover]
-
-[[cli.discover.steps]]
-type = "Discover"
-inputs = { format = "json", nonexistent = "value" }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("validate-step-inputs/unknown-input-on-discover");
+	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
@@ -2314,27 +2296,8 @@ inputs = { format = "json", nonexistent = "value" }
 
 #[test]
 fn load_workspace_configuration_rejects_unknown_input_on_validate_step() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.validate]
-
-[[cli.validate.steps]]
-type = "Validate"
-inputs = { format = "json" }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("validate-step-inputs/unknown-input-on-validate");
+	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
@@ -2351,32 +2314,8 @@ inputs = { format = "json" }
 
 #[test]
 fn load_workspace_configuration_allows_any_input_on_command_step() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.build]
-
-[[cli.build.inputs]]
-name = "target"
-type = "string"
-
-[[cli.build.steps]]
-type = "Command"
-command = "echo {{ inputs.target }}"
-inputs = { target = "release", custom_flag = "--verbose" }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let configuration = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("validate-step-inputs/any-input-on-command");
+	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let build_cmd = configuration
 		.cli
@@ -2388,27 +2327,8 @@ inputs = { target = "release", custom_flag = "--verbose" }
 
 #[test]
 fn load_workspace_configuration_rejects_wrong_type_format_override_on_discover() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.discover]
-
-[[cli.discover.steps]]
-type = "Discover"
-inputs = { format = true }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("validate-step-inputs/wrong-type-format-on-discover");
+	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
@@ -2421,27 +2341,8 @@ inputs = { format = true }
 
 #[test]
 fn load_workspace_configuration_rejects_list_for_string_input_on_change_step() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.change]
-
-[[cli.change.steps]]
-type = "CreateChangeFile"
-inputs = { reason = ["a", "b"] }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("validate-step-inputs/list-for-string-on-change");
+	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
@@ -2454,27 +2355,8 @@ inputs = { reason = ["a", "b"] }
 
 #[test]
 fn load_workspace_configuration_accepts_valid_diagnose_changesets_step_inputs() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.diag]
-
-[[cli.diag.steps]]
-type = "DiagnoseChangesets"
-inputs = { format = "json", changeset = ["my-change.md"] }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let configuration = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("validate-step-inputs/valid-diagnose-inputs");
+	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let diag_cmd = configuration
 		.cli
@@ -2486,27 +2368,8 @@ inputs = { format = "json", changeset = ["my-change.md"] }
 
 #[test]
 fn load_workspace_configuration_rejects_unknown_input_on_diagnose_changesets() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.diag]
-
-[[cli.diag.steps]]
-type = "DiagnoseChangesets"
-inputs = { format = "json", verbose = true }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("validate-step-inputs/unknown-input-on-diagnose");
+	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
@@ -2940,7 +2803,13 @@ path = "crates/core"
 	assert!(!configuration.packages.is_empty());
 }
 
-fn write_cargo_package(root: &std::path::Path, relative_dir: &str, name: &str) {
+fn fixture_path(relative: &str) -> PathBuf {
+	Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests")
+		.join(relative)
+}
+
+fn write_cargo_package(root: &Path, relative_dir: &str, name: &str) {
 	let dir = root.join(relative_dir);
 	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create cargo dir: {error}"));
 	fs::write(
@@ -2950,7 +2819,7 @@ fn write_cargo_package(root: &std::path::Path, relative_dir: &str, name: &str) {
 	.unwrap_or_else(|error| panic!("cargo manifest: {error}"));
 }
 
-fn write_npm_package(root: &std::path::Path, relative_dir: &str, name: &str) {
+fn write_npm_package(root: &Path, relative_dir: &str, name: &str) {
 	let dir = root.join(relative_dir);
 	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create npm dir: {error}"));
 	fs::write(
