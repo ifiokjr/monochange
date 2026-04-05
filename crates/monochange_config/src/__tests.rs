@@ -101,9 +101,10 @@ type = "DiagnoseChangesets"
 		.find(|command| command.name == "diagnostics")
 		.unwrap_or_else(|| panic!("expected diagnostics command"));
 	assert_eq!(diagnostics.steps.len(), 1);
-	match diagnostics.steps[0] {
-		CliStepDefinition::DiagnoseChangesets => {}
-		_ => panic!("expected DiagnoseChangesets step"),
+	match diagnostics.steps.first() {
+		Some(CliStepDefinition::DiagnoseChangesets) => {}
+		Some(_) => panic!("expected DiagnoseChangesets step"),
+		None => panic!("expected diagnostics step"),
 	}
 }
 

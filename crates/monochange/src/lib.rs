@@ -432,7 +432,7 @@ Rules:
   - Legacy manifest paths may still resolve during migration, but declared ids are the stable interface."#,
 		),
 		"release" => Some(
-			r#"Examples:
+			r"Examples:
   mc release --dry-run --format text
   mc release --dry-run --format json
   mc release
@@ -440,20 +440,20 @@ Rules:
 Planning reminders:
   - Direct package changes propagate to dependents using defaults.parent_bump.
   - Group synchronization happens before final output is rendered.
-  - Explicit versions on grouped members propagate to the whole group."#,
+  - Explicit versions on grouped members propagate to the whole group.",
 		),
 		"affected" => Some(
-			r#"Examples:
+			r"Examples:
   mc affected --changed-paths crates/core/src/lib.rs --format json
   mc affected --since origin/main --verify
 
 Verification reminders:
   - Prefer package ids in .changeset files.
   - Group-owned changesets cover all members of that group.
-  - Ignored paths and skip labels are controlled from [changesets.verify]."#,
+  - Ignored paths and skip labels are controlled from [changesets.verify].",
 		),
 		"diagnostics" => Some(
-			r#"Examples:
+			r"Examples:
   mc diagnostics --format json
   mc diagnostics --changeset .changeset/feature.md
 
@@ -461,7 +461,7 @@ Diagnostics include:
   - Target packages/groups and requested bump
   - commit SHA that introduced and last updated each changeset
   - linked review request (when detected)
-  - related issue references"#,
+  - related issue references",
 		),
 		_ => None,
 	}
@@ -1560,9 +1560,9 @@ fn resolve_changeset_path(root: &Path, requested: &str) -> MonochangeResult<Path
 	let candidates = if candidate.is_absolute() {
 		vec![candidate.to_path_buf()]
 	} else {
-		let mut candidates = vec![root.join(&candidate)];
+		let mut candidates = vec![root.join(candidate)];
 		if !normalized.starts_with(CHANGESET_DIR) {
-			candidates.push(root.join(CHANGESET_DIR).join(&candidate));
+			candidates.push(root.join(CHANGESET_DIR).join(candidate));
 		}
 		candidates
 	};
