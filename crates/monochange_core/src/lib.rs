@@ -701,9 +701,9 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn expected_input_kind(&self, name: &str) -> Option<CliInputKind> {
 		match self {
-			Self::Validate { .. }
-			| Self::RenderReleaseManifest { .. }
-			| Self::Command { .. } => None,
+			Self::Validate { .. } | Self::RenderReleaseManifest { .. } | Self::Command { .. } => {
+				None
+			}
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }

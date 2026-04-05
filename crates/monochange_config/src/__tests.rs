@@ -2301,7 +2301,9 @@ inputs = { format = "json", nonexistent = "value" }
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
-		error.to_string().contains("unknown input override `nonexistent`"),
+		error
+			.to_string()
+			.contains("unknown input override `nonexistent`"),
 		"error was: {error}"
 	);
 	assert!(
@@ -2336,7 +2338,9 @@ inputs = { format = "json" }
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
-		error.to_string().contains("unknown input override `format`"),
+		error
+			.to_string()
+			.contains("unknown input override `format`"),
 		"error was: {error}"
 	);
 	assert!(
@@ -2408,7 +2412,9 @@ inputs = { format = true }
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
-		error.to_string().contains("override `format` must use a string value"),
+		error
+			.to_string()
+			.contains("override `format` must use a string value"),
 		"error was: {error}"
 	);
 }
@@ -2439,7 +2445,9 @@ inputs = { reason = ["a", "b"] }
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
-		error.to_string().contains("override `reason` must use a string value"),
+		error
+			.to_string()
+			.contains("override `reason` must use a string value"),
 		"error was: {error}"
 	);
 }
@@ -2502,11 +2510,15 @@ inputs = { format = "json", verbose = true }
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
-		error.to_string().contains("unknown input override `verbose`"),
+		error
+			.to_string()
+			.contains("unknown input override `verbose`"),
 		"error was: {error}"
 	);
 	assert!(
-		error.to_string().contains("valid inputs: format, changeset"),
+		error
+			.to_string()
+			.contains("valid inputs: format, changeset"),
 		"error was: {error}"
 	);
 }

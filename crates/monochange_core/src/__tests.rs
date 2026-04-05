@@ -438,18 +438,12 @@ fn expected_input_kind_returns_correct_types_for_create_change_file() {
 		step.expected_input_kind("package"),
 		Some(CliInputKind::StringList)
 	);
-	assert_eq!(
-		step.expected_input_kind("bump"),
-		Some(CliInputKind::Choice)
-	);
+	assert_eq!(step.expected_input_kind("bump"), Some(CliInputKind::Choice));
 	assert_eq!(
 		step.expected_input_kind("reason"),
 		Some(CliInputKind::String)
 	);
-	assert_eq!(
-		step.expected_input_kind("output"),
-		Some(CliInputKind::Path)
-	);
+	assert_eq!(step.expected_input_kind("output"), Some(CliInputKind::Path));
 }
 
 #[test]
