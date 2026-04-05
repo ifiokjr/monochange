@@ -1,0 +1,11 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.diag]
+
+[[cli.diag.steps]]
+type = "DiagnoseChangesets"
+inputs = { format = "json", changeset = ["my-change.md"] }
