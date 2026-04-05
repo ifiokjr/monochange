@@ -33,7 +33,6 @@ help_text = "Validate the workspace"
 
 [[cli.validate.steps]]
 type = "Validate"
-inputs = { ignored = "hardcoded" }
 
 [cli.discover]
 help_text = "Discover packages"
@@ -59,13 +58,18 @@ inputs = { format = "json" }
 [cli.release-manifest]
 help_text = "Prepare a release manifest"
 
+[[cli.release-manifest.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.release-manifest.steps]]
 type = "PrepareRelease"
 
 [[cli.release-manifest.steps]]
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
-inputs = { format = "json" }
 
 [cli.affected]
 help_text = "Evaluate affected packages"
