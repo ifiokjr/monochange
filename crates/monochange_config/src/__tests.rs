@@ -2164,7 +2164,8 @@ inputs = { since = "origin/main" }
 }
 
 #[test]
-fn load_workspace_configuration_rejects_affected_packages_when_step_override_provides_no_path_source() {
+fn load_workspace_configuration_rejects_affected_packages_when_step_override_provides_no_path_source(
+) {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
 	fs::write(
@@ -2191,7 +2192,9 @@ inputs = { verify = true }
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
-	assert!(error.to_string().contains("declares neither a `changed_paths` nor a `since` input"));
+	assert!(error
+		.to_string()
+		.contains("declares neither a `changed_paths` nor a `since` input"));
 }
 
 #[test]
@@ -2227,7 +2230,9 @@ inputs = { changed_paths = true }
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
 	assert!(
-		error.to_string().contains("override `changed_paths` must use a"),
+		error
+			.to_string()
+			.contains("override `changed_paths` must use a"),
 		"error was: {error}"
 	);
 }
@@ -2549,7 +2554,9 @@ repo = "repo"
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
-	assert!(error.to_string().contains("configure either `[source]` or legacy `[github]`"));
+	assert!(error
+		.to_string()
+		.contains("configure either `[source]` or legacy `[github]`"));
 }
 
 #[test]

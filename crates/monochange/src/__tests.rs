@@ -2266,10 +2266,7 @@ inputs = { changed_paths = "{{ inputs.nonexistent }}", verify = false, format = 
 
 	let json: serde_json::Value = serde_json::from_str(&output)
 		.unwrap_or_else(|error| panic!("json parse: {error}; output={output}"));
-	assert_eq!(
-		json["affectedPackageIds"].as_array().map(Vec::len),
-		Some(0)
-	);
+	assert_eq!(json["affectedPackageIds"].as_array().map(Vec::len), Some(0));
 }
 
 // Unit tests for private helper functions in the input-override pipeline.
@@ -2312,32 +2309,35 @@ fn parse_direct_template_reference_returns_none_when_not_a_bare_ref() {
 
 #[test]
 fn lookup_template_value_traverses_nested_objects() {
-	use serde_json::json;
 	use super::lookup_template_value;
+	use serde_json::json;
 	let v = json!({"inputs": {"message": "hello"}});
-	assert_eq!(lookup_template_value(&v, "inputs.message"), Some(&json!("hello")));
+	assert_eq!(
+		lookup_template_value(&v, "inputs.message"),
+		Some(&json!("hello"))
+	);
 }
 
 #[test]
 fn lookup_template_value_traverses_array_by_index() {
-	use serde_json::json;
 	use super::lookup_template_value;
+	use serde_json::json;
 	let v = json!({"items": ["a", "b", "c"]});
 	assert_eq!(lookup_template_value(&v, "items.1"), Some(&json!("b")));
 }
 
 #[test]
 fn lookup_template_value_returns_none_for_missing_key() {
-	use serde_json::json;
 	use super::lookup_template_value;
+	use serde_json::json;
 	let v = json!({"inputs": {}});
 	assert_eq!(lookup_template_value(&v, "inputs.missing"), None);
 }
 
 #[test]
 fn lookup_template_value_returns_none_for_primitive_descent() {
-	use serde_json::json;
 	use super::lookup_template_value;
+	use serde_json::json;
 	let v = json!({"foo": "string_value"});
 	assert_eq!(lookup_template_value(&v, "foo.nested"), None);
 }
@@ -2353,16 +2353,22 @@ fn template_value_to_input_values_null_returns_empty() {
 
 #[test]
 fn template_value_to_input_values_number_returns_string() {
-	use serde_json::json;
 	use super::template_value_to_input_values;
-	assert_eq!(template_value_to_input_values(&json!(42)), vec!["42".to_string()]);
-	assert_eq!(template_value_to_input_values(&json!(1.5)), vec!["1.5".to_string()]);
+	use serde_json::json;
+	assert_eq!(
+		template_value_to_input_values(&json!(42)),
+		vec!["42".to_string()]
+	);
+	assert_eq!(
+		template_value_to_input_values(&json!(1.5)),
+		vec!["1.5".to_string()]
+	);
 }
 
 #[test]
 fn template_value_to_input_values_array_flattens_elements() {
-	use serde_json::json;
 	use super::template_value_to_input_values;
+	use serde_json::json;
 	assert_eq!(
 		template_value_to_input_values(&json!(["a", "b", "c"])),
 		vec!["a", "b", "c"]
@@ -2375,8 +2381,8 @@ fn template_value_to_input_values_array_flattens_elements() {
 
 #[test]
 fn template_value_to_input_values_object_returns_json_serialization() {
-	use serde_json::json;
 	use super::template_value_to_input_values;
+	use serde_json::json;
 	let obj = json!({"k": "v"});
 	let result = template_value_to_input_values(&obj);
 	assert_eq!(result.len(), 1);
