@@ -1,0 +1,56 @@
+[defaults]
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+tag = true
+release = true
+
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+
+[source.releases]
+source = "github_generated"
+generate_notes = true
+
+[source.pull_requests]
+base = "main"
+branch_prefix = "monochange/release"
+labels = ["release"]
+auto_merge = true
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.publish-release]
+help_text = "Publish releases"
+
+[[cli.publish-release.steps]]
+type = "PrepareRelease"
+
+[[cli.publish-release.steps]]
+type = "PublishRelease"
+inputs = { format = "json" }
+
+[cli.release-pr]
+help_text = "Open a release pull request"
+
+[[cli.release-pr.steps]]
+type = "PrepareRelease"
+
+[[cli.release-pr.steps]]
+type = "OpenReleaseRequest"
+inputs = { format = "json" }
+
+[cli.release-comments]
+help_text = "Comment on released issues"
+
+[[cli.release-comments.steps]]
+type = "PrepareRelease"
+
+[[cli.release-comments.steps]]
+type = "CommentReleasedIssues"
+inputs = { format = "json" }

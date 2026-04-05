@@ -1,0 +1,84 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = false
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
+[package.core]
+path = "crates/core"
+changelog = true
+
+[package.app]
+path = "crates/app"
+changelog = false
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+versioned_files = [{ path = "group.toml", type = "cargo" }]
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.validate]
+help_text = "Validate the workspace"
+
+[[cli.validate.steps]]
+type = "Validate"
+inputs = { ignored = "hardcoded" }
+
+[cli.discover]
+help_text = "Discover packages"
+
+[[cli.discover.steps]]
+type = "Discover"
+inputs = { format = "json" }
+
+[cli.change]
+help_text = "Create a hardcoded change"
+
+[[cli.change.steps]]
+type = "CreateChangeFile"
+inputs = { package = ["core"], bump = "minor", reason = "hardcoded change", output = ".changeset/hardcoded.md" }
+
+[cli.release]
+help_text = "Prepare a release"
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+inputs = { format = "json" }
+
+[cli.release-manifest]
+help_text = "Prepare a release manifest"
+
+[[cli.release-manifest.steps]]
+type = "PrepareRelease"
+
+[[cli.release-manifest.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+inputs = { format = "json" }
+
+[cli.affected]
+help_text = "Evaluate affected packages"
+
+[[cli.affected.steps]]
+type = "AffectedPackages"
+inputs = { format = "json", changed_paths = ["crates/core/CHANGELOG.md"], label = ["no-changeset-required"], verify = true }
+
+[cli.announce]
+help_text = "Write a hardcoded message"
+
+[[cli.announce.steps]]
+type = "Command"
+command = "printf '%s' '{{ inputs.message }}' > command-output.txt"
+shell = true
+inputs = { message = "hardcoded-message" }
