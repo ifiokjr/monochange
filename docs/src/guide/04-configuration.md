@@ -445,7 +445,11 @@ The `*_link` variants render markdown links when the hosting provider exposes UR
 
 <!-- {=configurationPackageReferenceRules} -->
 
-Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
+Package references in changesets and CLI commands should use configured ids.
+
+Prefer package ids when a leaf package changed. That keeps the authored change as specific as possible, and MonoChange will still propagate bumps to dependents and synchronize any configured groups automatically.
+
+Use a group id only when the change is intentionally owned by the whole group and should read that way in release output. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
 
 <!-- {/configurationPackageReferenceRules} -->
 

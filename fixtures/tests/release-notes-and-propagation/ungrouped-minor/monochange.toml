@@ -1,0 +1,26 @@
+[defaults]
+parent_bump = "minor"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"

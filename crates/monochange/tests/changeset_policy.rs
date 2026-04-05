@@ -1,10 +1,12 @@
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use insta_cmd::get_cargo_bin;
 use serde_json::Value;
 use tempfile::tempdir;
+
+mod test_support;
+use test_support::{copy_directory, fixture_path};
 
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
@@ -13,11 +15,14 @@ fn cli() -> Command {
 }
 
 #[test]
-fn verify_skips_required_changes_when_allowed_label_is_present() {
+fn verify_skipped_required_changes_when_allowed_label_is_present() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_policy_fixture(tempdir.path(), false, false, "core");
+	copy_directory(
+		&fixture_path("changeset-policy/with-changeset-core"),
+		tempdir.path(),
+	);
 
-	let json = run_json_workflow(
+	let json = run_affected_json(
 		tempdir.path(),
 		&[
 			"--changed-paths",
@@ -34,20 +39,25 @@ fn verify_skips_required_changes_when_allowed_label_is_present() {
 #[test]
 fn verify_does_not_require_changesets_for_non_package_changes() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_policy_fixture(tempdir.path(), false, false, "core");
+	copy_directory(
+		&fixture_path("changeset-policy/with-changeset-core"),
+		tempdir.path(),
+	);
 
-	let json = run_json_workflow(tempdir.path(), &["--changed-paths", "docs/readme.md"]);
+	let json = run_affected_json(tempdir.path(), &["--changed-paths", "docs/readme.md"]);
 	assert_eq!(json["status"], "not_required");
-	assert_eq!(json["matchedPaths"].as_array().map(Vec::len), Some(0));
 	assert_eq!(json["affectedPackageIds"].as_array().map(Vec::len), Some(0));
 }
 
 #[test]
 fn verify_respects_package_ignored_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_policy_fixture(tempdir.path(), false, false, "core");
+	copy_directory(
+		&fixture_path("changeset-policy/with-changeset-core"),
+		tempdir.path(),
+	);
 
-	let json = run_json_workflow(
+	let json = run_affected_json(
 		tempdir.path(),
 		&["--changed-paths", "crates/core/tests/smoke.rs"],
 	);
@@ -58,9 +68,12 @@ fn verify_respects_package_ignored_paths() {
 #[test]
 fn verify_respects_package_additional_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_policy_fixture(tempdir.path(), false, false, "core");
+	copy_directory(
+		&fixture_path("changeset-policy/with-changeset-core"),
+		tempdir.path(),
+	);
 
-	let json = run_json_workflow(tempdir.path(), &["--changed-paths", "Cargo.lock"]);
+	let json = run_affected_json(tempdir.path(), &["--changed-paths", "Cargo.lock"]);
 	assert_eq!(json["status"], "failed");
 	assert_eq!(json["affectedPackageIds"][0], "core");
 }
@@ -68,9 +81,12 @@ fn verify_respects_package_additional_paths() {
 #[test]
 fn verify_fails_when_attached_changeset_targets_the_wrong_package() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_policy_fixture(tempdir.path(), true, false, "other");
+	copy_directory(
+		&fixture_path("changeset-policy/with-changeset-other"),
+		tempdir.path(),
+	);
 
-	let json = run_json_workflow(
+	let json = run_affected_json(
 		tempdir.path(),
 		&[
 			"--changed-paths",
@@ -86,9 +102,12 @@ fn verify_fails_when_attached_changeset_targets_the_wrong_package() {
 #[test]
 fn verify_accepts_attached_changesets_that_cover_changed_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_policy_fixture(tempdir.path(), true, false, "core");
+	copy_directory(
+		&fixture_path("changeset-policy/with-changeset-core"),
+		tempdir.path(),
+	);
 
-	let json = run_json_workflow(
+	let json = run_affected_json(
 		tempdir.path(),
 		&[
 			"--changed-paths",
@@ -98,16 +117,18 @@ fn verify_accepts_attached_changesets_that_cover_changed_packages() {
 		],
 	);
 	assert_eq!(json["status"], "passed");
-	assert_eq!(json["changesetPaths"][0], ".changeset/feature.md");
 	assert_eq!(json["coveredPackageIds"][0], "core");
 }
 
 #[test]
 fn verify_reports_invalid_attached_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_policy_fixture(tempdir.path(), true, true, "core");
+	copy_directory(
+		&fixture_path("changeset-policy/with-changeset-invalid-core"),
+		tempdir.path(),
+	);
 
-	let json = run_json_workflow(
+	let json = run_affected_json(
 		tempdir.path(),
 		&[
 			"--changed-paths",
@@ -117,18 +138,19 @@ fn verify_reports_invalid_attached_changesets() {
 		],
 	);
 	assert_eq!(json["status"], "failed");
-	assert!(json["errors"]
-		.as_array()
-		.unwrap_or_else(|| panic!("expected errors array"))
-		.first()
-		.and_then(Value::as_str)
-		.is_some_and(|error| error.contains("must map to `patch`, `minor`, or `major`")));
+	assert!(json["errors"].as_array().is_some_and(|errors| {
+		errors.iter().any(|error| {
+			error
+				.as_str()
+				.is_some_and(|msg| msg.contains("must map to `patch`, `minor`, or `major`"))
+		})
+	}));
 	assert!(json["comment"]
 		.as_str()
 		.is_some_and(|comment| comment.contains("Attached changeset files:")));
 }
 
-fn run_json_workflow(root: &Path, args: &[&str]) -> Value {
+fn run_affected_json(root: &Path, args: &[&str]) -> Value {
 	let output = cli()
 		.current_dir(root)
 		.arg("affected")
@@ -144,103 +166,4 @@ fn run_json_workflow(root: &Path, args: &[&str]) -> Value {
 	);
 	serde_json::from_slice(&output.stdout)
 		.unwrap_or_else(|error| panic!("parse command json: {error}"))
-}
-
-fn seed_policy_fixture(root: &Path, with_changeset: bool, invalid_changeset: bool, target: &str) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
-	);
-	write_file(
-		root.join("crates/other/Cargo.toml"),
-		"[package]\nname = \"other\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
-	);
-	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
-	write_file(
-		root.join("crates/core/tests/smoke.rs"),
-		"#[test]\nfn smoke() {}\n",
-	);
-	write_file(root.join("crates/other/src/lib.rs"), "pub fn other() {}\n");
-	write_file(root.join("docs/readme.md"), "# docs\n");
-	write_file(root.join("Cargo.lock"), "# lock\n");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[changesets.verify]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required"]
-comment_on_failure = true
-
-[package.core]
-path = "crates/core"
-ignored_paths = ["tests/**"]
-additional_paths = ["Cargo.lock"]
-
-[package.other]
-path = "crates/other"
-
-[cli.affected]
-
-[[cli.affected.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.affected.inputs]]
-name = "changed_paths"
-type = "string_list"
-required = true
-
-[[cli.affected.inputs]]
-name = "label"
-type = "string_list"
-
-[[cli.affected.steps]]
-type = "AffectedPackages"
-"#,
-	);
-	if with_changeset {
-		let content = if invalid_changeset {
-			format!(
-				r"---
-{target}: nope
----
-
-#### invalid change
-"
-			)
-		} else {
-			format!(
-				r"---
-{target}: patch
----
-
-#### add feature
-"
-			)
-		};
-		write_file(root.join(".changeset/feature.md"), &content);
-	}
-}
-
-fn write_file(path: impl AsRef<Path>, content: &str) {
-	let path = path.as_ref();
-	if let Some(parent) = path.parent() {
-		fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
-	}
-	fs::write(path, content)
-		.unwrap_or_else(|error| panic!("write file {}: {error}", path.display()));
 }

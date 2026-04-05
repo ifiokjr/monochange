@@ -6,6 +6,9 @@ use insta_cmd::get_cargo_bin;
 use serde_json::Value;
 use tempfile::tempdir;
 
+mod test_support;
+use test_support::{copy_directory, fixture_path};
+
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
@@ -15,59 +18,34 @@ fn cli() -> Command {
 #[test]
 fn release_manifest_records_git_changeset_context_and_renders_context_templates() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_git_release_fixture(tempdir.path());
+	let root = tempdir.path();
 
-	run_git(tempdir.path(), &["init"]);
-	run_git(tempdir.path(), &["config", "user.name", "MonoChange Tests"]);
+	let fixture_root = fixture_path("changeset-provenance/base");
+	copy_directory(&fixture_root, root);
+
+	run_git(root, &["init"]);
+	run_git(root, &["config", "user.name", "MonoChange Tests"]);
 	run_git(
-		tempdir.path(),
+		root,
 		&["config", "user.email", "monochange-tests@example.com"],
 	);
-	run_git(tempdir.path(), &["add", "."]);
-	run_git(
-		tempdir.path(),
-		&["commit", "-m", "chore: seed release fixture"],
+	run_git(root, &["add", "Cargo.toml", "crates", "monochange.toml"]);
+	run_git(root, &["commit", "-m", "chore: seed release fixture"]);
+	run_git(root, &["add", ".changeset/feature.md"]);
+	run_git(root, &["commit", "-m", "feat: add changeset"]);
+	let introduced_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
+
+	let updated_fixture = fixture_path("changeset-provenance/with-updated-changeset");
+	copy_directory(
+		&updated_fixture.join(".changeset"),
+		&root.join(".changeset"),
 	);
-
-	fs::write(
-		tempdir.path().join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### add changeset context
-",
-	)
-	.unwrap_or_else(|error| panic!("changeset write: {error}"));
-	run_git(tempdir.path(), &["add", ".changeset/feature.md"]);
-	run_git(tempdir.path(), &["commit", "-m", "feat: add changeset"]);
-	let introduced_sha = git_stdout(tempdir.path(), &["rev-parse", "HEAD"])
-		.trim()
-		.to_string();
-
-	fs::write(
-		tempdir.path().join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### add changeset context
-
-Track the commit history in release notes.
-",
-	)
-	.unwrap_or_else(|error| panic!("changeset update: {error}"));
-	run_git(tempdir.path(), &["add", ".changeset/feature.md"]);
-	run_git(
-		tempdir.path(),
-		&["commit", "-m", "docs: refine changeset details"],
-	);
-	let updated_sha = git_stdout(tempdir.path(), &["rev-parse", "HEAD"])
-		.trim()
-		.to_string();
+	run_git(root, &["add", ".changeset/feature.md"]);
+	run_git(root, &["commit", "-m", "docs: refine changeset details"]);
+	let updated_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
 
 	let output = cli()
-		.current_dir(tempdir.path())
+		.current_dir(root)
 		.arg("release-manifest")
 		.arg("--dry-run")
 		.output()
@@ -78,9 +56,8 @@ Track the commit history in release notes.
 		String::from_utf8_lossy(&output.stderr)
 	);
 
-	let manifest_path = tempdir.path().join(".monochange/release-manifest.json");
-	let manifest = fs::read_to_string(&manifest_path)
-		.unwrap_or_else(|error| panic!("read manifest {}: {error}", manifest_path.display()));
+	let manifest_path = root.join(".monochange/release-manifest.json");
+	let manifest = fs_read_to_string(&manifest_path);
 	let parsed: Value =
 		serde_json::from_str(&manifest).unwrap_or_else(|error| panic!("manifest json: {error}"));
 
@@ -108,60 +85,6 @@ Track the commit history in release notes.
 	assert!(rendered.contains(&updated_sha[..7]));
 }
 
-fn seed_git_release_fixture(root: &Path) {
-	fs::create_dir_all(root.join("crates/core/src"))
-		.unwrap_or_else(|error| panic!("create core dir: {error}"));
-	fs::create_dir_all(root.join(".changeset"))
-		.unwrap_or_else(|error| panic!("create changeset dir: {error}"));
-	fs::create_dir_all(root.join(".monochange"))
-		.unwrap_or_else(|error| panic!("create monochange dir: {error}"));
-	fs::write(
-		root.join("Cargo.toml"),
-		"[workspace]\nmembers = [\"crates/core\"]\nresolver = \"2\"\n",
-	)
-	.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
-	fs::write(
-		root.join("crates/core/Cargo.toml"),
-		"[package]\nname = \"workflow-core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
-	)
-	.unwrap_or_else(|error| panic!("core manifest: {error}"));
-	fs::write(
-		root.join("crates/core/src/lib.rs"),
-		"pub fn answer() -> u32 { 42 }\n",
-	)
-	.unwrap_or_else(|error| panic!("core lib: {error}"));
-	fs::write(root.join("crates/core/CHANGELOG.md"), "# Changelog\n")
-		.unwrap_or_else(|error| panic!("core changelog: {error}"));
-	fs::write(
-		root.join("monochange.toml"),
-		r#####"
-[defaults]
-package_type = "cargo"
-
-[defaults.changelog]
-path = "{{ path }}/CHANGELOG.md"
-format = "monochange"
-
-[release_notes]
-change_templates = ["#### {{ summary }}\n\n{{ details }}\n\n{{ context }}", "#### {{ summary }}\n\n{{ context }}", "- {{ summary }}"]
-
-[package.core]
-path = "crates/core"
-
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
-
-[[cli.release-manifest.steps]]
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-"#####,
-	)
-	.unwrap_or_else(|error| panic!("monochange config: {error}"));
-}
-
 fn run_git(root: &Path, args: &[&str]) {
 	let output = Command::new("git")
 		.current_dir(root)
@@ -184,4 +107,9 @@ fn git_stdout(root: &Path, args: &[&str]) -> String {
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 	assert!(output.status.success(), "git {args:?} failed");
 	String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("utf8: {error}"))
+}
+
+fn fs_read_to_string(path: &Path) -> String {
+	fs::read_to_string(path)
+		.unwrap_or_else(|error| panic!("read manifest {}: {error}", path.display()))
 }

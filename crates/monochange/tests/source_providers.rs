@@ -1,10 +1,12 @@
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use insta_cmd::get_cargo_bin;
 use serde_json::Value;
 use tempfile::tempdir;
+
+mod test_support;
+use test_support::{copy_directory, fixture_path};
 
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
@@ -15,7 +17,7 @@ fn cli() -> Command {
 #[test]
 fn publish_release_dry_run_supports_gitlab_sources() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_gitlab_release_fixture(tempdir.path());
+	copy_directory(&fixture_path("source/gitlab"), tempdir.path());
 
 	let json = run_json_command(tempdir.path(), "publish-release");
 	let releases = json["releases"]
@@ -29,7 +31,7 @@ fn publish_release_dry_run_supports_gitlab_sources() {
 #[test]
 fn release_pr_dry_run_supports_gitea_sources() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_gitea_release_pr_fixture(tempdir.path());
+	copy_directory(&fixture_path("source/gitea"), tempdir.path());
 
 	let json = run_json_command(tempdir.path(), "release-pr");
 	let release_request = &json["releaseRequest"];
@@ -40,14 +42,13 @@ fn release_pr_dry_run_supports_gitea_sources() {
 
 #[test]
 fn source_provider_fixtures_support_configured_commands() {
-	for (relative_fixture, command) in [
-		("../../fixtures/source/github", "publish-release"),
-		("../../fixtures/source/gitlab", "publish-release"),
-		("../../fixtures/source/gitea", "release-pr"),
+	for (fixture, command) in [
+		("source/github", "publish-release"),
+		("source/gitlab", "publish-release"),
+		("source/gitea", "release-pr"),
 	] {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture);
-		copy_directory(&fixture_root, tempdir.path());
+		copy_directory(&fixture_path(fixture), tempdir.path());
 		let json = run_json_command(tempdir.path(), command);
 		assert!(json.is_object(), "expected json object output");
 	}
@@ -56,8 +57,7 @@ fn source_provider_fixtures_support_configured_commands() {
 #[test]
 fn github_source_fixture_supports_release_pull_request_and_issue_comment_dry_runs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/source/github");
-	copy_directory(&fixture_root, tempdir.path());
+	copy_directory(&fixture_path("source/github"), tempdir.path());
 
 	let publish_json = run_json_command(tempdir.path(), "publish-release");
 	let releases = publish_json["releases"]
@@ -93,186 +93,4 @@ fn run_json_command(root: &Path, command: &str) -> Value {
 	);
 	serde_json::from_slice(&output.stdout)
 		.unwrap_or_else(|error| panic!("parse json output: {error}"))
-}
-
-fn seed_gitlab_release_fixture(root: &Path) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "1.0.0"
-
-[workspace.dependencies]
-workflow-core = { path = "./crates/core", version = "1.0.0" }
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(root.join("crates/core/CHANGELOG.md"), "# Changelog\n");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-changelog = "{{ path }}/CHANGELOG.md"
-
-[package.core]
-path = "crates/core"
-tag = true
-release = true
-
-[source]
-provider = "gitlab"
-owner = "group"
-repo = "monochange"
-host = "https://gitlab.com"
-
-[source.releases]
-source = "monochange"
-
-[ecosystems.cargo]
-enabled = true
-
-[cli.publish-release]
-
-[[cli.publish-release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.publish-release.steps]]
-type = "PrepareRelease"
-
-[[cli.publish-release.steps]]
-type = "PublishRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### add gitlab support
-",
-	);
-}
-
-fn seed_gitea_release_pr_fixture(root: &Path) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "1.0.0"
-
-[workspace.dependencies]
-workflow-core = { path = "./crates/core", version = "1.0.0" }
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(root.join("crates/core/CHANGELOG.md"), "# Changelog\n");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-changelog = "{{ path }}/CHANGELOG.md"
-
-[package.core]
-path = "crates/core"
-tag = true
-release = true
-
-[source]
-provider = "gitea"
-owner = "org"
-repo = "monochange"
-host = "https://codeberg.org"
-
-[source.pull_requests]
-base = "main"
-branch_prefix = "monochange/release"
-labels = ["release"]
-
-[ecosystems.cargo]
-enabled = true
-
-[cli.release-pr]
-
-[[cli.release-pr.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release-pr.steps]]
-type = "PrepareRelease"
-
-[[cli.release-pr.steps]]
-type = "OpenReleaseRequest"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-core: patch
----
-
-#### add gitea support
-",
-	);
-}
-
-fn copy_directory(source: &Path, destination: &Path) {
-	fs::create_dir_all(destination).unwrap_or_else(|error| panic!("create dir: {error}"));
-	for entry in fs::read_dir(source).unwrap_or_else(|error| panic!("read dir: {error}")) {
-		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
-		let file_type = entry
-			.file_type()
-			.unwrap_or_else(|error| panic!("file type: {error}"));
-		let source_path = entry.path();
-		let destination_path = destination.join(entry.file_name());
-		if file_type.is_dir() {
-			copy_directory(&source_path, &destination_path);
-		} else {
-			if let Some(parent) = destination_path.parent() {
-				fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
-			}
-			fs::copy(&source_path, &destination_path)
-				.unwrap_or_else(|error| panic!("copy file: {error}"));
-		}
-	}
-}
-
-fn write_file(path: impl AsRef<Path>, content: &str) {
-	let path = path.as_ref();
-	if let Some(parent) = path.parent() {
-		fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
-	}
-	fs::write(path, content)
-		.unwrap_or_else(|error| panic!("write file {}: {error}", path.display()));
 }

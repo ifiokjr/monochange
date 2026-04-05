@@ -316,7 +316,11 @@ versioned_files = ["pubspec.lock"]
 
 <!-- {@configurationPackageReferenceRules} -->
 
-Package references in changesets and CLI commands should use configured package ids or group ids. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
+Package references in changesets and CLI commands should use configured ids.
+
+Prefer package ids when a leaf package changed. That keeps the authored change as specific as possible, and MonoChange will still propagate bumps to dependents and synchronize any configured groups automatically.
+
+Use a group id only when the change is intentionally owned by the whole group and should read that way in release output. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
 
 <!-- {/configurationPackageReferenceRules} -->
 
@@ -453,10 +457,11 @@ evidence:
 - markdown change files require a `patch`/`minor`/`major` entry per package, or an object with `bump` and/or `version`
 - when `version` is given without `bump`, the bump is inferred by comparing the current and target versions
 - explicit versions from grouped members propagate to the group version; conflicts take the highest semver or fail when `defaults.strict_version_conflicts = true`
+- prefer package ids over group ids in authored changesets when possible; direct package changes still propagate to dependents and synchronize configured groups
 - optional change `type` values can route entries into custom changelog sections without changing semver impact
 - `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
 - change templates support detailed multi-line release-note entries through `{{ details }}`, compact metadata blocks through `{{ context }}`, and fine-grained linked metadata like `{{ change_owner_link }}`, `{{ review_request_link }}`, and `{{ closed_issue_links }}`
-- dependents default to the configured `parent_bump`
+- dependents default to the configured `parent_bump`, including packages outside a changed version group when they depend on a synchronized member
 - Rust semver evidence can escalate both the changed crate and its dependents
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata

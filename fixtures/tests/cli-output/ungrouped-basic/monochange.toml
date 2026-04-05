@@ -1,0 +1,67 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.change]
+
+[[cli.change.inputs]]
+name = "interactive"
+type = "boolean"
+short = "i"
+
+[[cli.change.inputs]]
+name = "package"
+type = "string_list"
+
+[[cli.change.inputs]]
+name = "bump"
+type = "choice"
+choices = ["patch", "minor", "major"]
+default = "patch"
+
+[[cli.change.inputs]]
+name = "version"
+type = "string"
+
+[[cli.change.inputs]]
+name = "reason"
+type = "string"
+
+[[cli.change.inputs]]
+name = "type"
+type = "string"
+
+[[cli.change.inputs]]
+name = "details"
+type = "string"
+
+[[cli.change.inputs]]
+name = "evidence"
+type = "string_list"
+
+[[cli.change.inputs]]
+name = "output"
+type = "path"
+
+[[cli.change.steps]]
+type = "CreateChangeFile"
+
+[cli.release]
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"

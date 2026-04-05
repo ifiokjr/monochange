@@ -1,0 +1,39 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+tag = true
+release = true
+
+[package.app]
+path = "crates/app"
+release = true
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+draft = true
+prerelease = true
+source = "monochange"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.publish-release]
+
+[[cli.publish-release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.publish-release.steps]]
+type = "PrepareRelease"
+
+[[cli.publish-release.steps]]
+type = "PublishRelease"
