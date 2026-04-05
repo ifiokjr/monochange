@@ -20,7 +20,7 @@ fn release_manifest_records_git_changeset_context_and_renders_context_templates(
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
-	let fixture_root = fixture_path("changeset-provenance/base");
+	let fixture_root = fixture_path("changeset-context/base");
 	copy_directory(&fixture_root, root);
 
 	run_git(root, &["init"]);
@@ -35,7 +35,7 @@ fn release_manifest_records_git_changeset_context_and_renders_context_templates(
 	run_git(root, &["commit", "-m", "feat: add changeset"]);
 	let introduced_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
 
-	let updated_fixture = fixture_path("changeset-provenance/with-updated-changeset");
+	let updated_fixture = fixture_path("changeset-context/with-updated-changeset");
 	copy_directory(
 		&updated_fixture.join(".changeset"),
 		&root.join(".changeset"),
@@ -90,7 +90,7 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
-	let fixture_root = fixture_path("changeset-provenance/base");
+	let fixture_root = fixture_path("changeset-context/base");
 	copy_directory(&fixture_root, root);
 
 	run_git(root, &["init"]);
@@ -105,7 +105,7 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 	run_git(root, &["commit", "-m", "feat: add changeset"]);
 	let introduced_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
 
-	let updated_fixture = fixture_path("changeset-provenance/with-updated-changeset");
+	let updated_fixture = fixture_path("changeset-context/with-updated-changeset");
 	copy_directory(
 		&updated_fixture.join(".changeset"),
 		&root.join(".changeset"),
@@ -149,7 +149,7 @@ fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs()
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
-	let fixture_root = fixture_path("changeset-provenance/base");
+	let fixture_root = fixture_path("changeset-context/base");
 	copy_directory(&fixture_root, root);
 	fs::write(
 		root.join(".changeset/performance.md"),

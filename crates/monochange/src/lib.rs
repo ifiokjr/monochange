@@ -3616,7 +3616,7 @@ fn apply_change_template(
 	}
 	if let Some(value) = change.context.as_deref() {
 		context.insert("context", value);
-		context.insert("provenance", value);
+		context.insert("context", value);
 	}
 	if let Some(value) = change.changeset_path.as_deref() {
 		context.insert("changeset_path", value);

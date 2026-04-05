@@ -1,6 +1,6 @@
 # Diagnostics
 
-`mc diagnostics` gives you a quick snapshot of every pending changeset together with its git and review provenance.
+`mc diagnostics` gives you a quick snapshot of every pending changeset together with its git and review context.
 
 It is useful for human developers reviewing a PR, for AI agents auditing what has changed, and for CI steps that need to understand the full context of pending work before triggering a release.
 
@@ -55,25 +55,21 @@ The JSON envelope includes:
   - `summary` — the first paragraph of the markdown body
   - `details` — optional follow-up paragraphs
   - `targets` — package/group bump entries, each with `kind`, `id`, `bump`, `origin`, and optional `evidenceRefs`
-  - `context` — provenance metadata (see below)
+  - `context` — git and review context (see below)
 
-## Provenance context
+## Context fields
 
 When a changeset has been committed to a git repository, each `context` record contains:
 
-| Field | Description |
-|---|---|
-| `introduced` | revision where the changeset file was first committed |
-| `lastUpdated` | revision where it was most recently changed (omitted when same as `introduced`) |
-| `relatedIssues` | issues linked by the changeset or the PR that introduced it |
+- `introduced` — revision where the changeset file was first committed
+- `lastUpdated` — revision where it was most recently changed (omitted when same as `introduced`)
+- `relatedIssues` — issues linked by the changeset or the PR that introduced it
 
 Each revision record includes:
 
-| Field | Description |
-|---|---|
-| `commit.sha` | full commit SHA |
-| `commit.shortSha` | short SHA for display |
-| `reviewRequest` | PR/MR number and URL when the commit is associated with a pull request |
+- `commit.sha` — full commit SHA
+- `commit.shortSha` — short SHA for display
+- `reviewRequest` — PR/MR number and URL when the commit is associated with a pull request
 
 ## Config entry
 
@@ -81,7 +77,7 @@ Add it manually or run `mc init` to get it included automatically:
 
 ```toml
 [cli.diagnostics]
-help_text = "Show changeset diagnostics and provenance"
+help_text = "Show changeset diagnostics and context"
 
 [[cli.diagnostics.inputs]]
 name = "format"

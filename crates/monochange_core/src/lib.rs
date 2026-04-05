@@ -917,8 +917,6 @@ pub struct ChangesetContext {
 	pub related_issues: Vec<HostedIssueRef>,
 }
 
-pub type ChangesetProvenance = ChangesetContext;
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangesetTargetKind {
@@ -965,7 +963,7 @@ pub struct PreparedChangeset {
 	#[serde(default)]
 	pub details: Option<String>,
 	pub targets: Vec<PreparedChangesetTarget>,
-	#[serde(default, alias = "provenance")]
+	#[serde(default, alias = "context")]
 	pub context: Option<ChangesetContext>,
 }
 
@@ -1618,7 +1616,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 		CliCommandDefinition {
 			name: "diagnostics".to_string(),
 			help_text: Some(
-				"Show per-changeset diagnostics including provenance and commit/PR context"
+				"Show per-changeset diagnostics including context and commit/PR context"
 					.to_string(),
 			),
 			inputs: vec![

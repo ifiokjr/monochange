@@ -120,8 +120,8 @@ warn_on_group_mismatch = true
 #   {{ target_id }}     — release owner id (package or group)
 #   {{ bump }}          — bump severity (patch, minor, major)
 #   {{ type }}          — optional change type (e.g. "security", "note")
-#   {{ context }}       — rendered provenance context block
-#   {{ provenance }}    — alias for {{ context }}
+#   {{ context }}       — rendered context context block
+#   {{ context }}    — alias for {{ context }}
 #   {{ changeset_path }} — path to the changeset file
 #   {{ change_owner }}, {{ change_owner_link }}
 #   {{ review_request }}, {{ review_request_link }}
@@ -556,7 +556,7 @@ type = "string_list"
 type = "AffectedPackages"
 
 [cli.diagnostics]
-help_text = "Show changeset diagnostics and provenance"
+help_text = "Show changeset diagnostics and context"
 
 [[cli.diagnostics.inputs]]
 name = "format"

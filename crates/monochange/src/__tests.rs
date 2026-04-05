@@ -1392,7 +1392,7 @@ package_type = "cargo"
 path = "crates/core"
 
 [cli.diagnostics]
-help_text = "Show changeset diagnostics and provenance"
+help_text = "Show changeset diagnostics and context"
 
 [[cli.diagnostics.inputs]]
 name = "format"
