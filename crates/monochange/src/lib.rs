@@ -88,6 +88,7 @@ use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
+use monochange_core::CliStepInputValue;
 use monochange_core::CommandVariable;
 
 use monochange_core::DiscoveryReport;
@@ -770,6 +771,102 @@ fn collect_cli_command_inputs(
 	inputs
 }
 
+fn resolve_step_inputs(
+	context: &CliContext,
+	step: &CliStepDefinition,
+) -> MonochangeResult<BTreeMap<String, Vec<String>>> {
+	let mut resolved = context.inputs.clone();
+	if step.inputs().is_empty() {
+		return Ok(resolved);
+	}
+
+	let template_context = build_cli_template_context(context, &context.inputs, None);
+	for (input_name, input_value) in step.inputs() {
+		resolved.insert(
+			input_name.clone(),
+			resolve_step_input_override(input_value, &template_context)?,
+		);
+	}
+
+	Ok(resolved)
+}
+
+fn resolve_step_input_override(
+	input_value: &CliStepInputValue,
+	template_context: &serde_json::Map<String, serde_json::Value>,
+) -> MonochangeResult<Vec<String>> {
+	match input_value {
+		CliStepInputValue::Boolean(value) => Ok(vec![value.to_string()]),
+		CliStepInputValue::List(values) => {
+			let mut resolved = Vec::new();
+			for value in values {
+				resolved.extend(resolve_step_input_template(value, template_context)?);
+			}
+			Ok(resolved)
+		}
+		CliStepInputValue::String(value) => resolve_step_input_template(value, template_context),
+	}
+}
+
+fn resolve_step_input_template(
+	template: &str,
+	template_context: &serde_json::Map<String, serde_json::Value>,
+) -> MonochangeResult<Vec<String>> {
+	if let Some(path) = parse_direct_template_reference(template) {
+		return Ok(lookup_template_value(
+			&serde_json::Value::Object(template_context.clone()),
+			path,
+		)
+		.map_or_else(Vec::new, template_value_to_input_values));
+	}
+
+	let jinja_context =
+		minijinja::Value::from_serialize(&serde_json::Value::Object(template_context.clone()));
+	Ok(vec![render_jinja_template(template, &jinja_context)?])
+}
+
+fn parse_direct_template_reference(template: &str) -> Option<&str> {
+	let trimmed = template.trim();
+	let inner = trimmed.strip_prefix("{{")?.strip_suffix("}}")?.trim();
+	if inner.is_empty()
+		|| !inner
+			.chars()
+			.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '.')
+	{
+		return None;
+	}
+	Some(inner)
+}
+
+fn lookup_template_value<'a>(
+	value: &'a serde_json::Value,
+	path: &str,
+) -> Option<&'a serde_json::Value> {
+	let mut current = value;
+	for segment in path.split('.') {
+		current = match current {
+			serde_json::Value::Object(map) => map.get(segment)?,
+			serde_json::Value::Array(items) => items.get(segment.parse::<usize>().ok()?)?,
+			_ => return None,
+		};
+	}
+	Some(current)
+}
+
+fn template_value_to_input_values(value: &serde_json::Value) -> Vec<String> {
+	match value {
+		serde_json::Value::Null => Vec::new(),
+		serde_json::Value::Bool(value) => vec![value.to_string()],
+		serde_json::Value::Number(value) => vec![value.to_string()],
+		serde_json::Value::String(value) => vec![value.clone()],
+		serde_json::Value::Array(values) => values
+			.iter()
+			.flat_map(template_value_to_input_values)
+			.collect(),
+		serde_json::Value::Object(_) => vec![value.to_string()],
+	}
+}
+
 fn execute_cli_command(
 	root: &Path,
 	cli_command: &CliCommandDefinition,
@@ -795,8 +892,9 @@ fn execute_cli_command(
 	let mut output = None;
 
 	for step in &cli_command.steps {
+		let step_inputs = resolve_step_inputs(&context, step)?;
 		match step {
-			CliStepDefinition::Validate => {
+			CliStepDefinition::Validate { .. } => {
 				validate_workspace(root)?;
 				validate_cargo_workspace_version_groups(root)?;
 				output = Some(format!(
@@ -804,17 +902,15 @@ fn execute_cli_command(
 					root_relative(root, root).display()
 				));
 			}
-			CliStepDefinition::Discover => {
-				let format = context
-					.inputs
+			CliStepDefinition::Discover { .. } => {
+				let format = step_inputs
 					.get("format")
 					.and_then(|values| values.first())
 					.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 				output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
 			}
-			CliStepDefinition::CreateChangeFile => {
-				let is_interactive = context
-					.inputs
+			CliStepDefinition::CreateChangeFile { .. } => {
+				let is_interactive = step_inputs
 					.get("interactive")
 					.and_then(|values| values.first())
 					.is_some_and(|value| value == "true");
@@ -822,20 +918,17 @@ fn execute_cli_command(
 				if is_interactive {
 					let configuration = load_workspace_configuration(root)?;
 					let options = interactive::InteractiveOptions {
-						reason: context
-							.inputs
+						reason: step_inputs
 							.get("reason")
 							.and_then(|values| values.first())
 							.cloned(),
-						details: context
-							.inputs
+						details: step_inputs
 							.get("details")
 							.and_then(|values| values.first())
 							.cloned(),
 					};
 					let result = interactive::run_interactive_change(&configuration, &options)?;
-					let output_path = context
-						.inputs
+					let output_path = step_inputs
 						.get("output")
 						.and_then(|values| values.first())
 						.map(PathBuf::from);
@@ -845,24 +938,21 @@ fn execute_cli_command(
 						root_relative(root, &path).display()
 					));
 				} else {
-					let package_refs = context.inputs.get("package").cloned().unwrap_or_default();
+					let package_refs = step_inputs.get("package").cloned().unwrap_or_default();
 					if package_refs.is_empty() {
 						return Err(MonochangeError::Config(
 							"command `change` requires at least one `--package` value or `--interactive` mode".to_string(),
 						));
 					}
-					let bump = context
-						.inputs
+					let bump = step_inputs
 						.get("bump")
 						.and_then(|values| values.first())
 						.map_or(Ok(ChangeBump::Patch), |value| parse_change_bump(value))?;
-					let version = context
-						.inputs
+					let version = step_inputs
 						.get("version")
 						.and_then(|values| values.first())
 						.cloned();
-					let reason = context
-						.inputs
+					let reason = step_inputs
 						.get("reason")
 						.and_then(|values| values.first())
 						.cloned()
@@ -871,19 +961,16 @@ fn execute_cli_command(
 								"command `change` requires a `--reason` value".to_string(),
 							)
 						})?;
-					let change_type = context
-						.inputs
+					let change_type = step_inputs
 						.get("type")
 						.and_then(|values| values.first())
 						.cloned();
-					let details = context
-						.inputs
+					let details = step_inputs
 						.get("details")
 						.and_then(|values| values.first())
 						.cloned();
-					let evidence = context.inputs.get("evidence").cloned().unwrap_or_default();
-					let output_path = context
-						.inputs
+					let evidence = step_inputs.get("evidence").cloned().unwrap_or_default();
+					let output_path = step_inputs
 						.get("output")
 						.and_then(|values| values.first())
 						.map(PathBuf::from);
@@ -904,11 +991,11 @@ fn execute_cli_command(
 					));
 				}
 			}
-			CliStepDefinition::PrepareRelease => {
+			CliStepDefinition::PrepareRelease { .. } => {
 				context.prepared_release = Some(prepare_release(root, dry_run)?);
 				output = None;
 			}
-			CliStepDefinition::RenderReleaseManifest { path } => {
+			CliStepDefinition::RenderReleaseManifest { path, .. } => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`RenderReleaseManifest` requires a previous `PrepareRelease` step"
@@ -928,7 +1015,7 @@ fn execute_cli_command(
 				}
 				output = None;
 			}
-			CliStepDefinition::PublishRelease => {
+			CliStepDefinition::PublishRelease { .. } => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`PublishRelease` requires a previous `PrepareRelease` step".to_string(),
@@ -973,7 +1060,7 @@ fn execute_cli_command(
 				}
 				output = None;
 			}
-			CliStepDefinition::OpenReleaseRequest => {
+			CliStepDefinition::OpenReleaseRequest { .. } => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`OpenReleaseRequest` requires a previous `PrepareRelease` step"
@@ -1011,7 +1098,7 @@ fn execute_cli_command(
 				context.release_request = Some(request);
 				output = None;
 			}
-			CliStepDefinition::CommentReleasedIssues => {
+			CliStepDefinition::CommentReleasedIssues { .. } => {
 				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 					MonochangeError::Config(
 						"`CommentReleasedIssues` requires a previous `PrepareRelease` step"
@@ -1043,27 +1130,26 @@ fn execute_cli_command(
 							.into_iter()
 							.map(|result| {
 								format!(
-								"{} {} ({})",
-								result.repository,
-								result.issue_id,
-								match result.operation {
-									monochange_github::GitHubIssueCommentOperation::Created => "created",
-									monochange_github::GitHubIssueCommentOperation::SkippedExisting =>
-										"skipped_existing",
-								}
-							)
+									"{} {} ({})",
+									result.repository,
+									result.issue_id,
+									match result.operation {
+										monochange_github::GitHubIssueCommentOperation::Created => "created",
+										monochange_github::GitHubIssueCommentOperation::SkippedExisting => {
+											"skipped_existing"
+										}
+									}
+								)
 							})
 							.collect();
 				}
 				output = None;
 			}
-			CliStepDefinition::AffectedPackages => {
-				let since = context
-					.inputs
+			CliStepDefinition::AffectedPackages { .. } => {
+				let since = step_inputs
 					.get("since")
 					.and_then(|values| values.first().cloned());
-				let explicit_paths = context
-					.inputs
+				let explicit_paths = step_inputs
 					.get("changed_paths")
 					.cloned()
 					.unwrap_or_default();
@@ -1075,9 +1161,8 @@ fn execute_cli_command(
 				} else {
 					explicit_paths
 				};
-				let labels = context.inputs.get("label").cloned().unwrap_or_default();
-				let enforce = context
-					.inputs
+				let labels = step_inputs.get("label").cloned().unwrap_or_default();
+				let enforce = step_inputs
 					.get("verify")
 					.is_some_and(|values| values.iter().any(|v| v == "true"));
 				let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
@@ -1085,8 +1170,8 @@ fn execute_cli_command(
 				context.changeset_policy_evaluation = Some(evaluation);
 				output = None;
 			}
-			CliStepDefinition::DiagnoseChangesets => {
-				let requested = context.inputs.get("changeset").cloned().unwrap_or_default();
+			CliStepDefinition::DiagnoseChangesets { .. } => {
+				let requested = step_inputs.get("changeset").cloned().unwrap_or_default();
 				let report = diagnose_changesets(root, &requested)?;
 				context.changeset_diagnostics = Some(report);
 				output = None;
@@ -1096,12 +1181,14 @@ fn execute_cli_command(
 				dry_run_command,
 				shell,
 				variables,
+				..
 			} => run_cli_command_command(
 				&mut context,
 				command,
 				dry_run_command.as_deref(),
 				*shell,
 				variables.as_ref(),
+				&step_inputs,
 			)?,
 		}
 	}
@@ -1181,12 +1268,13 @@ fn run_cli_command_command(
 	dry_run_command: Option<&str>,
 	shell: bool,
 	variables: Option<&BTreeMap<String, CommandVariable>>,
+	step_inputs: &BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<()> {
 	let command_to_run = if context.dry_run {
 		if let Some(command) = dry_run_command {
 			command
 		} else {
-			let skipped = interpolate_cli_command_command(context, command, variables);
+			let skipped = interpolate_cli_command_command(context, command, variables, step_inputs);
 			context
 				.command_logs
 				.push(format!("skipped command `{skipped}` (dry-run)"));
@@ -1195,7 +1283,8 @@ fn run_cli_command_command(
 	} else {
 		command
 	};
-	let interpolated = interpolate_cli_command_command(context, command_to_run, variables);
+	let interpolated =
+		interpolate_cli_command_command(context, command_to_run, variables, step_inputs);
 
 	let output = if shell {
 		ProcessCommand::new("sh")
@@ -1241,93 +1330,124 @@ fn run_cli_command_command(
 	Ok(())
 }
 
-fn interpolate_cli_command_command(
-	context: &CliContext,
-	command: &str,
-	variables: Option<&BTreeMap<String, CommandVariable>>,
-) -> String {
-	let mut template_context = BTreeMap::<String, minijinja::Value>::new();
+fn cli_inputs_template_value(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> serde_json::Map<String, serde_json::Value> {
+	inputs
+		.iter()
+		.map(|(input_name, input_values)| {
+			(input_name.clone(), cli_input_template_value(input_values))
+		})
+		.collect()
+}
 
-	// Inject release variables
+fn cli_input_template_value(input_values: &[String]) -> serde_json::Value {
+	if input_values.len() == 1 {
+		let value = input_values.first().map_or("", String::as_str);
+		if value == "true" || value == "false" {
+			return serde_json::Value::Bool(value == "true");
+		}
+		return serde_json::Value::String(value.to_string());
+	}
+	if input_values.is_empty() {
+		return serde_json::Value::Bool(false);
+	}
+	serde_json::Value::Array(
+		input_values
+			.iter()
+			.cloned()
+			.map(serde_json::Value::String)
+			.collect(),
+	)
+}
+
+fn build_cli_template_context(
+	context: &CliContext,
+	inputs: &BTreeMap<String, Vec<String>>,
+	variables: Option<&BTreeMap<String, CommandVariable>>,
+) -> serde_json::Map<String, serde_json::Value> {
+	let mut template_context = serde_json::Map::new();
+
 	template_context.insert(
 		"version".to_string(),
-		minijinja::Value::from(cli_command_variable_value(
+		serde_json::Value::String(cli_command_variable_value(
 			context,
 			CommandVariable::Version,
 		)),
 	);
 	template_context.insert(
 		"group_version".to_string(),
-		minijinja::Value::from(cli_command_variable_value(
+		serde_json::Value::String(cli_command_variable_value(
 			context,
 			CommandVariable::GroupVersion,
 		)),
 	);
 	template_context.insert(
 		"released_packages".to_string(),
-		minijinja::Value::from(cli_command_variable_value(
+		serde_json::Value::String(cli_command_variable_value(
 			context,
 			CommandVariable::ReleasedPackages,
 		)),
 	);
 	template_context.insert(
 		"changed_files".to_string(),
-		minijinja::Value::from(cli_command_variable_value(
+		serde_json::Value::String(cli_command_variable_value(
 			context,
 			CommandVariable::ChangedFiles,
 		)),
 	);
 	template_context.insert(
 		"changesets".to_string(),
-		minijinja::Value::from(cli_command_variable_value(
+		serde_json::Value::String(cli_command_variable_value(
 			context,
 			CommandVariable::Changesets,
 		)),
 	);
 
-	// Inject released_packages_list as an array for filters like join()
 	if let Some(prepared) = &context.prepared_release {
 		template_context.insert(
 			"released_packages_list".to_string(),
-			minijinja::Value::from_serialize(&prepared.released_packages),
+			serde_json::Value::Array(
+				prepared
+					.released_packages
+					.iter()
+					.cloned()
+					.map(serde_json::Value::String)
+					.collect(),
+			),
 		);
 	}
 
-	// Inject all CLI inputs as template variables
-	for (input_name, input_values) in &context.inputs {
-		if input_values.len() == 1 {
-			let value = input_values.first().map_or("", String::as_str);
-			// Detect boolean-like values
-			if value == "true" || value == "false" {
-				template_context
-					.insert(input_name.clone(), minijinja::Value::from(value == "true"));
-			} else {
-				template_context.insert(
-					input_name.clone(),
-					minijinja::Value::from(value.to_string()),
-				);
-			}
-		} else if input_values.is_empty() {
-			template_context.insert(input_name.clone(), minijinja::Value::from(false));
-		} else {
-			template_context.insert(
-				input_name.clone(),
-				minijinja::Value::from_serialize(input_values),
-			);
-		}
+	let input_context = cli_inputs_template_value(inputs);
+	for (input_name, input_value) in &input_context {
+		template_context.insert(input_name.clone(), input_value.clone());
 	}
+	template_context.insert(
+		"inputs".to_string(),
+		serde_json::Value::Object(input_context),
+	);
 
-	// Inject explicit variable aliases if configured
 	if let Some(variables) = variables {
 		for (needle, variable) in variables {
 			template_context.insert(
 				needle.clone(),
-				minijinja::Value::from(cli_command_variable_value(context, *variable)),
+				serde_json::Value::String(cli_command_variable_value(context, *variable)),
 			);
 		}
 	}
 
-	let jinja_context = minijinja::Value::from_serialize(&template_context);
+	template_context
+}
+
+fn interpolate_cli_command_command(
+	context: &CliContext,
+	command: &str,
+	variables: Option<&BTreeMap<String, CommandVariable>>,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) -> String {
+	let template_context = build_cli_template_context(context, step_inputs, variables);
+	let jinja_context =
+		minijinja::Value::from_serialize(&serde_json::Value::Object(template_context));
 	render_jinja_template(command, &jinja_context).unwrap_or_else(|_| command.to_string())
 }
 

@@ -441,6 +441,12 @@ ignored_paths = [
 #   VerifyChangesets     — evaluate changeset policy from CI-supplied paths/labels
 #   Command              — run an arbitrary shell command
 #
+# Common step fields:
+#   inputs          — optional map of step-local input overrides. Values can be
+#                     strings, booleans, or string arrays. Use direct template
+#                     references like "{{ inputs.label }}" to forward values
+#                     from command inputs without losing list/boolean types.
+#
 # Command step fields:
 #   command         — the command to run
 #   dry_run_command — alternative command for --dry-run mode (optional;
@@ -449,6 +455,8 @@ ignored_paths = [
 #   variables       — map of placeholder → variable for interpolation
 #
 # Command variables: Version, GroupVersion, ReleasedPackages, ChangedFiles, Changesets
+# Command templates can also use {{ inputs.name }} for CLI inputs; bare input names
+# remain available for backward compatibility.
 # Legacy $-prefixed interpolation: {{ version }}, $group_version, $released_packages,
 #   $changed_files, $changesets
 
@@ -597,6 +605,7 @@ type = "string_list"
 
 [[cli.affected.steps]]
 type = "AffectedPackages"
+# inputs = { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
 
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"

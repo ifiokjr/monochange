@@ -548,6 +548,14 @@ pub struct CliInputDefinition {
 	pub short: Option<char>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CliStepInputValue {
+	String(String),
+	Boolean(bool),
+	List(Vec<String>),
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CommandVariable {
@@ -561,22 +569,51 @@ pub enum CommandVariable {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CliStepDefinition {
-	Validate,
-	Discover,
-	CreateChangeFile,
-	PrepareRelease,
+	Validate {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	Discover {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	CreateChangeFile {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	PrepareRelease {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	RenderReleaseManifest {
 		#[serde(default)]
 		path: Option<PathBuf>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	#[serde(alias = "PublishGitHubRelease")]
-	PublishRelease,
+	PublishRelease {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	#[serde(alias = "OpenReleasePullRequest")]
-	OpenReleaseRequest,
-	CommentReleasedIssues,
+	OpenReleaseRequest {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	CommentReleasedIssues {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	#[serde(alias = "EnforceChangesetPolicy", alias = "VerifyChangesets")]
-	AffectedPackages,
-	DiagnoseChangesets,
+	AffectedPackages {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	DiagnoseChangesets {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	Command {
 		command: String,
 		#[serde(default, alias = "dry_run")]
@@ -585,7 +622,45 @@ pub enum CliStepDefinition {
 		shell: bool,
 		#[serde(default)]
 		variables: Option<BTreeMap<String, CommandVariable>>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+}
+
+impl CliStepDefinition {
+	#[must_use]
+	pub fn inputs(&self) -> &BTreeMap<String, CliStepInputValue> {
+		match self {
+			Self::Validate { inputs }
+			| Self::Discover { inputs }
+			| Self::CreateChangeFile { inputs }
+			| Self::PrepareRelease { inputs }
+			| Self::RenderReleaseManifest { inputs, .. }
+			| Self::PublishRelease { inputs }
+			| Self::OpenReleaseRequest { inputs }
+			| Self::CommentReleasedIssues { inputs }
+			| Self::AffectedPackages { inputs }
+			| Self::DiagnoseChangesets { inputs }
+			| Self::Command { inputs, .. } => inputs,
+		}
+	}
+
+	#[must_use]
+	pub fn kind_name(&self) -> &'static str {
+		match self {
+			Self::Validate { .. } => "Validate",
+			Self::Discover { .. } => "Discover",
+			Self::CreateChangeFile { .. } => "CreateChangeFile",
+			Self::PrepareRelease { .. } => "PrepareRelease",
+			Self::RenderReleaseManifest { .. } => "RenderReleaseManifest",
+			Self::PublishRelease { .. } => "PublishRelease",
+			Self::OpenReleaseRequest { .. } => "OpenReleaseRequest",
+			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
+			Self::AffectedPackages { .. } => "AffectedPackages",
+			Self::DiagnoseChangesets { .. } => "DiagnoseChangesets",
+			Self::Command { .. } => "Command",
+		}
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -1423,7 +1498,9 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			name: "validate".to_string(),
 			help_text: Some("Validate monochange configuration and changesets".to_string()),
 			inputs: Vec::new(),
-			steps: vec![CliStepDefinition::Validate],
+			steps: vec![CliStepDefinition::Validate {
+				inputs: BTreeMap::new(),
+			}],
 		},
 		CliCommandDefinition {
 			name: "discover".to_string(),
@@ -1437,7 +1514,9 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				choices: vec!["text".to_string(), "json".to_string()],
 				short: None,
 			}],
-			steps: vec![CliStepDefinition::Discover],
+			steps: vec![CliStepDefinition::Discover {
+				inputs: BTreeMap::new(),
+			}],
 		},
 		CliCommandDefinition {
 			name: "change".to_string(),
@@ -1535,7 +1614,9 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					short: None,
 				},
 			],
-			steps: vec![CliStepDefinition::CreateChangeFile],
+			steps: vec![CliStepDefinition::CreateChangeFile {
+				inputs: BTreeMap::new(),
+			}],
 		},
 		CliCommandDefinition {
 			name: "release".to_string(),
@@ -1549,7 +1630,9 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				choices: vec!["text".to_string(), "json".to_string()],
 				short: None,
 			}],
-			steps: vec![CliStepDefinition::PrepareRelease],
+			steps: vec![CliStepDefinition::PrepareRelease {
+				inputs: BTreeMap::new(),
+			}],
 		},
 		CliCommandDefinition {
 			name: "affected".to_string(),
@@ -1611,7 +1694,9 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					short: None,
 				},
 			],
-			steps: vec![CliStepDefinition::AffectedPackages],
+			steps: vec![CliStepDefinition::AffectedPackages {
+				inputs: BTreeMap::new(),
+			}],
 		},
 		CliCommandDefinition {
 			name: "diagnostics".to_string(),
@@ -1641,7 +1726,9 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					short: None,
 				},
 			],
-			steps: vec![CliStepDefinition::DiagnoseChangesets],
+			steps: vec![CliStepDefinition::DiagnoseChangesets {
+				inputs: BTreeMap::new(),
+			}],
 		},
 	]
 }

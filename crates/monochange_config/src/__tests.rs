@@ -2103,6 +2103,37 @@ type = "AffectedPackages"
 }
 
 #[test]
+fn load_workspace_configuration_accepts_affected_packages_step_input_overrides() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[changesets.verify]
+enabled = true
+
+[cli.pr-check]
+help_text = "Verify attached changesets"
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = true }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	assert_eq!(configuration.cli.len(), 1);
+}
+
+#[test]
 fn load_workspace_configuration_parses_release_note_customization() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");
