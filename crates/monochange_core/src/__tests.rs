@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use semver::Version;
@@ -241,7 +242,9 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 		.unwrap_or_else(|| panic!("expected validate cli command"));
 	assert_eq!(
 		validate_cli_command.steps,
-		vec![CliStepDefinition::Validate]
+		vec![CliStepDefinition::Validate {
+			inputs: BTreeMap::new(),
+		}]
 	);
 }
 
@@ -256,8 +259,18 @@ fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
 	}))
 	.unwrap_or_else(|error| panic!("deserialize request alias: {error}"));
 
-	assert_eq!(publish_release, CliStepDefinition::PublishRelease);
-	assert_eq!(open_release_request, CliStepDefinition::OpenReleaseRequest);
+	assert_eq!(
+		publish_release,
+		CliStepDefinition::PublishRelease {
+			inputs: BTreeMap::new(),
+		}
+	);
+	assert_eq!(
+		open_release_request,
+		CliStepDefinition::OpenReleaseRequest {
+			inputs: BTreeMap::new(),
+		}
+	);
 }
 
 #[test]
