@@ -38,6 +38,7 @@ install:all
 mc validate
 mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
+mc diagnostics --format json
 mc release --dry-run --format json
 mc release-manifest --dry-run
 mc publish-release --dry-run --format json

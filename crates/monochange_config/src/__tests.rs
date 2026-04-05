@@ -4,6 +4,7 @@ use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
+use monochange_core::CliStepDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemType;
 use monochange_core::PackageRecord;
@@ -37,7 +38,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 5);
+	assert_eq!(configuration.cli.len(), 6);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -45,12 +46,66 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 		.collect::<Vec<_>>();
 	assert_eq!(
 		cli_command_names,
-		vec!["validate", "discover", "change", "release", "affected"]
+		vec![
+			"validate",
+			"discover",
+			"change",
+			"release",
+			"affected",
+			"diagnostics"
+		]
 	);
 	assert_eq!(configuration.cargo.enabled, None);
 	assert_eq!(configuration.npm.enabled, None);
 	assert_eq!(configuration.deno.enabled, None);
 	assert_eq!(configuration.dart.enabled, None);
+}
+
+#[test]
+fn load_workspace_configuration_supports_diagnostics_cli_command_definition() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.diagnostics]
+help_text = "Show changeset diagnostics and context"
+
+[[cli.diagnostics.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.diagnostics.inputs]]
+name = "changeset"
+type = "string_list"
+
+[[cli.diagnostics.steps]]
+type = "DiagnoseChangesets"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let diagnostics = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "diagnostics")
+		.unwrap_or_else(|| panic!("expected diagnostics command"));
+	assert_eq!(diagnostics.steps.len(), 1);
+	match diagnostics.steps.first() {
+		Some(CliStepDefinition::DiagnoseChangesets) => {}
+		Some(_) => panic!("expected DiagnoseChangesets step"),
+		None => panic!("expected diagnostics step"),
+	}
 }
 
 #[test]

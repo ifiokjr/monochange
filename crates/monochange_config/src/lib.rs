@@ -146,7 +146,7 @@ const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"bump",
 	"type",
 	"context",
-	"provenance",
+	"context",
 	"changeset_path",
 	"change_owner",
 	"change_owner_link",
@@ -2261,7 +2261,8 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::PublishRelease
 				| CliStepDefinition::OpenReleaseRequest
 				| CliStepDefinition::CommentReleasedIssues
-				| CliStepDefinition::AffectedPackages => {}
+				| CliStepDefinition::AffectedPackages
+				| CliStepDefinition::DiagnoseChangesets => {}
 			}
 		}
 	}

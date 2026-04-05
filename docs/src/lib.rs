@@ -19,3 +19,4 @@ doc_comment::doctest!("guide/04-configuration.md");
 doc_comment::doctest!("guide/05-version-groups.md");
 doc_comment::doctest!("guide/06-release-planning.md");
 doc_comment::doctest!("guide/08-github-automation.md");
+doc_comment::doctest!("guide/11-diagnostics.md");
