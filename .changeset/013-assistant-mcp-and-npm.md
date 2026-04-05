@@ -1,5 +1,5 @@
 ---
-main: minor
+monochange: minor
 ---
 
 #### add assistant setup, MCP server, and npm distribution

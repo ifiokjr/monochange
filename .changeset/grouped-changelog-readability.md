@@ -1,5 +1,5 @@
 ---
-main: patch
+monochange: patch
 ---
 
 #### improve grouped changelog readability

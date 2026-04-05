@@ -1,5 +1,5 @@
 ---
-main: minor
+monochange: minor
 ---
 
 #### validate that cargo workspace-versioned packages share the same group

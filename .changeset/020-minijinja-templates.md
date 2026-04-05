@@ -1,5 +1,5 @@
 ---
-main: minor
+monochange: minor
 ---
 
 #### migrate all variable interpolation to minijinja templates

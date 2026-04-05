@@ -1,5 +1,5 @@
 ---
-main: minor
+monochange: minor
 ---
 
 #### add configurable source providers for release automation

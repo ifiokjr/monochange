@@ -1,5 +1,5 @@
 ---
-main: major
+monochange: major
 ---
 
 #### replace built-in command structure with workflow-defined top-level commands

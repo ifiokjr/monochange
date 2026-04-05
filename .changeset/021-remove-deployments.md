@@ -1,5 +1,5 @@
 ---
-main: minor
+monochange: minor
 ---
 
 #### remove deployments feature
