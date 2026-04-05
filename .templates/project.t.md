@@ -54,7 +54,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
-- enforce pull-request changeset policy through typed command steps and reusable diagnostics
+- inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
 - apply Rust semver evidence when provided
 - expose built-in assistant setup guidance with `mc assist` and a stdio MCP server with `mc mcp`
 - publish the CLI as `@monochange/cli` and the bundled agent skill as `@monochange/skill`
@@ -71,6 +71,7 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
 - `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
+- `mc diagnostics --format json` shows all discovered changeset context or restricts to explicit inputs
 
 <!-- {/projectGitHubAutomationOverview} -->
 
@@ -82,6 +83,7 @@ install:all
 mc validate
 mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
+mc diagnostics --format json
 mc release --dry-run --format json
 mc release-manifest --dry-run
 mc publish-release --dry-run --format json
