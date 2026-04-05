@@ -2276,6 +2276,242 @@ inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = ["true"] }
 }
 
 #[test]
+fn load_workspace_configuration_rejects_unknown_step_input_override() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.discover]
+
+[[cli.discover.steps]]
+type = "Discover"
+inputs = { format = "json", nonexistent = "value" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+	assert!(
+		error.to_string().contains("unknown input override `nonexistent`"),
+		"error was: {error}"
+	);
+	assert!(
+		error.to_string().contains("valid inputs: format"),
+		"error was: {error}"
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_unknown_input_on_validate_step() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.validate]
+
+[[cli.validate.steps]]
+type = "Validate"
+inputs = { format = "json" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+	assert!(
+		error.to_string().contains("unknown input override `format`"),
+		"error was: {error}"
+	);
+	assert!(
+		error.to_string().contains("this step accepts no inputs"),
+		"error was: {error}"
+	);
+}
+
+#[test]
+fn load_workspace_configuration_allows_any_input_on_command_step() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.build]
+
+[[cli.build.inputs]]
+name = "target"
+type = "string"
+
+[[cli.build.steps]]
+type = "Command"
+command = "echo {{ inputs.target }}"
+inputs = { target = "release", custom_flag = "--verbose" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let build_cmd = configuration
+		.cli
+		.iter()
+		.find(|c| c.name == "build")
+		.unwrap_or_else(|| panic!("expected build command"));
+	assert_eq!(build_cmd.steps.len(), 1);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_wrong_type_format_override_on_discover() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.discover]
+
+[[cli.discover.steps]]
+type = "Discover"
+inputs = { format = true }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+	assert!(
+		error.to_string().contains("override `format` must use a string value"),
+		"error was: {error}"
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_list_for_string_input_on_change_step() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.change]
+
+[[cli.change.steps]]
+type = "CreateChangeFile"
+inputs = { reason = ["a", "b"] }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+	assert!(
+		error.to_string().contains("override `reason` must use a string value"),
+		"error was: {error}"
+	);
+}
+
+#[test]
+fn load_workspace_configuration_accepts_valid_diagnose_changesets_step_inputs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.diag]
+
+[[cli.diag.steps]]
+type = "DiagnoseChangesets"
+inputs = { format = "json", changeset = ["my-change.md"] }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let diag_cmd = configuration
+		.cli
+		.iter()
+		.find(|c| c.name == "diag")
+		.unwrap_or_else(|| panic!("expected diag command"));
+	assert_eq!(diag_cmd.steps.len(), 1);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_unknown_input_on_diagnose_changesets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_cargo_package(tempdir.path(), "crates/core", "core");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.diag]
+
+[[cli.diag.steps]]
+type = "DiagnoseChangesets"
+inputs = { format = "json", verbose = true }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("config write: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+	assert!(
+		error.to_string().contains("unknown input override `verbose`"),
+		"error was: {error}"
+	);
+	assert!(
+		error.to_string().contains("valid inputs: format, changeset"),
+		"error was: {error}"
+	);
+}
+
+#[test]
 fn load_workspace_configuration_parses_release_note_customization() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_cargo_package(tempdir.path(), "crates/core", "core");

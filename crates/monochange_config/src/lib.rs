@@ -2342,6 +2342,7 @@ fn validate_cli_runtime_requirements(
 			}
 		}
 		for step in &cli_command.steps {
+			validate_step_input_overrides(cli_command, step)?;
 			if let CliStepDefinition::AffectedPackages { inputs } = step {
 				if !changesets.verify.enabled {
 					return Err(MonochangeError::Config(format!(
@@ -2445,6 +2446,73 @@ fn validate_step_override_kind(
 			"string or string_list value"
 		}
 	)))
+}
+
+/// Validate that every input override key on a step is recognised and that
+/// its value type matches the expected [`CliInputKind`].
+fn validate_step_input_overrides(
+	cli_command: &CliCommandDefinition,
+	step: &CliStepDefinition,
+) -> MonochangeResult<()> {
+	let overrides = step.inputs();
+	if overrides.is_empty() {
+		return Ok(());
+	}
+
+	let valid_names = step.valid_input_names();
+
+	for (name, value) in overrides {
+		// Reject unknown input names (Command steps accept anything).
+		if let Some(names) = valid_names {
+			if !names.contains(&name.as_str()) {
+				let available = if names.is_empty() {
+					"this step accepts no inputs".to_string()
+				} else {
+					format!("valid inputs: {}", names.join(", "))
+				};
+				return Err(MonochangeError::Config(format!(
+					"CLI command `{}` step `{}` has unknown input override `{}`; {}",
+					cli_command.name,
+					step.kind_name(),
+					name,
+					available,
+				)));
+			}
+		}
+
+		// Validate value type against expected kind.
+		if let Some(expected_kind) = step.expected_input_kind(name) {
+			let type_ok = match expected_kind {
+				CliInputKind::Boolean => matches!(
+					value,
+					CliStepInputValue::Boolean(_) | CliStepInputValue::String(_)
+				),
+				CliInputKind::StringList => matches!(
+					value,
+					CliStepInputValue::String(_) | CliStepInputValue::List(_)
+				),
+				CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => {
+					matches!(value, CliStepInputValue::String(_))
+				}
+			};
+			if !type_ok {
+				return Err(MonochangeError::Config(format!(
+					"CLI command `{}` step `{}` override `{}` must use a {} value",
+					cli_command.name,
+					step.kind_name(),
+					name,
+					match expected_kind {
+						CliInputKind::Boolean => "boolean or string template",
+						CliInputKind::StringList => "string or string_list",
+						CliInputKind::String | CliInputKind::Path | CliInputKind::Choice =>
+							"string",
+					}
+				)));
+			}
+		}
+	}
+
+	Ok(())
 }
 
 #[allow(clippy::needless_pass_by_value)]

@@ -330,6 +330,146 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 }
 
 #[test]
+fn valid_input_names_returns_none_for_command_steps() {
+	let step = CliStepDefinition::Command {
+		command: "echo hi".into(),
+		dry_run_command: None,
+		shell: false,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(step.valid_input_names().is_none());
+}
+
+#[test]
+fn valid_input_names_returns_empty_for_validate() {
+	let step = CliStepDefinition::Validate {
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(step.valid_input_names(), Some([].as_slice()));
+}
+
+#[test]
+fn valid_input_names_returns_expected_names_for_affected_packages() {
+	let step = CliStepDefinition::AffectedPackages {
+		inputs: BTreeMap::new(),
+	};
+	let names = step.valid_input_names().unwrap();
+	assert!(names.contains(&"format"));
+	assert!(names.contains(&"changed_paths"));
+	assert!(names.contains(&"since"));
+	assert!(names.contains(&"verify"));
+	assert!(names.contains(&"label"));
+}
+
+#[test]
+fn valid_input_names_returns_expected_names_for_create_change_file() {
+	let step = CliStepDefinition::CreateChangeFile {
+		inputs: BTreeMap::new(),
+	};
+	let names = step.valid_input_names().unwrap();
+	for expected in [
+		"interactive",
+		"package",
+		"bump",
+		"version",
+		"reason",
+		"type",
+		"details",
+		"evidence",
+		"output",
+	] {
+		assert!(names.contains(&expected), "missing: {expected}");
+	}
+}
+
+#[test]
+fn expected_input_kind_returns_correct_types_for_affected_packages() {
+	use crate::CliInputKind;
+	let step = CliStepDefinition::AffectedPackages {
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		step.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		step.expected_input_kind("changed_paths"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(
+		step.expected_input_kind("since"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		step.expected_input_kind("verify"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(
+		step.expected_input_kind("label"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(step.expected_input_kind("unknown"), None);
+}
+
+#[test]
+fn expected_input_kind_returns_none_for_command_steps() {
+	let step = CliStepDefinition::Command {
+		command: "echo".into(),
+		dry_run_command: None,
+		shell: false,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(step.expected_input_kind("anything"), None);
+}
+
+#[test]
+fn expected_input_kind_returns_correct_types_for_create_change_file() {
+	use crate::CliInputKind;
+	let step = CliStepDefinition::CreateChangeFile {
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		step.expected_input_kind("interactive"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(
+		step.expected_input_kind("package"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(
+		step.expected_input_kind("bump"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		step.expected_input_kind("reason"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		step.expected_input_kind("output"),
+		Some(CliInputKind::Path)
+	);
+}
+
+#[test]
+fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
+	use crate::CliInputKind;
+	let step = CliStepDefinition::DiagnoseChangesets {
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		step.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		step.expected_input_kind("changeset"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(step.expected_input_kind("nonexistent"), None);
+}
+
+#[test]
 fn hosted_review_request_kind_as_str_and_display() {
 	use crate::HostedReviewRequestKind;
 	assert_eq!(
