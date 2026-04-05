@@ -1,0 +1,16 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.build]
+
+[[cli.build.inputs]]
+name = "target"
+type = "string"
+
+[[cli.build.steps]]
+type = "Command"
+command = "echo {{ inputs.target }}"
+inputs = { target = "release", custom_flag = "--verbose" }

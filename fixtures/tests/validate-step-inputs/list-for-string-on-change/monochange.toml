@@ -1,0 +1,11 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.change]
+
+[[cli.change.steps]]
+type = "CreateChangeFile"
+inputs = { reason = ["a", "b"] }
