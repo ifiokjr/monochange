@@ -249,6 +249,51 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 }
 
 #[test]
+fn cli_step_definition_kind_name_covers_all_variants() {
+	use std::collections::BTreeMap;
+	let cases: Vec<(CliStepDefinition, &str)> = vec![
+		(CliStepDefinition::Validate { inputs: BTreeMap::new() }, "Validate"),
+		(CliStepDefinition::Discover { inputs: BTreeMap::new() }, "Discover"),
+		(CliStepDefinition::CreateChangeFile { inputs: BTreeMap::new() }, "CreateChangeFile"),
+		(CliStepDefinition::PrepareRelease { inputs: BTreeMap::new() }, "PrepareRelease"),
+		(CliStepDefinition::RenderReleaseManifest { path: None, inputs: BTreeMap::new() }, "RenderReleaseManifest"),
+		(CliStepDefinition::PublishRelease { inputs: BTreeMap::new() }, "PublishRelease"),
+		(CliStepDefinition::OpenReleaseRequest { inputs: BTreeMap::new() }, "OpenReleaseRequest"),
+		(CliStepDefinition::CommentReleasedIssues { inputs: BTreeMap::new() }, "CommentReleasedIssues"),
+		(CliStepDefinition::AffectedPackages { inputs: BTreeMap::new() }, "AffectedPackages"),
+		(CliStepDefinition::DiagnoseChangesets { inputs: BTreeMap::new() }, "DiagnoseChangesets"),
+		(CliStepDefinition::Command { command: "echo".into(), dry_run_command: None, shell: false, variables: None, inputs: BTreeMap::new() }, "Command"),
+	];
+	for (step, expected) in cases {
+		assert_eq!(step.kind_name(), expected);
+	}
+}
+
+#[test]
+fn hosted_review_request_kind_as_str_and_display() {
+	use crate::HostedReviewRequestKind;
+	assert_eq!(HostedReviewRequestKind::PullRequest.as_str(), "pull_request");
+	assert_eq!(HostedReviewRequestKind::MergeRequest.as_str(), "merge_request");
+	assert_eq!(HostedReviewRequestKind::PullRequest.to_string(), "pull_request");
+	assert_eq!(HostedReviewRequestKind::MergeRequest.to_string(), "merge_request");
+}
+
+#[test]
+fn hosted_issue_relationship_kind_as_str_and_display() {
+	use crate::HostedIssueRelationshipKind;
+	let cases = [
+		(HostedIssueRelationshipKind::ClosedByReviewRequest, "closed_by_review_request"),
+		(HostedIssueRelationshipKind::ReferencedByReviewRequest, "referenced_by_review_request"),
+		(HostedIssueRelationshipKind::Mentioned, "mentioned"),
+		(HostedIssueRelationshipKind::Manual, "manual"),
+	];
+	for (kind, expected) in cases {
+		assert_eq!(kind.as_str(), expected);
+		assert_eq!(kind.to_string(), expected);
+	}
+}
+
+#[test]
 fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
 	let publish_release: CliStepDefinition = serde_json::from_value(json!({
 		"type": "PublishGitHubRelease"
