@@ -16,7 +16,7 @@ fn cli() -> Command {
 }
 
 #[test]
-fn validate_step_accepts_hardcoded_ignored_inputs() {
+fn validate_step_runs_without_input_overrides() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(
 		&fixture_path("cli-step-input-overrides/workspace"),

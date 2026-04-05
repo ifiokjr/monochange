@@ -661,6 +661,79 @@ impl CliStepDefinition {
 			Self::Command { .. } => "Command",
 		}
 	}
+
+	/// Returns the set of input names that this step kind recognises.
+	///
+	/// `Command` steps accept any input (returns `None`).
+	/// All built-in step kinds return `Some(…)` with the exhaustive set of
+	/// input names they consume at runtime.
+	#[must_use]
+	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
+		match self {
+			Self::Validate { .. } | Self::RenderReleaseManifest { .. } => Some(&[]),
+			Self::Discover { .. }
+			| Self::PrepareRelease { .. }
+			| Self::PublishRelease { .. }
+			| Self::OpenReleaseRequest { .. }
+			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
+			Self::CreateChangeFile { .. } => Some(&[
+				"interactive",
+				"package",
+				"bump",
+				"version",
+				"reason",
+				"type",
+				"details",
+				"evidence",
+				"output",
+			]),
+			Self::AffectedPackages { .. } => {
+				Some(&["format", "changed_paths", "since", "verify", "label"])
+			}
+			Self::DiagnoseChangesets { .. } => Some(&["format", "changeset"]),
+			Self::Command { .. } => None,
+		}
+	}
+
+	/// Returns the expected [`CliInputKind`] for a named input on this step,
+	/// or `None` when the step is a `Command` (accepts anything) or the name
+	/// is unrecognised.
+	#[must_use]
+	pub fn expected_input_kind(&self, name: &str) -> Option<CliInputKind> {
+		match self {
+			Self::Validate { .. }
+			| Self::RenderReleaseManifest { .. }
+			| Self::Command { .. } => None,
+			Self::Discover { .. }
+			| Self::PrepareRelease { .. }
+			| Self::PublishRelease { .. }
+			| Self::OpenReleaseRequest { .. }
+			| Self::CommentReleasedIssues { .. } => match name {
+				"format" => Some(CliInputKind::Choice),
+				_ => None,
+			},
+			Self::CreateChangeFile { .. } => match name {
+				"interactive" => Some(CliInputKind::Boolean),
+				"package" | "evidence" => Some(CliInputKind::StringList),
+				"bump" => Some(CliInputKind::Choice),
+				"version" | "reason" | "type" | "details" => Some(CliInputKind::String),
+				"output" => Some(CliInputKind::Path),
+				_ => None,
+			},
+			Self::AffectedPackages { .. } => match name {
+				"format" => Some(CliInputKind::Choice),
+				"changed_paths" | "label" => Some(CliInputKind::StringList),
+				"since" => Some(CliInputKind::String),
+				"verify" => Some(CliInputKind::Boolean),
+				_ => None,
+			},
+			Self::DiagnoseChangesets { .. } => match name {
+				"format" => Some(CliInputKind::Choice),
+				"changeset" => Some(CliInputKind::StringList),
+				_ => None,
+			},
+		}
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
