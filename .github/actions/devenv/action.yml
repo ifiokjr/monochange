@@ -13,11 +13,30 @@ runs:
   using: composite
   steps:
     - name: cache rust dependencies
+      id: cache-rust-dependencies
+      continue-on-error: true
+      uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "${{ inputs.cache-version }}"
+
+    - name: retry cache rust dependencies
+      if: steps.cache-rust-dependencies.outcome != 'success'
       uses: Swatinem/rust-cache@v2
       with:
         prefix-key: "${{ inputs.cache-version }}"
 
     - name: cache cargo binaries
+      id: cache-cargo-binaries
+      continue-on-error: true
+      uses: actions/cache@v5
+      with:
+        path: ./.bin
+        key: ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-${{ env.RUSTUP_TOOLCHAIN }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-
+
+    - name: retry cache cargo binaries
+      if: steps.cache-cargo-binaries.outcome != 'success'
       uses: actions/cache@v5
       with:
         path: ./.bin
@@ -26,17 +45,58 @@ runs:
           ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-
 
     - name: install nix
+      id: install-nix
+      continue-on-error: true
+      uses: cachix/install-nix-action@v31
+      with:
+        github_access_token: ${{ inputs.github-token }}
+
+    - name: retry install nix
+      if: steps.install-nix.outcome != 'success'
       uses: cachix/install-nix-action@v31
       with:
         github_access_token: ${{ inputs.github-token }}
 
     - name: setup nix environment
-      run: |
-        nix profile add --accept-flake-config nixpkgs#cachix
-        cachix use devenv
-        nix profile add nixpkgs#devenv
       shell: bash
+      run: |
+        set -euo pipefail
+
+        max_attempts=3
+        for attempt in $(seq 1 "$max_attempts"); do
+          if nix profile add --accept-flake-config nixpkgs#cachix && \
+            cachix use devenv && \
+            nix profile add nixpkgs#devenv; then
+            break
+          fi
+
+          if [ "$attempt" -eq "$max_attempts" ]; then
+            echo "::error::Failed to set up nix environment after $attempt attempts"
+            exit 1
+          fi
+
+          sleep_seconds=$((attempt * 10))
+          echo "::warning::setup nix environment failed (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+          sleep "$sleep_seconds"
+        done
 
     - name: install dependencies
-      run: install:cargo:bin
-      shell: devenv shell -- bash -e {0}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        max_attempts=3
+        for attempt in $(seq 1 "$max_attempts"); do
+          if devenv shell install:cargo:bin; then
+            break
+          fi
+
+          if [ "$attempt" -eq "$max_attempts" ]; then
+            echo "::error::install:cargo:bin failed after $attempt attempts"
+            exit 1
+          fi
+
+          sleep_seconds=$((attempt * 10))
+          echo "::warning::install:cargo:bin failed (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+          sleep "$sleep_seconds"
+        done
