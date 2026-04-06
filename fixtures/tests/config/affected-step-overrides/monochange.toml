@@ -1,0 +1,15 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[changesets.verify]
+enabled = true
+
+[cli.pr-check]
+help_text = "Verify attached changesets"
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = true }

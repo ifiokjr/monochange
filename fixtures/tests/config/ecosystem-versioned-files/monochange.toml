@@ -1,0 +1,13 @@
+[defaults]
+package_type = "npm"
+
+[ecosystems.npm]
+versioned_files = ["**/package.json"]
+
+[package.app]
+path = "packages/app"
+
+[package.web]
+path = "packages/web"
+ignore_ecosystem_versioned_files = true
+versioned_files = ["package.json"]

@@ -1,0 +1,18 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.test]
+help_text = "test"
+
+[[cli.test.steps]]
+type = "Command"
+command = "echo a"
+id = "step1"
+
+[[cli.test.steps]]
+type = "Command"
+command = "echo b"
+id = "step1"

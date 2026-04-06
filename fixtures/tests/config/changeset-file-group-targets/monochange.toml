@@ -1,0 +1,10 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[group.sdk]
+packages = ["core", "web"]

@@ -2090,6 +2090,90 @@ fn validate_accepts_single_workspace_versioned_package_without_group() {
 	assert!(output.contains("workspace validation passed"));
 }
 
+#[test]
+fn command_step_with_id_captures_stdout_for_later_steps() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_step_outputs_fixture(tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("echo-test"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+
+	assert!(
+		output.contains("got:hello-world"),
+		"expected stdout interpolation, got: {output}"
+	);
+}
+
+#[test]
+fn command_step_with_shell_string_uses_custom_shell() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_step_outputs_fixture(tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("shell-bash"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+
+	assert!(
+		output.contains("result:bash-works"),
+		"expected bash shell output, got: {output}"
+	);
+}
+
+#[test]
+fn release_step_exposes_updated_changelogs_to_command_steps() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_step_outputs_fixture(tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+
+	assert!(
+		output.contains("crates/core/CHANGELOG.md"),
+		"expected changelog path in output, got: {output}"
+	);
+}
+
+fn seed_step_outputs_fixture(root: &Path) {
+	let fixture_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/step-outputs/base");
+	let files = [
+		"Cargo.toml",
+		"monochange.toml",
+		"crates/core/Cargo.toml",
+		"crates/core/src/lib.rs",
+		"crates/core/CHANGELOG.md",
+		".changeset/feature.md",
+	];
+	for file in &files {
+		let source = fixture_dir.join(file);
+		let target = root.join(file);
+		if let Some(parent) = target.parent() {
+			fs::create_dir_all(parent)
+				.unwrap_or_else(|error| panic!("create dir: {error}"));
+		}
+		fs::copy(&source, &target).unwrap_or_else(|error| {
+			panic!("copy {}: {error}", source.display())
+		});
+	}
+}
+
 fn write_file(path: impl AsRef<Path>, content: &str) {
 	let path = path.as_ref();
 	if let Some(parent) = path.parent() {
