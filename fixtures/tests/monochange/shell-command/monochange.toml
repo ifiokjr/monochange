@@ -1,0 +1,6 @@
+[cli.announce]
+
+[[cli.announce.steps]]
+type = "Command"
+command = "printf '%s' shell-command > shell-output.txt"
+shell = true

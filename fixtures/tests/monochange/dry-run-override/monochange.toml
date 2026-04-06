@@ -1,0 +1,7 @@
+[cli.announce]
+
+[[cli.announce.steps]]
+type = "Command"
+command = "printf '%s' real-run > command-output.txt"
+dry_run_command = "printf '%s' dry-run > dry-run-output.txt"
+shell = true

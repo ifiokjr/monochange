@@ -1,0 +1,27 @@
+[defaults]
+package_type = "cargo"
+changelog = "{{ path }}/changelog.md"
+empty_update_message = "Default update for {{ package }} -> {{ version }}."
+
+[package.core]
+path = "crates/core"
+empty_update_message = "Package override for {{ package }} -> {{ version }}"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+empty_update_message = "Update triggered by group {{ group }}; version {{ version }}."
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
