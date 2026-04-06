@@ -1,0 +1,12 @@
+[cli.announce]
+
+[[cli.announce.inputs]]
+name = "prefix"
+type = "string"
+default = "hello"
+
+[[cli.announce.steps]]
+type = "Command"
+command = "printf '%s' '{{ inputs.message }}' > output.txt"
+shell = true
+inputs = { message = "{{ inputs.prefix }}-world" }

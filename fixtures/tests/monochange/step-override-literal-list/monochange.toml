@@ -1,0 +1,19 @@
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
+
+[cli.pr-check]
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = false, format = "json" }

@@ -1,0 +1,12 @@
+[defaults]
+package_type = "npm"
+changelog = false
+
+[package.app]
+path = "packages/app"
+versioned_files = [{ path = "lockfiles/shared/package-lock.json", type = "npm" }]
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"

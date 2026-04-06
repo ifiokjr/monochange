@@ -1,0 +1,4 @@
+{
+  "version": "4",
+  "specifiers": { "npm:app@1.0.0": "1.0.0" }
+}

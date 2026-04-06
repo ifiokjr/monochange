@@ -1,0 +1,11 @@
+[cli.announce]
+
+[[cli.announce.inputs]]
+name = "message"
+type = "string"
+
+[[cli.announce.steps]]
+type = "Command"
+command = "printf '%s' '{{ inputs.announcement }}' > command-output.txt"
+shell = true
+inputs = { announcement = "{{ inputs.message }}" }

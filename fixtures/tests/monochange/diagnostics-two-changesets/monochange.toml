@@ -1,0 +1,21 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.diagnostics]
+help_text = "Show changeset diagnostics and context"
+
+[[cli.diagnostics.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.diagnostics.inputs]]
+name = "changeset"
+type = "string_list"
+
+[[cli.diagnostics.steps]]
+type = "DiagnoseChangesets"
