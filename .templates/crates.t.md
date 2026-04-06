@@ -393,6 +393,8 @@ let manifest = ReleaseManifest {
         version_format: VersionFormat::Primary,
         tag_name: "v1.2.0".to_string(),
         members: vec!["core".to_string(), "app".to_string()],
+        rendered_title: "1.2.0 (2026-04-06)".to_string(),
+        rendered_changelog_title: "[1.2.0](https://example.com) (2026-04-06)".to_string(),
     }],
     released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
     changed_files: Vec::new(),
