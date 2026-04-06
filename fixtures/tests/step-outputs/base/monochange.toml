@@ -1,0 +1,56 @@
+[defaults]
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+
+[cli.release]
+help_text = "Prepare a release"
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[[cli.release.steps]]
+type = "Command"
+id = "list_changelogs"
+command = "echo {{ release.updated_changelogs | join(' ') }}"
+shell = true
+
+[[cli.release.steps]]
+type = "Command"
+command = "echo changelogs:{{ steps.list_changelogs.stdout }}"
+shell = true
+
+[cli.echo-test]
+help_text = "Test command step outputs"
+
+[[cli.echo-test.steps]]
+type = "Command"
+id = "greet"
+command = "echo hello-world"
+
+[[cli.echo-test.steps]]
+type = "Command"
+command = "echo got:{{ steps.greet.stdout }}"
+shell = true
+
+[cli.shell-bash]
+help_text = "Test bash shell config"
+
+[[cli.shell-bash.steps]]
+type = "Command"
+id = "bash_cmd"
+command = "echo bash-works"
+shell = "bash"
+
+[[cli.shell-bash.steps]]
+type = "Command"
+command = "echo result:{{ steps.bash_cmd.stdout }}"
+shell = true

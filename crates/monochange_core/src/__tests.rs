@@ -27,6 +27,7 @@ use crate::ReleaseNotesDocument;
 use crate::ReleaseNotesSection;
 use crate::ReleaseNotesSettings;
 use crate::ReleaseOwnerKind;
+use crate::ShellConfig;
 use crate::VersionFormat;
 use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
@@ -317,7 +318,8 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::Command {
 				command: "echo".into(),
 				dry_run_command: None,
-				shell: false,
+				shell: ShellConfig::None,
+				id: None,
 				variables: None,
 				inputs: BTreeMap::new(),
 			},
@@ -334,7 +336,8 @@ fn valid_input_names_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
 		command: "echo hi".into(),
 		dry_run_command: None,
-		shell: false,
+		shell: ShellConfig::None,
+		id: None,
 		variables: None,
 		inputs: BTreeMap::new(),
 	};
@@ -417,7 +420,8 @@ fn expected_input_kind_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
 		command: "echo".into(),
 		dry_run_command: None,
-		shell: false,
+		shell: ShellConfig::None,
+		id: None,
 		variables: None,
 		inputs: BTreeMap::new(),
 	};
@@ -675,5 +679,69 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		npm: EcosystemSettings::default(),
 		deno: EcosystemSettings::default(),
 		dart: EcosystemSettings::default(),
+	}
+}
+
+#[test]
+fn shell_config_deserializes_from_bool_and_string() {
+	let from_true: ShellConfig = serde_json::from_str("true").unwrap();
+	assert_eq!(from_true, ShellConfig::Default);
+	assert_eq!(from_true.shell_binary(), Some("sh"));
+
+	let from_false: ShellConfig = serde_json::from_str("false").unwrap();
+	assert_eq!(from_false, ShellConfig::None);
+	assert_eq!(from_false.shell_binary(), None);
+
+	let from_bash: ShellConfig = serde_json::from_str(r#""bash""#).unwrap();
+	assert_eq!(from_bash, ShellConfig::Custom("bash".to_string()));
+	assert_eq!(from_bash.shell_binary(), Some("bash"));
+
+	let from_empty: Result<ShellConfig, _> = serde_json::from_str(r#""""#);
+	assert!(from_empty.is_err());
+
+	assert_eq!(ShellConfig::default(), ShellConfig::None);
+}
+
+#[test]
+fn shell_config_serializes_roundtrip() {
+	assert_eq!(serde_json::to_string(&ShellConfig::None).unwrap(), "false");
+	assert_eq!(
+		serde_json::to_string(&ShellConfig::Default).unwrap(),
+		"true"
+	);
+	assert_eq!(
+		serde_json::to_string(&ShellConfig::Custom("bash".into())).unwrap(),
+		r#""bash""#
+	);
+}
+
+#[test]
+fn cli_step_command_with_id_deserializes() {
+	let json_str = r#"{"type":"Command","command":"echo hello","id":"greet","shell":"bash"}"#;
+	let step: CliStepDefinition =
+		serde_json::from_str(json_str).unwrap_or_else(|error| panic!("deserialize: {error}"));
+	match &step {
+		CliStepDefinition::Command {
+			command, id, shell, ..
+		} => {
+			assert_eq!(command, "echo hello");
+			assert_eq!(id.as_deref(), Some("greet"));
+			assert_eq!(shell, &ShellConfig::Custom("bash".to_string()));
+		}
+		_ => panic!("expected Command step"),
+	}
+}
+
+#[test]
+fn cli_step_command_without_id_has_none() {
+	let json_str = r#"{"type":"Command","command":"echo hello","shell":true}"#;
+	let step: CliStepDefinition =
+		serde_json::from_str(json_str).unwrap_or_else(|error| panic!("deserialize: {error}"));
+	match &step {
+		CliStepDefinition::Command { id, shell, .. } => {
+			assert!(id.is_none());
+			assert_eq!(shell, &ShellConfig::Default);
+		}
+		_ => panic!("expected Command step"),
 	}
 }
