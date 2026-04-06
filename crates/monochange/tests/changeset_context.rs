@@ -151,11 +151,6 @@ fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs()
 
 	let fixture_root = fixture_path("changeset-context/base");
 	copy_directory(&fixture_root, root);
-	fs::write(
-		root.join(".changeset/performance.md"),
-		"---\ncore: patch\n---\n\n#### improve performance\n",
-	)
-	.unwrap_or_else(|error| panic!("write changeset: {error}"));
 
 	let output = cli()
 		.current_dir(root)
