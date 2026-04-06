@@ -1,0 +1,33 @@
+[defaults]
+parent_bump = "minor"
+include_private = true
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+changelog = "crates/core/changelog.md"
+tag = true
+release = true
+
+[package."npm:web"]
+path = "packages/web"
+type = "npm"
+
+[group.sdk]
+packages = ["core", "npm:web"]
+changelog = "changelog.md"
+version_format = "primary"
+
+[ecosystems.npm]
+enabled = true
+roots = ["packages/*"]
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[[cli.release.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
