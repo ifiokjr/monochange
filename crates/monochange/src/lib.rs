@@ -1474,16 +1474,16 @@ fn build_cli_template_context(
 	if !context.step_outputs.is_empty() {
 		let mut steps_map = serde_json::Map::new();
 		for (id, output) in &context.step_outputs {
-			let mut step_map = serde_json::Map::new();
-			step_map.insert(
+			let mut output_map = serde_json::Map::new();
+			output_map.insert(
 				"stdout".to_string(),
 				serde_json::Value::String(output.stdout.clone()),
 			);
-			step_map.insert(
+			output_map.insert(
 				"stderr".to_string(),
 				serde_json::Value::String(output.stderr.clone()),
 			);
-			steps_map.insert(id.clone(), serde_json::Value::Object(step_map));
+			steps_map.insert(id.clone(), serde_json::Value::Object(output_map));
 		}
 		template_context.insert("steps".to_string(), serde_json::Value::Object(steps_map));
 	}
