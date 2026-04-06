@@ -13,7 +13,6 @@ use test_support::{copy_directory, fixture_path};
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
-	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
 	command
 }
 
@@ -28,6 +27,11 @@ macro_rules! apply_common_filters {
 			settings.add_filter(r"SourceOffset\(\d+\)", "SourceOffset([OFFSET])");
 			settings.add_filter(r"length: \d+", "length: [LEN]");
 			settings.add_filter(r"@ bytes \d+\.\.\d+", "@ bytes [OFFSET]..[END]");
+			settings.add_filter(
+				r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",
+				"[DATETIME]",
+			);
+			settings.add_filter(r"\d{4}-\d{2}-\d{2}", "[DATE]");
 			settings.bind_to_scope()
 		};
 	};
@@ -383,8 +387,8 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	        "core",
 	        "app"
 	      ],
-	      "renderedTitle": "1.1.0 (2026-04-06)",
-	      "renderedChangelogTitle": "1.1.0 (2026-04-06)"
+	      "renderedTitle": "1.1.0 ([DATE])",
+	      "renderedChangelogTitle": "1.1.0 ([DATE])"
 	    }
 	  ],
 	  "releasedPackages": [
@@ -406,7 +410,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	      "path": "changelog.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0 (2026-04-06)",
+	        "title": "1.1.0 ([DATE])",
 	        "summary": [
 	          "Grouped release for `sdk`.",
 	          "Changed members: core",
@@ -421,7 +425,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0 (2026-04-06)\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
+	      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
 	    },
 	    {
 	      "ownerId": "core",
@@ -429,7 +433,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	      "path": "crates/core/CHANGELOG.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0 (2026-04-06)",
+	        "title": "1.1.0 ([DATE])",
 	        "summary": [],
 	        "sections": [
 	          {
@@ -440,7 +444,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0 (2026-04-06)\n\n### Features\n\n- add feature"
+	      "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add feature"
 	    }
 	  ],
 	  "changesets": [
@@ -677,8 +681,8 @@ fn release_manifest_workflow_writes_manifest_json() {
 	        "core",
 	        "app"
 	      ],
-	      "renderedTitle": "1.1.0 (2026-04-06)",
-	      "renderedChangelogTitle": "1.1.0 (2026-04-06)"
+	      "renderedTitle": "1.1.0 ([DATE])",
+	      "renderedChangelogTitle": "1.1.0 ([DATE])"
 	    }
 	  ],
 	  "releasedPackages": [
@@ -700,7 +704,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	      "path": "changelog.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0 (2026-04-06)",
+	        "title": "1.1.0 ([DATE])",
 	        "summary": [
 	          "Grouped release for `sdk`.",
 	          "Changed members: core",
@@ -715,7 +719,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0 (2026-04-06)\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
+	      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
 	    },
 	    {
 	      "ownerId": "core",
@@ -723,7 +727,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	      "path": "crates/core/CHANGELOG.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0 (2026-04-06)",
+	        "title": "1.1.0 ([DATE])",
 	        "summary": [],
 	        "sections": [
 	          {
@@ -734,7 +738,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0 (2026-04-06)\n\n### Features\n\n- add feature"
+	      "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add feature"
 	    }
 	  ],
 	  "changesets": [
