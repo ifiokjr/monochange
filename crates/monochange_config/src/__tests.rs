@@ -5,7 +5,6 @@ use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::CliStepDefinition;
-use monochange_core::ShellConfig;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemType;
 use monochange_core::PackageRecord;
@@ -313,8 +312,8 @@ fn load_workspace_configuration_uses_defaults_package_type_when_type_is_omitted(
 }
 
 #[test]
-fn load_workspace_configuration_uses_defaults_changelog_pattern_when_package_changelog_is_omitted(
-) {
+fn load_workspace_configuration_uses_defaults_changelog_pattern_when_package_changelog_is_omitted()
+{
 	let root = fixture_path("config/defaults-changelog-pattern");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -1420,8 +1419,6 @@ fn fixture_path(relative: &str) -> PathBuf {
 		.join(relative)
 }
 
-
-
 #[test]
 fn load_workspace_configuration_rejects_duplicate_command_step_ids() {
 	let root = fixture_path("config/rejects-duplicate-step-ids");
@@ -1440,125 +1437,13 @@ fn load_workspace_configuration_rejects_empty_command_step_id() {
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected error for empty step id"));
-	assert!(
-		error.to_string().contains("empty id"),
-		"error: {error}"
-	);
+	assert!(error.to_string().contains("empty id"), "error: {error}");
 }
 
 #[test]
 fn load_workspace_configuration_accepts_command_step_with_shell_string() {
 	let root = fixture_path("config/accepts-shell-string");
 	let configuration = load_workspace_configuration(&root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let test_cmd = configuration
-		.cli
-		.iter()
-		.find(|c| c.name == "test")
-		.unwrap_or_else(|| panic!("expected test command"));
-	match test_cmd.steps.first() {
-		Some(CliStepDefinition::Command { shell, id, .. }) => {
-			assert_eq!(*shell, ShellConfig::Custom("bash".to_string()));
-			assert_eq!(id.as_deref(), Some("greet"));
-		}
-		_ => panic!("expected Command step"),
-	}
-}
-
-#[test]
-fn load_workspace_configuration_rejects_duplicate_command_step_ids() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.test]
-help_text = "test"
-
-[[cli.test.steps]]
-type = "Command"
-command = "echo a"
-id = "step1"
-
-[[cli.test.steps]]
-type = "Command"
-command = "echo b"
-id = "step1"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected error for duplicate step ids"));
-	assert!(
-		error.to_string().contains("duplicate step id"),
-		"error: {error}"
-	);
-}
-
-#[test]
-fn load_workspace_configuration_rejects_empty_command_step_id() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.test]
-help_text = "test"
-
-[[cli.test.steps]]
-type = "Command"
-command = "echo a"
-id = "  "
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let error = load_workspace_configuration(tempdir.path())
-		.err()
-		.unwrap_or_else(|| panic!("expected error for empty step id"));
-	assert!(error.to_string().contains("empty id"), "error: {error}");
-}
-
-#[test]
-fn load_workspace_configuration_accepts_command_step_with_shell_string_and_id() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.test]
-help_text = "test"
-
-[[cli.test.steps]]
-type = "Command"
-command = "echo hello"
-shell = "bash"
-id = "greet"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let test_cmd = configuration
 		.cli
