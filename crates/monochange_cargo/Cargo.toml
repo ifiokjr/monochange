@@ -13,20 +13,20 @@ rust-version = { workspace = true }
 description = "Manage versions and releases for your multiplatform, multilanguage monorepo"
 
 [dependencies]
-glob = { workspace = true }
+glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
 monochange_semver = { workspace = true }
-semver = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
-toml = { workspace = true }
-walkdir = { workspace = true }
+semver = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }
+toml = { workspace = true, default-features = true }
+walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true }
-rstest = { workspace = true }
-similar-asserts = { workspace = true }
-tempfile = "3"
+insta = { workspace = true, default-features = true }
+rstest = { workspace = true, default-features = true }
+similar-asserts = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

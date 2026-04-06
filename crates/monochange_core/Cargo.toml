@@ -13,15 +13,15 @@ rust-version = { workspace = true }
 description = "Manage versions and releases for your multiplatform, multilanguage monorepo"
 
 [dependencies]
-semver = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
+semver = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true }
-rstest = { workspace = true }
-serde_json = { workspace = true }
-similar-asserts = { workspace = true }
+insta = { workspace = true, default-features = true }
+rstest = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+similar-asserts = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

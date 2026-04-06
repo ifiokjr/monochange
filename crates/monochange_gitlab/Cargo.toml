@@ -14,15 +14,15 @@ description = "GitLab release payload rendering and publishing for monochange"
 
 [dependencies]
 monochange_core = { workspace = true }
-reqwest = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-urlencoding = "2"
+reqwest = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+urlencoding = { workspace = true, default-features = true }
 
 [dev-dependencies]
-httpmock = "0.8.3"
-temp-env = "0.3"
-tempfile = "3"
+httpmock = { workspace = true, default-features = true }
+temp-env = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
