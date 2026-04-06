@@ -90,11 +90,11 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 use monochange_core::CommandVariable;
+use monochange_core::ShellConfig;
 use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY;
 use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
-use monochange_core::ShellConfig;
 
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
