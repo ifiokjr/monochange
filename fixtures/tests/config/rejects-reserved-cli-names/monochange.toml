@@ -1,0 +1,4 @@
+[cli.init]
+
+[[cli.init.steps]]
+type = "PrepareRelease"

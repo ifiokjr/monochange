@@ -1,0 +1,3 @@
+[package.core]
+path = "crates/core"
+type = "cargo"

@@ -1,0 +1,14 @@
+[defaults]
+package_type = "cargo"
+empty_update_message = "No package-specific changes for {{ package }}; version is now {{ version }}."
+
+[package.core]
+path = "crates/core"
+empty_update_message = "Package override for {{ package }}@{{ version }}"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+empty_update_message = "Group fallback for {{ package }} from {{ group }}"

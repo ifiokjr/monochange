@@ -1,0 +1,6 @@
+[defaults]
+package_type = "cargo"
+changelog = true
+
+[package.core]
+path = "crates/core"

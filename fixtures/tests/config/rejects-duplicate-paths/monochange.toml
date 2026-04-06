@@ -1,0 +1,8 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/shared"
+
+[package.other]
+path = "crates/shared"

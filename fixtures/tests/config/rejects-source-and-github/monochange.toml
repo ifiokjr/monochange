@@ -1,0 +1,14 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "repo"
+
+[github]
+owner = "ifiokjr"
+repo = "repo"

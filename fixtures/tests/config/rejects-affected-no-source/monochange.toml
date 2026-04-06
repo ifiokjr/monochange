@@ -1,0 +1,18 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[changesets.verify]
+enabled = true
+
+[cli.pr-check]
+
+[[cli.pr-check.inputs]]
+name = "verify"
+type = "boolean"
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { verify = true }

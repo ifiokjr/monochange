@@ -1,0 +1,2 @@
+[package.core]
+path = "crates/core"

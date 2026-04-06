@@ -1,0 +1,7 @@
+[[changes]]
+package = "core"
+bump = "patch"
+
+[[changes]]
+package = "core"
+bump = "minor"

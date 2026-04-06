@@ -1,0 +1,6 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+extra_changelog_sections = [{ name = "", types = ["security"] }]
