@@ -1,0 +1,13 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[[cli.release.steps]]
+type = "OpenReleaseRequest"

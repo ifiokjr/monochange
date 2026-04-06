@@ -1,0 +1,19 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[source]
+provider = "gitea"
+owner = "org"
+repo = "monochange"
+host = "https://codeberg.org"
+
+[cli.comment]
+
+[[cli.comment.steps]]
+type = "PrepareRelease"
+
+[[cli.comment.steps]]
+type = "CommentReleasedIssues"

@@ -1,0 +1,13 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.other]
+path = "crates/other"
+type = "cargo"
+
+[group.sdk]
+packages = ["core"]
+
+[group.cli]
+packages = ["core", "other"]

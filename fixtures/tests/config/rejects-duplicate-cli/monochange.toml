@@ -1,0 +1,10 @@
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "Command"
+command = "cargo check"

@@ -1,0 +1,16 @@
+[defaults]
+package_type = "cargo"
+
+[package.monochange]
+path = "crates/monochange"
+changelog = "crates/monochange/changelog.md"
+
+[package.monochange_core]
+path = "crates/monochange_core"
+changelog = "crates/monochange_core/changelog.md"
+
+[group.main]
+packages = ["monochange", "monochange_core"]
+tag = true
+release = true
+version_format = "primary"

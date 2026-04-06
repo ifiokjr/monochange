@@ -1,0 +1,18 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[changesets.verify]
+enabled = true
+
+[cli.pr-check]
+
+[[cli.pr-check.inputs]]
+name = "changed_paths"
+type = "string_list"
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = true }

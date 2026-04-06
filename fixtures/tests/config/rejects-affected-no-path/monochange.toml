@@ -1,0 +1,13 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[changesets.verify]
+enabled = true
+
+[cli.affected]
+
+[[cli.affected.steps]]
+type = "AffectedPackages"

@@ -1,0 +1,12 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+version_format = "primary"
+
+[package.other]
+path = "crates/other"
+type = "cargo"
+
+[group.sdk]
+packages = ["other"]
+version_format = "primary"
