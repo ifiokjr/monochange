@@ -88,10 +88,10 @@ monochange_semver = { version = "0.0.0", path = "./crates/monochange_semver" }
 
 [workspace.metadata.bin]
 cargo-deny = { version = "0.19.0" }
-cargo-insta = { version = "1.46.3" }
-cargo-llvm-cov = { version = "0.8.4" }
-cargo-nextest = { version = "0.9.129" }
-cargo-semver-checks = { version = "0.46.0" }
+cargo-insta = { version = "1.47.2" }
+cargo-llvm-cov = { version = "0.8.5" }
+cargo-nextest = { version = "0.9.132" }
+cargo-semver-checks = { version = "0.47.0" }
 cargo-workspaces = { version = "0.4.2" }
 
 [workspace.lints.rust]
