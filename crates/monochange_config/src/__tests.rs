@@ -65,37 +65,8 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 
 #[test]
 fn load_workspace_configuration_supports_diagnostics_cli_command_definition() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.diagnostics]
-help_text = "Show changeset diagnostics and context"
-
-[[cli.diagnostics.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.diagnostics.inputs]]
-name = "changeset"
-type = "string_list"
-
-[[cli.diagnostics.steps]]
-type = "DiagnoseChangesets"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let configuration = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("config/diagnostics-cli");
+	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let diagnostics = configuration
 		.cli
@@ -112,50 +83,8 @@ type = "DiagnoseChangesets"
 
 #[test]
 fn load_workspace_configuration_parses_package_group_and_cli_command_declarations() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	write_npm_package(tempdir.path(), "packages/web", "web");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-parent_bump = "minor"
-include_private = true
-package_type = "cargo"
-changelog = "{{ path }}/CHANGELOG.md"
-
-[package.core]
-path = "crates/core"
-changelog = "crates/core/changelog.md"
-tag = true
-release = true
-
-[package."npm:web"]
-path = "packages/web"
-type = "npm"
-
-[group.sdk]
-packages = ["core", "npm:web"]
-changelog = "changelog.md"
-version_format = "primary"
-
-[ecosystems.npm]
-enabled = true
-roots = ["packages/*"]
-
-[cli.release]
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-
-[[cli.release.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let configuration = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("config/package-group-and-cli");
+	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert_eq!(configuration.defaults.parent_bump, BumpSeverity::Minor);
 	assert!(configuration.defaults.include_private);
@@ -212,40 +141,8 @@ path = ".monochange/release-manifest.json"
 
 #[test]
 fn load_workspace_configuration_parses_github_release_settings() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_cargo_package(tempdir.path(), "crates/core", "core");
-	fs::write(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[github]
-owner = "ifiokjr"
-repo = "monochange"
-
-[github.releases]
-enabled = true
-draft = true
-prerelease = true
-source = "github_generated"
-generate_notes = true
-
-[github.pull_requests]
-enabled = true
-branch_prefix = "automation/release"
-base = "develop"
-title = "chore(release): prepare release"
-labels = ["release", "automated", "bot"]
-auto_merge = true
-"#,
-	)
-	.unwrap_or_else(|error| panic!("config write: {error}"));
-
-	let configuration = load_workspace_configuration(tempdir.path())
+	let root = fixture_path("config/github-release-settings");
+	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let source = configuration
 		.source
