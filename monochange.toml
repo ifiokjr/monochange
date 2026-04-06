@@ -237,6 +237,9 @@ packages = [
 	"monochange_gitlab",
 	"monochange_gitea",
 ]
+extra_changelog_sections = [
+	{ name = "Improve testing", types = ["improve testing"] },
+]
 tag = true
 release = true
 version_format = "primary"
