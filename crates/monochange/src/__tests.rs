@@ -1020,25 +1020,21 @@ fn affected_packages_step_can_override_built_in_inputs() {
 fn planning_behavior_is_consistent_across_ecosystem_fixtures() {
 	assert_simple_release_pattern(
 		"../../fixtures/cargo/workspace",
-		"core",
 		"crates/core/Cargo.toml",
 		"crates/app/Cargo.toml",
 	);
 	assert_simple_release_pattern(
 		"../../fixtures/npm/workspace",
-		"shared",
 		"packages/shared/package.json",
 		"packages/web/package.json",
 	);
 	assert_simple_release_pattern(
 		"../../fixtures/deno/workspace",
-		"shared",
 		"packages/shared/deno.json",
 		"packages/tool/deno.json",
 	);
 	assert_simple_release_pattern(
 		"../../fixtures/dart/workspace",
-		"shared",
 		"packages/shared/pubspec.yaml",
 		"packages/app/pubspec.yaml",
 	);
@@ -1069,25 +1065,21 @@ fn source_github_release_comments_command_supports_provider_neutral_source_confi
 fn command_release_dry_run_is_consistent_across_ecosystem_fixtures() {
 	assert_cli_release_pattern(
 		"../../fixtures/cargo/workspace",
-		"core",
 		"crates/core/Cargo.toml",
 		"crates/app/Cargo.toml",
 	);
 	assert_cli_release_pattern(
 		"../../fixtures/npm/workspace",
-		"shared",
 		"packages/shared/package.json",
 		"packages/web/package.json",
 	);
 	assert_cli_release_pattern(
 		"../../fixtures/deno/workspace",
-		"shared",
 		"packages/shared/deno.json",
 		"packages/tool/deno.json",
 	);
 	assert_cli_release_pattern(
 		"../../fixtures/dart/workspace",
-		"shared",
 		"packages/shared/pubspec.yaml",
 		"packages/app/pubspec.yaml",
 	);
@@ -1178,19 +1170,13 @@ fn release_planning_guide_describes_release_cli_command_requirements() {
 
 fn assert_simple_release_pattern(
 	relative_fixture_root: &str,
-	change_reference: &str,
 	direct_manifest_suffix: &str,
 	dependent_manifest_suffix: &str,
 ) {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
-	let changes_path = tempdir.path().join("changes.generated.md");
-	fs::write(
-		&changes_path,
-		format!("---\n{change_reference}: minor\n---\n\n#### feature\n"),
-	)
-	.unwrap_or_else(|error| panic!("generated changes: {error}"));
+	let changes_path = tempdir.path().join(".changeset/feature.md");
 
 	let discovery = discover_workspace(tempdir.path())
 		.unwrap_or_else(|error| panic!("fixture discovery: {error}"));
@@ -1216,17 +1202,12 @@ fn assert_simple_release_pattern(
 
 fn assert_cli_release_pattern(
 	relative_fixture_root: &str,
-	change_reference: &str,
 	direct_manifest_suffix: &str,
 	dependent_manifest_suffix: &str,
 ) {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_fixture_root);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_root, tempdir.path());
-	write_file(
-		tempdir.path().join(".changeset/feature.md"),
-		&format!("---\n{change_reference}: minor\n---\n\n#### feature\n"),
-	);
 
 	let output = run_cli(
 		tempdir.path(),
@@ -1492,15 +1473,6 @@ fn fixture_path(relative: &str) -> std::path::PathBuf {
 
 fn copy_fixture(fixture_relative: &str, dest: &Path) {
 	copy_directory(&fixture_path(fixture_relative), dest);
-}
-
-fn write_file(path: impl AsRef<Path>, content: &str) {
-	let path = path.as_ref();
-	if let Some(parent) = path.parent() {
-		fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
-	}
-	fs::write(path, content)
-		.unwrap_or_else(|error| panic!("write file {}: {error}", path.display()));
 }
 
 #[test]
