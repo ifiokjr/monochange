@@ -74,18 +74,17 @@ pub struct MonochangeMcpServer {
 #[tool_handler]
 impl ServerHandler for MonochangeMcpServer {
 	fn get_info(&self) -> ServerInfo {
-		ServerInfo {
-			instructions: Some(
-				"Monochange manages versions and releases across Cargo, npm, Deno, and Dart/Flutter \
-				 workspaces. Prefer validation and dry-run planning before mutating release state. \
-				 Read monochange.toml first, inspect the normalized model with discover, use change \
-				 to write explicit .changeset files, and use release preview or release manifest \
-				 tools before source-provider publishing."
-					.into(),
-			),
-			capabilities: ServerCapabilities::builder().enable_tools().build(),
-			..Default::default()
-		}
+		let mut info = ServerInfo::default();
+		info.instructions = Some(
+			"Monochange manages versions and releases across Cargo, npm, Deno, and Dart/Flutter \
+			 workspaces. Prefer validation and dry-run planning before mutating release state. \
+			 Read monochange.toml first, inspect the normalized model with discover, use change \
+			 to write explicit .changeset files, and use release preview or release manifest \
+			 tools before source-provider publishing."
+				.into(),
+		);
+		info.capabilities = ServerCapabilities::builder().enable_tools().build();
+		info
 	}
 }
 
@@ -99,23 +98,17 @@ fn resolve_root(path: Option<&str>) -> PathBuf {
 fn json_result(value: serde_json::Value) -> CallToolResult {
 	let text = serde_json::to_string_pretty(&value)
 		.unwrap_or_else(|_| "{\"ok\":false,\"summary\":\"failed to serialize\"}".to_string());
-	CallToolResult {
-		content: vec![Content::text(text)],
-		structured_content: Some(value),
-		is_error: Some(false),
-		meta: None,
-	}
+	let mut result = CallToolResult::success(vec![Content::text(text)]);
+	result.structured_content = Some(value);
+	result
 }
 
 fn json_error_result(value: serde_json::Value) -> CallToolResult {
 	let text = serde_json::to_string_pretty(&value)
 		.unwrap_or_else(|_| "{\"ok\":false,\"summary\":\"failed to serialize\"}".to_string());
-	CallToolResult {
-		content: vec![Content::text(text)],
-		structured_content: Some(value),
-		is_error: Some(true),
-		meta: None,
-	}
+	let mut result = CallToolResult::error(vec![Content::text(text)]);
+	result.structured_content = Some(value);
+	result
 }
 
 fn manifest_for_prepared_release(prepared_release: &PreparedRelease) -> ReleaseManifest {
