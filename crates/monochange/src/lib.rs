@@ -71,10 +71,6 @@ use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_config::validate_workspace;
-use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED;
-use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY;
-use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
-use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::default_cli_commands;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
@@ -94,6 +90,10 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 use monochange_core::CommandVariable;
+use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED;
+use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY;
+use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
+use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
@@ -2501,12 +2501,8 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	let manifest_updates = [cargo_updates, npm_updates, dart_updates].concat();
 	let versioned_file_updates =
 		build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)?;
-	let release_targets = build_release_targets(
-		&configuration,
-		&discovery.packages,
-		&plan,
-		&changeset_paths,
-	);
+	let release_targets =
+		build_release_targets(&configuration, &discovery.packages, &plan, &changeset_paths);
 	let changelog_updates = build_changelog_updates(
 		root,
 		&configuration,
@@ -2929,11 +2925,12 @@ fn build_changelog_updates(
 			.iter()
 			.find(|rt| {
 				(rt.kind == ReleaseOwnerKind::Package && rt.id == package_id)
-					|| (rt.kind == ReleaseOwnerKind::Group
-						&& rt.members.contains(&package_id))
+					|| (rt.kind == ReleaseOwnerKind::Group && rt.members.contains(&package_id))
 			})
-			.map(|rt| rt.rendered_changelog_title.clone())
-			.unwrap_or_else(|| planned_version.to_string());
+			.map_or_else(
+				|| planned_version.to_string(),
+				|rt| rt.rendered_changelog_title.clone(),
+			);
 		let document = build_release_notes_document(
 			&package_id,
 			&changelog_title,
@@ -2990,8 +2987,10 @@ fn build_changelog_updates(
 		let changelog_title = release_targets
 			.iter()
 			.find(|rt| rt.kind == ReleaseOwnerKind::Group && rt.id == planned_group.group_id)
-			.map(|rt| rt.rendered_changelog_title.clone())
-			.unwrap_or_else(|| planned_version.to_string());
+			.map_or_else(
+				|| planned_version.to_string(),
+				|rt| rt.rendered_changelog_title.clone(),
+			);
 		let document = build_release_notes_document(
 			&planned_group.group_id,
 			&changelog_title,
@@ -4453,7 +4452,12 @@ fn build_release_targets(
 						let tag = render_tag_name(&group.id, &vs, group.version_format);
 						let prev = find_previous_tag(&configuration.root_path, &tag);
 						let ctx = TitleRenderContext::new(
-							&group.id, &vs, changes_count, source, &tag, prev.as_deref(),
+							&group.id,
+							&vs,
+							changes_count,
+							source,
+							&tag,
+							prev.as_deref(),
 						);
 						let rt = effective_title_template(
 							group.release_title.as_deref(),
@@ -4505,7 +4509,12 @@ fn build_release_targets(
 		let prev = find_previous_tag(&configuration.root_path, &tag);
 		let pkg_def = configuration.package_by_id(&config_id);
 		let ctx = TitleRenderContext::new(
-			&identity.owner_id, &vs, changes_count, source, &tag, prev.as_deref(),
+			&identity.owner_id,
+			&vs,
+			changes_count,
+			source,
+			&tag,
+			prev.as_deref(),
 		);
 		let rt = effective_title_template(
 			pkg_def.and_then(|p| p.release_title.as_deref()),
@@ -4557,15 +4566,9 @@ fn compare_url_for_provider(
 	current_tag: &str,
 ) -> String {
 	match source.provider {
-		SourceProvider::GitHub => {
-			github_provider::compare_url(source, previous_tag, current_tag)
-		}
-		SourceProvider::GitLab => {
-			gitlab_provider::compare_url(source, previous_tag, current_tag)
-		}
-		SourceProvider::Gitea => {
-			gitea_provider::compare_url(source, previous_tag, current_tag)
-		}
+		SourceProvider::GitHub => github_provider::compare_url(source, previous_tag, current_tag),
+		SourceProvider::GitLab => gitlab_provider::compare_url(source, previous_tag, current_tag),
+		SourceProvider::Gitea => gitea_provider::compare_url(source, previous_tag, current_tag),
 	}
 }
 
@@ -4594,7 +4597,7 @@ fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
 
 fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
 	let v_pos = tag.rfind('v')?;
-	let prefix = &tag[..v_pos + 1];
+	let prefix = &tag[..=v_pos];
 	let version_str = &tag[v_pos + 1..];
 	let version = semver::Version::parse(version_str).ok()?;
 	Some((prefix.to_string(), version))
@@ -4662,8 +4665,7 @@ impl TitleRenderContext {
 			compare_url => &self.compare_url,
 		};
 		let jinja_value = minijinja::Value::from_serialize(&context);
-		render_jinja_template(template, &jinja_value)
-			.unwrap_or_else(|_| self.version.clone())
+		render_jinja_template(template, &jinja_value).unwrap_or_else(|_| self.version.clone())
 	}
 }
 

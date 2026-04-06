@@ -27,10 +27,7 @@ macro_rules! apply_common_filters {
 			settings.add_filter(r"SourceOffset\(\d+\)", "SourceOffset([OFFSET])");
 			settings.add_filter(r"length: \d+", "length: [LEN]");
 			settings.add_filter(r"@ bytes \d+\.\.\d+", "@ bytes [OFFSET]..[END]");
-			settings.add_filter(
-				r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",
-				"[DATETIME]",
-			);
+			settings.add_filter(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "[DATETIME]");
 			settings.add_filter(r"\d{4}-\d{2}-\d{2}", "[DATE]");
 			settings.bind_to_scope()
 		};

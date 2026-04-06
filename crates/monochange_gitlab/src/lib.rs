@@ -125,7 +125,10 @@ fn gitlab_host(source: &SourceConfiguration) -> &str {
 #[must_use]
 pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
 	let host = gitlab_host(source);
-	format!("{host}/{}/{}/-/releases/{tag_name}", source.owner, source.repo)
+	format!(
+		"{host}/{}/{}/-/releases/{tag_name}",
+		source.owner, source.repo
+	)
 }
 
 /// URL comparing two tags on the GitLab repository.
@@ -577,8 +580,6 @@ fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 	}
 	Ok(())
 }
-
-
 
 fn release_body(
 	source: &SourceConfiguration,
