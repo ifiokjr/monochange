@@ -463,8 +463,20 @@ comment_on_failure = true
 #   command         — the command to run (supports minijinja interpolation)
 #   dry_run_command — alternative command for --dry-run mode (optional;
 #                     if omitted, the step is skipped in dry-run)
-#   shell           — run through sh -c (default: false)
+#   shell           — run through a shell: true (sh -c), "bash" (bash -c),
+#                     "zsh" (zsh -c), or false/omitted (direct exec)
+#   id              — optional step identifier; when set, stdout and stderr are
+#                     captured and available to later steps via
+#                     steps.ID.stdout and steps.ID.stderr
 #   variables       — map of placeholder → variable for interpolation
+#
+# Step output namespaces (available in Command step templates):
+#   release.*       — from PrepareRelease: version, group_version, dry_run,
+#                     released_packages, changed_files, updated_changelogs,
+#                     deleted_changesets, changeset_paths, targets
+#   manifest.path   — from RenderReleaseManifest: path to the written manifest
+#   affected.*      — from AffectedPackages: status, summary
+#   steps.ID.*      — from Command steps with id: stdout, stderr
 #
 {% raw -%}
 # Built-in command variables (available as {{ var }} in command templates):
