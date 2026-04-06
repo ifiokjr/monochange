@@ -94,6 +94,7 @@ use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY;
 use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
+use monochange_core::ShellConfig;
 
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
@@ -335,7 +336,14 @@ struct CliContext {
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
 	changeset_diagnostics: Option<ChangesetDiagnosticsReport>,
+	step_outputs: BTreeMap<String, CommandStepOutput>,
 	command_logs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct CommandStepOutput {
+	stdout: String,
+	stderr: String,
 }
 
 const CHANGESET_DIR: &str = ".changeset";
@@ -895,6 +903,7 @@ fn execute_cli_command(
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
 		changeset_diagnostics: None,
+		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
 	let mut output = None;
@@ -1189,13 +1198,15 @@ fn execute_cli_command(
 				command,
 				dry_run_command,
 				shell,
+				id,
 				variables,
 				..
 			} => run_cli_command_command(
 				&mut context,
 				command,
 				dry_run_command.as_deref(),
-				*shell,
+				shell,
+				id.as_deref(),
 				variables.as_ref(),
 				&step_inputs,
 			)?,
@@ -1267,7 +1278,8 @@ fn run_cli_command_command(
 	context: &mut CliContext,
 	command: &str,
 	dry_run_command: Option<&str>,
-	shell: bool,
+	shell: &ShellConfig,
+	step_id: Option<&str>,
 	variables: Option<&BTreeMap<String, CommandVariable>>,
 	step_inputs: &BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<()> {
@@ -1287,8 +1299,8 @@ fn run_cli_command_command(
 	let interpolated =
 		interpolate_cli_command_command(context, command_to_run, variables, step_inputs);
 
-	let output = if shell {
-		ProcessCommand::new("sh")
+	let output = if let Some(shell_binary) = shell.shell_binary() {
+		ProcessCommand::new(shell_binary)
 			.arg("-c")
 			.arg(&interpolated)
 			.current_dir(&context.root)
@@ -1323,6 +1335,18 @@ fn run_cli_command_command(
 	}
 
 	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+	let stderr_text = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+	if let Some(id) = step_id {
+		context.step_outputs.insert(
+			id.to_string(),
+			CommandStepOutput {
+				stdout: stdout.clone(),
+				stderr: stderr_text,
+			},
+		);
+	}
+
 	if stdout.is_empty() {
 		context.command_logs.push(format!("ran `{interpolated}`"));
 	} else {
@@ -1419,6 +1443,57 @@ fn build_cli_template_context(
 		);
 	}
 
+	// Structured release.* namespace
+	template_context.insert("release".to_string(), build_release_template_value(context));
+
+	// Structured manifest.* namespace
+	if let Some(path) = &context.release_manifest_path {
+		let mut manifest_map = serde_json::Map::new();
+		manifest_map.insert(
+			"path".to_string(),
+			serde_json::Value::String(path.display().to_string()),
+		);
+		template_context.insert(
+			"manifest".to_string(),
+			serde_json::Value::Object(manifest_map),
+		);
+	}
+
+	// Structured affected.* namespace
+	if let Some(evaluation) = &context.changeset_policy_evaluation {
+		let mut affected_map = serde_json::Map::new();
+		affected_map.insert(
+			"status".to_string(),
+			serde_json::Value::String(evaluation.status.to_string()),
+		);
+		affected_map.insert(
+			"summary".to_string(),
+			serde_json::Value::String(evaluation.summary.clone()),
+		);
+		template_context.insert(
+			"affected".to_string(),
+			serde_json::Value::Object(affected_map),
+		);
+	}
+
+	// Structured steps.<id>.* namespace from command step outputs
+	if !context.step_outputs.is_empty() {
+		let mut steps_map = serde_json::Map::new();
+		for (id, output) in &context.step_outputs {
+			let mut step_map = serde_json::Map::new();
+			step_map.insert(
+				"stdout".to_string(),
+				serde_json::Value::String(output.stdout.clone()),
+			);
+			step_map.insert(
+				"stderr".to_string(),
+				serde_json::Value::String(output.stderr.clone()),
+			);
+			steps_map.insert(id.clone(), serde_json::Value::Object(step_map));
+		}
+		template_context.insert("steps".to_string(), serde_json::Value::Object(steps_map));
+	}
+
 	let input_context = cli_inputs_template_value(inputs);
 	for (input_name, input_value) in &input_context {
 		template_context.insert(input_name.clone(), input_value.clone());
@@ -1438,6 +1513,112 @@ fn build_cli_template_context(
 	}
 
 	template_context
+}
+
+fn build_release_template_value(context: &CliContext) -> serde_json::Value {
+	let Some(prepared) = &context.prepared_release else {
+		return serde_json::Value::Null;
+	};
+
+	let mut release_map = serde_json::Map::new();
+	release_map.insert(
+		"version".to_string(),
+		prepared
+			.version
+			.as_deref()
+			.map_or(serde_json::Value::Null, |v| {
+				serde_json::Value::String(v.to_string())
+			}),
+	);
+	release_map.insert(
+		"group_version".to_string(),
+		prepared
+			.group_version
+			.as_deref()
+			.map_or(serde_json::Value::Null, |v| {
+				serde_json::Value::String(v.to_string())
+			}),
+	);
+	release_map.insert(
+		"dry_run".to_string(),
+		serde_json::Value::Bool(prepared.dry_run),
+	);
+	release_map.insert(
+		"released_packages".to_string(),
+		serde_json::Value::Array(
+			prepared
+				.released_packages
+				.iter()
+				.cloned()
+				.map(serde_json::Value::String)
+				.collect(),
+		),
+	);
+	release_map.insert(
+		"changed_files".to_string(),
+		serde_json::Value::Array(
+			prepared
+				.changed_files
+				.iter()
+				.map(|p| serde_json::Value::String(p.display().to_string()))
+				.collect(),
+		),
+	);
+	release_map.insert(
+		"updated_changelogs".to_string(),
+		serde_json::Value::Array(
+			prepared
+				.updated_changelogs
+				.iter()
+				.map(|p| serde_json::Value::String(p.display().to_string()))
+				.collect(),
+		),
+	);
+	release_map.insert(
+		"deleted_changesets".to_string(),
+		serde_json::Value::Array(
+			prepared
+				.deleted_changesets
+				.iter()
+				.map(|p| serde_json::Value::String(p.display().to_string()))
+				.collect(),
+		),
+	);
+	release_map.insert(
+		"changeset_paths".to_string(),
+		serde_json::Value::Array(
+			prepared
+				.changeset_paths
+				.iter()
+				.map(|p| serde_json::Value::String(p.display().to_string()))
+				.collect(),
+		),
+	);
+
+	let targets: Vec<serde_json::Value> = prepared
+		.release_targets
+		.iter()
+		.map(|target| {
+			let mut target_map = serde_json::Map::new();
+			target_map.insert(
+				"id".to_string(),
+				serde_json::Value::String(target.id.clone()),
+			);
+			target_map.insert(
+				"version".to_string(),
+				serde_json::Value::String(target.tag_name.clone()),
+			);
+			target_map.insert(
+				"kind".to_string(),
+				serde_json::Value::String(target.kind.to_string()),
+			);
+			target_map.insert("tag".to_string(), serde_json::Value::Bool(target.tag));
+			serde_json::Value::Object(target_map)
+		})
+		.collect();
+	release_map.insert("targets".to_string(), serde_json::Value::Array(targets));
+
+	serde_json::Value::Object(release_map)
 }
 
 fn interpolate_cli_command_command(

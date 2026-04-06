@@ -589,6 +589,76 @@ pub enum CommandVariable {
 	Changesets,
 }
 
+/// Shell configuration for `Command` steps.
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub enum ShellConfig {
+	#[default]
+	None,
+	Default,
+	Custom(String),
+}
+
+impl ShellConfig {
+	#[must_use]
+	pub fn shell_binary(&self) -> Option<&str> {
+		match self {
+			Self::None => None,
+			Self::Default => Some("sh"),
+			Self::Custom(shell) => Some(shell),
+		}
+	}
+}
+
+impl Serialize for ShellConfig {
+	fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+		match self {
+			Self::None => serializer.serialize_bool(false),
+			Self::Default => serializer.serialize_bool(true),
+			Self::Custom(shell) => serializer.serialize_str(shell),
+		}
+	}
+}
+
+impl<'de> Deserialize<'de> for ShellConfig {
+	fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+		use serde::de;
+
+		struct ShellConfigVisitor;
+
+		impl de::Visitor<'_> for ShellConfigVisitor {
+			type Value = ShellConfig;
+
+			fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+				formatter.write_str("a boolean or a shell name string")
+			}
+
+			fn visit_bool<E: de::Error>(self, value: bool) -> Result<ShellConfig, E> {
+				Ok(if value {
+					ShellConfig::Default
+				} else {
+					ShellConfig::None
+				})
+			}
+
+			fn visit_str<E: de::Error>(self, value: &str) -> Result<ShellConfig, E> {
+				if value.is_empty() {
+					return Err(de::Error::invalid_value(
+						de::Unexpected::Str(value),
+						&"a non-empty shell name",
+					));
+				}
+				Ok(ShellConfig::Custom(value.to_string()))
+			}
+
+			fn visit_string<E: de::Error>(self, value: String) -> Result<ShellConfig, E> {
+				self.visit_str(&value)
+			}
+		}
+
+		deserializer.deserialize_any(ShellConfigVisitor)
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CliStepDefinition {
@@ -642,7 +712,9 @@ pub enum CliStepDefinition {
 		#[serde(default, alias = "dry_run")]
 		dry_run_command: Option<String>,
 		#[serde(default)]
-		shell: bool,
+		shell: ShellConfig,
+		#[serde(default)]
+		id: Option<String>,
 		#[serde(default)]
 		variables: Option<BTreeMap<String, CommandVariable>>,
 		#[serde(default)]
