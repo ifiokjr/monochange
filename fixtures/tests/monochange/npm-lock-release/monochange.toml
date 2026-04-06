@@ -1,0 +1,11 @@
+[defaults]
+package_type = "npm"
+changelog = false
+
+[package.app]
+path = "packages/app"
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"

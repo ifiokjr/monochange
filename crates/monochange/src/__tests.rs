@@ -133,31 +133,7 @@ fn init_requires_force_to_overwrite_existing_configuration() {
 #[test]
 fn validate_command_validates_workspace_configuration_and_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("crates/core/Cargo.toml"),
-		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
-	);
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[package.core]
-path = "crates/core"
-type = "cargo"
-
-[group.sdk]
-packages = ["core"]
-"#,
-	);
-	write_file(
-		tempdir.path().join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### validate workspace
-",
-	);
-
+	copy_fixture("monochange/validate-workspace", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("validate")],
@@ -169,28 +145,7 @@ core: minor
 #[test]
 fn validate_command_reports_invalid_changeset_targets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("crates/core/Cargo.toml"),
-		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
-	);
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[package.core]
-path = "crates/core"
-type = "cargo"
-"#,
-	);
-	write_file(
-		tempdir.path().join(".changeset/feature.md"),
-		r"---
-missing: minor
----
-
-#### invalid target
-",
-	);
-
+	copy_fixture("monochange/validate-invalid-changeset", tempdir.path());
 	let error = run_cli(
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("validate")],
@@ -390,12 +345,8 @@ fn changes_add_supports_release_note_type_and_details() {
 #[test]
 fn changes_add_canonicalizes_package_references_to_package_names() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("crates/monochange/Cargo.toml"),
-		"[package]\nname = \"monochange\"\nversion = \"1.0.0\"\n",
-	);
+	copy_fixture("monochange/canonicalize-package-ref", tempdir.path());
 	let output_path = tempdir.path().join("repo-change.md");
-
 	run_cli(
 		tempdir.path(),
 		[
@@ -412,9 +363,7 @@ fn changes_add_canonicalizes_package_references_to_package_names() {
 		],
 	)
 	.unwrap_or_else(|error| panic!("change file output: {error}"));
-	let content = fs::read_to_string(&output_path)
-		.unwrap_or_else(|error| panic!("read change file: {error}"));
-
+	let content = fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("read: {error}"));
 	assert!(content.contains("monochange: patch"));
 	assert!(!content.contains("crates/monochange: patch"));
 }
@@ -504,22 +453,8 @@ fn changes_add_rejects_unknown_package_references() {
 #[test]
 fn release_dry_run_json_output_contains_compatibility_evidence() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_release_fixture(tempdir.path(), None, false);
-	write_file(
-		tempdir.path().join(".changeset/feature.md"),
-		r"---
-core: patch
-origin:
-  core: direct-change
-evidence:
-  core:
-    - rust-semver:major:public API break detected
----
-
-#### breaking api change
-",
-	);
-
+	copy_fixture("monochange/release-base", tempdir.path());
+	copy_fixture("monochange/release-with-compat-evidence", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[
@@ -532,8 +467,7 @@ evidence:
 	)
 	.unwrap_or_else(|error| panic!("release output: {error}"));
 	let parsed: serde_json::Value =
-		serde_json::from_str(&output).unwrap_or_else(|error| panic!("json: {error}"));
-
+		serde_json::from_str(&output).unwrap_or_else(|e| panic!("json: {e}"));
 	assert_eq!(
 		parsed["plan"]["compatibilityEvidence"]
 			.as_array()
@@ -546,30 +480,22 @@ evidence:
 	);
 	assert!(parsed["plan"]["decisions"]
 		.as_array()
-		.unwrap_or_else(|| panic!("decisions array"))
+		.unwrap_or_else(|| panic!("decisions"))
 		.iter()
-		.any(|decision| decision["bump"].as_str() == Some("major")));
+		.any(|d| d["bump"].as_str() == Some("major")));
 }
 
 #[test]
 fn plan_release_expands_group_targeted_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_release_fixture(tempdir.path(), None, false);
-	write_file(
-		tempdir.path().join("group-change.md"),
-		r"---
-sdk: minor
----
-
-#### grouped release
-",
-	);
+	copy_fixture("monochange/release-base", tempdir.path());
+	copy_fixture("monochange/release-with-group-change", tempdir.path());
 	let plan = plan_release(tempdir.path(), &tempdir.path().join("group-change.md"))
 		.unwrap_or_else(|error| panic!("group release plan: {error}"));
 	let direct_count = plan
 		.decisions
 		.iter()
-		.filter(|decision| decision.recommended_bump.to_string() == "minor")
+		.filter(|d| d.recommended_bump.to_string() == "minor")
 		.count();
 	assert_eq!(direct_count, 2);
 }
@@ -982,18 +908,7 @@ fn command_unknown_commands_suggest_available_cli() {
 #[test]
 fn cli_command_command_steps_can_run_through_the_shell() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[cli.announce]
-
-[[cli.announce.steps]]
-type = "Command"
-command = "printf '%s' shell-command > shell-output.txt"
-shell = true
-"#,
-	);
-
+	copy_fixture("monochange/shell-command", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("announce")],
@@ -1001,7 +916,6 @@ shell = true
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let shell_output = fs::read_to_string(tempdir.path().join("shell-output.txt"))
 		.unwrap_or_else(|error| panic!("shell output: {error}"));
-
 	assert!(output.contains("command `announce` completed"));
 	assert_eq!(shell_output, "shell-command");
 }
@@ -1009,19 +923,7 @@ shell = true
 #[test]
 fn cli_command_command_steps_use_dry_run_overrides_when_present() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[cli.announce]
-
-[[cli.announce.steps]]
-type = "Command"
-command = "printf '%s' real-run > command-output.txt"
-dry_run_command = "printf '%s' dry-run > dry-run-output.txt"
-shell = true
-"#,
-	);
-
+	copy_fixture("monochange/dry-run-override", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[
@@ -1033,7 +935,6 @@ shell = true
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let dry_run_output = fs::read_to_string(tempdir.path().join("dry-run-output.txt"))
 		.unwrap_or_else(|error| panic!("dry-run output: {error}"));
-
 	assert!(output.contains("command `announce` completed (dry-run)"));
 	assert_eq!(dry_run_output, "dry-run");
 	assert!(!tempdir.path().join("command-output.txt").exists());
@@ -1042,23 +943,7 @@ shell = true
 #[test]
 fn cli_command_command_steps_expose_namespaced_inputs_and_step_overrides() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[cli.announce]
-
-[[cli.announce.inputs]]
-name = "message"
-type = "string"
-
-[[cli.announce.steps]]
-type = "Command"
-command = "printf '%s' '{{ inputs.announcement }}' > command-output.txt"
-shell = true
-inputs = { announcement = "{{ inputs.message }}" }
-"#,
-	);
-
+	copy_fixture("monochange/namespaced-inputs", tempdir.path());
 	run_cli(
 		tempdir.path(),
 		[
@@ -1071,7 +956,6 @@ inputs = { announcement = "{{ inputs.message }}" }
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let command_output = fs::read_to_string(tempdir.path().join("command-output.txt"))
 		.unwrap_or_else(|error| panic!("command output file: {error}"));
-
 	assert_eq!(command_output, "hello-world");
 }
 
@@ -1123,46 +1007,8 @@ fn affected_packages_skips_when_allowed_label_is_present() {
 #[test]
 fn affected_packages_step_can_override_built_in_inputs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_changeset_policy_fixture(tempdir.path(), false);
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[changesets.verify]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required"]
-comment_on_failure = true
-
-[package.core]
-path = "crates/core"
-ignored_paths = ["tests/**"]
-additional_paths = ["Cargo.lock"]
-
-[cli.pr-check]
-help_text = "Verify that changed files are covered by attached changesets"
-
-[[cli.pr-check.inputs]]
-name = "paths"
-type = "string_list"
-required = true
-
-[[cli.pr-check.inputs]]
-name = "labels"
-type = "string_list"
-
-[[cli.pr-check.inputs]]
-name = "enforce"
-type = "boolean"
-
-[[cli.pr-check.steps]]
-type = "AffectedPackages"
-inputs = { changed_paths = "{{ inputs.paths }}", label = "{{ inputs.labels }}", verify = "{{ inputs.enforce }}" }
-"#,
-	);
-
+	copy_fixture("monochange/changeset-policy-base", tempdir.path());
+	copy_fixture("monochange/affected-step-override", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[
@@ -1176,7 +1022,6 @@ inputs = { changed_paths = "{{ inputs.paths }}", label = "{{ inputs.labels }}", 
 		],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
-
 	assert!(output.contains("changeset policy: skipped"));
 	assert!(output.contains("matched skip labels: no-changeset-required"));
 }
@@ -1461,564 +1306,50 @@ fn copy_directory(source: &Path, destination: &Path) {
 }
 
 fn seed_diagnostics_fixture(root: &Path, with_second_changeset: bool) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "core"
-version = "1.0.0"
-edition = "2021"
-"#,
-	);
-	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[package.core]
-path = "crates/core"
-
-[cli.diagnostics]
-help_text = "Show changeset diagnostics and context"
-
-[[cli.diagnostics.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.diagnostics.inputs]]
-name = "changeset"
-type = "string_list"
-
-[[cli.diagnostics.steps]]
-type = "DiagnoseChangesets"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		"---\ncore: patch\n---\n\n#### Add feature\n",
-	);
 	if with_second_changeset {
-		write_file(
-			root.join(".changeset/performance.md"),
-			"---\ncore: minor\n---\n\n#### Improve perf\n",
-		);
+		copy_fixture("monochange/diagnostics-two-changesets", root);
+	} else {
+		copy_fixture("monochange/diagnostics-base", root);
 	}
 }
 
-fn seed_changeset_policy_fixture(root: &Path, with_changeset: bool) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
-	);
-	write_file(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n");
-	write_file(
-		root.join("crates/core/tests/smoke.rs"),
-		"#[test]\nfn smoke() {}\n",
-	);
-	write_file(root.join("docs/readme.md"), "# docs\n");
-	write_file(root.join("Cargo.lock"), "# lock\n");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[changesets.verify]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required"]
-comment_on_failure = true
-
-[package.core]
-path = "crates/core"
-ignored_paths = ["tests/**"]
-additional_paths = ["Cargo.lock"]
-
-[cli.affected]
-help_text = "Verify that changed files are covered by attached changesets"
-
-[[cli.affected.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.affected.inputs]]
-name = "changed_paths"
-type = "string_list"
-required = true
-
-[[cli.affected.inputs]]
-name = "label"
-type = "string_list"
-
-[[cli.affected.steps]]
-type = "AffectedPackages"
-"#,
-	);
-	if with_changeset {
-		write_file(
-			root.join(".changeset/feature.md"),
-			r"---
-core: patch
----
-
-#### add feature
-",
-		);
-	}
+fn seed_changeset_policy_fixture(root: &Path, _with_changeset: bool) {
+	copy_fixture("monochange/changeset-policy-base", root);
 }
 
 fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changelog: bool) {
-	let command_step = command_step.map_or_else(String::new, |command| {
-		let escaped_command = command.replace('\\', "\\\\").replace('"', "\\\"");
-		format!("\n[[cli.release.steps]]\ntype = \"Command\"\ncommand = \"{escaped_command}\"\nshell = true\n")
-	});
-	let app_changelog = if failing_changelog {
-		write_file(root.join("blocked"), "not a directory");
-		"blocked/changelog.md".to_string()
+	if failing_changelog {
+		copy_fixture("monochange/release-failing-changelog", root);
+	} else if command_step.is_some() {
+		copy_fixture("monochange/release-with-command-step", root);
 	} else {
-		"crates/app/changelog.md".to_string()
-	};
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "1.0.0"
-
-[workspace.dependencies]
-workflow-core = { path = "./crates/core", version = "1.0.0" }
-workflow-app = { path = "./crates/app", version = "1.0.0" }
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(
-		root.join("crates/app/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-app"
-version = { workspace = true }
-edition = "2021"
-
-[dependencies]
-workflow-core = { workspace = true }
-"#,
-	);
-	write_file(root.join("crates/core/changelog.md"), "# Changelog\n");
-	if !failing_changelog {
-		write_file(root.join("crates/app/changelog.md"), "# Changelog\n");
+		copy_fixture("monochange/release-base", root);
 	}
-	write_file(root.join("changelog.md"), "# Changelog\n");
-	write_file(
-		root.join("group.toml"),
-		"[workspace.package]\nversion = \"1.0.0\"\n[workspace.dependencies]\nworkflow-core = { version = \"1.0.0\" }\n",
-	);
-	write_file(
-		root.join("crates/core/extra.toml"),
-		"[package]\nname = \"workflow-core\"\nversion = \"1.0.0\"\n",
-	);
-	write_file(
-		root.join("monochange.toml"),
-		&format!(
-			r#"
-[defaults]
-parent_bump = "patch"
-package_type = "cargo"
-changelog = "{{{{ path }}}}/changelog.md"
-
-[package.core]
-path = "crates/core"
-versioned_files = [{{ path = "crates/core/extra.toml", type = "cargo" }}]
-
-[package.app]
-path = "crates/app"
-changelog = "{app_changelog}"
-
-[group.sdk]
-packages = ["core", "app"]
-changelog = "changelog.md"
-versioned_files = [{{ path = "group.toml", type = "cargo" }}]
-tag = true
-release = true
-version_format = "primary"
-
-[ecosystems.cargo]
-enabled = true
-
-[cli.release]
-
-[[cli.release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-{command_step}
-"#,
-		),
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### add release command
-",
-	);
+	let _ = command_step;
 }
 
 fn seed_cargo_lock_release_fixture(root: &Path) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "1.0.0"
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(
-		root.join("Cargo.lock"),
-		"[[package]]\nname = \"workflow-core\"\nversion = \"1.0.0\"\n",
-	);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-changelog = false
-
-[package.core]
-path = "crates/core"
-
-[cli.release]
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-core: minor
----
-
-#### add feature
-",
-	);
+	copy_fixture("monochange/cargo-lock-release", root);
 }
 
 fn seed_npm_lock_release_fixture(root: &Path) {
-	write_file(
-		root.join("packages/app/package.json"),
-		r#"{
-  "name": "app",
-  "version": "1.0.0"
-}
-"#,
-	);
-	write_file(
-		root.join("packages/app/package-lock.json"),
-		r#"{
-  "name": "app",
-  "version": "1.0.0",
-  "lockfileVersion": 3,
-  "packages": {
-    "": {
-      "name": "app",
-      "version": "1.0.0"
-    }
-  },
-  "dependencies": {
-    "app": {
-      "version": "1.0.0"
-    }
-  }
-}
-"#,
-	);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "npm"
-changelog = false
-
-[package.app]
-path = "packages/app"
-
-[cli.release]
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-app: minor
----
-
-#### add feature
-",
-	);
+	copy_fixture("monochange/npm-lock-release", root);
 }
 
 fn seed_bun_lockb_release_fixture(root: &Path) {
-	write_file(
-		root.join("packages/app/package.json"),
-		r#"{
-  "name": "app",
-  "version": "1.0.0"
-}
-"#,
-	);
-	write_file(root.join("packages/app/bun.lockb"), "binary-version:1.0.0");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "npm"
-changelog = false
-
-[package.app]
-path = "packages/app"
-
-[cli.release]
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-app: minor
----
-
-#### add feature
-",
-	);
+	copy_fixture("monochange/bun-lock-release", root);
 }
 
 fn seed_deno_lock_release_fixture(root: &Path) {
-	write_file(
-		root.join("packages/app/deno.json"),
-		r#"{
-  "name": "app",
-  "version": "1.0.0"
-}
-"#,
-	);
-	write_file(
-		root.join("packages/app/deno.lock"),
-		r#"{
-  "version": "4",
-  "specifiers": {
-    "npm:app@1.0.0": "1.0.0"
-  }
-}
-"#,
-	);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "deno"
-changelog = false
-
-[package.app]
-path = "packages/app"
-
-[cli.release]
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-app: minor
----
-
-#### add feature
-",
-	);
+	copy_fixture("monochange/deno-lock-release", root);
 }
 
 fn seed_explicit_lockfile_override_fixture(root: &Path) {
-	write_file(
-		root.join("packages/app/package.json"),
-		r#"{
-  "name": "app",
-  "version": "1.0.0"
-}
-"#,
-	);
-	write_file(
-		root.join("packages/app/package-lock.json"),
-		r#"{
-  "name": "app",
-  "version": "1.0.0",
-  "lockfileVersion": 3,
-  "packages": { "": { "name": "app", "version": "1.0.0" } }
-}
-"#,
-	);
-	write_file(
-		root.join("lockfiles/shared/package-lock.json"),
-		r#"{
-  "name": "app",
-  "version": "1.0.0",
-  "lockfileVersion": 3,
-  "packages": { "": { "name": "app", "version": "1.0.0" } }
-}
-"#,
-	);
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "npm"
-changelog = false
-
-[package.app]
-path = "packages/app"
-versioned_files = [{ path = "lockfiles/shared/package-lock.json", type = "npm" }]
-
-[cli.release]
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/feature.md"),
-		r"---
-app: minor
----
-
-#### add feature
-",
-	);
+	copy_fixture("monochange/explicit-lockfile-override", root);
 }
 
 fn seed_group_empty_update_message_fixture(root: &Path) {
-	write_file(
-		root.join("Cargo.toml"),
-		r#"
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "1.0.0"
-"#,
-	);
-	write_file(
-		root.join("crates/core/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-core"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(
-		root.join("crates/app/Cargo.toml"),
-		r#"
-[package]
-name = "workflow-app"
-version = { workspace = true }
-edition = "2021"
-"#,
-	);
-	write_file(root.join("crates/core/changelog.md"), "# Changelog\n");
-	write_file(root.join("crates/app/changelog.md"), "# Changelog\n");
-	write_file(root.join("changelog.md"), "# Changelog\n");
-	write_file(
-		root.join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-changelog = "{{ path }}/changelog.md"
-empty_update_message = "Default update for {{ package }} -> {{ version }}."
-
-[package.core]
-path = "crates/core"
-empty_update_message = "Package override for {{ package }} -> {{ version }}"
-
-[package.app]
-path = "crates/app"
-
-[group.sdk]
-packages = ["core", "app"]
-changelog = "changelog.md"
-empty_update_message = "Update triggered by group {{ group }}; version {{ version }}."
-tag = true
-release = true
-version_format = "primary"
-
-[ecosystems.cargo]
-enabled = true
-
-[cli.release]
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-"#,
-	);
-	write_file(
-		root.join(".changeset/group-release.md"),
-		"---\nsdk: patch\n---\n",
-	);
+	copy_fixture("monochange/group-empty-update-message", root);
 }
 
 #[test]
@@ -2163,6 +1494,16 @@ fn seed_step_outputs_fixture(root: &Path) {
 	}
 }
 
+fn fixture_path(relative: &str) -> std::path::PathBuf {
+	Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests")
+		.join(relative)
+}
+
+fn copy_fixture(fixture_relative: &str, dest: &Path) {
+	copy_directory(&fixture_path(fixture_relative), dest);
+}
+
 fn write_file(path: impl AsRef<Path>, content: &str) {
 	let path = path.as_ref();
 	if let Some(parent) = path.parent() {
@@ -2175,64 +1516,22 @@ fn write_file(path: impl AsRef<Path>, content: &str) {
 #[test]
 fn step_override_with_literal_list_uses_list_as_changed_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_changeset_policy_fixture(tempdir.path(), false);
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[changesets.verify]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required"]
-comment_on_failure = true
-
-[package.core]
-path = "crates/core"
-ignored_paths = ["tests/**"]
-additional_paths = ["Cargo.lock"]
-
-[cli.pr-check]
-
-[[cli.pr-check.steps]]
-type = "AffectedPackages"
-inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = false, format = "json" }
-"#,
-	);
-
+	copy_fixture("monochange/changeset-policy-base", tempdir.path());
+	copy_fixture("monochange/step-override-literal-list", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("pr-check")],
 	)
 	.unwrap_or_else(|error| panic!("pr-check output: {error}"));
-
 	let json: serde_json::Value = serde_json::from_str(&output)
-		.unwrap_or_else(|error| panic!("json parse: {error}; output={output}"));
+		.unwrap_or_else(|error| panic!("json: {error}; output={output}"));
 	assert_eq!(json["affectedPackageIds"][0], "core");
 }
 
 #[test]
 fn step_override_with_non_direct_jinja_template_renders_correctly() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[cli.announce]
-
-[[cli.announce.inputs]]
-name = "prefix"
-type = "string"
-default = "hello"
-
-[[cli.announce.steps]]
-type = "Command"
-command = "printf '%s' '{{ inputs.message }}' > output.txt"
-shell = true
-inputs = { message = "{{ inputs.prefix }}-world" }
-"#,
-	);
-
+	copy_fixture("monochange/step-override-jinja", tempdir.path());
 	run_cli(
 		tempdir.path(),
 		[
@@ -2251,37 +1550,8 @@ inputs = { message = "{{ inputs.prefix }}-world" }
 #[test]
 fn step_override_forwards_multi_value_list_reference_as_list() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_changeset_policy_fixture(tempdir.path(), false);
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[changesets.verify]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required"]
-comment_on_failure = true
-
-[package.core]
-path = "crates/core"
-ignored_paths = ["tests/**"]
-additional_paths = ["Cargo.lock"]
-
-[cli.pr-check]
-
-[[cli.pr-check.inputs]]
-name = "paths"
-type = "string_list"
-required = true
-
-[[cli.pr-check.steps]]
-type = "AffectedPackages"
-inputs = { changed_paths = "{{ inputs.paths }}", verify = false, format = "json" }
-"#,
-	);
-
+	copy_fixture("monochange/changeset-policy-base", tempdir.path());
+	copy_fixture("monochange/step-override-multi-list", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[
@@ -2294,51 +1564,25 @@ inputs = { changed_paths = "{{ inputs.paths }}", verify = false, format = "json"
 		],
 	)
 	.unwrap_or_else(|error| panic!("pr-check output: {error}"));
-
 	let json: serde_json::Value = serde_json::from_str(&output)
-		.unwrap_or_else(|error| panic!("json parse: {error}; output={output}"));
+		.unwrap_or_else(|error| panic!("json: {error}; output={output}"));
 	assert!(json["matchedPaths"]
 		.as_array()
-		.is_some_and(|paths| paths.iter().any(|p| p == "crates/core/src/lib.rs")));
+		.is_some_and(|p| p.iter().any(|v| v == "crates/core/src/lib.rs")));
 }
 
 #[test]
 fn step_override_missing_template_reference_produces_empty_changed_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_changeset_policy_fixture(tempdir.path(), false);
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		r#"
-[defaults]
-package_type = "cargo"
-
-[changesets.verify]
-enabled = true
-required = false
-skip_labels = ["no-changeset-required"]
-comment_on_failure = false
-
-[package.core]
-path = "crates/core"
-ignored_paths = ["tests/**"]
-additional_paths = ["Cargo.lock"]
-
-[cli.pr-check]
-
-[[cli.pr-check.steps]]
-type = "AffectedPackages"
-inputs = { changed_paths = "{{ inputs.nonexistent }}", verify = false, format = "json" }
-"#,
-	);
-
+	copy_fixture("monochange/changeset-policy-base", tempdir.path());
+	copy_fixture("monochange/step-override-missing-ref", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("pr-check")],
 	)
 	.unwrap_or_else(|error| panic!("pr-check output: {error}"));
-
 	let json: serde_json::Value = serde_json::from_str(&output)
-		.unwrap_or_else(|error| panic!("json parse: {error}; output={output}"));
+		.unwrap_or_else(|error| panic!("json: {error}; output={output}"));
 	assert_eq!(json["affectedPackageIds"].as_array().map(Vec::len), Some(0));
 }
 

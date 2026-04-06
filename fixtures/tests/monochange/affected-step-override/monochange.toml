@@ -1,0 +1,33 @@
+[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+
+[package.core]
+path = "crates/core"
+ignored_paths = ["tests/**"]
+additional_paths = ["Cargo.lock"]
+
+[cli.pr-check]
+help_text = "Verify that changed files are covered by attached changesets"
+
+[[cli.pr-check.inputs]]
+name = "paths"
+type = "string_list"
+required = true
+
+[[cli.pr-check.inputs]]
+name = "labels"
+type = "string_list"
+
+[[cli.pr-check.inputs]]
+name = "enforce"
+type = "boolean"
+
+[[cli.pr-check.steps]]
+type = "AffectedPackages"
+inputs = { changed_paths = "{{ inputs.paths }}", label = "{{ inputs.labels }}", verify = "{{ inputs.enforce }}" }
