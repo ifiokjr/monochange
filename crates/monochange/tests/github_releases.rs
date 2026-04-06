@@ -11,6 +11,7 @@ use test_support::{copy_directory, fixture_path};
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
+	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
 	command
 }
 
@@ -29,7 +30,7 @@ fn publish_github_release_dry_run_renders_group_release_payloads() {
 	assert_eq!(github_releases[0]["targetId"], "sdk");
 	assert_eq!(github_releases[0]["targetKind"], "group");
 	assert_eq!(github_releases[0]["tagName"], "v1.1.0");
-	assert_eq!(github_releases[0]["name"], "sdk 1.1.0");
+	assert_eq!(github_releases[0]["name"], "1.1.0 (2026-04-06)");
 	assert!(github_releases[0]["body"]
 		.as_str()
 		.is_some_and(|text| text.contains("Grouped release for `sdk`.")));

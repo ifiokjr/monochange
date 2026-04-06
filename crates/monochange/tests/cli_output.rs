@@ -13,6 +13,7 @@ use test_support::{copy_directory, fixture_path};
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
+	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
 	command
 }
 
@@ -381,7 +382,9 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	      "members": [
 	        "core",
 	        "app"
-	      ]
+	      ],
+	      "renderedTitle": "1.1.0 (2026-04-06)",
+	      "renderedChangelogTitle": "1.1.0 (2026-04-06)"
 	    }
 	  ],
 	  "releasedPackages": [
@@ -403,7 +406,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	      "path": "changelog.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0",
+	        "title": "1.1.0 (2026-04-06)",
 	        "summary": [
 	          "Grouped release for `sdk`.",
 	          "Changed members: core",
@@ -418,7 +421,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
+	      "rendered": "## 1.1.0 (2026-04-06)\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
 	    },
 	    {
 	      "ownerId": "core",
@@ -426,7 +429,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	      "path": "crates/core/CHANGELOG.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0",
+	        "title": "1.1.0 (2026-04-06)",
 	        "summary": [],
 	        "sections": [
 	          {
@@ -437,7 +440,7 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\n### Features\n\n- add feature"
+	      "rendered": "## 1.1.0 (2026-04-06)\n\n### Features\n\n- add feature"
 	    }
 	  ],
 	  "changesets": [
@@ -673,7 +676,9 @@ fn release_manifest_workflow_writes_manifest_json() {
 	      "members": [
 	        "core",
 	        "app"
-	      ]
+	      ],
+	      "renderedTitle": "1.1.0 (2026-04-06)",
+	      "renderedChangelogTitle": "1.1.0 (2026-04-06)"
 	    }
 	  ],
 	  "releasedPackages": [
@@ -695,7 +700,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	      "path": "changelog.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0",
+	        "title": "1.1.0 (2026-04-06)",
 	        "summary": [
 	          "Grouped release for `sdk`.",
 	          "Changed members: core",
@@ -710,7 +715,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
+	      "rendered": "## 1.1.0 (2026-04-06)\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
 	    },
 	    {
 	      "ownerId": "core",
@@ -718,7 +723,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	      "path": "crates/core/CHANGELOG.md",
 	      "format": "monochange",
 	      "notes": {
-	        "title": "1.1.0",
+	        "title": "1.1.0 (2026-04-06)",
 	        "summary": [],
 	        "sections": [
 	          {
@@ -729,7 +734,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	          }
 	        ]
 	      },
-	      "rendered": "## 1.1.0\n\n### Features\n\n- add feature"
+	      "rendered": "## 1.1.0 (2026-04-06)\n\n### Features\n\n- add feature"
 	    }
 	  ],
 	  "changesets": [

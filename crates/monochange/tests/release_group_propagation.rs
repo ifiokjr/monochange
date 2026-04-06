@@ -10,6 +10,7 @@ use test_support::{copy_directory, fixture_path};
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
+	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
 	command
 }
 

@@ -107,6 +107,31 @@ struct GiteaPullRequestResponse {
 	html_url: Option<String>,
 }
 
+fn gitea_host(source: &SourceConfiguration) -> &str {
+	source
+		.host
+		.as_deref()
+		.unwrap_or("https://gitea.com")
+		.trim_end_matches('/')
+}
+
+/// URL to a specific tag on the Gitea repository.
+#[must_use]
+pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
+	let host = gitea_host(source);
+	format!("{host}/{}/{}/releases/tag/{tag_name}", source.owner, source.repo)
+}
+
+/// URL comparing two tags on the Gitea repository.
+#[must_use]
+pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag: &str) -> String {
+	let host = gitea_host(source);
+	format!(
+		"{host}/{}/{}/compare/{previous_tag}...{current_tag}",
+		source.owner, source.repo
+	)
+}
+
 #[must_use]
 pub fn build_release_requests(
 	source: &SourceConfiguration,
@@ -124,7 +149,7 @@ pub fn build_release_requests(
 			target_id: target.id.clone(),
 			target_kind: target.kind,
 			tag_name: target.tag_name.clone(),
-			name: release_name(target),
+			name: target.rendered_title.clone(),
 			body: release_body(source, manifest, target),
 			draft: source.releases.draft,
 			prerelease: source.releases.prerelease,
@@ -536,9 +561,7 @@ fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 	Ok(())
 }
 
-fn release_name(target: &ReleaseManifestTarget) -> String {
-	format!("{} {}", target.id, target.version)
-}
+
 
 fn release_body(
 	source: &SourceConfiguration,

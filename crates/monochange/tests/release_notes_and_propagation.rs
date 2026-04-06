@@ -12,6 +12,7 @@ use test_support::{copy_directory, fixture_path};
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
+	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
 	command
 }
 
@@ -37,9 +38,9 @@ fn ungrouped_transitive_bump_writes_empty_update_message_to_dependent_changelog(
 	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("app changelog: {error}"));
 
-	assert!(core_changelog.contains("## 1.1.0"));
+	assert!(core_changelog.contains("1.1.0 (2026-04-06)"));
 	assert!(core_changelog.contains("- add core feature"));
-	assert!(app_changelog.contains("## 1.0.1"));
+	assert!(app_changelog.contains("1.0.1 (2026-04-06)"));
 	assert!(app_changelog.contains(
 		"No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
 	));
@@ -105,11 +106,11 @@ fn grouped_transitive_bump_writes_empty_update_message_with_group_reference() {
 	let group_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(app_changelog.contains("## 1.1.0"));
+	assert!(app_changelog.contains("1.1.0 (2026-04-06)"));
 	assert!(app_changelog.contains(
 		"No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
 	));
-	assert!(group_changelog.contains("## 1.1.0"));
+	assert!(group_changelog.contains("1.1.0 (2026-04-06)"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
 	assert!(group_changelog.contains("- **core**: add core feature"));
 }
@@ -134,7 +135,7 @@ fn custom_empty_update_message_on_package_overrides_default() {
 
 	let changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("package changelog: {error}"));
-	assert!(changelog.contains("## 1.1.0"));
+	assert!(changelog.contains("1.1.0 (2026-04-06)"));
 	assert!(changelog.contains("This entry appears in changelog via `group.sdk.changelog.text`"));
 	assert!(changelog.contains("### Features"));
 	assert!(changelog.contains("- **core**: add core feature"));

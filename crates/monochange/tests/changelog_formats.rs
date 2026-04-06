@@ -10,6 +10,7 @@ use test_support::{copy_directory, fixture_path};
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
 	command.env("NO_COLOR", "1");
+	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
 	command
 }
 
@@ -37,13 +38,13 @@ fn release_uses_keep_a_changelog_format_from_defaults() {
 	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(core_changelog.contains("## [1.1.0]"));
+	assert!(core_changelog.contains("## [1.1.0 (2026-04-06)]"));
 	assert!(core_changelog.contains("### Features"));
 	assert!(core_changelog.contains("- add keep a changelog support"));
 	assert!(!core_changelog.contains("- **core**: add keep a changelog support"));
-	assert!(app_changelog.contains("## [1.1.0]"));
+	assert!(app_changelog.contains("## [1.1.0 (2026-04-06)]"));
 	assert!(app_changelog.contains("### Features"));
-	assert!(group_changelog.contains("## [1.1.0]"));
+	assert!(group_changelog.contains("## [1.1.0 (2026-04-06)]"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
 	assert!(group_changelog.contains("Changed members: core"));
 	assert!(group_changelog.contains("Synchronized members: app"));
@@ -75,17 +76,17 @@ fn release_allows_package_and_group_changelog_format_overrides() {
 	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(core_changelog.contains("## [1.1.0]"));
+	assert!(core_changelog.contains("## [1.1.0 (2026-04-06)]"));
 	assert!(core_changelog.contains("### Features"));
 	assert!(!core_changelog.contains("- **core**: add keep a changelog support"));
 	assert!(app_changelog.contains("## 1.1.0"));
-	assert!(!app_changelog.contains("## [1.1.0]"));
+	assert!(!app_changelog.contains("## [1.1.0 (2026-04-06)]"));
 	assert!(app_changelog.contains("### Features"));
 	assert!(app_changelog.contains(
 		"No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
 	));
 	assert!(group_changelog.contains("## 1.1.0"));
-	assert!(!group_changelog.contains("## [1.1.0]"));
+	assert!(!group_changelog.contains("## [1.1.0 (2026-04-06)]"));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
 	assert!(group_changelog.contains("Changed members: core"));
 	assert!(group_changelog.contains("Synchronized members: app"));
