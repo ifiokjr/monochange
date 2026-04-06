@@ -13,18 +13,18 @@ rust-version = { workspace = true }
 description = "Dart and Flutter workspace discovery for monochange"
 
 [dependencies]
-glob = { workspace = true }
+glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
-semver = { workspace = true }
-serde = { workspace = true }
-serde_yaml_ng = { workspace = true }
-thiserror = { workspace = true }
-walkdir = { workspace = true }
+semver = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+serde_yaml_ng = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }
+walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true }
-rstest = { workspace = true }
-similar-asserts = { workspace = true }
+insta = { workspace = true, default-features = true }
+rstest = { workspace = true, default-features = true }
+similar-asserts = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

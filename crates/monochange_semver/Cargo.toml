@@ -16,9 +16,9 @@ description = "Compatibility and semver helpers for monochange"
 monochange_core = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
-rstest = { workspace = true }
-similar-asserts = { workspace = true }
+insta = { workspace = true, default-features = true }
+rstest = { workspace = true, default-features = true }
+similar-asserts = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

@@ -17,11 +17,11 @@ name = "mc"
 path = "src/bin/mc.rs"
 
 [dependencies]
-chrono = { workspace = true }
-clap = { workspace = true }
-glob = { workspace = true }
-inquire = { workspace = true }
-minijinja = { workspace = true }
+chrono = { workspace = true, default-features = true }
+clap = { workspace = true, default-features = true }
+glob = { workspace = true, default-features = true }
+inquire = { workspace = true, default-features = true }
+minijinja = { workspace = true, default-features = true }
 monochange_cargo = { workspace = true }
 monochange_config = { workspace = true }
 monochange_core = { workspace = true }
@@ -33,22 +33,22 @@ monochange_gitlab = { workspace = true }
 monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }
-rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
-semver = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-serde_yaml_ng = { workspace = true }
-shlex = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-toml = { workspace = true }
+rmcp = { workspace = true, features = ["server", "transport-io", "macros"], default-features = true }
+semver = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+serde_yaml_ng = { workspace = true, default-features = true }
+shlex = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"], default-features = true }
+toml = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true }
-insta-cmd = { workspace = true }
-rstest = { workspace = true }
-similar-asserts = { workspace = true }
-tempfile = "3"
+insta = { workspace = true, default-features = true }
+insta-cmd = { workspace = true, default-features = true }
+rstest = { workspace = true, default-features = true }
+similar-asserts = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

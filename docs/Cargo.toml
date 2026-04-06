@@ -5,7 +5,7 @@ edition = { workspace = true }
 publish = false
 
 [dependencies]
-doc-comment = { workspace = true }
+doc-comment = { workspace = true, default-features = true }
 monochange = { workspace = true }
 monochange_cargo = { workspace = true }
 monochange_config = { workspace = true }
@@ -16,7 +16,7 @@ monochange_github = { workspace = true }
 monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }
-semver = { workspace = true }
+semver = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
