@@ -84,14 +84,7 @@ fn assist_command_supports_json_output() {
 #[test]
 fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("crates/core/Cargo.toml"),
-		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
-	);
-	write_file(
-		tempdir.path().join("packages/web/package.json"),
-		"{\"name\":\"web\",\"version\":\"1.0.0\"}",
-	);
+	copy_fixture("monochange/init-scan", tempdir.path());
 
 	let output = run_cli(
 		tempdir.path(),
@@ -116,10 +109,7 @@ fn init_writes_detected_packages_groups_and_default_cli_commands() {
 #[test]
 fn init_requires_force_to_overwrite_existing_configuration() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_file(
-		tempdir.path().join("monochange.toml"),
-		"[defaults]\nparent_bump = \"patch\"\n",
-	);
+	copy_fixture("monochange/init-existing-config", tempdir.path());
 
 	let error = run_cli(
 		tempdir.path(),
