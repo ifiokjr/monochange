@@ -376,10 +376,7 @@ pub fn github_issue_url(source: &SourceConfiguration, number: u64) -> String {
 #[must_use]
 pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
 	let base = github_web_base_url();
-	let base = source
-		.host
-		.as_deref()
-		.unwrap_or(base.trim_end_matches('/'));
+	let base = source.host.as_deref().unwrap_or(base.trim_end_matches('/'));
 	format!(
 		"{}/{}/{}/releases/tag/{tag_name}",
 		base.trim_end_matches('/'),
@@ -392,10 +389,7 @@ pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
 #[must_use]
 pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag: &str) -> String {
 	let base = github_web_base_url();
-	let base = source
-		.host
-		.as_deref()
-		.unwrap_or(base.trim_end_matches('/'));
+	let base = source.host.as_deref().unwrap_or(base.trim_end_matches('/'));
 	format!(
 		"{}/{}/{}/compare/{previous_tag}...{current_tag}",
 		base.trim_end_matches('/'),
