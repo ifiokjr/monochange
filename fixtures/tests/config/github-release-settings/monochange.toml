@@ -1,0 +1,24 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+enabled = true
+draft = true
+prerelease = true
+source = "github_generated"
+generate_notes = true
+
+[github.pull_requests]
+enabled = true
+branch_prefix = "automation/release"
+base = "develop"
+title = "chore(release): prepare release"
+labels = ["release", "automated", "bot"]
+auto_merge = true
