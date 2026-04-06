@@ -4603,6 +4603,7 @@ fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> 
 struct TitleRenderContext {
 	id: String,
 	version: String,
+	previous_version: String,
 	date: String,
 	time: String,
 	datetime: String,
@@ -4631,9 +4632,14 @@ impl TitleRenderContext {
 			(Some(s), Some(prev)) => compare_url_for_provider(s, prev, tag_name),
 			_ => tag_url.clone(),
 		};
+		// Extract the bare semver string from the previous tag (e.g. "pkg/v1.1.0" → "1.1.0").
+		let previous_version = previous_tag_name
+			.and_then(|t| parse_tag_prefix_and_version(t).map(|(_, v)| v.to_string()))
+			.unwrap_or_default();
 		Self {
 			id: id.to_string(),
 			version: version.to_string(),
+			previous_version,
 			date,
 			time,
 			datetime,
@@ -4647,6 +4653,7 @@ impl TitleRenderContext {
 		let context = minijinja::context! {
 			id => &self.id,
 			version => &self.version,
+			previous_version => &self.previous_version,
 			date => &self.date,
 			time => &self.time,
 			datetime => &self.datetime,
