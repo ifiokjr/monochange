@@ -2097,10 +2097,7 @@ fn command_step_with_id_captures_stdout_for_later_steps() {
 
 	let output = run_cli(
 		tempdir.path(),
-		[
-			OsString::from("mc"),
-			OsString::from("echo-test"),
-		],
+		[OsString::from("mc"), OsString::from("echo-test")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 
@@ -2117,10 +2114,7 @@ fn command_step_with_shell_string_uses_custom_shell() {
 
 	let output = run_cli(
 		tempdir.path(),
-		[
-			OsString::from("mc"),
-			OsString::from("shell-bash"),
-		],
+		[OsString::from("mc"), OsString::from("shell-bash")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 
@@ -2137,10 +2131,7 @@ fn release_step_exposes_updated_changelogs_to_command_steps() {
 
 	let output = run_cli(
 		tempdir.path(),
-		[
-			OsString::from("mc"),
-			OsString::from("release"),
-		],
+		[OsString::from("mc"), OsString::from("release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 
@@ -2151,8 +2142,8 @@ fn release_step_exposes_updated_changelogs_to_command_steps() {
 }
 
 fn seed_step_outputs_fixture(root: &Path) {
-	let fixture_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/step-outputs/base");
+	let fixture_dir =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tests/step-outputs/base");
 	let files = [
 		"Cargo.toml",
 		"monochange.toml",
@@ -2165,12 +2156,10 @@ fn seed_step_outputs_fixture(root: &Path) {
 		let source = fixture_dir.join(file);
 		let target = root.join(file);
 		if let Some(parent) = target.parent() {
-			fs::create_dir_all(parent)
-				.unwrap_or_else(|error| panic!("create dir: {error}"));
+			fs::create_dir_all(parent).unwrap_or_else(|error| panic!("create dir: {error}"));
 		}
-		fs::copy(&source, &target).unwrap_or_else(|error| {
-			panic!("copy {}: {error}", source.display())
-		});
+		fs::copy(&source, &target)
+			.unwrap_or_else(|error| panic!("copy {}: {error}", source.display()));
 	}
 }
 
