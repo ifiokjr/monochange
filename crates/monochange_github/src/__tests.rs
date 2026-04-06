@@ -57,7 +57,7 @@ fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 		.unwrap_or_else(|| panic!("expected request"));
 	assert_eq!(request.repository, "ifiokjr/monochange");
 	assert_eq!(request.tag_name, "v1.2.0");
-	assert_eq!(request.name, "sdk 1.2.0");
+	assert_eq!(request.name, "test title");
 	assert_eq!(
 		request.body.as_deref(),
 		Some("## 1.2.0\n\nGrouped release for `sdk`.\n\n### Features\n\n- add github publishing")
@@ -252,6 +252,8 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 			release: true,
 			version_format: VersionFormat::Namespaced,
 			tag_name: "core/v1.0.1".to_string(),
+			rendered_title: "test title".to_string(),
+			rendered_changelog_title: "test changelog title".to_string(),
 			members: vec!["cargo:crates/core/Cargo.toml".to_string()],
 		}],
 		released_packages: vec!["workflow-core".to_string()],
@@ -1034,6 +1036,8 @@ fn sample_manifest() -> ReleaseManifest {
 			release: true,
 			version_format: VersionFormat::Primary,
 			tag_name: "v1.2.0".to_string(),
+			rendered_title: "test title".to_string(),
+			rendered_changelog_title: "test changelog title".to_string(),
 			members: vec![
 				"cargo:crates/core/Cargo.toml".to_string(),
 				"cargo:crates/app/Cargo.toml".to_string(),

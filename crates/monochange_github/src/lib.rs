@@ -56,6 +56,8 @@
 //!         version_format: VersionFormat::Primary,
 //!         tag_name: "v1.2.0".to_string(),
 //!         members: vec!["core".to_string(), "app".to_string()],
+//!         rendered_title: "1.2.0 (2026-04-06)".to_string(),
+//!         rendered_changelog_title: "[1.2.0](https://example.com) (2026-04-06)".to_string(),
 //!     }],
 //!     released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
 //!     changed_files: Vec::new(),
@@ -370,6 +372,38 @@ pub fn github_issue_url(source: &SourceConfiguration, number: u64) -> String {
 	)
 }
 
+/// URL to a specific tag on the GitHub repository.
+#[must_use]
+pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
+	let base = github_web_base_url();
+	let base = source
+		.host
+		.as_deref()
+		.unwrap_or(base.trim_end_matches('/'));
+	format!(
+		"{}/{}/{}/releases/tag/{tag_name}",
+		base.trim_end_matches('/'),
+		source.owner,
+		source.repo
+	)
+}
+
+/// URL comparing two tags on the GitHub repository.
+#[must_use]
+pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag: &str) -> String {
+	let base = github_web_base_url();
+	let base = source
+		.host
+		.as_deref()
+		.unwrap_or(base.trim_end_matches('/'));
+	format!(
+		"{}/{}/{}/compare/{previous_tag}...{current_tag}",
+		base.trim_end_matches('/'),
+		source.owner,
+		source.repo
+	)
+}
+
 pub fn enrich_changeset_context(
 	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
@@ -431,7 +465,7 @@ pub fn build_release_requests(
 			target_id: target.id.clone(),
 			target_kind: target.kind,
 			tag_name: target.tag_name.clone(),
-			name: release_name(target),
+			name: target.rendered_title.clone(),
 			body: release_body(source, manifest, target),
 			draft: source.releases.draft,
 			prerelease: source.releases.prerelease,
@@ -1150,10 +1184,6 @@ fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 		)));
 	}
 	Ok(())
-}
-
-fn release_name(target: &ReleaseManifestTarget) -> String {
-	format!("{} {}", target.id, target.version)
 }
 
 fn release_body(

@@ -203,6 +203,10 @@ struct RawWorkspaceDefaults {
 	changelog: Option<RawChangelogConfig>,
 	#[serde(default)]
 	empty_update_message: Option<String>,
+	#[serde(default)]
+	release_title: Option<String>,
+	#[serde(default)]
+	changelog_version_title: Option<String>,
 }
 
 impl Default for RawWorkspaceDefaults {
@@ -215,6 +219,8 @@ impl Default for RawWorkspaceDefaults {
 			package_type: None,
 			changelog: None,
 			empty_update_message: None,
+			release_title: None,
+			changelog_version_title: None,
 		}
 	}
 }
@@ -255,6 +261,10 @@ struct RawPackageDefinition {
 	#[serde(default)]
 	empty_update_message: Option<String>,
 	#[serde(default)]
+	release_title: Option<String>,
+	#[serde(default)]
+	changelog_version_title: Option<String>,
+	#[serde(default)]
 	versioned_files: Vec<RawVersionedFileDefinition>,
 	#[serde(default)]
 	ignore_ecosystem_versioned_files: bool,
@@ -279,6 +289,10 @@ struct RawGroupDefinition {
 	extra_changelog_sections: Vec<ExtraChangelogSection>,
 	#[serde(default)]
 	empty_update_message: Option<String>,
+	#[serde(default)]
+	release_title: Option<String>,
+	#[serde(default)]
+	changelog_version_title: Option<String>,
 	#[serde(default)]
 	versioned_files: Vec<RawVersionedFileDefinition>,
 	#[serde(default)]
@@ -890,6 +904,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				changelog,
 				extra_changelog_sections: package.extra_changelog_sections,
 				empty_update_message: package.empty_update_message,
+				release_title: package.release_title,
+				changelog_version_title: package.changelog_version_title,
 				versioned_files,
 				ignore_ecosystem_versioned_files: package.ignore_ecosystem_versioned_files,
 				ignored_paths: package.ignored_paths,
@@ -937,6 +953,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				changelog,
 				extra_changelog_sections: group.extra_changelog_sections,
 				empty_update_message: group.empty_update_message,
+				release_title: group.release_title,
+				changelog_version_title: group.changelog_version_title,
 				versioned_files: normalize_versioned_files(
 					&contents,
 					group.versioned_files,
@@ -1086,6 +1104,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			changelog: defaults_changelog_policy,
 			changelog_format: default_changelog_format,
 			empty_update_message: defaults.empty_update_message,
+			release_title: defaults.release_title,
+			changelog_version_title: defaults.changelog_version_title,
 		},
 		release_notes: ReleaseNotesSettings {
 			change_templates: release_notes.change_templates,

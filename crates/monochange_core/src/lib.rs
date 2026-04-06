@@ -67,6 +67,17 @@ use thiserror::Error;
 
 pub type MonochangeResult<T> = Result<T, MonochangeError>;
 
+/// Default release title template for primary versioning: `1.2.3 (2026-04-06)`.
+pub const DEFAULT_RELEASE_TITLE_PRIMARY: &str = "{{ version }} ({{ date }})";
+/// Default release title template for namespaced versioning: `my-pkg 1.2.3 (2026-04-06)`.
+pub const DEFAULT_RELEASE_TITLE_NAMESPACED: &str = "{{ id }} {{ version }} ({{ date }})";
+/// Default changelog version title for primary versioning (markdown-linked when source configured).
+pub const DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY: &str =
+	"{% if tag_url %}[{{ version }}]({{ tag_url }}){% else %}{{ version }}{% endif %} ({{ date }})";
+/// Default changelog version title for namespaced versioning (markdown-linked when source configured).
+pub const DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED: &str =
+	"{% if tag_url %}{{ id }} [{{ version }}]({{ tag_url }}){% else %}{{ id }} {{ version }}{% endif %} ({{ date }})";
+
 #[derive(Debug, Error)]
 pub enum MonochangeError {
 	#[error("io error: {0}")]
@@ -455,6 +466,10 @@ pub struct PackageDefinition {
 	pub changelog: Option<ChangelogTarget>,
 	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub empty_update_message: Option<String>,
+	#[serde(default)]
+	pub release_title: Option<String>,
+	#[serde(default)]
+	pub changelog_version_title: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
 	pub ignore_ecosystem_versioned_files: bool,
@@ -474,6 +489,10 @@ pub struct GroupDefinition {
 	pub changelog: Option<ChangelogTarget>,
 	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub empty_update_message: Option<String>,
+	#[serde(default)]
+	pub release_title: Option<String>,
+	#[serde(default)]
+	pub changelog_version_title: Option<String>,
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	pub tag: bool,
 	pub release: bool,
@@ -490,6 +509,8 @@ pub struct WorkspaceDefaults {
 	pub changelog: Option<ChangelogDefinition>,
 	pub changelog_format: ChangelogFormat,
 	pub empty_update_message: Option<String>,
+	pub release_title: Option<String>,
+	pub changelog_version_title: Option<String>,
 }
 
 impl Default for WorkspaceDefaults {
@@ -503,6 +524,8 @@ impl Default for WorkspaceDefaults {
 			changelog: None,
 			changelog_format: ChangelogFormat::Monochange,
 			empty_update_message: None,
+			release_title: None,
+			changelog_version_title: None,
 		}
 	}
 }
@@ -858,6 +881,10 @@ pub struct ReleaseManifestTarget {
 	pub version_format: VersionFormat,
 	pub tag_name: String,
 	pub members: Vec<String>,
+	#[serde(default)]
+	pub rendered_title: String,
+	#[serde(default)]
+	pub rendered_changelog_title: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

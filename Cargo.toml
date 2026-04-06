@@ -45,6 +45,7 @@ rust-version = "1.86.0"
 
 [workspace.dependencies]
 cargo_metadata = "0.15"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4", features = ["derive"] }
 derive_more = "0.99"
 doc-comment = "0.3"

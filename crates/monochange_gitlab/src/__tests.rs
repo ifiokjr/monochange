@@ -439,6 +439,8 @@ fn sample_manifest() -> ReleaseManifest {
 			release: true,
 			version_format: VersionFormat::Primary,
 			tag_name: "v1.2.0".to_string(),
+			rendered_title: "test title".to_string(),
+			rendered_changelog_title: "test changelog title".to_string(),
 			members: vec!["core".to_string(), "app".to_string()],
 		}],
 		released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],

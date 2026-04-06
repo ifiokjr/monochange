@@ -71,6 +71,10 @@ use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_config::validate_workspace;
+use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED;
+use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY;
+use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
+use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::default_cli_commands;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
@@ -194,6 +198,8 @@ pub struct ReleaseTarget {
 	pub version_format: VersionFormat,
 	pub tag_name: String,
 	pub members: Vec<String>,
+	pub rendered_title: String,
+	pub rendered_changelog_title: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -2495,6 +2501,12 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	let manifest_updates = [cargo_updates, npm_updates, dart_updates].concat();
 	let versioned_file_updates =
 		build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)?;
+	let release_targets = build_release_targets(
+		&configuration,
+		&discovery.packages,
+		&plan,
+		&changeset_paths,
+	);
 	let changelog_updates = build_changelog_updates(
 		root,
 		&configuration,
@@ -2503,6 +2515,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		&change_signals,
 		&changesets,
 		&changelog_targets,
+		&release_targets,
 	)?;
 	let mut changed_files = manifest_updates
 		.iter()
@@ -2542,7 +2555,6 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 
 	let version = shared_release_version(&plan);
 	let group_version = shared_group_version(&plan);
-	let release_targets = build_release_targets(&configuration, &discovery.packages, &plan);
 	let mut deleted_changesets = Vec::new();
 	if !dry_run {
 		apply_file_updates(&manifest_updates)?;
@@ -2825,6 +2837,7 @@ fn resolve_config_path(root: &Path, path: &Path) -> PathBuf {
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_changelog_updates(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -2833,6 +2846,7 @@ fn build_changelog_updates(
 	change_signals: &[ChangeSignal],
 	changesets: &[PreparedChangeset],
 	changelog_targets: &(PackageChangelogTargets, GroupChangelogTargets),
+	release_targets: &[ReleaseTarget],
 ) -> MonochangeResult<Vec<ChangelogUpdate>> {
 	let changeset_context_by_path = changesets
 		.iter()
@@ -2911,9 +2925,18 @@ fn build_changelog_updates(
 			release_note_changes.get(&decision.package_id),
 			&planned_version.to_string(),
 		);
+		let changelog_title = release_targets
+			.iter()
+			.find(|rt| {
+				(rt.kind == ReleaseOwnerKind::Package && rt.id == package_id)
+					|| (rt.kind == ReleaseOwnerKind::Group
+						&& rt.members.contains(&package_id))
+			})
+			.map(|rt| rt.rendered_changelog_title.clone())
+			.unwrap_or_else(|| planned_version.to_string());
 		let document = build_release_notes_document(
 			&package_id,
-			&planned_version.to_string(),
+			&changelog_title,
 			Vec::new(),
 			package_definition.map_or(&[][..], |package| {
 				package.extra_changelog_sections.as_slice()
@@ -2964,9 +2987,14 @@ fn build_changelog_updates(
 			&planned_version.to_string(),
 		);
 		let changed_members = group_changed_members(planned_group, &release_note_changes, packages);
+		let changelog_title = release_targets
+			.iter()
+			.find(|rt| rt.kind == ReleaseOwnerKind::Group && rt.id == planned_group.group_id)
+			.map(|rt| rt.rendered_changelog_title.clone())
+			.unwrap_or_else(|| planned_version.to_string());
 		let document = build_release_notes_document(
 			&planned_group.group_id,
-			&planned_version.to_string(),
+			&changelog_title,
 			group_release_summary(&planned_group.group_id, &member_ids, &changed_members),
 			group_definition.map_or(&[][..], |group| group.extra_changelog_sections.as_slice()),
 			&configuration.release_notes.change_templates,
@@ -4405,47 +4433,60 @@ fn build_release_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
+	changeset_paths: &[PathBuf],
 ) -> Vec<ReleaseTarget> {
+	let changes_count = changeset_paths.len();
+	let source = configuration.source.as_ref();
+	let defaults_release_title = configuration.defaults.release_title.as_deref();
+	let defaults_changelog_title = configuration.defaults.changelog_version_title.as_deref();
+
 	let mut release_targets = configuration
 		.groups
 		.iter()
 		.filter_map(|group| {
 			plan.groups
 				.iter()
-				.find(|planned_group| {
-					planned_group.group_id == group.id
-						&& planned_group.recommended_bump.is_release()
-				})
-				.and_then(|planned_group| {
-					planned_group
-						.planned_version
-						.as_ref()
-						.map(|version| ReleaseTarget {
+				.find(|pg| pg.group_id == group.id && pg.recommended_bump.is_release())
+				.and_then(|pg| {
+					pg.planned_version.as_ref().map(|version| {
+						let vs = version.to_string();
+						let tag = render_tag_name(&group.id, &vs, group.version_format);
+						let prev = find_previous_tag(&configuration.root_path, &tag);
+						let ctx = TitleRenderContext::new(
+							&group.id, &vs, changes_count, source, &tag, prev.as_deref(),
+						);
+						let rt = effective_title_template(
+							group.release_title.as_deref(),
+							defaults_release_title,
+							default_release_title_for_format(group.version_format),
+						);
+						let ct = effective_title_template(
+							group.changelog_version_title.as_deref(),
+							defaults_changelog_title,
+							default_changelog_version_title_for_format(group.version_format),
+						);
+						ReleaseTarget {
 							id: group.id.clone(),
 							kind: ReleaseOwnerKind::Group,
-							version: version.to_string(),
+							version: vs,
 							tag: group.tag,
 							release: group.release,
 							version_format: group.version_format,
-							tag_name: render_tag_name(
-								&group.id,
-								&version.to_string(),
-								group.version_format,
-							),
+							tag_name: tag,
 							members: group.packages.clone(),
-						})
+							rendered_title: ctx.render(rt),
+							rendered_changelog_title: ctx.render(ct),
+						}
+					})
 				})
 		})
 		.collect::<Vec<_>>();
 	for decision in plan
 		.decisions
 		.iter()
-		.filter(|decision| decision.recommended_bump.is_release() && decision.group_id.is_none())
+		.filter(|d| d.recommended_bump.is_release() && d.group_id.is_none())
 	{
-		let Some(package) = packages
-			.iter()
-			.find(|package| package.id == decision.package_id)
-		else {
+		let Some(package) = packages.iter().find(|p| p.id == decision.package_id) else {
 			continue;
 		};
 		let Some(version) = decision.planned_version.as_ref() else {
@@ -4459,19 +4500,34 @@ fn build_release_targets(
 		let Some(identity) = configuration.effective_release_identity(&config_id) else {
 			continue;
 		};
+		let vs = version.to_string();
+		let tag = render_tag_name(&identity.owner_id, &vs, identity.version_format);
+		let prev = find_previous_tag(&configuration.root_path, &tag);
+		let pkg_def = configuration.package_by_id(&config_id);
+		let ctx = TitleRenderContext::new(
+			&identity.owner_id, &vs, changes_count, source, &tag, prev.as_deref(),
+		);
+		let rt = effective_title_template(
+			pkg_def.and_then(|p| p.release_title.as_deref()),
+			defaults_release_title,
+			default_release_title_for_format(identity.version_format),
+		);
+		let ct = effective_title_template(
+			pkg_def.and_then(|p| p.changelog_version_title.as_deref()),
+			defaults_changelog_title,
+			default_changelog_version_title_for_format(identity.version_format),
+		);
 		release_targets.push(ReleaseTarget {
 			id: identity.owner_id.clone(),
 			kind: identity.owner_kind,
-			version: version.to_string(),
+			version: vs,
 			tag: identity.tag,
 			release: identity.release,
 			version_format: identity.version_format,
-			tag_name: render_tag_name(
-				&identity.owner_id,
-				&version.to_string(),
-				identity.version_format,
-			),
+			tag_name: tag,
 			members: identity.members,
+			rendered_title: ctx.render(rt),
+			rendered_changelog_title: ctx.render(ct),
 		});
 	}
 	release_targets.sort_by(|left, right| left.id.cmp(&right.id));
@@ -4482,6 +4538,162 @@ fn render_tag_name(id: &str, version: &str, version_format: VersionFormat) -> St
 	match version_format {
 		VersionFormat::Namespaced => format!("{id}/v{version}"),
 		VersionFormat::Primary => format!("v{version}"),
+	}
+}
+
+/// Dispatch tag URL generation to the appropriate provider crate.
+fn tag_url_for_provider(source: &SourceConfiguration, tag_name: &str) -> String {
+	match source.provider {
+		SourceProvider::GitHub => github_provider::tag_url(source, tag_name),
+		SourceProvider::GitLab => gitlab_provider::tag_url(source, tag_name),
+		SourceProvider::Gitea => gitea_provider::tag_url(source, tag_name),
+	}
+}
+
+/// Dispatch compare URL generation to the appropriate provider crate.
+fn compare_url_for_provider(
+	source: &SourceConfiguration,
+	previous_tag: &str,
+	current_tag: &str,
+) -> String {
+	match source.provider {
+		SourceProvider::GitHub => {
+			github_provider::compare_url(source, previous_tag, current_tag)
+		}
+		SourceProvider::GitLab => {
+			gitlab_provider::compare_url(source, previous_tag, current_tag)
+		}
+		SourceProvider::Gitea => {
+			gitea_provider::compare_url(source, previous_tag, current_tag)
+		}
+	}
+}
+
+fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
+	let output = std::process::Command::new("git")
+		.current_dir(root)
+		.args(["tag", "--list", "--sort=-v:refname"])
+		.output()
+		.ok()?;
+	if !output.status.success() {
+		return None;
+	}
+	let tags_text = String::from_utf8_lossy(&output.stdout);
+	let all_tags: Vec<&str> = tags_text.lines().map(str::trim).collect();
+	let (prefix, current_version) = parse_tag_prefix_and_version(current_tag)?;
+	all_tags
+		.into_iter()
+		.filter(|tag| *tag != current_tag)
+		.filter_map(|tag| {
+			let (p, v) = parse_tag_prefix_and_version(tag)?;
+			(p == prefix && v < current_version).then(|| (tag.to_string(), v))
+		})
+		.max_by(|a, b| a.1.cmp(&b.1))
+		.map(|(tag, _)| tag)
+}
+
+fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
+	let v_pos = tag.rfind('v')?;
+	let prefix = &tag[..v_pos + 1];
+	let version_str = &tag[v_pos + 1..];
+	let version = semver::Version::parse(version_str).ok()?;
+	Some((prefix.to_string(), version))
+}
+
+struct TitleRenderContext {
+	id: String,
+	version: String,
+	date: String,
+	time: String,
+	datetime: String,
+	changes_count: usize,
+	tag_url: String,
+	compare_url: String,
+}
+
+impl TitleRenderContext {
+	fn new(
+		id: &str,
+		version: &str,
+		changes_count: usize,
+		source: Option<&SourceConfiguration>,
+		tag_name: &str,
+		previous_tag_name: Option<&str>,
+	) -> Self {
+		let now = resolve_release_datetime();
+		let date = now.format("%Y-%m-%d").to_string();
+		let time = now.format("%H:%M:%S").to_string();
+		let datetime = now.format("%Y-%m-%dT%H:%M:%S").to_string();
+		let tag_url = source
+			.map(|s| tag_url_for_provider(s, tag_name))
+			.unwrap_or_default();
+		let compare_url = match (source, previous_tag_name) {
+			(Some(s), Some(prev)) => compare_url_for_provider(s, prev, tag_name),
+			_ => tag_url.clone(),
+		};
+		Self {
+			id: id.to_string(),
+			version: version.to_string(),
+			date,
+			time,
+			datetime,
+			changes_count,
+			tag_url,
+			compare_url,
+		}
+	}
+
+	fn render(&self, template: &str) -> String {
+		let context = minijinja::context! {
+			id => &self.id,
+			version => &self.version,
+			date => &self.date,
+			time => &self.time,
+			datetime => &self.datetime,
+			changes_count => self.changes_count,
+			tag_url => &self.tag_url,
+			compare_url => &self.compare_url,
+		};
+		let jinja_value = minijinja::Value::from_serialize(&context);
+		render_jinja_template(template, &jinja_value)
+			.unwrap_or_else(|_| self.version.clone())
+	}
+}
+
+fn resolve_release_datetime() -> chrono::NaiveDateTime {
+	use chrono::NaiveDate;
+	use chrono::NaiveDateTime;
+
+	if let Ok(env_date) = std::env::var("MONOCHANGE_RELEASE_DATE") {
+		if let Ok(ndt) = NaiveDateTime::parse_from_str(&env_date, "%Y-%m-%dT%H:%M:%S") {
+			return ndt;
+		}
+		if let Ok(nd) = NaiveDate::parse_from_str(&env_date, "%Y-%m-%d") {
+			return nd.and_hms_opt(0, 0, 0).unwrap_or_default();
+		}
+	}
+	chrono::Local::now().naive_local()
+}
+
+fn effective_title_template<'a>(
+	specific: Option<&'a str>,
+	defaults: Option<&'a str>,
+	builtin: &'a str,
+) -> &'a str {
+	specific.or(defaults).unwrap_or(builtin)
+}
+
+fn default_release_title_for_format(version_format: VersionFormat) -> &'static str {
+	match version_format {
+		VersionFormat::Primary => DEFAULT_RELEASE_TITLE_PRIMARY,
+		VersionFormat::Namespaced => DEFAULT_RELEASE_TITLE_NAMESPACED,
+	}
+}
+
+fn default_changelog_version_title_for_format(version_format: VersionFormat) -> &'static str {
+	match version_format {
+		VersionFormat::Primary => DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY,
+		VersionFormat::Namespaced => DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED,
 	}
 }
 
@@ -4851,6 +5063,8 @@ fn build_release_manifest(
 				version_format: target.version_format,
 				tag_name: target.tag_name.clone(),
 				members: target.members.clone(),
+				rendered_title: target.rendered_title.clone(),
+				rendered_changelog_title: target.rendered_changelog_title.clone(),
 			})
 			.collect(),
 		released_packages: prepared_release.released_packages.clone(),

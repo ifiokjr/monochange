@@ -17,6 +17,7 @@ name = "mc"
 path = "src/bin/mc.rs"
 
 [dependencies]
+chrono = { workspace = true }
 clap = { workspace = true }
 glob = { workspace = true }
 inquire = { workspace = true }
