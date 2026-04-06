@@ -7,12 +7,6 @@
 
 let
   extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
-  pnpmStandalone = extra.pnpm-standalone.overrideAttrs (_old: {
-    # Keep using pnpm-standalone for Node management, but skip the upstream
-    # installCheck that currently fails on Linux CI when exercising the
-    # pnpm-activate-env helper under a synthetic `/usr/bin/env`-free path.
-    doInstallCheck = false;
-  });
 in
 {
   packages =
@@ -23,7 +17,7 @@ in
       deno
       dprint
       extra.mdt
-      pnpmStandalone
+      extra.pnpm-standalone
       mdbook
       nixfmt
       rustup

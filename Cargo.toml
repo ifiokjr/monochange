@@ -44,16 +44,13 @@ repository = "https://github.com/ifiokjr/monochange"
 rust-version = "1.86.0"
 
 [workspace.dependencies]
-cargo_metadata = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4", features = ["derive"] }
-derive_more = "0.99"
 doc-comment = "0.3"
 glob = "0.3"
 inquire = "0.9"
 insta = { version = "1", features = ["filters", "json"] }
 insta-cmd = "0.6"
-markdown = "1.0.0-alpha.9"
 miette = "7"
 minijinja = "2"
 octocrab = { version = "0.49.7", default-features = false, features = ["default-client", "follow-redirect", "jwt-rust-crypto", "retry", "rustls", "rustls-ring", "timeout", "tracing"] }
@@ -69,7 +66,6 @@ similar-asserts = "1"
 thiserror = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 toml = "0.8"
-typed-builder = "0.14"
 walkdir = "2"
 
 # Internal crates
