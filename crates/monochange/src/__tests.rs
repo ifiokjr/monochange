@@ -47,6 +47,28 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
 	assert!(output.contains("diagnostics"));
+	assert!(output.contains("release-record"));
+}
+
+#[test]
+fn release_record_help_describes_first_parent_discovery() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("release-record"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("release-record help: {error}"));
+
+	assert!(
+		output.contains("Inspect the MonoChange release record associated with a tag or commit")
+	);
+	assert!(output.contains("mc release-record --from v1.2.3"));
+	assert!(
+		output.contains("Walks first-parent ancestry until it finds a MonoChange release record")
+	);
 }
 
 #[test]
@@ -2111,4 +2133,134 @@ fn sample_release_manifest_for_commit_message(
 			compatibility_evidence: Vec::new(),
 		},
 	}
+}
+
+#[test]
+fn text_release_record_discovery_renders_targets_packages_and_provider() {
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: "abc1234567890".to_string(),
+		record_commit: "abc1234567890".to_string(),
+		distance: 0,
+		record: sample_release_record_for_discovery_text(),
+	};
+
+	let rendered = crate::text_release_record_discovery(&discovery);
+	assert!(rendered.contains("input ref: v1.2.3"));
+	assert!(rendered.contains("resolved commit: abc1234"));
+	assert!(rendered.contains("record commit: abc1234"));
+	assert!(rendered.contains("distance: 0"));
+	assert!(rendered.contains("version: 1.2.3"));
+	assert!(rendered.contains("group version: 1.2.3"));
+	assert!(rendered.contains("- group sdk -> 1.2.3 (tag: v1.2.3)"));
+	assert!(rendered.contains("- monochange"));
+	assert!(rendered.contains("- monochange_core"));
+	assert!(rendered.contains("provider: github ifiokjr/monochange"));
+}
+
+fn sample_release_record_for_discovery_text() -> monochange_core::ReleaseRecord {
+	monochange_core::ReleaseRecord {
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
+		created_at: "2026-04-07T08:00:00Z".to_string(),
+		command: "release-pr".to_string(),
+		version: Some("1.2.3".to_string()),
+		group_version: Some("1.2.3".to_string()),
+		release_targets: vec![monochange_core::ReleaseRecordTarget {
+			id: "sdk".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Group,
+			version: "1.2.3".to_string(),
+			version_format: monochange_core::VersionFormat::Primary,
+			tag: true,
+			release: true,
+			tag_name: "v1.2.3".to_string(),
+			members: vec!["monochange".to_string(), "monochange_core".to_string()],
+		}],
+		released_packages: vec!["monochange".to_string(), "monochange_core".to_string()],
+		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
+		updated_changelogs: vec![Path::new("crates/monochange/CHANGELOG.md").to_path_buf()],
+		deleted_changesets: vec![Path::new(".changeset/feature.md").to_path_buf()],
+		provider: Some(monochange_core::ReleaseRecordProvider {
+			kind: monochange_core::SourceProvider::GitHub,
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			host: None,
+		}),
+	}
+}
+
+#[test]
+fn text_release_record_discovery_omits_empty_sections() {
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "HEAD".to_string(),
+		resolved_commit: "def5678901234".to_string(),
+		record_commit: "abc1234567890".to_string(),
+		distance: 2,
+		record: monochange_core::ReleaseRecord {
+			schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+			kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
+			created_at: "2026-04-07T08:00:00Z".to_string(),
+			command: "release-pr".to_string(),
+			version: None,
+			group_version: None,
+			release_targets: Vec::new(),
+			released_packages: Vec::new(),
+			changed_files: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			provider: None,
+		},
+	};
+
+	let rendered = crate::text_release_record_discovery(&discovery);
+	assert!(rendered.contains("input ref: HEAD"));
+	assert!(!rendered.contains("  targets:"));
+	assert!(!rendered.contains("  packages:"));
+	assert!(!rendered.contains("  provider:"));
+}
+
+#[test]
+fn first_parent_commits_returns_head_then_ancestors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	git_in_temp_repo(root, &["init"]);
+	git_in_temp_repo(root, &["config", "user.name", "MonoChange Tests"]);
+	git_in_temp_repo(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write initial file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	fs::write(root.join("release.txt"), "second\n")
+		.unwrap_or_else(|error| panic!("write second file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "second"]);
+
+	let head = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	let commits = crate::first_parent_commits(root, &head)
+		.unwrap_or_else(|error| panic!("first parent commits: {error}"));
+	assert_eq!(commits.first().map(String::as_str), Some(head.as_str()));
+	assert_eq!(commits.len(), 2);
+}
+
+fn git_in_temp_repo(root: &Path, args: &[&str]) {
+	let status = std::process::Command::new("git")
+		.current_dir(root)
+		.args(args)
+		.status()
+		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+	assert!(status.success(), "git {args:?} failed");
+}
+
+fn git_output_in_temp_repo(root: &Path, args: &[&str]) -> String {
+	let output = std::process::Command::new("git")
+		.current_dir(root)
+		.args(args)
+		.output()
+		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+	assert!(output.status.success(), "git {args:?} failed");
+	String::from_utf8(output.stdout)
+		.unwrap_or_else(|error| panic!("git output utf8: {error}"))
+		.trim()
+		.to_string()
 }
