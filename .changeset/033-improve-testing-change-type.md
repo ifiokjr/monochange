@@ -1,7 +1,7 @@
 ---
 main:
   bump: patch
-  type: improve testing
+  type: test
 ---
 
 #### improve and refactor tests
