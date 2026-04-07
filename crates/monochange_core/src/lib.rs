@@ -736,7 +736,7 @@ pub enum CliStepDefinition {
 	/// Publish hosted releases from a prepared `MonoChange` release.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
-	/// configuration. The legacy alias `PublishGitHubRelease` is also accepted.
+	/// configuration.
 	///
 	PublishRelease {
 		#[serde(default)]
@@ -746,8 +746,7 @@ pub enum CliStepDefinition {
 	/// Open or update a hosted release request from prepared release state.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
-	/// configuration. The legacy alias `OpenReleasePullRequest` is also
-	/// accepted.
+	/// configuration.
 	///
 	OpenReleaseRequest {
 		#[serde(default)]
@@ -765,8 +764,7 @@ pub enum CliStepDefinition {
 	#[serde(alias = "EnforceChangesetPolicy", alias = "VerifyChangesets")]
 	/// Evaluate affected packages and changeset coverage for changed files.
 	///
-	/// Standalone CI-oriented step. Legacy aliases `EnforceChangesetPolicy` and
-	/// `VerifyChangesets` are also accepted.
+	/// Standalone CI-oriented step.
 	///
 	AffectedPackages {
 		#[serde(default)]
