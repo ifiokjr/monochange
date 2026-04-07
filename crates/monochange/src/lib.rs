@@ -55,6 +55,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use clap::error::ErrorKind;
+use clap::parser::ValueSource;
 use clap::Arg;
 use clap::ArgAction;
 use clap::ArgMatches;
@@ -766,6 +767,7 @@ fn collect_cli_command_inputs(
 ) -> BTreeMap<String, Vec<String>> {
 	let mut inputs = BTreeMap::new();
 	for input in &cli_command.inputs {
+		let value_source = matches.value_source(input.name.as_str());
 		let values = match input.kind {
 			CliInputKind::StringList => matches
 				.get_many::<String>(input.name.as_str())
@@ -778,10 +780,19 @@ fn collect_cli_command_inputs(
 					Vec::new()
 				}
 			}
-			CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => matches
-				.get_one::<String>(input.name.as_str())
-				.map(|value| vec![value.clone()])
-				.unwrap_or_default(),
+			CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => {
+				if cli_command.name == "change"
+					&& input.name == "bump"
+					&& value_source == Some(ValueSource::DefaultValue)
+				{
+					Vec::new()
+				} else {
+					matches
+						.get_one::<String>(input.name.as_str())
+						.map(|value| vec![value.clone()])
+						.unwrap_or_default()
+				}
+			}
 		};
 		inputs.insert(input.name.clone(), values);
 	}
@@ -964,23 +975,19 @@ fn execute_cli_command(
 							"command `change` requires at least one `--package` value or `--interactive` mode".to_string(),
 						));
 					}
-					let bump = step_inputs
-						.get("bump")
+					let bump = if let Some(value) =
+						step_inputs.get("bump").and_then(|values| values.first())
+					{
+						parse_change_bump(value)?
+					} else if step_inputs
+						.get("type")
 						.and_then(|values| values.first())
-						.map_or_else(
-							|| {
-								if step_inputs
-									.get("type")
-									.and_then(|values| values.first())
-									.is_some()
-								{
-									Ok(ChangeBump::None)
-								} else {
-									Ok(ChangeBump::Patch)
-								}
-							},
-							|value| parse_change_bump(value),
-						)?;
+						.is_some()
+					{
+						ChangeBump::None
+					} else {
+						ChangeBump::Patch
+					};
 					let version = step_inputs
 						.get("version")
 						.and_then(|values| values.first())
@@ -2620,13 +2627,14 @@ fn change_type_default_bump(
 	target_id: &str,
 	change_type: &str,
 ) -> Option<BumpSeverity> {
-	let sections = if let Some(package) = configuration.package_by_id(target_id) {
-		package.extra_changelog_sections.as_slice()
-	} else if let Some(group) = configuration.group_by_id(target_id) {
-		group.extra_changelog_sections.as_slice()
-	} else {
-		return None;
-	};
+	let sections = configuration
+		.package_by_id(target_id)
+		.map(|package| package.extra_changelog_sections.as_slice())
+		.or_else(|| {
+			configuration
+				.group_by_id(target_id)
+				.map(|group| group.extra_changelog_sections.as_slice())
+		})?;
 	sections.iter().find_map(|section| {
 		section
 			.types
@@ -2688,13 +2696,12 @@ fn render_interactive_changeset_markdown(
 ) -> MonochangeResult<String> {
 	let mut lines = vec!["---".to_string()];
 	for target in &result.targets {
-		lines.extend(render_change_target_markdown(
-			configuration,
-			&target.id,
-			target.bump,
-			target.version.as_deref(),
-			target.change_type.as_deref(),
-		)?);
+		let id = &target.id;
+		let version = target.version.as_deref();
+		let change_type = target.change_type.as_deref();
+		let target_lines =
+			render_change_target_markdown(configuration, id, target.bump, version, change_type)?;
+		lines.extend(target_lines);
 	}
 	lines.push("---".to_string());
 	lines.push(String::new());

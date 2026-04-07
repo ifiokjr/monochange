@@ -2,16 +2,21 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 
+use monochange_config::load_workspace_configuration;
+use monochange_core::BumpSeverity;
 use monochange_core::Ecosystem;
 use tempfile::tempdir;
 
 use crate::add_change_file;
+use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
 use crate::discover_workspace;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
+use crate::parse_change_bump;
 use crate::plan_release;
+use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 
@@ -366,7 +371,7 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 	let output_path = add_change_file(
 		&fixture_root,
 		&["sdk-core".to_string()],
-		monochange_core::BumpSeverity::Patch,
+		BumpSeverity::Patch,
 		None,
 		"default output",
 		None,
@@ -380,6 +385,268 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 	assert!(output_path.starts_with(fixture_root.join(".changeset")));
 	assert!(content.contains("sdk-core: patch"));
 	fs::remove_file(output_path).unwrap_or_else(|error| panic!("cleanup change file: {error}"));
+}
+
+#[test]
+fn collect_cli_command_inputs_omits_default_bump_for_type_only_changes() {
+	let root = fixture_path("changeset-target-metadata/cli-type-only-change");
+	let command = build_command_for_root("mc", &root);
+	let matches = command
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("change"),
+			OsString::from("--package"),
+			OsString::from("core"),
+			OsString::from("--type"),
+			OsString::from("docs"),
+			OsString::from("--reason"),
+			OsString::from("clarify migration guide"),
+		])
+		.unwrap_or_else(|error| panic!("matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected subcommand"));
+	let cli_command = monochange_core::default_cli_commands()
+		.into_iter()
+		.find(|command| command.name == "change")
+		.unwrap_or_else(|| panic!("expected change command"));
+	let inputs = crate::collect_cli_command_inputs(&cli_command, subcommand_matches);
+	assert!(inputs.get("bump").is_some_and(Vec::is_empty));
+	assert_eq!(
+		inputs
+			.get("type")
+			.and_then(|values| values.first())
+			.map(String::as_str),
+		Some("docs")
+	);
+}
+
+#[test]
+fn parse_change_bump_supports_none() {
+	assert_eq!(parse_change_bump("none").unwrap(), crate::ChangeBump::None);
+	assert_eq!(
+		BumpSeverity::from(crate::ChangeBump::None),
+		BumpSeverity::None
+	);
+}
+
+#[test]
+fn changes_add_requires_package_or_interactive_mode() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture(
+		"changeset-target-metadata/cli-type-only-change",
+		tempdir.path(),
+	);
+
+	let error = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("change"),
+			OsString::from("--reason"),
+			OsString::from("missing package"),
+		],
+	)
+	.expect_err("change without package should fail");
+	assert!(error
+		.to_string()
+		.contains("requires at least one `--package` value or `--interactive` mode"));
+}
+
+#[test]
+fn changes_add_defaults_bump_to_none_when_type_is_present() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture(
+		"changeset-target-metadata/cli-type-only-change",
+		tempdir.path(),
+	);
+	let output_path = tempdir.path().join("docs.md");
+
+	run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("change"),
+			OsString::from("--package"),
+			OsString::from("core"),
+			OsString::from("--type"),
+			OsString::from("docs"),
+			OsString::from("--reason"),
+			OsString::from("clarify migration guide"),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+
+	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert!(content.contains("core: docs"));
+	assert!(!content.contains("bump:"));
+}
+
+#[test]
+fn add_change_file_renders_type_and_explicit_version_without_bump() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+	let output_path = tempdir.path().join("security-version.md");
+
+	add_change_file(
+		tempdir.path(),
+		&["core".to_string()],
+		BumpSeverity::None,
+		Some("2.0.0"),
+		"pin a secure release",
+		Some("security"),
+		None,
+		Some(&output_path),
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+
+	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert!(content.contains("core:"));
+	assert!(!content.contains("  bump:"));
+	assert!(content.contains("  type: security"));
+	assert!(content.contains("  version: \"2.0.0\""));
+}
+
+#[test]
+fn add_change_file_renders_object_metadata_when_bump_differs_from_type_default() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+	let output_path = tempdir.path().join("security-major.md");
+
+	add_change_file(
+		tempdir.path(),
+		&["core".to_string()],
+		BumpSeverity::Major,
+		None,
+		"break the api",
+		Some("security"),
+		None,
+		Some(&output_path),
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+
+	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert!(content.contains("core:"));
+	assert!(content.contains("  bump: major"));
+	assert!(content.contains("  type: security"));
+}
+
+#[test]
+fn add_change_file_rejects_none_without_type_or_version() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+
+	let error = add_change_file(
+		tempdir.path(),
+		&["core".to_string()],
+		BumpSeverity::None,
+		None,
+		"type required",
+		None,
+		None,
+		None,
+	)
+	.expect_err("none bump without type/version should fail");
+	assert!(error
+		.to_string()
+		.contains("must not use a `none` bump without also declaring `type` or `version`"));
+}
+
+#[test]
+fn add_change_file_rejects_unknown_change_type() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+
+	let error = add_change_file(
+		tempdir.path(),
+		&["core".to_string()],
+		BumpSeverity::Patch,
+		None,
+		"unknown type",
+		Some("docs"),
+		None,
+		None,
+	)
+	.expect_err("unknown type should fail");
+	assert!(error
+		.to_string()
+		.contains("uses unknown change type `docs`"));
+}
+
+#[test]
+fn render_change_target_markdown_uses_package_defaults() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+	let lines = render_change_target_markdown(
+		&configuration,
+		"core",
+		BumpSeverity::Patch,
+		None,
+		Some("security"),
+	)
+	.unwrap_or_else(|error| panic!("render target: {error}"));
+	assert_eq!(lines, vec!["core: security".to_string()]);
+}
+
+#[test]
+fn render_change_target_markdown_uses_group_defaults() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+	let lines = render_change_target_markdown(
+		&configuration,
+		"sdk",
+		BumpSeverity::Minor,
+		None,
+		Some("test"),
+	)
+	.unwrap_or_else(|error| panic!("render target: {error}"));
+	assert_eq!(lines, vec!["sdk: test".to_string()]);
+}
+
+#[test]
+fn change_type_default_bump_resolves_package_group_and_unknown_targets() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+	assert_eq!(
+		crate::change_type_default_bump(&configuration, "core", "security"),
+		Some(BumpSeverity::Patch)
+	);
+	assert_eq!(
+		crate::change_type_default_bump(&configuration, "sdk", "test"),
+		Some(BumpSeverity::Minor)
+	);
+	assert_eq!(
+		crate::change_type_default_bump(&configuration, "unknown", "test"),
+		None
+	);
+}
+
+#[test]
+fn add_interactive_change_file_writes_target_owned_metadata() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+	let output_path = tempdir.path().join("interactive.md");
+	let result = InteractiveChangeResult {
+		targets: vec![InteractiveTarget {
+			id: "sdk".to_string(),
+			bump: BumpSeverity::Minor,
+			version: None,
+			change_type: Some("test".to_string()),
+		}],
+		reason: "broaden integration coverage".to_string(),
+		details: Some("Exercise the group-authored shorthand path.".to_string()),
+	};
+
+	add_interactive_change_file(tempdir.path(), &result, Some(&output_path))
+		.unwrap_or_else(|error| panic!("interactive change file: {error}"));
+	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert!(content.contains("sdk: test"));
+	assert!(content.contains("#### broaden integration coverage"));
 }
 
 #[test]
