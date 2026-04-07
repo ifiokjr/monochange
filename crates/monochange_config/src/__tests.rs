@@ -742,6 +742,11 @@ fn load_change_signals_parses_explicit_versions_and_infers_bumps() {
 }
 
 #[test]
+fn markdown_heading_level_rejects_missing_separator_after_hashes() {
+	assert_eq!(crate::markdown_heading_level("#Not a heading"), None);
+}
+
+#[test]
 fn markdown_change_text_normalizes_relative_heading_levels() {
 	let (summary, details) =
 		crate::markdown_change_text("# Summary\n\n## Details\n\n### Sub-details\n\n- bullet");
