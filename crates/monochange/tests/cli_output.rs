@@ -232,7 +232,7 @@ fn change_cli_writes_requested_file_contents() {
 core: minor
 ---
 
-#### document cli snapshots
+# document cli snapshots
 "###);
 }
 
@@ -276,7 +276,7 @@ core:
   version: "2.0.0"
 ---
 
-#### promote to stable
+# promote to stable
 "###);
 }
 

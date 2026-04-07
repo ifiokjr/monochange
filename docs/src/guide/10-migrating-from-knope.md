@@ -314,7 +314,7 @@ MonoChange and knope both use markdown-frontmatter changesets under `.changeset/
 my_crate: minor
 ---
 
-#### add new feature
+# add new feature
 
 Details about the feature.
 ```
@@ -328,7 +328,7 @@ Same format — but use declared **package ids** or **group ids** as keys:
 my_crate: minor
 ---
 
-#### add new feature
+# add new feature
 
 Details about the feature.
 ```
@@ -340,7 +340,7 @@ If you have a group, you can target the group directly:
 main: minor
 ---
 
-#### coordinated release across all packages
+# coordinated release across all packages
 ```
 
 > **Note:** a changeset may not reference both a group id and one of its member package ids in the same file. Use either the group id or individual package ids.
