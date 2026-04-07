@@ -25,10 +25,6 @@ This is a strong fit when your release process includes:
 - a previous `PrepareRelease` step in the same command
 - `[source]` configuration
 
-Legacy alias:
-
-- `OpenReleasePullRequest`
-
 ## Side effects and outputs
 
 - in dry-run mode, previews the request payload

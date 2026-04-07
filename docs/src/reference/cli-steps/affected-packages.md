@@ -29,11 +29,6 @@ It is the best fit for:
 - `verify` — whether to enforce non-zero failure on uncovered packages
 - `label` — skip labels supplied from CI
 
-Legacy aliases:
-
-- `EnforceChangesetPolicy`
-- `VerifyChangesets`
-
 ## Prerequisites
 
 None. `AffectedPackages` is standalone.
