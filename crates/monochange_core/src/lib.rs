@@ -688,27 +688,23 @@ impl<'de> Deserialize<'de> for ShellConfig {
 pub enum CliStepDefinition {
 	/// Validate `MonoChange` configuration and changesets without preparing a
 	/// release.
-	///
 	Validate {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Discover packages across supported ecosystems and render the result.
-	///
 	Discover {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Create a `.changeset/*.md` file from typed CLI inputs or interactive
 	/// prompts.
-	///
 	CreateChangeFile {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Prepare a release and expose structured `release.*` context to later
 	/// steps.
-	///
 	PrepareRelease {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -716,7 +712,6 @@ pub enum CliStepDefinition {
 	/// Create a local release commit with an embedded durable `ReleaseRecord`.
 	///
 	/// Requires a previous `PrepareRelease` step.
-	///
 	CommitRelease {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -725,7 +720,6 @@ pub enum CliStepDefinition {
 	/// it to disk.
 	///
 	/// Requires a previous `PrepareRelease` step.
-	///
 	RenderReleaseManifest {
 		#[serde(default)]
 		path: Option<PathBuf>,
@@ -737,7 +731,6 @@ pub enum CliStepDefinition {
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
 	/// configuration.
-	///
 	PublishRelease {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -747,7 +740,6 @@ pub enum CliStepDefinition {
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
 	/// configuration.
-	///
 	OpenReleaseRequest {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -756,7 +748,6 @@ pub enum CliStepDefinition {
 	///
 	/// Requires a previous `PrepareRelease` step and currently expects
 	/// `[source].provider = "github"`.
-	///
 	CommentReleasedIssues {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -765,13 +756,11 @@ pub enum CliStepDefinition {
 	/// Evaluate affected packages and changeset coverage for changed files.
 	///
 	/// Standalone CI-oriented step.
-	///
 	AffectedPackages {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Inspect parsed changeset data, provenance, and linked metadata.
-	///
 	DiagnoseChangesets {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -780,7 +769,6 @@ pub enum CliStepDefinition {
 	///
 	/// This step is independent from `PrepareRelease` and exposes structured
 	/// `retarget.*` state to later commands.
-	///
 	RetargetRelease {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -788,7 +776,6 @@ pub enum CliStepDefinition {
 	/// Run an arbitrary command with `MonoChange` template context.
 	///
 	/// Use this to bridge built-in `MonoChange` state into external tooling.
-	///
 	Command {
 		command: String,
 		#[serde(default, alias = "dry_run")]
