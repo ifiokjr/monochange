@@ -43,6 +43,8 @@ mc release --dry-run --format json
 mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
+mc release-record --from v1.2.3
+mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc release
 ```
 
