@@ -10,4 +10,4 @@ change_templates = [
 
 [package.core]
 path = "crates/core"
-extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+extra_changelog_sections = [{ name = "Security", types = ["security"], default_bump = "patch" }]

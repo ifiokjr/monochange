@@ -379,7 +379,6 @@ fn valid_input_names_returns_expected_names_for_create_change_file() {
 		"reason",
 		"type",
 		"details",
-		"evidence",
 		"output",
 	] {
 		assert!(names.contains(&expected), "missing: {expected}");

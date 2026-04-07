@@ -100,7 +100,7 @@ format = "keep_a_changelog"
 #   {{ package }}       — package name
 #   {{ version }}       — planned version
 #   {{ target_id }}     — release owner id (package or group)
-#   {{ bump }}          — bump severity (patch, minor, major)
+#   {{ bump }}          — bump severity (none, patch, minor, major)
 #   {{ type }}          — optional change type (e.g. "security", "note")
 #   {{ context }}       — rendered context context block
 #   {{ context }}    — alias for {{ context }}
@@ -132,7 +132,8 @@ change_templates = [
 #                             (not needed when defaults.package_type is set)
 #   changelog               — true, false, "path/to/changelog.md", or a table
 #                             with { path, format }; overrides [defaults.changelog]
-#   extra_changelog_sections — custom changelog sections with type routing
+#   extra_changelog_sections — custom changelog sections with type routing;
+#                              each section supports { name, types, default_bump? }
 #   empty_update_message    — per-package fallback text for transitive bumps
 #   versioned_files         — additional files to update with the new version
 #                             package-scoped string entries infer the package ecosystem,
@@ -206,7 +207,8 @@ type = "npm"
 #
 # Optional fields:
 #   changelog               — path or table for the group-level changelog
-#   extra_changelog_sections — custom changelog sections with type routing
+#   extra_changelog_sections — custom changelog sections with type routing;
+#                              each section supports { name, types, default_bump? }
 #   empty_update_message    — fallback text when the group bumps but a
 #                             specific member has no direct changeset entries
 #   versioned_files         — additional files to version-bump with the group
@@ -501,7 +503,7 @@ type = "string_list"
 [[cli.change.inputs]]
 name = "bump"
 type = "choice"
-choices = ["patch", "minor", "major"]
+choices = ["none", "patch", "minor", "major"]
 default = "patch"
 
 [[cli.change.inputs]]
@@ -519,10 +521,6 @@ type = "string"
 [[cli.change.inputs]]
 name = "details"
 type = "string"
-
-[[cli.change.inputs]]
-name = "evidence"
-type = "string_list"
 
 [[cli.change.inputs]]
 name = "output"

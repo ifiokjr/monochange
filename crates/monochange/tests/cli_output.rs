@@ -61,7 +61,7 @@ fn change_cli_help_documents_package_and_group_targeting_rules() {
 
 	assert_cmd_snapshot!(
 		cli().arg("change").arg("--help"),
-		@r###"
+		@r#"
 	success: true
 	exit_code: 0
 	----- stdout -----
@@ -70,17 +70,16 @@ fn change_cli_help_documents_package_and_group_targeting_rules() {
 	Usage: mc change [OPTIONS]
 
 	Options:
-	      --dry-run              Run the command in dry-run mode when supported
-	  -i, --interactive          Select packages, bumps, and options interactively
-	      --package <PACKAGE>    Package or group to include in the change
-	      --bump <BUMP>          Requested semantic version bump [default: patch] [possible values: patch, minor, major]
-	      --version <VERSION>    Pin an explicit version for this release
-	      --reason <REASON>      Short release-note summary for this change
-	      --type <TYPE>          Optional release-note type such as `security` or `note`
-	      --details <DETAILS>    Optional multi-line release-note details
-	      --evidence <EVIDENCE>  Additional evidence strings to include
-	      --output <PATH>        Write the generated change file to a specific path
-	  -h, --help                 Print help
+	      --dry-run            Run the command in dry-run mode when supported
+	  -i, --interactive        Select packages, bumps, and options interactively
+	      --package <PACKAGE>  Package or group to include in the change
+	      --bump <BUMP>        Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
+	      --version <VERSION>  Pin an explicit version for this release
+	      --reason <REASON>    Short release-note summary for this change
+	      --type <TYPE>        Optional release-note type such as `security` or `note`
+	      --details <DETAILS>  Optional multi-line release-note details
+	      --output <PATH>      Write the generated change file to a specific path
+	  -h, --help               Print help
 
 	Examples:
 	  mc change --package sdk-core --bump patch --reason "fix panic"
@@ -95,7 +94,7 @@ fn change_cli_help_documents_package_and_group_targeting_rules() {
 
 
 	----- stderr -----
-	"###
+	"#
 	);
 }
 

@@ -255,13 +255,14 @@ fn prompt_bump_for_target(target: &SelectableTarget) -> MonochangeResult<BumpSev
 		TargetKind::Package => format!("Bump for package `{}`:", target.id),
 	};
 
-	let options = vec!["patch", "minor", "major"];
+	let options = vec!["none", "patch", "minor", "major"];
 	let selection = Select::new(&label, options)
 		.with_starting_cursor(0)
 		.prompt()
 		.map_err(|error| MonochangeError::Config(format!("bump selection cancelled: {error}")))?;
 
 	match selection {
+		"none" => Ok(BumpSeverity::None),
 		"minor" => Ok(BumpSeverity::Minor),
 		"major" => Ok(BumpSeverity::Major),
 		_ => Ok(BumpSeverity::Patch),
@@ -308,17 +309,11 @@ fn prompt_version_for_target(target: &SelectableTarget) -> MonochangeResult<Opti
 
 fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<Option<String>> {
 	if target.configured_types.is_empty() {
-		// No configured types — offer a free-text input
-		return prompt_optional(&format!(
-			"Change type for `{}`? (e.g. security, note — leave empty to skip):",
-			target.id
-		));
+		return Ok(None);
 	}
 
-	// Build options from configured types + "none" + "custom"
 	let mut options = vec!["(none)".to_string()];
 	options.extend(target.configured_types.iter().cloned());
-	options.push("(custom)".to_string());
 
 	let label = match target.kind {
 		TargetKind::Group => format!("Change type for group `{}`:", target.id),
@@ -334,18 +329,6 @@ fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<
 
 	match selection.as_str() {
 		"(none)" => Ok(None),
-		"(custom)" => {
-			let custom = Text::new("Enter custom change type:")
-				.prompt()
-				.map_err(|error| {
-					MonochangeError::Config(format!("custom type input cancelled: {error}"))
-				})?;
-			if custom.trim().is_empty() {
-				Ok(None)
-			} else {
-				Ok(Some(custom))
-			}
-		}
 		_ => Ok(Some(selection)),
 	}
 }

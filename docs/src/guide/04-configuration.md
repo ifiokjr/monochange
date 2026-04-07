@@ -190,7 +190,9 @@ change_templates = [
 
 [package.core]
 path = "crates/core"
-extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+extra_changelog_sections = [
+	{ name = "Security", types = ["security"], default_bump = "patch" },
+]
 
 [cli.discover]
 help_text = "Discover packages across supported ecosystems"
@@ -421,7 +423,7 @@ Supported template variables include:
 | `{{ package }}`                  | owning package id for the rendered entry                              | useful in shared templates                                                                                 |
 | `{{ version }}`                  | release version for the current target                                | package or group version                                                                                   |
 | `{{ target_id }}`                | release target id                                                     | package id or group id                                                                                     |
-| `{{ bump }}`                     | resolved bump severity                                                | `patch`, `minor`, or `major`                                                                               |
+| `{{ bump }}`                     | resolved bump severity                                                | `none`, `patch`, `minor`, or `major`                                                                       |
 | `{{ type }}`                     | changeset note type                                                   | e.g. `feature`, `fix`, `security`; omitted when absent                                                     |
 | `{{ context }}`                  | compact default metadata block                                        | preferred rendered block for human-readable notes                                                          |
 | `{{ provenance }}`               | legacy alias for `{{ context }}`                                      | kept for backward compatibility                                                                            |

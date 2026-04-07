@@ -450,6 +450,8 @@ pub struct ExtraChangelogSection {
 	pub name: String,
 	#[serde(default)]
 	pub types: Vec<String>,
+	#[serde(default)]
+	pub default_bump: Option<BumpSeverity>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -779,7 +781,6 @@ impl CliStepDefinition {
 				"reason",
 				"type",
 				"details",
-				"evidence",
 				"output",
 			]),
 			Self::AffectedPackages { .. } => {
@@ -809,7 +810,7 @@ impl CliStepDefinition {
 			},
 			Self::CreateChangeFile { .. } => match name {
 				"interactive" => Some(CliInputKind::Boolean),
-				"package" | "evidence" => Some(CliInputKind::StringList),
+				"package" => Some(CliInputKind::StringList),
 				"bump" => Some(CliInputKind::Choice),
 				"version" | "reason" | "type" | "details" => Some(CliInputKind::String),
 				"output" => Some(CliInputKind::Path),
@@ -1721,6 +1722,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					required: false,
 					default: Some("patch".to_string()),
 					choices: vec![
+						"none".to_string(),
 						"patch".to_string(),
 						"minor".to_string(),
 						"major".to_string(),
@@ -1760,15 +1762,6 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					name: "details".to_string(),
 					kind: CliInputKind::String,
 					help_text: Some("Optional multi-line release-note details".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "evidence".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some("Additional evidence strings to include".to_string()),
 					required: false,
 					default: None,
 					choices: Vec::new(),

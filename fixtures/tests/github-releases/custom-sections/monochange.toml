@@ -10,7 +10,7 @@ change_templates = ["#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details
 path = "crates/core"
 tag = true
 release = true
-extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+extra_changelog_sections = [{ name = "Security", types = ["security"], default_bump = "patch" }]
 
 [github]
 owner = "ifiokjr"
