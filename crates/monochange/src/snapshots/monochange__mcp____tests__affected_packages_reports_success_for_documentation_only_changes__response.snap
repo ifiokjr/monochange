@@ -1,0 +1,28 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "affected_packages",
+  "evaluation": {
+    "affectedPackageIds": [],
+    "changedPaths": [
+      "docs/readme.md"
+    ],
+    "changesetPaths": [],
+    "comment": null,
+    "coveredPackageIds": [],
+    "enforce": false,
+    "errors": [],
+    "ignoredPaths": [],
+    "labels": [],
+    "matchedPaths": [],
+    "matchedSkipLabels": [],
+    "required": false,
+    "status": "not_required",
+    "summary": "changeset verification passed: no configured packages were affected by the changed files",
+    "uncoveredPackageIds": []
+  },
+  "ok": true,
+  "summary": "changeset verification passed: no configured packages were affected by the changed files"
+}

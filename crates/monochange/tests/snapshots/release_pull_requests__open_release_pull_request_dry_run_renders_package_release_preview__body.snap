@@ -1,0 +1,30 @@
+---
+source: crates/monochange/tests/release_pull_requests.rs
+expression: "pull_request[\"body\"].as_str().unwrap_or_else(||\npanic!(\"expected release request body\"))"
+---
+## Prepared release
+
+- command: `release-pr`
+- package `app` -> `app/v1.0.1`
+- package `core` -> `core/v1.1.0`
+
+## Release notes
+
+### app 1.0.1
+
+#### Fixes
+
+- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.
+
+### core 1.1.0
+
+#### Features
+
+- add feature
+
+## Changed files
+
+- crates/app/CHANGELOG.md
+- crates/app/Cargo.toml
+- crates/core/CHANGELOG.md
+- crates/core/Cargo.toml

@@ -1,0 +1,20 @@
+---
+source: crates/monochange_github/src/__tests.rs
+expression: "serde_json::json!({\n    \"repository\": request.repository, \"base_branch\": request.base_branch,\n    \"head_branch\": request.head_branch, \"title\": request.title,\n    \"commit_message\": request.commit_message, \"labels\": request.labels,\n    \"auto_merge\": request.auto_merge, \"body\": request.body,\n})"
+---
+{
+  "auto_merge": true,
+  "base_branch": "develop",
+  "body": "## Prepared release\n\n- command: `release`\n- group `sdk` -> `v1.2.0`\n\n## Release notes\n\n### sdk 1.2.0\n\nGrouped release for `sdk`.\n\n#### Features\n\n- add github publishing\n\n## Changed files\n\n- Cargo.toml",
+  "commit_message": {
+    "body": null,
+    "subject": "chore(release): prepare release"
+  },
+  "head_branch": "automation/release/release",
+  "labels": [
+    "release",
+    "automated"
+  ],
+  "repository": "ifiokjr/monochange",
+  "title": "chore(release): prepare release"
+}

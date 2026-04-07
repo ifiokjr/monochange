@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde_json::{Map, Value};
+
 pub fn fixture_path(relative: &str) -> PathBuf {
 	Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests")
@@ -34,4 +36,34 @@ pub fn copy_directory(source: &Path, destination: &Path) {
 			});
 		}
 	}
+}
+
+#[allow(dead_code)]
+pub fn snapshot_settings() -> insta::Settings {
+	let mut settings = insta::Settings::clone_current();
+	settings.add_filter(r"/private/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
+	settings.add_filter(r"/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
+	settings.add_filter(r"/private/tmp/[^/\s]+", "[ROOT]");
+	settings.add_filter(r"/tmp/[^/\s]+", "[ROOT]");
+	settings.add_filter(r"/home/runner/work/_temp/[^/\s]+", "[ROOT]");
+	settings.add_filter(r"\b[A-Z]:\\[^\s]+?\\Temp\\[^\\\s]+", "[ROOT]");
+	settings.add_filter(r"SourceOffset\(\d+\)", "SourceOffset([OFFSET])");
+	settings.add_filter(r"length: \d+", "length: [LEN]");
+	settings.add_filter(r"@ bytes \d+\.\.\d+", "@ bytes [OFFSET]..[END]");
+	settings.add_filter(r"\b[0-9a-f]{7,40}\b", "[SHA]");
+	settings.add_filter(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "[DATETIME]");
+	settings.add_filter(r"\d{4}-\d{2}-\d{2}", "[DATE]");
+	settings
+}
+
+#[allow(dead_code)]
+pub fn json_subset(value: &Value, fields: &[(&str, &str)]) -> Value {
+	let mut subset = Map::new();
+	for (key, pointer) in fields {
+		subset.insert(
+			(*key).to_string(),
+			value.pointer(pointer).cloned().unwrap_or(Value::Null),
+		);
+	}
+	Value::Object(subset)
 }

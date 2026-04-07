@@ -1,12 +1,13 @@
 use std::path::Path;
 use std::process::Command;
 
+use insta::{assert_json_snapshot, assert_snapshot};
 use insta_cmd::get_cargo_bin;
 use serde_json::Value;
 use tempfile::tempdir;
 
 mod test_support;
-use test_support::{copy_directory, fixture_path};
+use test_support::{copy_directory, fixture_path, json_subset, snapshot_settings};
 
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
@@ -17,72 +18,66 @@ fn cli() -> Command {
 
 #[test]
 fn open_release_pull_request_dry_run_renders_group_release_preview() {
+	let _snapshot = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root = fixture_path("release-pr/group");
 	copy_directory(&fixture_root, tempdir.path());
 
 	let json = run_json_workflow(tempdir.path(), "release-pr");
 	let pull_request = &json["releaseRequest"];
-	assert_eq!(pull_request["repository"], "ifiokjr/monochange");
-	assert_eq!(pull_request["baseBranch"], "main");
-	assert_eq!(pull_request["headBranch"], "monochange/release/release-pr");
-	assert_eq!(pull_request["title"], "chore(release): prepare release");
-	assert_eq!(
-		pull_request["commitMessage"]["subject"],
-		"chore(release): prepare release"
+	assert_json_snapshot!(
+		"open_release_pull_request_dry_run_renders_group_release_preview__release_request",
+		json_subset(
+			&json,
+			&[
+				("repository", "/releaseRequest/repository"),
+				("baseBranch", "/releaseRequest/baseBranch"),
+				("headBranch", "/releaseRequest/headBranch"),
+				("title", "/releaseRequest/title"),
+				("commitMessage", "/releaseRequest/commitMessage"),
+				("labels", "/releaseRequest/labels"),
+				("releaseTargetId", "/manifest/releaseTargets/0/id"),
+			]
+		)
 	);
-	assert!(pull_request["commitMessage"]["body"]
-		.as_str()
-		.is_some_and(|text| text.contains("## MonoChange Release Record")));
-	assert!(pull_request["commitMessage"]["body"]
-		.as_str()
-		.is_some_and(|text| text.contains("<!-- monochange:release-record:start -->")));
-	assert_eq!(pull_request["labels"][0], "release");
-	assert_eq!(pull_request["labels"][1], "automated");
-	assert!(pull_request["body"]
-		.as_str()
-		.is_some_and(|text| text.contains("### sdk 1.1.0")));
-	assert!(pull_request["body"]
-		.as_str()
-		.is_some_and(|text| text.contains("#### Features")));
-
-	let manifest = &json["manifest"];
-	assert_eq!(manifest["command"], "release-pr");
-	assert_eq!(manifest["releaseTargets"][0]["id"], "sdk");
+	assert_snapshot!(
+		"open_release_pull_request_dry_run_renders_group_release_preview__body",
+		pull_request["body"]
+			.as_str()
+			.unwrap_or_else(|| panic!("expected release request body"))
+	);
 }
 
 #[test]
 fn open_release_pull_request_dry_run_renders_package_release_preview() {
+	let _snapshot = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root = fixture_path("release-pr/ungrouped");
 	copy_directory(&fixture_root, tempdir.path());
 
 	let json = run_json_workflow(tempdir.path(), "release-pr");
 	let pull_request = &json["releaseRequest"];
-	assert_eq!(pull_request["baseBranch"], "develop");
-	assert_eq!(pull_request["headBranch"], "automation/release/release-pr");
-	assert_eq!(pull_request["autoMerge"], true);
-	assert_eq!(
-		pull_request["commitMessage"]["subject"],
-		"chore(release): prepare release"
+	assert_json_snapshot!(
+		"open_release_pull_request_dry_run_renders_package_release_preview__release_request",
+		json_subset(
+			&json,
+			&[
+				("baseBranch", "/releaseRequest/baseBranch"),
+				("headBranch", "/releaseRequest/headBranch"),
+				("autoMerge", "/releaseRequest/autoMerge"),
+				("commitMessage", "/releaseRequest/commitMessage"),
+				("version", "/manifest/version"),
+				("firstTargetId", "/manifest/releaseTargets/0/id"),
+				("secondTargetId", "/manifest/releaseTargets/1/id"),
+			]
+		)
 	);
-	assert!(pull_request["commitMessage"]["body"]
-		.as_str()
-		.is_some_and(|text| text.contains("\"command\": \"release-pr\"")));
-	let body = pull_request["body"]
-		.as_str()
-		.unwrap_or_else(|| panic!("expected release request body"));
-	assert!(body.contains("### app 1.0.1"));
-	assert!(body.contains("### core 1.1.0"));
-	assert!(body.contains(
-		"No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
-	));
-	assert!(body.contains("add feature"));
-
-	let manifest = &json["manifest"];
-	assert!(manifest["version"].is_null());
-	assert_eq!(manifest["releaseTargets"][0]["id"], "app");
-	assert_eq!(manifest["releaseTargets"][1]["id"], "core");
+	assert_snapshot!(
+		"open_release_pull_request_dry_run_renders_package_release_preview__body",
+		pull_request["body"]
+			.as_str()
+			.unwrap_or_else(|| panic!("expected release request body"))
+	);
 }
 
 fn run_json_workflow(root: &Path, workflow: &str) -> Value {

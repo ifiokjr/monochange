@@ -1,0 +1,30 @@
+---
+source: crates/monochange/tests/release_pull_requests.rs
+expression: "pull_request[\"body\"].as_str().unwrap_or_else(||\npanic!(\"expected release request body\"))"
+---
+## Prepared release
+
+- command: `release-pr`
+- group `sdk` -> `v1.1.0`
+
+## Release notes
+
+### sdk 1.1.0
+
+Grouped release for `sdk`.
+
+Changed members: core
+
+Synchronized members: app
+
+#### Features
+
+- **core**: add feature
+
+## Changed files
+
+- Cargo.toml
+- changelog.md
+- crates/app/Cargo.toml
+- crates/core/CHANGELOG.md
+- crates/core/Cargo.toml

@@ -1,0 +1,22 @@
+---
+source: crates/monochange_gitea/src/__tests.rs
+expression: request.body
+---
+## Prepared release
+
+- command: `Release PR!`
+- group `sdk` -> `v1.2.0`
+
+## Release notes
+
+### sdk 1.2.0
+
+Grouped release for `sdk`.
+
+#### Features
+
+- add gitea publishing
+
+## Changed files
+
+- Cargo.toml

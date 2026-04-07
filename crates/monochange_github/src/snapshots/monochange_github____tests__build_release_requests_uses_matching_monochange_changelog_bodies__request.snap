@@ -1,0 +1,11 @@
+---
+source: crates/monochange_github/src/__tests.rs
+expression: "serde_json::json!({\n    \"repository\": request.repository, \"tag_name\": request.tag_name, \"name\":\n    request.name, \"body\": request.body, \"generate_release_notes\":\n    request.generate_release_notes,\n})"
+---
+{
+  "body": "## 1.2.0\n\nGrouped release for `sdk`.\n\n### Features\n\n- add github publishing",
+  "generate_release_notes": false,
+  "name": "test title",
+  "repository": "ifiokjr/monochange",
+  "tag_name": "v1.2.0"
+}
