@@ -116,6 +116,7 @@ use monochange_core::PackageType;
 use monochange_core::PreparedChangeset;
 use monochange_core::PreparedChangesetTarget;
 
+use monochange_core::parse_release_record_block;
 use monochange_core::render_release_record_block;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
@@ -129,6 +130,7 @@ use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleasePlan;
 use monochange_core::ReleaseRecord;
+use monochange_core::ReleaseRecordDiscovery;
 use monochange_core::ReleaseRecordProvider;
 use monochange_core::ReleaseRecordTarget;
 use monochange_core::SourceChangeRequest;
@@ -434,6 +436,7 @@ fn build_command_with_cli(bin_name: &'static str, cli: &[CliCommandDefinition]) 
 				),
 		)
 		.subcommand(build_assist_subcommand())
+		.subcommand(build_release_record_subcommand())
 		.subcommand(
 			Command::new("mcp")
 				.about("Start the monochange MCP (Model Context Protocol) server over stdin/stdout"),
@@ -459,6 +462,35 @@ fn build_assist_subcommand() -> Command {
 			Arg::new("format")
 				.long("format")
 				.help("Output format for the assistant setup profile")
+				.default_value("text")
+				.value_parser(["text", "json"]),
+		)
+}
+
+fn build_release_record_subcommand() -> Command {
+	Command::new("release-record")
+		.about("Inspect the MonoChange release record associated with a tag or commit")
+		.after_help(
+			r"Examples:
+  mc release-record --from v1.2.3
+  mc release-record --from HEAD --format json
+
+Inspection notes:
+  - Resolves the supplied ref to a commit.
+  - Walks first-parent ancestry until it finds a MonoChange release record.
+  - Fails loudly if it encounters a malformed release record block on the path.",
+		)
+		.arg(
+			Arg::new("from")
+				.long("from")
+				.required(true)
+				.value_name("REF")
+				.help("Tag or commit-ish used to locate the release record"),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format")
 				.default_value("text")
 				.value_parser(["text", "json"]),
 		)
@@ -784,12 +816,174 @@ where
 			runtime.block_on(mcp::run_server());
 			Ok(String::new())
 		}
+		Some(("release-record", release_record_matches)) => {
+			let from = release_record_matches
+				.get_one::<String>("from")
+				.map(String::as_str)
+				.ok_or_else(|| MonochangeError::Config("missing release-record ref".to_string()))?;
+			let format = if release_record_matches
+				.get_one::<String>("format")
+				.is_some_and(|value| value == "json")
+			{
+				OutputFormat::Json
+			} else {
+				OutputFormat::Text
+			};
+			render_release_record_discovery(root, from, format)
+		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;
 			execute_matches(root, &configuration, cli_command_name, cli_command_matches)
 		}
 		None => Err(MonochangeError::Config("unknown command".to_string())),
 	}
+}
+
+fn render_release_record_discovery(
+	root: &Path,
+	from: &str,
+	format: OutputFormat,
+) -> MonochangeResult<String> {
+	let discovery = discover_release_record(root, from)?;
+	match format {
+		OutputFormat::Json => serde_json::to_string_pretty(&discovery)
+			.map_err(|error| MonochangeError::Discovery(error.to_string())),
+		OutputFormat::Text => Ok(text_release_record_discovery(&discovery)),
+	}
+}
+
+pub fn discover_release_record(
+	root: &Path,
+	from: &str,
+) -> MonochangeResult<ReleaseRecordDiscovery> {
+	let resolved_commit = resolve_git_commit_ref(root, from)?;
+	for (distance, commit) in first_parent_commits(root, &resolved_commit)?
+		.into_iter()
+		.enumerate()
+	{
+		let message = read_git_commit_message(root, &commit)?;
+		match parse_release_record_block(&message) {
+			Ok(record) => {
+				return Ok(ReleaseRecordDiscovery {
+					input_ref: from.to_string(),
+					resolved_commit: resolved_commit.clone(),
+					record_commit: commit,
+					distance,
+					record,
+				});
+			}
+			Err(monochange_core::ReleaseRecordError::NotFound) => {}
+			Err(monochange_core::ReleaseRecordError::UnsupportedSchemaVersion(version)) => {
+				return Err(MonochangeError::Discovery(format!(
+					"release record in commit {} uses unsupported schemaVersion {}",
+					short_commit_sha(&commit),
+					version
+				)))
+			}
+			Err(error) => {
+				return Err(MonochangeError::Discovery(format!(
+					"found a malformed MonoChange release record in commit {}: {}",
+					short_commit_sha(&commit),
+					error
+				)))
+			}
+		}
+	}
+	Err(MonochangeError::Discovery(format!(
+		"no MonoChange release record found in first-parent ancestry from `{from}`"
+	)))
+}
+
+fn text_release_record_discovery(discovery: &ReleaseRecordDiscovery) -> String {
+	let mut lines = vec!["release record:".to_string()];
+	lines.push(format!("  input ref: {}", discovery.input_ref));
+	lines.push(format!(
+		"  resolved commit: {}",
+		short_commit_sha(&discovery.resolved_commit)
+	));
+	lines.push(format!(
+		"  record commit: {}",
+		short_commit_sha(&discovery.record_commit)
+	));
+	lines.push(format!("  distance: {}", discovery.distance));
+	if let Some(version) = &discovery.record.version {
+		lines.push(format!("  version: {version}"));
+	}
+	if let Some(group_version) = &discovery.record.group_version {
+		lines.push(format!("  group version: {group_version}"));
+	}
+	if !discovery.record.release_targets.is_empty() {
+		lines.push("  targets:".to_string());
+		for target in &discovery.record.release_targets {
+			lines.push(format!(
+				"    - {} {} -> {} (tag: {})",
+				target.kind, target.id, target.version, target.tag_name
+			));
+		}
+	}
+	if !discovery.record.released_packages.is_empty() {
+		lines.push("  packages:".to_string());
+		for package in &discovery.record.released_packages {
+			lines.push(format!("    - {package}"));
+		}
+	}
+	if let Some(provider) = &discovery.record.provider {
+		lines.push(format!(
+			"  provider: {} {}/{}",
+			provider.kind, provider.owner, provider.repo
+		));
+	}
+	lines.join(
+		"
+",
+	)
+}
+
+fn resolve_git_commit_ref(root: &Path, from: &str) -> MonochangeResult<String> {
+	run_git_capture(
+		root,
+		&["rev-parse", "--verify", &format!("{from}^{{commit}}")],
+		&format!("could not resolve ref `{from}` to a commit"),
+	)
+}
+
+fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResult<Vec<String>> {
+	let output = run_git_capture(
+		root,
+		&["rev-list", "--first-parent", commit],
+		"failed to read first-parent commit ancestry",
+	)?;
+	Ok(output
+		.lines()
+		.map(str::to_string)
+		.filter(|line| !line.is_empty())
+		.collect())
+}
+
+fn read_git_commit_message(root: &Path, commit: &str) -> MonochangeResult<String> {
+	run_git_capture(
+		root,
+		&["show", "-s", "--format=%B", commit],
+		&format!("failed to read commit message for `{commit}`"),
+	)
+}
+
+fn run_git_capture(root: &Path, args: &[&str], error_message: &str) -> MonochangeResult<String> {
+	let output = ProcessCommand::new("git")
+		.current_dir(root)
+		.args(args)
+		.output()
+		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
+	if !output.status.success() {
+		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+		let detail = [error_message, stderr.as_str()]
+			.into_iter()
+			.filter(|part| !part.is_empty())
+			.collect::<Vec<_>>()
+			.join(": ");
+		return Err(MonochangeError::Discovery(detail));
+	}
+	Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn execute_matches(

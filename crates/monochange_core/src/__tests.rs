@@ -28,6 +28,7 @@ use crate::ReleaseNotesSection;
 use crate::ReleaseNotesSettings;
 use crate::ReleaseOwnerKind;
 use crate::ReleaseRecord;
+use crate::ReleaseRecordDiscovery;
 use crate::ReleaseRecordError;
 use crate::ReleaseRecordProvider;
 use crate::ReleaseRecordTarget;
@@ -1134,4 +1135,43 @@ fn parse_release_record_block_rejects_missing_closing_json_fence() {
 		.err()
 		.unwrap_or_else(|| panic!("expected missing closing fence error"));
 	assert!(matches!(error, ReleaseRecordError::MissingJsonBlock));
+}
+
+#[test]
+fn release_record_discovery_serializes_with_camel_case_keys() {
+	let discovery = ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: "abc1234567890".to_string(),
+		record_commit: "abc1234567890".to_string(),
+		distance: 0,
+		record: sample_release_record(),
+	};
+	let value = serde_json::to_value(&discovery)
+		.unwrap_or_else(|error| panic!("serialize release record discovery: {error}"));
+	let input_ref = value
+		.get("inputRef")
+		.unwrap_or_else(|| panic!("expected inputRef"));
+	assert_eq!(input_ref, "v1.2.3");
+	let resolved_commit = value
+		.get("resolvedCommit")
+		.unwrap_or_else(|| panic!("expected resolvedCommit"));
+	assert_eq!(resolved_commit, "abc1234567890");
+	let record_commit = value
+		.get("recordCommit")
+		.unwrap_or_else(|| panic!("expected recordCommit"));
+	assert_eq!(record_commit, "abc1234567890");
+	let distance = value
+		.get("distance")
+		.unwrap_or_else(|| panic!("expected distance"));
+	assert_eq!(distance, 0);
+	let record = value
+		.get("record")
+		.and_then(serde_json::Value::as_object)
+		.unwrap_or_else(|| panic!("expected record object"));
+	assert_eq!(
+		record
+			.get("kind")
+			.unwrap_or_else(|| panic!("expected record.kind")),
+		RELEASE_RECORD_KIND
+	);
 }

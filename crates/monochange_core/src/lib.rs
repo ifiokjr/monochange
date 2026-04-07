@@ -1346,6 +1346,16 @@ pub struct ReleaseRecord {
 	pub provider: Option<ReleaseRecordProvider>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseRecordDiscovery {
+	pub input_ref: String,
+	pub resolved_commit: String,
+	pub record_commit: String,
+	pub distance: usize,
+	pub record: ReleaseRecord,
+}
+
 #[derive(Debug, Error)]
 pub enum ReleaseRecordError {
 	#[error("no MonoChange release record block found")]
