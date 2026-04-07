@@ -202,7 +202,13 @@ changelog = "{{ pkg.changelog }}"
 #   packages — list of [package.*] ids that belong to this group
 #
 # Optional fields:
-#   changelog               — path or table for the group-level changelog
+#   changelog               — path or table for the group-level changelog;
+#                             tables may also set `include = "all"`,
+#                             `include = "group-only"`, or
+#                             `include = ["package-id"]` to control which
+#                             member-targeted changesets appear in the group
+#                             changelog (direct group-targeted changesets are
+#                             always included; default: "all")
 #   extra_changelog_sections — custom changelog sections with type routing
 #   empty_update_message    — fallback text when the group bumps but a
 #                             specific member has no direct changeset entries
@@ -229,6 +235,9 @@ packages = [{{ package_ids_toml }}]
 tag = true
 release = true
 version_format = "primary"
+# [group.main.changelog]
+# path = "changelog.md"
+# include = ["package-id"]
 {% endif %}
 
 # =============================================================================

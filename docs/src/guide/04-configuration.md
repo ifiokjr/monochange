@@ -152,6 +152,21 @@ Rules:
 - group `tag`, `release`, and `version_format` override member package release identity
 - package changelogs and package `versioned_files` still apply when grouped
 - grouped packages can customize fallback changelog entries with `empty_update_message` when no direct package notes are present
+- `[group.<id>.changelog].include` can filter which member-targeted changesets appear in the group changelog without changing release planning or package changelogs
+
+For grouped changelog filtering, use the changelog table form:
+
+```toml
+[group.sdk.changelog]
+path = "docs/sdk-changelog.md"
+include = ["sdk-cli"]
+```
+
+`include` accepts:
+
+- `"all"` — include direct group-targeted changesets and all member-targeted changesets (default)
+- `"group-only"` — include only direct group-targeted changesets
+- `[]` or `["package-id", ...]` — include direct group-targeted changesets plus member-targeted changesets only when every target in that group is listed
 
 ## Versioned files
 
