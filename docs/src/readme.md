@@ -15,6 +15,8 @@ The current milestone focuses on:
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
+- inspect durable release records from tags or descendant commits with `mc release-record`
+- repair a recent source/provider release by retargeting its release tags with `mc repair-release`
 - inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
 - apply Rust semver evidence when provided
 - expose built-in assistant setup guidance with `mc assist` and a stdio MCP server with `mc mcp`
@@ -32,6 +34,8 @@ MonoChange can promote one prepared release into several source-provider automat
 - `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
+- `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
+- `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
 - `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
 - `mc diagnostics --format json` shows all discovered changeset context or restricts to explicit inputs

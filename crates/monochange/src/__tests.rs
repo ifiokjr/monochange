@@ -1504,11 +1504,53 @@ fn configuration_guide_calls_out_current_implementation_limits() {
 		"`[ecosystems.*].enabled/roots/exclude`",
 		"`package_overrides.changelog`",
 		"`PrepareRelease`",
+		"`RetargetRelease`",
 		"`Command`",
 	] {
 		assert!(
 			content.contains(expected),
 			"configuration guide missing `{expected}`"
+		);
+	}
+}
+
+#[test]
+fn repairable_releases_guide_distinguishes_manifest_and_release_record() {
+	let guide = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../docs/src/guide/12-repairable-releases.md");
+	let content = fs::read_to_string(guide)
+		.unwrap_or_else(|error| panic!("repairable releases guide: {error}"));
+
+	for expected in [
+		"manifest = \"what MonoChange is preparing right now\"",
+		"release record = \"what this release commit historically declared\"",
+		"`ReleaseRecord` does **not** replace `RenderReleaseManifest`",
+		"mc release-record --from v1.2.3",
+		"mc repair-release --from v1.2.3 --target HEAD --dry-run",
+		"Prefer publishing a new patch release",
+	] {
+		assert!(
+			content.contains(expected),
+			"repairable releases guide missing `{expected}`"
+		);
+	}
+}
+
+#[test]
+fn github_automation_guide_mentions_release_repair_and_dry_run() {
+	let guide =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/guide/08-github-automation.md");
+	let content = fs::read_to_string(guide)
+		.unwrap_or_else(|error| panic!("github automation guide: {error}"));
+
+	for expected in [
+		"mc release-record --from v1.2.3",
+		"mc repair-release --from v1.2.3 --target HEAD --dry-run",
+		"Use `--dry-run` first for `repair-release`",
+	] {
+		assert!(
+			content.contains(expected),
+			"github automation guide missing `{expected}`"
 		);
 	}
 }

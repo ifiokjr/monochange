@@ -27,6 +27,27 @@ mc affected --format json --changed-paths crates/monochange/src/lib.rs
 
 <!-- {/githubAutomationWorkflowCommands} -->
 
+## Inspecting and repairing a recent release
+
+GitHub automation now has a repair-oriented history flow in addition to the existing manifest-driven execution flow.
+
+Use these commands when you need to inspect or repair a just-created release:
+
+```bash
+mc release-record --from v1.2.3
+mc repair-release --from v1.2.3 --target HEAD --dry-run
+mc repair-release --from v1.2.3 --target HEAD
+```
+
+The important distinction is:
+
+- `RenderReleaseManifest` still describes the execution-time release plan for automation
+- `ReleaseRecord` describes the durable release declaration stored in the release commit body
+
+Use `--dry-run` first for `repair-release`. It is a destructive workflow because it retargets release tags.
+
+If immutable registry artifacts have already been published, prefer cutting a new patch release instead of retargeting the source release.
+
 ## Release notes, GitHub releases, and release PRs
 
 <!-- {=githubAutomationReleaseConfigExample} -->
@@ -193,6 +214,8 @@ MonoChange now includes a release workflow modeled after the latest `mdt` patter
 - `.github/workflows/npm-publish.yml` runs after a successful release workflow, downloads those exact release assets, repackages them into `@monochange/cli` platform packages plus the `@monochange/cli` root package, and publishes `@monochange/skill`
 
 That split keeps npm publication tied to the exact binaries shipped in the GitHub release instead of rebuilding them separately.
+
+For release repair, GitHub is also the first provider with hosted-release retarget sync support. MonoChange uses the durable release record plus tag names from that record to keep the hosted release view aligned with moved tags.
 
 ## GitHub Actions policy workflow
 

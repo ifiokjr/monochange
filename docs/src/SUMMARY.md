@@ -15,3 +15,4 @@
 - [Assistant setup and MCP](guide/09-assistant-setup.md)
 - [Migrating from knope](guide/10-migrating-from-knope.md)
 - [Diagnostics](guide/11-diagnostics.md)
+- [Repairable releases](guide/12-repairable-releases.md)

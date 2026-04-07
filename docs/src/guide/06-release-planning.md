@@ -77,6 +77,21 @@ Validate before planning:
 mc validate
 ```
 
+## Release manifests vs release records
+
+Release planning and release repair use two different artifacts on purpose.
+
+- `RenderReleaseManifest` captures **what MonoChange is preparing right now** during command execution.
+- `ReleaseRecord` captures **what a release commit historically declared** inside the MonoChange-managed release commit body.
+
+Use the manifest when you want execution-time automation such as CI artifacts, MCP/server responses, previews, or downstream machine-readable release data.
+
+Use the release record when you want to rediscover or repair a release later from a tag or descendant commit.
+
+That is why `ReleaseRecord` does not replace `RenderReleaseManifest`: one is an execution-time automation artifact, the other is a durable git-history artifact.
+
+When you need to inspect or repair a recent release, see [Repairable releases](./12-repairable-releases.md).
+
 Generate a plan directly when you want to inspect the raw planner output:
 
 <!-- {=projectPlanCommand} -->
