@@ -52,9 +52,27 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("assist"));
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
+	assert!(output.contains("commit-release"));
 	assert!(output.contains("diagnostics"));
 	assert!(output.contains("repair-release"));
 	assert!(output.contains("release-record"));
+}
+
+#[test]
+fn commit_release_help_describes_local_commit_workflow() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("commit-release"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("commit-release help: {error}"));
+
+	assert!(output.contains("Prepare a release and create a local release commit"));
+	assert!(output.contains("mc commit-release --dry-run --format json"));
+	assert!(output.contains("Embeds a durable release record block in the commit body"));
 }
 
 #[test]
@@ -2093,7 +2111,7 @@ fn build_release_commit_message_includes_release_record_body() {
 	let source = sample_source_configuration_for_release_commit();
 	let manifest = sample_release_manifest_for_commit_message(true, true);
 
-	let commit_message = crate::build_release_commit_message(&source, &manifest);
+	let commit_message = crate::build_release_commit_message(Some(&source), &manifest);
 	assert_eq!(commit_message.subject, "chore(release): prepare release");
 	let body = commit_message
 		.body
@@ -2113,9 +2131,21 @@ fn render_release_commit_body_omits_release_targets_when_empty() {
 	let mut manifest = sample_release_manifest_for_commit_message(false, false);
 	manifest.release_targets.clear();
 
-	let body = crate::render_release_commit_body(&source, &manifest);
+	let body = crate::render_release_commit_body(Some(&source), &manifest);
 	assert!(!body.contains("- release targets:"));
 	assert!(body.contains("- released packages: monochange, monochange_core"));
+}
+
+#[test]
+fn build_release_commit_message_uses_default_title_without_source() {
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+
+	let commit_message = crate::build_release_commit_message(None, &manifest);
+	assert_eq!(commit_message.subject, "chore(release): prepare release");
+	assert!(commit_message
+		.body
+		.as_deref()
+		.is_some_and(|body| body.contains("## MonoChange Release Record")));
 }
 
 #[test]
@@ -2123,7 +2153,7 @@ fn render_release_commit_body_omits_empty_optional_sections() {
 	let source = sample_source_configuration_for_release_commit();
 	let manifest = sample_release_manifest_for_commit_message(false, false);
 
-	let body = crate::render_release_commit_body(&source, &manifest);
+	let body = crate::render_release_commit_body(Some(&source), &manifest);
 	assert!(body.contains("Prepare release."));
 	assert!(body.contains("- release targets: sdk (1.2.3)"));
 	assert!(body.contains("- released packages: monochange, monochange_core"));
@@ -2309,6 +2339,72 @@ fn text_release_record_discovery_omits_empty_sections() {
 }
 
 #[test]
+fn commit_release_command_creates_local_commit_with_release_record() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	copy_fixture("monochange/release-base", root);
+	copy_fixture("monochange/commit-release", root);
+	init_git_repo(root);
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+
+	let output = run_cli(
+		root,
+		[OsString::from("mc"), OsString::from("commit-release")],
+	)
+	.unwrap_or_else(|error| panic!("commit-release output: {error}"));
+	let commit_subject = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%s"]);
+	let commit_body = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%B"]);
+	let status = git_output_in_temp_repo(root, &["status", "--short"]);
+
+	assert!(output.contains("release commit:"));
+	assert!(output.contains("status: completed"));
+	assert_eq!(commit_subject, "chore(release): prepare release");
+	assert!(commit_body.contains("## MonoChange Release Record"));
+	assert!(commit_body.contains("\"command\": \"commit-release\""));
+	assert!(
+		status.is_empty(),
+		"expected clean working tree, got: {status}"
+	);
+}
+
+#[test]
+fn commit_release_command_reports_json_output() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	copy_fixture("monochange/release-base", root);
+	copy_fixture("monochange/commit-release", root);
+
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("commit-release"),
+			OsString::from("--format"),
+			OsString::from("json"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("commit-release json output: {error}"));
+	let value: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
+	assert_eq!(
+		value.pointer("/releaseCommit/subject"),
+		Some(&serde_json::Value::String(
+			"chore(release): prepare release".to_string()
+		))
+	);
+	assert_eq!(
+		value.pointer("/releaseCommit/status"),
+		Some(&serde_json::Value::String("dry_run".to_string()))
+	);
+	assert_eq!(
+		value.pointer("/manifest/command"),
+		Some(&serde_json::Value::String("commit-release".to_string()))
+	);
+}
+
+#[test]
 fn repair_release_command_dry_run_reports_text_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2443,6 +2539,45 @@ fn repair_release_command_rejects_non_descendant_targets_without_force() {
 }
 
 #[test]
+fn template_context_exposes_release_commit_namespace() {
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		release_manifest_path: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: Some(crate::CommitReleaseReport {
+			subject: "chore(release): prepare release".to_string(),
+			body: "Prepare release.".to_string(),
+			commit: Some("abc1234567890".to_string()),
+			tracked_paths: vec![PathBuf::from("Cargo.toml")],
+			dry_run: false,
+			status: "completed".to_string(),
+		}),
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	assert_eq!(
+		template_context
+			.get("release_commit")
+			.and_then(|value| value.pointer("/commit"))
+			.and_then(serde_json::Value::as_str),
+		Some("abc1234567890")
+	);
+}
+
+#[test]
 fn template_context_exposes_retarget_namespace() {
 	let context = CliContext {
 		root: PathBuf::from("."),
@@ -2455,6 +2590,7 @@ fn template_context_exposes_retarget_namespace() {
 		release_results: Vec::new(),
 		release_request: None,
 		release_request_result: None,
+		release_commit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -2492,6 +2628,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 		release_results: Vec::new(),
 		release_request: None,
 		release_request_result: None,
+		release_commit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3334,6 +3471,45 @@ fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
 	assert!(error
 		.to_string()
 		.contains("provider sync is not yet supported for gitlab release retargeting"));
+}
+
+#[test]
+fn execute_cli_command_commit_release_requires_prepare_release() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "commit-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::CommitRelease {
+			inputs: BTreeMap::new(),
+		}],
+	};
+
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing PrepareRelease error"));
+	assert!(error
+		.to_string()
+		.contains("`CommitRelease` requires a previous `PrepareRelease` step"));
+}
+
+#[test]
+fn git_stage_paths_reports_git_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let error = crate::git_stage_paths(tempdir.path(), &[PathBuf::from("release.txt")])
+		.err()
+		.unwrap_or_else(|| panic!("expected git stage failure"));
+	assert!(error
+		.to_string()
+		.contains("failed to stage release commit files"));
 }
 
 #[test]

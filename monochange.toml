@@ -453,6 +453,7 @@ ignored_paths = [
 #   Discover             — discover packages across ecosystems
 #   CreateChangeFile     — create a .changeset/*.md file
 #   PrepareRelease       — compute release plan, update versions, changelogs
+#   CommitRelease        — create a local release commit (requires PrepareRelease)
 #   RenderReleaseManifest — write release-manifest.json (requires PrepareRelease)
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
@@ -550,6 +551,21 @@ default = "text"
 [[cli.release.steps]]
 type = "PrepareRelease"
 
+[cli.commit-release]
+help_text = "Prepare a release and create a local release commit"
+
+[[cli.commit-release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.commit-release.steps]]
+type = "PrepareRelease"
+
+[[cli.commit-release.steps]]
+type = "CommitRelease"
+
 [cli.release-manifest]
 help_text = "Prepare a release and write a stable JSON manifest"
 
@@ -589,6 +605,9 @@ default = "text"
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
+
+[[cli.release-pr.steps]]
+type = "CommitRelease"
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"

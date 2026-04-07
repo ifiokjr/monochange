@@ -358,6 +358,17 @@ struct RetargetReleaseReport {
 	status: String,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommitReleaseReport {
+	subject: String,
+	body: String,
+	commit: Option<String>,
+	tracked_paths: Vec<PathBuf>,
+	dry_run: bool,
+	status: String,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct CliContext {
 	root: PathBuf,
@@ -370,6 +381,7 @@ struct CliContext {
 	release_results: Vec<String>,
 	release_request: Option<SourceChangeRequest>,
 	release_request_result: Option<String>,
+	release_commit_report: Option<CommitReleaseReport>,
 	issue_comment_plans: Vec<github_provider::GitHubIssueCommentPlan>,
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
@@ -575,6 +587,16 @@ Planning reminders:
   - Direct package changes propagate to dependents using defaults.parent_bump.
   - Group synchronization happens before final output is rendered.
   - Explicit versions on grouped members propagate to the whole group.",
+		),
+		"commit-release" => Some(
+			r"Examples:
+  mc commit-release --dry-run --format json
+  mc commit-release
+
+Commit notes:
+  - Reuses the standard MonoChange release commit subject/body contract.
+  - Embeds a durable release record block in the commit body.
+  - Can run before OpenReleaseRequest in the same workflow.",
 		),
 		"affected" => Some(
 			r"Examples:
@@ -1274,6 +1296,7 @@ fn resolve_git_commit_ref(root: &Path, from: &str) -> MonochangeResult<String> {
 	)
 }
 
+#[rustfmt::skip]
 fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResult<Vec<String>> {
 	let output = run_git_capture(
 		root,
@@ -1315,6 +1338,52 @@ fn run_git_capture(root: &Path, args: &[&str], error_message: &str) -> Monochang
 
 fn run_git_status(root: &Path, args: &[&str], error_message: &str) -> MonochangeResult<()> {
 	run_git_capture(root, args, error_message).map(|_| ())
+}
+
+fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
+	let mut command = ProcessCommand::new("git");
+	command.current_dir(root).arg("add").arg("-A").arg("--");
+	for path in tracked_paths {
+		command.arg(path);
+	}
+	run_git_process(command, "failed to stage release commit files")
+}
+
+fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
+	let mut command = ProcessCommand::new("git");
+	command
+		.current_dir(root)
+		.arg("commit")
+		.arg("--message")
+		.arg(&message.subject);
+	if let Some(body) = &message.body {
+		command.arg("--message").arg(body);
+	}
+	run_git_process(command, "failed to create release commit")
+}
+
+fn git_head_commit(root: &Path) -> MonochangeResult<String> {
+	run_git_capture(
+		root,
+		&["rev-parse", "HEAD"],
+		"failed to read release commit sha",
+	)
+}
+
+fn run_git_process(mut command: ProcessCommand, error_message: &str) -> MonochangeResult<()> {
+	let output = command
+		.output()
+		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
+	if !output.status.success() {
+		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+		let detail = [error_message, stderr.as_str()]
+			.into_iter()
+			.filter(|part| !part.is_empty())
+			.collect::<Vec<_>>()
+			.join(": ");
+		return Err(MonochangeError::Discovery(detail));
+	}
+	Ok(())
 }
 
 fn execute_matches(
@@ -1495,6 +1564,7 @@ fn execute_cli_command(
 		release_results: Vec::new(),
 		release_request: None,
 		release_request_result: None,
+		release_commit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -1680,6 +1750,19 @@ fn execute_cli_command(
 							})
 							.collect();
 				}
+				output = None;
+			}
+			CliStepDefinition::CommitRelease { .. } => {
+				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+					MonochangeError::Config(
+						"`CommitRelease` requires a previous `PrepareRelease` step".to_string(),
+					)
+				})?;
+				let manifest =
+					build_release_manifest(cli_command, prepared_release, &context.command_logs);
+				#[rustfmt::skip]
+				let release_commit_report = commit_release(root, &context, configuration.source.as_ref(), &manifest)?;
+				context.release_commit_report = Some(release_commit_report);
 				output = None;
 			}
 			CliStepDefinition::OpenReleaseRequest { .. } => {
@@ -1871,6 +1954,7 @@ fn execute_cli_command(
 					&context.release_requests,
 					context.release_request.as_ref(),
 					&context.issue_comment_plans,
+					context.release_commit_report.as_ref(),
 				)
 			}
 			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
@@ -2140,6 +2224,14 @@ fn build_cli_template_context(
 		);
 	}
 
+	// Structured release_commit.* namespace
+	if let Some(report) = &context.release_commit_report {
+		template_context.insert(
+			"release_commit".to_string(),
+			build_release_commit_template_value(report),
+		);
+	}
+
 	// Structured steps.<id>.* namespace from command step outputs
 	if !context.step_outputs.is_empty() {
 		let mut steps_map = serde_json::Map::new();
@@ -2289,6 +2381,10 @@ fn build_retarget_template_value(report: &RetargetReleaseReport) -> serde_json::
 	serde_json::to_value(report).unwrap_or(serde_json::Value::Null)
 }
 
+fn build_release_commit_template_value(report: &CommitReleaseReport) -> serde_json::Value {
+	serde_json::to_value(report).unwrap_or(serde_json::Value::Null)
+}
+
 fn parse_boolean_step_input(
 	inputs: &BTreeMap<String, Vec<String>>,
 	name: &str,
@@ -2361,6 +2457,19 @@ fn build_retarget_release_report(
 			"completed".to_string()
 		},
 	}
+}
+
+fn render_release_commit_report(report: &CommitReleaseReport) -> Vec<String> {
+	let mut lines = vec!["release commit:".to_string()];
+	lines.push(format!("  subject: {}", report.subject));
+	if let Some(commit) = &report.commit {
+		lines.push(format!("  commit: {}", short_commit_sha(commit)));
+	}
+	lines.extend((!report.tracked_paths.is_empty()).then_some("  tracked paths:".to_string()));
+	#[rustfmt::skip]
+	lines.extend(report.tracked_paths.iter().map(|path| format!("    - {}", path.display())));
+	lines.push(format!("  status: {}", report.status.replace('_', "-")));
+	lines
 }
 
 fn render_retarget_release_report(report: &RetargetReleaseReport) -> String {
@@ -2517,6 +2626,9 @@ fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliCo
 			for release in &context.release_results {
 				lines.push(format!("- {release}"));
 			}
+		}
+		if let Some(release_commit_report) = &context.release_commit_report {
+			lines.extend(render_release_commit_report(release_commit_report));
 		}
 		if let Some(release_request_result) = &context.release_request_result {
 			lines.push("release request:".to_string());
@@ -6226,16 +6338,22 @@ fn build_release_record(
 }
 
 fn build_release_commit_message(
-	source: &SourceConfiguration,
+	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
 ) -> CommitMessage {
 	CommitMessage {
-		subject: source.pull_requests.title.clone(),
+		subject: source.map_or_else(
+			|| monochange_core::ChangeRequestSettings::default().title,
+			|source| source.pull_requests.title.clone(),
+		),
 		body: Some(render_release_commit_body(source, manifest)),
 	}
 }
 
-fn render_release_commit_body(source: &SourceConfiguration, manifest: &ReleaseManifest) -> String {
+fn render_release_commit_body(
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+) -> String {
 	let mut lines = vec!["Prepare release.".to_string()];
 	if !manifest.release_targets.is_empty() {
 		lines.push(String::new());
@@ -6277,7 +6395,7 @@ fn render_release_commit_body(source: &SourceConfiguration, manifest: &ReleaseMa
 				.join(", ")
 		));
 	}
-	let release_record = build_release_record(Some(source), manifest);
+	let release_record = build_release_record(source, manifest);
 	let release_record_block = render_release_record_block(&release_record)
 		.unwrap_or_else(|error| panic!("release record generation bug: {error}"));
 	format!("{}\n\n{}", lines.join("\n"), release_record_block)
@@ -6314,7 +6432,7 @@ fn build_source_change_request(
 			gitea_provider::build_release_pull_request_request(source, manifest)
 		}
 	};
-	request.commit_message = build_release_commit_message(source, manifest);
+	request.commit_message = build_release_commit_message(Some(source), manifest);
 	request
 }
 
@@ -6367,17 +6485,53 @@ fn render_release_cli_command_json(
 	releases: &[SourceReleaseRequest],
 	release_request: Option<&SourceChangeRequest>,
 	issue_comments: &[github_provider::GitHubIssueCommentPlan],
+	release_commit: Option<&CommitReleaseReport>,
 ) -> MonochangeResult<String> {
-	if releases.is_empty() && release_request.is_none() && issue_comments.is_empty() {
+	if releases.is_empty()
+		&& release_request.is_none()
+		&& issue_comments.is_empty()
+		&& release_commit.is_none()
+	{
 		return render_release_manifest_json(manifest);
 	}
 	serde_json::to_string_pretty(&json!({
 		"manifest": manifest,
+		"releaseCommit": release_commit,
 		"releases": releases,
 		"releaseRequest": release_request,
 		"issueComments": issue_comments,
 	}))
 	.map_err(|error| MonochangeError::Discovery(error.to_string()))
+}
+
+fn commit_release(
+	root: &Path,
+	context: &CliContext,
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<CommitReleaseReport> {
+	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
+	let message = build_release_commit_message(source, manifest);
+	if !context.dry_run {
+		git_stage_paths(root, &tracked_paths)?;
+		git_commit_paths(root, &message)?;
+	}
+	Ok(CommitReleaseReport {
+		subject: message.subject,
+		body: message.body.unwrap_or_default(),
+		commit: if context.dry_run {
+			None
+		} else {
+			Some(git_head_commit(root)?)
+		},
+		tracked_paths,
+		dry_run: context.dry_run,
+		status: if context.dry_run {
+			"dry_run".to_string()
+		} else {
+			"completed".to_string()
+		},
+	})
 }
 
 fn tracked_release_pull_request_paths(

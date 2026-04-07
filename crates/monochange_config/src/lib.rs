@@ -2482,6 +2482,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::Discover { .. }
 				| CliStepDefinition::CreateChangeFile { .. }
 				| CliStepDefinition::PrepareRelease { .. }
+				| CliStepDefinition::CommitRelease { .. }
 				| CliStepDefinition::PublishRelease { .. }
 				| CliStepDefinition::OpenReleaseRequest { .. }
 				| CliStepDefinition::CommentReleasedIssues { .. }
