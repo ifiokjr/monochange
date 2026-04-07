@@ -2,6 +2,9 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 
+use httpmock::Method::GET;
+use httpmock::Method::PATCH;
+use httpmock::MockServer;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
 use monochange_core::Ecosystem;
@@ -2220,6 +2223,670 @@ fn text_release_record_discovery_omits_empty_sections() {
 }
 
 #[test]
+fn plan_release_retarget_collects_tag_and_provider_updates() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	fs::write(root.join("release.txt"), "second\n")
+		.unwrap_or_else(|error| panic!("write second release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "second"]);
+
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD~1"]);
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit: record_commit.clone(),
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+	let source = sample_github_source_configuration("https://example.com");
+
+	let plan =
+		crate::plan_release_retarget(root, &discovery, "HEAD", false, true, true, Some(&source))
+			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
+
+	assert!(plan.is_descendant);
+	assert_eq!(plan.git_tag_updates.len(), 1);
+	assert_eq!(plan.git_tag_updates[0].tag_name, "v1.2.3");
+	assert_eq!(
+		plan.git_tag_updates[0].operation,
+		monochange_core::RetargetOperation::Planned
+	);
+	assert_eq!(plan.provider_updates.len(), 1);
+	assert_eq!(
+		plan.provider_updates[0].operation,
+		monochange_core::RetargetProviderOperation::Planned
+	);
+}
+
+#[test]
+fn plan_release_retarget_rejects_non_descendant_without_force() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let main_branch = git_output_in_temp_repo(root, &["branch", "--show-current"]);
+	let base_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	fs::write(root.join("release.txt"), "second\n")
+		.unwrap_or_else(|error| panic!("write second release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "second"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["checkout", &base_commit]);
+	fs::write(root.join("release.txt"), "branch\n")
+		.unwrap_or_else(|error| panic!("write branch release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "branch"]);
+	let branch_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["checkout", &main_branch]);
+	assert_ne!(record_commit, branch_commit);
+
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: record_commit.clone(),
+		resolved_commit: record_commit.clone(),
+		record_commit: record_commit.clone(),
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+
+	let error =
+		crate::plan_release_retarget(root, &discovery, &branch_commit, false, false, true, None)
+			.err()
+			.unwrap_or_else(|| panic!("expected non-descendant error"));
+	assert!(error
+		.to_string()
+		.contains("is not a descendant of release-record commit"));
+}
+
+#[test]
+fn execute_release_retarget_moves_tags_and_pushes_origin_refs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let remote = tempdir.path().join("remote.git");
+	git_in_dir(
+		tempdir.path(),
+		&["init", "--bare", remote.to_str().unwrap_or("remote.git")],
+	);
+
+	let repo = tempdir.path().join("repo");
+	fs::create_dir_all(&repo).unwrap_or_else(|error| panic!("create repo dir: {error}"));
+	init_git_repo(&repo);
+	git_in_temp_repo(
+		&repo,
+		&[
+			"remote",
+			"add",
+			"origin",
+			remote.to_str().unwrap_or("remote.git"),
+		],
+	);
+	fs::write(repo.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(&repo, &["add", "release.txt"]);
+	git_in_temp_repo(&repo, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(&repo, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(&repo, &["tag", "v1.2.3"]);
+	git_in_temp_repo(
+		&repo,
+		&[
+			"push",
+			"origin",
+			"HEAD",
+			"refs/tags/v1.2.3:refs/tags/v1.2.3",
+		],
+	);
+	fs::write(repo.join("release.txt"), "second\n")
+		.unwrap_or_else(|error| panic!("write second release file: {error}"));
+	git_in_temp_repo(&repo, &["add", "release.txt"]);
+	git_in_temp_repo(&repo, &["commit", "-m", "second"]);
+
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+	let plan = crate::plan_release_retarget(&repo, &discovery, "HEAD", false, false, false, None)
+		.unwrap_or_else(|error| panic!("plan retarget: {error}"));
+
+	let result = crate::execute_release_retarget(&repo, None, &plan)
+		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
+	let head = git_output_in_temp_repo(&repo, &["rev-parse", "HEAD"]);
+	let local_tag = git_output_in_temp_repo(&repo, &["rev-parse", "refs/tags/v1.2.3^{commit}"]);
+	let remote_tag = git_output_in_git_dir(&remote, &["rev-parse", "refs/tags/v1.2.3^{commit}"]);
+
+	assert_eq!(
+		result.git_tag_results[0].operation,
+		monochange_core::RetargetOperation::Moved
+	);
+	assert_eq!(local_tag, head);
+	assert_eq!(remote_tag, head);
+}
+
+#[test]
+fn retarget_release_reports_missing_tags() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: record_commit.clone(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+
+	let error = crate::retarget_release(root, &discovery, "HEAD", false, false, true, None)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing tag error"));
+	assert!(error
+		.to_string()
+		.contains("release tag v1.2.3 could not be found"));
+}
+
+#[test]
+fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit: record_commit.clone(),
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+
+	let plan =
+		crate::plan_release_retarget(root, &discovery, &record_commit, false, false, false, None)
+			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
+	assert_eq!(
+		plan.git_tag_updates
+			.first()
+			.unwrap_or_else(|| panic!("expected git tag update"))
+			.operation,
+		monochange_core::RetargetOperation::AlreadyUpToDate
+	);
+
+	let result = crate::execute_release_retarget(root, None, &plan)
+		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
+	assert_eq!(
+		result
+			.git_tag_results
+			.first()
+			.unwrap_or_else(|| panic!("expected git tag result"))
+			.operation,
+		monochange_core::RetargetOperation::AlreadyUpToDate
+	);
+}
+
+#[test]
+fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	let mut record = sample_release_record_for_retarget();
+	record.provider = Some(monochange_core::ReleaseRecordProvider {
+		kind: monochange_core::SourceProvider::GitLab,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		host: None,
+	});
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record,
+	};
+	let source = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::GitLab,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	};
+
+	let plan =
+		crate::plan_release_retarget(root, &discovery, "HEAD", false, true, true, Some(&source))
+			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
+	let provider_update = plan
+		.provider_updates
+		.first()
+		.unwrap_or_else(|| panic!("expected provider update"));
+	assert_eq!(
+		provider_update.operation,
+		monochange_core::RetargetProviderOperation::Unsupported
+	);
+	assert!(provider_update
+		.message
+		.as_deref()
+		.unwrap_or("")
+		.contains("gitlab"));
+
+	let result = crate::execute_release_retarget(root, Some(&source), &plan)
+		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
+	assert_eq!(
+		result
+			.provider_results
+			.first()
+			.unwrap_or_else(|| panic!("expected provider result"))
+			.operation,
+		monochange_core::RetargetProviderOperation::Unsupported
+	);
+}
+
+#[test]
+fn execute_release_retarget_returns_empty_provider_results_without_source() {
+	let plan = monochange_core::RetargetPlan {
+		record_commit: "abc1234".to_string(),
+		target_commit: "def5678".to_string(),
+		is_descendant: true,
+		force: false,
+		git_tag_updates: Vec::new(),
+		provider_updates: vec![monochange_core::RetargetProviderResult {
+			provider: monochange_core::SourceProvider::GitHub,
+			tag_name: "v1.2.3".to_string(),
+			target_commit: "def5678".to_string(),
+			operation: monochange_core::RetargetProviderOperation::Planned,
+			url: None,
+			message: None,
+		}],
+		sync_provider: true,
+		dry_run: false,
+	};
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let result = crate::execute_release_retarget(tempdir.path(), None, &plan)
+		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
+	assert!(result.provider_results.is_empty());
+}
+
+#[test]
+fn plan_release_retarget_rejects_provider_kind_mismatches() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+	let source = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::GitLab,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	};
+
+	let error =
+		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
+			.err()
+			.unwrap_or_else(|| panic!("expected provider mismatch error"));
+	assert!(error
+		.to_string()
+		.contains("does not match configured source provider"));
+}
+
+#[test]
+fn plan_release_retarget_rejects_repository_mismatches() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	let mut record = sample_release_record_for_retarget();
+	record.provider = Some(monochange_core::ReleaseRecordProvider {
+		kind: monochange_core::SourceProvider::GitHub,
+		owner: "other".to_string(),
+		repo: "repo".to_string(),
+		host: None,
+	});
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record,
+	};
+	let source = sample_github_source_configuration("https://example.com");
+
+	let error =
+		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
+			.err()
+			.unwrap_or_else(|| panic!("expected repository mismatch error"));
+	assert!(error
+		.to_string()
+		.contains("does not match configured source repository"));
+}
+
+#[test]
+fn plan_release_retarget_skips_provider_updates_when_no_provider_is_available() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	let mut record = sample_release_record_for_retarget();
+	record.provider = None;
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record,
+	};
+	let plan = crate::plan_release_retarget(root, &discovery, "HEAD", false, true, true, None)
+		.unwrap_or_else(|error| panic!("plan retarget: {error}"));
+	assert!(plan.provider_updates.is_empty());
+}
+
+#[test]
+fn plan_release_retarget_accepts_missing_record_provider_with_configured_source() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	let mut record = sample_release_record_for_retarget();
+	record.provider = None;
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record,
+	};
+	let source = sample_github_source_configuration("https://example.com");
+	let plan =
+		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
+			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
+	assert_eq!(plan.git_tag_updates.len(), 1);
+}
+
+#[test]
+fn execute_release_retarget_delegates_github_provider_sync() {
+	let server = MockServer::start();
+	let release_lookup = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}");
+	});
+	let update_release = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/releases/42")
+			.json_body_obj(&serde_json::json!({ "target_commitish": "def5678" }));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"html_url\":\"https://example.com/releases/42\"}");
+	});
+	let source = sample_github_source_configuration(&server.base_url());
+	let plan = monochange_core::RetargetPlan {
+		record_commit: "abc1234".to_string(),
+		target_commit: "def5678".to_string(),
+		is_descendant: true,
+		force: false,
+		git_tag_updates: vec![monochange_core::RetargetTagResult {
+			tag_name: "v1.2.3".to_string(),
+			from_commit: "def5678".to_string(),
+			to_commit: "def5678".to_string(),
+			operation: monochange_core::RetargetOperation::AlreadyUpToDate,
+			message: None,
+		}],
+		provider_updates: vec![monochange_core::RetargetProviderResult {
+			provider: monochange_core::SourceProvider::GitHub,
+			tag_name: "v1.2.3".to_string(),
+			target_commit: "def5678".to_string(),
+			operation: monochange_core::RetargetProviderOperation::Planned,
+			url: None,
+			message: None,
+		}],
+		sync_provider: true,
+		dry_run: false,
+	};
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let result = temp_env::with_var("GITHUB_TOKEN", Some("token"), || {
+		crate::execute_release_retarget(tempdir.path(), Some(&source), &plan)
+	})
+	.unwrap_or_else(|error| panic!("execute retarget: {error}"));
+	assert_eq!(result.provider_results.len(), 1);
+	release_lookup.assert();
+	assert_eq!(update_release.calls(), 0);
+	assert_eq!(
+		result
+			.provider_results
+			.first()
+			.unwrap_or_else(|| panic!("expected provider result"))
+			.operation,
+		monochange_core::RetargetProviderOperation::AlreadyAligned
+	);
+}
+
+#[test]
+fn retarget_release_succeeds_end_to_end_without_provider_sync() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let remote = root.join("remote.git");
+	git_in_dir(
+		root,
+		&["init", "--bare", remote.to_str().unwrap_or("remote.git")],
+	);
+	let repo = root.join("repo");
+	fs::create_dir_all(&repo).unwrap_or_else(|error| panic!("create repo dir: {error}"));
+	init_git_repo(&repo);
+	git_in_temp_repo(
+		&repo,
+		&[
+			"remote",
+			"add",
+			"origin",
+			remote.to_str().unwrap_or("remote.git"),
+		],
+	);
+	fs::write(repo.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(&repo, &["add", "release.txt"]);
+	git_in_temp_repo(&repo, &["commit", "-m", "initial"]);
+	let record_commit = git_output_in_temp_repo(&repo, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(&repo, &["tag", "v1.2.3"]);
+	git_in_temp_repo(
+		&repo,
+		&[
+			"push",
+			"origin",
+			"HEAD",
+			"refs/tags/v1.2.3:refs/tags/v1.2.3",
+		],
+	);
+	fs::write(repo.join("release.txt"), "second\n")
+		.unwrap_or_else(|error| panic!("write second release file: {error}"));
+	git_in_temp_repo(&repo, &["add", "release.txt"]);
+	git_in_temp_repo(&repo, &["commit", "-m", "second"]);
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: record_commit.clone(),
+		record_commit,
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+	let result = crate::retarget_release(&repo, &discovery, "HEAD", false, false, false, None)
+		.unwrap_or_else(|error| panic!("retarget release: {error}"));
+	assert_eq!(result.git_tag_results.len(), 1);
+}
+
+#[test]
+fn git_is_ancestor_reports_git_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let error = crate::git_is_ancestor(tempdir.path(), "abc", "def")
+		.err()
+		.unwrap_or_else(|| panic!("expected git ancestry error"));
+	assert!(error.to_string().contains("discovery error"));
+}
+
+#[test]
+fn git_is_ancestor_reports_missing_worktree_directory_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let missing = tempdir.path().join("missing");
+	let error = crate::git_is_ancestor(&missing, "abc", "def")
+		.err()
+		.unwrap_or_else(|| panic!("expected git spawn error"));
+	assert!(error
+		.to_string()
+		.contains("failed to compare commit ancestry"));
+}
+
+#[test]
+fn sync_retargeted_provider_releases_reports_unsupported_provider_in_dry_run() {
+	let source = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::Gitea,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	};
+	let updates = vec![monochange_core::RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: monochange_core::RetargetOperation::Moved,
+		message: None,
+	}];
+	let results = crate::sync_retargeted_provider_releases(&source, &updates, true)
+		.unwrap_or_else(|error| panic!("expected dry-run provider results: {error}"));
+	assert_eq!(results.len(), 1);
+	assert_eq!(
+		results
+			.first()
+			.unwrap_or_else(|| panic!("expected provider result"))
+			.operation,
+		monochange_core::RetargetProviderOperation::Unsupported
+	);
+}
+
+#[test]
+fn sync_retargeted_provider_releases_rejects_unsupported_provider_in_real_mode() {
+	let source = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::Gitea,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	};
+	let updates = vec![monochange_core::RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: monochange_core::RetargetOperation::Moved,
+		message: None,
+	}];
+	let error = crate::sync_retargeted_provider_releases(&source, &updates, false)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported provider error"));
+	assert!(error.to_string().contains("gitea"));
+}
+
+#[test]
+fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
+	let plan = monochange_core::RetargetPlan {
+		record_commit: "abc1234".to_string(),
+		target_commit: "def5678".to_string(),
+		is_descendant: true,
+		force: false,
+		git_tag_updates: Vec::new(),
+		provider_updates: vec![monochange_core::RetargetProviderResult {
+			provider: monochange_core::SourceProvider::GitLab,
+			tag_name: "v1.2.3".to_string(),
+			target_commit: "def5678".to_string(),
+			operation: monochange_core::RetargetProviderOperation::Unsupported,
+			url: None,
+			message: Some(
+				"provider sync is not yet supported for gitlab release retargeting".to_string(),
+			),
+		}],
+		sync_provider: true,
+		dry_run: false,
+	};
+	let source = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::GitLab,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	};
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let error = crate::execute_release_retarget(tempdir.path(), Some(&source), &plan)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported provider error"));
+	assert!(error
+		.to_string()
+		.contains("provider sync is not yet supported for gitlab release retargeting"));
+}
+
+#[test]
 fn first_parent_commits_returns_head_then_ancestors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2241,6 +2908,80 @@ fn first_parent_commits_returns_head_then_ancestors() {
 		.unwrap_or_else(|error| panic!("first parent commits: {error}"));
 	assert_eq!(commits.first().map(String::as_str), Some(head.as_str()));
 	assert_eq!(commits.len(), 2);
+}
+
+fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
+	monochange_core::ReleaseRecord {
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
+		created_at: "2026-04-07T08:00:00Z".to_string(),
+		command: "release-pr".to_string(),
+		version: Some("1.2.3".to_string()),
+		group_version: Some("1.2.3".to_string()),
+		release_targets: vec![monochange_core::ReleaseRecordTarget {
+			id: "sdk".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Group,
+			version: "1.2.3".to_string(),
+			version_format: monochange_core::VersionFormat::Primary,
+			tag: true,
+			release: true,
+			tag_name: "v1.2.3".to_string(),
+			members: vec!["monochange".to_string()],
+		}],
+		released_packages: vec!["monochange".to_string()],
+		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
+		updated_changelogs: Vec::new(),
+		deleted_changesets: Vec::new(),
+		provider: Some(monochange_core::ReleaseRecordProvider {
+			kind: monochange_core::SourceProvider::GitHub,
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			host: None,
+		}),
+	}
+}
+
+fn sample_github_source_configuration(api_url: &str) -> monochange_core::SourceConfiguration {
+	monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::GitHub,
+		host: None,
+		api_url: Some(api_url.to_string()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	}
+}
+
+fn init_git_repo(root: &Path) {
+	git_in_temp_repo(root, &["init"]);
+	git_in_temp_repo(root, &["config", "user.name", "MonoChange Tests"]);
+	git_in_temp_repo(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);
+}
+
+fn git_in_dir(root: &Path, args: &[&str]) {
+	let status = std::process::Command::new("git")
+		.current_dir(root)
+		.args(args)
+		.status()
+		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+	assert!(status.success(), "git {args:?} failed");
+}
+
+fn git_output_in_git_dir(git_dir: &Path, args: &[&str]) -> String {
+	let output = std::process::Command::new("git")
+		.arg("--git-dir")
+		.arg(git_dir)
+		.args(args)
+		.output()
+		.unwrap_or_else(|error| panic!("git --git-dir {args:?}: {error}"));
+	assert!(output.status.success(), "git --git-dir {args:?} failed");
+	String::from_utf8(output.stdout)
+		.unwrap_or_else(|error| panic!("git output utf8: {error}"))
+		.trim()
+		.to_string()
 }
 
 fn git_in_temp_repo(root: &Path, args: &[&str]) {

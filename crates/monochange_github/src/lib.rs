@@ -113,6 +113,10 @@ use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::RetargetOperation;
+use monochange_core::RetargetProviderOperation;
+use monochange_core::RetargetProviderResult;
+use monochange_core::RetargetTagResult;
 use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOperation;
@@ -226,11 +230,18 @@ struct GitHubLabelsPayload<'a> {
 #[derive(Debug, Deserialize)]
 struct GitHubExistingRelease {
 	id: u64,
+	html_url: Option<String>,
+	target_commitish: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct GitHubReleaseResponse {
 	html_url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubReleaseRetargetPayload<'a> {
+	target_commitish: &'a str,
 }
 
 #[derive(Debug, Deserialize)]
@@ -844,6 +855,20 @@ pub fn publish_release_pull_request(
 	})
 }
 
+pub fn sync_retargeted_releases(
+	source: &SourceConfiguration,
+	tag_updates: &[RetargetTagResult],
+	dry_run: bool,
+) -> MonochangeResult<Vec<RetargetProviderResult>> {
+	let runtime = github_runtime()?;
+	runtime.block_on(async {
+		let client = github_client_from_env(source)?;
+		let outcomes =
+			sync_retargeted_releases_with_client(&client, source, tag_updates, dry_run).await?;
+		Ok(outcomes)
+	})
+}
+
 async fn publish_release_requests_with_client(
 	client: &Octocrab,
 	requests: &[GitHubReleaseRequest],
@@ -962,6 +987,72 @@ async fn publish_release_pull_request_with_client(
 		operation,
 		url: pull_request.html_url,
 	})
+}
+
+async fn sync_retargeted_releases_with_client(
+	client: &Octocrab,
+	source: &SourceConfiguration,
+	tag_updates: &[RetargetTagResult],
+	dry_run: bool,
+) -> MonochangeResult<Vec<RetargetProviderResult>> {
+	let mut results = Vec::with_capacity(tag_updates.len());
+	for update in tag_updates {
+		if dry_run {
+			results.push(RetargetProviderResult {
+				provider: SourceProvider::GitHub,
+				tag_name: update.tag_name.clone(),
+				target_commit: update.to_commit.clone(),
+				operation: RetargetProviderOperation::Planned,
+				url: None,
+				message: None,
+			});
+			continue;
+		}
+		let path = format!(
+			"/repos/{}/{}/releases/tags/{}",
+			source.owner, source.repo, update.tag_name
+		);
+		let Some(existing) = get_optional_json::<GitHubExistingRelease>(client, &path).await?
+		else {
+			return Err(MonochangeError::Config(format!(
+				"GitHub release for tag `{}` could not be found",
+				update.tag_name
+			)));
+		};
+		if existing.target_commitish.as_deref() == Some(update.to_commit.as_str())
+			|| update.operation == RetargetOperation::AlreadyUpToDate
+		{
+			results.push(RetargetProviderResult {
+				provider: SourceProvider::GitHub,
+				tag_name: update.tag_name.clone(),
+				target_commit: update.to_commit.clone(),
+				operation: RetargetProviderOperation::AlreadyAligned,
+				url: existing.html_url,
+				message: None,
+			});
+			continue;
+		}
+		let response = patch_json::<_, GitHubReleaseResponse>(
+			client,
+			&format!(
+				"/repos/{}/{}/releases/{}",
+				source.owner, source.repo, existing.id
+			),
+			&GitHubReleaseRetargetPayload {
+				target_commitish: &update.to_commit,
+			},
+		)
+		.await?;
+		results.push(RetargetProviderResult {
+			provider: SourceProvider::GitHub,
+			tag_name: update.tag_name.clone(),
+			target_commit: update.to_commit.clone(),
+			operation: RetargetProviderOperation::Synced,
+			url: response.html_url,
+			message: None,
+		});
+	}
+	Ok(results)
 }
 
 async fn lookup_existing_release_with_client(

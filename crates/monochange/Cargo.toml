@@ -44,10 +44,12 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros"], default-fe
 toml = { workspace = true, default-features = true }
 
 [dev-dependencies]
+httpmock = { workspace = true, default-features = true }
 insta = { workspace = true, default-features = true }
 insta-cmd = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
+temp-env = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 
 [lints]
