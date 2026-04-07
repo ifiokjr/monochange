@@ -33,6 +33,11 @@ use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
 
 #[test]
+fn workspace_defaults_default_has_no_extra_changelog_sections() {
+	assert!(WorkspaceDefaults::default().extra_changelog_sections.is_empty());
+}
+
+#[test]
 fn bump_severity_orders_from_none_to_major() {
 	assert!(BumpSeverity::Patch > BumpSeverity::None);
 	assert!(BumpSeverity::Minor > BumpSeverity::Patch);

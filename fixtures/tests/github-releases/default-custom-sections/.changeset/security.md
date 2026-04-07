@@ -1,9 +1,9 @@
 ---
-core: patch
-type:
-  core: security
+core:
+  bump: patch
+  type: security
 ---
 
-#### rotate signing keys
+# rotate signing keys
 
 Roll the signing key before the release window closes.
