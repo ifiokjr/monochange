@@ -351,7 +351,8 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 	});
 	let (_tempdir, repo) = seed_git_repository();
 	let source = sample_source(Some(format!("{}/api/v4", server.base_url())));
-	let request = build_release_pull_request_request(&source, &sample_manifest());
+	let mut request = build_release_pull_request_request(&source, &sample_manifest());
+	request.commit_message.body = Some("release body".to_string());
 
 	let outcome = with_gitlab_env(Some("token"), || {
 		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
@@ -367,6 +368,8 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 	)
 	.trim()
 	.is_empty());
+	let commit_body = git_output(&repo, &["log", "-1", "--pretty=%B"]);
+	assert!(commit_body.contains("release body"));
 }
 
 #[test]

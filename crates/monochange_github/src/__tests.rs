@@ -10,6 +10,7 @@ use monochange_core::BotSettings;
 use monochange_core::ChangeRequestSettings;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
+use monochange_core::CommitMessage;
 use monochange_core::GitHubReleaseNotesSource;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
@@ -323,7 +324,8 @@ fn build_release_pull_request_request_renders_branch_and_body() {
 	assert_eq!(request.base_branch, "develop");
 	assert_eq!(request.head_branch, "automation/release/release");
 	assert_eq!(request.title, "chore(release): prepare release");
-	assert_eq!(request.commit_message, request.title);
+	assert_eq!(request.commit_message.subject, request.title);
+	assert!(request.commit_message.body.is_none());
 	assert_eq!(request.labels, vec!["release", "automated"]);
 	assert!(request.auto_merge);
 	assert!(request.body.contains("## Prepared release"));
@@ -666,7 +668,15 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 		.unwrap_or_else(|error| panic!("checkout branch: {error}"));
 	git_stage_paths(&repo, &[PathBuf::from("release.txt")])
 		.unwrap_or_else(|error| panic!("stage paths: {error}"));
-	git_commit_paths(&repo, "chore(release): prepare release")
+	git_commit_paths(
+		&repo,
+		&CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: Some(
+				"Prepare release.\n\n## MonoChange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{}\n```\n<!-- monochange:release-record:end -->".to_string(),
+			),
+		},
+	)
 		.unwrap_or_else(|error| panic!("commit paths: {error}"));
 	git_push_branch(&repo, "monochange/release/release")
 		.unwrap_or_else(|error| panic!("push branch: {error}"));
@@ -676,6 +686,9 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 		&["rev-parse", "--verify", "monochange/release/release"],
 	);
 	assert!(!branch.trim().is_empty());
+	let commit_body = git_output(&repo, &["log", "-1", "--pretty=%B"]);
+	assert!(commit_body.contains("## MonoChange Release Record"));
+	assert!(commit_body.contains("<!-- monochange:release-record:start -->"));
 }
 
 #[test]
@@ -994,7 +1007,10 @@ fn sample_pull_request_request() -> GitHubPullRequestRequest {
 			.to_string(),
 		labels: vec!["release".to_string(), "automated".to_string()],
 		auto_merge: false,
-		commit_message: "chore(release): prepare release".to_string(),
+		commit_message: CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
 	}
 }
 

@@ -1749,6 +1749,14 @@ pub struct SourceReleaseOutcome {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CommitMessage {
+	pub subject: String,
+	#[serde(default)]
+	pub body: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SourceChangeRequest {
 	pub provider: SourceProvider,
 	pub repository: String,
@@ -1760,7 +1768,7 @@ pub struct SourceChangeRequest {
 	pub body: String,
 	pub labels: Vec<String>,
 	pub auto_merge: bool,
-	pub commit_message: String,
+	pub commit_message: CommitMessage,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
