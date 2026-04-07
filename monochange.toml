@@ -189,6 +189,10 @@ path = "crates/monochange_gitlab"
 [package.monochange_gitea]
 path = "crates/monochange_gitea"
 
+[package."@monochange/skill"]
+path = "npm/skill"
+type = "npm"
+
 # =============================================================================
 # [group.*] — version groups that share a single release identity
 # =============================================================================
@@ -238,7 +242,8 @@ packages = [
 	"monochange_gitea",
 ]
 extra_changelog_sections = [
-	{ name = "Improve testing", types = ["improve testing"] },
+	{ name = "Testing", types = ["test"] },
+	{ name = "Documentation", types = ["docs"] },
 ]
 tag = true
 release = true
