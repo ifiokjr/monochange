@@ -1279,6 +1279,195 @@ pub struct ReleaseManifest {
 	pub plan: ReleaseManifestPlan,
 }
 
+/// Current supported `ReleaseRecord` schema version.
+pub const RELEASE_RECORD_SCHEMA_VERSION: u64 = 1;
+/// Required `ReleaseRecord.kind` discriminator.
+pub const RELEASE_RECORD_KIND: &str = "monochange.releaseRecord";
+/// Human-readable heading used for commit-embedded release records.
+pub const RELEASE_RECORD_HEADING: &str = "## MonoChange Release Record";
+/// Opening marker for a commit-embedded release record block.
+pub const RELEASE_RECORD_START_MARKER: &str = "<!-- monochange:release-record:start -->";
+/// Closing marker for a commit-embedded release record block.
+pub const RELEASE_RECORD_END_MARKER: &str = "<!-- monochange:release-record:end -->";
+
+const fn release_record_schema_version() -> u64 {
+	RELEASE_RECORD_SCHEMA_VERSION
+}
+
+fn default_release_record_kind() -> String {
+	RELEASE_RECORD_KIND.to_string()
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseRecordTarget {
+	pub id: String,
+	pub kind: ReleaseOwnerKind,
+	pub version: String,
+	pub version_format: VersionFormat,
+	pub tag: bool,
+	pub release: bool,
+	pub tag_name: String,
+	#[serde(default)]
+	pub members: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseRecordProvider {
+	pub kind: SourceProvider,
+	pub owner: String,
+	pub repo: String,
+	#[serde(default)]
+	pub host: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseRecord {
+	#[serde(default = "release_record_schema_version")]
+	pub schema_version: u64,
+	#[serde(default = "default_release_record_kind")]
+	pub kind: String,
+	pub created_at: String,
+	pub command: String,
+	#[serde(default)]
+	pub version: Option<String>,
+	#[serde(default)]
+	pub group_version: Option<String>,
+	pub release_targets: Vec<ReleaseRecordTarget>,
+	pub released_packages: Vec<String>,
+	pub changed_files: Vec<PathBuf>,
+	#[serde(default)]
+	pub updated_changelogs: Vec<PathBuf>,
+	#[serde(default)]
+	pub deleted_changesets: Vec<PathBuf>,
+	#[serde(default)]
+	pub provider: Option<ReleaseRecordProvider>,
+}
+
+#[derive(Debug, Error)]
+pub enum ReleaseRecordError {
+	#[error("no MonoChange release record block found")]
+	NotFound,
+	#[error("found multiple MonoChange release record blocks")]
+	MultipleBlocks,
+	#[error("found a release record start marker without a matching end marker")]
+	MissingEndMarker,
+	#[error("found a malformed release record block without a fenced json payload")]
+	MissingJsonBlock,
+	#[error("release record is missing required `kind`")]
+	MissingKind,
+	#[error("release record is missing required `schemaVersion`")]
+	MissingSchemaVersion,
+	#[error("release record uses unsupported kind `{0}`")]
+	UnsupportedKind(String),
+	#[error("release record uses unsupported schemaVersion {0}")]
+	UnsupportedSchemaVersion(u64),
+	#[error("release record json error: {0}")]
+	InvalidJson(#[from] serde_json::Error),
+}
+
+pub type ReleaseRecordResult<T> = Result<T, ReleaseRecordError>;
+
+/// Render a `ReleaseRecord` into the reserved commit-message block format.
+pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResult<String> {
+	if record.kind != RELEASE_RECORD_KIND {
+		return Err(ReleaseRecordError::UnsupportedKind(record.kind.clone()));
+	}
+	if record.schema_version != RELEASE_RECORD_SCHEMA_VERSION {
+		return Err(ReleaseRecordError::UnsupportedSchemaVersion(
+			record.schema_version,
+		));
+	}
+	let json = serde_json::to_string_pretty(record)?;
+	Ok(format!(
+		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{json}\n```\n{RELEASE_RECORD_END_MARKER}"
+	))
+}
+
+/// Parse a `ReleaseRecord` from a full commit message body.
+pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<ReleaseRecord> {
+	let start_matches = commit_message
+		.match_indices(RELEASE_RECORD_START_MARKER)
+		.collect::<Vec<_>>();
+	if start_matches.is_empty() {
+		return Err(ReleaseRecordError::NotFound);
+	}
+	let end_matches = commit_message
+		.match_indices(RELEASE_RECORD_END_MARKER)
+		.collect::<Vec<_>>();
+	if end_matches.is_empty() {
+		return Err(ReleaseRecordError::MissingEndMarker);
+	}
+	if start_matches.len() > 1 || end_matches.len() > 1 {
+		return Err(ReleaseRecordError::MultipleBlocks);
+	}
+	let (start_index, _) = start_matches
+		.first()
+		.copied()
+		.unwrap_or_else(|| unreachable!("start marker count was validated"));
+	let (end_index, _) = end_matches
+		.first()
+		.copied()
+		.unwrap_or_else(|| unreachable!("end marker count was validated"));
+	if end_index <= start_index {
+		return Err(ReleaseRecordError::MissingEndMarker);
+	}
+	let block_contents =
+		&commit_message[start_index + RELEASE_RECORD_START_MARKER.len()..end_index];
+	let json_text = extract_release_record_json(block_contents)?;
+	let raw = serde_json::from_str::<serde_json::Value>(&json_text)?;
+	let kind = raw
+		.get("kind")
+		.and_then(serde_json::Value::as_str)
+		.ok_or(ReleaseRecordError::MissingKind)?;
+	if kind != RELEASE_RECORD_KIND {
+		return Err(ReleaseRecordError::UnsupportedKind(kind.to_string()));
+	}
+	let schema_version = raw
+		.get("schemaVersion")
+		.and_then(serde_json::Value::as_u64)
+		.ok_or(ReleaseRecordError::MissingSchemaVersion)?;
+	if schema_version != RELEASE_RECORD_SCHEMA_VERSION {
+		return Err(ReleaseRecordError::UnsupportedSchemaVersion(schema_version));
+	}
+	serde_json::from_value(raw).map_err(ReleaseRecordError::InvalidJson)
+}
+
+fn extract_release_record_json(block_contents: &str) -> ReleaseRecordResult<String> {
+	let lines = block_contents.trim().lines().collect::<Vec<_>>();
+	if lines.first().map(|line| line.trim_end()) != Some("```json") {
+		return Err(ReleaseRecordError::MissingJsonBlock);
+	}
+	let Some(closing_index) = lines
+		.iter()
+		.enumerate()
+		.skip(1)
+		.find_map(|(index, line)| (line.trim_end() == "```").then_some(index))
+	else {
+		return Err(ReleaseRecordError::MissingJsonBlock);
+	};
+	if lines
+		.iter()
+		.skip(closing_index + 1)
+		.any(|line| !line.trim().is_empty())
+	{
+		return Err(ReleaseRecordError::MissingJsonBlock);
+	}
+	let json = lines
+		.iter()
+		.skip(1)
+		.take(closing_index.saturating_sub(1))
+		.copied()
+		.collect::<Vec<_>>()
+		.join("\n");
+	if json.trim().is_empty() {
+		return Err(ReleaseRecordError::MissingJsonBlock);
+	}
+	Ok(json)
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum GitHubReleaseNotesSource {
