@@ -9,6 +9,8 @@ use crate::add_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
 use crate::discover_workspace;
+use crate::interactive::InteractiveChangeResult;
+use crate::interactive::InteractiveTarget;
 use crate::plan_release;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
@@ -526,6 +528,23 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 		original_changelog
 	);
 	assert!(tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn render_interactive_changeset_markdown_uses_natural_summary_heading() {
+	let result = InteractiveChangeResult {
+		targets: vec![InteractiveTarget {
+			id: "core".to_string(),
+			bump: monochange_core::BumpSeverity::Minor,
+			version: None,
+			change_type: None,
+		}],
+		reason: "interactive heading".to_string(),
+		details: Some("Details body".to_string()),
+	};
+	let rendered = crate::render_interactive_changeset_markdown(&result);
+	assert!(rendered.contains("# interactive heading"));
+	assert!(rendered.contains("Details body"));
 }
 
 #[test]
