@@ -1577,6 +1577,31 @@ fn configured_change_types(configuration: &WorkspaceConfiguration, target: &str)
 		.collect()
 }
 
+fn validate_configured_change_type(
+	configuration: &WorkspaceConfiguration,
+	changes_path: &Path,
+	target: &str,
+	change_type: &str,
+) -> MonochangeResult<()> {
+	if configuration.package_by_id(target).is_none() && configuration.group_by_id(target).is_none()
+	{
+		return Ok(());
+	}
+	let valid_types = configured_change_types(configuration, target);
+	if valid_types.iter().any(|candidate| candidate == change_type) {
+		return Ok(());
+	}
+	let valid_types_help = if valid_types.is_empty() {
+		"no configured types are available for this target".to_string()
+	} else {
+		format!("valid types: {}", valid_types.join(", "))
+	};
+	Err(MonochangeError::Config(format!(
+		"failed to parse {}: target `{target}` has invalid type `{change_type}`; {valid_types_help}",
+		changes_path.display()
+	)))
+}
+
 fn parse_markdown_change_target(
 	value: &serde_yaml_ng::Value,
 	changes_path: &Path,
@@ -1669,22 +1694,7 @@ fn parse_markdown_change_target(
 		.map(ToString::to_string);
 
 	if let Some(change_type) = change_type.as_deref() {
-		if configuration.package_by_id(package).is_some()
-			|| configuration.group_by_id(package).is_some()
-		{
-			let valid_types = configured_change_types(configuration, package);
-			if !valid_types.iter().any(|candidate| candidate == change_type) {
-				let valid_types_help = if valid_types.is_empty() {
-					"no configured types are available for this target".to_string()
-				} else {
-					format!("valid types: {}", valid_types.join(", "))
-				};
-				return Err(MonochangeError::Config(format!(
-					"failed to parse {}: target `{package}` has invalid type `{change_type}`; {valid_types_help}",
-					changes_path.display()
-				)));
-			}
-		}
+		validate_configured_change_type(configuration, changes_path, package, change_type)?;
 	}
 
 	if bump.is_none() && version.is_none() && change_type.is_none() {

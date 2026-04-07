@@ -432,6 +432,62 @@ type = "cargo"
 		assert!(contents.contains("core: patch"));
 	}
 
+	#[test]
+	fn mcp_change_bump_none_maps_to_change_bump_none() {
+		assert_eq!(
+			crate::ChangeBump::from(McpChangeBump::None),
+			crate::ChangeBump::None
+		);
+	}
+
+	#[tokio::test]
+	async fn change_writes_type_only_markdown_changeset() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::create_dir_all(tempdir.path().join("crates/core"))
+			.unwrap_or_else(|error| panic!("mkdir: {error}"));
+		fs::write(
+			tempdir.path().join("crates/core/Cargo.toml"),
+			"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+		)
+		.unwrap_or_else(|error| panic!("cargo write: {error}"));
+		fs::write(
+			tempdir.path().join("monochange.toml"),
+			r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+extra_changelog_sections = [{ name = "Documentation", types = ["docs"] }]
+"#,
+		)
+		.unwrap_or_else(|error| panic!("config write: {error}"));
+
+		let result = MonochangeMcpServer::new()
+			.change(Parameters(ChangeParam {
+				path: Some(tempdir.path().display().to_string()),
+				package: vec!["core".to_string()],
+				bump: McpChangeBump::None,
+				version: None,
+				reason: "document the migration".to_string(),
+				change_type: Some("docs".to_string()),
+				details: None,
+				output: Some(
+					tempdir
+						.path()
+						.join(".changeset/core-docs.md")
+						.display()
+						.to_string(),
+				),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("change: {error}"));
+
+		assert!(content_text(&result).contains("Wrote change file"));
+		let contents = fs::read_to_string(tempdir.path().join(".changeset/core-docs.md"))
+			.unwrap_or_else(|error| panic!("changeset read: {error}"));
+		assert!(contents.contains("core: docs"));
+		assert!(!contents.contains("bump:"));
+	}
+
 	#[tokio::test]
 	async fn affected_packages_reports_success_for_documentation_only_changes() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
