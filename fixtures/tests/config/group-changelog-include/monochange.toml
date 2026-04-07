@@ -1,0 +1,34 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[package.cli]
+path = "crates/cli"
+
+[package.api]
+path = "crates/api"
+
+[package.site]
+path = "crates/site"
+
+[group.sdk]
+packages = ["core", "app"]
+[group.sdk.changelog]
+path = "docs/sdk-CHANGELOG.md"
+
+[group.main]
+packages = ["cli"]
+[group.main.changelog]
+path = "docs/main-CHANGELOG.md"
+include = "group-only"
+
+[group.docs]
+packages = ["api", "site"]
+[group.docs.changelog]
+path = "docs/docs-CHANGELOG.md"
+include = ["api", "site", "api"]

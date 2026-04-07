@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
@@ -9,7 +10,12 @@ use httpmock::Method::PATCH;
 use httpmock::MockServer;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
+use monochange_core::ChangesetTargetKind;
 use monochange_core::Ecosystem;
+use monochange_core::GroupChangelogInclude;
+use monochange_core::PreparedChangesetTarget;
+use monochange_core::VersionFormat;
+use semver::Version;
 use tempfile::tempdir;
 
 use crate::add_change_file;
@@ -2213,7 +2219,7 @@ fn sample_release_manifest_for_commit_message(
 			version: "1.2.3".to_string(),
 			tag: true,
 			release: true,
-			version_format: monochange_core::VersionFormat::Primary,
+			version_format: VersionFormat::Primary,
 			tag_name: "v1.2.3".to_string(),
 			members: vec!["monochange".to_string(), "monochange_core".to_string()],
 			rendered_title: "MonoChange 1.2.3".to_string(),
@@ -2289,7 +2295,7 @@ fn sample_release_record_for_discovery_text() -> monochange_core::ReleaseRecord 
 			id: "sdk".to_string(),
 			kind: monochange_core::ReleaseOwnerKind::Group,
 			version: "1.2.3".to_string(),
-			version_format: monochange_core::VersionFormat::Primary,
+			version_format: VersionFormat::Primary,
 			tag: true,
 			release: true,
 			tag_name: "v1.2.3".to_string(),
@@ -3603,7 +3609,7 @@ fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
 			id: "sdk".to_string(),
 			kind: monochange_core::ReleaseOwnerKind::Group,
 			version: "1.2.3".to_string(),
-			version_format: monochange_core::VersionFormat::Primary,
+			version_format: VersionFormat::Primary,
 			tag: true,
 			release: true,
 			tag_name: "v1.2.3".to_string(),
@@ -3619,6 +3625,213 @@ fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
 			repo: "monochange".to_string(),
 			host: None,
 		}),
+	}
+}
+
+#[test]
+fn group_changelog_include_allows_expected_member_targets() {
+	let core_only = BTreeSet::from(["core".to_string()]);
+	let core_and_app = BTreeSet::from(["core".to_string(), "app".to_string()]);
+
+	assert!(crate::group_changelog_include_allows(
+		&GroupChangelogInclude::All,
+		&core_only,
+	));
+	assert!(!crate::group_changelog_include_allows(
+		&GroupChangelogInclude::GroupOnly,
+		&core_only,
+	));
+	assert!(crate::group_changelog_include_allows(
+		&GroupChangelogInclude::Selected(["core".to_string()].into()),
+		&core_only,
+	));
+	assert!(!crate::group_changelog_include_allows(
+		&GroupChangelogInclude::Selected(["app".to_string()].into()),
+		&core_only,
+	));
+	assert!(!crate::group_changelog_include_allows(
+		&GroupChangelogInclude::Selected(["core".to_string()].into()),
+		&core_and_app,
+	));
+}
+
+#[test]
+fn filter_group_release_note_change_handles_missing_context_and_direct_group_targets() {
+	let planned_group = sample_planned_group();
+	let group = sample_group_definition(GroupChangelogInclude::GroupOnly);
+
+	assert!(crate::filter_group_release_note_change(
+		&sample_release_note_change(None),
+		Some(&group),
+		&planned_group,
+		&BTreeMap::new(),
+	)
+	.is_none());
+
+	assert!(crate::filter_group_release_note_change(
+		&sample_release_note_change(Some(".changeset/missing.md")),
+		Some(&group),
+		&planned_group,
+		&BTreeMap::new(),
+	)
+	.is_none());
+
+	let group_changeset = BTreeMap::from([(
+		PathBuf::from(".changeset/group.md"),
+		vec![PreparedChangesetTarget {
+			id: "sdk".to_string(),
+			kind: ChangesetTargetKind::Group,
+			bump: None,
+			origin: "author".to_string(),
+			evidence_refs: Vec::new(),
+			change_type: None,
+		}],
+	)]);
+	let renamed = crate::filter_group_release_note_change(
+		&sample_release_note_change(Some(".changeset/group.md")),
+		Some(&group),
+		&planned_group,
+		&group_changeset,
+	)
+	.unwrap_or_else(|| panic!("expected direct group note"));
+	assert_eq!(renamed.package_name, "sdk");
+
+	let outside_group_changeset = BTreeMap::from([(
+		PathBuf::from(".changeset/outside.md"),
+		vec![PreparedChangesetTarget {
+			id: "docs".to_string(),
+			kind: ChangesetTargetKind::Package,
+			bump: None,
+			origin: "author".to_string(),
+			evidence_refs: Vec::new(),
+			change_type: None,
+		}],
+	)]);
+	assert!(crate::filter_group_release_note_change(
+		&sample_release_note_change(Some(".changeset/outside.md")),
+		Some(&group),
+		&planned_group,
+		&outside_group_changeset,
+	)
+	.is_none());
+}
+
+#[test]
+fn filter_group_release_note_change_respects_member_allowlists() {
+	let planned_group = sample_planned_group();
+	let change = sample_release_note_change(Some(".changeset/member.md"));
+	let selected_core =
+		sample_group_definition(GroupChangelogInclude::Selected(["core".to_string()].into()));
+	let member_changeset = BTreeMap::from([(
+		PathBuf::from(".changeset/member.md"),
+		vec![PreparedChangesetTarget {
+			id: "core".to_string(),
+			kind: ChangesetTargetKind::Package,
+			bump: None,
+			origin: "author".to_string(),
+			evidence_refs: Vec::new(),
+			change_type: None,
+		}],
+	)]);
+	assert!(crate::filter_group_release_note_change(
+		&change,
+		Some(&selected_core),
+		&planned_group,
+		&member_changeset,
+	)
+	.is_some());
+
+	let blocked_changeset = BTreeMap::from([(
+		PathBuf::from(".changeset/member.md"),
+		vec![
+			PreparedChangesetTarget {
+				id: "core".to_string(),
+				kind: ChangesetTargetKind::Package,
+				bump: None,
+				origin: "author".to_string(),
+				evidence_refs: Vec::new(),
+				change_type: None,
+			},
+			PreparedChangesetTarget {
+				id: "app".to_string(),
+				kind: ChangesetTargetKind::Package,
+				bump: None,
+				origin: "author".to_string(),
+				evidence_refs: Vec::new(),
+				change_type: None,
+			},
+		],
+	)]);
+	assert!(crate::filter_group_release_note_change(
+		&change,
+		Some(&selected_core),
+		&planned_group,
+		&blocked_changeset,
+	)
+	.is_none());
+
+	let message = crate::render_group_filtered_update_message("sdk");
+	assert!(message.contains("No group-facing notes were recorded for this release."));
+	assert!(message.contains("synchronized group `sdk`"));
+}
+
+fn sample_release_note_change(source_path: Option<&str>) -> crate::ReleaseNoteChange {
+	crate::ReleaseNoteChange {
+		package_id: "core".to_string(),
+		package_name: "core".to_string(),
+		package_labels: Vec::new(),
+		source_path: source_path.map(str::to_string),
+		summary: "add grouped note".to_string(),
+		details: None,
+		bump: BumpSeverity::Minor,
+		change_type: None,
+		context: None,
+		changeset_path: None,
+		change_owner: None,
+		change_owner_link: None,
+		review_request: None,
+		review_request_link: None,
+		introduced_commit: None,
+		introduced_commit_link: None,
+		last_updated_commit: None,
+		last_updated_commit_link: None,
+		related_issues: None,
+		related_issue_links: None,
+		closed_issues: None,
+		closed_issue_links: None,
+	}
+}
+
+fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::GroupDefinition {
+	monochange_core::GroupDefinition {
+		id: "sdk".to_string(),
+		packages: vec!["core".to_string(), "app".to_string()],
+		changelog: None,
+		changelog_include: include,
+		extra_changelog_sections: Vec::new(),
+		empty_update_message: None,
+		release_title: None,
+		changelog_version_title: None,
+		versioned_files: Vec::new(),
+		tag: false,
+		release: false,
+		version_format: VersionFormat::Namespaced,
+	}
+}
+
+fn sample_planned_group() -> monochange_core::PlannedVersionGroup {
+	monochange_core::PlannedVersionGroup {
+		group_id: "sdk".to_string(),
+		display_name: "sdk".to_string(),
+		members: vec![
+			"cargo:crates/core".to_string(),
+			"cargo:crates/app".to_string(),
+		],
+		mismatch_detected: false,
+		planned_version: Some(
+			Version::parse("1.2.3").unwrap_or_else(|error| panic!("version: {error}")),
+		),
+		recommended_bump: BumpSeverity::Minor,
 	}
 }
 

@@ -7,6 +7,7 @@ use monochange_core::ChangelogTarget;
 use monochange_core::CliStepDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemType;
+use monochange_core::GroupChangelogInclude;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
@@ -479,6 +480,76 @@ fn load_workspace_configuration_supports_changelog_format_tables_and_overrides()
 			format: ChangelogFormat::KeepAChangelog,
 		})
 	);
+}
+
+#[test]
+fn load_workspace_configuration_supports_group_changelog_include_policies() {
+	let root = fixture_path("config/group-changelog-include");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let sdk = configuration
+		.group_by_id("sdk")
+		.unwrap_or_else(|| panic!("expected sdk group"));
+	let main = configuration
+		.group_by_id("main")
+		.unwrap_or_else(|| panic!("expected main group"));
+	let docs = configuration
+		.group_by_id("docs")
+		.unwrap_or_else(|| panic!("expected docs group"));
+
+	assert_eq!(sdk.changelog_include, GroupChangelogInclude::All);
+	assert_eq!(main.changelog_include, GroupChangelogInclude::GroupOnly);
+	assert_eq!(
+		docs.changelog_include,
+		GroupChangelogInclude::Selected(["api".to_string(), "site".to_string()].into())
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_invalid_group_changelog_include_members() {
+	let root = fixture_path("config/rejects-group-changelog-include-invalid-member");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+	assert!(rendered.contains("group `sdk` changelog include entry `missing` must reference a package declared in that group"));
+	assert!(rendered.contains("group changelog include member"));
+}
+
+#[test]
+fn load_workspace_configuration_supports_empty_group_changelog_include_lists() {
+	let root = fixture_path("config/group-changelog-include-empty-list");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let sdk = configuration
+		.group_by_id("sdk")
+		.unwrap_or_else(|| panic!("expected sdk group"));
+
+	assert_eq!(sdk.changelog_include, GroupChangelogInclude::GroupOnly);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_invalid_group_changelog_include_modes() {
+	let root = fixture_path("config/rejects-group-changelog-include-invalid-mode");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+	assert!(rendered.contains(
+		"group `sdk` changelog include must be `\"all\"`, `\"group-only\"`, or an array of member package ids"
+	));
+	assert!(rendered.contains("group changelog include"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_empty_group_changelog_include_members() {
+	let root = fixture_path("config/rejects-group-changelog-include-empty-member");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+	assert!(rendered.contains("group `sdk` changelog include entries must not be empty"));
+	assert!(rendered.contains("group changelog include member"));
 }
 
 #[test]

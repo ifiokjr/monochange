@@ -51,6 +51,16 @@ sdk: minor
 
 But a changeset may not reference both the group id and one of its members in the same file.
 
+To keep a group changelog focused on public surfaces while leaving package changelogs detailed, configure the grouped changelog table:
+
+```toml
+[group.sdk.changelog]
+path = "changelog.md"
+include = ["sdk-cli"]
+```
+
+Direct group-targeted changesets are always included. Member-targeted changesets are filtered only for the group changelog; package changelogs and release planning remain unchanged.
+
 <!-- {=versionGroupsCurrentStatus} -->
 
 Legacy `version_groups.strategy` is no longer the primary authoring model. The current implementation always derives synchronized release behavior from `[group.<id>]` declarations.

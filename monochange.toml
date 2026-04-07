@@ -215,7 +215,13 @@ type = "npm"
 #   packages — list of [package.*] ids that belong to this group
 #
 # Optional fields:
-#   changelog               — path or table for the group-level changelog
+#   changelog               — path or table for the group-level changelog;
+#                             tables may also set `include = "all"`,
+#                             `include = "group-only"`, or
+#                             `include = ["package-id"]` to control which
+#                             member-targeted changesets appear in the group
+#                             changelog (direct group-targeted changesets are
+#                             always included; default: "all")
 #   extra_changelog_sections — custom changelog sections with type routing;
 #                              each section supports { name, types, default_bump? }
 #   empty_update_message    — fallback text when the group bumps but a
@@ -263,6 +269,11 @@ version_format = "primary"
 [group.main.changelog]
 path = "changelog.md"
 format = "monochange"
+# Optional: filter member-targeted notes in the group changelog.
+# Omit `include` (or set it to "all") to keep current behavior.
+# Use "group-only" to show only direct group-targeted changesets.
+# Use an array to allow only specific group members to contribute notes.
+# include = ["monochange"]
 
 # =============================================================================
 # [changesets.verify] — changeset verification settings

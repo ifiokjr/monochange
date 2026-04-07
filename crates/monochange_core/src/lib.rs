@@ -485,11 +485,21 @@ pub struct PackageDefinition {
 	pub version_format: VersionFormat,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub enum GroupChangelogInclude {
+	#[default]
+	All,
+	GroupOnly,
+	Selected(BTreeSet<String>),
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GroupDefinition {
 	pub id: String,
 	pub packages: Vec<String>,
 	pub changelog: Option<ChangelogTarget>,
+	#[serde(default)]
+	pub changelog_include: GroupChangelogInclude,
 	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub empty_update_message: Option<String>,
 	#[serde(default)]
