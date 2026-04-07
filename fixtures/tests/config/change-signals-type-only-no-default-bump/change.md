@@ -2,4 +2,4 @@
 core: docs
 ---
 
-#### clarify migration docs
+# clarify migration docs

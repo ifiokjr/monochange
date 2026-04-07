@@ -388,6 +388,26 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 }
 
 #[test]
+fn change_command_sources_type_choices_from_workspace_configuration() {
+	let root = fixture_path("changeset-target-metadata/cli-type-only-change");
+	let error = build_command_for_root("mc", &root)
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("change"),
+			OsString::from("--package"),
+			OsString::from("core"),
+			OsString::from("--type"),
+			OsString::from("security"),
+			OsString::from("--reason"),
+			OsString::from("clarify migration guide"),
+		])
+		.expect_err("unknown configured type should be rejected by clap choices");
+	let rendered = error.to_string();
+	assert!(rendered.contains("invalid value 'security'"));
+	assert!(rendered.contains("[possible values: docs, test]"));
+}
+
+#[test]
 fn collect_cli_command_inputs_omits_default_bump_for_type_only_changes() {
 	let root = fixture_path("changeset-target-metadata/cli-type-only-change");
 	let command = build_command_for_root("mc", &root);
@@ -646,7 +666,7 @@ fn add_interactive_change_file_writes_target_owned_metadata() {
 		.unwrap_or_else(|error| panic!("interactive change file: {error}"));
 	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
 	assert!(content.contains("sdk: test"));
-	assert!(content.contains("#### broaden integration coverage"));
+	assert!(content.contains("# broaden integration coverage"));
 }
 
 #[test]
@@ -778,17 +798,21 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 
 #[test]
 fn render_interactive_changeset_markdown_uses_natural_summary_heading() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
 	let result = InteractiveChangeResult {
 		targets: vec![InteractiveTarget {
 			id: "core".to_string(),
-			bump: monochange_core::BumpSeverity::Minor,
+			bump: BumpSeverity::Minor,
 			version: None,
 			change_type: None,
 		}],
 		reason: "interactive heading".to_string(),
 		details: Some("Details body".to_string()),
 	};
-	let rendered = crate::render_interactive_changeset_markdown(&result);
+	let rendered = crate::render_interactive_changeset_markdown(&configuration, &result)
+		.unwrap_or_else(|error| panic!("render interactive markdown: {error}"));
 	assert!(rendered.contains("# interactive heading"));
 	assert!(rendered.contains("Details body"));
 }

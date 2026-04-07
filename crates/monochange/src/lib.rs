@@ -356,11 +356,60 @@ pub fn build_command(bin_name: &'static str) -> Command {
 	build_command_for_root(bin_name, &root)
 }
 
-fn build_command_for_root(bin_name: &'static str, root: &Path) -> Command {
-	let cli = load_workspace_configuration(root).map_or_else(
+fn configured_change_type_choices(
+	configuration: &monochange_core::WorkspaceConfiguration,
+) -> Vec<String> {
+	configuration
+		.packages
+		.iter()
+		.flat_map(|package| package.extra_changelog_sections.iter())
+		.chain(
+			configuration
+				.groups
+				.iter()
+				.flat_map(|group| group.extra_changelog_sections.iter()),
+		)
+		.flat_map(|section| section.types.iter())
+		.map(|value| value.trim().to_string())
+		.filter(|value| !value.is_empty())
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.collect()
+}
+
+fn apply_runtime_change_type_choices(
+	cli: &mut [CliCommandDefinition],
+	configuration: &monochange_core::WorkspaceConfiguration,
+) {
+	let choices = configured_change_type_choices(configuration);
+	if choices.is_empty() {
+		return;
+	}
+	if let Some(change_command) = cli.iter_mut().find(|command| command.name == "change") {
+		if let Some(change_type_input) = change_command
+			.inputs
+			.iter_mut()
+			.find(|input| input.name == "type" && input.choices.is_empty())
+		{
+			change_type_input.kind = CliInputKind::Choice;
+			change_type_input.choices = choices;
+		}
+	}
+}
+
+fn cli_commands_for_root(root: &Path) -> Vec<CliCommandDefinition> {
+	load_workspace_configuration(root).map_or_else(
 		|_| default_cli_commands(),
-		|configuration| configuration.cli,
-	);
+		|configuration| {
+			let mut cli = configuration.cli.clone();
+			apply_runtime_change_type_choices(&mut cli, &configuration);
+			cli
+		},
+	)
+}
+
+fn build_command_for_root(bin_name: &'static str, root: &Path) -> Command {
+	let cli = cli_commands_for_root(root);
 	build_command_with_cli(bin_name, &cli)
 }
 
@@ -674,9 +723,7 @@ where
 {
 	let args = args.into_iter().collect::<Vec<_>>();
 	let configuration = load_workspace_configuration(root);
-	let cli = configuration
-		.as_ref()
-		.map_or_else(|_| default_cli_commands(), |loaded| loaded.cli.clone());
+	let cli = cli_commands_for_root(root);
 	let matches = match build_command_with_cli(bin_name, &cli).try_get_matches_from(args) {
 		Ok(matches) => matches,
 		Err(error)

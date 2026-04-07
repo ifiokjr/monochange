@@ -416,7 +416,7 @@ sdk-core:
   type: security
 ---
 
-#### rotate signing keys
+# rotate signing keys
 
 Roll the signing key before the release window closes.
 ```
@@ -434,7 +434,7 @@ sdk-core:
   version: "2.0.0"
 ---
 
-#### promote to stable
+# promote to stable
 ```
 
 When `version` is provided without `bump`, the bump is inferred from the current version. If the package belongs to a version group, the explicit version propagates to the whole group.

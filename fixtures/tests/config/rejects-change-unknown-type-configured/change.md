@@ -2,4 +2,4 @@
 core: nope
 ---
 
-#### invalid configured type
+# invalid configured type
