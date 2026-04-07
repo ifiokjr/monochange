@@ -109,6 +109,32 @@ fn publish_github_release_dry_run_supports_custom_sections_and_templates() {
 	);
 }
 
+#[test]
+fn publish_github_release_dry_run_inherits_custom_sections_from_defaults() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let fixture_root = fixture_path("github-releases/default-custom-sections");
+	copy_directory(&fixture_root, tempdir.path());
+
+	let json = run_json_workflow(tempdir.path(), "publish-release");
+	let github_releases = json["releases"]
+		.as_array()
+		.unwrap_or_else(|| panic!("expected github releases array"));
+	assert_eq!(github_releases.len(), 1);
+	let body = github_releases[0]["body"]
+		.as_str()
+		.unwrap_or_else(|| panic!("expected GitHub release body"));
+	assert!(body.contains("### Security"));
+	assert!(body.contains("#### rotate signing keys (core patch)"));
+	assert!(body.contains("Roll the signing key before the release window closes."));
+
+	let manifest = &json["manifest"];
+	assert_eq!(manifest["changelogs"][0]["ownerId"], "core");
+	assert_eq!(
+		manifest["changelogs"][0]["notes"]["sections"][0]["title"],
+		"Security"
+	);
+}
+
 fn run_json_workflow(root: &Path, workflow: &str) -> Value {
 	let output = cli()
 		.current_dir(root)

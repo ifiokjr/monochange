@@ -1,0 +1,37 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+
+[release_notes]
+change_templates = ["#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details }}", "- {{ summary }}"]
+
+[package.core]
+path = "crates/core"
+tag = true
+release = true
+
+[github]
+owner = "ifiokjr"
+repo = "monochange"
+
+[github.releases]
+source = "monochange"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.publish-release]
+
+[[cli.publish-release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.publish-release.steps]]
+type = "PrepareRelease"
+
+[[cli.publish-release.steps]]
+type = "PublishRelease"
