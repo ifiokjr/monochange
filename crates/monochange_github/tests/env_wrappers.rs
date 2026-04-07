@@ -5,6 +5,7 @@ use httpmock::Method::POST;
 use httpmock::MockServer;
 use monochange_core::BotSettings;
 use monochange_core::ChangeRequestSettings;
+use monochange_core::CommitMessage;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleaseProviderSettings;
 use monochange_core::SourceConfiguration;
@@ -124,7 +125,10 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 				body: "release body".to_string(),
 				labels: vec!["release".to_string()],
 				auto_merge: false,
-				commit_message: "chore(release): prepare release".to_string(),
+				commit_message: CommitMessage {
+					subject: "chore(release): prepare release".to_string(),
+					body: None,
+				},
 			},
 			&[PathBuf::from("release.txt")],
 		)

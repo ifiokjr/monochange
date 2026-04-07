@@ -330,7 +330,8 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 		Some(format!("{}/api/v1", server.base_url())),
 		Some("https://codeberg.org".to_string()),
 	);
-	let request = build_release_pull_request_request(&source, &sample_manifest());
+	let mut request = build_release_pull_request_request(&source, &sample_manifest());
+	request.commit_message.body = Some("release body".to_string());
 
 	let outcome = with_gitea_env(Some("token"), || {
 		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
@@ -347,6 +348,8 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 	)
 	.trim()
 	.is_empty());
+	let commit_body = git_output(&repo, &["log", "-1", "--pretty=%B"]);
+	assert!(commit_body.contains("release body"));
 }
 
 #[test]

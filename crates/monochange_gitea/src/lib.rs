@@ -6,6 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::ReleaseManifest;
@@ -182,7 +183,10 @@ pub fn build_release_pull_request_request(
 		body: release_pull_request_body(manifest),
 		labels: source.pull_requests.labels.clone(),
 		auto_merge: source.pull_requests.auto_merge,
-		commit_message: title,
+		commit_message: CommitMessage {
+			subject: title,
+			body: None,
+		},
 	}
 }
 
@@ -520,7 +524,7 @@ fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<(
 	run_command(command, "stage release pull request files")
 }
 
-fn git_commit_paths(root: &Path, message: &str) -> MonochangeResult<()> {
+fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
 	run_command(
 		{
 			let mut command = Command::new("git");
@@ -528,7 +532,10 @@ fn git_commit_paths(root: &Path, message: &str) -> MonochangeResult<()> {
 				.current_dir(root)
 				.arg("commit")
 				.arg("--message")
-				.arg(message);
+				.arg(&message.subject);
+			if let Some(body) = &message.body {
+				command.arg("--message").arg(body);
+			}
 			command
 		},
 		"commit release pull request changes",
