@@ -2413,6 +2413,15 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 						cli_command.name, input.name
 					)));
 				}
+				if matches!(input.kind, CliInputKind::Boolean)
+					&& default != "true"
+					&& default != "false"
+				{
+					return Err(MonochangeError::Config(format!(
+						"CLI command `{}` input `{}` boolean default must be `true` or `false`",
+						cli_command.name, input.name
+					)));
+				}
 			}
 		}
 
@@ -2477,7 +2486,8 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::OpenReleaseRequest { .. }
 				| CliStepDefinition::CommentReleasedIssues { .. }
 				| CliStepDefinition::AffectedPackages { .. }
-				| CliStepDefinition::DiagnoseChangesets { .. } => {}
+				| CliStepDefinition::DiagnoseChangesets { .. }
+				| CliStepDefinition::RetargetRelease { .. } => {}
 			}
 		}
 	}

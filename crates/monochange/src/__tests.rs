@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -22,6 +24,7 @@ use crate::plan_release;
 use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
+use crate::CliContext;
 
 fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
@@ -50,7 +53,48 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
 	assert!(output.contains("diagnostics"));
+	assert!(output.contains("repair-release"));
 	assert!(output.contains("release-record"));
+}
+
+#[test]
+fn repair_release_help_describes_retargeting_workflow() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("repair-release"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("repair-release help: {error}"));
+
+	assert!(output.contains("Repair a recent release by moving its release tags to a later commit"));
+	assert!(output.contains("mc repair-release --from v1.2.3 --dry-run"));
+	assert!(output.contains("--sync-provider=false"));
+}
+
+#[test]
+fn boolean_cli_inputs_support_explicit_false_values() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let matches = build_command_for_root("mc", &fixture_root)
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("repair-release"),
+			OsString::from("--from"),
+			OsString::from("v1.2.3"),
+			OsString::from("--sync-provider=false"),
+		])
+		.unwrap_or_else(|error| panic!("matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected repair-release subcommand"));
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("sync_provider")
+			.map(String::as_str),
+		Some("false")
+	);
 }
 
 #[test]
@@ -1799,7 +1843,7 @@ fn seed_step_outputs_fixture(root: &Path) {
 	}
 }
 
-fn fixture_path(relative: &str) -> std::path::PathBuf {
+fn fixture_path(relative: &str) -> PathBuf {
 	Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests")
 		.join(relative)
@@ -2220,6 +2264,370 @@ fn text_release_record_discovery_omits_empty_sections() {
 	assert!(!rendered.contains("  targets:"));
 	assert!(!rendered.contains("  packages:"));
 	assert!(!rendered.contains("  provider:"));
+}
+
+#[test]
+fn repair_release_command_dry_run_reports_text_output() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	write_blank_monochange_config(root);
+	create_release_record_history(root);
+
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("repair-release"),
+			OsString::from("--from"),
+			OsString::from("v1.2.3"),
+			OsString::from("--target"),
+			OsString::from("HEAD"),
+			OsString::from("--sync-provider=false"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("repair-release output: {error}"));
+
+	assert!(output.contains("repair release:"));
+	assert!(output.contains("from: v1.2.3"));
+	assert!(output.contains("tags to move:"));
+	assert!(output.contains("v1.2.3"));
+	assert!(output.contains("provider sync: disabled"));
+	assert!(output.contains("status: dry-run"));
+}
+
+#[test]
+fn repair_release_command_reports_json_output() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	write_blank_monochange_config(root);
+	create_release_record_history(root);
+
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("repair-release"),
+			OsString::from("--from"),
+			OsString::from("v1.2.3"),
+			OsString::from("--sync-provider=false"),
+			OsString::from("--format"),
+			OsString::from("json"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("repair-release json output: {error}"));
+	let value: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
+	assert_eq!(
+		value.get("from"),
+		Some(&serde_json::Value::String("v1.2.3".to_string()))
+	);
+	assert_eq!(
+		value.get("target"),
+		Some(&serde_json::Value::String("HEAD".to_string()))
+	);
+	assert_eq!(
+		value.get("status"),
+		Some(&serde_json::Value::String("dry_run".to_string()))
+	);
+	assert_eq!(
+		value
+			.pointer("/gitTagResults/0/tagName")
+			.and_then(serde_json::Value::as_str),
+		Some("v1.2.3")
+	);
+}
+
+#[test]
+fn repair_release_command_rejects_non_descendant_targets_without_force() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	write_blank_monochange_config(root);
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write initial file: {error}"));
+	git_in_temp_repo(root, &["add", "monochange.toml", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+	let initial_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	fs::write(root.join("release.txt"), "release\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	let release_record =
+		monochange_core::render_release_record_block(&sample_release_record_for_retarget())
+			.unwrap_or_else(|error| panic!("render release record: {error}"));
+	git_in_temp_repo(
+		root,
+		&[
+			"commit",
+			"-m",
+			"chore(release): prepare release",
+			"-m",
+			release_record.as_str(),
+		],
+	);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	fs::write(root.join("release.txt"), "follow-up\n")
+		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "fix: follow-up release change"]);
+	let main_branch = git_output_in_temp_repo(root, &["branch", "--show-current"]);
+	git_in_temp_repo(root, &["checkout", &initial_commit]);
+	fs::write(root.join("release.txt"), "branch\n")
+		.unwrap_or_else(|error| panic!("write branch release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "branch"]);
+	let branch_commit = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
+	git_in_temp_repo(root, &["checkout", &main_branch]);
+
+	let error = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("repair-release"),
+			OsString::from("--from"),
+			OsString::from("v1.2.3"),
+			OsString::from("--target"),
+			OsString::from(branch_commit),
+			OsString::from("--sync-provider=false"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected non-descendant error"));
+	assert!(error
+		.to_string()
+		.contains("is not a descendant of release-record commit"));
+}
+
+#[test]
+fn template_context_exposes_retarget_namespace() {
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		release_manifest_path: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: Some(sample_retarget_release_report()),
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	assert_eq!(
+		template_context
+			.get("retarget")
+			.and_then(|value| value.pointer("/status"))
+			.and_then(serde_json::Value::as_str),
+		Some("dry_run")
+	);
+}
+
+#[test]
+fn render_cli_command_result_prefers_retarget_report() {
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "repair-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+	};
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		release_manifest_path: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: Some(sample_retarget_release_report()),
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let rendered = crate::render_cli_command_result(&cli_command, &context);
+	assert!(rendered.contains("repair release:"));
+	assert!(rendered.contains("status: dry-run"));
+}
+
+#[test]
+fn execute_cli_command_retarget_release_requires_from_input() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "repair-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::RetargetRelease {
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		true,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing from input error"));
+	assert!(error
+		.to_string()
+		.contains("`RetargetRelease` requires a `from` input"));
+}
+
+#[test]
+fn parse_boolean_step_input_rejects_invalid_values() {
+	let inputs = BTreeMap::from([("force".to_string(), vec!["maybe".to_string()])]);
+	let error = crate::parse_boolean_step_input(&inputs, "force")
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid boolean error"));
+	assert!(error
+		.to_string()
+		.contains("invalid boolean value `maybe` for `force`"));
+}
+
+#[test]
+fn inferred_retarget_source_configuration_prefers_configured_source() {
+	let configured = sample_github_source_configuration("https://example.com");
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: "abc1234".to_string(),
+		record_commit: "abc1234".to_string(),
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+	let inferred =
+		crate::inferred_retarget_source_configuration(Some(&configured), &discovery, true)
+			.unwrap_or_else(|| panic!("expected configured source"));
+	assert_eq!(inferred, configured);
+}
+
+#[test]
+fn inferred_retarget_source_configuration_infers_from_release_record_provider() {
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: "abc1234".to_string(),
+		record_commit: "abc1234".to_string(),
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+	let inferred = crate::inferred_retarget_source_configuration(None, &discovery, true)
+		.unwrap_or_else(|| panic!("expected inferred source"));
+	assert_eq!(inferred.provider, monochange_core::SourceProvider::GitHub);
+	assert_eq!(inferred.owner, "ifiokjr");
+	assert_eq!(inferred.repo, "monochange");
+}
+
+#[test]
+fn inferred_retarget_source_configuration_returns_none_when_sync_is_disabled() {
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: "abc1234".to_string(),
+		record_commit: "abc1234".to_string(),
+		distance: 0,
+		record: sample_release_record_for_retarget(),
+	};
+	assert!(crate::inferred_retarget_source_configuration(None, &discovery, false).is_none());
+}
+
+#[test]
+fn build_retarget_release_report_marks_completed_status() {
+	let discovery = monochange_core::ReleaseRecordDiscovery {
+		input_ref: "v1.2.3".to_string(),
+		resolved_commit: "abc1234".to_string(),
+		record_commit: "abc1234".to_string(),
+		distance: 2,
+		record: sample_release_record_for_retarget(),
+	};
+	let result = monochange_core::RetargetResult {
+		record_commit: "abc1234".to_string(),
+		target_commit: "def5678".to_string(),
+		force: true,
+		git_tag_results: vec![monochange_core::RetargetTagResult {
+			tag_name: "v1.2.3".to_string(),
+			from_commit: "abc1234".to_string(),
+			to_commit: "def5678".to_string(),
+			operation: monochange_core::RetargetOperation::Moved,
+			message: None,
+		}],
+		provider_results: vec![monochange_core::RetargetProviderResult {
+			provider: monochange_core::SourceProvider::GitHub,
+			tag_name: "v1.2.3".to_string(),
+			target_commit: "def5678".to_string(),
+			operation: monochange_core::RetargetProviderOperation::Synced,
+			url: None,
+			message: None,
+		}],
+		sync_provider: true,
+		dry_run: false,
+	};
+	let report = crate::build_retarget_release_report("v1.2.3", "HEAD", &discovery, false, &result);
+	assert_eq!(report.status, "completed");
+	assert!(!report.is_descendant);
+}
+
+#[test]
+fn render_retarget_release_report_handles_provider_sync_variants() {
+	let mut report = sample_retarget_release_report();
+	report.sync_provider = true;
+	report.provider_results = vec![monochange_core::RetargetProviderResult {
+		provider: monochange_core::SourceProvider::GitHub,
+		tag_name: "v1.2.3".to_string(),
+		target_commit: "def5678901234".to_string(),
+		operation: monochange_core::RetargetProviderOperation::Synced,
+		url: None,
+		message: None,
+	}];
+	let rendered = crate::render_retarget_release_report(&report);
+	assert!(rendered.contains("provider sync: github"));
+	assert!(rendered.contains("[planned]"));
+
+	let mut no_provider_report = sample_retarget_release_report();
+	no_provider_report.sync_provider = true;
+	no_provider_report.provider_results = Vec::new();
+	no_provider_report.git_tag_results = Vec::new();
+	let rendered = crate::render_retarget_release_report(&no_provider_report);
+	assert!(rendered.contains("provider sync: none"));
+}
+
+#[test]
+fn retarget_operation_label_covers_all_variants() {
+	assert_eq!(
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Planned),
+		"planned"
+	);
+	assert_eq!(
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Moved),
+		"moved"
+	);
+	assert_eq!(
+		crate::retarget_operation_label(monochange_core::RetargetOperation::AlreadyUpToDate),
+		"already_up_to_date"
+	);
+	assert_eq!(
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Skipped),
+		"skipped"
+	);
+	assert_eq!(
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Failed),
+		"failed"
+	);
 }
 
 #[test]
@@ -2908,6 +3316,61 @@ fn first_parent_commits_returns_head_then_ancestors() {
 		.unwrap_or_else(|error| panic!("first parent commits: {error}"));
 	assert_eq!(commits.first().map(String::as_str), Some(head.as_str()));
 	assert_eq!(commits.len(), 2);
+}
+
+fn sample_retarget_release_report() -> crate::RetargetReleaseReport {
+	crate::RetargetReleaseReport {
+		from: "v1.2.3".to_string(),
+		target: "HEAD".to_string(),
+		resolved_from_commit: "abc1234567890".to_string(),
+		record_commit: "abc1234567890".to_string(),
+		target_commit: "def5678901234".to_string(),
+		distance: 1,
+		is_descendant: true,
+		force: false,
+		dry_run: true,
+		sync_provider: false,
+		tags: vec!["v1.2.3".to_string()],
+		git_tag_results: vec![monochange_core::RetargetTagResult {
+			tag_name: "v1.2.3".to_string(),
+			from_commit: "abc1234567890".to_string(),
+			to_commit: "def5678901234".to_string(),
+			operation: monochange_core::RetargetOperation::Planned,
+			message: None,
+		}],
+		provider_results: Vec::new(),
+		status: "dry_run".to_string(),
+	}
+}
+
+fn write_blank_monochange_config(root: &Path) {
+	fs::write(root.join("monochange.toml"), "")
+		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+}
+
+fn create_release_record_history(root: &Path) {
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "release\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "monochange.toml", "release.txt"]);
+	let record = sample_release_record_for_retarget();
+	let release_record = monochange_core::render_release_record_block(&record)
+		.unwrap_or_else(|error| panic!("render release record: {error}"));
+	git_in_temp_repo(
+		root,
+		&[
+			"commit",
+			"-m",
+			"chore(release): prepare release",
+			"-m",
+			release_record.as_str(),
+		],
+	);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	fs::write(root.join("release.txt"), "follow-up\n")
+		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "fix: follow-up release change"]);
 }
 
 fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {

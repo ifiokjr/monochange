@@ -712,6 +712,10 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+	RetargetRelease {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	Command {
 		command: String,
 		#[serde(default, alias = "dry_run")]
@@ -741,6 +745,7 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { inputs }
 			| Self::AffectedPackages { inputs }
 			| Self::DiagnoseChangesets { inputs }
+			| Self::RetargetRelease { inputs }
 			| Self::Command { inputs, .. } => inputs,
 		}
 	}
@@ -758,6 +763,7 @@ impl CliStepDefinition {
 			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
 			Self::AffectedPackages { .. } => "AffectedPackages",
 			Self::DiagnoseChangesets { .. } => "DiagnoseChangesets",
+			Self::RetargetRelease { .. } => "RetargetRelease",
 			Self::Command { .. } => "Command",
 		}
 	}
@@ -790,6 +796,7 @@ impl CliStepDefinition {
 				Some(&["format", "changed_paths", "since", "verify", "label"])
 			}
 			Self::DiagnoseChangesets { .. } => Some(&["format", "changeset"]),
+			Self::RetargetRelease { .. } => Some(&["from", "target", "force", "sync_provider"]),
 			Self::Command { .. } => None,
 		}
 	}
@@ -829,6 +836,11 @@ impl CliStepDefinition {
 			Self::DiagnoseChangesets { .. } => match name {
 				"format" => Some(CliInputKind::Choice),
 				"changeset" => Some(CliInputKind::StringList),
+				_ => None,
+			},
+			Self::RetargetRelease { .. } => match name {
+				"from" | "target" => Some(CliInputKind::String),
+				"force" | "sync_provider" => Some(CliInputKind::Boolean),
 				_ => None,
 			},
 		}
@@ -2198,6 +2210,64 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::DiagnoseChangesets {
+				inputs: BTreeMap::new(),
+			}],
+		},
+		CliCommandDefinition {
+			name: "repair-release".to_string(),
+			help_text: Some(
+				"Repair a recent release by moving its release tags to a later commit".to_string(),
+			),
+			inputs: vec![
+				CliInputDefinition {
+					name: "from".to_string(),
+					kind: CliInputKind::String,
+					help_text: Some(
+						"Tag or commit-ish used to locate the release record".to_string(),
+					),
+					required: true,
+					default: None,
+					choices: Vec::new(),
+					short: None,
+				},
+				CliInputDefinition {
+					name: "target".to_string(),
+					kind: CliInputKind::String,
+					help_text: Some("Commit-ish the release set should move to".to_string()),
+					required: false,
+					default: Some("HEAD".to_string()),
+					choices: Vec::new(),
+					short: None,
+				},
+				CliInputDefinition {
+					name: "force".to_string(),
+					kind: CliInputKind::Boolean,
+					help_text: Some("Allow non-descendant retargets".to_string()),
+					required: false,
+					default: Some("false".to_string()),
+					choices: Vec::new(),
+					short: None,
+				},
+				CliInputDefinition {
+					name: "sync_provider".to_string(),
+					kind: CliInputKind::Boolean,
+					help_text: Some("Sync hosted release state after tag movement".to_string()),
+					required: false,
+					default: Some("true".to_string()),
+					choices: Vec::new(),
+					short: None,
+				},
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Output format".to_string()),
+					required: false,
+					default: Some("text".to_string()),
+					choices: vec!["text".to_string(), "json".to_string()],
+					short: None,
+				},
+			],
+			steps: vec![CliStepDefinition::RetargetRelease {
 				inputs: BTreeMap::new(),
 			}],
 		},
