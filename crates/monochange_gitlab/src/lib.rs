@@ -542,21 +542,36 @@ fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<(
 }
 
 fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
-	run_command(
-		{
-			let mut command = Command::new("git");
-			command
-				.current_dir(root)
-				.arg("commit")
-				.arg("--message")
-				.arg(&message.subject);
-			if let Some(body) = &message.body {
-				command.arg("--message").arg(body);
-			}
-			command
-		},
-		"commit release merge request changes",
-	)
+	let output = {
+		let mut command = Command::new("git");
+		command
+			.current_dir(root)
+			.arg("commit")
+			.arg("--message")
+			.arg(&message.subject);
+		if let Some(body) = &message.body {
+			command.arg("--message").arg(body);
+		}
+		command
+	}
+	.output()
+	.map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to commit release merge request changes: {error}"
+		))
+	})?;
+	if output.status.success() {
+		return Ok(());
+	}
+	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	if stderr.contains("nothing to commit") || stdout.contains("nothing to commit") {
+		return Ok(());
+	}
+	let detail = if stderr.is_empty() { stdout } else { stderr };
+	Err(MonochangeError::Config(format!(
+		"failed to commit release merge request changes: {detail}"
+	)))
 }
 
 fn git_push_branch(root: &Path, branch: &str) -> MonochangeResult<()> {

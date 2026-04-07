@@ -258,6 +258,7 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 			"discover",
 			"change",
 			"release",
+			"commit-release",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -301,6 +302,12 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 				inputs: BTreeMap::new(),
 			},
 			"PrepareRelease",
+		),
+		(
+			CliStepDefinition::CommitRelease {
+				inputs: BTreeMap::new(),
+			},
+			"CommitRelease",
 		),
 		(
 			CliStepDefinition::RenderReleaseManifest {
@@ -378,6 +385,14 @@ fn valid_input_names_returns_none_for_command_steps() {
 #[test]
 fn valid_input_names_returns_empty_for_validate() {
 	let step = CliStepDefinition::Validate {
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(step.valid_input_names(), Some([].as_slice()));
+}
+
+#[test]
+fn valid_input_names_returns_empty_for_commit_release() {
+	let step = CliStepDefinition::CommitRelease {
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.valid_input_names(), Some([].as_slice()));
@@ -490,6 +505,14 @@ fn expected_input_kind_returns_none_for_command_steps() {
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.expected_input_kind("anything"), None);
+}
+
+#[test]
+fn expected_input_kind_returns_none_for_commit_release() {
+	let step = CliStepDefinition::CommitRelease {
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(step.expected_input_kind("format"), None);
 }
 
 #[test]

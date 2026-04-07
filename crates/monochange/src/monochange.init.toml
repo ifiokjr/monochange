@@ -450,6 +450,7 @@ comment_on_failure = true
 #   Discover             — discover packages across ecosystems
 #   CreateChangeFile     — create a .changeset/*.md file
 #   PrepareRelease       — compute release plan, update versions, changelogs
+#   CommitRelease        — create a local release commit (requires PrepareRelease)
 #   RenderReleaseManifest — write release-manifest.json (requires PrepareRelease)
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
@@ -484,6 +485,7 @@ comment_on_failure = true
 #                     released_packages, changed_files, updated_changelogs,
 #                     deleted_changesets, changeset_paths, targets
 #   manifest.path   — from RenderReleaseManifest: path to the written manifest
+#   release_commit.* — from CommitRelease: subject, body, commit, tracked_paths, status
 #   affected.*      — from AffectedPackages: status, summary
 #   steps.ID.*      — from Command steps with id: stdout, stderr
 #
@@ -563,6 +565,21 @@ default = "text"
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+
+[cli.commit-release]
+help_text = "Prepare a release and create a local release commit"
+
+[[cli.commit-release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.commit-release.steps]]
+type = "PrepareRelease"
+
+[[cli.commit-release.steps]]
+type = "CommitRelease"
 
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"
