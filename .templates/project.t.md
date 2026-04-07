@@ -429,44 +429,42 @@ build:book
 
 <!-- {@projectCoreWorkflow} -->
 
-Initialize the repository with detected packages, groups, and default CLI commands:
+Generate a starter config from the packages MonoChange detects:
 
 ```bash
 mc init
 ```
 
-The generated `monochange.toml` becomes the source of truth for top-level commands like `mc validate`, `mc discover`, `mc change`, and `mc release`.
+`mc init` writes an annotated `monochange.toml`, so most first-time users can start with the generated file instead of hand-authoring config.
 
-Validate the repository:
+Validate the workspace:
 
 ```bash
 mc validate
 ```
 
-Discover the workspace:
+Discover the package ids you will use in commands and changesets:
 
 ```bash
 mc discover --format json
 ```
 
-Create a change file:
+Create one change file for a package id:
 
 ```bash
-mc change --package monochange --bump minor --reason "add release planning"
+mc change --package <id> --bump patch --reason "describe the change"
 ```
 
-Prefer package ids for authored changes whenever a leaf package changed. MonoChange will propagate bumps to dependents and synchronize configured groups for you, so group ids are best reserved for intentionally group-owned changes.
+Most changes should target a package id. Use group ids only when the change is intentionally owned by the whole group.
 
-Preview the release command:
+Preview the release plan safely:
 
 ```bash
 mc release --dry-run --format json
 ```
 
-Prepare the release:
+This first run is safe: nothing is published. Stop here until you are ready to prepare release files locally.
 
-```bash
-mc release
-```
+When you are ready to prepare the release locally, run `mc release`.
 
 <!-- {/projectCoreWorkflow} -->

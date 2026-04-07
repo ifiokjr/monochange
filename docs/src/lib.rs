@@ -12,6 +12,7 @@ doc_comment::doctest!("../../crates/monochange_dart/readme.md");
 doc_comment::doctest!("../../crates/monochange_semver/readme.md");
 
 doc_comment::doctest!("readme.md");
+doc_comment::doctest!("guide/00-start-here.md");
 doc_comment::doctest!("guide/01-installation.md");
 doc_comment::doctest!("guide/02-setup.md");
 doc_comment::doctest!("guide/03-discovery.md");
