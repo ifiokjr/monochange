@@ -1,0 +1,16 @@
+---
+source: crates/monochange/tests/release_notes_and_propagation.rs
+expression: app_decision
+---
+{
+  "bump": "minor",
+  "package": "cargo:crates/app/Cargo.toml",
+  "plannedVersion": "1.1.0",
+  "reasons": [
+    "depends on `cargo:crates/core/Cargo.toml`"
+  ],
+  "trigger": "transitive-dependency",
+  "upstreamSources": [
+    "cargo:crates/core/Cargo.toml"
+  ]
+}

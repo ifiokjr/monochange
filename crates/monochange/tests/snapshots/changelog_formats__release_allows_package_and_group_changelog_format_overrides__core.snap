@@ -1,0 +1,9 @@
+---
+source: crates/monochange/tests/changelog_formats.rs
+expression: core_changelog
+---
+## [1.1.0 ([DATE])]
+
+### Features
+
+- add keep a changelog support

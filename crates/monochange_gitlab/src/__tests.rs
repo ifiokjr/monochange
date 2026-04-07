@@ -7,6 +7,7 @@ use httpmock::Method::PATCH;
 use httpmock::Method::POST;
 use httpmock::Method::PUT;
 use httpmock::MockServer;
+use insta::assert_snapshot;
 use monochange_core::BotSettings;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeRequestSettings;
@@ -59,8 +60,10 @@ fn build_release_pull_request_request_uses_gitlab_provider_and_sanitized_branch(
 	assert_eq!(request.repository, "group/monochange");
 	assert_eq!(request.base_branch, "main");
 	assert_eq!(request.head_branch, "monochange/release/release-pr");
-	assert!(request.body.contains("## Prepared release"));
-	assert!(request.body.contains("## Changed files"));
+	assert_snapshot!(
+		"build_release_pull_request_request_uses_gitlab_provider_and_sanitized_branch__body",
+		request.body
+	);
 }
 
 #[test]
@@ -220,9 +223,10 @@ fn release_body_supports_generated_notes_and_minimal_fallback() {
 		.unwrap_or_else(|| panic!("expected release target"));
 	let body = release_body(&sample_source(None), &manifest, target)
 		.unwrap_or_else(|| panic!("expected release body"));
-	assert!(body.contains("Release target `sdk`"));
-	assert!(body.contains("Members: core, app"));
-	assert!(body.contains("- add provider automation"));
+	assert_snapshot!(
+		"release_body_supports_generated_notes_and_minimal_fallback__minimal_body",
+		body
+	);
 }
 
 #[test]
@@ -230,9 +234,10 @@ fn release_pull_request_body_uses_minimal_notes_when_changelog_is_missing() {
 	let manifest = sample_manifest_without_changelog();
 	let body = release_pull_request_body(&manifest);
 
-	assert!(body.contains("### sdk 1.2.0"));
-	assert!(body.contains("Release target `sdk`"));
-	assert!(body.contains("## Changed files"));
+	assert_snapshot!(
+		"release_pull_request_body_uses_minimal_notes_when_changelog_is_missing__body",
+		body
+	);
 }
 
 #[test]

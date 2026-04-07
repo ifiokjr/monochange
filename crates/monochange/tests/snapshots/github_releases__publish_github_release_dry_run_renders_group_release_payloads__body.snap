@@ -1,0 +1,15 @@
+---
+source: crates/monochange/tests/github_releases.rs
+expression: "github_releases[0][\"body\"].as_str().unwrap_or_else(||\npanic!(\"expected GitHub release body\"))"
+---
+## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])
+
+Grouped release for `sdk`.
+
+Changed members: core
+
+Synchronized members: app
+
+### Features
+
+- **core**: add feature

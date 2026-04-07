@@ -1,0 +1,17 @@
+---
+source: crates/monochange/tests/release_notes_and_propagation.rs
+expression: group_changelog
+---
+# Changelog
+
+## 1.1.0 ([DATE])
+
+Grouped release for `sdk`.
+
+Changed members: core
+
+Synchronized members: app
+
+### Features
+
+- **core**: add core feature

@@ -21,6 +21,7 @@ urlencoding = { workspace = true, default-features = true }
 
 [dev-dependencies]
 httpmock = { workspace = true, default-features = true }
+insta = { workspace = true, default-features = true }
 temp-env = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 

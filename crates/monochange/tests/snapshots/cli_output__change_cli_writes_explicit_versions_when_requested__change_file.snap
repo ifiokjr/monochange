@@ -1,0 +1,11 @@
+---
+source: crates/monochange/tests/cli_output.rs
+expression: change_file
+---
+---
+core:
+  bump: major
+  version: "2.0.0"
+---
+
+# promote to stable

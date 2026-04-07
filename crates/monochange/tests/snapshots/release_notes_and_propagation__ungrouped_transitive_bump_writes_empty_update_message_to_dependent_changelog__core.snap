@@ -1,0 +1,11 @@
+---
+source: crates/monochange/tests/release_notes_and_propagation.rs
+expression: core_changelog
+---
+# Changelog
+
+## core 1.1.0 ([DATE])
+
+### Features
+
+- add core feature

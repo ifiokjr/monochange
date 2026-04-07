@@ -345,6 +345,7 @@ pub async fn run_server() {
 mod __tests {
 	use std::fs;
 
+	use insta::assert_snapshot;
 	use rmcp::handler::server::wrapper::Parameters;
 	use tempfile::tempdir;
 
@@ -353,6 +354,19 @@ mod __tests {
 	use super::McpChangeBump;
 	use super::MonochangeMcpServer;
 	use super::PathParam;
+
+	fn snapshot_settings() -> insta::Settings {
+		let mut settings = insta::Settings::clone_current();
+		settings.add_filter(r"/private/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
+		settings.add_filter(r"/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
+		settings.add_filter(r"/private/tmp/[^/\s]+", "[ROOT]");
+		settings.add_filter(r"/tmp/[^/\s]+", "[ROOT]");
+		settings.add_filter(r"/home/runner/work/_temp/[^/\s]+", "[ROOT]");
+		settings.add_filter(r"\b[A-Z]:\\[^\s]+?\\Temp\\[^\\\s]+", "[ROOT]");
+		settings.add_filter(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "[DATETIME]");
+		settings.add_filter(r"\d{4}-\d{2}-\d{2}", "[DATE]");
+		settings
+	}
 
 	fn content_text(result: &rmcp::model::CallToolResult) -> String {
 		result
@@ -367,6 +381,7 @@ mod __tests {
 
 	#[tokio::test]
 	async fn discover_reports_workspace_packages() {
+		let _snapshot = snapshot_settings().bind_to_scope();
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		fs::create_dir_all(tempdir.path().join("crates/core"))
 			.unwrap_or_else(|error| panic!("mkdir: {error}"));
@@ -383,11 +398,15 @@ mod __tests {
 			.await
 			.unwrap_or_else(|error| panic!("discover: {error}"));
 
-		assert!(content_text(&result).contains("Discovered 1 package(s)"));
+		assert_snapshot!(
+			"discover_reports_workspace_packages__response",
+			content_text(&result)
+		);
 	}
 
 	#[tokio::test]
 	async fn change_writes_markdown_changeset() {
+		let _snapshot = snapshot_settings().bind_to_scope();
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		fs::create_dir_all(tempdir.path().join("crates/core"))
 			.unwrap_or_else(|error| panic!("mkdir: {error}"));
@@ -426,10 +445,13 @@ type = "cargo"
 			.await
 			.unwrap_or_else(|error| panic!("change: {error}"));
 
-		assert!(content_text(&result).contains("Wrote change file"));
+		assert_snapshot!(
+			"change_writes_markdown_changeset__response",
+			content_text(&result)
+		);
 		let contents = fs::read_to_string(tempdir.path().join(".changeset/core.md"))
 			.unwrap_or_else(|error| panic!("changeset read: {error}"));
-		assert!(contents.contains("core: patch"));
+		assert_snapshot!("change_writes_markdown_changeset__changeset", contents);
 	}
 
 	#[test]
@@ -490,6 +512,7 @@ extra_changelog_sections = [{ name = "Documentation", types = ["docs"] }]
 
 	#[tokio::test]
 	async fn affected_packages_reports_success_for_documentation_only_changes() {
+		let _snapshot = snapshot_settings().bind_to_scope();
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		fs::write(
 			tempdir.path().join("monochange.toml"),
@@ -535,11 +558,9 @@ type = "AffectedPackages"
 			.await
 			.unwrap_or_else(|error| panic!("affected: {error}"));
 
-		let text = content_text(&result);
-		assert!(text.contains("\"ok\": true"));
-		assert!(text.contains("\"status\": "));
-		assert!(
-			text.contains("not_required") || text.contains("skipped") || text.contains("passed")
+		assert_snapshot!(
+			"affected_packages_reports_success_for_documentation_only_changes__response",
+			content_text(&result)
 		);
 	}
 }

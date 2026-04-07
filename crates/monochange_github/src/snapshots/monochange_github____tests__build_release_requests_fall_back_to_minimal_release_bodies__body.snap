@@ -1,0 +1,9 @@
+---
+source: crates/monochange_github/src/__tests.rs
+expression: "request.body.as_deref().unwrap_or_else(|| panic!(\"expected release body\"))"
+---
+Release target `core`
+
+Members: cargo:crates/core/Cargo.toml
+
+- fix race condition

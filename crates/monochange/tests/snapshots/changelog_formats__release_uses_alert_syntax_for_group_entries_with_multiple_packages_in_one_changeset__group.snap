@@ -1,0 +1,16 @@
+---
+source: crates/monochange/tests/changelog_formats.rs
+expression: group_changelog
+---
+## 1.1.0 ([DATE])
+
+Grouped release for `sdk`.
+
+Changed members: core, app
+
+### Features
+
+> [!NOTE]
+> *core*, *app*
+
+- add shared release note
