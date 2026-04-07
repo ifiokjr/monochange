@@ -155,6 +155,7 @@ in
         fix:clippy
         docs:update # runs `mdt update`
         fix:format
+        mc validate
       '';
       description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
       binary = "bash";
@@ -190,6 +191,7 @@ in
         lint:format
         deny:check
         docs:check
+        mc validate
       '';
       description = "Run all checks.";
       binary = "bash";
