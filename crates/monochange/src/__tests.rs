@@ -328,7 +328,7 @@ fn changes_add_supports_release_note_type_and_details() {
 	let content = fs::read_to_string(&output_path)
 		.unwrap_or_else(|error| panic!("read change file: {error}"));
 
-	assert!(content.contains("type:"));
+	assert!(!content.contains("type:"));
 	assert!(content.contains("sdk-core: security"));
 	assert!(content.contains("# rotate signing keys"));
 	assert!(content.contains("Roll the signing key before the release window closes."));
@@ -371,7 +371,6 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 		"default output",
 		None,
 		None,
-		&[],
 		None,
 	)
 	.unwrap_or_else(|error| panic!("default change file: {error}"));
@@ -384,12 +383,12 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 }
 
 #[test]
-fn changes_add_supports_evidence_and_round_trips_into_plan_release() {
+fn changes_add_rejects_legacy_evidence_input() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let output_path = tempdir.path().join("major.md");
 
-	run_cli(
+	let error = run_cli(
 		&fixture_root,
 		[
 			OsString::from("mc"),
@@ -403,21 +402,14 @@ fn changes_add_supports_evidence_and_round_trips_into_plan_release() {
 			OsString::from("--evidence"),
 			OsString::from("rust-semver:major:public API break detected"),
 			OsString::from("--output"),
-			output_path.clone().into_os_string(),
+			output_path.into_os_string(),
 		],
 	)
-	.unwrap_or_else(|error| panic!("change file output: {error}"));
-	let content = fs::read_to_string(&output_path)
-		.unwrap_or_else(|error| panic!("read change file: {error}"));
-	let plan = plan_release(&fixture_root, &output_path)
-		.unwrap_or_else(|error| panic!("release plan: {error}"));
+	.expect_err("legacy evidence input should be rejected");
 
-	assert!(content.contains("evidence:"));
-	assert!(content.contains("rust-semver:major:public API break detected"));
-	assert!(plan
-		.compatibility_evidence
-		.iter()
-		.any(|assessment| assessment.severity.to_string() == "major"));
+	assert!(error
+		.to_string()
+		.contains("unexpected argument '--evidence'"));
 }
 
 #[test]
@@ -443,11 +435,11 @@ fn changes_add_rejects_unknown_package_references() {
 }
 
 #[test]
-fn release_dry_run_json_output_contains_compatibility_evidence() {
+fn release_dry_run_rejects_legacy_origin_and_evidence_metadata() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
 	copy_fixture("monochange/release-with-compat-evidence", tempdir.path());
-	let output = run_cli(
+	let error = run_cli(
 		tempdir.path(),
 		[
 			OsString::from("mc"),
@@ -457,24 +449,11 @@ fn release_dry_run_json_output_contains_compatibility_evidence() {
 			OsString::from("json"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("release output: {error}"));
-	let parsed: serde_json::Value =
-		serde_json::from_str(&output).unwrap_or_else(|e| panic!("json: {e}"));
-	assert_eq!(
-		parsed["plan"]["compatibilityEvidence"]
-			.as_array()
-			.map(Vec::len),
-		Some(1)
-	);
-	assert_eq!(
-		parsed["plan"]["compatibilityEvidence"][0]["severity"].as_str(),
-		Some("major")
-	);
-	assert!(parsed["plan"]["decisions"]
-		.as_array()
-		.unwrap_or_else(|| panic!("decisions"))
-		.iter()
-		.any(|d| d["bump"].as_str() == Some("major")));
+	.expect_err("legacy metadata should be rejected");
+
+	assert!(error
+		.to_string()
+		.contains("target `origin` uses unsupported field(s): core"));
 }
 
 #[test]

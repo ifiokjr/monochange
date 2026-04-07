@@ -1,7 +1,5 @@
 ---
-core: patch
-type:
-  core: security
+core: security
 ---
 
 #### rotate signing keys

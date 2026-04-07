@@ -159,6 +159,7 @@ pub enum OutputFormat {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum ChangeBump {
+	None,
 	Patch,
 	Minor,
 	Major,
@@ -167,6 +168,7 @@ pub enum ChangeBump {
 impl From<ChangeBump> for BumpSeverity {
 	fn from(value: ChangeBump) -> Self {
 		match value {
+			ChangeBump::None => Self::None,
 			ChangeBump::Patch => Self::Patch,
 			ChangeBump::Minor => Self::Minor,
 			ChangeBump::Major => Self::Major,
@@ -965,7 +967,20 @@ fn execute_cli_command(
 					let bump = step_inputs
 						.get("bump")
 						.and_then(|values| values.first())
-						.map_or(Ok(ChangeBump::Patch), |value| parse_change_bump(value))?;
+						.map_or_else(
+							|| {
+								if step_inputs
+									.get("type")
+									.and_then(|values| values.first())
+									.is_some()
+								{
+									Ok(ChangeBump::None)
+								} else {
+									Ok(ChangeBump::Patch)
+								}
+							},
+							|value| parse_change_bump(value),
+						)?;
 					let version = step_inputs
 						.get("version")
 						.and_then(|values| values.first())
@@ -987,7 +1002,6 @@ fn execute_cli_command(
 						.get("details")
 						.and_then(|values| values.first())
 						.cloned();
-					let evidence = step_inputs.get("evidence").cloned().unwrap_or_default();
 					let output_path = step_inputs
 						.get("output")
 						.and_then(|values| values.first())
@@ -1000,7 +1014,6 @@ fn execute_cli_command(
 						&reason,
 						change_type.as_deref(),
 						details.as_deref(),
-						&evidence,
 						output_path.as_deref(),
 					)?;
 					output = Some(format!(
@@ -1797,6 +1810,7 @@ fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
 
 fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 	match value {
+		"none" => Ok(ChangeBump::None),
 		"patch" => Ok(ChangeBump::Patch),
 		"minor" => Ok(ChangeBump::Minor),
 		"major" => Ok(ChangeBump::Major),
@@ -2530,7 +2544,6 @@ pub fn add_change_file(
 	reason: &str,
 	change_type: Option<&str>,
 	details: Option<&str>,
-	evidence: &[String],
 	output: Option<&Path>,
 ) -> MonochangeResult<PathBuf> {
 	let configuration = load_workspace_configuration(root)?;
@@ -2554,14 +2567,14 @@ pub fn add_change_file(
 	}
 
 	let content = render_changeset_markdown(
+		&configuration,
 		&packages,
 		bump,
 		version,
 		reason,
 		change_type,
 		details,
-		evidence,
-	);
+	)?;
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write {}: {error}",
@@ -2591,7 +2604,8 @@ fn add_interactive_change_file(
 		})?;
 	}
 
-	let content = render_interactive_changeset_markdown(result);
+	let configuration = load_workspace_configuration(root)?;
+	let content = render_interactive_changeset_markdown(&configuration, result)?;
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write {}: {error}",
@@ -2601,29 +2615,86 @@ fn add_interactive_change_file(
 	Ok(output_path)
 }
 
-fn render_interactive_changeset_markdown(result: &interactive::InteractiveChangeResult) -> String {
+fn change_type_default_bump(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	target_id: &str,
+	change_type: &str,
+) -> Option<BumpSeverity> {
+	let sections = if let Some(package) = configuration.package_by_id(target_id) {
+		package.extra_changelog_sections.as_slice()
+	} else if let Some(group) = configuration.group_by_id(target_id) {
+		group.extra_changelog_sections.as_slice()
+	} else {
+		return None;
+	};
+	sections.iter().find_map(|section| {
+		section
+			.types
+			.iter()
+			.any(|candidate| candidate.trim() == change_type)
+			.then_some(section.default_bump.unwrap_or(BumpSeverity::None))
+	})
+}
+
+fn render_change_target_markdown(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	target_id: &str,
+	bump: BumpSeverity,
+	version: Option<&str>,
+	change_type: Option<&str>,
+) -> MonochangeResult<Vec<String>> {
+	if change_type.is_none() && version.is_none() && bump == BumpSeverity::None {
+		return Err(MonochangeError::Config(format!(
+			"target `{target_id}` must not use a `none` bump without also declaring `type` or `version`"
+		)));
+	}
+	let mut lines = Vec::new();
+	if let Some(change_type) = change_type.filter(|value| !value.trim().is_empty()) {
+		let default_bump = change_type_default_bump(configuration, target_id, change_type)
+			.ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"target `{target_id}` uses unknown change type `{change_type}`"
+				))
+			})?;
+		if version.is_none() && bump == default_bump {
+			lines.push(format!("{target_id}: {change_type}"));
+			return Ok(lines);
+		}
+		lines.push(format!("{target_id}:"));
+		if bump != BumpSeverity::None {
+			lines.push(format!("  bump: {bump}"));
+		}
+		lines.push(format!("  type: {change_type}"));
+		if let Some(version) = version {
+			lines.push(format!("  version: \"{version}\""));
+		}
+		return Ok(lines);
+	}
+	if let Some(version) = version {
+		lines.push(format!("{target_id}:"));
+		if bump != BumpSeverity::None {
+			lines.push(format!("  bump: {bump}"));
+		}
+		lines.push(format!("  version: \"{version}\""));
+		return Ok(lines);
+	}
+	lines.push(format!("{target_id}: {bump}"));
+	Ok(lines)
+}
+
+fn render_interactive_changeset_markdown(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	result: &interactive::InteractiveChangeResult,
+) -> MonochangeResult<String> {
 	let mut lines = vec!["---".to_string()];
 	for target in &result.targets {
-		if let Some(version) = &target.version {
-			lines.push(format!("{}:", target.id));
-			lines.push(format!("  bump: {}", target.bump));
-			lines.push(format!("  version: \"{version}\""));
-		} else {
-			lines.push(format!("{}: {}", target.id, target.bump));
-		}
-	}
-	let typed_targets = result
-		.targets
-		.iter()
-		.filter(|target| target.change_type.is_some())
-		.collect::<Vec<_>>();
-	if !typed_targets.is_empty() {
-		lines.push("type:".to_string());
-		for target in &typed_targets {
-			if let Some(change_type) = &target.change_type {
-				lines.push(format!("  {}: {change_type}", target.id));
-			}
-		}
+		lines.extend(render_change_target_markdown(
+			configuration,
+			&target.id,
+			target.bump,
+			target.version.as_deref(),
+			target.change_type.as_deref(),
+		)?);
 	}
 	lines.push("---".to_string());
 	lines.push(String::new());
@@ -2637,7 +2708,7 @@ fn render_interactive_changeset_markdown(result: &interactive::InteractiveChange
 		lines.push(details.trim().to_string());
 	}
 	lines.push(String::new());
-	lines.join("\n")
+	Ok(lines.join("\n"))
 }
 
 pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<ReleasePlan> {
@@ -5518,38 +5589,23 @@ fn default_change_path(root: &Path, package_refs: &[String]) -> PathBuf {
 }
 
 fn render_changeset_markdown(
+	configuration: &monochange_core::WorkspaceConfiguration,
 	package_refs: &[String],
 	bump: BumpSeverity,
 	version: Option<&str>,
 	reason: &str,
 	change_type: Option<&str>,
 	details: Option<&str>,
-	evidence: &[String],
-) -> String {
+) -> MonochangeResult<String> {
 	let mut lines = vec!["---".to_string()];
 	for package in package_refs {
-		if let Some(version) = version {
-			lines.push(format!("{package}:"));
-			lines.push(format!("  bump: {bump}"));
-			lines.push(format!("  version: \"{version}\""));
-		} else {
-			lines.push(format!("{package}: {bump}"));
-		}
-	}
-	if let Some(change_type) = change_type.filter(|value| !value.trim().is_empty()) {
-		lines.push("type:".to_string());
-		for package in package_refs {
-			lines.push(format!("  {package}: {change_type}"));
-		}
-	}
-	if !evidence.is_empty() {
-		lines.push("evidence:".to_string());
-		for package in package_refs {
-			lines.push(format!("  {package}:"));
-			for item in evidence {
-				lines.push(format!("    - {item}"));
-			}
-		}
+		lines.extend(render_change_target_markdown(
+			configuration,
+			package,
+			bump,
+			version,
+			change_type,
+		)?);
 	}
 	lines.push("---".to_string());
 	lines.push(String::new());
@@ -5559,7 +5615,7 @@ fn render_changeset_markdown(
 		lines.push(details.trim().to_string());
 	}
 	lines.push(String::new());
-	lines.join("\n")
+	Ok(lines.join("\n"))
 }
 
 fn format_publish_state(publish_state: monochange_core::PublishState) -> &'static str {

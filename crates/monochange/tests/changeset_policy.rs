@@ -142,7 +142,7 @@ fn verify_reports_invalid_attached_changesets() {
 		errors.iter().any(|error| {
 			error
 				.as_str()
-				.is_some_and(|msg| msg.contains("must map to `patch`, `minor`, or `major`"))
+				.is_some_and(|msg| msg.contains("invalid scalar value `nope`"))
 		})
 	}));
 	assert!(json["comment"]

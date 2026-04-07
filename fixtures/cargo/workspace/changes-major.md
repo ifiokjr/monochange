@@ -1,8 +1,5 @@
 ---
-core: patch
-evidence:
-  core:
-    - rust-semver:major:public API break detected
+core: major
 ---
 
 #### breaking API change

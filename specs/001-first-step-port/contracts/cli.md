@@ -34,8 +34,8 @@ monochange discover --format <text|json>
 ## Command 3: Change File Creation
 
 ```bash
-mc change --package <id>... --reason <text> [--bump <patch|minor|major>] [--evidence <value>...] [--output <path>]
-monochange change --package <id>... --reason <text> [--bump <patch|minor|major>] [--evidence <value>...] [--output <path>]
+mc change --package <id>... --reason <text> [--bump <none|patch|minor|major>] [--type <section-type>] [--output <path>]
+monochange change --package <id>... --reason <text> [--bump <none|patch|minor|major>] [--type <section-type>] [--output <path>]
 ```
 
 ### Behavior
