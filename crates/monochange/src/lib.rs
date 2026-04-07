@@ -103,6 +103,7 @@ use monochange_core::CommitMessage;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::ExtraChangelogSection;
+use monochange_core::GroupChangelogInclude;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
@@ -120,6 +121,7 @@ use monochange_core::PreparedChangesetTarget;
 
 use monochange_core::parse_release_record_block;
 use monochange_core::render_release_record_block;
+use monochange_core::ChangesetTargetKind;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestCompatibilityEvidence;
@@ -4009,6 +4011,10 @@ fn build_changelog_updates(
 			)
 		})
 		.collect::<BTreeMap<_, _>>();
+	let changeset_targets_by_path = changesets
+		.iter()
+		.map(|changeset| (changeset.path.clone(), changeset.targets.clone()))
+		.collect::<BTreeMap<_, _>>();
 	let release_note_changes = change_signals
 		.iter()
 		.filter_map(|signal| {
@@ -4136,6 +4142,7 @@ fn build_changelog_updates(
 			group_definition,
 			planned_group,
 			&release_note_changes,
+			&changeset_targets_by_path,
 			packages,
 			&planned_version.to_string(),
 		);
@@ -4588,10 +4595,11 @@ fn group_release_note_changes(
 	group_definition: Option<&monochange_core::GroupDefinition>,
 	planned_group: &monochange_core::PlannedVersionGroup,
 	release_note_changes: &BTreeMap<String, Vec<ReleaseNoteChange>>,
+	changeset_targets_by_path: &BTreeMap<PathBuf, Vec<PreparedChangesetTarget>>,
 	packages: &[PackageRecord],
 	planned_version: &str,
 ) -> Vec<ReleaseNoteChange> {
-	let mut changes = planned_group
+	let unfiltered_changes = planned_group
 		.members
 		.iter()
 		.flat_map(|member_id| {
@@ -4602,19 +4610,35 @@ fn group_release_note_changes(
 				.cloned()
 		})
 		.collect::<Vec<_>>();
+	let mut changes = unfiltered_changes
+		.iter()
+		.filter_map(|change| {
+			filter_group_release_note_change(
+				change,
+				group_definition,
+				planned_group,
+				changeset_targets_by_path,
+			)
+		})
+		.collect::<Vec<_>>();
 	if changes.is_empty() {
-		changes.push(ReleaseNoteChange {
-			package_id: planned_group.group_id.clone(),
-			package_name: planned_group.group_id.clone(),
-			package_labels: Vec::new(),
-			source_path: None,
-			summary: render_group_empty_update_message(
+		let summary = if unfiltered_changes.is_empty() {
+			render_group_empty_update_message(
 				configuration,
 				group_definition,
 				planned_group,
 				planned_version,
 				packages,
-			),
+			)
+		} else {
+			render_group_filtered_update_message(&planned_group.group_id)
+		};
+		changes.push(ReleaseNoteChange {
+			package_id: planned_group.group_id.clone(),
+			package_name: planned_group.group_id.clone(),
+			package_labels: Vec::new(),
+			source_path: None,
+			summary,
 			details: None,
 			bump: planned_group.recommended_bump,
 			change_type: None,
@@ -4637,6 +4661,61 @@ fn group_release_note_changes(
 		changes = aggregate_group_release_note_changes(changes);
 	}
 	changes
+}
+
+fn filter_group_release_note_change(
+	change: &ReleaseNoteChange,
+	group_definition: Option<&monochange_core::GroupDefinition>,
+	planned_group: &monochange_core::PlannedVersionGroup,
+	changeset_targets_by_path: &BTreeMap<PathBuf, Vec<PreparedChangesetTarget>>,
+) -> Option<ReleaseNoteChange> {
+	let source_path = change.source_path.as_ref().map(PathBuf::from)?;
+	let targets = changeset_targets_by_path.get(&source_path)?;
+	if targets.iter().any(|target| {
+		target.kind == ChangesetTargetKind::Group && target.id == planned_group.group_id
+	}) {
+		let mut change = change.clone();
+		change.package_name.clone_from(&planned_group.group_id);
+		return Some(change);
+	}
+	let in_group_targets = targets
+		.iter()
+		.filter(|target| {
+			target.kind == ChangesetTargetKind::Package
+				&& group_definition
+					.is_some_and(|group| group.packages.iter().any(|member| member == &target.id))
+		})
+		.map(|target| target.id.clone())
+		.collect::<BTreeSet<_>>();
+	if in_group_targets.is_empty() {
+		return None;
+	}
+	let default_include = GroupChangelogInclude::All;
+	let include = group_definition.map_or(&default_include, |group| &group.changelog_include);
+	if group_changelog_include_allows(include, &in_group_targets) {
+		Some(change.clone())
+	} else {
+		None
+	}
+}
+
+fn group_changelog_include_allows(
+	include: &GroupChangelogInclude,
+	in_group_targets: &BTreeSet<String>,
+) -> bool {
+	match include {
+		GroupChangelogInclude::All => true,
+		GroupChangelogInclude::GroupOnly => false,
+		GroupChangelogInclude::Selected(selected) => in_group_targets
+			.iter()
+			.all(|package_id| selected.contains(package_id)),
+	}
+}
+
+fn render_group_filtered_update_message(group_id: &str) -> String {
+	format!(
+		"No group-facing notes were recorded for this release. Member packages were updated as part of the synchronized group `{group_id}` version, but their changes are not configured for inclusion in this changelog."
+	)
 }
 
 fn aggregate_group_release_note_changes(changes: Vec<ReleaseNoteChange>) -> Vec<ReleaseNoteChange> {

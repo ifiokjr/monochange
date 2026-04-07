@@ -17,6 +17,7 @@ use crate::DependencyKind;
 
 use crate::Ecosystem;
 use crate::EcosystemSettings;
+use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
 use crate::PackageDefinition;
 use crate::PackageDependency;
@@ -782,6 +783,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				path: PathBuf::from("changelog.md"),
 				format: ChangelogFormat::Monochange,
 			}),
+			changelog_include: GroupChangelogInclude::All,
 			extra_changelog_sections: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
@@ -799,6 +801,26 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		deno: EcosystemSettings::default(),
 		dart: EcosystemSettings::default(),
 	}
+}
+
+#[test]
+fn group_definition_defaults_changelog_include_when_omitted() {
+	let group: GroupDefinition = serde_json::from_value(json!({
+		"id": "sdk",
+		"packages": ["core", "app"],
+		"changelog": null,
+		"extra_changelog_sections": [],
+		"empty_update_message": null,
+		"release_title": null,
+		"changelog_version_title": null,
+		"versioned_files": [],
+		"tag": false,
+		"release": false,
+		"version_format": "namespaced"
+	}))
+	.unwrap_or_else(|error| panic!("group: {error}"));
+
+	assert_eq!(group.changelog_include, GroupChangelogInclude::All);
 }
 
 #[test]

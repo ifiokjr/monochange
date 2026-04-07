@@ -117,6 +117,7 @@ use monochange_core::GitHubConfiguration;
 use monochange_core::GitHubPullRequestSettings;
 use monochange_core::GitHubReleaseNotesSource;
 use monochange_core::GitHubReleaseSettings;
+use monochange_core::GroupChangelogInclude;
 use monochange_core::GroupDefinition;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -241,6 +242,13 @@ enum RawChangelogConfig {
 	Detailed(RawChangelogTable),
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum RawGroupChangelogInclude {
+	Mode(String),
+	Packages(Vec<String>),
+}
+
 #[derive(Debug, Clone, Deserialize, Default)]
 struct RawChangelogTable {
 	#[serde(default)]
@@ -249,6 +257,8 @@ struct RawChangelogTable {
 	path: Option<String>,
 	#[serde(default)]
 	format: Option<ChangelogFormat>,
+	#[serde(default)]
+	include: Option<RawGroupChangelogInclude>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -625,6 +635,13 @@ impl RawChangelogConfig {
 		}
 	}
 
+	fn include(&self) -> Option<&RawGroupChangelogInclude> {
+		match self {
+			Self::Legacy(_) => None,
+			Self::Detailed(table) => table.include.as_ref(),
+		}
+	}
+
 	fn is_disabled(&self) -> bool {
 		match self {
 			Self::Legacy(definition) => {
@@ -686,6 +703,89 @@ impl RawChangelogConfig {
 					return None;
 				}
 				table.path.as_ref().map(PathBuf::from)
+			}
+		}
+	}
+}
+
+fn parse_group_changelog_include(
+	config_contents: &str,
+	group_id: &str,
+	group_packages: &[String],
+	include: Option<&RawGroupChangelogInclude>,
+) -> MonochangeResult<GroupChangelogInclude> {
+	let Some(include) = include else {
+		return Ok(GroupChangelogInclude::All);
+	};
+	match include {
+		RawGroupChangelogInclude::Mode(mode) => match mode.as_str() {
+			"all" => Ok(GroupChangelogInclude::All),
+			"group-only" => Ok(GroupChangelogInclude::GroupOnly),
+			_ => Err(config_diagnostic(
+				config_contents,
+				format!(
+					"group `{group_id}` changelog include must be `\"all\"`, `\"group-only\"`, or an array of member package ids"
+				),
+				vec![config_field_label(
+					config_contents,
+					"group",
+					&format!("{group_id}.changelog"),
+					"include",
+					"group changelog include",
+				)],
+				Some(
+					"use `include = \"all\"`, `include = \"group-only\"`, or `include = [\"member-id\"]`"
+						.to_string(),
+				),
+			)),
+		},
+		RawGroupChangelogInclude::Packages(package_ids) => {
+			let mut selected = BTreeSet::new();
+			for package_id in package_ids {
+				if package_id.trim().is_empty() {
+					return Err(config_diagnostic(
+						config_contents,
+						format!(
+							"group `{group_id}` changelog include entries must not be empty"
+						),
+						vec![config_field_label(
+							config_contents,
+							"group",
+							&format!("{group_id}.changelog"),
+							"include",
+							"group changelog include member",
+						)],
+						Some(
+							"remove the empty value or replace it with a package id declared in the group"
+								.to_string(),
+						),
+					));
+				}
+				if !group_packages.iter().any(|member| member == package_id) {
+					return Err(config_diagnostic(
+						config_contents,
+						format!(
+							"group `{group_id}` changelog include entry `{package_id}` must reference a package declared in that group"
+						),
+						vec![config_field_label(
+							config_contents,
+							"group",
+							&format!("{group_id}.changelog"),
+							"include",
+							"group changelog include member",
+						)],
+						Some(
+							"list only package ids from `group.<id>.packages` in `group.<id>.changelog.include`"
+								.to_string(),
+						),
+					));
+				}
+				selected.insert(package_id.clone());
+			}
+			if selected.is_empty() {
+				Ok(GroupChangelogInclude::GroupOnly)
+			} else {
+				Ok(GroupChangelogInclude::Selected(selected))
 			}
 		}
 	}
@@ -945,10 +1045,17 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 					}
 				},
 			};
+			let changelog_include = parse_group_changelog_include(
+				&contents,
+				&id,
+				&group.packages,
+				group.changelog.as_ref().and_then(RawChangelogConfig::include),
+			)?;
 			Ok::<_, MonochangeError>(GroupDefinition {
 				id: id.clone(),
 				packages: group.packages,
 				changelog,
+				changelog_include,
 				extra_changelog_sections: merge_extra_changelog_sections(
 					&default_extra_changelog_sections,
 					group.extra_changelog_sections,

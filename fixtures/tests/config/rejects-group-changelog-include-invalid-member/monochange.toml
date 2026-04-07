@@ -1,0 +1,15 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+
+[group.sdk.changelog]
+path = "docs/sdk-CHANGELOG.md"
+include = ["core", "missing"]
