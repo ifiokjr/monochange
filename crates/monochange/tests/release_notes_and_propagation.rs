@@ -1,13 +1,13 @@
 use std::fs;
+use std::process::Command;
 
+use insta::{assert_json_snapshot, assert_snapshot};
+use insta_cmd::get_cargo_bin;
 use serde_json::Value;
 use tempfile::tempdir;
 
-use insta_cmd::get_cargo_bin;
-use std::process::Command;
-
 mod test_support;
-use test_support::{copy_directory, fixture_path};
+use test_support::{copy_directory, fixture_path, snapshot_settings};
 
 fn cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("mc"));
@@ -18,6 +18,7 @@ fn cli() -> Command {
 
 #[test]
 fn ungrouped_transitive_bump_writes_empty_update_message_to_dependent_changelog() {
+	let _snapshot = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root = fixture_path("release-notes-and-propagation/ungrouped-patch");
 	copy_directory(&fixture_root, tempdir.path());
@@ -38,16 +39,19 @@ fn ungrouped_transitive_bump_writes_empty_update_message_to_dependent_changelog(
 	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("app changelog: {error}"));
 
-	assert!(core_changelog.contains("1.1.0 (2026-04-06)"));
-	assert!(core_changelog.contains("- add core feature"));
-	assert!(app_changelog.contains("1.0.1 (2026-04-06)"));
-	assert!(app_changelog.contains(
-		"No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
-	));
+	assert_snapshot!(
+		"ungrouped_transitive_bump_writes_empty_update_message_to_dependent_changelog__core",
+		core_changelog
+	);
+	assert_snapshot!(
+		"ungrouped_transitive_bump_writes_empty_update_message_to_dependent_changelog__app",
+		app_changelog
+	);
 }
 
 #[test]
 fn ungrouped_transitive_bump_with_parent_bump_minor_escalates_dependent_version() {
+	let _snapshot = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root = fixture_path("release-notes-and-propagation/ungrouped-minor");
 	copy_directory(&fixture_root, tempdir.path());
@@ -79,13 +83,15 @@ fn ungrouped_transitive_bump_with_parent_bump_minor_escalates_dependent_version(
 		})
 		.unwrap_or_else(|| panic!("expected app decision"));
 
-	assert_eq!(app_decision["bump"], "minor");
-	assert_eq!(app_decision["trigger"], "transitive-dependency");
-	assert_eq!(app_decision["plannedVersion"], "1.1.0");
+	assert_json_snapshot!(
+		"ungrouped_transitive_bump_with_parent_bump_minor_escalates_dependent_version__app_decision",
+		app_decision
+	);
 }
 
 #[test]
 fn grouped_transitive_bump_writes_empty_update_message_with_group_reference() {
+	let _snapshot = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root = fixture_path("release-notes-and-propagation/grouped-default");
 	copy_directory(&fixture_root, tempdir.path());
@@ -106,17 +112,19 @@ fn grouped_transitive_bump_writes_empty_update_message_with_group_reference() {
 	let group_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(app_changelog.contains("1.1.0 (2026-04-06)"));
-	assert!(app_changelog.contains(
-		"No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
-	));
-	assert!(group_changelog.contains("1.1.0 (2026-04-06)"));
-	assert!(group_changelog.contains("Grouped release for `sdk`."));
-	assert!(group_changelog.contains("- **core**: add core feature"));
+	assert_snapshot!(
+		"grouped_transitive_bump_writes_empty_update_message_with_group_reference__app",
+		app_changelog
+	);
+	assert_snapshot!(
+		"grouped_transitive_bump_writes_empty_update_message_with_group_reference__group",
+		group_changelog
+	);
 }
 
 #[test]
 fn custom_empty_update_message_on_package_overrides_default() {
+	let _snapshot = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root =
 		fixture_path("release-notes-and-propagation/ungrouped-custom-package-message");
@@ -135,11 +143,8 @@ fn custom_empty_update_message_on_package_overrides_default() {
 
 	let changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("package changelog: {error}"));
-	assert!(changelog.contains("1.1.0 (2026-04-06)"));
-	assert!(changelog.contains("This entry appears in changelog via `group.sdk.changelog.text`"));
-	assert!(changelog.contains("### Features"));
-	assert!(changelog.contains("- **core**: add core feature"));
-	assert!(changelog.contains(
-		"No changes were recorded for some group members; as a result, package changelogs were synchronized to version 1.1.0."
-	));
+	assert_snapshot!(
+		"custom_empty_update_message_on_package_overrides_default__changelog",
+		changelog
+	);
 }

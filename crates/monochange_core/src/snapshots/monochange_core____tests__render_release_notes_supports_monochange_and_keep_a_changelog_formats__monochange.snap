@@ -1,0 +1,9 @@
+---
+source: crates/monochange_core/src/__tests.rs
+expression: monochange
+---
+## 1.2.3
+
+Grouped release for `sdk`.
+
+- add release automation

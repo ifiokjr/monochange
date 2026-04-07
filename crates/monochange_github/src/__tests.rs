@@ -6,6 +6,8 @@ use httpmock::Method::GET;
 use httpmock::Method::PATCH;
 use httpmock::Method::POST;
 use httpmock::MockServer;
+use insta::assert_json_snapshot;
+use insta::assert_snapshot;
 use monochange_core::BotSettings;
 use monochange_core::ChangeRequestSettings;
 use monochange_core::ChangesetContext;
@@ -56,14 +58,16 @@ fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 	let request = requests
 		.first()
 		.unwrap_or_else(|| panic!("expected request"));
-	assert_eq!(request.repository, "ifiokjr/monochange");
-	assert_eq!(request.tag_name, "v1.2.0");
-	assert_eq!(request.name, "test title");
-	assert_eq!(
-		request.body.as_deref(),
-		Some("## 1.2.0\n\nGrouped release for `sdk`.\n\n### Features\n\n- add github publishing")
+	assert_json_snapshot!(
+		"build_release_requests_uses_matching_monochange_changelog_bodies__request",
+		serde_json::json!({
+			"repository": request.repository,
+			"tag_name": request.tag_name,
+			"name": request.name,
+			"body": request.body,
+			"generate_release_notes": request.generate_release_notes,
+		})
 	);
-	assert!(!request.generate_release_notes);
 }
 
 #[test]
@@ -285,16 +289,13 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 		.unwrap_or_else(|| panic!("expected request"));
 
 	assert_eq!(request.tag_name, "core/v1.0.1");
-	assert!(request
-		.body
-		.as_deref()
-		.unwrap_or_else(|| panic!("expected release body"))
-		.contains("Release target `core`"));
-	assert!(request
-		.body
-		.as_deref()
-		.unwrap_or_else(|| panic!("expected release body"))
-		.contains("- fix race condition"));
+	assert_snapshot!(
+		"build_release_requests_fall_back_to_minimal_release_bodies__body",
+		request
+			.body
+			.as_deref()
+			.unwrap_or_else(|| panic!("expected release body"))
+	);
 }
 
 #[test]
@@ -320,18 +321,19 @@ fn build_release_pull_request_request_renders_branch_and_body() {
 
 	let request = build_release_pull_request_request(&github, &manifest);
 
-	assert_eq!(request.repository, "ifiokjr/monochange");
-	assert_eq!(request.base_branch, "develop");
-	assert_eq!(request.head_branch, "automation/release/release");
-	assert_eq!(request.title, "chore(release): prepare release");
-	assert_eq!(request.commit_message.subject, request.title);
-	assert!(request.commit_message.body.is_none());
-	assert_eq!(request.labels, vec!["release", "automated"]);
-	assert!(request.auto_merge);
-	assert!(request.body.contains("## Prepared release"));
-	assert!(request.body.contains("### sdk 1.2.0"));
-	assert!(request.body.contains("#### Features"));
-	assert!(request.body.contains("- add github publishing"));
+	assert_json_snapshot!(
+		"build_release_pull_request_request_renders_branch_and_body__request",
+		serde_json::json!({
+			"repository": request.repository,
+			"base_branch": request.base_branch,
+			"head_branch": request.head_branch,
+			"title": request.title,
+			"commit_message": request.commit_message,
+			"labels": request.labels,
+			"auto_merge": request.auto_merge,
+			"body": request.body,
+		})
+	);
 }
 
 #[test]

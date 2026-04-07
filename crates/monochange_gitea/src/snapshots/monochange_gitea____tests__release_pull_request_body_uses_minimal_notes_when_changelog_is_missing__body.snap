@@ -1,0 +1,22 @@
+---
+source: crates/monochange_gitea/src/__tests.rs
+expression: body
+---
+## Prepared release
+
+- command: `release`
+- group `sdk` -> `v1.2.0`
+
+## Release notes
+
+### sdk 1.2.0
+
+Release target `sdk`
+
+Members: core, app
+
+- add provider automation
+
+## Changed files
+
+- Cargo.toml

@@ -1,0 +1,29 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "discover",
+  "ok": true,
+  "report": {
+    "dependencies": [],
+    "packages": [
+      {
+        "current_version": "1.0.0",
+        "declared_dependencies": [],
+        "ecosystem": "cargo",
+        "id": "cargo:crates/core/Cargo.toml",
+        "manifest_path": "/private[ROOT]/crates/core/Cargo.toml",
+        "metadata": {},
+        "name": "core",
+        "publish_state": "public",
+        "version_group_id": null,
+        "workspace_root": "/private[ROOT]/crates/core"
+      }
+    ],
+    "version_groups": [],
+    "warnings": [],
+    "workspace_root": "[ROOT]
+  },
+  "summary": "Discovered 1 package(s) and 0 dependency edge(s)."
+}

@@ -1,0 +1,9 @@
+---
+source: crates/monochange/tests/github_releases.rs
+expression: "json_subset(&json,\n&[(\"ownerId\", \"/manifest/changelogs/0/ownerId\"),\n(\"sectionTitle\", \"/manifest/changelogs/0/notes/sections/0/title\"),\n(\"firstEntry\", \"/manifest/changelogs/0/notes/sections/0/entries/0\"),])"
+---
+{
+  "firstEntry": "#### rotate signing keys (core patch)\n\nRoll the signing key before the release window closes.",
+  "ownerId": "core",
+  "sectionTitle": "Security"
+}

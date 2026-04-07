@@ -575,6 +575,7 @@ fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
 
 #[test]
 fn render_release_notes_supports_monochange_and_keep_a_changelog_formats() {
+	let _snapshot = insta::Settings::clone_current().bind_to_scope();
 	let document = ReleaseNotesDocument {
 		title: "1.2.3".to_string(),
 		summary: vec!["Grouped release for `sdk`.".to_string()],
@@ -587,13 +588,14 @@ fn render_release_notes_supports_monochange_and_keep_a_changelog_formats() {
 	let monochange = render_release_notes(ChangelogFormat::Monochange, &document);
 	let keep_a_changelog = render_release_notes(ChangelogFormat::KeepAChangelog, &document);
 
-	assert!(monochange.contains("## 1.2.3"));
-	assert!(monochange.contains("Grouped release for `sdk`."));
-	assert!(monochange.contains("- add release automation"));
-	assert!(!monochange.contains("## [1.2.3]"));
-	assert!(keep_a_changelog.contains("## [1.2.3]"));
-	assert!(keep_a_changelog.contains("### Changed"));
-	assert!(keep_a_changelog.contains("- add release automation"));
+	insta::assert_snapshot!(
+		"render_release_notes_supports_monochange_and_keep_a_changelog_formats__monochange",
+		monochange
+	);
+	insta::assert_snapshot!(
+		"render_release_notes_supports_monochange_and_keep_a_changelog_formats__keep_a_changelog",
+		keep_a_changelog
+	);
 }
 
 #[test]

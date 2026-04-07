@@ -226,13 +226,10 @@ fn change_cli_writes_requested_file_contents() {
 
 	let change_file =
 		fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("change file: {error}"));
-	assert_snapshot!(change_file, @r###"
----
-core: minor
----
-
-# document cli snapshots
-"###);
+	assert_snapshot!(
+		"change_cli_writes_requested_file_contents__change_file",
+		change_file
+	);
 }
 
 #[test]
@@ -268,15 +265,10 @@ fn change_cli_writes_explicit_versions_when_requested() {
 
 	let change_file =
 		fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("change file: {error}"));
-	assert_snapshot!(change_file, @r###"
----
-core:
-  bump: major
-  version: "2.0.0"
----
-
-# promote to stable
-"###);
+	assert_snapshot!(
+		"change_cli_writes_explicit_versions_when_requested__change_file",
+		change_file
+	);
 }
 
 #[test]
@@ -658,164 +650,10 @@ fn release_manifest_workflow_writes_manifest_json() {
 	let manifest_path = tempdir.path().join(".monochange/release-manifest.json");
 	let manifest = fs::read_to_string(&manifest_path)
 		.unwrap_or_else(|error| panic!("read manifest {}: {error}", manifest_path.display()));
-	assert_snapshot!(manifest, @r###"
-	{
-	  "command": "release-manifest",
-	  "dryRun": true,
-	  "version": "1.1.0",
-	  "groupVersion": "1.1.0",
-	  "releaseTargets": [
-	    {
-	      "id": "sdk",
-	      "kind": "group",
-	      "version": "1.1.0",
-	      "tag": true,
-	      "release": true,
-	      "versionFormat": "primary",
-	      "tagName": "v1.1.0",
-	      "members": [
-	        "core",
-	        "app"
-	      ],
-	      "renderedTitle": "1.1.0 ([DATE])",
-	      "renderedChangelogTitle": "1.1.0 ([DATE])"
-	    }
-	  ],
-	  "releasedPackages": [
-	    "workflow-app",
-	    "workflow-core"
-	  ],
-	  "changedFiles": [
-	    "Cargo.toml",
-	    "changelog.md",
-	    "crates/app/Cargo.toml",
-	    "crates/core/CHANGELOG.md",
-	    "crates/core/Cargo.toml",
-	    "group.toml"
-	  ],
-	  "changelogs": [
-	    {
-	      "ownerId": "sdk",
-	      "ownerKind": "group",
-	      "path": "changelog.md",
-	      "format": "monochange",
-	      "notes": {
-	        "title": "1.1.0 ([DATE])",
-	        "summary": [
-	          "Grouped release for `sdk`.",
-	          "Changed members: core",
-	          "Synchronized members: app"
-	        ],
-	        "sections": [
-	          {
-	            "title": "Features",
-	            "entries": [
-	              "- **core**: add feature"
-	            ]
-	          }
-	        ]
-	      },
-	      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
-	    },
-	    {
-	      "ownerId": "core",
-	      "ownerKind": "package",
-	      "path": "crates/core/CHANGELOG.md",
-	      "format": "monochange",
-	      "notes": {
-	        "title": "1.1.0 ([DATE])",
-	        "summary": [],
-	        "sections": [
-	          {
-	            "title": "Features",
-	            "entries": [
-	              "- add feature"
-	            ]
-	          }
-	        ]
-	      },
-	      "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add feature"
-	    }
-	  ],
-	  "changesets": [
-	    {
-	      "path": ".changeset/feature.md",
-	      "summary": "add feature",
-	      "details": null,
-	      "targets": [
-	        {
-	          "id": "core",
-	          "kind": "package",
-	          "bump": "minor",
-	          "origin": "direct-change",
-	          "evidenceRefs": [],
-	          "changeType": null
-	        }
-	      ],
-	      "context": {
-	        "provider": "generic_git",
-	        "host": null,
-	        "capabilities": {
-	          "commitWebUrls": false,
-	          "actorProfiles": false,
-	          "reviewRequestLookup": false,
-	          "relatedIssues": false,
-	          "issueComments": false
-	        },
-	        "introduced": null,
-	        "lastUpdated": null,
-	        "relatedIssues": []
-	      }
-	    }
-	  ],
-	  "deletedChangesets": [],
-	  "plan": {
-	    "workspaceRoot": ".",
-	    "decisions": [
-	      {
-	        "package": "cargo:crates/app/Cargo.toml",
-	        "bump": "minor",
-	        "trigger": "version-group-synchronization",
-	        "plannedVersion": "1.1.0",
-	        "reasons": [
-	          "depends on `cargo:crates/core/Cargo.toml`",
-	          "shares version group `sdk`"
-	        ],
-	        "upstreamSources": [
-	          "cargo:crates/core/Cargo.toml"
-	        ]
-	      },
-	      {
-	        "package": "cargo:crates/core/Cargo.toml",
-	        "bump": "minor",
-	        "trigger": "direct-change",
-	        "plannedVersion": "1.1.0",
-	        "reasons": [
-	          "add feature",
-	          "shares version group `sdk`"
-	        ],
-	        "upstreamSources": [
-	          "cargo:crates/core/Cargo.toml"
-	        ]
-	      }
-	    ],
-	    "groups": [
-	      {
-	        "id": "sdk",
-	        "plannedVersion": "1.1.0",
-	        "members": [
-	          "cargo:crates/core/Cargo.toml",
-	          "cargo:crates/app/Cargo.toml"
-	        ],
-	        "bump": "minor"
-	      }
-	    ],
-	    "warnings": [],
-	    "unresolvedItems": [],
-	    "compatibilityEvidence": []
-	  }
-	}
-	"###);
+	assert_snapshot!(
+		"release_manifest_workflow_writes_manifest_json__manifest",
+		manifest
+	);
 }
 
 #[test]

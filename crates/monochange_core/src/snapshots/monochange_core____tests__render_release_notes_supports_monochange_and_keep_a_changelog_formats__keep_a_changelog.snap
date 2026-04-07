@@ -1,0 +1,11 @@
+---
+source: crates/monochange_core/src/__tests.rs
+expression: keep_a_changelog
+---
+## [1.2.3]
+
+Grouped release for `sdk`.
+
+### Changed
+
+- add release automation
