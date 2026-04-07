@@ -1,0 +1,13 @@
+[defaults]
+package_type = "cargo"
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+
+[release_notes]
+change_templates = [
+    "#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details }}\n\n{{ context }}",
+    "#### {{ summary }}\n\n_Owner:_ {{ change_owner_link }}\n_PR:_ {{ review_request_link }}\n_Closed issues:_ {{ closed_issue_links }}",
+    "- {{ summary }}"
+]
+
+[package.core]
+path = "crates/core"

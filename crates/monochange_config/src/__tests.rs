@@ -1580,6 +1580,25 @@ fn load_workspace_configuration_parses_release_note_customization() {
 }
 
 #[test]
+fn load_workspace_configuration_inherits_default_extra_changelog_sections() {
+	let root = fixture_path("config/default-extra-changelog-sections");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.package_by_id("core")
+		.unwrap_or_else(|| panic!("expected package"));
+
+	assert_eq!(configuration.defaults.extra_changelog_sections.len(), 1);
+	assert_eq!(package.extra_changelog_sections.len(), 1);
+	let extra_section = package
+		.extra_changelog_sections
+		.first()
+		.unwrap_or_else(|| panic!("expected extra changelog section"));
+	assert_eq!(extra_section.name, "Security");
+	assert_eq!(extra_section.types, vec!["security"]);
+}
+
+#[test]
 fn load_workspace_configuration_rejects_empty_extra_changelog_section_names() {
 	let root = fixture_path("config/rejects-empty-section-names");
 	let rendered = load_workspace_configuration(&root)
