@@ -27,6 +27,16 @@ fn open_release_pull_request_dry_run_renders_group_release_preview() {
 	assert_eq!(pull_request["baseBranch"], "main");
 	assert_eq!(pull_request["headBranch"], "monochange/release/release-pr");
 	assert_eq!(pull_request["title"], "chore(release): prepare release");
+	assert_eq!(
+		pull_request["commitMessage"]["subject"],
+		"chore(release): prepare release"
+	);
+	assert!(pull_request["commitMessage"]["body"]
+		.as_str()
+		.is_some_and(|text| text.contains("## MonoChange Release Record")));
+	assert!(pull_request["commitMessage"]["body"]
+		.as_str()
+		.is_some_and(|text| text.contains("<!-- monochange:release-record:start -->")));
 	assert_eq!(pull_request["labels"][0], "release");
 	assert_eq!(pull_request["labels"][1], "automated");
 	assert!(pull_request["body"]
@@ -52,6 +62,13 @@ fn open_release_pull_request_dry_run_renders_package_release_preview() {
 	assert_eq!(pull_request["baseBranch"], "develop");
 	assert_eq!(pull_request["headBranch"], "automation/release/release-pr");
 	assert_eq!(pull_request["autoMerge"], true);
+	assert_eq!(
+		pull_request["commitMessage"]["subject"],
+		"chore(release): prepare release"
+	);
+	assert!(pull_request["commitMessage"]["body"]
+		.as_str()
+		.is_some_and(|text| text.contains("\"command\": \"release-pr\"")));
 	let body = pull_request["body"]
 		.as_str()
 		.unwrap_or_else(|| panic!("expected release request body"));

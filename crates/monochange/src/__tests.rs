@@ -1976,3 +1976,139 @@ fn template_value_to_input_values_object_returns_json_serialization() {
 	assert_eq!(result.len(), 1);
 	assert!(result[0].contains('"'));
 }
+
+#[test]
+fn build_release_commit_message_includes_release_record_body() {
+	let source = sample_source_configuration_for_release_commit();
+	let manifest = sample_release_manifest_for_commit_message(true, true);
+
+	let commit_message = crate::build_release_commit_message(&source, &manifest);
+	assert_eq!(commit_message.subject, "chore(release): prepare release");
+	let body = commit_message
+		.body
+		.unwrap_or_else(|| panic!("expected commit body"));
+	assert!(body.contains("Prepare release."));
+	assert!(body.contains("- release targets: sdk (1.2.3)"));
+	assert!(body.contains("- released packages: monochange, monochange_core"));
+	assert!(body.contains("- updated changelogs: crates/monochange/CHANGELOG.md"));
+	assert!(body.contains("- deleted changesets: .changeset/feature.md"));
+	assert!(body.contains("## MonoChange Release Record"));
+	assert!(body.contains("\"command\": \"release-pr\""));
+}
+
+#[test]
+fn render_release_commit_body_omits_release_targets_when_empty() {
+	let source = sample_source_configuration_for_release_commit();
+	let mut manifest = sample_release_manifest_for_commit_message(false, false);
+	manifest.release_targets.clear();
+
+	let body = crate::render_release_commit_body(&source, &manifest);
+	assert!(!body.contains("- release targets:"));
+	assert!(body.contains("- released packages: monochange, monochange_core"));
+}
+
+#[test]
+fn render_release_commit_body_omits_empty_optional_sections() {
+	let source = sample_source_configuration_for_release_commit();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+
+	let body = crate::render_release_commit_body(&source, &manifest);
+	assert!(body.contains("Prepare release."));
+	assert!(body.contains("- release targets: sdk (1.2.3)"));
+	assert!(body.contains("- released packages: monochange, monochange_core"));
+	assert!(!body.contains("- updated changelogs:"));
+	assert!(!body.contains("- deleted changesets:"));
+}
+
+#[test]
+fn build_release_record_captures_provider_and_release_targets() {
+	let source = sample_source_configuration_for_release_commit();
+	let manifest = sample_release_manifest_for_commit_message(true, true);
+
+	let record = crate::build_release_record(Some(&source), &manifest);
+	assert_eq!(record.command, "release-pr");
+	assert_eq!(record.version.as_deref(), Some("1.2.3"));
+	assert_eq!(record.group_version.as_deref(), Some("1.2.3"));
+	assert_eq!(record.release_targets.len(), 1);
+	assert_eq!(record.release_targets[0].tag_name, "v1.2.3");
+	assert_eq!(record.updated_changelogs.len(), 1);
+	assert_eq!(record.deleted_changesets.len(), 1);
+	let provider = record
+		.provider
+		.unwrap_or_else(|| panic!("expected provider block"));
+	assert_eq!(provider.kind, monochange_core::SourceProvider::GitHub);
+	assert_eq!(provider.owner, "ifiokjr");
+	assert_eq!(provider.repo, "monochange");
+}
+
+fn sample_source_configuration_for_release_commit() -> monochange_core::SourceConfiguration {
+	monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::GitHub,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		host: None,
+		api_url: None,
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings {
+			title: "chore(release): prepare release".to_string(),
+			..monochange_core::ChangeRequestSettings::default()
+		},
+		bot: monochange_core::BotSettings::default(),
+	}
+}
+
+fn sample_release_manifest_for_commit_message(
+	include_changelog: bool,
+	include_deleted_changeset: bool,
+) -> monochange_core::ReleaseManifest {
+	monochange_core::ReleaseManifest {
+		command: "release-pr".to_string(),
+		dry_run: false,
+		version: Some("1.2.3".to_string()),
+		group_version: Some("1.2.3".to_string()),
+		release_targets: vec![monochange_core::ReleaseManifestTarget {
+			id: "sdk".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Group,
+			version: "1.2.3".to_string(),
+			tag: true,
+			release: true,
+			version_format: monochange_core::VersionFormat::Primary,
+			tag_name: "v1.2.3".to_string(),
+			members: vec!["monochange".to_string(), "monochange_core".to_string()],
+			rendered_title: "MonoChange 1.2.3".to_string(),
+			rendered_changelog_title: "1.2.3".to_string(),
+		}],
+		released_packages: vec!["monochange".to_string(), "monochange_core".to_string()],
+		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
+		changelogs: if include_changelog {
+			vec![monochange_core::ReleaseManifestChangelog {
+				owner_id: "sdk".to_string(),
+				owner_kind: monochange_core::ReleaseOwnerKind::Group,
+				path: Path::new("crates/monochange/CHANGELOG.md").to_path_buf(),
+				format: monochange_core::ChangelogFormat::Monochange,
+				notes: monochange_core::ReleaseNotesDocument {
+					title: "1.2.3".to_string(),
+					summary: vec!["- prepare release".to_string()],
+					sections: Vec::new(),
+				},
+				rendered: "## 1.2.3".to_string(),
+			}]
+		} else {
+			Vec::new()
+		},
+		changesets: Vec::new(),
+		deleted_changesets: if include_deleted_changeset {
+			vec![Path::new(".changeset/feature.md").to_path_buf()]
+		} else {
+			Vec::new()
+		},
+		plan: monochange_core::ReleaseManifestPlan {
+			workspace_root: Path::new(".").to_path_buf(),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		},
+	}
+}

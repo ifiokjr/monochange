@@ -97,6 +97,7 @@ use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY;
 use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 
+use monochange_core::CommitMessage;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::ExtraChangelogSection;
@@ -115,6 +116,7 @@ use monochange_core::PackageType;
 use monochange_core::PreparedChangeset;
 use monochange_core::PreparedChangesetTarget;
 
+use monochange_core::render_release_record_block;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestCompatibilityEvidence;
@@ -126,6 +128,9 @@ use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleasePlan;
+use monochange_core::ReleaseRecord;
+use monochange_core::ReleaseRecordProvider;
+use monochange_core::ReleaseRecordTarget;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOperation;
 use monochange_core::SourceChangeRequestOutcome;
@@ -5443,6 +5448,108 @@ fn build_release_manifest(
 	}
 }
 
+fn build_release_record(
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+) -> ReleaseRecord {
+	ReleaseRecord {
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
+		created_at: resolve_release_datetime()
+			.and_utc()
+			.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+		command: manifest.command.clone(),
+		version: manifest.version.clone(),
+		group_version: manifest.group_version.clone(),
+		release_targets: manifest
+			.release_targets
+			.iter()
+			.map(|target| ReleaseRecordTarget {
+				id: target.id.clone(),
+				kind: target.kind,
+				version: target.version.clone(),
+				version_format: target.version_format,
+				tag: target.tag,
+				release: target.release,
+				tag_name: target.tag_name.clone(),
+				members: target.members.clone(),
+			})
+			.collect(),
+		released_packages: manifest.released_packages.clone(),
+		changed_files: manifest.changed_files.clone(),
+		updated_changelogs: manifest
+			.changelogs
+			.iter()
+			.map(|changelog| changelog.path.clone())
+			.collect(),
+		deleted_changesets: manifest.deleted_changesets.clone(),
+		provider: source.map(|source| ReleaseRecordProvider {
+			kind: source.provider,
+			owner: source.owner.clone(),
+			repo: source.repo.clone(),
+			host: source.host.clone(),
+		}),
+	}
+}
+
+fn build_release_commit_message(
+	source: &SourceConfiguration,
+	manifest: &ReleaseManifest,
+) -> CommitMessage {
+	CommitMessage {
+		subject: source.pull_requests.title.clone(),
+		body: Some(render_release_commit_body(source, manifest)),
+	}
+}
+
+fn render_release_commit_body(source: &SourceConfiguration, manifest: &ReleaseManifest) -> String {
+	let mut lines = vec!["Prepare release.".to_string()];
+	if !manifest.release_targets.is_empty() {
+		lines.push(String::new());
+		lines.push(format!(
+			"- release targets: {}",
+			manifest
+				.release_targets
+				.iter()
+				.map(|target| format!("{} ({})", target.id, target.version))
+				.collect::<Vec<_>>()
+				.join(", ")
+		));
+	}
+	if !manifest.released_packages.is_empty() {
+		lines.push(format!(
+			"- released packages: {}",
+			manifest.released_packages.join(", ")
+		));
+	}
+	if !manifest.changelogs.is_empty() {
+		lines.push(format!(
+			"- updated changelogs: {}",
+			manifest
+				.changelogs
+				.iter()
+				.map(|changelog| changelog.path.display().to_string())
+				.collect::<Vec<_>>()
+				.join(", ")
+		));
+	}
+	if !manifest.deleted_changesets.is_empty() {
+		lines.push(format!(
+			"- deleted changesets: {}",
+			manifest
+				.deleted_changesets
+				.iter()
+				.map(|path| path.display().to_string())
+				.collect::<Vec<_>>()
+				.join(", ")
+		));
+	}
+	let release_record = build_release_record(Some(source), manifest);
+	let release_record_block = render_release_record_block(&release_record)
+		.unwrap_or_else(|error| panic!("release record generation bug: {error}"));
+	format!("{}\n\n{}", lines.join("\n"), release_record_block)
+}
+
 fn render_release_manifest_json(manifest: &ReleaseManifest) -> MonochangeResult<String> {
 	serde_json::to_string_pretty(manifest)
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
@@ -5463,7 +5570,7 @@ fn build_source_change_request(
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> SourceChangeRequest {
-	match source.provider {
+	let mut request = match source.provider {
 		SourceProvider::GitHub => {
 			github_provider::build_release_pull_request_request(source, manifest)
 		}
@@ -5473,7 +5580,9 @@ fn build_source_change_request(
 		SourceProvider::Gitea => {
 			gitea_provider::build_release_pull_request_request(source, manifest)
 		}
-	}
+	};
+	request.commit_message = build_release_commit_message(source, manifest);
+	request
 }
 
 fn publish_source_release_requests(
