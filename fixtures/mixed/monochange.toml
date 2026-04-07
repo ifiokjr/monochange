@@ -4,6 +4,7 @@ parent_bump = "patch"
 [package.sdk-core]
 path = "cargo/sdk-core"
 type = "cargo"
+extra_changelog_sections = [{ name = "Security", types = ["security"], default_bump = "patch" }]
 
 [package.web-sdk]
 path = "packages/web-sdk"

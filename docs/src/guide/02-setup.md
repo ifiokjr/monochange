@@ -24,7 +24,9 @@ change_templates = [
 
 [package.sdk-core]
 path = "crates/sdk_core"
-extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+extra_changelog_sections = [
+	{ name = "Security", types = ["security"], default_bump = "patch" },
+]
 
 [package.web-sdk]
 path = "packages/web-sdk"
@@ -111,7 +113,7 @@ type = "string_list"
 [[cli.change.inputs]]
 name = "bump"
 type = "choice"
-choices = ["patch", "minor", "major"]
+choices = ["none", "patch", "minor", "major"]
 default = "patch"
 
 [[cli.change.inputs]]
@@ -129,10 +131,6 @@ type = "string"
 [[cli.change.inputs]]
 name = "details"
 type = "string"
-
-[[cli.change.inputs]]
-name = "evidence"
-type = "string_list"
 
 [[cli.change.inputs]]
 name = "output"

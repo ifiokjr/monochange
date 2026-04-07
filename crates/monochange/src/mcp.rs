@@ -35,8 +35,6 @@ pub struct ChangeParam {
 	#[serde(rename = "type")]
 	pub change_type: Option<String>,
 	pub details: Option<String>,
-	#[serde(default)]
-	pub evidence: Vec<String>,
 	pub output: Option<String>,
 }
 
@@ -51,6 +49,7 @@ pub struct AffectedParam {
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpChangeBump {
+	None,
 	Patch,
 	Minor,
 	Major,
@@ -59,6 +58,7 @@ pub enum McpChangeBump {
 impl From<McpChangeBump> for ChangeBump {
 	fn from(value: McpChangeBump) -> Self {
 		match value {
+			McpChangeBump::None => Self::None,
 			McpChangeBump::Patch => Self::Patch,
 			McpChangeBump::Minor => Self::Minor,
 			McpChangeBump::Major => Self::Major,
@@ -219,7 +219,6 @@ impl MonochangeMcpServer {
 			&params.reason,
 			params.change_type.as_deref(),
 			params.details.as_deref(),
-			&params.evidence,
 			output,
 		) {
 			Ok(path) => Ok(json_result(json!({
@@ -416,7 +415,6 @@ type = "cargo"
 				reason: "add test coverage".to_string(),
 				change_type: None,
 				details: None,
-				evidence: Vec::new(),
 				output: Some(
 					tempdir
 						.path()

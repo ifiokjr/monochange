@@ -134,7 +134,6 @@ use monochange_core::WorkspaceDefaults;
 use semver::Version;
 use serde::Deserialize;
 use serde_yaml_ng::Mapping;
-use serde_yaml_ng::Value as YamlValue;
 
 const CONFIG_FILE: &str = "monochange.toml";
 const RESERVED_CLI_COMMAND_NAMES: &[&str] = &["assist", "help", "init", "mcp", "version"];
@@ -524,10 +523,6 @@ struct RawChangeEntry {
 	details: Option<String>,
 	#[serde(rename = "type", default)]
 	change_type: Option<String>,
-	#[serde(default = "default_change_origin")]
-	origin: String,
-	#[serde(default)]
-	evidence: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -569,10 +564,6 @@ fn default_parent_bump() -> BumpSeverity {
 
 fn default_warn_on_group_mismatch() -> bool {
 	true
-}
-
-fn default_change_origin() -> String {
-	"direct-change".to_string()
 }
 
 fn default_true() -> bool {
@@ -1142,7 +1133,7 @@ pub fn load_changeset_file(
 		))
 	})?;
 	let raw = if changes_path.extension().and_then(|value| value.to_str()) == Some("md") {
-		parse_markdown_change_file(&contents, changes_path)?
+		parse_markdown_change_file(&contents, changes_path, configuration)?
 	} else {
 		toml::from_str::<RawChangeFile>(&contents).map_err(|error| {
 			MonochangeError::Config(format!(
@@ -1246,8 +1237,8 @@ pub fn load_changeset_file(
 				kind: ChangesetTargetKind::Group,
 				bump: inferred_bump,
 				explicit_version: explicit_version.clone(),
-				origin: change.origin.clone(),
-				evidence_refs: change.evidence.clone(),
+				origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
 				change_type: change.change_type.clone(),
 			});
 			for member_id in &group.packages {
@@ -1273,8 +1264,8 @@ pub fn load_changeset_file(
 					package_id,
 					requested_bump: inferred_bump,
 					explicit_version: explicit_version.clone(),
-					change_origin: change.origin.clone(),
-					evidence_refs: change.evidence.clone(),
+					change_origin: "direct-change".to_string(),
+					evidence_refs: Vec::new(),
 					notes: change.reason.clone(),
 					details: change.details.clone(),
 					change_type: change.change_type.clone(),
@@ -1297,8 +1288,8 @@ pub fn load_changeset_file(
 				kind: ChangesetTargetKind::Package,
 				bump: inferred_bump,
 				explicit_version: explicit_version.clone(),
-				origin: change.origin.clone(),
-				evidence_refs: change.evidence.clone(),
+				origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
 				change_type: change.change_type.clone(),
 			});
 			if !seen_package_ids.insert(package_id.clone()) {
@@ -1321,8 +1312,8 @@ pub fn load_changeset_file(
 				package_id,
 				requested_bump: inferred_bump,
 				explicit_version,
-				change_origin: change.origin,
-				evidence_refs: change.evidence,
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
 				notes: change.reason,
 				details: change.details,
 				change_type: change.change_type,
@@ -1410,6 +1401,7 @@ pub fn resolve_package_reference(
 fn parse_markdown_change_file(
 	contents: &str,
 	changes_path: &Path,
+	configuration: &WorkspaceConfiguration,
 ) -> MonochangeResult<RawChangeFile> {
 	let Some(without_opening) = contents.strip_prefix("---") else {
 		return Err(MonochangeError::Config(format!(
@@ -1430,9 +1422,6 @@ fn parse_markdown_change_file(
 			changes_path.display()
 		))
 	})?;
-	let evidence_mapping = yaml_mapping(&mapping, "evidence");
-	let origin_mapping = yaml_mapping(&mapping, "origin");
-	let type_mapping = yaml_mapping(&mapping, "type");
 	let (reason, details) = markdown_change_text(body);
 	let mut changes = Vec::new();
 
@@ -1440,24 +1429,15 @@ fn parse_markdown_change_file(
 		let Some(package) = key.as_str() else {
 			continue;
 		};
-		if matches!(package, "evidence" | "origin" | "type") {
-			continue;
-		}
-		let (requested_bump, explicit_version) =
-			parse_markdown_change_target(value, changes_path, package)?;
+		let (requested_bump, explicit_version, change_type) =
+			parse_markdown_change_target(value, changes_path, package, configuration)?;
 		changes.push(RawChangeEntry {
 			package: package.to_string(),
 			bump: requested_bump,
 			version: explicit_version,
 			reason: reason.clone(),
 			details: details.clone(),
-			change_type: type_mapping.and_then(|mapping| yaml_string(mapping, package)),
-			origin: origin_mapping
-				.and_then(|mapping| yaml_string(mapping, package))
-				.unwrap_or_else(default_change_origin),
-			evidence: evidence_mapping
-				.and_then(|mapping| yaml_array_strings(mapping, package))
-				.unwrap_or_default(),
+			change_type,
 		});
 	}
 
@@ -1557,21 +1537,105 @@ fn markdown_change_text(body: &str) -> (Option<String>, Option<String>) {
 	)
 }
 
+fn configured_change_sections<'config>(
+	configuration: &'config WorkspaceConfiguration,
+	target: &str,
+) -> &'config [ExtraChangelogSection] {
+	if let Some(package) = configuration.package_by_id(target) {
+		return package.extra_changelog_sections.as_slice();
+	}
+	if let Some(group) = configuration.group_by_id(target) {
+		return group.extra_changelog_sections.as_slice();
+	}
+	&[]
+}
+
+fn configured_change_type_default_bump(
+	configuration: &WorkspaceConfiguration,
+	target: &str,
+	change_type: &str,
+) -> Option<BumpSeverity> {
+	configured_change_sections(configuration, target)
+		.iter()
+		.find(|section| {
+			section
+				.types
+				.iter()
+				.any(|candidate| candidate.trim() == change_type)
+		})
+		.map(|section| section.default_bump.unwrap_or(BumpSeverity::None))
+}
+
+fn configured_change_types(configuration: &WorkspaceConfiguration, target: &str) -> Vec<String> {
+	configured_change_sections(configuration, target)
+		.iter()
+		.flat_map(|section| section.types.iter())
+		.map(|value| value.trim().to_string())
+		.filter(|value| !value.is_empty())
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.collect()
+}
+
 fn parse_markdown_change_target(
 	value: &serde_yaml_ng::Value,
 	changes_path: &Path,
 	package: &str,
-) -> MonochangeResult<(Option<BumpSeverity>, Option<Version>)> {
-	if let Some(bump) = value.as_str().and_then(parse_bump_severity) {
-		return Ok((Some(bump), None));
+	configuration: &WorkspaceConfiguration,
+) -> MonochangeResult<(Option<BumpSeverity>, Option<Version>, Option<String>)> {
+	if let Some(token) = value
+		.as_str()
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
+	{
+		if let Some(bump) = parse_bump_severity(token) {
+			return Ok((Some(bump), None, None));
+		}
+		if let Some(default_bump) =
+			configured_change_type_default_bump(configuration, package, token)
+		{
+			return Ok((Some(default_bump), None, Some(token.to_string())));
+		}
+		if configuration.package_by_id(package).is_some()
+			|| configuration.group_by_id(package).is_some()
+		{
+			let valid_types = configured_change_types(configuration, package);
+			let valid_types_help = if valid_types.is_empty() {
+				String::new()
+			} else {
+				format!(
+					" or one of the configured types: {}",
+					valid_types.join(", ")
+				)
+			};
+			return Err(MonochangeError::Config(format!(
+				"failed to parse {}: target `{package}` has invalid scalar value `{token}`; expected one of `none`, `patch`, `minor`, `major`{valid_types_help}`",
+				changes_path.display()
+			)));
+		}
+		return Ok((None, None, Some(token.to_string())));
 	}
 
 	let Some(mapping) = value.as_mapping() else {
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: package `{package}` must map to `patch`, `minor`, or `major`, or to a table with `bump` and/or `version`",
+			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, and/or `type`",
 			changes_path.display()
 		)));
 	};
+
+	let allowed_keys = ["bump", "version", "type"];
+	let unknown_keys = mapping
+		.keys()
+		.filter_map(serde_yaml_ng::Value::as_str)
+		.filter(|key| !allowed_keys.contains(key))
+		.collect::<Vec<_>>();
+	if !unknown_keys.is_empty() {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: target `{package}` uses unsupported field(s): {}",
+			changes_path.display(),
+			unknown_keys.join(", ")
+		)));
+	}
 
 	let bump = mapping
 		.get(serde_yaml_ng::Value::String("bump".to_string()))
@@ -1579,7 +1643,7 @@ fn parse_markdown_change_target(
 		.map(|value| {
 			parse_bump_severity(value).ok_or_else(|| {
 				MonochangeError::Config(format!(
-					"failed to parse {}: package `{package}` has invalid bump `{value}`; expected `patch`, `minor`, or `major`",
+					"failed to parse {}: target `{package}` has invalid bump `{value}`; expected `none`, `patch`, `minor`, or `major`",
 					changes_path.display()
 				))
 			})
@@ -1591,56 +1655,63 @@ fn parse_markdown_change_target(
 		.map(|value| {
 			Version::parse(value).map_err(|error| {
 				MonochangeError::Config(format!(
-					"failed to parse {}: package `{package}` has invalid version `{value}`: {error}",
+					"failed to parse {}: target `{package}` has invalid version `{value}`: {error}",
 					changes_path.display()
 				))
 			})
 		})
 		.transpose()?;
+	let change_type = mapping
+		.get(serde_yaml_ng::Value::String("type".to_string()))
+		.and_then(serde_yaml_ng::Value::as_str)
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
+		.map(ToString::to_string);
 
-	if bump.is_none() && version.is_none() {
+	if let Some(change_type) = change_type.as_deref() {
+		if configuration.package_by_id(package).is_some()
+			|| configuration.group_by_id(package).is_some()
+		{
+			let valid_types = configured_change_types(configuration, package);
+			if !valid_types.iter().any(|candidate| candidate == change_type) {
+				let valid_types_help = if valid_types.is_empty() {
+					"no configured types are available for this target".to_string()
+				} else {
+					format!("valid types: {}", valid_types.join(", "))
+				};
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {}: target `{package}` has invalid type `{change_type}`; {valid_types_help}",
+					changes_path.display()
+				)));
+			}
+		}
+	}
+
+	if bump.is_none() && version.is_none() && change_type.is_none() {
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: package `{package}` must declare `bump`, `version`, or both",
+			"failed to parse {}: target `{package}` must declare `bump`, `version`, `type`, or a valid scalar shorthand",
 			changes_path.display()
 		)));
 	}
 
-	Ok((bump, version))
+	if bump == Some(BumpSeverity::None) && version.is_none() && change_type.is_none() {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: target `{package}` must not use `bump = \"none\"` without also declaring `type` or `version`",
+			changes_path.display()
+		)));
+	}
+
+	Ok((bump, version, change_type))
 }
 
 fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {
 	match value {
+		"none" => Some(BumpSeverity::None),
 		"major" => Some(BumpSeverity::Major),
 		"minor" => Some(BumpSeverity::Minor),
 		"patch" => Some(BumpSeverity::Patch),
 		_ => None,
 	}
-}
-
-fn yaml_mapping<'map>(mapping: &'map Mapping, key: &str) -> Option<&'map Mapping> {
-	mapping
-		.get(YamlValue::String(key.to_string()))
-		.and_then(YamlValue::as_mapping)
-}
-
-fn yaml_string(mapping: &Mapping, key: &str) -> Option<String> {
-	mapping
-		.get(YamlValue::String(key.to_string()))
-		.and_then(YamlValue::as_str)
-		.map(ToString::to_string)
-}
-
-fn yaml_array_strings(mapping: &Mapping, key: &str) -> Option<Vec<String>> {
-	mapping
-		.get(YamlValue::String(key.to_string()))
-		.and_then(YamlValue::as_sequence)
-		.map(|items| {
-			items
-				.iter()
-				.filter_map(YamlValue::as_str)
-				.map(ToString::to_string)
-				.collect::<Vec<_>>()
-		})
 }
 
 fn validate_package_and_group_definitions(
@@ -3041,7 +3112,7 @@ fn validate_changeset_targets(
 		))
 	})?;
 	let raw = if changeset_path.extension().and_then(|value| value.to_str()) == Some("md") {
-		parse_markdown_change_file(&contents, changeset_path)?
+		parse_markdown_change_file(&contents, changeset_path, configuration)?
 	} else {
 		return Ok(());
 	};

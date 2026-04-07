@@ -672,7 +672,7 @@ fn apply_version_groups_assigns_group_ids_and_detects_mismatched_versions() {
 }
 
 #[test]
-fn load_change_signals_resolves_configured_package_ids_and_evidence() {
+fn load_change_signals_resolves_configured_package_ids() {
 	let root = fixture_path("config/change-signals-basic");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -702,10 +702,7 @@ fn load_change_signals_resolves_configured_package_ids_and_evidence() {
 	assert_eq!(signal.explicit_version, None);
 	assert_eq!(signal.notes.as_deref(), Some("public API addition"));
 	assert_eq!(signal.source_path, root.join("change.md"));
-	assert_eq!(
-		signal.evidence_refs,
-		vec!["rust-semver:major:public API break detected"]
-	);
+	assert!(signal.evidence_refs.is_empty());
 }
 
 #[test]
@@ -866,9 +863,7 @@ fn load_change_signals_rejects_invalid_markdown_bumps() {
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(error
-		.to_string()
-		.contains("must map to `patch`, `minor`, or `major`"));
+	assert!(error.to_string().contains("invalid scalar value `note`"));
 }
 
 #[test]
@@ -987,7 +982,7 @@ fn load_changeset_file_preserves_group_targets_and_source_paths() {
 		.unwrap_or_else(|| panic!("expected one changeset target"));
 	assert_eq!(target.id, "sdk");
 	assert_eq!(target.kind.as_str(), "group");
-	assert_eq!(target.origin, "pull-request");
+	assert_eq!(target.origin, "direct-change");
 	assert_eq!(target.explicit_version, None);
 	assert_eq!(changeset.signals.len(), 2);
 	assert!(changeset
@@ -1287,6 +1282,7 @@ fn load_workspace_configuration_parses_release_note_customization() {
 		.unwrap_or_else(|| panic!("expected extra changelog section"));
 	assert_eq!(extra_section.name, "Security");
 	assert_eq!(extra_section.types, vec!["security"]);
+	assert_eq!(extra_section.default_bump, Some(BumpSeverity::Patch));
 }
 
 #[test]

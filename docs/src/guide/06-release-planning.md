@@ -7,7 +7,8 @@ Create a changeset with the CLI:
 ```bash
 mc change --package sdk-core --bump minor --reason "public API addition"
 mc change --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
-mc change --package sdk-core --bump major --version 2.0.0 --reason "break the public API" --evidence rust-semver:major:public API break detected --output .changeset/sdk-core-major.md
+mc change --package sdk-core --bump none --type docs --reason "clarify migration guidance" --output .changeset/sdk-core-docs.md
+mc change --package sdk-core --bump major --version 2.0.0 --reason "break the public API" --output .changeset/sdk-core-major.md
 ```
 
 Or use interactive mode to select packages, bumps, and options from a guided wizard:
@@ -26,9 +27,9 @@ Or write one manually with configured package or group ids:
 
 ```markdown
 ---
-sdk-core: patch
-type:
-  sdk-core: security
+sdk-core:
+  bump: patch
+  type: security
 ---
 
 #### rotate signing keys
@@ -50,7 +51,7 @@ sdk: minor
 
 <!-- {=releaseExplicitVersionChangesetExample} -->
 
-To pin an exact version, use the object syntax with `bump` and/or `version`:
+Use scalar shorthand for plain bumps (`sdk-core: minor`) or for configured change types (`sdk-core: security`). To pin an exact version or combine `bump`, `version`, and `type`, use the object syntax:
 
 ```markdown
 ---
@@ -68,24 +69,7 @@ When `version` is provided without `bump`, the bump is inferred from the current
 
 If multiple changesets specify conflicting explicit versions for the same package or group, monochange uses the highest semver version and emits a warning by default. Set `defaults.strict_version_conflicts = true` to fail instead.
 
-MonoChange keeps its own changeset standard rather than reusing a narrower external parser. In addition to package/group bump entries, MonoChange changesets can include reserved metadata keys such as `evidence`, `origin`, `type`, and explicit `version`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs. Authored heading depth is normalized when release notes are rendered, so use natural markdown headings in the changeset body instead of hard-coding output depth.
-
-Optionally include Rust semver evidence:
-
-<!-- {=releaseEvidenceExample} -->
-
-```markdown
----
-sdk-core: patch
-evidence:
-  sdk-core:
-    - rust-semver:major:public API break detected
----
-
-#### breaking API change
-```
-
-<!-- {/releaseEvidenceExample} -->
+MonoChange keeps its own changeset standard rather than reusing a narrower external parser. Top-level frontmatter keys are package ids or group ids only. Each target can use scalar shorthand or the object syntax with `bump`, `version`, and `type`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs. Authored heading depth is normalized when release notes are rendered, so use natural markdown headings in the changeset body instead of hard-coding output depth.
 
 Validate before planning:
 
@@ -216,16 +200,16 @@ Planning rules in this milestone:
 
 <!-- {=releasePlanningRules} -->
 
-- `mc change` defaults `--bump` to `patch`; pass `--version` to pin an explicit release version
-- markdown change files require a `patch`/`minor`/`major` entry per package, or an object with `bump` and/or `version`
+- `mc change` defaults `--bump` to `patch`; use `--bump none` when you want a type-only or version-only entry, and pass `--version` to pin an explicit release version
+- markdown change files use package/group ids as the only top-level frontmatter keys, with scalar shorthand for `none`/`patch`/`minor`/`major` or configured change types, plus object syntax for `bump`, `version`, and/or `type`
 - when `version` is given without `bump`, the bump is inferred by comparing the current and target versions
 - explicit versions from grouped members propagate to the group version; conflicts take the highest semver or fail when `defaults.strict_version_conflicts = true`
 - prefer package ids over group ids in authored changesets when possible; direct package changes still propagate to dependents and synchronize configured groups
-- optional change `type` values can route entries into custom changelog sections without changing semver impact
-- `mc change` can attach extra `--evidence ...` entries and write to a deterministic path with `--output ...`
+- optional change `type` values can route entries into custom changelog sections, and configured section `default_bump` values let scalar type shorthand imply the desired semver behavior
+- `mc change` can write to a deterministic path with `--output ...`
 - change templates support detailed multi-line release-note entries through `{{ details }}`, compact metadata blocks through `{{ context }}`, and fine-grained linked metadata like `{{ change_owner_link }}`, `{{ review_request_link }}`, and `{{ closed_issue_links }}`
 - dependents default to the configured `parent_bump`, including packages outside a changed version group when they depend on a synchronized member
-- Rust semver evidence can escalate both the changed crate and its dependents
+- computed compatibility evidence can still escalate both the changed crate and its dependents when provider analysis produces it
 - configured groups synchronize before final output is rendered
 - release targets carry effective `tag`, `release`, and `version_format` metadata
 - release-manifest JSON captures release targets, changelog payloads, authored changesets, linked changeset context metadata, changed files, and the synchronized release plan for downstream automation
