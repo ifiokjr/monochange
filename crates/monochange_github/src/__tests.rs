@@ -21,6 +21,7 @@ use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
+use monochange_core::MonochangeError;
 use monochange_core::PreparedChangeset;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
@@ -30,6 +31,9 @@ use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleaseProviderSettings;
+use monochange_core::RetargetOperation;
+use monochange_core::RetargetProviderOperation;
+use monochange_core::RetargetTagResult;
 use monochange_core::SourceCapabilities;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
@@ -414,6 +418,238 @@ fn publish_release_requests_updates_existing_release_via_octocrab() {
 		outcome.url.as_deref(),
 		Some("https://example.com/releases/42")
 	);
+}
+
+#[test]
+fn sync_retargeted_releases_plans_updates_in_dry_run_mode() {
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some("https://example.com".to_string()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+	let updates = vec![RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: RetargetOperation::Planned,
+		message: None,
+	}];
+
+	let outcomes = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&MockServer::start());
+			let outcomes =
+				sync_retargeted_releases_with_client(&client, &source, &updates, true).await?;
+			Ok::<_, MonochangeError>(outcomes)
+		})
+		.unwrap_or_else(|error| panic!("sync releases: {error}"));
+
+	assert_eq!(outcomes.len(), 1);
+	let outcome = outcomes
+		.first()
+		.unwrap_or_else(|| panic!("expected planned provider outcome"));
+	assert_eq!(outcome.operation, RetargetProviderOperation::Planned);
+	assert_eq!(outcome.tag_name, "v1.2.3");
+}
+
+#[test]
+fn sync_retargeted_releases_updates_existing_release_target_commitish() {
+	let server = MockServer::start();
+	let release_lookup = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}");
+	});
+	let update_release = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/releases/42")
+			.json_body_obj(&serde_json::json!({ "target_commitish": "def5678" }));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"html_url\":\"https://example.com/releases/42\"}");
+	});
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+	let updates = vec![RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: RetargetOperation::Moved,
+		message: None,
+	}];
+
+	let outcomes = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			let outcomes =
+				sync_retargeted_releases_with_client(&client, &source, &updates, false).await?;
+			Ok::<_, MonochangeError>(outcomes)
+		})
+		.unwrap_or_else(|error| panic!("sync releases: {error}"));
+
+	release_lookup.assert();
+	update_release.assert();
+	let outcome = outcomes
+		.first()
+		.unwrap_or_else(|| panic!("expected synced provider outcome"));
+	assert_eq!(outcome.operation, RetargetProviderOperation::Synced);
+	assert_eq!(
+		outcome.url.as_deref(),
+		Some("https://example.com/releases/42")
+	);
+}
+
+#[test]
+fn sync_retargeted_releases_reports_already_aligned_release() {
+	let server = MockServer::start();
+	let release_lookup = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"def5678\"}");
+	});
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+	let updates = vec![RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: RetargetOperation::Moved,
+		message: None,
+	}];
+
+	let outcomes = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			let outcomes =
+				sync_retargeted_releases_with_client(&client, &source, &updates, false).await?;
+			Ok::<_, MonochangeError>(outcomes)
+		})
+		.unwrap_or_else(|error| panic!("sync releases: {error}"));
+
+	release_lookup.assert();
+	let outcome = outcomes
+		.first()
+		.unwrap_or_else(|| panic!("expected already aligned provider outcome"));
+	assert_eq!(outcome.operation, RetargetProviderOperation::AlreadyAligned);
+}
+
+#[test]
+fn sync_retargeted_releases_errors_when_release_lookup_is_missing() {
+	let server = MockServer::start();
+	let release_lookup = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
+		then.status(404)
+			.header("content-type", "application/json")
+			.body("{\"message\":\"Not Found\"}");
+	});
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+	let updates = vec![RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: RetargetOperation::Moved,
+		message: None,
+	}];
+
+	let error = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			let result =
+				sync_retargeted_releases_with_client(&client, &source, &updates, false).await;
+			result
+		})
+		.err()
+		.unwrap_or_else(|| panic!("expected release lookup error"));
+
+	release_lookup.assert();
+	assert!(error
+		.to_string()
+		.contains("GitHub release for tag `v1.2.3` could not be found"));
+}
+
+#[test]
+fn sync_retargeted_releases_public_api_uses_source_configuration_and_env() {
+	let server = MockServer::start();
+	let release_lookup = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}");
+	});
+	let update_release = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/releases/42")
+			.json_body_obj(&serde_json::json!({ "target_commitish": "def5678" }));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"html_url\":\"https://example.com/releases/42\"}");
+	});
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ReleaseProviderSettings::default(),
+		pull_requests: ChangeRequestSettings::default(),
+		bot: BotSettings::default(),
+	};
+	let updates = vec![RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: RetargetOperation::Moved,
+		message: None,
+	}];
+
+	let outcomes = temp_env::with_var("GITHUB_TOKEN", Some("token"), || {
+		sync_retargeted_releases(&source, &updates, false)
+	})
+	.unwrap_or_else(|error| panic!("public sync releases: {error}"));
+
+	release_lookup.assert();
+	update_release.assert();
+	assert_eq!(outcomes.len(), 1);
 }
 
 #[test]

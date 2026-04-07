@@ -75,6 +75,8 @@ use monochange_config::validate_workspace;
 use monochange_core::default_cli_commands;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
+use monochange_core::release_record_release_tag_names;
+use monochange_core::release_record_tag_names;
 use monochange_core::render_release_notes;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
@@ -133,6 +135,12 @@ use monochange_core::ReleaseRecord;
 use monochange_core::ReleaseRecordDiscovery;
 use monochange_core::ReleaseRecordProvider;
 use monochange_core::ReleaseRecordTarget;
+use monochange_core::RetargetOperation;
+use monochange_core::RetargetPlan;
+use monochange_core::RetargetProviderOperation;
+use monochange_core::RetargetProviderResult;
+use monochange_core::RetargetResult;
+use monochange_core::RetargetTagResult;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOperation;
 use monochange_core::SourceChangeRequestOutcome;
@@ -894,6 +902,281 @@ pub fn discover_release_record(
 	)))
 }
 
+pub fn plan_release_retarget(
+	root: &Path,
+	discovery: &ReleaseRecordDiscovery,
+	target: &str,
+	force: bool,
+	sync_provider: bool,
+	dry_run: bool,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<RetargetPlan> {
+	let target_commit = resolve_git_commit_ref(root, target)?;
+	let is_descendant = git_is_ancestor(root, &discovery.record_commit, &target_commit)?;
+	if !is_descendant && !force {
+		return Err(MonochangeError::Config(format!(
+			"target commit {} is not a descendant of release-record commit {}; rerun with --force to override",
+			short_commit_sha(&target_commit),
+			short_commit_sha(&discovery.record_commit)
+		)));
+	}
+	validate_retarget_provider(discovery, source)?;
+
+	let git_tag_updates = release_record_tag_names(&discovery.record)
+		.into_iter()
+		.map(|tag_name| {
+			let from_commit = resolve_git_tag_commit(root, &tag_name)?;
+			Ok(RetargetTagResult {
+				tag_name,
+				operation: if from_commit == target_commit {
+					RetargetOperation::AlreadyUpToDate
+				} else {
+					RetargetOperation::Planned
+				},
+				from_commit,
+				to_commit: target_commit.clone(),
+				message: None,
+			})
+		})
+		.collect::<MonochangeResult<Vec<_>>>()?;
+	let provider = source.map(|configured| configured.provider).or_else(|| {
+		discovery
+			.record
+			.provider
+			.as_ref()
+			.map(|provider| provider.kind)
+	});
+	let provider_updates = if sync_provider {
+		match provider {
+			Some(provider) => release_record_release_tag_names(&discovery.record)
+				.into_iter()
+				.map(|tag_name| RetargetProviderResult {
+					provider,
+					tag_name,
+					target_commit: target_commit.clone(),
+					operation: match provider {
+						SourceProvider::GitHub => RetargetProviderOperation::Planned,
+						SourceProvider::GitLab | SourceProvider::Gitea => {
+							RetargetProviderOperation::Unsupported
+						}
+					},
+					url: None,
+					message: match provider {
+						SourceProvider::GitHub => None,
+						SourceProvider::GitLab | SourceProvider::Gitea => Some(format!(
+							"provider sync is not yet supported for {provider} release retargeting"
+						)),
+					},
+				})
+				.collect(),
+			None => Vec::new(),
+		}
+	} else {
+		Vec::new()
+	};
+
+	Ok(RetargetPlan {
+		record_commit: discovery.record_commit.clone(),
+		target_commit,
+		is_descendant,
+		force,
+		git_tag_updates,
+		provider_updates,
+		sync_provider,
+		dry_run,
+	})
+}
+
+pub fn execute_release_retarget(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	plan: &RetargetPlan,
+) -> MonochangeResult<RetargetResult> {
+	let mut git_tag_results = plan.git_tag_updates.clone();
+	if !plan.dry_run {
+		for update in &mut git_tag_results {
+			if update.from_commit == update.to_commit {
+				update.operation = RetargetOperation::AlreadyUpToDate;
+				continue;
+			}
+			move_git_tag(root, &update.tag_name, &update.to_commit)?;
+			update.operation = RetargetOperation::Moved;
+		}
+		let moved_tags = git_tag_results
+			.iter()
+			.filter(|update| update.operation == RetargetOperation::Moved)
+			.map(|update| update.tag_name.as_str())
+			.collect::<Vec<_>>();
+		if !moved_tags.is_empty() {
+			push_git_tags(root, &moved_tags)?;
+		}
+	}
+
+	let provider_results = if !plan.sync_provider {
+		Vec::new()
+	} else if plan
+		.provider_updates
+		.iter()
+		.any(|result| result.operation == RetargetProviderOperation::Unsupported)
+	{
+		if plan.dry_run {
+			plan.provider_updates.clone()
+		} else {
+			let provider = plan
+				.provider_updates
+				.first()
+				.map_or(SourceProvider::GitHub, |result| result.provider);
+			return Err(MonochangeError::Config(format!(
+				"provider sync is not yet supported for {provider} release retargeting"
+			)));
+		}
+	} else if let Some(source) = source {
+		sync_retargeted_provider_releases(source, &git_tag_results, plan.dry_run)?
+	} else {
+		Vec::new()
+	};
+
+	Ok(RetargetResult {
+		record_commit: plan.record_commit.clone(),
+		target_commit: plan.target_commit.clone(),
+		force: plan.force,
+		git_tag_results,
+		provider_results,
+		sync_provider: plan.sync_provider,
+		dry_run: plan.dry_run,
+	})
+}
+
+pub fn retarget_release(
+	root: &Path,
+	discovery: &ReleaseRecordDiscovery,
+	target: &str,
+	force: bool,
+	sync_provider: bool,
+	dry_run: bool,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<RetargetResult> {
+	let plan = plan_release_retarget(
+		root,
+		discovery,
+		target,
+		force,
+		sync_provider,
+		dry_run,
+		source,
+	)?;
+	execute_release_retarget(root, source, &plan)
+}
+
+fn validate_retarget_provider(
+	discovery: &ReleaseRecordDiscovery,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<()> {
+	let Some(source) = source else {
+		return Ok(());
+	};
+	let Some(provider) = &discovery.record.provider else {
+		return Ok(());
+	};
+	if provider.kind != source.provider {
+		return Err(MonochangeError::Config(format!(
+			"release record provider `{}` does not match configured source provider `{}`",
+			provider.kind, source.provider
+		)));
+	}
+	if provider.owner != source.owner || provider.repo != source.repo {
+		return Err(MonochangeError::Config(format!(
+			"release record repository `{}/{}` does not match configured source repository `{}/{}`",
+			provider.owner, provider.repo, source.owner, source.repo
+		)));
+	}
+	Ok(())
+}
+
+fn resolve_git_tag_commit(root: &Path, tag_name: &str) -> MonochangeResult<String> {
+	run_git_capture(
+		root,
+		&[
+			"rev-parse",
+			"--verify",
+			&format!("refs/tags/{tag_name}^{{commit}}"),
+		],
+		&format!("release tag {tag_name} could not be found"),
+	)
+}
+
+fn git_is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> MonochangeResult<bool> {
+	let output = ProcessCommand::new("git")
+		.current_dir(root)
+		.args(["merge-base", "--is-ancestor", ancestor, descendant])
+		.output()
+		.map_err(|error| {
+			MonochangeError::Discovery(format!("failed to compare commit ancestry: {error}"))
+		})?;
+	match output.status.code() {
+		Some(0) => Ok(true),
+		Some(1) => Ok(false),
+		_ => Err(MonochangeError::Discovery(
+			String::from_utf8_lossy(&output.stderr).trim().to_string(),
+		)),
+	}
+}
+
+fn move_git_tag(root: &Path, tag_name: &str, target_commit: &str) -> MonochangeResult<()> {
+	run_git_status(
+		root,
+		&["tag", "--force", tag_name, target_commit],
+		&format!("failed to retarget tag `{tag_name}`"),
+	)
+}
+
+fn push_git_tags(root: &Path, tags: &[&str]) -> MonochangeResult<()> {
+	let mut args = vec!["push", "--force", "origin"];
+	let tag_refs = tags
+		.iter()
+		.map(|tag| format!("refs/tags/{tag}:refs/tags/{tag}"))
+		.collect::<Vec<_>>();
+	for tag_ref in &tag_refs {
+		args.push(tag_ref.as_str());
+	}
+	run_git_status(root, &args, "failed to push retargeted release tags")
+}
+
+fn sync_retargeted_provider_releases(
+	source: &SourceConfiguration,
+	tag_results: &[RetargetTagResult],
+	dry_run: bool,
+) -> MonochangeResult<Vec<RetargetProviderResult>> {
+	match source.provider {
+		SourceProvider::GitHub => {
+			github_provider::sync_retargeted_releases(source, tag_results, dry_run)
+		}
+		SourceProvider::GitLab | SourceProvider::Gitea => {
+			if dry_run {
+				Ok(tag_results
+					.iter()
+					.map(|update| RetargetProviderResult {
+						provider: source.provider,
+						tag_name: update.tag_name.clone(),
+						target_commit: update.to_commit.clone(),
+						operation: RetargetProviderOperation::Unsupported,
+						url: None,
+						message: Some(format!(
+							"provider sync is not yet supported for {} release retargeting",
+							source.provider
+						)),
+					})
+					.collect())
+			} else {
+				Err(MonochangeError::Config(format!(
+					"provider sync is not yet supported for {} release retargeting",
+					source.provider
+				)))
+			}
+		}
+	}
+}
+
 fn text_release_record_discovery(discovery: &ReleaseRecordDiscovery) -> String {
 	let mut lines = vec!["release record:".to_string()];
 	lines.push(format!("  input ref: {}", discovery.input_ref));
@@ -984,6 +1267,10 @@ fn run_git_capture(root: &Path, args: &[&str], error_message: &str) -> Monochang
 		return Err(MonochangeError::Discovery(detail));
 	}
 	Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn run_git_status(root: &Path, args: &[&str], error_message: &str) -> MonochangeResult<()> {
+	run_git_capture(root, args, error_message).map(|_| ())
 }
 
 fn execute_matches(
