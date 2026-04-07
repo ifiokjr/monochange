@@ -318,6 +318,10 @@ CLI command interpolation variables:
 
 <!-- {/configurationWorkflowVariables} -->
 
+`RetargetRelease` is intentionally different from `PrepareRelease`-driven steps. It operates from git history plus source/provider information, discovers the durable `ReleaseRecord`, and then exposes structured `retarget.*` outputs for later command steps.
+
+See [Repairable releases](./12-repairable-releases.md) for when to use `mc repair-release` versus publishing a new patch release.
+
 ## GitHub release settings
 
 Use `[source]` plus `[source.releases]` when you want command steps such as `PublishRelease` to derive repository release payloads from the prepared release. GitHub remains the default provider when `provider` is omitted.
