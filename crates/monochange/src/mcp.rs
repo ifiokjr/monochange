@@ -357,7 +357,9 @@ mod __tests {
 
 	fn snapshot_settings() -> insta::Settings {
 		let mut settings = insta::Settings::clone_current();
+		settings.add_filter(r"/private/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
 		settings.add_filter(r"/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
+		settings.add_filter(r"/private/tmp/[^/\s]+", "[ROOT]");
 		settings.add_filter(r"/tmp/[^/\s]+", "[ROOT]");
 		settings.add_filter(r"/home/runner/work/_temp/[^/\s]+", "[ROOT]");
 		settings.add_filter(r"\b[A-Z]:\\[^\s]+?\\Temp\\[^\\\s]+", "[ROOT]");

@@ -13,12 +13,12 @@ expression: content_text(&result)
         "declared_dependencies": [],
         "ecosystem": "cargo",
         "id": "cargo:crates/core/Cargo.toml",
-        "manifest_path": "/private[ROOT]/crates/core/Cargo.toml",
+        "manifest_path": "[ROOT]/crates/core/Cargo.toml",
         "metadata": {},
         "name": "core",
         "publish_state": "public",
         "version_group_id": null,
-        "workspace_root": "/private[ROOT]/crates/core"
+        "workspace_root": "[ROOT]/crates/core"
       }
     ],
     "version_groups": [],
