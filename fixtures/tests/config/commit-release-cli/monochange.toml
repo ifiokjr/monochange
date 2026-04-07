@@ -1,0 +1,7 @@
+[cli.commit-release]
+
+[[cli.commit-release.steps]]
+type = "PrepareRelease"
+
+[[cli.commit-release.steps]]
+type = "CommitRelease"

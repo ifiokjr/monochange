@@ -930,6 +930,79 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 }
 
 #[test]
+fn git_commit_paths_reports_io_and_non_noop_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let missing = tempdir.path().join("missing");
+	let io_error = git_commit_paths(
+		&missing,
+		&CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing worktree error"));
+	assert!(io_error
+		.to_string()
+		.contains("failed to commit release pull request changes"));
+
+	let repo = tempdir.path().join("repo-error");
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	let hooks_dir = repo.join(".git/hooks");
+	std::fs::write(hooks_dir.join("pre-commit"), "#!/bin/sh\nexit 1\n")
+		.unwrap_or_else(|error| panic!("write hook: {error}"));
+	std::fs::set_permissions(
+		hooks_dir.join("pre-commit"),
+		std::os::unix::fs::PermissionsExt::from_mode(0o755),
+	)
+	.unwrap_or_else(|error| panic!("chmod hook: {error}"));
+	std::fs::write(repo.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git(&repo, &["add", "release.txt"]);
+	let error = git_commit_paths(
+		&repo,
+		&CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
+	assert!(error
+		.to_string()
+		.contains("failed to commit release pull request changes"));
+}
+
+#[test]
+fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	std::fs::write(repo.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git(&repo, &["add", "release.txt"]);
+	git(&repo, &["commit", "-m", "initial"]);
+
+	git_commit_paths(
+		&repo,
+		&CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+	)
+	.unwrap_or_else(|error| panic!("commit paths: {error}"));
+
+	assert_eq!(
+		git_output(&repo, &["rev-list", "--count", "HEAD"]).trim(),
+		"1"
+	);
+}
+
+#[test]
 fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 	let server = MockServer::start();
 	let lookup_pull_request = server.mock(|when, then| {

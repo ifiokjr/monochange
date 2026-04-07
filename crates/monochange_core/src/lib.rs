@@ -683,6 +683,10 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+	CommitRelease {
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	RenderReleaseManifest {
 		#[serde(default)]
 		path: Option<PathBuf>,
@@ -739,6 +743,7 @@ impl CliStepDefinition {
 			| Self::Discover { inputs }
 			| Self::CreateChangeFile { inputs }
 			| Self::PrepareRelease { inputs }
+			| Self::CommitRelease { inputs }
 			| Self::RenderReleaseManifest { inputs, .. }
 			| Self::PublishRelease { inputs }
 			| Self::OpenReleaseRequest { inputs }
@@ -757,6 +762,7 @@ impl CliStepDefinition {
 			Self::Discover { .. } => "Discover",
 			Self::CreateChangeFile { .. } => "CreateChangeFile",
 			Self::PrepareRelease { .. } => "PrepareRelease",
+			Self::CommitRelease { .. } => "CommitRelease",
 			Self::RenderReleaseManifest { .. } => "RenderReleaseManifest",
 			Self::PublishRelease { .. } => "PublishRelease",
 			Self::OpenReleaseRequest { .. } => "OpenReleaseRequest",
@@ -776,7 +782,9 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
-			Self::Validate { .. } | Self::RenderReleaseManifest { .. } => Some(&[]),
+			Self::Validate { .. }
+			| Self::CommitRelease { .. }
+			| Self::RenderReleaseManifest { .. } => Some(&[]),
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
@@ -807,9 +815,10 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn expected_input_kind(&self, name: &str) -> Option<CliInputKind> {
 		match self {
-			Self::Validate { .. } | Self::RenderReleaseManifest { .. } | Self::Command { .. } => {
-				None
-			}
+			Self::Validate { .. }
+			| Self::CommitRelease { .. }
+			| Self::RenderReleaseManifest { .. }
+			| Self::Command { .. } => None,
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
@@ -2116,6 +2125,30 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::PrepareRelease {
 				inputs: BTreeMap::new(),
 			}],
+		},
+		CliCommandDefinition {
+			name: "commit-release".to_string(),
+			help_text: Some(
+				"Prepare a release and create a local release commit with an embedded MonoChange release record"
+					.to_string(),
+			),
+			inputs: vec![CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec!["text".to_string(), "json".to_string()],
+				short: None,
+			}],
+			steps: vec![
+				CliStepDefinition::PrepareRelease {
+					inputs: BTreeMap::new(),
+				},
+				CliStepDefinition::CommitRelease {
+					inputs: BTreeMap::new(),
+				},
+			],
 		},
 		CliCommandDefinition {
 			name: "affected".to_string(),

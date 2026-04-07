@@ -39,7 +39,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 7);
+	assert_eq!(configuration.cli.len(), 8);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -52,6 +52,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 			"discover",
 			"change",
 			"release",
+			"commit-release",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -79,6 +80,27 @@ fn load_workspace_configuration_supports_diagnostics_cli_command_definition() {
 		Some(_) => panic!("expected DiagnoseChangesets step"),
 		None => panic!("expected diagnostics step"),
 	}
+}
+
+#[test]
+fn load_workspace_configuration_supports_commit_release_cli_command_definition() {
+	let root = fixture_path("config/commit-release-cli");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let commit_release = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "commit-release")
+		.unwrap_or_else(|| panic!("expected commit-release command"));
+	assert_eq!(commit_release.steps.len(), 2);
+	assert!(matches!(
+		commit_release.steps.first(),
+		Some(CliStepDefinition::PrepareRelease { .. })
+	));
+	assert!(matches!(
+		commit_release.steps.get(1),
+		Some(CliStepDefinition::CommitRelease { .. })
+	));
 }
 
 #[test]
