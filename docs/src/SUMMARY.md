@@ -16,3 +16,20 @@
 - [Migrating from knope](guide/10-migrating-from-knope.md)
 - [Diagnostics](guide/11-diagnostics.md)
 - [Repairable releases](guide/12-repairable-releases.md)
+
+# CLI step reference
+
+- [Overview](reference/cli-steps/index.md)
+- [Validate](reference/cli-steps/validate.md)
+- [Discover](reference/cli-steps/discover.md)
+- [CreateChangeFile](reference/cli-steps/create-change-file.md)
+- [PrepareRelease](reference/cli-steps/prepare-release.md)
+- [CommitRelease](reference/cli-steps/commit-release.md)
+- [RenderReleaseManifest](reference/cli-steps/render-release-manifest.md)
+- [PublishRelease](reference/cli-steps/publish-release.md)
+- [OpenReleaseRequest](reference/cli-steps/open-release-request.md)
+- [CommentReleasedIssues](reference/cli-steps/comment-released-issues.md)
+- [AffectedPackages](reference/cli-steps/affected-packages.md)
+- [DiagnoseChangesets](reference/cli-steps/diagnose-changesets.md)
+- [RetargetRelease](reference/cli-steps/retarget-release.md)
+- [Command](reference/cli-steps/command.md)
