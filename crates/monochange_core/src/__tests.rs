@@ -32,6 +32,12 @@ use crate::ReleaseRecordDiscovery;
 use crate::ReleaseRecordError;
 use crate::ReleaseRecordProvider;
 use crate::ReleaseRecordTarget;
+use crate::RetargetOperation;
+use crate::RetargetPlan;
+use crate::RetargetProviderOperation;
+use crate::RetargetProviderResult;
+use crate::RetargetResult;
+use crate::RetargetTagResult;
 use crate::ShellConfig;
 use crate::SourceProvider;
 use crate::VersionFormat;
@@ -1173,5 +1179,106 @@ fn release_record_discovery_serializes_with_camel_case_keys() {
 			.get("kind")
 			.unwrap_or_else(|| panic!("expected record.kind")),
 		RELEASE_RECORD_KIND
+	);
+}
+
+#[test]
+fn release_record_tag_helpers_deduplicate_tags() {
+	let mut record = sample_release_record();
+	record.release_targets.push(ReleaseRecordTarget {
+		id: "duplicate".to_string(),
+		kind: ReleaseOwnerKind::Package,
+		version: "1.2.3".to_string(),
+		version_format: VersionFormat::Primary,
+		tag: true,
+		release: true,
+		tag_name: "v1.2.3".to_string(),
+		members: Vec::new(),
+	});
+
+	assert_eq!(crate::release_record_tag_names(&record), vec!["v1.2.3"]);
+	assert_eq!(
+		crate::release_record_release_tag_names(&record),
+		vec!["v1.2.3"]
+	);
+}
+
+#[test]
+fn retarget_plan_and_result_serialize_with_camel_case_keys() {
+	let tag_result = RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: RetargetOperation::Planned,
+		message: None,
+	};
+	let provider_result = RetargetProviderResult {
+		provider: SourceProvider::GitHub,
+		tag_name: "v1.2.3".to_string(),
+		target_commit: "def5678".to_string(),
+		operation: RetargetProviderOperation::Planned,
+		url: Some("https://example.com/releases/1".to_string()),
+		message: None,
+	};
+	let plan = RetargetPlan {
+		record_commit: "abc1234".to_string(),
+		target_commit: "def5678".to_string(),
+		is_descendant: true,
+		force: false,
+		git_tag_updates: vec![tag_result.clone()],
+		provider_updates: vec![provider_result.clone()],
+		sync_provider: true,
+		dry_run: true,
+	};
+	let result = RetargetResult {
+		record_commit: "abc1234".to_string(),
+		target_commit: "def5678".to_string(),
+		force: false,
+		git_tag_results: vec![tag_result],
+		provider_results: vec![provider_result],
+		sync_provider: true,
+		dry_run: false,
+	};
+
+	let plan_value =
+		serde_json::to_value(&plan).unwrap_or_else(|error| panic!("serialize plan: {error}"));
+	assert_eq!(
+		plan_value
+			.get("recordCommit")
+			.unwrap_or_else(|| panic!("expected recordCommit")),
+		"abc1234"
+	);
+	assert_eq!(
+		plan_value
+			.get("isDescendant")
+			.unwrap_or_else(|| panic!("expected isDescendant")),
+		true
+	);
+	assert_eq!(
+		plan_value
+			.pointer("/gitTagUpdates/0/operation")
+			.unwrap_or_else(|| panic!("expected gitTagUpdates[0].operation")),
+		"planned"
+	);
+	assert_eq!(
+		plan_value
+			.pointer("/providerUpdates/0/operation")
+			.unwrap_or_else(|| panic!("expected providerUpdates[0].operation")),
+		"planned"
+	);
+
+	let result_value =
+		serde_json::to_value(&result).unwrap_or_else(|error| panic!("serialize result: {error}"));
+	assert_eq!(
+		result_value
+			.pointer("/gitTagResults/0/operation")
+			.unwrap_or_else(|| panic!("expected gitTagResults[0].operation")),
+		"planned"
+	);
+	assert_eq!(
+		result_value
+			.pointer("/providerResults/0/operation")
+			.unwrap_or_else(|| panic!("expected providerResults[0].operation")),
+		"planned"
 	);
 }

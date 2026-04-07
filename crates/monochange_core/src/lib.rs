@@ -54,6 +54,7 @@
 //! <!-- {/monochangeCoreCrateDocs} -->
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::env;
 use std::fmt;
 use std::fs;
@@ -1354,6 +1355,102 @@ pub struct ReleaseRecordDiscovery {
 	pub record_commit: String,
 	pub distance: usize,
 	pub record: ReleaseRecord,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RetargetOperation {
+	Planned,
+	Moved,
+	AlreadyUpToDate,
+	Skipped,
+	Failed,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetargetTagResult {
+	pub tag_name: String,
+	pub from_commit: String,
+	pub to_commit: String,
+	pub operation: RetargetOperation,
+	#[serde(default)]
+	pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RetargetProviderOperation {
+	Planned,
+	Synced,
+	AlreadyAligned,
+	Unsupported,
+	Skipped,
+	Failed,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetargetProviderResult {
+	pub provider: SourceProvider,
+	pub tag_name: String,
+	pub target_commit: String,
+	pub operation: RetargetProviderOperation,
+	#[serde(default)]
+	pub url: Option<String>,
+	#[serde(default)]
+	pub message: Option<String>,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetargetPlan {
+	pub record_commit: String,
+	pub target_commit: String,
+	pub is_descendant: bool,
+	pub force: bool,
+	pub git_tag_updates: Vec<RetargetTagResult>,
+	pub provider_updates: Vec<RetargetProviderResult>,
+	pub sync_provider: bool,
+	pub dry_run: bool,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetargetResult {
+	pub record_commit: String,
+	pub target_commit: String,
+	pub force: bool,
+	pub git_tag_results: Vec<RetargetTagResult>,
+	pub provider_results: Vec<RetargetProviderResult>,
+	pub sync_provider: bool,
+	pub dry_run: bool,
+}
+
+#[must_use]
+pub fn release_record_tag_names(record: &ReleaseRecord) -> Vec<String> {
+	record
+		.release_targets
+		.iter()
+		.filter(|target| target.tag)
+		.map(|target| target.tag_name.clone())
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.collect()
+}
+
+#[must_use]
+pub fn release_record_release_tag_names(record: &ReleaseRecord) -> Vec<String> {
+	record
+		.release_targets
+		.iter()
+		.filter(|target| target.release)
+		.map(|target| target.tag_name.clone())
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.collect()
 }
 
 #[derive(Debug, Error)]
