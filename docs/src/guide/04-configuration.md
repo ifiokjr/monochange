@@ -453,7 +453,6 @@ Supported template variables include:
 | `{{ bump }}`                     | resolved bump severity                                                | `none`, `patch`, `minor`, or `major`                                                                       |
 | `{{ type }}`                     | changeset note type                                                   | e.g. `feature`, `fix`, `security`; omitted when absent                                                     |
 | `{{ context }}`                  | compact default metadata block                                        | preferred rendered block for human-readable notes                                                          |
-| `{{ provenance }}`               | legacy alias for `{{ context }}`                                      | kept for backward compatibility                                                                            |
 | `{{ changeset_path }}`           | source `.changeset/*.md` path                                         | tracked in manifests and still available for custom templates, but not shown by default in `{{ context }}` |
 | `{{ change_owner }}`             | plain-text hosted actor label                                         | usually something like `@ifiokjr`                                                                          |
 | `{{ change_owner_link }}`        | markdown link to the hosted actor                                     | falls back to plain text when no URL is available                                                          |
@@ -502,7 +501,6 @@ Current implementation notes:
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
 - supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `CommitRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`, and `Command`
 - see the [CLI step reference](../reference/cli-steps/index.md) for detailed per-step guidance, prerequisites, and composition examples
-- legacy `PublishGitHubRelease`, `OpenReleasePullRequest`, and `EnforceChangesetPolicy` step names are still accepted as migration aliases
 
 <!-- {/configurationCurrentStatus} -->
 
