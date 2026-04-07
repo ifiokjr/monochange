@@ -27,10 +27,20 @@ use crate::ReleaseNotesDocument;
 use crate::ReleaseNotesSection;
 use crate::ReleaseNotesSettings;
 use crate::ReleaseOwnerKind;
+use crate::ReleaseRecord;
+use crate::ReleaseRecordError;
+use crate::ReleaseRecordProvider;
+use crate::ReleaseRecordTarget;
 use crate::ShellConfig;
+use crate::SourceProvider;
 use crate::VersionFormat;
 use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
+use crate::RELEASE_RECORD_END_MARKER;
+use crate::RELEASE_RECORD_HEADING;
+use crate::RELEASE_RECORD_KIND;
+use crate::RELEASE_RECORD_SCHEMA_VERSION;
+use crate::RELEASE_RECORD_START_MARKER;
 
 #[test]
 fn workspace_defaults_default_has_no_extra_changelog_sections() {
@@ -781,4 +791,345 @@ fn cli_step_command_without_id_has_none() {
 		}
 		_ => panic!("expected Command step"),
 	}
+}
+
+#[test]
+fn release_record_deserializes_defaults_for_schema_and_kind() {
+	let record: ReleaseRecord = serde_json::from_str(
+		r#"{
+		  "createdAt": "2026-04-06T12:00:00Z",
+		  "command": "release-pr",
+		  "releaseTargets": [],
+		  "releasedPackages": [],
+		  "changedFiles": []
+		}"#,
+	)
+	.unwrap_or_else(|error| panic!("deserialize release record defaults: {error}"));
+	assert_eq!(record.schema_version, RELEASE_RECORD_SCHEMA_VERSION);
+	assert_eq!(record.kind, RELEASE_RECORD_KIND);
+}
+
+#[test]
+fn release_record_block_roundtrips_with_reserved_markers() {
+	let record = sample_release_record();
+	let rendered = crate::render_release_record_block(&record)
+		.unwrap_or_else(|error| panic!("render release record: {error}"));
+
+	assert!(rendered.starts_with(RELEASE_RECORD_HEADING));
+	assert!(rendered.contains(RELEASE_RECORD_START_MARKER));
+	assert!(rendered.contains(RELEASE_RECORD_END_MARKER));
+	assert!(rendered.contains("```json"));
+
+	let parsed = crate::parse_release_record_block(&rendered)
+		.unwrap_or_else(|error| panic!("parse release record: {error}"));
+	assert_eq!(parsed, record);
+}
+
+#[test]
+fn parse_release_record_block_returns_not_found_without_markers() {
+	let error = crate::parse_release_record_block("chore(release): prepare release")
+		.err()
+		.unwrap_or_else(|| panic!("expected not found error"));
+	assert!(matches!(error, ReleaseRecordError::NotFound));
+}
+
+#[test]
+fn parse_release_record_block_rejects_duplicate_blocks() {
+	let rendered = crate::render_release_record_block(&sample_release_record())
+		.unwrap_or_else(|error| panic!("render release record: {error}"));
+	let duplicated = format!("{rendered}\n\n{rendered}");
+
+	let error = crate::parse_release_record_block(&duplicated)
+		.err()
+		.unwrap_or_else(|| panic!("expected duplicate block error"));
+	assert!(matches!(error, ReleaseRecordError::MultipleBlocks));
+}
+
+#[test]
+fn parse_release_record_block_rejects_missing_json_fence() {
+	let malformed = format!(
+		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n{{}}\n{RELEASE_RECORD_END_MARKER}"
+	);
+	let error = crate::parse_release_record_block(&malformed)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing json block error"));
+	assert!(matches!(error, ReleaseRecordError::MissingJsonBlock));
+}
+
+#[test]
+fn parse_release_record_block_rejects_invalid_json() {
+	let malformed = format!(
+		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{{\n```\n{RELEASE_RECORD_END_MARKER}"
+	);
+	let error = crate::parse_release_record_block(&malformed)
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid json error"));
+	assert!(matches!(error, ReleaseRecordError::InvalidJson(_)));
+}
+
+#[test]
+fn parse_release_record_block_rejects_unsupported_kind() {
+	let heading = RELEASE_RECORD_HEADING;
+	let start = RELEASE_RECORD_START_MARKER;
+	let end = RELEASE_RECORD_END_MARKER;
+	let invalid_kind = format!(
+		r#"{heading}
+
+{start}
+```json
+{{
+  "schemaVersion": 1,
+  "kind": "monochange.otherRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}
+```
+{end}"#
+	);
+	let error = crate::parse_release_record_block(&invalid_kind)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported kind error"));
+	assert!(matches!(
+		error,
+		ReleaseRecordError::UnsupportedKind(kind) if kind == "monochange.otherRecord"
+	));
+}
+
+#[test]
+fn parse_release_record_block_rejects_unsupported_schema_version() {
+	let heading = RELEASE_RECORD_HEADING;
+	let start = RELEASE_RECORD_START_MARKER;
+	let end = RELEASE_RECORD_END_MARKER;
+	let kind = RELEASE_RECORD_KIND;
+	let unsupported_schema = format!(
+		r#"{heading}
+
+{start}
+```json
+{{
+  "schemaVersion": 2,
+  "kind": "{kind}",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}
+```
+{end}"#
+	);
+	let error = crate::parse_release_record_block(&unsupported_schema)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported schema error"));
+	assert!(matches!(
+		error,
+		ReleaseRecordError::UnsupportedSchemaVersion(2)
+	));
+}
+
+#[test]
+fn parse_release_record_block_ignores_unknown_fields() {
+	let heading = RELEASE_RECORD_HEADING;
+	let start = RELEASE_RECORD_START_MARKER;
+	let end = RELEASE_RECORD_END_MARKER;
+	let schema = RELEASE_RECORD_SCHEMA_VERSION;
+	let kind = RELEASE_RECORD_KIND;
+	let with_unknown = format!(
+		r#"{heading}
+
+{start}
+```json
+{{
+  "schemaVersion": {schema},
+  "kind": "{kind}",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": [],
+  "unknownField": "ignored"
+}}
+```
+{end}"#
+	);
+	let parsed = crate::parse_release_record_block(&with_unknown)
+		.unwrap_or_else(|error| panic!("parse release record with unknown field: {error}"));
+	assert_eq!(parsed.kind, RELEASE_RECORD_KIND);
+	assert_eq!(parsed.schema_version, RELEASE_RECORD_SCHEMA_VERSION);
+	assert!(parsed.release_targets.is_empty());
+}
+
+fn sample_release_record() -> ReleaseRecord {
+	ReleaseRecord {
+		schema_version: RELEASE_RECORD_SCHEMA_VERSION,
+		kind: RELEASE_RECORD_KIND.to_string(),
+		created_at: "2026-04-06T12:00:00Z".to_string(),
+		command: "release-pr".to_string(),
+		version: Some("1.2.3".to_string()),
+		group_version: Some("1.2.3".to_string()),
+		release_targets: vec![ReleaseRecordTarget {
+			id: "main".to_string(),
+			kind: ReleaseOwnerKind::Group,
+			version: "1.2.3".to_string(),
+			version_format: VersionFormat::Primary,
+			tag: true,
+			release: true,
+			tag_name: "v1.2.3".to_string(),
+			members: vec![
+				"monochange".to_string(),
+				"monochange_core".to_string(),
+				"monochange_config".to_string(),
+			],
+		}],
+		released_packages: vec![
+			"monochange".to_string(),
+			"monochange_core".to_string(),
+			"monochange_config".to_string(),
+		],
+		changed_files: vec![
+			PathBuf::from("Cargo.lock"),
+			PathBuf::from("crates/monochange/Cargo.toml"),
+		],
+		updated_changelogs: vec![PathBuf::from("crates/monochange/CHANGELOG.md")],
+		deleted_changesets: vec![PathBuf::from(".changeset/032-step-outputs.md")],
+		provider: Some(ReleaseRecordProvider {
+			kind: SourceProvider::GitHub,
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			host: None,
+		}),
+	}
+}
+
+#[test]
+fn render_release_record_block_rejects_unsupported_kind() {
+	let mut record = sample_release_record();
+	record.kind = "monochange.otherRecord".to_string();
+
+	let error = crate::render_release_record_block(&record)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported kind render error"));
+	assert!(matches!(
+		error,
+		ReleaseRecordError::UnsupportedKind(kind) if kind == "monochange.otherRecord"
+	));
+}
+
+#[test]
+fn render_release_record_block_rejects_unsupported_schema_version() {
+	let mut record = sample_release_record();
+	record.schema_version = 2;
+
+	let error = crate::render_release_record_block(&record)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported schema render error"));
+	assert!(matches!(
+		error,
+		ReleaseRecordError::UnsupportedSchemaVersion(2)
+	));
+}
+
+#[test]
+fn parse_release_record_block_rejects_missing_end_marker() {
+	let malformed =
+		format!("{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{{}}\n```");
+	let error = crate::parse_release_record_block(&malformed)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing end marker error"));
+	assert!(matches!(error, ReleaseRecordError::MissingEndMarker));
+}
+
+#[test]
+fn parse_release_record_block_rejects_missing_kind() {
+	let missing_kind = format!(
+		r#"{RELEASE_RECORD_HEADING}
+
+{RELEASE_RECORD_START_MARKER}
+```json
+{{
+  "schemaVersion": 1,
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}
+```
+{RELEASE_RECORD_END_MARKER}"#
+	);
+	let error = crate::parse_release_record_block(&missing_kind)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing kind error"));
+	assert!(matches!(error, ReleaseRecordError::MissingKind));
+}
+
+#[test]
+fn parse_release_record_block_rejects_missing_schema_version() {
+	let missing_schema = format!(
+		r#"{RELEASE_RECORD_HEADING}
+
+{RELEASE_RECORD_START_MARKER}
+```json
+{{
+  "kind": "{RELEASE_RECORD_KIND}",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}
+```
+{RELEASE_RECORD_END_MARKER}"#
+	);
+	let error = crate::parse_release_record_block(&missing_schema)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing schema error"));
+	assert!(matches!(error, ReleaseRecordError::MissingSchemaVersion));
+}
+
+#[test]
+fn parse_release_record_block_rejects_end_marker_before_start_marker() {
+	let malformed = format!(
+		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_END_MARKER}\n{RELEASE_RECORD_START_MARKER}\n```json\n{{}}\n```"
+	);
+	let error = crate::parse_release_record_block(&malformed)
+		.err()
+		.unwrap_or_else(|| panic!("expected end-before-start error"));
+	assert!(matches!(error, ReleaseRecordError::MissingEndMarker));
+}
+
+#[test]
+fn parse_release_record_block_rejects_trailing_non_empty_lines_after_json_block() {
+	let malformed = format!(
+		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{{}}\n```\nextra\n{RELEASE_RECORD_END_MARKER}"
+	);
+	let error = crate::parse_release_record_block(&malformed)
+		.err()
+		.unwrap_or_else(|| panic!("expected trailing-line error"));
+	assert!(matches!(error, ReleaseRecordError::MissingJsonBlock));
+}
+
+#[test]
+fn parse_release_record_block_rejects_empty_json_payload() {
+	let malformed = format!(
+		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n\n```\n{RELEASE_RECORD_END_MARKER}"
+	);
+	let error = crate::parse_release_record_block(&malformed)
+		.err()
+		.unwrap_or_else(|| panic!("expected empty-json error"));
+	assert!(matches!(error, ReleaseRecordError::MissingJsonBlock));
+}
+
+#[test]
+fn parse_release_record_block_rejects_missing_closing_json_fence() {
+	let malformed = format!(
+		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{{}}\n{RELEASE_RECORD_END_MARKER}"
+	);
+	let error = crate::parse_release_record_block(&malformed)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing closing fence error"));
+	assert!(matches!(error, ReleaseRecordError::MissingJsonBlock));
 }
