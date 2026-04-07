@@ -4,4 +4,4 @@ core:
   type: nope
 ---
 
-#### invalid object type
+# invalid object type

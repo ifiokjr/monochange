@@ -3,4 +3,4 @@ core:
   type: docs
 ---
 
-#### object type without config
+# object type without config

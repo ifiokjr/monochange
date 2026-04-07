@@ -3,4 +3,4 @@ core:
   bump: nope
 ---
 
-#### invalid object bump
+# invalid object bump
