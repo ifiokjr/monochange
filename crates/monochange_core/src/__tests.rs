@@ -34,7 +34,9 @@ use crate::WorkspaceDefaults;
 
 #[test]
 fn workspace_defaults_default_has_no_extra_changelog_sections() {
-	assert!(WorkspaceDefaults::default().extra_changelog_sections.is_empty());
+	assert!(WorkspaceDefaults::default()
+		.extra_changelog_sections
+		.is_empty());
 }
 
 #[test]
