@@ -805,6 +805,300 @@ fn load_change_signals_parses_markdown_change_types_and_details() {
 }
 
 #[test]
+fn load_change_signals_accept_group_scalar_type_shorthand_with_default_bump() {
+	let root = fixture_path("config/change-signals-group-type-shorthand");
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"cargo-core",
+			root.join("crates/core/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"cargo-app",
+			root.join("crates/app/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let changeset = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| panic!("changeset file: {error}"));
+	let target = changeset
+		.targets
+		.first()
+		.unwrap_or_else(|| panic!("expected target"));
+	assert_eq!(target.id, "sdk");
+	assert_eq!(target.bump, Some(BumpSeverity::Minor));
+	assert_eq!(target.change_type.as_deref(), Some("test"));
+	assert!(changeset
+		.signals
+		.iter()
+		.all(|signal| signal.requested_bump == Some(BumpSeverity::Minor)));
+}
+
+#[test]
+fn load_change_signals_accept_type_only_scalar_shorthand_without_default_bump() {
+	let root = fixture_path("config/change-signals-type-only-no-default-bump");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let mut packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let signals = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| panic!("change signals: {error}"));
+	let signal = signals.first().unwrap_or_else(|| panic!("expected signal"));
+	assert_eq!(signal.requested_bump, Some(BumpSeverity::None));
+	assert_eq!(signal.change_type.as_deref(), Some("docs"));
+}
+
+#[test]
+fn load_change_signals_reject_unknown_scalar_type_with_valid_types_help() {
+	let root = fixture_path("config/rejects-change-unknown-type-configured");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	let rendered = error.to_string();
+	assert!(rendered.contains("invalid scalar value `nope`"));
+	assert!(rendered.contains("configured types: docs, test"));
+}
+
+#[test]
+fn load_change_signals_reject_unknown_object_type_with_valid_types_help() {
+	let root = fixture_path("config/rejects-change-unknown-object-type");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	let rendered = error.to_string();
+	assert!(rendered.contains("invalid type `nope`"));
+	assert!(rendered.contains("valid types: security"));
+}
+
+#[test]
+fn load_change_signals_reject_object_type_when_target_has_no_configured_sections() {
+	let root = fixture_path("config/rejects-change-object-type-without-configured-sections");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	assert!(error
+		.to_string()
+		.contains("no configured types are available for this target"));
+}
+
+#[test]
+fn load_change_signals_reject_unknown_group_object_type_with_valid_types_help() {
+	let root = fixture_path("config/rejects-group-change-unknown-object-type");
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"cargo-core",
+			root.join("crates/core/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"cargo-app",
+			root.join("crates/app/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	let rendered = error.to_string();
+	assert!(rendered.contains("target `sdk` has invalid type `docs`"));
+	assert!(rendered.contains("valid types: test"));
+}
+
+#[test]
+fn load_change_signals_reject_none_bump_without_type_or_version() {
+	let root = fixture_path("config/rejects-change-none-without-type-or-version");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	assert!(error
+		.to_string()
+		.contains("must not use `bump = \"none\"` without also declaring `type` or `version`"));
+}
+
+#[test]
+fn load_change_signals_reject_invalid_object_bumps() {
+	let root = fixture_path("config/rejects-change-invalid-object-bump");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	assert!(error
+		.to_string()
+		.contains("has invalid bump `nope`; expected `none`, `patch`, `minor`, or `major`"));
+}
+
+#[test]
+fn validate_configured_change_type_accepts_known_type() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	crate::validate_configured_change_type(
+		&configuration,
+		Path::new("change.md"),
+		"core",
+		"security",
+	)
+	.unwrap_or_else(|error| panic!("validate type: {error}"));
+}
+
+#[test]
+fn parse_markdown_change_target_accepts_unconfigured_object_type_literal() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let value = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("type: docs")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let parsed = crate::parse_markdown_change_target(
+		&value,
+		Path::new("change.md"),
+		"unknown-target",
+		&configuration,
+	)
+	.unwrap_or_else(|error| panic!("parse target: {error}"));
+	assert_eq!(parsed, (None, None, Some("docs".to_string())));
+}
+
+#[test]
+fn parse_markdown_change_target_accepts_unconfigured_scalar_type_literal() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let value = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("docs")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let parsed = crate::parse_markdown_change_target(
+		&value,
+		Path::new("change.md"),
+		"unknown-target",
+		&configuration,
+	)
+	.unwrap_or_else(|error| panic!("parse target: {error}"));
+	assert_eq!(parsed, (None, None, Some("docs".to_string())));
+}
+
+#[test]
+fn parse_markdown_change_target_rejects_non_scalar_non_mapping_values() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let value = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("[docs]")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let error =
+		crate::parse_markdown_change_target(&value, Path::new("change.md"), "core", &configuration)
+			.expect_err("sequence values should fail");
+	assert!(error
+		.to_string()
+		.contains("must map to `none`, `patch`, `minor`, `major`, a configured change type"));
+}
+
+#[test]
+fn parse_markdown_change_target_rejects_empty_mapping() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let value = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("{}")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let error =
+		crate::parse_markdown_change_target(&value, Path::new("change.md"), "core", &configuration)
+			.expect_err("empty mapping should fail");
+	assert!(error
+		.to_string()
+		.contains("must declare `bump`, `version`, `type`, or a valid scalar shorthand"));
+}
+
+#[test]
+fn configured_change_sections_fall_back_to_empty_for_unknown_targets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	assert!(crate::configured_change_sections(&configuration, "unknown").is_empty());
+}
+
+#[test]
 fn load_change_signals_rejects_markdown_without_frontmatter() {
 	let root = fixture_path("config/rejects-change-no-frontmatter");
 	let configuration = load_workspace_configuration(&root)

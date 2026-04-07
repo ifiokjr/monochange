@@ -386,6 +386,29 @@ fn valid_input_names_returns_expected_names_for_create_change_file() {
 }
 
 #[test]
+fn default_change_command_supports_none_bump_and_omits_legacy_evidence_input() {
+	let change = default_cli_commands()
+		.into_iter()
+		.find(|command| command.name == "change")
+		.unwrap_or_else(|| panic!("expected change command"));
+	let bump = change
+		.inputs
+		.iter()
+		.find(|input| input.name == "bump")
+		.unwrap_or_else(|| panic!("expected bump input"));
+	assert_eq!(
+		bump.choices,
+		vec![
+			"none".to_string(),
+			"patch".to_string(),
+			"minor".to_string(),
+			"major".to_string(),
+		]
+	);
+	assert!(change.inputs.iter().all(|input| input.name != "evidence"));
+}
+
+#[test]
 fn expected_input_kind_returns_correct_types_for_affected_packages() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::AffectedPackages {

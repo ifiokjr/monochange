@@ -249,24 +249,31 @@ fn prompt_select_targets(targets: &[SelectableTarget]) -> MonochangeResult<Vec<S
 	Ok(selected)
 }
 
+fn bump_options() -> Vec<&'static str> {
+	vec!["none", "patch", "minor", "major"]
+}
+
+fn parse_selected_bump(selection: &str) -> BumpSeverity {
+	match selection {
+		"none" => BumpSeverity::None,
+		"minor" => BumpSeverity::Minor,
+		"major" => BumpSeverity::Major,
+		_ => BumpSeverity::Patch,
+	}
+}
+
 fn prompt_bump_for_target(target: &SelectableTarget) -> MonochangeResult<BumpSeverity> {
 	let label = match target.kind {
 		TargetKind::Group => format!("Bump for group `{}`:", target.id),
 		TargetKind::Package => format!("Bump for package `{}`:", target.id),
 	};
 
-	let options = vec!["none", "patch", "minor", "major"];
-	let selection = Select::new(&label, options)
+	let selection = Select::new(&label, bump_options())
 		.with_starting_cursor(0)
 		.prompt()
 		.map_err(|error| MonochangeError::Config(format!("bump selection cancelled: {error}")))?;
 
-	match selection {
-		"none" => Ok(BumpSeverity::None),
-		"minor" => Ok(BumpSeverity::Minor),
-		"major" => Ok(BumpSeverity::Major),
-		_ => Ok(BumpSeverity::Patch),
-	}
+	Ok(parse_selected_bump(selection))
 }
 
 fn prompt_version_for_target(target: &SelectableTarget) -> MonochangeResult<Option<String>> {
@@ -307,13 +314,25 @@ fn prompt_version_for_target(target: &SelectableTarget) -> MonochangeResult<Opti
 	}
 }
 
-fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<Option<String>> {
-	if target.configured_types.is_empty() {
-		return Ok(None);
-	}
+fn change_type_options(target: &SelectableTarget) -> Option<Vec<String>> {
+	(!target.configured_types.is_empty()).then(|| {
+		let mut options = vec!["(none)".to_string()];
+		options.extend(target.configured_types.iter().cloned());
+		options
+	})
+}
 
-	let mut options = vec!["(none)".to_string()];
-	options.extend(target.configured_types.iter().cloned());
+fn parse_change_type_selection(selection: &str) -> Option<String> {
+	match selection {
+		"(none)" => None,
+		_ => Some(selection.to_string()),
+	}
+}
+
+fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<Option<String>> {
+	let Some(options) = change_type_options(target) else {
+		return Ok(None);
+	};
 
 	let label = match target.kind {
 		TargetKind::Group => format!("Change type for group `{}`:", target.id),
@@ -327,10 +346,7 @@ fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<
 			MonochangeError::Config(format!("change type selection cancelled: {error}"))
 		})?;
 
-	match selection.as_str() {
-		"(none)" => Ok(None),
-		_ => Ok(Some(selection)),
-	}
+	Ok(parse_change_type_selection(&selection))
 }
 
 fn prompt_reason() -> MonochangeResult<String> {
@@ -357,5 +373,80 @@ fn prompt_optional(label: &str) -> MonochangeResult<Option<String>> {
 		Ok(None)
 	} else {
 		Ok(Some(value))
+	}
+}
+
+#[cfg(test)]
+mod __tests {
+	use std::collections::BTreeSet;
+
+	use monochange_core::BumpSeverity;
+
+	use super::bump_options;
+	use super::change_type_options;
+	use super::parse_change_type_selection;
+	use super::parse_selected_bump;
+	use super::prompt_change_type_for_target;
+	use super::SelectableTarget;
+	use super::TargetKind;
+
+	fn package_target(configured_types: Vec<String>) -> SelectableTarget {
+		SelectableTarget {
+			id: "core".to_string(),
+			kind: TargetKind::Package,
+			display: "core".to_string(),
+			member_package_ids: BTreeSet::new(),
+			configured_types,
+		}
+	}
+
+	#[test]
+	fn bump_options_include_none() {
+		assert_eq!(bump_options(), vec!["none", "patch", "minor", "major"]);
+	}
+
+	#[test]
+	fn parse_selected_bump_supports_none() {
+		assert_eq!(parse_selected_bump("none"), BumpSeverity::None);
+		assert_eq!(parse_selected_bump("minor"), BumpSeverity::Minor);
+		assert_eq!(parse_selected_bump("major"), BumpSeverity::Major);
+		assert_eq!(parse_selected_bump("patch"), BumpSeverity::Patch);
+	}
+
+	#[test]
+	fn prompt_change_type_for_target_returns_none_for_targets_without_configured_types() {
+		assert_eq!(
+			prompt_change_type_for_target(&package_target(Vec::new())).unwrap(),
+			None
+		);
+	}
+
+	#[test]
+	fn change_type_options_return_none_for_targets_without_configured_types() {
+		assert_eq!(change_type_options(&package_target(Vec::new())), None);
+	}
+
+	#[test]
+	fn change_type_options_include_none_and_configured_values() {
+		assert_eq!(
+			change_type_options(&package_target(vec![
+				"docs".to_string(),
+				"test".to_string()
+			])),
+			Some(vec![
+				"(none)".to_string(),
+				"docs".to_string(),
+				"test".to_string(),
+			])
+		);
+	}
+
+	#[test]
+	fn parse_change_type_selection_handles_none_and_values() {
+		assert_eq!(parse_change_type_selection("(none)"), None);
+		assert_eq!(
+			parse_change_type_selection("security"),
+			Some("security".to_string())
+		);
 	}
 }
