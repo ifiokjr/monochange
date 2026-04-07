@@ -259,7 +259,8 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 			"change",
 			"release",
 			"affected",
-			"diagnostics"
+			"diagnostics",
+			"repair-release"
 		]
 	);
 	let validate_cli_command = cli
@@ -339,6 +340,12 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			"DiagnoseChangesets",
 		),
 		(
+			CliStepDefinition::RetargetRelease {
+				inputs: BTreeMap::new(),
+			},
+			"RetargetRelease",
+		),
+		(
 			CliStepDefinition::Command {
 				command: "echo".into(),
 				dry_run_command: None,
@@ -387,6 +394,17 @@ fn valid_input_names_returns_expected_names_for_affected_packages() {
 	assert!(names.contains(&"since"));
 	assert!(names.contains(&"verify"));
 	assert!(names.contains(&"label"));
+}
+
+#[test]
+fn valid_input_names_returns_expected_names_for_retarget_release() {
+	let step = CliStepDefinition::RetargetRelease {
+		inputs: BTreeMap::new(),
+	};
+	let names = step.valid_input_names().unwrap();
+	for expected in ["from", "target", "force", "sync_provider"] {
+		assert!(names.contains(&expected), "missing: {expected}");
+	}
 }
 
 #[test]
@@ -509,6 +527,28 @@ fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
 	assert_eq!(
 		step.expected_input_kind("changeset"),
 		Some(CliInputKind::StringList)
+	);
+	assert_eq!(step.expected_input_kind("nonexistent"), None);
+}
+
+#[test]
+fn expected_input_kind_returns_correct_types_for_retarget_release() {
+	use crate::CliInputKind;
+	let step = CliStepDefinition::RetargetRelease {
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(step.expected_input_kind("from"), Some(CliInputKind::String));
+	assert_eq!(
+		step.expected_input_kind("target"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		step.expected_input_kind("force"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(
+		step.expected_input_kind("sync_provider"),
+		Some(CliInputKind::Boolean)
 	);
 	assert_eq!(step.expected_input_kind("nonexistent"), None);
 }

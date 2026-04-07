@@ -39,7 +39,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 6);
+	assert_eq!(configuration.cli.len(), 7);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -53,7 +53,8 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 			"change",
 			"release",
 			"affected",
-			"diagnostics"
+			"diagnostics",
+			"repair-release"
 		]
 	);
 	assert_eq!(configuration.cargo.enabled, None);
@@ -78,6 +79,49 @@ fn load_workspace_configuration_supports_diagnostics_cli_command_definition() {
 		Some(_) => panic!("expected DiagnoseChangesets step"),
 		None => panic!("expected diagnostics step"),
 	}
+}
+
+#[test]
+fn load_workspace_configuration_supports_retarget_release_cli_command_definition() {
+	let root = fixture_path("config/repair-release-cli");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let repair_release = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "repair-release")
+		.unwrap_or_else(|| panic!("expected repair-release command"));
+	assert_eq!(repair_release.steps.len(), 1);
+	assert!(matches!(
+		repair_release.steps.first(),
+		Some(CliStepDefinition::RetargetRelease { .. })
+	));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_invalid_boolean_input_defaults() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[cli.repair-release]
+
+[[cli.repair-release.inputs]]
+name = "force"
+type = "boolean"
+default = "maybe"
+
+[[cli.repair-release.steps]]
+type = "RetargetRelease"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid boolean default error"));
+	assert!(error
+		.to_string()
+		.contains("boolean default must be `true` or `false`"));
 }
 
 #[test]

@@ -1,0 +1,26 @@
+[cli.repair-release]
+help_text = "Repair a recent release by moving its release tags to a later commit"
+
+[[cli.repair-release.inputs]]
+name = "from"
+type = "string"
+required = true
+
+[[cli.repair-release.inputs]]
+name = "target"
+type = "string"
+default = "HEAD"
+
+[[cli.repair-release.inputs]]
+name = "force"
+type = "boolean"
+default = "false"
+
+[[cli.repair-release.inputs]]
+name = "sync_provider"
+type = "boolean"
+default = "true"
+
+[[cli.repair-release.steps]]
+type = "RetargetRelease"
+inputs = { from = "{{ inputs.from }}", target = "{{ inputs.target }}", force = "{{ inputs.force }}", sync_provider = "{{ inputs.sync_provider }}" }
