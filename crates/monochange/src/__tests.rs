@@ -294,7 +294,7 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 	assert!(output.contains("wrote change file"));
 	assert!(content.contains("sdk-core: minor"));
 	assert!(content.contains("web-sdk: minor"));
-	assert!(content.contains("#### feature foundation"));
+	assert!(content.contains("# feature foundation"));
 }
 
 #[test]
@@ -328,7 +328,7 @@ fn changes_add_supports_release_note_type_and_details() {
 
 	assert!(content.contains("type:"));
 	assert!(content.contains("sdk-core: security"));
-	assert!(content.contains("#### rotate signing keys"));
+	assert!(content.contains("# rotate signing keys"));
 	assert!(content.contains("Roll the signing key before the release window closes."));
 }
 
@@ -526,6 +526,26 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 		original_changelog
 	);
 	assert!(tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn command_release_normalizes_authored_changeset_heading_levels() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-heading-normalization", tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/changelog.md"))
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+
+	assert!(core_changelog.contains("#### add release command"));
+	assert!(core_changelog.contains("##### Details"));
+	assert!(core_changelog.contains("###### API changes"));
+	assert!(!core_changelog.contains("\n## Details\n"));
+	assert!(!core_changelog.contains("\n### API changes\n"));
 }
 
 #[test]

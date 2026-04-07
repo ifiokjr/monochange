@@ -1464,6 +1464,59 @@ fn parse_markdown_change_file(
 	Ok(RawChangeFile { changes })
 }
 
+fn markdown_heading_level(line: &str) -> Option<usize> {
+	let trimmed = line.trim_start();
+	let level = trimmed
+		.chars()
+		.take_while(|character| *character == '#')
+		.count();
+	if !(1..=6).contains(&level) {
+		return None;
+	}
+	let remainder = &trimmed[level..];
+	if remainder.is_empty() || remainder.starts_with(char::is_whitespace) {
+		Some(level)
+	} else {
+		None
+	}
+}
+
+fn normalize_markdown_heading_levels(
+	markdown: &str,
+	summary_heading_level: Option<usize>,
+	summary_render_level: usize,
+) -> String {
+	let mut in_fenced_code_block = false;
+	let mut first_detail_heading_level = None;
+	markdown
+		.lines()
+		.map(|line| {
+			let trimmed = line.trim_start();
+			if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+				in_fenced_code_block = !in_fenced_code_block;
+				return line.to_string();
+			}
+			if in_fenced_code_block {
+				return line.to_string();
+			}
+			let Some(authored_level) = markdown_heading_level(line) else {
+				return line.to_string();
+			};
+			let summary_context_level = if let Some(summary_heading_level) = summary_heading_level {
+				summary_render_level as isize + authored_level as isize
+					- summary_heading_level as isize
+			} else {
+				let baseline = *first_detail_heading_level.get_or_insert(authored_level);
+				(summary_render_level + 1) as isize + authored_level as isize - baseline as isize
+			};
+			let normalized_level = summary_context_level.clamp(1, 6) as usize;
+			let text = trimmed.trim_start_matches('#').trim();
+			format!("{} {text}", "#".repeat(normalized_level))
+		})
+		.collect::<Vec<_>>()
+		.join("\n")
+}
+
 fn markdown_change_text(body: &str) -> (Option<String>, Option<String>) {
 	let trimmed = body.trim();
 	if trimmed.is_empty() {
@@ -1480,24 +1533,26 @@ fn markdown_change_text(body: &str) -> (Option<String>, Option<String>) {
 	}) else {
 		return (None, None);
 	};
-	let summary = summary_line.strip_prefix('#').map_or_else(
+	let summary_heading_level = markdown_heading_level(summary_line);
+	let summary = summary_heading_level.map_or_else(
 		|| summary_line.to_string(),
-		|value| value.trim_start_matches('#').trim().to_string(),
+		|_| summary_line.trim_start_matches('#').trim().to_string(),
 	);
 	let details = lines
 		.iter()
 		.skip(summary_index + 1)
 		.copied()
 		.collect::<Vec<_>>()
-		.join("\n")
+		.join("\n");
+	let normalized_details = normalize_markdown_heading_levels(&details, summary_heading_level, 4)
 		.trim()
 		.to_string();
 	(
 		Some(summary),
-		if details.is_empty() {
+		if normalized_details.is_empty() {
 			None
 		} else {
-			Some(details)
+			Some(normalized_details)
 		},
 	)
 }

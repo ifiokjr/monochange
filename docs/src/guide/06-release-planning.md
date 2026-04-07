@@ -45,7 +45,7 @@ Group-targeted changesets are also valid:
 sdk: minor
 ---
 
-#### coordinated SDK release
+# coordinated SDK release
 ```
 
 <!-- {=releaseExplicitVersionChangesetExample} -->
@@ -68,7 +68,7 @@ When `version` is provided without `bump`, the bump is inferred from the current
 
 If multiple changesets specify conflicting explicit versions for the same package or group, monochange uses the highest semver version and emits a warning by default. Set `defaults.strict_version_conflicts = true` to fail instead.
 
-MonoChange keeps its own changeset standard rather than reusing a narrower external parser. In addition to package/group bump entries, MonoChange changesets can include reserved metadata keys such as `evidence`, `origin`, `type`, and explicit `version`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs.
+MonoChange keeps its own changeset standard rather than reusing a narrower external parser. In addition to package/group bump entries, MonoChange changesets can include reserved metadata keys such as `evidence`, `origin`, `type`, and explicit `version`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs. Authored heading depth is normalized when release notes are rendered, so use natural markdown headings in the changeset body instead of hard-coding output depth.
 
 Optionally include Rust semver evidence:
 

@@ -2627,7 +2627,7 @@ fn render_interactive_changeset_markdown(result: &interactive::InteractiveChange
 	}
 	lines.push("---".to_string());
 	lines.push(String::new());
-	lines.push(format!("#### {}", result.reason));
+	lines.push(format!("# {}", result.reason));
 	if let Some(details) = result
 		.details
 		.as_deref()
@@ -5553,7 +5553,7 @@ fn render_changeset_markdown(
 	}
 	lines.push("---".to_string());
 	lines.push(String::new());
-	lines.push(format!("#### {reason}"));
+	lines.push(format!("# {reason}"));
 	if let Some(details) = details.filter(|value| !value.trim().is_empty()) {
 		lines.push(String::new());
 		lines.push(details.trim().to_string());
