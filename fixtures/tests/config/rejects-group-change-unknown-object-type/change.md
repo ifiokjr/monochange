@@ -3,4 +3,4 @@ sdk:
   type: docs
 ---
 
-#### invalid group object type
+# invalid group object type

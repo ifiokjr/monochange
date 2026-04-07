@@ -143,7 +143,9 @@ fn change_cli_rejects_unknown_change_type_for_configured_target() {
 		.output()
 		.unwrap_or_else(|error| panic!("change output: {error}"));
 	assert!(!output.status.success());
-	assert!(String::from_utf8_lossy(&output.stderr).contains("unknown change type `security`"));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("invalid value 'security'"));
+	assert!(stderr.contains("[possible values: docs, test]"));
 }
 
 #[test]
@@ -228,7 +230,7 @@ fn interactive_change_cli_writes_selected_bump() {
 
 	let contents = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
 	assert!(contents.contains("sdk: patch"));
-	assert!(contents.contains("#### interactive reason"));
+	assert!(contents.contains("# interactive reason"));
 }
 
 #[test]
