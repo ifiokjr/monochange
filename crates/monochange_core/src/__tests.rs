@@ -793,7 +793,6 @@ fn cli_step_command_without_id_has_none() {
 	}
 }
 
-
 #[test]
 fn release_record_deserializes_defaults_for_schema_and_kind() {
 	let record: ReleaseRecord = serde_json::from_str(
@@ -1035,9 +1034,8 @@ fn render_release_record_block_rejects_unsupported_schema_version() {
 
 #[test]
 fn parse_release_record_block_rejects_missing_end_marker() {
-	let malformed = format!(
-		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{{}}\n```"
-	);
+	let malformed =
+		format!("{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{{}}\n```");
 	let error = crate::parse_release_record_block(&malformed)
 		.err()
 		.unwrap_or_else(|| panic!("expected missing end marker error"));
