@@ -637,3 +637,39 @@ type = "string_list"
 
 [[cli.diagnostics.steps]]
 type = "DiagnoseChangesets"
+
+[cli.repair-release]
+help_text = "Repair a recent release by moving its release tags to a later commit"
+
+[[cli.repair-release.inputs]]
+name = "from"
+type = "string"
+help_text = "tag or commit-ish used to locate the release record"
+required = true
+
+[[cli.repair-release.inputs]]
+name = "target"
+type = "string"
+help_text = "commit-ish the release set should move to"
+default = "HEAD"
+
+[[cli.repair-release.inputs]]
+name = "force"
+type = "boolean"
+help_text = "allow non-descendant retargets"
+default = "false"
+
+[[cli.repair-release.inputs]]
+name = "sync_provider"
+type = "boolean"
+help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)"
+default = "true"
+
+[[cli.repair-release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.repair-release.steps]]
+type = "RetargetRelease"

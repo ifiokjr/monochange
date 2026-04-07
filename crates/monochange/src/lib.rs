@@ -338,6 +338,26 @@ struct ChangesetDiagnosticsReport {
 	changesets: Vec<PreparedChangeset>,
 }
 
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RetargetReleaseReport {
+	from: String,
+	target: String,
+	resolved_from_commit: String,
+	record_commit: String,
+	target_commit: String,
+	distance: usize,
+	is_descendant: bool,
+	force: bool,
+	dry_run: bool,
+	sync_provider: bool,
+	tags: Vec<String>,
+	git_tag_results: Vec<RetargetTagResult>,
+	provider_results: Vec<RetargetProviderResult>,
+	status: String,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct CliContext {
 	root: PathBuf,
@@ -354,6 +374,7 @@ struct CliContext {
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
 	changeset_diagnostics: Option<ChangesetDiagnosticsReport>,
+	retarget_report: Option<RetargetReleaseReport>,
 	step_outputs: BTreeMap<String, CommandStepOutput>,
 	command_logs: Vec<String>,
 }
@@ -576,6 +597,17 @@ Diagnostics include:
   - linked review request (when detected)
   - related issue references",
 		),
+		"repair-release" => Some(
+			r"Examples:
+  mc repair-release --from v1.2.3 --dry-run
+  mc repair-release --from v1.2.3 --target HEAD --format json
+
+Repair notes:
+  - Finds the release record from history using the supplied ref.
+  - Moves the full release tag set together.
+  - Defaults to descendant-only retargets unless --force is set.
+  - Hosted release sync runs by default and can be disabled with --sync-provider=false.",
+		),
 		_ => None,
 	}
 }
@@ -592,7 +624,17 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 		CliInputKind::String => arg.value_name(value_name),
 		CliInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
 		CliInputKind::Path => arg.value_name("PATH"),
-		CliInputKind::Boolean => arg.action(ArgAction::SetTrue),
+		CliInputKind::Boolean => {
+			if input.default.as_deref() == Some("true") {
+				arg.value_name(value_name)
+					.num_args(0..=1)
+					.default_missing_value("true")
+					.require_equals(true)
+					.value_parser(["true", "false"])
+			} else {
+				arg.action(ArgAction::SetTrue)
+			}
+		}
 		CliInputKind::Choice => {
 			arg.value_name(value_name)
 				.value_parser(clap::builder::PossibleValuesParser::new(
@@ -611,7 +653,9 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 	}
 
 	if let Some(default) = &input.default {
-		arg = arg.default_value(leak_string(default.clone()));
+		if !matches!(input.kind, CliInputKind::Boolean) || default == "true" {
+			arg = arg.default_value(leak_string(default.clone()));
+		}
 	}
 
 	arg
@@ -1291,7 +1335,7 @@ fn execute_matches(
 
 	let dry_run = cli_command_matches.get_flag("dry-run");
 	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
-	execute_cli_command(root, cli_command, dry_run, inputs)
+	execute_cli_command(root, configuration, cli_command, dry_run, inputs)
 }
 
 fn collect_cli_command_inputs(
@@ -1307,7 +1351,12 @@ fn collect_cli_command_inputs(
 				.map(|values| values.cloned().collect::<Vec<_>>())
 				.unwrap_or_default(),
 			CliInputKind::Boolean => {
-				if matches.get_flag(input.name.as_str()) {
+				if input.default.as_deref() == Some("true") {
+					matches
+						.get_one::<String>(input.name.as_str())
+						.map(|value| vec![value.clone()])
+						.unwrap_or_default()
+				} else if matches.get_flag(input.name.as_str()) {
 					vec!["true".to_string()]
 				} else {
 					Vec::new()
@@ -1430,6 +1479,7 @@ fn template_value_to_input_values(value: &serde_json::Value) -> Vec<String> {
 
 fn execute_cli_command(
 	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
 	cli_command: &CliCommandDefinition,
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
@@ -1449,6 +1499,7 @@ fn execute_cli_command(
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
 		changeset_diagnostics: None,
+		retarget_report: None,
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
@@ -1747,6 +1798,49 @@ fn execute_cli_command(
 				context.changeset_diagnostics = Some(report);
 				output = None;
 			}
+			CliStepDefinition::RetargetRelease { .. } => {
+				let from = step_inputs
+					.get("from")
+					.and_then(|values| values.first())
+					.cloned()
+					.ok_or_else(|| {
+						MonochangeError::Config(
+							"`RetargetRelease` requires a `from` input".to_string(),
+						)
+					})?;
+				let target = step_inputs
+					.get("target")
+					.and_then(|values| values.first())
+					.cloned()
+					.unwrap_or_else(|| "HEAD".to_string());
+				let force = parse_boolean_step_input(&step_inputs, "force")?.unwrap_or(false);
+				let sync_provider =
+					parse_boolean_step_input(&step_inputs, "sync_provider")?.unwrap_or(true);
+				let discovery = discover_release_record(root, &from)?;
+				let source = inferred_retarget_source_configuration(
+					configuration.source.as_ref(),
+					&discovery,
+					sync_provider,
+				);
+				let plan = plan_release_retarget(
+					root,
+					&discovery,
+					&target,
+					force,
+					sync_provider,
+					context.dry_run,
+					source.as_ref(),
+				)?;
+				let result = execute_release_retarget(root, source.as_ref(), &plan)?;
+				context.retarget_report = Some(build_retarget_release_report(
+					&from,
+					&target,
+					&discovery,
+					plan.is_descendant,
+					&result,
+				));
+				output = None;
+			}
 			CliStepDefinition::Command {
 				command,
 				dry_run_command,
@@ -1811,6 +1905,15 @@ fn execute_cli_command(
 				))
 			})?,
 			OutputFormat::Text => render_changeset_diagnostics(report),
+		};
+		return Ok(rendered);
+	}
+	if let Some(report) = &context.retarget_report {
+		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let rendered = match format {
+			OutputFormat::Json => serde_json::to_string_pretty(report)
+				.unwrap_or_else(|error| panic!("retarget report serialization bug: {error}")),
+			OutputFormat::Text => render_retarget_release_report(report),
 		};
 		return Ok(rendered);
 	}
@@ -2029,6 +2132,14 @@ fn build_cli_template_context(
 		);
 	}
 
+	// Structured retarget.* namespace
+	if let Some(report) = &context.retarget_report {
+		template_context.insert(
+			"retarget".to_string(),
+			build_retarget_template_value(report),
+		);
+	}
+
 	// Structured steps.<id>.* namespace from command step outputs
 	if !context.step_outputs.is_empty() {
 		let mut steps_map = serde_json::Map::new();
@@ -2174,6 +2285,143 @@ fn build_release_template_value(context: &CliContext) -> serde_json::Value {
 	serde_json::Value::Object(release_map)
 }
 
+fn build_retarget_template_value(report: &RetargetReleaseReport) -> serde_json::Value {
+	serde_json::to_value(report).unwrap_or(serde_json::Value::Null)
+}
+
+fn parse_boolean_step_input(
+	inputs: &BTreeMap<String, Vec<String>>,
+	name: &str,
+) -> MonochangeResult<Option<bool>> {
+	inputs
+		.get(name)
+		.and_then(|values| values.first())
+		.map(|value| match value.as_str() {
+			"true" => Ok(true),
+			"false" => Ok(false),
+			other => Err(MonochangeError::Config(format!(
+				"invalid boolean value `{other}` for `{name}`"
+			))),
+		})
+		.transpose()
+}
+
+fn inferred_retarget_source_configuration(
+	configured_source: Option<&SourceConfiguration>,
+	discovery: &ReleaseRecordDiscovery,
+	sync_provider: bool,
+) -> Option<SourceConfiguration> {
+	if let Some(source) = configured_source {
+		return Some(source.clone());
+	}
+	if !sync_provider {
+		return None;
+	}
+	let provider = discovery.record.provider.as_ref()?;
+	Some(SourceConfiguration {
+		provider: provider.kind,
+		owner: provider.owner.clone(),
+		repo: provider.repo.clone(),
+		host: provider.host.clone(),
+		api_url: None,
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	})
+}
+
+fn build_retarget_release_report(
+	from: &str,
+	target: &str,
+	discovery: &ReleaseRecordDiscovery,
+	is_descendant: bool,
+	result: &RetargetResult,
+) -> RetargetReleaseReport {
+	RetargetReleaseReport {
+		from: from.to_string(),
+		target: target.to_string(),
+		resolved_from_commit: discovery.resolved_commit.clone(),
+		record_commit: result.record_commit.clone(),
+		target_commit: result.target_commit.clone(),
+		distance: discovery.distance,
+		is_descendant,
+		force: result.force,
+		dry_run: result.dry_run,
+		sync_provider: result.sync_provider,
+		tags: result
+			.git_tag_results
+			.iter()
+			.map(|tag_result| tag_result.tag_name.clone())
+			.collect(),
+		git_tag_results: result.git_tag_results.clone(),
+		provider_results: result.provider_results.clone(),
+		status: if result.dry_run {
+			"dry_run".to_string()
+		} else {
+			"completed".to_string()
+		},
+	}
+}
+
+fn render_retarget_release_report(report: &RetargetReleaseReport) -> String {
+	let mut lines = vec!["repair release:".to_string()];
+	lines.push(format!("  from: {}", report.from));
+	lines.push(format!(
+		"  resolved commit: {}",
+		short_commit_sha(&report.resolved_from_commit)
+	));
+	lines.push(format!(
+		"  record commit: {}",
+		short_commit_sha(&report.record_commit)
+	));
+	lines.push(format!(
+		"  target: {}",
+		short_commit_sha(&report.target_commit)
+	));
+	lines.push(format!(
+		"  descendant: {}",
+		if report.is_descendant { "yes" } else { "no" }
+	));
+	lines.push(format!(
+		"  force: {}",
+		if report.force { "yes" } else { "no" }
+	));
+	if !report.git_tag_results.is_empty() {
+		lines.push("  tags to move:".to_string());
+		for tag_result in &report.git_tag_results {
+			lines.push(format!(
+				"    - {} ({} -> {}) [{}]",
+				tag_result.tag_name,
+				short_commit_sha(&tag_result.from_commit),
+				short_commit_sha(&tag_result.to_commit),
+				retarget_operation_label(tag_result.operation),
+			));
+		}
+	}
+	lines.push(format!(
+		"  provider sync: {}",
+		if !report.sync_provider {
+			"disabled".to_string()
+		} else if let Some(provider_result) = report.provider_results.first() {
+			provider_result.provider.to_string()
+		} else {
+			"none".to_string()
+		}
+	));
+	lines.push(format!("  status: {}", report.status.replace('_', "-")));
+	lines.join("\n")
+}
+
+fn retarget_operation_label(operation: RetargetOperation) -> &'static str {
+	match operation {
+		RetargetOperation::Planned => "planned",
+		RetargetOperation::Moved => "moved",
+		RetargetOperation::AlreadyUpToDate => "already_up_to_date",
+		RetargetOperation::Skipped => "skipped",
+		RetargetOperation::Failed => "failed",
+	}
+}
+
 fn interpolate_cli_command_command(
 	context: &CliContext,
 	command: &str,
@@ -2233,6 +2481,10 @@ fn cli_command_variable_value(context: &CliContext, variable: CommandVariable) -
 }
 
 fn render_cli_command_result(cli_command: &CliCommandDefinition, context: &CliContext) -> String {
+	if let Some(report) = &context.retarget_report {
+		return render_retarget_release_report(report);
+	}
+
 	let mut lines = vec![format!(
 		"command `{}` completed{}",
 		cli_command.name,
