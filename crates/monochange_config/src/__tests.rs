@@ -742,6 +742,39 @@ fn load_change_signals_parses_explicit_versions_and_infers_bumps() {
 }
 
 #[test]
+fn markdown_change_text_normalizes_relative_heading_levels() {
+	let (summary, details) =
+		crate::markdown_change_text("# Summary\n\n## Details\n\n### Sub-details\n\n- bullet");
+	assert_eq!(summary.as_deref(), Some("Summary"));
+	assert_eq!(
+		details.as_deref(),
+		Some("##### Details\n\n###### Sub-details\n\n- bullet")
+	);
+}
+
+#[test]
+fn markdown_change_text_normalizes_headings_after_plain_text_summary() {
+	let (summary, details) = crate::markdown_change_text("Summary\n\n# Details\n\n## Sub-details");
+	assert_eq!(summary.as_deref(), Some("Summary"));
+	assert_eq!(
+		details.as_deref(),
+		Some("##### Details\n\n###### Sub-details")
+	);
+}
+
+#[test]
+fn markdown_change_text_clamps_deep_headings_and_preserves_code_fences() {
+	let (summary, details) = crate::markdown_change_text(
+		"# Summary\n\n###### Deep detail\n\n```md\n# leave code fences alone\n```",
+	);
+	assert_eq!(summary.as_deref(), Some("Summary"));
+	assert_eq!(
+		details.as_deref(),
+		Some("###### Deep detail\n\n```md\n# leave code fences alone\n```")
+	);
+}
+
+#[test]
 fn load_change_signals_parses_markdown_change_types_and_details() {
 	let root = fixture_path("config/change-signals-types-and-details");
 	let mut packages = vec![PackageRecord::new(

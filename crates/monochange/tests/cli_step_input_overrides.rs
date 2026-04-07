@@ -68,7 +68,7 @@ fn create_change_file_step_can_hardcode_inputs_without_cli_inputs() {
 	let contents = fs::read_to_string(tempdir.path().join(".changeset/hardcoded.md"))
 		.unwrap_or_else(|error| panic!("hardcoded change file: {error}"));
 	assert!(contents.contains("core: minor"));
-	assert!(contents.contains("#### hardcoded change"));
+	assert!(contents.contains("# hardcoded change"));
 }
 
 #[test]
