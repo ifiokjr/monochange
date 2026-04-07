@@ -97,6 +97,14 @@ A package-level `changelog` value overrides the default for that package.
 - `[package.<id>]`
 - `[group.<id>]`
 
+`extra_changelog_sections` can also be set on:
+
+- `[defaults]`
+- `[package.<id>]`
+- `[group.<id>]`
+
+Defaults are inherited by packages and groups; package/group definitions append target-specific sections on top of the workspace defaults.
+
 Template placeholders may include:
 
 - `{{ package }}` / `{{ package_name }}`

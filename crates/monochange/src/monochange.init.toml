@@ -78,6 +78,15 @@ warn_on_group_mismatch = true
 {% endraw -%}
 # format = "keep_a_changelog"
 
+# Default extra changelog sections applied to every package/group unless
+# that target adds more sections of its own.
+#
+# Each entry maps one or more changeset `type` values into a named changelog
+# section. Example:
+# extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+#
+# Default: []
+
 # Default empty_update_message applied when a package is bumped but has no
 # direct changeset entries (e.g. transitive dependency bumps or group
 # synchronization). Template placeholders are interpolated at render time
