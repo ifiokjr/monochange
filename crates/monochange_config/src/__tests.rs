@@ -1580,6 +1580,14 @@ fn load_workspace_configuration_parses_release_note_customization() {
 }
 
 #[test]
+fn section_patterns_support_root_sections_without_ids() {
+	assert_eq!(
+		crate::section_patterns("defaults", ""),
+		["[defaults]".to_string(), "[defaults]".to_string()]
+	);
+}
+
+#[test]
 fn load_workspace_configuration_inherits_default_extra_changelog_sections() {
 	let root = fixture_path("config/default-extra-changelog-sections");
 	let configuration = load_workspace_configuration(&root)
