@@ -2270,7 +2270,7 @@ fn text_release_record_discovery_renders_targets_packages_and_provider() {
 		record: sample_release_record_for_discovery_text(),
 	};
 
-	let rendered = crate::text_release_record_discovery(&discovery);
+	let rendered = crate::release_record::text_release_record_discovery(&discovery);
 	assert!(rendered.contains("input ref: v1.2.3"));
 	assert!(rendered.contains("resolved commit: abc1234"));
 	assert!(rendered.contains("record commit: abc1234"));
@@ -2337,7 +2337,7 @@ fn text_release_record_discovery_omits_empty_sections() {
 		},
 	};
 
-	let rendered = crate::text_release_record_discovery(&discovery);
+	let rendered = crate::release_record::text_release_record_discovery(&discovery);
 	assert!(rendered.contains("input ref: HEAD"));
 	assert!(!rendered.contains("  targets:"));
 	assert!(!rendered.contains("  packages:"));
@@ -3365,7 +3365,7 @@ fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 #[test]
 fn git_is_ancestor_reports_git_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let error = crate::git_is_ancestor(tempdir.path(), "abc", "def")
+	let error = crate::git_support::git_is_ancestor(tempdir.path(), "abc", "def")
 		.err()
 		.unwrap_or_else(|| panic!("expected git ancestry error"));
 	assert!(error.to_string().contains("discovery error"));
@@ -3375,7 +3375,7 @@ fn git_is_ancestor_reports_git_failures() {
 fn git_is_ancestor_reports_missing_worktree_directory_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let error = crate::git_is_ancestor(&missing, "abc", "def")
+	let error = crate::git_support::git_is_ancestor(&missing, "abc", "def")
 		.err()
 		.unwrap_or_else(|| panic!("expected git spawn error"));
 	assert!(error
@@ -3402,7 +3402,7 @@ fn sync_retargeted_provider_releases_reports_unsupported_provider_in_dry_run() {
 		operation: monochange_core::RetargetOperation::Moved,
 		message: None,
 	}];
-	let results = crate::sync_retargeted_provider_releases(&source, &updates, true)
+	let results = crate::release_record::sync_retargeted_provider_releases(&source, &updates, true)
 		.unwrap_or_else(|error| panic!("expected dry-run provider results: {error}"));
 	assert_eq!(results.len(), 1);
 	assert_eq!(
@@ -3433,7 +3433,7 @@ fn sync_retargeted_provider_releases_rejects_unsupported_provider_in_real_mode()
 		operation: monochange_core::RetargetOperation::Moved,
 		message: None,
 	}];
-	let error = crate::sync_retargeted_provider_releases(&source, &updates, false)
+	let error = crate::release_record::sync_retargeted_provider_releases(&source, &updates, false)
 		.err()
 		.unwrap_or_else(|| panic!("expected unsupported provider error"));
 	assert!(error.to_string().contains("gitea"));
@@ -3536,7 +3536,7 @@ fn first_parent_commits_returns_head_then_ancestors() {
 	git_in_temp_repo(root, &["commit", "-m", "second"]);
 
 	let head = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
-	let commits = crate::first_parent_commits(root, &head)
+	let commits = crate::git_support::first_parent_commits(root, &head)
 		.unwrap_or_else(|error| panic!("first parent commits: {error}"));
 	assert_eq!(commits.first().map(String::as_str), Some(head.as_str()));
 	assert_eq!(commits.len(), 2);
