@@ -2,13 +2,13 @@
 
 ## What it does
 
-`Validate` runs MonoChange's repository validation without preparing a release.
+`Validate` runs monochange's repository validation without preparing a release.
 
 It checks the current workspace configuration, package and group rules, and authored changesets. The goal is to fail early when the repository is in a state that would make later commands unreliable.
 
 ## Why use it
 
-Use `Validate` when you want a cheap, deterministic gate before any workflow that depends on a healthy MonoChange model.
+Use `Validate` when you want a cheap, deterministic gate before any workflow that depends on a healthy monochange model.
 
 It is especially useful for:
 
@@ -65,7 +65,7 @@ type = "Validate"
 
 ```toml
 [cli.preflight]
-help_text = "Validate MonoChange state and then run project checks"
+help_text = "Validate monochange state and then run project checks"
 
 [[cli.preflight.steps]]
 type = "Validate"

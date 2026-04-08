@@ -44,7 +44,7 @@ Then run one safe local walkthrough:
 
 <!-- {=projectCoreWorkflow} -->
 
-Generate a starter config from the packages MonoChange detects:
+Generate a starter config from the packages monochange detects:
 
 ```bash
 mc init
@@ -91,7 +91,7 @@ If you do not know which package id to target, rerun `mc discover --format json`
 - [Start here](docs/src/guide/00-start-here.md) — the shortest beginner path through installation, `mc init`, and `--dry-run`
 - [Installation](docs/src/guide/01-installation.md) — npm, Cargo, optional assistant tooling, and repository-development setup
 - [Your first release plan](docs/src/guide/02-setup.md) — a fuller walkthrough built around generated config
-- [Discovery](docs/src/guide/03-discovery.md) — what MonoChange finds and how ids are rendered
+- [Discovery](docs/src/guide/03-discovery.md) — what monochange finds and how ids are rendered
 - [Configuration reference](docs/src/guide/04-configuration.md) — evolve the generated config once the basics feel familiar
 - [Groups and shared release identity](docs/src/guide/05-version-groups.md) — when to reach for group ids instead of package ids
 
@@ -113,7 +113,7 @@ If you do not know which package id to target, rerun `mc discover --format json`
 
 <!-- {=projectGitHubAutomationOverview} -->
 
-MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
+monochange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
 - `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
@@ -130,7 +130,7 @@ MonoChange can promote one prepared release into several source-provider automat
 
 Assistant tooling is optional.
 
-When you want AI-assisted workflows, MonoChange ships built-in setup guidance and an MCP server:
+When you want AI-assisted workflows, monochange ships built-in setup guidance and an MCP server:
 
 ```bash
 npm install -g @monochange/skill
@@ -141,7 +141,7 @@ mc mcp
 
 See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) for the full setup flow.
 
-## What MonoChange can do today
+## What monochange can do today
 
 <!-- {=projectMilestoneCapabilities} -->
 

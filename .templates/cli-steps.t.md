@@ -1,8 +1,8 @@
 <!-- {@cliStepReferenceOverview} -->
 
-MonoChange CLI commands are built from ordered `[[cli.<command>.steps]]` entries.
+monochange CLI commands are built from ordered `[[cli.<command>.steps]]` entries.
 
-A step is the smallest execution unit in a MonoChange workflow. Some steps are **standalone** (`Validate`, `Discover`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`). Others are **stateful** and build on the result of an earlier `PrepareRelease` step (`RenderReleaseManifest`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`).
+A step is the smallest execution unit in a monochange workflow. Some steps are **standalone** (`Validate`, `Discover`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`). Others are **stateful** and build on the result of an earlier `PrepareRelease` step (`RenderReleaseManifest`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`).
 
 When you design a command, think in terms of:
 
@@ -38,7 +38,7 @@ The reference pages in this section document each built-in step with:
 | `AffectedPackages`      | evaluate changeset coverage for changed files                            | no                               | CI enforcement, custom failure messaging                                                                             |
 | `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata | no                               | local debugging, CI inspection                                                                                       |
 | `RetargetRelease`       | repair a recent release by moving its tag set                            | no                               | custom `Command` steps using `retarget.*`                                                                            |
-| `Command`               | run arbitrary shell/program commands with MonoChange context             | depends on your workflow         | any external tool                                                                                                    |
+| `Command`               | run arbitrary shell/program commands with monochange context             | depends on your workflow         | any external tool                                                                                                    |
 
 <!-- {/cliStepReferenceChoosingGuide} -->
 

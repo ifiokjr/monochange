@@ -245,7 +245,7 @@ version_format = "primary"
 # =============================================================================
 #
 # Deployments are structured intents emitted in the release manifest so
-# downstream CI can decide when and how to execute them. Monochange does not
+# downstream CI can decide when and how to execute them. monochange does not
 # run deployments directly — it declares them.
 #
 # Fields:

@@ -887,7 +887,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 		&["init", "--bare", bare.to_string_lossy().as_ref()],
 	);
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
-	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	std::fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
@@ -911,7 +911,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
 			body: Some(
-				"Prepare release.\n\n## MonoChange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{}\n```\n<!-- monochange:release-record:end -->".to_string(),
+				"Prepare release.\n\n## monochange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{}\n```\n<!-- monochange:release-record:end -->".to_string(),
 			),
 		},
 	)
@@ -925,7 +925,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	);
 	assert!(!branch.trim().is_empty());
 	let commit_body = git_output(&repo, &["log", "-1", "--pretty=%B"]);
-	assert!(commit_body.contains("## MonoChange Release Record"));
+	assert!(commit_body.contains("## monochange Release Record"));
 	assert!(commit_body.contains("<!-- monochange:release-record:start -->"));
 }
 
@@ -948,7 +948,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 
 	let repo = tempdir.path().join("repo-error");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
-	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	let hooks_dir = repo.join(".git/hooks");
 	std::fs::write(hooks_dir.join("pre-commit"), "#!/bin/sh\nexit 1\n")
@@ -980,7 +980,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path().join("repo");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
-	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	std::fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));

@@ -1,7 +1,7 @@
 {
 	"name": "@monochange/skill",
 	"version": "0.0.0",
-	"description": "Installable agent skill for Monochange workflows and release planning guidance",
+	"description": "Installable agent skill for monochange workflows and release planning guidance",
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",

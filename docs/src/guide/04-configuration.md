@@ -432,7 +432,7 @@ changelog = "crates/sdk_core/changelog.md"
 
 Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
 
-MonoChange currently supports two changelog formats:
+monochange currently supports two changelog formats:
 
 - `monochange` keeps the current heading-and-bullets layout
 - `keep_a_changelog` renders section headings such as `### Features`, `### Fixes`, and `### Breaking changes`
@@ -477,7 +477,7 @@ The `*_link` variants render markdown links when the hosting provider exposes UR
 
 Package references in changesets and CLI commands should use configured ids.
 
-Prefer package ids when a leaf package changed. That keeps the authored change as specific as possible, and MonoChange will still propagate bumps to dependents and synchronize any configured groups automatically.
+Prefer package ids when a leaf package changed. That keeps the authored change as specific as possible, and monochange will still propagate bumps to dependents and synchronize any configured groups automatically.
 
 Use a group id only when the change is intentionally owned by the whole group and should read that way in release output. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
 

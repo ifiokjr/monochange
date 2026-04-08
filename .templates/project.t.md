@@ -66,7 +66,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {@projectGitHubAutomationOverview} -->
 
-MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
+monochange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
 - `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
@@ -429,7 +429,7 @@ build:book
 
 <!-- {@projectCoreWorkflow} -->
 
-Generate a starter config from the packages MonoChange detects:
+Generate a starter config from the packages monochange detects:
 
 ```bash
 mc init

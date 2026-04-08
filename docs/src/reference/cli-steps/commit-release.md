@@ -4,7 +4,7 @@
 
 `CommitRelease` turns an already prepared release into a local git commit.
 
-The step uses MonoChange's release-commit format and embeds a durable `ReleaseRecord` in the commit body. That record is what later powers release inspection and repair workflows such as `mc release-record` and `mc repair-release`.
+The step uses monochange's release-commit format and embeds a durable `ReleaseRecord` in the commit body. That record is what later powers release inspection and repair workflows such as `mc release-record` and `mc repair-release`.
 
 Think of it as the step that makes a prepared release durable in git history.
 
@@ -16,7 +16,7 @@ This is especially useful when you want to:
 
 - create a durable release commit locally
 - keep release history explicit in git rather than only in provider APIs
-- open a release request from a known MonoChange-generated commit
+- open a release request from a known monochange-generated commit
 - preserve the `ReleaseRecord` needed for later repair or inspection flows
 - hand off a prepared release to later custom `Command` steps without reconstructing commit metadata yourself
 
@@ -105,7 +105,7 @@ A strong provider-facing pattern is:
 2. `CommitRelease`
 3. `OpenReleaseRequest`
 
-That sequence keeps the release branch and provider request aligned with the durable release commit that MonoChange created.
+That sequence keeps the release branch and provider request aligned with the durable release commit that monochange created.
 
 ### Prepare once, then let custom tooling consume commit metadata
 
@@ -123,13 +123,13 @@ If your team has custom chat notifications, CI uploads, or deployment hooks, `Co
 
 - validation or inspection-only commands
 - workflows that do not prepare a release first
-- commands where a plain custom shell commit is acceptable and no MonoChange release record is needed
+- commands where a plain custom shell commit is acceptable and no monochange release record is needed
 
 ## Why choose it over a plain `git commit` command?
 
-Because `CommitRelease` understands prepared release state and writes MonoChange's `ReleaseRecord` contract for you.
+Because `CommitRelease` understands prepared release state and writes monochange's `ReleaseRecord` contract for you.
 
-A raw shell commit can create a commit, but it cannot automatically preserve the release metadata that later MonoChange repair and inspection features rely on unless you reimplement that format yourself.
+A raw shell commit can create a commit, but it cannot automatically preserve the release metadata that later monochange repair and inspection features rely on unless you reimplement that format yourself.
 
 ## Common mistakes
 

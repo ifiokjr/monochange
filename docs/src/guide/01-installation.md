@@ -24,7 +24,7 @@ mc --help
 
 ## Optional: assistant skill package
 
-You do not need assistant tooling to use MonoChange.
+You do not need assistant tooling to use monochange.
 
 When you want reusable agent guidance for Pi or other assistants, install the bundled skill package:
 
@@ -42,7 +42,7 @@ The main CLI is `monochange` and the short alias is `mc`.
 
 ## Repository development
 
-If you are working on the MonoChange repository itself, use the reproducible development shell:
+If you are working on the monochange repository itself, use the reproducible development shell:
 
 <!-- {=repoDevEnvironmentSetupCode} -->
 

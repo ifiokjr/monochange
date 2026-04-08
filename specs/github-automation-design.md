@@ -9,7 +9,7 @@ Planning draft prepared in isolated worktree for discussion.
 
 ## Goal
 
-Extend MonoChange from local planning and workflow-driven file mutation into a GitHub-aware release automation system that can:
+Extend monochange from local planning and workflow-driven file mutation into a GitHub-aware release automation system that can:
 
 1. render changelogs in configurable formats
 2. publish GitHub releases from prepared release targets
@@ -19,7 +19,7 @@ Extend MonoChange from local planning and workflow-driven file mutation into a G
 
 ## Current State
 
-MonoChange already supports:
+monochange already supports:
 
 - top-level workflow-defined commands
 - `mc validate`, `mc discover`, `mc change`, and `mc release`
@@ -28,7 +28,7 @@ MonoChange already supports:
 - release target metadata for `tag`, `release`, and `version_format`
 - generic `Command` workflow steps with dry-run support
 
-MonoChange does **not** yet provide first-class support for:
+monochange does **not** yet provide first-class support for:
 
 - GitHub release publication
 - release-note templating beyond current changelog file writes
@@ -38,13 +38,13 @@ MonoChange does **not** yet provide first-class support for:
 
 ## Product Principles
 
-### 1. Keep MonoChange config-driven
+### 1. Keep monochange config-driven
 
 Repositories should describe automation in `monochange.toml`, not scatter release semantics across ad hoc GitHub workflows.
 
 ### 2. Separate planning from execution
 
-MonoChange should keep its strong planning core and make side effects explicit:
+monochange should keep its strong planning core and make side effects explicit:
 
 - planning computes what should happen
 - GitHub release publication publishes that plan
@@ -53,7 +53,7 @@ MonoChange should keep its strong planning core and make side effects explicit:
 
 ### 3. Keep repository-specific deploys customizable
 
-MonoChange should understand _when_ deployments should run and _what release metadata exists_, but it should avoid baking every deployment platform into core.
+monochange should understand _when_ deployments should run and _what release metadata exists_, but it should avoid baking every deployment platform into core.
 
 ### 4. Prefer first-class release domain models over shell-only automation
 
@@ -69,7 +69,7 @@ A GitHub Action-based bot can validate the product and config model quickly. A d
 
 ### Why
 
-Today MonoChange can write changelog files, but it does not have an explicit changelog _format_ model. GitHub releases and release PRs need structured notes, not only raw file updates.
+Today monochange can write changelog files, but it does not have an explicit changelog _format_ model. GitHub releases and release PRs need structured notes, not only raw file updates.
 
 ### Recommendation
 
@@ -108,7 +108,7 @@ sections = ["summary", "packages", "evidence"]
 
 ### Why
 
-MonoChange already computes release targets with tag names, versions, and group membership. That is the right substrate for GitHub release publication.
+monochange already computes release targets with tag names, versions, and group membership. That is the right substrate for GitHub release publication.
 
 ### Recommendation
 
@@ -141,7 +141,7 @@ source = "monochange"
 
 ### Recommendation on release notes
 
-Prefer MonoChange-authored notes as the source of truth, not GitHub generated notes, because MonoChange has richer package/group semantics.
+Prefer monochange-authored notes as the source of truth, not GitHub generated notes, because monochange has richer package/group semantics.
 
 ## Capability C — Release or changeset pull requests
 
@@ -184,7 +184,7 @@ There are two PR concepts to support:
 2. **release PR creation**
    - aggregate pending changesets into a version-bump PR
 
-MonoChange should model both explicitly.
+monochange should model both explicitly.
 
 ## Capability D — Automatic deployments after merged release PRs
 
@@ -194,14 +194,14 @@ A release PR should often be the review checkpoint before deployment or publishi
 
 ### Recommendation
 
-MonoChange should provide structured metadata and workflow steps for deployment orchestration, but actual deploy commands should remain repository-configurable.
+monochange should provide structured metadata and workflow steps for deployment orchestration, but actual deploy commands should remain repository-configurable.
 
 ### Proposed model
 
 After a release PR merges:
 
-- CI detects a merged MonoChange release PR or a merge commit with release metadata
-- MonoChange reconstructs or reads release metadata
+- CI detects a merged monochange release PR or a merge commit with release metadata
+- monochange reconstructs or reads release metadata
 - deployment steps run per configured environment or target
 - deployment status is associated with the released version or tag
 
@@ -217,9 +217,9 @@ requires = ["main"]
 
 ### Key recommendation
 
-Do **not** hardcode platform-specific deployment behavior into MonoChange core yet. Instead:
+Do **not** hardcode platform-specific deployment behavior into monochange core yet. Instead:
 
-- let MonoChange decide eligibility and metadata
+- let monochange decide eligibility and metadata
 - let repository workflows decide execution details
 
 ## Capability E — GitHub bot rules for changesets on PRs
@@ -282,7 +282,7 @@ These steps can coexist with `Command` for repository-specific extensions.
 
 ## 3. Add a release manifest artifact
 
-MonoChange should be able to emit a stable machine-readable artifact describing:
+monochange should be able to emit a stable machine-readable artifact describing:
 
 - release targets
 - versions
@@ -381,5 +381,5 @@ PR commenting and merge-aware automation require careful permission boundaries, 
 1. Should release PRs always target `main`, or support configurable target branches?
 2. Should GitHub releases be per package/group target, or support one aggregate release too?
 3. Should changelog formats be independently configurable for package, group, PR body, and GitHub release body?
-4. Should deployment automation happen inside MonoChange workflow steps, or primarily through emitted release manifests consumed by GitHub Actions?
+4. Should deployment automation happen inside monochange workflow steps, or primarily through emitted release manifests consumed by GitHub Actions?
 5. Is a GitHub App an explicit near-term goal, or should the first bot release stay Actions-only?

@@ -24,7 +24,7 @@ Then run the core beginner flow:
 
 <!-- {=projectCoreWorkflow} -->
 
-Generate a starter config from the packages MonoChange detects:
+Generate a starter config from the packages monochange detects:
 
 ```bash
 mc init
@@ -75,7 +75,7 @@ If you want a slower, more guided walkthrough, continue with [Start here](./guid
 - [Advanced: GitHub automation](./guide/08-github-automation.md) — provider publishing and release requests
 - [Advanced: Assistant setup and MCP](./guide/09-assistant-setup.md) — optional AI-assisted workflows
 
-## What MonoChange can do today
+## What monochange can do today
 
 <!-- {=projectMilestoneCapabilities} -->
 
@@ -122,9 +122,9 @@ Release-plan output includes:
 
 <!-- {/projectReleaseOutputIncludes} -->
 
-## Contributing to MonoChange itself
+## Contributing to monochange itself
 
-If you are working on the MonoChange repository, run the full local validation suite before opening a PR:
+If you are working on the monochange repository, run the full local validation suite before opening a PR:
 
 <!-- {=projectValidationCommands} -->
 

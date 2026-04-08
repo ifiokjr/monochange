@@ -1,6 +1,6 @@
 # Start here
 
-MonoChange is easiest to learn with one safe local walkthrough.
+monochange is easiest to learn with one safe local walkthrough.
 
 In about 10 minutes you will:
 
@@ -83,9 +83,9 @@ Stop here on your first run. This previews the release plan without publishing a
 
 A good first-time mental model is:
 
-1. MonoChange discovers packages.
+1. monochange discovers packages.
 2. You author explicit changes against package ids.
-3. MonoChange propagates dependent bumps for you.
+3. monochange propagates dependent bumps for you.
 4. Groups synchronize packages that intentionally share release identity.
 
 That is why most beginner flows should start with package ids, not groups.

@@ -1,6 +1,6 @@
 # @monochange/skill
 
-Installable agent skill for Monochange.
+Installable agent skill for monochange.
 
 This package bundles:
 

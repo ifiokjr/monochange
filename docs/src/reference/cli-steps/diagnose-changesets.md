@@ -2,18 +2,18 @@
 
 ## What it does
 
-`DiagnoseChangesets` inspects discovered changesets and reports how MonoChange interpreted them.
+`DiagnoseChangesets` inspects discovered changesets and reports how monochange interpreted them.
 
 That includes parsed targets, notes, bump or version intent, provenance, and linked review metadata.
 
-It is the inspection step you reach for when a changeset exists but you want to understand **why MonoChange is treating it a certain way**.
+It is the inspection step you reach for when a changeset exists but you want to understand **why monochange is treating it a certain way**.
 
 ## Why use it
 
 Use `DiagnoseChangesets` when you need visibility into:
 
 - which package or group targets a changeset resolved to
-- what bump or explicit version MonoChange inferred
+- what bump or explicit version monochange inferred
 - which commit introduced or last updated the changeset
 - which review request or linked issues were attached to it
 - why a release note, policy decision, or provider comment included that changeset
@@ -123,7 +123,7 @@ If you need custom summarization or uploads, run `DiagnoseChangesets` as JSON an
 
 Because the raw file is only part of the picture.
 
-`DiagnoseChangesets` shows the interpreted result after MonoChange resolves package ids, provenance, linked review metadata, and related issue context. That is usually the information you actually need when debugging release behavior.
+`DiagnoseChangesets` shows the interpreted result after monochange resolves package ids, provenance, linked review metadata, and related issue context. That is usually the information you actually need when debugging release behavior.
 
 ## Common mistakes
 

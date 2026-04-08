@@ -1,8 +1,8 @@
-# Monochange reference
+# monochange reference
 
-## What Monochange is for
+## What monochange is for
 
-Monochange manages versions and releases for monorepos that span more than one package ecosystem.
+monochange manages versions and releases for monorepos that span more than one package ecosystem.
 
 Use it when a repository needs one release-planning model across:
 

@@ -1,4 +1,4 @@
-# Monochange Constitution
+# monochange Constitution
 
 ## Core Principles
 
@@ -14,7 +14,7 @@ Tests MUST be purposeful, readable, and realistic. They MUST cover edge cases, e
 
 ### II. Workspace-First Modular Architecture
 
-Monochange MUST preserve a clear workspace-oriented structure with focused crates and explicit responsibilities.
+monochange MUST preserve a clear workspace-oriented structure with focused crates and explicit responsibilities.
 
 The default project structure is:
 
@@ -49,7 +49,7 @@ If a change alters user-visible behavior and no documentation changes are needed
 
 ### IV. Strict Quality Gates, Formatting, and Safety
 
-Monochange MUST use a reproducible development environment and enforce strict local and CI quality gates.
+monochange MUST use a reproducible development environment and enforce strict local and CI quality gates.
 
 The authoritative development environment is `devenv`. Formatting is enforced through `dprint`, not ad hoc formatter invocations. Rust formatting and imports MUST remain consistent and machine-enforced.
 
@@ -74,7 +74,7 @@ No code may be merged with failing tests, failing format checks, or unresolved l
 
 ### V. Release Discipline and SemVer Integrity
 
-Monochange MUST use a rigorous, documented, changeset-driven release process.
+monochange MUST use a rigorous, documented, changeset-driven release process.
 
 Every pull request that changes code in a publishable crate MUST include a release note entry in `.changeset/` using the same disciplined style as `mdt`. Changesets MUST be specific, user-meaningful, and accurate about scope and impact.
 
@@ -90,7 +90,7 @@ Versions, changelogs, and release artifacts MUST never be updated informally or 
 
 ## Technical and Structural Standards
 
-Monochange is a Rust workspace for multi-language monorepo change management. The repository MUST remain organized around explicit package boundaries, reproducible tooling, and discoverable documentation.
+monochange is a Rust workspace for multi-language monorepo change management. The repository MUST remain organized around explicit package boundaries, reproducible tooling, and discoverable documentation.
 
 Baseline standards:
 

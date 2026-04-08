@@ -8,7 +8,7 @@ It is a post-publication communication step, not a planning step.
 
 ## Why use it
 
-Use `CommentReleasedIssues` when you want MonoChange to close the loop after publication by posting structured release follow-up comments.
+Use `CommentReleasedIssues` when you want monochange to close the loop after publication by posting structured release follow-up comments.
 
 This is especially valuable when:
 
@@ -92,7 +92,7 @@ shell = true
 
 ## Why choose it over a custom GitHub API script?
 
-Because the built-in step already consumes MonoChange's linked issue and review metadata model. A shell script would need to rediscover which issues matter for the release.
+Because the built-in step already consumes monochange's linked issue and review metadata model. A shell script would need to rediscover which issues matter for the release.
 
 ## Common mistake
 

@@ -94,7 +94,7 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 		&["init", "--bare", bare.to_string_lossy().as_ref()],
 	);
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
-	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	std::fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));

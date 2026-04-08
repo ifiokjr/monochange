@@ -2,15 +2,15 @@
 
 ## What it does
 
-`Discover` runs MonoChange package discovery and renders the result in `text` or `json` form.
+`Discover` runs monochange package discovery and renders the result in `text` or `json` form.
 
-It is the step to use when you want to inspect how MonoChange sees the repository before you involve changesets or release logic.
+It is the step to use when you want to inspect how monochange sees the repository before you involve changesets or release logic.
 
 ## Why use it
 
 Use `Discover` when you need visibility into:
 
-- which packages MonoChange found
+- which packages monochange found
 - which ids were assigned
 - which manifest paths were normalized
 - whether a repository layout is discoverable the way you expect

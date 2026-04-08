@@ -49,7 +49,7 @@ mc change --package <id> --bump patch --reason "describe the change"
 
 Most changes should target a package id.
 
-MonoChange will propagate bumps to dependents and synchronize configured groups for you, so group ids are best reserved for intentionally shared ownership.
+monochange will propagate bumps to dependents and synchronize configured groups for you, so group ids are best reserved for intentionally shared ownership.
 
 ## 5. Preview the release plan safely
 
@@ -72,7 +72,7 @@ Use this rule of thumb:
 - **package ids first** — most authored changes belong to one package
 - **group ids later** — use a group id only when the change is intentionally owned by the whole group
 
-That keeps your first changes simple while still letting MonoChange synchronize grouped packages when needed.
+That keeps your first changes simple while still letting monochange synchronize grouped packages when needed.
 
 ## First-failure recovery
 

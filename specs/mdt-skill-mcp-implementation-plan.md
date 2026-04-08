@@ -1,10 +1,10 @@
-# Monochange assistant distribution implementation plan
+# monochange assistant distribution implementation plan
 
 ## Stage 1 — exploration artifacts
 
 - [ ] capture the `mdt` MCP, assist, release, and npm packaging patterns
-- [ ] draft Monochange-specific architecture and publish plan
-- [ ] draft the skill content that teaches correct Monochange usage
+- [ ] draft monochange-specific architecture and publish plan
+- [ ] draft the skill content that teaches correct monochange usage
 - [ ] decide package names:
   - [ ] `@monochange/cli`
   - [ ] `@monochange/skill`
@@ -82,5 +82,5 @@
 ## Notes
 
 - Use `mdt` as the reference pattern, not a byte-for-byte copy.
-- Keep Monochange’s existing config-defined CLI model intact; `assist` and `mcp` should be explicitly built-in.
+- Keep monochange’s existing config-defined CLI model intact; `assist` and `mcp` should be explicitly built-in.
 - Treat `@monochange/skill` as a documentation-and-guidance distribution package, not as a replacement for the MCP server.

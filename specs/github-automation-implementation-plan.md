@@ -4,7 +4,7 @@
 
 ## Summary
 
-Add a GitHub-aware automation layer on top of MonoChange's current workflow-driven CLI so repositories can render structured changelogs, publish GitHub releases, open release pull requests, trigger deployments after merge, and enforce changeset policies on pull requests.
+Add a GitHub-aware automation layer on top of monochange's current workflow-driven CLI so repositories can render structured changelogs, publish GitHub releases, open release pull requests, trigger deployments after merge, and enforce changeset policies on pull requests.
 
 This work should build on the current config-driven CLI and release planner rather than replacing it.
 
@@ -21,9 +21,9 @@ This work should build on the current config-driven CLI and release planner rath
 
 ## Non-Goals
 
-- implementing every deployment provider directly inside MonoChange
+- implementing every deployment provider directly inside monochange
 - building a fully hosted GitHub App in the first slice
-- replacing repository CI/CD systems with MonoChange-owned pipelines
+- replacing repository CI/CD systems with monochange-owned pipelines
 - remote package publishing for every ecosystem in the same milestone
 - multi-forge support in the first GitHub-focused slice
 
@@ -76,7 +76,7 @@ Recommended responsibilities:
 - release creation/update logic
 - pull request creation/update logic
 - bot comment/status helpers
-- conversion between MonoChange release artifacts and GitHub payloads
+- conversion between monochange release artifacts and GitHub payloads
 
 ## Proposed Workflow Step Additions
 
@@ -273,7 +273,7 @@ This artifact should be usable by:
 
 ## Phase 6 — Changeset bot policy
 
-1. Implement a reusable PR policy engine in MonoChange.
+1. Implement a reusable PR policy engine in monochange.
 2. Add `EnforceChangesetPolicy` behavior for CI usage.
 3. Publish an example GitHub Action workflow for PR checks.
 4. Add skip-label and changed-path policy support.

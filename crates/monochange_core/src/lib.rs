@@ -676,7 +676,7 @@ impl<'de> Deserialize<'de> for ShellConfig {
 
 /// Built-in execution units for `[[cli.<command>.steps]]`.
 ///
-/// `MonoChange` runs steps in order and lets later steps consume state created by
+/// `monochange` runs steps in order and lets later steps consume state created by
 /// earlier ones. Use standalone steps such as `Validate`, `Discover`,
 /// `AffectedPackages`, `DiagnoseChangesets`, and `RetargetRelease` when you want
 /// inspection or repair. Use `PrepareRelease` when later steps need structured
@@ -686,7 +686,7 @@ impl<'de> Deserialize<'de> for ShellConfig {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CliStepDefinition {
-	/// Validate `MonoChange` configuration and changesets without preparing a
+	/// Validate `monochange` configuration and changesets without preparing a
 	/// release.
 	Validate {
 		#[serde(default)]
@@ -727,7 +727,7 @@ pub enum CliStepDefinition {
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	#[serde(alias = "PublishGitHubRelease")]
-	/// Publish hosted releases from a prepared `MonoChange` release.
+	/// Publish hosted releases from a prepared `monochange` release.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
 	/// configuration.
@@ -773,9 +773,9 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
-	/// Run an arbitrary command with `MonoChange` template context.
+	/// Run an arbitrary command with `monochange` template context.
 	///
-	/// Use this to bridge built-in `MonoChange` state into external tooling.
+	/// Use this to bridge built-in `monochange` state into external tooling.
 	Command {
 		command: String,
 		#[serde(default, alias = "dry_run")]
@@ -1362,7 +1362,7 @@ pub const RELEASE_RECORD_SCHEMA_VERSION: u64 = 1;
 /// Required `ReleaseRecord.kind` discriminator.
 pub const RELEASE_RECORD_KIND: &str = "monochange.releaseRecord";
 /// Human-readable heading used for commit-embedded release records.
-pub const RELEASE_RECORD_HEADING: &str = "## MonoChange Release Record";
+pub const RELEASE_RECORD_HEADING: &str = "## monochange Release Record";
 /// Opening marker for a commit-embedded release record block.
 pub const RELEASE_RECORD_START_MARKER: &str = "<!-- monochange:release-record:start -->";
 /// Closing marker for a commit-embedded release record block.
@@ -1532,9 +1532,9 @@ pub fn release_record_release_tag_names(record: &ReleaseRecord) -> Vec<String> {
 
 #[derive(Debug, Error)]
 pub enum ReleaseRecordError {
-	#[error("no MonoChange release record block found")]
+	#[error("no monochange release record block found")]
 	NotFound,
-	#[error("found multiple MonoChange release record blocks")]
+	#[error("found multiple monochange release record blocks")]
 	MultipleBlocks,
 	#[error("found a release record start marker without a matching end marker")]
 	MissingEndMarker,
@@ -2185,7 +2185,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 		CliCommandDefinition {
 			name: "commit-release".to_string(),
 			help_text: Some(
-				"Prepare a release and create a local release commit with an embedded MonoChange release record"
+				"Prepare a release and create a local release commit with an embedded monochange release record"
 					.to_string(),
 			),
 			inputs: vec![CliInputDefinition {
