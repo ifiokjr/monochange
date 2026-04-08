@@ -1,10 +1,8 @@
 # Installation
 
-MonoChange can be installed either from npm as a prebuilt CLI or from Cargo.
+If you want the fastest path to a first successful run, install the prebuilt CLI from npm.
 
-## npm
-
-Install the published CLI package:
+## Fastest path: npm
 
 ```bash
 npm install -g @monochange/cli
@@ -12,15 +10,11 @@ monochange --help
 mc --help
 ```
 
-Install the bundled skill package when you want reusable agent guidance for Pi or other assistants:
+Then continue with [Start here](./00-start-here.md) or [Your first release plan](./02-setup.md).
 
-```bash
-npm install -g @monochange/skill
-monochange-skill --print-install
-monochange-skill --copy ~/.pi/agent/skills/monochange
-```
+## Alternative: Cargo
 
-## Cargo
+If you prefer to install from Rust tooling instead:
 
 ```bash
 cargo install monochange
@@ -28,7 +22,27 @@ monochange --help
 mc --help
 ```
 
+## Optional: assistant skill package
+
+You do not need assistant tooling to use monochange.
+
+When you want reusable agent guidance for Pi or other assistants, install the bundled skill package:
+
+```bash
+npm install -g @monochange/skill
+monochange-skill --print-install
+monochange-skill --copy ~/.pi/agent/skills/monochange
+```
+
+Assistant-specific setup is covered in [Advanced: Assistant setup and MCP](./09-assistant-setup.md).
+
+## CLI names
+
+The main CLI is `monochange` and the short alias is `mc`.
+
 ## Repository development
+
+If you are working on the monochange repository itself, use the reproducible development shell:
 
 <!-- {=repoDevEnvironmentSetupCode} -->
 
@@ -50,7 +64,7 @@ mc release
 
 <!-- {/repoDevEnvironmentSetupCode} -->
 
-Useful commands:
+Useful repository-development commands:
 
 <!-- {=repoCommonDevelopmentCommands} -->
 
@@ -70,14 +84,3 @@ build:book
 ```
 
 <!-- {/repoCommonDevelopmentCommands} -->
-
-## CLI names
-
-The main CLI is `monochange` and the short alias is `mc`.
-
-MonoChange also ships built-in assistant setup helpers:
-
-```bash
-mc assist pi
-mc mcp
-```

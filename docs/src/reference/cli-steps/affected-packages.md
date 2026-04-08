@@ -100,7 +100,7 @@ This step is often best kept in a dedicated CI command rather than bundled into 
 
 ## Why choose it over a plain `git diff` script?
 
-Because it reuses MonoChange's own understanding of package paths, groups, ignored paths, additional paths, skip labels, and changeset coverage.
+Because it reuses monochange's own understanding of package paths, groups, ignored paths, additional paths, skip labels, and changeset coverage.
 
 ## Common mistakes
 

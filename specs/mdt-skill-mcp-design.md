@@ -1,14 +1,14 @@
-# Monochange assistant distribution design
+# monochange assistant distribution design
 
 ## Goal
 
-Explore a Monochange assistant surface modeled after the latest `mdt` patterns:
+Explore a monochange assistant surface modeled after the latest `mdt` patterns:
 
 1. ship a portable MCP server entrypoint via `monochange mcp`
 2. ship a lightweight assistant setup command similar to `mdt assist`
 3. publish the CLI to npm as `@monochange/cli`
 4. publish a reusable agent skill to npm as `@monochange/skill`
-5. document how agents should use Monochange and how users should install it
+5. document how agents should use monochange and how users should install it
 
 ## Reference points from `mdt`
 
@@ -49,7 +49,7 @@ Key files reviewed:
 - `/Users/ifiokjr/Developer/projects/mdt/scripts/npm/publish-packages.mjs`
 - `/Users/ifiokjr/Developer/projects/mdt/npm/bin/mdt.js`
 
-## Proposed Monochange adaptation
+## Proposed monochange adaptation
 
 ### 1. Built-in assistant entrypoints
 
@@ -69,7 +69,7 @@ This mirrors `mdt`:
 
 - MCP config that runs `monochange mcp`
 - installation commands for `@monochange/cli` and `@monochange/skill`
-- repo-local guidance describing how Monochange should be used
+- repo-local guidance describing how monochange should be used
 - assistant-specific notes for `generic`, `claude`, `cursor`, `copilot`, and `pi`
 
 Suggested JSON shape:
@@ -163,7 +163,7 @@ Recommended platform package naming:
 
 ### 6. Release flow
 
-Monochange does not use `knope`, but the distribution pattern from `mdt` still applies.
+monochange does not use `knope`, but the distribution pattern from `mdt` still applies.
 
 Recommended workflow split:
 

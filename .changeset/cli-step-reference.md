@@ -4,7 +4,7 @@ monochange_core: patch
 
 #### add a built-in CLI step reference for workflow authors
 
-MonoChange now documents every built-in `[[cli.<command>.steps]]` step in a dedicated reference section, with guidance on when to use each step, what prerequisite state it expects, and how to compose it with later workflow steps.
+monochange now documents every built-in `[[cli.<command>.steps]]` step in a dedicated reference section, with guidance on when to use each step, what prerequisite state it expects, and how to compose it with later workflow steps.
 
 **Before:** workflow authors had to infer newer step behavior such as `CommitRelease`, `DiagnoseChangesets`, and `RetargetRelease` from scattered examples or by reading the enum definitions directly.
 

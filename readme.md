@@ -22,6 +22,79 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {/projectReadmeOverview} -->
 
+## Who `monochange` is for
+
+- maintainers of monorepos that span more than one package ecosystem
+- teams replacing ad hoc release scripts with explicit, reviewable change files
+- people who want one safe release-planning model before adding provider automation
+
+## First 10 minutes
+
+Install the prebuilt CLI from npm:
+
+```bash
+npm install -g @monochange/cli
+monochange --help
+mc --help
+```
+
+If you prefer a Rust-native install, use `cargo install monochange` instead.
+
+Then run one safe local walkthrough:
+
+<!-- {=projectCoreWorkflow} -->
+
+Generate a starter config from the packages monochange detects:
+
+```bash
+mc init
+```
+
+`mc init` writes an annotated `monochange.toml`, so most first-time users can start with the generated file instead of hand-authoring config.
+
+Validate the workspace:
+
+```bash
+mc validate
+```
+
+Discover the package ids you will use in commands and changesets:
+
+```bash
+mc discover --format json
+```
+
+Create one change file for a package id:
+
+```bash
+mc change --package <id> --bump patch --reason "describe the change"
+```
+
+Most changes should target a package id. Use group ids only when the change is intentionally owned by the whole group.
+
+Preview the release plan safely:
+
+```bash
+mc release --dry-run --format json
+```
+
+This first run is safe: nothing is published. Stop here until you are ready to prepare release files locally.
+
+When you are ready to prepare the release locally, run `mc release`.
+
+<!-- {/projectCoreWorkflow} -->
+
+If you do not know which package id to target, rerun `mc discover --format json` and copy an id directly from the output.
+
+## Next steps
+
+- [Start here](docs/src/guide/00-start-here.md) — the shortest beginner path through installation, `mc init`, and `--dry-run`
+- [Installation](docs/src/guide/01-installation.md) — npm, Cargo, optional assistant tooling, and repository-development setup
+- [Your first release plan](docs/src/guide/02-setup.md) — a fuller walkthrough built around generated config
+- [Discovery](docs/src/guide/03-discovery.md) — what monochange finds and how ids are rendered
+- [Configuration reference](docs/src/guide/04-configuration.md) — evolve the generated config once the basics feel familiar
+- [Groups and shared release identity](docs/src/guide/05-version-groups.md) — when to reach for group ids instead of package ids
+
 ## Why use `monochange`?
 
 <!-- {=projectWhyUse} -->
@@ -34,7 +107,41 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {/projectWhyUse} -->
 
-## Current milestone capabilities
+## Advanced workflows
+
+### GitHub automation
+
+<!-- {=projectGitHubAutomationOverview} -->
+
+monochange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
+
+- `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
+- `mc publish-release --dry-run --format json` previews provider release payloads before publishing
+- `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
+- `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
+- `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
+- changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
+- `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
+- `mc diagnostics --format json` shows all discovered changeset context or restricts to explicit inputs
+
+<!-- {/projectGitHubAutomationOverview} -->
+
+### Assistant setup and MCP
+
+Assistant tooling is optional.
+
+When you want AI-assisted workflows, monochange ships built-in setup guidance and an MCP server:
+
+```bash
+npm install -g @monochange/skill
+monochange-skill --print-install
+mc assist pi
+mc mcp
+```
+
+See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) for the full setup flow.
+
+## What monochange can do today
 
 <!-- {=projectMilestoneCapabilities} -->
 
@@ -56,23 +163,6 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - publish end-user documentation through the mdBook in `docs/`
 
 <!-- {/projectMilestoneCapabilities} -->
-
-## GitHub automation
-
-<!-- {=projectGitHubAutomationOverview} -->
-
-MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
-
-- `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
-- `mc publish-release --dry-run --format json` previews provider release payloads before publishing
-- `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
-- `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
-- `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
-- changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
-- `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
-- `mc diagnostics --format json` shows all discovered changeset context or restricts to explicit inputs
-
-<!-- {/projectGitHubAutomationOverview} -->
 
 ## Workspace crates
 
@@ -101,7 +191,7 @@ MonoChange can promote one prepared release into several source-provider automat
 
 <!-- {/projectCrateCatalog} -->
 
-## Quick start
+## Repository development
 
 Enter the reproducible development shell and install workspace tooling:
 
@@ -124,95 +214,6 @@ mc release
 ```
 
 <!-- {/repoDevEnvironmentSetupCode} -->
-
-<!-- {=projectCoreWorkflow} -->
-
-Initialize the repository with detected packages, groups, and default CLI commands:
-
-```bash
-mc init
-```
-
-The generated `monochange.toml` becomes the source of truth for top-level commands like `mc validate`, `mc discover`, `mc change`, and `mc release`.
-
-Validate the repository:
-
-```bash
-mc validate
-```
-
-Discover the workspace:
-
-```bash
-mc discover --format json
-```
-
-Create a change file:
-
-```bash
-mc change --package monochange --bump minor --reason "add release planning"
-```
-
-Prefer package ids for authored changes whenever a leaf package changed. MonoChange will propagate bumps to dependents and synchronize configured groups for you, so group ids are best reserved for intentionally group-owned changes.
-
-Preview the release command:
-
-```bash
-mc release --dry-run --format json
-```
-
-Prepare the release:
-
-```bash
-mc release
-```
-
-<!-- {/projectCoreWorkflow} -->
-
-## Assistant setup and MCP
-
-Install the CLI from npm when you want a prebuilt binary:
-
-```bash
-npm install -g @monochange/cli
-monochange --help
-mc --help
-```
-
-Install the bundled skill when you want reusable agent guidance:
-
-```bash
-npm install -g @monochange/skill
-monochange-skill --print-install
-monochange-skill --copy ~/.pi/agent/skills/monochange
-```
-
-Print an assistant profile with install steps, repo guidance, and MCP configuration:
-
-```bash
-mc assist pi
-```
-
-Start the MCP server over stdin/stdout:
-
-```bash
-mc mcp
-```
-
-Typical MCP client config:
-
-```json
-{
-	"mcpServers": {
-		"monochange": {
-			"command": "monochange",
-			"args": ["mcp"]
-		}
-	}
-}
-```
-
-## Development
 
 Useful commands:
 

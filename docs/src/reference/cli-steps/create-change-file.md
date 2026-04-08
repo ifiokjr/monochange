@@ -11,12 +11,12 @@ It supports both:
 
 ## Why use it
 
-Use `CreateChangeFile` when you want MonoChange itself to remain the source of truth for authored change files.
+Use `CreateChangeFile` when you want monochange itself to remain the source of truth for authored change files.
 
 That gives you a few advantages over rolling your own shell template generator:
 
 - package and group references resolve through the same config model used for release planning
-- default bump/type behavior stays aligned with MonoChange parsing rules
+- default bump/type behavior stays aligned with monochange parsing rules
 - interactive mode can guide authors instead of forcing them to remember frontmatter details
 - the generated file shape stays compatible with `mc validate`, `PrepareRelease`, and diagnostics tooling
 

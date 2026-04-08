@@ -7,7 +7,7 @@ monochange_github: patch
 
 #### enable live GitHub automation workflows for this repository
 
-The MonoChange repository now uses its own release tooling end-to-end. The `monochange.toml` was expanded with:
+The monochange repository now uses its own release tooling end-to-end. The `monochange.toml` was expanded with:
 
 - a `verify` CLI command that runs `EnforceChangesetPolicy` on every pull request
 - a `release-pr` CLI command that opens a versioned release pull request from CI

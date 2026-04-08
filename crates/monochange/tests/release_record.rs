@@ -120,7 +120,7 @@ fn release_record_command_reports_missing_record_in_history() {
 	let stderr =
 		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("stderr utf8: {error}"));
 	assert!(
-		stderr.contains("no MonoChange release record found in first-parent ancestry from `HEAD`")
+		stderr.contains("no monochange release record found in first-parent ancestry from `HEAD`")
 	);
 }
 
@@ -134,7 +134,7 @@ fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 	commit_with_body(
 		repo,
 		"chore(release): malformed release record",
-		"## MonoChange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{}\n```");
+		"## monochange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{}\n```");
 	commit_plain(repo, "fix: follow-up", "follow-up\n");
 
 	let output = cli()
@@ -147,7 +147,7 @@ fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 	assert!(!output.status.success());
 	let stderr =
 		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("stderr utf8: {error}"));
-	assert!(stderr.contains("found a malformed MonoChange release record in commit"));
+	assert!(stderr.contains("found a malformed monochange release record in commit"));
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn release_record_command_reports_unsupported_schema_version() {
 	init_repo(repo);
 	let body = r#"Prepare release.
 
-## MonoChange Release Record
+## monochange Release Record
 
 <!-- monochange:release-record:start -->
 ```json
@@ -221,7 +221,7 @@ fn sample_release_record() -> ReleaseRecord {
 
 fn init_repo(root: &Path) {
 	git(root, &["init"]);
-	git(root, &["config", "user.name", "MonoChange Tests"]);
+	git(root, &["config", "user.name", "monochange Tests"]);
 	git(root, &["config", "user.email", "monochange@example.com"]);
 	git(root, &["config", "commit.gpgsign", "false"]);
 	fs::write(root.join("release.txt"), "before\n")

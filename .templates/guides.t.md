@@ -74,7 +74,7 @@ changelog = "crates/sdk_core/changelog.md"
 
 Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
 
-MonoChange currently supports two changelog formats:
+monochange currently supports two changelog formats:
 
 - `monochange` keeps the current heading-and-bullets layout
 - `keep_a_changelog` renders section headings such as `### Features`, `### Fixes`, and `### Breaking changes`
@@ -321,7 +321,7 @@ versioned_files = ["pubspec.lock"]
 
 Package references in changesets and CLI commands should use configured ids.
 
-Prefer package ids when a leaf package changed. That keeps the authored change as specific as possible, and MonoChange will still propagate bumps to dependents and synchronize any configured groups automatically.
+Prefer package ids when a leaf package changed. That keeps the authored change as specific as possible, and monochange will still propagate bumps to dependents and synchronize any configured groups automatically.
 
 Use a group id only when the change is intentionally owned by the whole group and should read that way in release output. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
 
@@ -465,7 +465,7 @@ When `version` is provided without `bump`, the bump is inferred from the current
 
 <!-- {@releaseWorkflowBehavior} -->
 
-`mc release` is a config-defined top-level command. When your config omits `[cli.<command>]` entries, MonoChange synthesizes the default `release` command automatically.
+`mc release` is a config-defined top-level command. When your config omits `[cli.<command>]` entries, monochange synthesizes the default `release` command automatically.
 
 During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
 
@@ -556,7 +556,7 @@ jobs:
 
 <!-- {@githubAutomationOverview} -->
 
-MonoChange keeps source-provider automation layered on top of the same `PrepareRelease` result used for normal release planning.
+monochange keeps source-provider automation layered on top of the same `PrepareRelease` result used for normal release planning.
 
 That means one set of `.changeset/*.md` inputs can drive all of these commands and automation flows consistently:
 
@@ -735,7 +735,7 @@ type = "AffectedPackages"
 
 <!-- {@githubAutomationDogfoodNotes} -->
 
-The MonoChange repository itself can dogfood this model by:
+The monochange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`

@@ -134,11 +134,11 @@ fn release_record_help_describes_first_parent_discovery() {
 	.unwrap_or_else(|error| panic!("release-record help: {error}"));
 
 	assert!(
-		output.contains("Inspect the MonoChange release record associated with a tag or commit")
+		output.contains("Inspect the monochange release record associated with a tag or commit")
 	);
 	assert!(output.contains("mc release-record --from v1.2.3"));
 	assert!(
-		output.contains("Walks first-parent ancestry until it finds a MonoChange release record")
+		output.contains("Walks first-parent ancestry until it finds a monochange release record")
 	);
 }
 
@@ -1546,7 +1546,7 @@ fn repairable_releases_guide_distinguishes_manifest_and_release_record() {
 		.unwrap_or_else(|error| panic!("repairable releases guide: {error}"));
 
 	for expected in [
-		"manifest = \"what MonoChange is preparing right now\"",
+		"manifest = \"what monochange is preparing right now\"",
 		"release record = \"what this release commit historically declared\"",
 		"`ReleaseRecord` does **not** replace `RenderReleaseManifest`",
 		"mc release-record --from v1.2.3",
@@ -2127,7 +2127,7 @@ fn build_release_commit_message_includes_release_record_body() {
 	assert!(body.contains("- released packages: monochange, monochange_core"));
 	assert!(body.contains("- updated changelogs: crates/monochange/CHANGELOG.md"));
 	assert!(body.contains("- deleted changesets: .changeset/feature.md"));
-	assert!(body.contains("## MonoChange Release Record"));
+	assert!(body.contains("## monochange Release Record"));
 	assert!(body.contains("\"command\": \"release-pr\""));
 }
 
@@ -2151,7 +2151,7 @@ fn build_release_commit_message_uses_default_title_without_source() {
 	assert!(commit_message
 		.body
 		.as_deref()
-		.is_some_and(|body| body.contains("## MonoChange Release Record")));
+		.is_some_and(|body| body.contains("## monochange Release Record")));
 }
 
 #[test]
@@ -2222,7 +2222,7 @@ fn sample_release_manifest_for_commit_message(
 			version_format: VersionFormat::Primary,
 			tag_name: "v1.2.3".to_string(),
 			members: vec!["monochange".to_string(), "monochange_core".to_string()],
-			rendered_title: "MonoChange 1.2.3".to_string(),
+			rendered_title: "monochange 1.2.3".to_string(),
 			rendered_changelog_title: "1.2.3".to_string(),
 		}],
 		released_packages: vec!["monochange".to_string(), "monochange_core".to_string()],
@@ -2366,7 +2366,7 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 	assert!(output.contains("release commit:"));
 	assert!(output.contains("status: completed"));
 	assert_eq!(commit_subject, "chore(release): prepare release");
-	assert!(commit_body.contains("## MonoChange Release Record"));
+	assert!(commit_body.contains("## monochange Release Record"));
 	assert!(commit_body.contains("\"command\": \"commit-release\""));
 	assert!(
 		status.is_empty(),
@@ -3523,7 +3523,7 @@ fn first_parent_commits_returns_head_then_ancestors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	git_in_temp_repo(root, &["init"]);
-	git_in_temp_repo(root, &["config", "user.name", "MonoChange Tests"]);
+	git_in_temp_repo(root, &["config", "user.name", "monochange Tests"]);
 	git_in_temp_repo(root, &["config", "user.email", "monochange@example.com"]);
 	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);
 	fs::write(root.join("release.txt"), "initial\n")
@@ -3850,7 +3850,7 @@ fn sample_github_source_configuration(api_url: &str) -> monochange_core::SourceC
 
 fn init_git_repo(root: &Path) {
 	git_in_temp_repo(root, &["init"]);
-	git_in_temp_repo(root, &["config", "user.name", "MonoChange Tests"]);
+	git_in_temp_repo(root, &["config", "user.name", "monochange Tests"]);
 	git_in_temp_repo(root, &["config", "user.email", "monochange@example.com"]);
 	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);
 }

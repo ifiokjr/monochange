@@ -4,18 +4,18 @@
 
 `PublishRelease` converts a prepared release into hosted provider release operations.
 
-For example, with a configured source provider it can create or update the outward release objects that correspond to MonoChange's prepared release targets.
+For example, with a configured source provider it can create or update the outward release objects that correspond to monochange's prepared release targets.
 
 ## Why use it
 
-Use `PublishRelease` when you want MonoChange to handle provider-aware publication rather than stitching together release API calls manually.
+Use `PublishRelease` when you want monochange to handle provider-aware publication rather than stitching together release API calls manually.
 
 That gives you:
 
 - one publication step for grouped and package-owned releases
 - dry-run previews that stay aligned with the prepared release state
 - a typed boundary between planning and provider mutation
-- source-provider integration driven by the same manifest and release target model as the rest of MonoChange
+- source-provider integration driven by the same manifest and release target model as the rest of monochange
 
 ## Inputs
 
@@ -105,7 +105,7 @@ shell = true
 
 ## Why choose it over a raw `Command` step?
 
-Because `PublishRelease` understands MonoChange release targets, provider settings, and dry-run behavior. A hand-written shell command would need to rebuild all of that context.
+Because `PublishRelease` understands monochange release targets, provider settings, and dry-run behavior. A hand-written shell command would need to rebuild all of that context.
 
 ## Common mistake
 

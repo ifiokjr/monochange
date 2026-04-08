@@ -69,7 +69,7 @@ When `version` is provided without `bump`, the bump is inferred from the current
 
 If multiple changesets specify conflicting explicit versions for the same package or group, monochange uses the highest semver version and emits a warning by default. Set `defaults.strict_version_conflicts = true` to fail instead.
 
-MonoChange keeps its own changeset standard rather than reusing a narrower external parser. Top-level frontmatter keys are package ids or group ids only. Each target can use scalar shorthand or the object syntax with `bump`, `version`, and `type`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs. Authored heading depth is normalized when release notes are rendered, so use natural markdown headings in the changeset body instead of hard-coding output depth.
+monochange keeps its own changeset standard rather than reusing a narrower external parser. Top-level frontmatter keys are package ids or group ids only. Each target can use scalar shorthand or the object syntax with `bump`, `version`, and `type`, while the markdown body is split into a summary plus optional detailed follow-up paragraphs. Authored heading depth is normalized when release notes are rendered, so use natural markdown headings in the changeset body instead of hard-coding output depth.
 
 Validate before planning:
 
@@ -81,8 +81,8 @@ mc validate
 
 Release planning and release repair use two different artifacts on purpose.
 
-- `RenderReleaseManifest` captures **what MonoChange is preparing right now** during command execution.
-- `ReleaseRecord` captures **what a release commit historically declared** inside the MonoChange-managed release commit body.
+- `RenderReleaseManifest` captures **what monochange is preparing right now** during command execution.
+- `ReleaseRecord` captures **what a release commit historically declared** inside the monochange-managed release commit body.
 
 Use the manifest when you want execution-time automation such as CI artifacts, MCP/server responses, previews, or downstream machine-readable release data.
 
@@ -122,7 +122,7 @@ mc release
 
 <!-- {=releaseWorkflowBehavior} -->
 
-`mc release` is a config-defined top-level command. When your config omits `[cli.<command>]` entries, MonoChange synthesizes the default `release` command automatically.
+`mc release` is a config-defined top-level command. When your config omits `[cli.<command>]` entries, monochange synthesizes the default `release` command automatically.
 
 During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
 

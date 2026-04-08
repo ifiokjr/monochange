@@ -4,13 +4,13 @@
 //! # `monochange_github`
 //!
 //! <!-- {=monochangeGithubCrateDocs|trim|linePrefix:"//! ":true} -->
-//! `monochange_github` turns `MonoChange` release manifests into GitHub automation requests.
+//! `monochange_github` turns `monochange` release manifests into GitHub automation requests.
 //!
 //! Reach for this crate when you want to preview or publish GitHub releases and release pull requests using the same structured release data that powers changelog files and release manifests.
 //!
 //! ## Why use it?
 //!
-//! - derive GitHub release payloads and release-PR bodies from `MonoChange`'s structured release manifest
+//! - derive GitHub release payloads and release-PR bodies from `monochange`'s structured release manifest
 //! - keep GitHub automation aligned with changelog rendering and release targets
 //! - reuse one publishing path for dry-run previews and real repository updates
 //!

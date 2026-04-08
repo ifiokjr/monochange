@@ -4,7 +4,7 @@
 
 `RenderReleaseManifest` turns the prepared release into a stable JSON manifest and can write it to disk.
 
-This is the step to use when another job, script, AI workflow, or deployment stage needs a machine-readable description of the release that MonoChange just prepared.
+This is the step to use when another job, script, AI workflow, or deployment stage needs a machine-readable description of the release that monochange just prepared.
 
 ## Why use it
 

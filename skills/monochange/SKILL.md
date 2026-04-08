@@ -1,9 +1,9 @@
 ---
 name: monochange
-description: Guides agents through Monochange discovery, changesets, release planning, and provider-aware release workflows. Use when working on `monochange.toml`, `.changeset/*.md`, release automation, grouped versions, or cross-ecosystem monorepo releases.
+description: Guides agents through monochange discovery, changesets, release planning, and provider-aware release workflows. Use when working on `monochange.toml`, `.changeset/*.md`, release automation, grouped versions, or cross-ecosystem monorepo releases.
 ---
 
-# Monochange
+# monochange
 
 ## Quick start
 

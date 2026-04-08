@@ -8,25 +8,25 @@ Examples:
 - generated artifacts were wrong
 - a release automation step succeeded, but the tagged commit needs one or two immediate fixes before the release should stand
 
-MonoChange solves that by storing a durable release declaration in git history and then using that declaration to move the whole release set forward together.
+monochange solves that by storing a durable release declaration in git history and then using that declaration to move the whole release set forward together.
 
 ## The two artifacts: release manifest vs release record
 
-MonoChange now has two related but different release artifacts:
+monochange now has two related but different release artifacts:
 
 | Artifact                                   | What it means                                  | When it exists                                    | What it is for                                                                    |
 | ------------------------------------------ | ---------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `RenderReleaseManifest` / release manifest | what MonoChange is preparing right now         | during command execution                          | CI, MCP/server consumers, previews, downstream automation, and AI/agent workflows |
-| `ReleaseRecord`                            | what this release commit historically declared | inside the MonoChange-managed release commit body | later inspection and repair from git history                                      |
+| `RenderReleaseManifest` / release manifest | what monochange is preparing right now         | during command execution                          | CI, MCP/server consumers, previews, downstream automation, and AI/agent workflows |
+| `ReleaseRecord`                            | what this release commit historically declared | inside the monochange-managed release commit body | later inspection and repair from git history                                      |
 
 Plain-language summary:
 
-- manifest = "what MonoChange is preparing right now"
+- manifest = "what monochange is preparing right now"
 - release record = "what this release commit historically declared"
 
 If you prefer the emphasized version:
 
-- **manifest** = "what MonoChange is preparing right now"
+- **manifest** = "what monochange is preparing right now"
 - **release record** = "what this release commit historically declared"
 
 The important consequence is that `ReleaseRecord` does **not** replace `RenderReleaseManifest`.
@@ -35,16 +35,16 @@ Use the manifest when you want execution-time automation. Use the release record
 
 ## Where the release record lives
 
-MonoChange writes the durable `ReleaseRecord` into the body of the MonoChange-managed release commit.
+monochange writes the durable `ReleaseRecord` into the body of the monochange-managed release commit.
 
 That means the repair anchor travels with git history itself instead of living in a mutable receipt file somewhere in the repository tree.
 
 The release commit body contains:
 
 1. a compact human-readable release summary
-2. a reserved MonoChange release-record block with structured JSON
+2. a reserved monochange release-record block with structured JSON
 
-## How MonoChange finds a release later
+## How monochange finds a release later
 
 Use `mc release-record` when you want to inspect the durable release declaration for a tag or a newer commit built on top of that release.
 
@@ -53,11 +53,11 @@ mc release-record --from v1.2.3
 mc release-record --from HEAD --format json
 ```
 
-MonoChange will:
+monochange will:
 
 1. resolve the supplied ref to a commit
 2. walk first-parent ancestry
-3. stop at the first valid MonoChange `ReleaseRecord`
+3. stop at the first valid monochange `ReleaseRecord`
 4. report the release commit that declared it plus the distance from the input ref
 
 That lets you inspect a release directly from its tag or from later fix commits.
@@ -86,7 +86,7 @@ The command does the heavy lifting for you:
 
 Use dry-run to see:
 
-- the release record MonoChange found
+- the release record monochange found
 - the target commit
 - which tags will move
 - whether the target is a descendant of the original release commit
@@ -100,7 +100,7 @@ mc repair-release --from v1.2.3 --target HEAD --dry-run --format json
 
 A typical repair flow looks like this:
 
-1. MonoChange creates a release request commit with an embedded release record.
+1. monochange creates a release request commit with an embedded release record.
 2. That release is tagged and published.
 3. You add a follow-up fix commit or two.
 4. You inspect the durable history record:
@@ -177,7 +177,7 @@ The main fields exposed there are:
 
 GitHub is the first provider with release retarget sync support.
 
-When provider sync is unsupported, MonoChange reports that clearly in dry-run and real execution paths rather than pretending the operation completed.
+When provider sync is unsupported, monochange reports that clearly in dry-run and real execution paths rather than pretending the operation completed.
 
 ## Keep using release manifests for automation
 
@@ -188,6 +188,6 @@ Keep using `RenderReleaseManifest` and manifest JSON when you want:
 - machine-readable release plans in CI
 - MCP/server responses for assistants
 - deterministic previews for downstream automation
-- a stable execution-time snapshot of what MonoChange is about to do
+- a stable execution-time snapshot of what monochange is about to do
 
 Use `ReleaseRecord` and `repair-release` when you want to inspect or repair a release later from git history.

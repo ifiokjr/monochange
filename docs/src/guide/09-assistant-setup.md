@@ -1,9 +1,9 @@
 # Assistant setup and MCP
 
-MonoChange ships two assistant-facing surfaces:
+monochange ships two assistant-facing surfaces:
 
 - `mc assist <assistant>` prints install instructions, MCP configuration, and repo-local guidance
-- `mc mcp` starts a stdio MCP server so assistants can call MonoChange tools directly
+- `mc mcp` starts a stdio MCP server so assistants can call monochange tools directly
 
 ## Install the CLI and skill
 
@@ -37,7 +37,7 @@ The profile includes:
 
 - install commands for `@monochange/cli` and `@monochange/skill`
 - an MCP server config snippet that runs `monochange mcp`
-- repo-local guidance for how agents should use MonoChange
+- repo-local guidance for how agents should use monochange
 - assistant-specific notes
 
 ## MCP configuration

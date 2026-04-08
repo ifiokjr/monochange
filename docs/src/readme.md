@@ -2,7 +2,80 @@
 
 `monochange` is a cross-ecosystem release planner for monorepos.
 
-The current milestone focuses on:
+It is easiest to learn with one safe local walkthrough before you touch provider publishing, release PRs, diagnostics, or MCP setup.
+
+## Who this guide is for
+
+- maintainers of monorepos that span more than one package ecosystem
+- teams replacing ad hoc release scripts with explicit change files
+- people who want a predictable release plan before adding automation
+
+## Start with one safe walkthrough
+
+Install the prebuilt CLI from npm:
+
+```bash
+npm install -g @monochange/cli
+monochange --help
+mc --help
+```
+
+Then run the core beginner flow:
+
+<!-- {=projectCoreWorkflow} -->
+
+Generate a starter config from the packages monochange detects:
+
+```bash
+mc init
+```
+
+`mc init` writes an annotated `monochange.toml`, so most first-time users can start with the generated file instead of hand-authoring config.
+
+Validate the workspace:
+
+```bash
+mc validate
+```
+
+Discover the package ids you will use in commands and changesets:
+
+```bash
+mc discover --format json
+```
+
+Create one change file for a package id:
+
+```bash
+mc change --package <id> --bump patch --reason "describe the change"
+```
+
+Most changes should target a package id. Use group ids only when the change is intentionally owned by the whole group.
+
+Preview the release plan safely:
+
+```bash
+mc release --dry-run --format json
+```
+
+This first run is safe: nothing is published. Stop here until you are ready to prepare release files locally.
+
+When you are ready to prepare the release locally, run `mc release`.
+
+<!-- {/projectCoreWorkflow} -->
+
+If you want a slower, more guided walkthrough, continue with [Start here](./guide/00-start-here.md) and [Your first release plan](./guide/02-setup.md).
+
+## What to read next
+
+- [Start here](./guide/00-start-here.md) — install, `mc init`, validation, discovery, and `--dry-run`
+- [Installation](./guide/01-installation.md) — npm, Cargo, optional assistant tooling, and repository development setup
+- [Your first release plan](./guide/02-setup.md) — generated config first, package ids before groups
+- [Configuration reference](./guide/04-configuration.md) — the full package, group, changelog, and CLI model
+- [Advanced: GitHub automation](./guide/08-github-automation.md) — provider publishing and release requests
+- [Advanced: Assistant setup and MCP](./guide/09-assistant-setup.md) — optional AI-assisted workflows
+
+## What monochange can do today
 
 <!-- {=projectMilestoneCapabilities} -->
 
@@ -24,132 +97,6 @@ The current milestone focuses on:
 - publish end-user documentation through the mdBook in `docs/`
 
 <!-- {/projectMilestoneCapabilities} -->
-
-## GitHub automation
-
-<!-- {=projectGitHubAutomationOverview} -->
-
-MonoChange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
-
-- `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
-- `mc publish-release --dry-run --format json` previews provider release payloads before publishing
-- `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
-- `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
-- `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
-- changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
-- `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
-- `mc diagnostics --format json` shows all discovered changeset context or restricts to explicit inputs
-
-<!-- {/projectGitHubAutomationOverview} -->
-
-## Core workflow
-
-<!-- {=projectCoreWorkflow} -->
-
-Initialize the repository with detected packages, groups, and default CLI commands:
-
-```bash
-mc init
-```
-
-The generated `monochange.toml` becomes the source of truth for top-level commands like `mc validate`, `mc discover`, `mc change`, and `mc release`.
-
-Validate the repository:
-
-```bash
-mc validate
-```
-
-Discover the workspace:
-
-```bash
-mc discover --format json
-```
-
-Create a change file:
-
-```bash
-mc change --package monochange --bump minor --reason "add release planning"
-```
-
-Prefer package ids for authored changes whenever a leaf package changed. MonoChange will propagate bumps to dependents and synchronize configured groups for you, so group ids are best reserved for intentionally group-owned changes.
-
-Preview the release command:
-
-```bash
-mc release --dry-run --format json
-```
-
-Prepare the release:
-
-```bash
-mc release
-```
-
-<!-- {/projectCoreWorkflow} -->
-
-## Assistant setup and MCP
-
-Install the prebuilt CLI with npm:
-
-```bash
-npm install -g @monochange/cli
-monochange --help
-mc --help
-```
-
-Install the bundled skill package when you want reusable agent guidance:
-
-```bash
-npm install -g @monochange/skill
-monochange-skill --print-install
-monochange-skill --copy ~/.pi/agent/skills/monochange
-```
-
-Print an assistant profile with install instructions, repo-local guidance, and MCP configuration:
-
-```bash
-mc assist pi
-```
-
-Start the MCP server over stdin/stdout:
-
-```bash
-mc mcp
-```
-
-Query change context before a code review or release handoff:
-
-```bash
-mc diagnostics --format json
-```
-
-Typical MCP client config:
-
-```json
-{
-	"mcpServers": {
-		"monochange": {
-			"command": "monochange",
-			"args": ["mcp"]
-		}
-	}
-}
-```
-
-Run the full validation suite:
-
-<!-- {=projectValidationCommands} -->
-
-```bash
-docs:verify
-lint:all
-test:all
-build:all
-build:book
-```
-
-<!-- {/projectValidationCommands} -->
 
 ## What the JSON output includes
 
@@ -174,3 +121,19 @@ Release-plan output includes:
 - warnings and unresolved items
 
 <!-- {/projectReleaseOutputIncludes} -->
+
+## Contributing to monochange itself
+
+If you are working on the monochange repository, run the full local validation suite before opening a PR:
+
+<!-- {=projectValidationCommands} -->
+
+```bash
+docs:verify
+lint:all
+test:all
+build:all
+build:book
+```
+
+<!-- {/projectValidationCommands} -->

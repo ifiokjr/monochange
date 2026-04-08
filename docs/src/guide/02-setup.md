@@ -1,6 +1,114 @@
-# Setting up a project
+# Your first release plan
 
-Add a `monochange.toml` file at the repository root.
+Use this guide after installation when you want one local, beginner-safe walkthrough.
+
+You will stop at `mc release --dry-run --format json`, so nothing is published.
+
+## 1. Generate a starter config with `mc init`
+
+Run this at the repository root:
+
+```bash
+mc init
+```
+
+`mc init` detects packages, writes an annotated `monochange.toml`, and gives you a better starting point than hand-authoring a first config from scratch.
+
+The generated file becomes the source of truth for commands like `mc validate`, `mc discover`, `mc change`, and `mc release`.
+
+## 2. Validate the generated workspace
+
+```bash
+mc validate
+```
+
+This confirms that the generated config and any existing `.changeset/*.md` files agree with the workspace.
+
+If validation fails, fix the reported problem first, then rerun `mc validate`.
+
+## 3. Discover the package ids you will actually use
+
+<!-- {=projectDiscoverCommand} -->
+
+```bash
+mc validate
+mc discover --format json
+```
+
+<!-- {/projectDiscoverCommand} -->
+
+The most important thing to find in discovery output is the package id you want to target in your first change file.
+
+If you are unsure what id to use later, rerun discovery and copy one from the output.
+
+## 4. Create one change file
+
+```bash
+mc change --package <id> --bump patch --reason "describe the change"
+```
+
+Most changes should target a package id.
+
+monochange will propagate bumps to dependents and synchronize configured groups for you, so group ids are best reserved for intentionally shared ownership.
+
+## 5. Preview the release plan safely
+
+<!-- {=projectDryRunCommand} -->
+
+```bash
+mc release --dry-run --format json
+```
+
+<!-- {/projectDryRunCommand} -->
+
+This is the right stopping point for a first-time user.
+
+You get a concrete preview of the release plan without publishing anything or opening provider requests.
+
+## Package ids vs. group ids
+
+Use this rule of thumb:
+
+- **package ids first** — most authored changes belong to one package
+- **group ids later** — use a group id only when the change is intentionally owned by the whole group
+
+That keeps your first changes simple while still letting monochange synchronize grouped packages when needed.
+
+## First-failure recovery
+
+### `mc init` says a config already exists
+
+Keep the existing `monochange.toml`, inspect it, and continue with `mc validate`.
+
+### `mc validate` reports config or changeset errors
+
+Fix the reported issue first. `mc validate` is the fastest way to get back to a known-good workspace.
+
+### `mc change` says the package id is unknown
+
+Run `mc discover --format json` again and copy an id directly from the output.
+
+### You are not ready to hand-edit config yet
+
+That is normal. Stay with the generated `monochange.toml` until the basic flow feels familiar.
+
+## When to edit `monochange.toml` by hand
+
+Most first-time users should not start by writing a large config manually.
+
+Reach for manual edits when you want to:
+
+- rename or reorganize package ids
+- define groups with `[group.<id>]`
+- customize changelog paths or formats
+- add provider configuration for release publishing or release PRs
+- expand the CLI surface beyond the default generated commands
+
+## Reference: expanded configuration example
+
+The example below shows the broader package, group, changelog, source-provider, and CLI-command model.
+
+Use it as reference material after the generated config makes sense.
 
 <!-- {=projectSetupConfig} -->
 
@@ -227,16 +335,3 @@ type = "AffectedPackages"
 This guide shows the preferred package/group configuration model together with an expanded CLI command surface.
 
 <!-- {/projectSetupConfigNote} -->
-
-Then validate and verify discovery:
-
-<!-- {=projectDiscoverCommand} -->
-
-```bash
-mc validate
-mc discover --format json
-```
-
-<!-- {/projectDiscoverCommand} -->
-
-Use configured package ids such as `sdk-core` and group ids such as `sdk` in changesets and CLI commands.

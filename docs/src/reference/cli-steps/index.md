@@ -2,9 +2,9 @@
 
 <!-- {=cliStepReferenceOverview} -->
 
-MonoChange CLI commands are built from ordered `[[cli.<command>.steps]]` entries.
+monochange CLI commands are built from ordered `[[cli.<command>.steps]]` entries.
 
-A step is the smallest execution unit in a MonoChange workflow. Some steps are **standalone** (`Validate`, `Discover`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`). Others are **stateful** and build on the result of an earlier `PrepareRelease` step (`RenderReleaseManifest`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`).
+A step is the smallest execution unit in a monochange workflow. Some steps are **standalone** (`Validate`, `Discover`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`). Others are **stateful** and build on the result of an earlier `PrepareRelease` step (`RenderReleaseManifest`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`).
 
 When you design a command, think in terms of:
 
@@ -42,20 +42,20 @@ The reference pages in this section document each built-in step with:
 | `AffectedPackages`      | evaluate changeset coverage for changed files                            | no                               | CI enforcement, custom failure messaging                                                                             |
 | `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata | no                               | local debugging, CI inspection                                                                                       |
 | `RetargetRelease`       | repair a recent release by moving its tag set                            | no                               | custom `Command` steps using `retarget.*`                                                                            |
-| `Command`               | run arbitrary shell/program commands with MonoChange context             | depends on your workflow         | any external tool                                                                                                    |
+| `Command`               | run arbitrary shell/program commands with monochange context             | depends on your workflow         | any external tool                                                                                                    |
 
 <!-- {/cliStepReferenceChoosingGuide} -->
 
 ## A note on composition
 
-MonoChange executes steps in order.
+monochange executes steps in order.
 
 That means composition is explicit:
 
 - a step can only consume state created by an earlier step in the same command
 - a later step never runs "in parallel" with an earlier one
 - `--dry-run` flows through the whole command and changes the behavior of steps that support previews
-- a plain `Command` step can bridge MonoChange and external tools, but built-in steps are preferable when you want stable semantics, structured JSON, or provider-aware behavior
+- a plain `Command` step can bridge monochange and external tools, but built-in steps are preferable when you want stable semantics, structured JSON, or provider-aware behavior
 
 In practice, most workflows fit one of four patterns:
 
@@ -87,7 +87,7 @@ Use that when:
 
 ### Structured template namespaces
 
-When you compose `Command` steps after built-in steps, MonoChange exposes structured context values such as:
+When you compose `Command` steps after built-in steps, monochange exposes structured context values such as:
 
 - `release.*` after `PrepareRelease`
 - `manifest.path` after `RenderReleaseManifest` with a `path`

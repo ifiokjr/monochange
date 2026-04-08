@@ -377,7 +377,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 
 	let repo = tempdir.path().join("repo-error");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
-	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	let hooks_dir = repo.join(".git/hooks");
 	std::fs::write(hooks_dir.join("pre-commit"), "#!/bin/sh\nexit 1\n")
@@ -409,7 +409,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path().join("repo");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
-	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	std::fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
@@ -572,7 +572,7 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 		&["init", "--bare", bare.to_string_lossy().as_ref()],
 	);
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
-	git(&repo, &["config", "user.name", "MonoChange Tests"]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	std::fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));

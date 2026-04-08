@@ -2,7 +2,7 @@
 
 This guide walks through converting a `knope.toml` configuration to `monochange.toml`.
 
-MonoChange was originally inspired by knope and shares many of the same ideas — changeset-driven releases, configurable workflows, GitHub integration — but uses a different configuration surface and adds cross-ecosystem support.
+monochange was originally inspired by knope and shares many of the same ideas — changeset-driven releases, configurable workflows, GitHub integration — but uses a different configuration surface and adds cross-ecosystem support.
 
 ## Quick comparison
 
@@ -66,7 +66,7 @@ extra_changelog_sections = [
 ]
 ```
 
-> **Note:** knope's `scopes` filter conventional commits to specific packages. MonoChange does not use conventional commits — use changeset frontmatter keys instead.
+> **Note:** knope's `scopes` filter conventional commits to specific packages. monochange does not use conventional commits — use changeset frontmatter keys instead.
 
 ### Multi-package knope repository
 
@@ -90,7 +90,7 @@ versioned_files = [
 changelog = "crates/sdk_cli/changelog.md"
 ```
 
-In monochange, use `[package.<id>]` entries with a `path` field. MonoChange updates native manifests automatically for supported ecosystems, so `versioned_files` only needs to cover _extra_ managed files:
+In monochange, use `[package.<id>]` entries with a `path` field. monochange updates native manifests automatically for supported ecosystems, so `versioned_files` only needs to cover _extra_ managed files:
 
 ```toml
 # monochange.toml
@@ -141,7 +141,7 @@ Group behavior:
 
 ## Step 4 — Migrate workflows to CLI commands
 
-knope uses `[[workflows]]` arrays. MonoChange uses `[cli.<command>]` map entries that become top-level CLI subcommands.
+knope uses `[[workflows]]` arrays. monochange uses `[cli.<command>]` map entries that become top-level CLI subcommands.
 
 ### knope workflow
 
@@ -257,7 +257,7 @@ type = "PrepareRelease"
 type = "OpenReleaseRequest"
 ```
 
-> **Key difference:** knope workflows often include manual `git add`, `git commit`, and `git push` Command steps. MonoChange handles git operations internally when using `PublishRelease` or `OpenReleaseRequest`, so you can drop those manual steps.
+> **Key difference:** knope workflows often include manual `git add`, `git commit`, and `git push` Command steps. monochange handles git operations internally when using `PublishRelease` or `OpenReleaseRequest`, so you can drop those manual steps.
 
 ## Step 5 — Migrate GitHub configuration
 
@@ -272,7 +272,7 @@ repo = "my-repo"
 
 ### monochange
 
-MonoChange uses a provider-neutral `[source]` table. GitHub is the default provider:
+monochange uses a provider-neutral `[source]` table. GitHub is the default provider:
 
 ```toml
 # monochange.toml
@@ -293,7 +293,7 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 ```
 
-MonoChange also supports GitLab and Gitea providers:
+monochange also supports GitLab and Gitea providers:
 
 ```toml
 [source]
@@ -305,7 +305,7 @@ host = "gitlab.example.com"
 
 ## Step 6 — Migrate changeset files
 
-MonoChange and knope both use markdown-frontmatter changesets under `.changeset/`. The format is compatible, but there are differences in how packages are referenced.
+monochange and knope both use markdown-frontmatter changesets under `.changeset/`. The format is compatible, but there are differences in how packages are referenced.
 
 ### knope changeset
 
@@ -349,7 +349,7 @@ main: minor
 
 ### Conventional commits
 
-knope can derive version bumps from conventional commit messages. MonoChange does not support conventional commits — all version changes must come from changeset files.
+knope can derive version bumps from conventional commit messages. monochange does not support conventional commits — all version changes must come from changeset files.
 
 If your knope config uses conventional commits alongside changesets:
 
@@ -405,7 +405,7 @@ versioned_files = [
 ]
 ```
 
-MonoChange does not currently support regex-based version file updates. For now, handle these with a `Command` step:
+monochange does not currently support regex-based version file updates. For now, handle these with a `Command` step:
 
 ```toml
 [[cli.release.steps]]
