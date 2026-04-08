@@ -178,7 +178,7 @@ Because the built-in step repairs the release as a coherent unit based on the st
 That means it can:
 
 - find the release record from history
-- reason about the release as MonoChange recorded it
+- reason about the release as monochange recorded it
 - coordinate provider synchronization at the same time
 - expose structured repair results to later steps
 

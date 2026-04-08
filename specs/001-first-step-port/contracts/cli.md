@@ -64,7 +64,7 @@ monochange release [--dry-run] [--format <text|json>]
 ## CLI Surface Rules
 
 - repositories may define custom top-level commands through `[cli.<command>]`
-- when `[cli.<command>]` is omitted, MonoChange synthesizes `validate`, `discover`, `change`, and `release`
+- when `[cli.<command>]` is omitted, monochange synthesizes `validate`, `discover`, `change`, and `release`
 - command-declared inputs become CLI flags
 - all configured commands implicitly support `--help` and `--dry-run`
 - `init`, `help`, and `version` remain reserved built-ins

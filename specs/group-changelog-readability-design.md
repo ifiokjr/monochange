@@ -13,13 +13,13 @@ Improve grouped changelog output so readers can immediately tell:
 
 1. which group member a note came from
 2. which members changed directly versus only synchronized to the group version
-3. what Markdown structure MonoChange should render by default for grouped releases
+3. what Markdown structure monochange should render by default for grouped releases
 
 The design should improve readability without making package-owned changelogs noisier.
 
 ## Current Behavior
 
-When a group member is the only package referenced in a changeset, MonoChange:
+When a group member is the only package referenced in a changeset, monochange:
 
 - expands that change into the grouped release plan
 - writes the member package changelog
@@ -290,7 +290,7 @@ If every member changed directly, omit the synchronized line. If no direct notes
 
 ## Proposed Markdown Shapes
 
-## Monochange format
+## monochange format
 
 ### Current
 
@@ -449,4 +449,4 @@ Recommended sequence:
 1. adopt Option C as the immediate product improvement
 2. follow with Option D if the first change reads well in tests and fixtures
 
-That sequence gives MonoChange a clear readability win quickly while keeping the initial implementation narrow and low-risk.
+That sequence gives monochange a clear readability win quickly while keeping the initial implementation narrow and low-risk.

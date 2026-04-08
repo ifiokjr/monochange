@@ -2,7 +2,7 @@
 
 <!-- {=githubAutomationOverview} -->
 
-MonoChange keeps source-provider automation layered on top of the same `PrepareRelease` result used for normal release planning.
+monochange keeps source-provider automation layered on top of the same `PrepareRelease` result used for normal release planning.
 
 That means one set of `.changeset/*.md` inputs can drive all of these commands and automation flows consistently:
 
@@ -208,14 +208,14 @@ type = "AffectedPackages"
 
 ## Release and npm publish workflows
 
-MonoChange now includes a release workflow modeled after the latest `mdt` pattern:
+monochange now includes a release workflow modeled after the latest `mdt` pattern:
 
 - `.github/workflows/release.yml` builds tagged release archives for the `monochange` binary across supported targets and uploads them to the GitHub release
 - `.github/workflows/npm-publish.yml` runs after a successful release workflow, downloads those exact release assets, repackages them into `@monochange/cli` platform packages plus the `@monochange/cli` root package, and publishes `@monochange/skill`
 
 That split keeps npm publication tied to the exact binaries shipped in the GitHub release instead of rebuilding them separately.
 
-For release repair, GitHub is also the first provider with hosted-release retarget sync support. MonoChange uses the durable release record plus tag names from that record to keep the hosted release view aligned with moved tags.
+For release repair, GitHub is also the first provider with hosted-release retarget sync support. monochange uses the durable release record plus tag names from that record to keep the hosted release view aligned with moved tags.
 
 ## GitHub Actions policy workflow
 
@@ -287,7 +287,7 @@ jobs:
 
 <!-- {=githubAutomationDogfoodNotes} -->
 
-The MonoChange repository itself can dogfood this model by:
+The monochange repository itself can dogfood this model by:
 
 - declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`

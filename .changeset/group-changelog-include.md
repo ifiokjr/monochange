@@ -22,4 +22,4 @@ include = "group-only"
 # or: include = ["cli"]
 ```
 
-Direct group-targeted changesets are always included. Member-targeted changesets still affect synchronized group versions and package changelogs, but MonoChange now filters them out of the group changelog unless the group changelog `include` policy allows them.
+Direct group-targeted changesets are always included. Member-targeted changesets still affect synchronized group versions and package changelogs, but monochange now filters them out of the group changelog unless the group changelog `include` policy allows them.

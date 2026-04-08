@@ -545,7 +545,7 @@ fn verify_cli_json_reports_failure_comment() {
 	  "required": true,
 	  "enforce": false,
 	  "summary": "changeset verification failed: attached changesets do not cover 1 changed package",
-	  "comment": "### MonoChange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `crates/core/src/lib.rs`\n\nAffected packages:\n- `core`\n\nErrors:\n- changed packages are not covered by attached changesets: core\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
+	  "comment": "### monochange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `crates/core/src/lib.rs`\n\nAffected packages:\n- `core`\n\nErrors:\n- changed packages are not covered by attached changesets: core\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
 	  "labels": [],
 	  "matchedSkipLabels": [],
 	  "changedPaths": [

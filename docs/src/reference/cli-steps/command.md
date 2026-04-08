@@ -2,23 +2,23 @@
 
 ## What it does
 
-`Command` runs an arbitrary program or shell command from a MonoChange workflow.
+`Command` runs an arbitrary program or shell command from a monochange workflow.
 
-This is the escape hatch step that lets you combine MonoChange's structured state with the rest of your toolchain.
+This is the escape hatch step that lets you combine monochange's structured state with the rest of your toolchain.
 
 ## Why use it
 
 Use `Command` when you need to:
 
-- run project-specific tooling that MonoChange does not own
+- run project-specific tooling that monochange does not own
 - upload artifacts
 - call deployment, chat, or notification tools
-- bridge MonoChange release context into custom scripts
+- bridge monochange release context into custom scripts
 - compose outputs from earlier steps into external automation
 
 The important design rule is this:
 
-> prefer a built-in step whenever MonoChange already has a first-class semantic for the work.
+> prefer a built-in step whenever monochange already has a first-class semantic for the work.
 
 Use `Command` for what is truly custom.
 
@@ -150,7 +150,7 @@ shell = true
 
 ## Why choose `Command` carefully?
 
-Because it is powerful enough to bypass MonoChange's typed guarantees.
+Because it is powerful enough to bypass monochange's typed guarantees.
 
 That is useful, but it also means:
 

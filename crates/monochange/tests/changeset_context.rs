@@ -24,7 +24,7 @@ fn release_manifest_records_git_changeset_context_and_renders_context_templates(
 	copy_directory(&fixture_root, root);
 
 	run_git(root, &["init"]);
-	run_git(root, &["config", "user.name", "MonoChange Tests"]);
+	run_git(root, &["config", "user.name", "monochange Tests"]);
 	run_git(
 		root,
 		&["config", "user.email", "monochange-tests@example.com"],
@@ -94,7 +94,7 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 	copy_directory(&fixture_root, root);
 
 	run_git(root, &["init"]);
-	run_git(root, &["config", "user.name", "MonoChange Tests"]);
+	run_git(root, &["config", "user.name", "monochange Tests"]);
 	run_git(
 		root,
 		&["config", "user.email", "monochange-tests@example.com"],

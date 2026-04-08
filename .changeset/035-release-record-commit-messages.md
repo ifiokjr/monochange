@@ -8,7 +8,7 @@ monochange_gitea: minor
 
 #### add structured release commit messages with embedded ReleaseRecord blocks
 
-MonoChange-managed release-request commits now carry a generated commit body instead of only a subject line.
+monochange-managed release-request commits now carry a generated commit body instead of only a subject line.
 
 Before, provider release-request payloads only carried a string commit message subject:
 
@@ -28,6 +28,6 @@ commit_message: CommitMessage {
 For `mc release-pr` and equivalent provider flows, the generated commit body now includes:
 
 - a compact release summary for humans
-- the reserved `## MonoChange Release Record` fenced JSON block for durable release history
+- the reserved `## monochange Release Record` fenced JSON block for durable release history
 
 This is the first step toward repairable releases built from commit history rather than repository receipt files.

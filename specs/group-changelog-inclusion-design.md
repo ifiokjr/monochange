@@ -17,7 +17,7 @@ The new design adds a group-level inclusion policy so repositories can decide wh
 
 ## Problem Statement
 
-A group in MonoChange owns a shared release identity:
+A group in monochange owns a shared release identity:
 
 - one synchronized version
 - one outward tag / release identity
@@ -66,7 +66,7 @@ include = "group-only" # or "all" or ["cli", "api"]
 
 #### Omitted `include`
 
-If `include` is omitted, MonoChange behaves as though `include = "all"`.
+If `include` is omitted, monochange behaves as though `include = "all"`.
 
 That preserves current behavior for existing repositories.
 
@@ -110,7 +110,7 @@ For a group `G`:
 
 ### Why the allowlist requires all in-group targets
 
-A single changeset body can describe multiple package targets. If one allowed member and one disallowed member share the same note body, MonoChange should not partially reinterpret the note for the group changelog. Requiring every in-group target to be allowed avoids ambiguous rendering and accidental leakage of internal details.
+A single changeset body can describe multiple package targets. If one allowed member and one disallowed member share the same note body, monochange should not partially reinterpret the note for the group changelog. Requiring every in-group target to be allowed avoids ambiguous rendering and accidental leakage of internal details.
 
 ## Examples
 
@@ -184,7 +184,7 @@ If a grouped release occurs but no notes are eligible for the group changelog af
 - the summary should still show:
   - `Changed members`
   - `Synchronized members`
-- MonoChange should render built-in fallback text explaining that no group-facing notes were recorded because member package changes are not configured for inclusion in the group changelog
+- monochange should render built-in fallback text explaining that no group-facing notes were recorded because member package changes are not configured for inclusion in the group changelog
 
 Recommended fallback shape:
 

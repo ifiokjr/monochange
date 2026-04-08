@@ -20,7 +20,7 @@ Usage:
 
 function printInstall() {
 	console.log(
-		`Install the Monochange CLI:\n  npm install -g @monochange/cli\n\nInstall the bundled skill package:\n  npm install -g @monochange/skill\n\nCopy the skill into an agent skill directory:\n  monochange-skill --copy ~/.pi/agent/skills/monochange\n\nStart the MCP server manually:\n  monochange mcp\n\nPlanned MCP config:\n{\n  \"mcpServers\": {\n    \"monochange\": {\n      \"command\": \"monochange\",\n      \"args\": [\"mcp\"]\n    }\n  }\n}`,
+		`Install the monochange CLI:\n  npm install -g @monochange/cli\n\nInstall the bundled skill package:\n  npm install -g @monochange/skill\n\nCopy the skill into an agent skill directory:\n  monochange-skill --copy ~/.pi/agent/skills/monochange\n\nStart the MCP server manually:\n  monochange mcp\n\nPlanned MCP config:\n{\n  \"mcpServers\": {\n    \"monochange\": {\n      \"command\": \"monochange\",\n      \"args\": [\"mcp\"]\n    }\n  }\n}`,
 	);
 }
 

@@ -66,7 +66,7 @@
 - [x] T071 Add a GitHub automation guide to the mdBook.
 - [x] T072 Add example `monochange.toml` snippets for changelog formats, GitHub releases, release PRs, deployments, and bot rules.
 - [x] T073 Re-run docs sync, linting, testing, coverage, and book builds.
-- [x] T074 Dogfood the new automation on the MonoChange repository itself.
+- [x] T074 Dogfood the new automation on the monochange repository itself.
 
 ## Suggested execution order
 

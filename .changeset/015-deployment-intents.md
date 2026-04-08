@@ -11,7 +11,7 @@ monochange_graph: minor
 
 > **Note:** This feature was later removed in `021-remove-deployments`. The `[[deployments]]` section and `Deploy` step are no longer available.
 
-A `Deploy` workflow step and `[[deployments]]` configuration section were introduced to surface structured deployment intents through the release manifest, allowing downstream CI to orchestrate deployments without hardcoding provider logic into MonoChange.
+A `Deploy` workflow step and `[[deployments]]` configuration section were introduced to surface structured deployment intents through the release manifest, allowing downstream CI to orchestrate deployments without hardcoding provider logic into monochange.
 
 ```toml
 [[deployments]]

@@ -4,7 +4,7 @@
 
 `OpenReleaseRequest` turns a prepared release into a hosted release request, such as a release pull request.
 
-It uses the prepared release state to build branch names, commit descriptions, and request bodies that correspond to the exact release content MonoChange prepared.
+It uses the prepared release state to build branch names, commit descriptions, and request bodies that correspond to the exact release content monochange prepared.
 
 ## Why use it
 
@@ -14,7 +14,7 @@ This is a strong fit when your release process includes:
 
 - opening or updating a release PR for human review
 - staging release artifacts on a branch before merge
-- reusing MonoChange's structured release data in the request body
+- reusing monochange's structured release data in the request body
 
 ## Inputs
 
@@ -96,7 +96,7 @@ Because `OpenReleaseRequest` already knows:
 
 - which release targets were prepared
 - which files changed
-- how MonoChange wants release requests described
+- how monochange wants release requests described
 - how dry-run should behave
 
 ## Common mistake

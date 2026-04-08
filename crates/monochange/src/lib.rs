@@ -512,7 +512,7 @@ fn build_assist_subcommand() -> Command {
 
 fn build_release_record_subcommand() -> Command {
 	Command::new("release-record")
-		.about("Inspect the MonoChange release record associated with a tag or commit")
+		.about("Inspect the monochange release record associated with a tag or commit")
 		.after_help(
 			r"Examples:
   mc release-record --from v1.2.3
@@ -520,7 +520,7 @@ fn build_release_record_subcommand() -> Command {
 
 Inspection notes:
   - Resolves the supplied ref to a commit.
-  - Walks first-parent ancestry until it finds a MonoChange release record.
+  - Walks first-parent ancestry until it finds a monochange release record.
   - Fails loudly if it encounters a malformed release record block on the path.",
 		)
 		.arg(
@@ -596,7 +596,7 @@ Planning reminders:
   mc commit-release
 
 Commit notes:
-  - Reuses the standard MonoChange release commit subject/body contract.
+  - Reuses the standard monochange release commit subject/body contract.
   - Embeds a durable release record block in the commit body.
   - Can run before OpenReleaseRequest in the same workflow.",
 		),
@@ -734,10 +734,10 @@ fn assistant_setup_payload(assistant: Assistant) -> serde_json::Value {
 		],
 		Assistant::Copilot => vec![
 			"Use this MCP snippet in Copilot or VS Code environments that support MCP-compatible server definitions.".to_string(),
-			"Keep the guidance close to workspace instructions so Copilot follows Monochange's explicit changeset and dry-run workflow.".to_string(),
+			"Keep the guidance close to workspace instructions so Copilot follows monochange's explicit changeset and dry-run workflow.".to_string(),
 		],
 		Assistant::Pi => vec![
-			"Install `@monochange/skill` and copy the bundled files into your Pi skills directory when you want reusable Monochange-specific instructions.".to_string(),
+			"Install `@monochange/skill` and copy the bundled files into your Pi skills directory when you want reusable monochange-specific instructions.".to_string(),
 			"Configure Pi to run `monochange mcp` so agents can inspect the workspace model, create changesets, and preview releases through MCP tools.".to_string(),
 		],
 	};
@@ -958,7 +958,7 @@ pub fn discover_release_record(
 			}
 			Err(error) => {
 				return Err(MonochangeError::Discovery(format!(
-					"found a malformed MonoChange release record in commit {}: {}",
+					"found a malformed monochange release record in commit {}: {}",
 					short_commit_sha(&commit),
 					error
 				)))
@@ -966,7 +966,7 @@ pub fn discover_release_record(
 		}
 	}
 	Err(MonochangeError::Discovery(format!(
-		"no MonoChange release record found in first-parent ancestry from `{from}`"
+		"no monochange release record found in first-parent ancestry from `{from}`"
 	)))
 }
 
@@ -3181,7 +3181,7 @@ fn render_changeset_verification_comment(
 	evaluation: &ChangesetPolicyEvaluation,
 ) -> String {
 	let mut lines = vec![
-		"### MonoChange changeset verification failed".to_string(),
+		"### monochange changeset verification failed".to_string(),
 		String::new(),
 		evaluation.summary.clone(),
 	];
