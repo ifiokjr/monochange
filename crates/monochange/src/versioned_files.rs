@@ -1,13 +1,13 @@
 use super::*;
 
-struct VersionedFileUpdateContext<'a> {
-	package_by_record_id: BTreeMap<&'a str, &'a PackageRecord>,
-	released_versions_by_native_name: BTreeMap<String, String>,
-	configuration: &'a monochange_core::WorkspaceConfiguration,
+pub(crate) struct VersionedFileUpdateContext<'a> {
+	pub(crate) package_by_record_id: BTreeMap<&'a str, &'a PackageRecord>,
+	pub(crate) released_versions_by_native_name: BTreeMap<String, String>,
+	pub(crate) configuration: &'a monochange_core::WorkspaceConfiguration,
 }
 
 #[derive(Debug)]
-enum CachedDocument {
+pub(crate) enum CachedDocument {
 	Toml(Value),
 	Json(serde_json::Value),
 	Yaml(serde_yaml_ng::Mapping),
@@ -16,14 +16,14 @@ enum CachedDocument {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum VersionedFileKind {
+pub(crate) enum VersionedFileKind {
 	Cargo(monochange_cargo::CargoVersionedFileKind),
 	Npm(monochange_npm::NpmVersionedFileKind),
 	Deno(monochange_deno::DenoVersionedFileKind),
 	Dart(monochange_dart::DartVersionedFileKind),
 }
 
-fn versioned_file_kind(
+pub(crate) fn versioned_file_kind(
 	ecosystem_type: monochange_core::EcosystemType,
 	path: &Path,
 ) -> Option<VersionedFileKind> {
@@ -210,7 +210,7 @@ pub(crate) fn build_versioned_file_updates(
 		.collect()
 }
 
-fn serialize_cached_document(
+pub(crate) fn serialize_cached_document(
 	path: &Path,
 	document: CachedDocument,
 ) -> MonochangeResult<FileUpdate> {
@@ -236,7 +236,7 @@ fn serialize_cached_document(
 	})
 }
 
-fn read_cached_document(
+pub(crate) fn read_cached_document(
 	updates: &mut BTreeMap<PathBuf, CachedDocument>,
 	path: &Path,
 	ecosystem_type: monochange_core::EcosystemType,
@@ -321,7 +321,7 @@ fn read_cached_document(
 	}
 }
 
-fn update_json_dependency_fields(
+pub(crate) fn update_json_dependency_fields(
 	value: &mut serde_json::Value,
 	fields: &[&str],
 	versioned_deps: &BTreeMap<String, String>,
@@ -343,7 +343,7 @@ fn update_json_dependency_fields(
 	}
 }
 
-fn resolve_versioned_prefix(
+pub(crate) fn resolve_versioned_prefix(
 	definition: &VersionedFileDefinition,
 	context: &VersionedFileUpdateContext<'_>,
 ) -> String {
@@ -369,7 +369,7 @@ fn resolve_versioned_prefix(
 	ecosystem_prefix.unwrap_or_else(|| definition.ecosystem_type.default_prefix().to_string())
 }
 
-fn apply_versioned_file_definition(
+pub(crate) fn apply_versioned_file_definition(
 	root: &Path,
 	updates: &mut BTreeMap<PathBuf, CachedDocument>,
 	definition: &VersionedFileDefinition,

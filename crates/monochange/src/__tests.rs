@@ -22,7 +22,6 @@ use monochange_test_helpers::current_test_name;
 use semver::Version;
 use tempfile::tempdir;
 
-use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
@@ -4667,7 +4666,6 @@ fn apply_versioned_file_definition_returns_early_without_matching_versions() {
 		tempdir.path(),
 		&mut updates,
 		&definition,
-		"web",
 		"2.0.0",
 		None,
 		&dep_names,
@@ -4698,7 +4696,6 @@ fn apply_versioned_file_definition_rejects_invalid_glob_patterns() {
 		tempdir.path(),
 		&mut BTreeMap::new(),
 		&definition,
-		"web",
 		"2.0.0",
 		None,
 		&dep_names,
@@ -4730,7 +4727,6 @@ fn apply_versioned_file_definition_rejects_unsupported_glob_matches() {
 		tempdir.path(),
 		&mut BTreeMap::new(),
 		&definition,
-		"core",
 		"2.0.0",
 		None,
 		&dep_names,
@@ -4765,7 +4761,6 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 		manifest_tempdir.path(),
 		&mut manifest_updates,
 		&manifest_definition,
-		"web",
 		"2.0.0",
 		None,
 		&manifest_dep_names,
@@ -4811,7 +4806,6 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 		package_lock_tempdir.path(),
 		&mut package_lock_updates,
 		&package_lock_definition,
-		"app",
 		"2.0.0",
 		None,
 		&package_lock_dep_names,
@@ -4851,7 +4845,6 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 		pnpm_tempdir.path(),
 		&mut pnpm_updates,
 		&pnpm_definition,
-		"web",
 		"2.0.0",
 		None,
 		&pnpm_dep_names,
@@ -4896,7 +4889,6 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 		bun_tempdir.path(),
 		&mut bun_updates,
 		&bun_definition,
-		"web",
 		"2.0.0",
 		None,
 		&bun_dep_names,
@@ -4936,7 +4928,6 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 		deno_manifest_tempdir.path(),
 		&mut deno_manifest_updates,
 		&deno_manifest_definition,
-		"tool",
 		"2.0.0",
 		None,
 		&deno_manifest_dep_names,
@@ -4972,7 +4963,6 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 		deno_lock_tempdir.path(),
 		&mut deno_lock_updates,
 		&deno_lock_definition,
-		"app",
 		"2.0.0",
 		None,
 		&deno_lock_dep_names,
@@ -5007,7 +4997,6 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 		dart_manifest_tempdir.path(),
 		&mut dart_manifest_updates,
 		&dart_manifest_definition,
-		"warning_app",
 		"2.0.0",
 		None,
 		&dart_manifest_dep_names,
@@ -5050,7 +5039,6 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 		dart_lock_tempdir.path(),
 		&mut dart_lock_updates,
 		&dart_lock_definition,
-		"nested_dart_app",
 		"2.0.0",
 		None,
 		&dart_lock_dep_names,
