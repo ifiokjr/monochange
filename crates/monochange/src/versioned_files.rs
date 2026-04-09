@@ -322,10 +322,20 @@ pub(crate) fn read_cached_document(
 			};
 			if kind == VersionedFileKind::Dart(monochange_dart::DartVersionedFileKind::Manifest) {
 				monochange_dart::update_manifest_text(&contents, None, &[], &BTreeMap::new())
-					.map_err(|error| MonochangeError::Config(format!("failed to parse {}: {error}", path.display())))?;
+					.map_err(|error| {
+						MonochangeError::Config(format!(
+							"failed to parse {}: {error}",
+							path.display()
+						))
+					})?;
 			} else {
 				monochange_core::update_json_manifest_text(&contents, None, &[], &BTreeMap::new())
-					.map_err(|error| MonochangeError::Config(format!("failed to parse {}: {error}", path.display())))?;
+					.map_err(|error| {
+						MonochangeError::Config(format!(
+							"failed to parse {}: {error}",
+							path.display()
+						))
+					})?;
 			}
 			Ok(CachedDocument::Text(contents))
 		}
@@ -370,6 +380,44 @@ pub(crate) fn resolve_versioned_prefix(
 	ecosystem_prefix.unwrap_or_else(|| definition.ecosystem_type.default_prefix().to_string())
 }
 
+pub(crate) fn expand_versioned_file_fields(
+	definition: &VersionedFileDefinition,
+	dep_names: &[String],
+) -> Vec<String> {
+	let field_templates = definition.fields.as_ref().map_or_else(
+		|| {
+			definition
+				.ecosystem_type
+				.default_fields()
+				.iter()
+				.map(ToString::to_string)
+				.collect::<Vec<_>>()
+		},
+		Clone::clone,
+	);
+	let mut fields = Vec::new();
+	for field_template in field_templates {
+		if field_template.contains("{{ name }}") {
+			fields.extend(
+				dep_names
+					.iter()
+					.map(|name| field_template.replace("{{ name }}", name)),
+			);
+			continue;
+		}
+		if field_template.contains("{{name}}") {
+			fields.extend(
+				dep_names
+					.iter()
+					.map(|name| field_template.replace("{{name}}", name)),
+			);
+			continue;
+		}
+		fields.push(field_template);
+	}
+	fields
+}
+
 pub(crate) fn apply_versioned_file_definition(
 	root: &Path,
 	updates: &mut BTreeMap<PathBuf, CachedDocument>,
@@ -380,10 +428,11 @@ pub(crate) fn apply_versioned_file_definition(
 	context: &VersionedFileUpdateContext<'_>,
 ) -> MonochangeResult<()> {
 	let prefix = resolve_versioned_prefix(definition, context);
-	let fields = definition.fields.as_deref().map_or_else(
-		|| definition.ecosystem_type.default_fields().to_vec(),
-		|fields| fields.iter().map(String::as_str).collect::<Vec<_>>(),
-	);
+	let expanded_fields = expand_versioned_file_fields(definition, dep_names);
+	let fields = expanded_fields
+		.iter()
+		.map(String::as_str)
+		.collect::<Vec<_>>();
 	let versioned_deps: BTreeMap<String, String> = dep_names
 		.iter()
 		.filter_map(|name| {
@@ -494,7 +543,7 @@ pub(crate) fn apply_versioned_file_definition(
 				} else if kind == monochange_npm::NpmVersionedFileKind::BunLock {
 					*contents = monochange_npm::update_bun_lock(contents, &raw_versions);
 				}
-			},
+			}
 			(CachedDocument::Json(value), VersionedFileKind::Npm(kind)) => {
 				if kind == monochange_npm::NpmVersionedFileKind::PackageLock {
 					monochange_npm::update_package_lock(
@@ -503,7 +552,7 @@ pub(crate) fn apply_versioned_file_definition(
 						&raw_versions,
 					);
 				}
-			},
+			}
 			(CachedDocument::Yaml(mapping), VersionedFileKind::Npm(kind)) => {
 				if kind == monochange_npm::NpmVersionedFileKind::PnpmLock {
 					monochange_npm::update_pnpm_lock(mapping, &raw_versions);
@@ -548,12 +597,12 @@ pub(crate) fn apply_versioned_file_definition(
 						))
 					})?;
 				}
-			},
+			}
 			(CachedDocument::Json(value), VersionedFileKind::Deno(kind)) => {
 				if kind == monochange_deno::DenoVersionedFileKind::Lock {
 					monochange_deno::update_lockfile(value, &raw_versions);
 				}
-			},
+			}
 			(CachedDocument::Text(contents), VersionedFileKind::Dart(kind)) => {
 				if kind == monochange_dart::DartVersionedFileKind::Manifest {
 					*contents = monochange_dart::update_manifest_text(
@@ -562,14 +611,19 @@ pub(crate) fn apply_versioned_file_definition(
 						&fields,
 						&versioned_deps,
 					)
-					.map_err(|error| MonochangeError::Config(format!("failed to parse {}: {error}", resolved_path.display())))?;
+					.map_err(|error| {
+						MonochangeError::Config(format!(
+							"failed to parse {}: {error}",
+							resolved_path.display()
+						))
+					})?;
 				}
-			},
+			}
 			(CachedDocument::Yaml(mapping), VersionedFileKind::Dart(kind)) => {
 				if kind == monochange_dart::DartVersionedFileKind::Lock {
 					monochange_dart::update_pubspec_lock(mapping, &raw_versions);
 				}
-			},
+			}
 			_ => {}
 		}
 		updates.insert(resolved_path, document);

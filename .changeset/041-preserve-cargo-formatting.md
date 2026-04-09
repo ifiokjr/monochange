@@ -36,6 +36,20 @@ After this change, MonoChange updates only the relevant Cargo version values in 
 - matching `[workspace.dependencies]` entries for released workspace crates
 - `Cargo.lock` package versions without reformatting the rest of the lockfile
 
+Cargo versioned-file updates also support nested field paths and `{{ name }}` expansion for workspace dependency entries. That means config like:
+
+```toml
+[package.monochange]
+path = "crates/monochange"
+versioned_files = ["Cargo.toml"]
+```
+
+continues to update the matching root `workspace.dependencies.monochange.version` entry automatically, and explicit typed entries can now target object-style fields such as:
+
+```toml
+{ path = "Cargo.toml", type = "cargo", fields = ["workspace.dependencies.{{ name }}.version"] }
+```
+
 The same release flow now preserves existing formatting for non-TOML manifests too:
 
 - `package.json`

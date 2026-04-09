@@ -612,6 +612,303 @@ fn cargo_versioned_file_helpers_cover_non_table_and_insertion_paths() {
 }
 
 #[test]
+fn update_versioned_file_supports_nested_manifest_field_paths() {
+	let manifest = r#"
+[package]
+name = "app"
+version = "1.0.0"
+
+[dependencies]
+core = { version = "1.0.0", path = "../core" }
+serde = "1.0.0"
+
+[dev-dependencies]
+core = { version = "1.0.0" }
+
+[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+core = { path = "crates/core", version = "1.0.0" }
+"#;
+	let updated = update_versioned_file_text(
+		manifest,
+		CargoVersionedFileKind::Manifest,
+		&[
+			"workspace.version",
+			"workspace.dependencies.core.version",
+			"dependencies.core.version",
+			"dev_dependencies.core.version",
+		],
+		Some("2.0.0"),
+		Some("3.0.0"),
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+		&BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("update manifest: {error}"));
+	let manifest: Value =
+		toml::from_str(&updated).unwrap_or_else(|error| panic!("manifest toml: {error}"));
+
+	assert_eq!(
+		manifest
+			.get("package")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("workspace")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("package"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("3.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("workspace")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("dependencies"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("core"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("dependencies")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("core"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("dev-dependencies")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("core"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("dependencies")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("serde"))
+			.and_then(Value::as_str),
+		Some("1.0.0")
+	);
+}
+
+#[test]
+fn update_versioned_file_version_field_paths_leave_string_entries_unchanged() {
+	let manifest = r#"
+[dependencies]
+core = "1.0.0"
+
+[workspace.dependencies]
+core = "1.0.0"
+"#;
+	let updated = update_versioned_file_text(
+		manifest,
+		CargoVersionedFileKind::Manifest,
+		&[
+			"dependencies.core.version",
+			"workspace.dependencies.core.version",
+		],
+		None,
+		None,
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+		&BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("update manifest: {error}"));
+	let manifest: Value =
+		toml::from_str(&updated).unwrap_or_else(|error| panic!("manifest toml: {error}"));
+
+	assert_eq!(
+		manifest
+			.get("dependencies")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("core"))
+			.and_then(Value::as_str),
+		Some("1.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("workspace")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("dependencies"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("core"))
+			.and_then(Value::as_str),
+		Some("1.0.0")
+	);
+}
+
+#[test]
+fn cargo_manifest_field_helpers_cover_direct_path_updates() {
+	let mut document = r#"
+[package]
+name = "app"
+version = "1.0.0"
+
+[dependencies]
+core = { version = "1.0.0" }
+
+[workspace.dependencies]
+core = { version = "1.0.0" }
+"#
+	.parse::<DocumentMut>()
+	.unwrap_or_else(|error| panic!("parse field helper document: {error}"));
+	let versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
+
+	crate::update_manifest_field(&mut document, "package.version", Some("2.0.0"), None, &versions);
+	crate::update_manifest_field(
+		&mut document,
+		"workspace.dependencies",
+		None,
+		None,
+		&versions,
+	);
+	crate::update_manifest_field(&mut document, "dependencies.core", None, None, &versions);
+	crate::update_manifest_field(
+		&mut document,
+		"dependencies.core.version",
+		None,
+		None,
+		&versions,
+	);
+	crate::update_manifest_field(
+		&mut document,
+		"workspace.dependencies.core",
+		None,
+		None,
+		&versions,
+	);
+	crate::update_manifest_field(
+		&mut document,
+		"workspace.dependencies.core.version",
+		None,
+		None,
+		&versions,
+	);
+	crate::update_manifest_field(&mut document, "unknown.field", None, None, &versions);
+
+	assert_eq!(
+		document
+			.get("package")
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("version"))
+			.and_then(Item::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		document
+			.get("dependencies")
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("core"))
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("version"))
+			.and_then(Item::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		document
+			.get("workspace")
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("dependencies"))
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("core"))
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("version"))
+			.and_then(Item::as_str),
+		Some("2.0.0")
+	);
+
+	let mut empty_document = ""
+		.parse::<DocumentMut>()
+		.unwrap_or_else(|error| panic!("parse empty document: {error}"));
+	crate::update_manifest_field(
+		&mut empty_document,
+		"dependencies.missing",
+		None,
+		None,
+		&BTreeMap::new(),
+	);
+	crate::update_manifest_field(
+		&mut empty_document,
+		"dependencies.missing.version",
+		None,
+		None,
+		&BTreeMap::new(),
+	);
+	crate::update_manifest_field(
+		&mut empty_document,
+		"workspace.dependencies.missing",
+		None,
+		None,
+		&BTreeMap::new(),
+	);
+	crate::update_manifest_field(
+		&mut empty_document,
+		"workspace.dependencies.missing.version",
+		None,
+		None,
+		&BTreeMap::new(),
+	);
+	crate::update_manifest_field(
+		&mut empty_document,
+		"dependencies.core",
+		None,
+		None,
+		&versions,
+	);
+	crate::update_manifest_field(
+		&mut empty_document,
+		"dependencies.core.version",
+		None,
+		None,
+		&versions,
+	);
+	crate::update_manifest_field(
+		&mut empty_document,
+		"workspace.dependencies.core",
+		None,
+		None,
+		&versions,
+	);
+	crate::update_manifest_field(
+		&mut empty_document,
+		"workspace.dependencies.core.version",
+		None,
+		None,
+		&versions,
+	);
+
+	assert!(crate::fields_target_workspace_dependencies(&["workspace.dependencies"]));
+	assert!(!crate::fields_target_workspace_dependencies(&["dependencies"]));
+
+	let mut helpers_document = "[dependencies]\n"
+		.parse::<DocumentMut>()
+		.unwrap_or_else(|error| panic!("parse helpers document: {error}"));
+	let helpers_table = helpers_document
+		.get_mut("dependencies")
+		.and_then(Item::as_table_like_mut)
+		.unwrap_or_else(|| panic!("expected helpers dependency table"));
+	crate::update_dependency_by_name(helpers_table, "missing", "2.0.0");
+	crate::update_dependency_version_by_name(helpers_table, "missing", "2.0.0");
+}
+
+#[test]
 fn adapter_discover_matches_direct_cargo_discovery() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/cargo/workspace");
 	let from_adapter = adapter()

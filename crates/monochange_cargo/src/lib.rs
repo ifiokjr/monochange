@@ -200,52 +200,19 @@ pub fn update_versioned_file(
 			}
 		}
 		CargoVersionedFileKind::Manifest => {
-			if let Some(owner_version) = owner_version {
-				if let Some(package_table) = document
-					.get_mut("package")
-					.and_then(Item::as_table_like_mut)
-				{
-					let uses_workspace_version = package_table
-						.get("version")
-						.is_some_and(uses_workspace_marker);
-					if !uses_workspace_version {
-						set_table_value(package_table, "version", owner_version);
-					}
-				}
-			}
+			update_manifest_owner_version(document, owner_version);
 			for field in fields {
-				if let Some(table) = document.get_mut(field).and_then(Item::as_table_like_mut) {
-					for (dep_name, dep_version) in versioned_deps {
-						let Some(entry) = table.get_mut(dep_name) else {
-							continue;
-						};
-						update_dependency_entry(entry, dep_version);
-					}
-				}
+				update_manifest_field(
+					document,
+					field,
+					owner_version,
+					shared_release_version,
+					versioned_deps,
+				);
 			}
-			if let Some(workspace_table) = document
-				.get_mut("workspace")
-				.and_then(Item::as_table_like_mut)
-			{
-				if let Some(shared) = shared_release_version {
-					if let Some(workspace_package) = workspace_table
-						.get_mut("package")
-						.and_then(Item::as_table_like_mut)
-					{
-						set_table_value(workspace_package, "version", shared);
-					}
-				}
-				if let Some(workspace_deps) = workspace_table
-					.get_mut("dependencies")
-					.and_then(Item::as_table_like_mut)
-				{
-					for (dep_name, dep_version) in versioned_deps {
-						let Some(entry) = workspace_deps.get_mut(dep_name) else {
-							continue;
-						};
-						update_dependency_entry(entry, dep_version);
-					}
-				}
+			update_manifest_workspace_version(document, shared_release_version);
+			if !fields_target_workspace_dependencies(fields) {
+				update_workspace_dependencies(document, versioned_deps);
 			}
 		}
 	}
@@ -273,11 +240,198 @@ pub fn update_versioned_file_text(
 	Ok(document.to_string())
 }
 
+fn update_manifest_owner_version(document: &mut DocumentMut, owner_version: Option<&str>) {
+	let Some(owner_version) = owner_version else {
+		return;
+	};
+	let Some(package_table) = document
+		.get_mut("package")
+		.and_then(Item::as_table_like_mut)
+	else {
+		return;
+	};
+	let uses_workspace_version = package_table
+		.get("version")
+		.is_some_and(uses_workspace_marker);
+	if !uses_workspace_version {
+		set_table_value(package_table, "version", owner_version);
+	}
+}
+
+fn update_manifest_workspace_version(
+	document: &mut DocumentMut,
+	shared_release_version: Option<&str>,
+) {
+	let Some(shared_release_version) = shared_release_version else {
+		return;
+	};
+	let Some(workspace_package) = document
+		.get_mut("workspace")
+		.and_then(Item::as_table_like_mut)
+		.and_then(|workspace| workspace.get_mut("package"))
+		.and_then(Item::as_table_like_mut)
+	else {
+		return;
+	};
+	set_table_value(workspace_package, "version", shared_release_version);
+}
+
+fn update_workspace_dependencies(
+	document: &mut DocumentMut,
+	versioned_deps: &BTreeMap<String, String>,
+) {
+	let Some(workspace_deps) = document
+		.get_mut("workspace")
+		.and_then(Item::as_table_like_mut)
+		.and_then(|workspace| workspace.get_mut("dependencies"))
+		.and_then(Item::as_table_like_mut)
+	else {
+		return;
+	};
+	for (dep_name, dep_version) in versioned_deps {
+		update_dependency_by_name(workspace_deps, dep_name, dep_version);
+	}
+}
+
+fn update_manifest_field(
+	document: &mut DocumentMut,
+	field: &str,
+	owner_version: Option<&str>,
+	shared_release_version: Option<&str>,
+	versioned_deps: &BTreeMap<String, String>,
+) {
+	let segments = normalized_manifest_field_segments(field);
+	match segments.as_slice() {
+		["package", "version"] => update_manifest_owner_version(document, owner_version),
+		["workspace", "package", "version"] => {
+			update_manifest_workspace_version(document, shared_release_version.or(owner_version));
+		}
+		[table] if is_dependency_table(table) => {
+			let Some(table) = document.get_mut(table).and_then(Item::as_table_like_mut) else {
+				return;
+			};
+			for (dep_name, dep_version) in versioned_deps {
+				update_dependency_by_name(table, dep_name, dep_version);
+			}
+		}
+		["workspace", "dependencies"] => update_workspace_dependencies(document, versioned_deps),
+		[table, dep_name] if is_dependency_table(table) => {
+			let Some(dep_version) = versioned_deps.get(*dep_name) else {
+				return;
+			};
+			let Some(table) = document.get_mut(table).and_then(Item::as_table_like_mut) else {
+				return;
+			};
+			update_dependency_by_name(table, dep_name, dep_version);
+		}
+		[table, dep_name, "version"] if is_dependency_table(table) => {
+			let Some(dep_version) = versioned_deps.get(*dep_name) else {
+				return;
+			};
+			let Some(table) = document.get_mut(table).and_then(Item::as_table_like_mut) else {
+				return;
+			};
+			update_dependency_version_by_name(table, dep_name, dep_version);
+		}
+		["workspace", "dependencies", dep_name] => {
+			let Some(dep_version) = versioned_deps.get(*dep_name) else {
+				return;
+			};
+			let Some(workspace_deps) = document
+				.get_mut("workspace")
+				.and_then(Item::as_table_like_mut)
+				.and_then(|workspace| workspace.get_mut("dependencies"))
+				.and_then(Item::as_table_like_mut)
+			else {
+				return;
+			};
+			update_dependency_by_name(workspace_deps, dep_name, dep_version);
+		}
+		["workspace", "dependencies", dep_name, "version"] => {
+			let Some(dep_version) = versioned_deps.get(*dep_name) else {
+				return;
+			};
+			let Some(workspace_deps) = document
+				.get_mut("workspace")
+				.and_then(Item::as_table_like_mut)
+				.and_then(|workspace| workspace.get_mut("dependencies"))
+				.and_then(Item::as_table_like_mut)
+			else {
+				return;
+			};
+			update_dependency_version_by_name(workspace_deps, dep_name, dep_version);
+		}
+		_ => {}
+	}
+}
+
+fn fields_target_workspace_dependencies(fields: &[&str]) -> bool {
+	fields.iter().any(|field| {
+		matches!(
+			normalized_manifest_field_segments(field).as_slice(),
+			["workspace", "dependencies"] | ["workspace", "dependencies", ..]
+		)
+	})
+}
+
+fn normalized_manifest_field_segments(field: &str) -> Vec<&str> {
+	let mut segments = field
+		.split('.')
+		.filter(|segment| !segment.is_empty())
+		.map(normalize_manifest_field_segment)
+		.collect::<Vec<_>>();
+	if matches!(segments.as_slice(), ["workspace", "version"]) {
+		segments = vec!["workspace", "package", "version"];
+	}
+	segments
+}
+
+fn normalize_manifest_field_segment(segment: &str) -> &str {
+	match segment {
+		"dev_dependencies" => "dev-dependencies",
+		"build_dependencies" => "build-dependencies",
+		_ => segment,
+	}
+}
+
+fn is_dependency_table(segment: &str) -> bool {
+	matches!(
+		segment,
+		"dependencies" | "dev-dependencies" | "build-dependencies"
+	)
+}
+
+fn update_dependency_by_name(table: &mut dyn TableLike, dep_name: &str, version: &str) {
+	let Some(entry) = table.get_mut(dep_name) else {
+		return;
+	};
+	update_dependency_entry(entry, version);
+}
+
+fn update_dependency_version_by_name(table: &mut dyn TableLike, dep_name: &str, version: &str) {
+	let Some(entry) = table.get_mut(dep_name) else {
+		return;
+	};
+	update_dependency_version_field(entry, version);
+}
+
 fn update_dependency_entry(entry: &mut Item, version: &str) {
 	if entry.is_str() {
 		set_item_string(entry, version);
 		return;
 	}
+	let Some(entry_table) = entry.as_table_like_mut() else {
+		return;
+	};
+	let uses_workspace = entry_table
+		.get("workspace")
+		.is_some_and(uses_workspace_marker);
+	if !uses_workspace {
+		set_table_value(entry_table, "version", version);
+	}
+}
+
+fn update_dependency_version_field(entry: &mut Item, version: &str) {
 	let Some(entry_table) = entry.as_table_like_mut() else {
 		return;
 	};

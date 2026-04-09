@@ -4625,11 +4625,8 @@ fn build_manifest_updates_preserve_npm_deno_and_dart_formatting() {
 		"{\n  \"name\": \"tool\",\n  \"version\": \"1.0.0\",\n  \"imports\": {\n    \"core\": \"^1.0.0\"\n  }\n}\n",
 	)
 	.unwrap_or_else(|error| panic!("write deno.json: {error}"));
-	fs::write(
-		&dart_path,
-		"name: mobile\nversion: '1.0.0' # keep quote\n",
-	)
-	.unwrap_or_else(|error| panic!("write pubspec.yaml: {error}"));
+	fs::write(&dart_path, "name: mobile\nversion: '1.0.0' # keep quote\n")
+		.unwrap_or_else(|error| panic!("write pubspec.yaml: {error}"));
 
 	let packages = vec![
 		monochange_core::PackageRecord::new(
@@ -4688,9 +4685,15 @@ fn build_manifest_updates_preserve_npm_deno_and_dart_formatting() {
 	let dart_updates = crate::build_dart_manifest_updates(&packages, &plan)
 		.unwrap_or_else(|error| panic!("dart manifest updates: {error}"));
 
-	assert_eq!(String::from_utf8_lossy(&npm_updates[0].content), "{\n    \"name\": \"web\",\n    \"version\": \"1.1.0\",\n    \"private\": false\n}\n");
+	assert_eq!(
+		String::from_utf8_lossy(&npm_updates[0].content),
+		"{\n    \"name\": \"web\",\n    \"version\": \"1.1.0\",\n    \"private\": false\n}\n"
+	);
 	assert_eq!(String::from_utf8_lossy(&deno_updates[0].content), "{\n  \"name\": \"tool\",\n  \"version\": \"1.1.0\",\n  \"imports\": {\n    \"core\": \"^1.0.0\"\n  }\n}\n");
-	assert_eq!(String::from_utf8_lossy(&dart_updates[0].content), "name: mobile\nversion: '1.1.0' # keep quote\n");
+	assert_eq!(
+		String::from_utf8_lossy(&dart_updates[0].content),
+		"name: mobile\nversion: '1.1.0' # keep quote\n"
+	);
 }
 
 #[test]
@@ -4754,21 +4757,20 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 			dart.id.clone(),
 			dart_missing.id.clone(),
 		]
-			.into_iter()
-			.map(|package_id| monochange_core::ReleaseDecision {
-				package_id,
-				trigger_type: "changeset".to_string(),
-				recommended_bump: BumpSeverity::Minor,
-				planned_version: Some(
-					Version::parse("1.1.0")
-						.unwrap_or_else(|error| panic!("planned version: {error}")),
-				),
-				group_id: None,
-				reasons: vec!["release".to_string()],
-				upstream_sources: Vec::new(),
-				warnings: Vec::new(),
-			})
-			.collect(),
+		.into_iter()
+		.map(|package_id| monochange_core::ReleaseDecision {
+			package_id,
+			trigger_type: "changeset".to_string(),
+			recommended_bump: BumpSeverity::Minor,
+			planned_version: Some(
+				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
+			),
+			group_id: None,
+			reasons: vec!["release".to_string()],
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		})
+		.collect(),
 		groups: Vec::new(),
 		warnings: Vec::new(),
 		unresolved_items: Vec::new(),
@@ -4777,17 +4779,21 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 	let npm_error = crate::build_npm_manifest_updates(std::slice::from_ref(&npm), &plan)
 		.err()
 		.unwrap_or_else(|| panic!("expected npm parse error"));
-	assert!(npm_error.to_string().contains("failed to parse"), "error: {npm_error}");
+	assert!(
+		npm_error.to_string().contains("failed to parse"),
+		"error: {npm_error}"
+	);
 	let deno_error = crate::build_deno_manifest_updates(std::slice::from_ref(&deno_missing), &plan)
 		.err()
 		.unwrap_or_else(|| panic!("expected deno io error"));
-	assert!(deno_error.to_string().contains("failed to read"), "error: {deno_error}");
-	let deno_parse_error = crate::build_deno_manifest_updates(
-		std::slice::from_ref(&deno_invalid),
-		&plan,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected deno parse error"));
+	assert!(
+		deno_error.to_string().contains("failed to read"),
+		"error: {deno_error}"
+	);
+	let deno_parse_error =
+		crate::build_deno_manifest_updates(std::slice::from_ref(&deno_invalid), &plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected deno parse error"));
 	assert!(
 		deno_parse_error.to_string().contains("failed to parse"),
 		"error: {deno_parse_error}"
@@ -4795,10 +4801,14 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 	let dart_error = crate::build_dart_manifest_updates(std::slice::from_ref(&dart), &plan)
 		.err()
 		.unwrap_or_else(|| panic!("expected dart parse error"));
-	assert!(dart_error.to_string().contains("failed to parse"), "error: {dart_error}");
-	let dart_read_error = crate::build_dart_manifest_updates(std::slice::from_ref(&dart_missing), &plan)
-		.err()
-		.unwrap_or_else(|| panic!("expected dart read error"));
+	assert!(
+		dart_error.to_string().contains("failed to parse"),
+		"error: {dart_error}"
+	);
+	let dart_read_error =
+		crate::build_dart_manifest_updates(std::slice::from_ref(&dart_missing), &plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected dart read error"));
 	assert!(
 		dart_read_error.to_string().contains("failed to read"),
 		"error: {dart_read_error}"
@@ -4878,8 +4888,7 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 			trigger_type: "changeset".to_string(),
 			recommended_bump: BumpSeverity::Minor,
 			planned_version: Some(
-				Version::parse("1.1.0")
-					.unwrap_or_else(|error| panic!("planned version: {error}")),
+				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
 			),
 			group_id: None,
 			reasons: vec!["release".to_string()],
@@ -4892,22 +4901,18 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 		unresolved_items: Vec::new(),
 		compatibility_evidence: Vec::new(),
 	};
-	let cargo_read_error = crate::build_cargo_manifest_updates(
-		std::slice::from_ref(&cargo_missing),
-		&cargo_plan,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected cargo read error"));
+	let cargo_read_error =
+		crate::build_cargo_manifest_updates(std::slice::from_ref(&cargo_missing), &cargo_plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected cargo read error"));
 	assert!(
 		cargo_read_error.to_string().contains("failed to read"),
 		"error: {cargo_read_error}"
 	);
-	let cargo_parse_error = crate::build_cargo_manifest_updates(
-		std::slice::from_ref(&cargo_invalid),
-		&cargo_plan,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected cargo parse error"));
+	let cargo_parse_error =
+		crate::build_cargo_manifest_updates(std::slice::from_ref(&cargo_invalid), &cargo_plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected cargo parse error"));
 	assert!(
 		cargo_parse_error.to_string().contains("failed to parse"),
 		"error: {cargo_parse_error}"
@@ -4945,9 +4950,32 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 		unresolved_items: Vec::new(),
 		compatibility_evidence: Vec::new(),
 	};
-	assert!(crate::build_deno_manifest_updates(&[deno_missing], &unreleased_plan)
-		.unwrap_or_else(|error| panic!("unreleased deno updates: {error}"))
-		.is_empty());
+	assert!(
+		crate::build_deno_manifest_updates(&[deno_missing], &unreleased_plan)
+			.unwrap_or_else(|error| panic!("unreleased deno updates: {error}"))
+			.is_empty()
+	);
+}
+
+#[test]
+fn expand_versioned_file_fields_supports_name_templates_and_passthrough_fields() {
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "Cargo.toml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		prefix: None,
+		fields: Some(vec![
+			"workspace.dependencies.{{name}}.version".to_string(),
+			"workspace.version".to_string(),
+		]),
+		name: None,
+	};
+	assert_eq!(
+		crate::versioned_files::expand_versioned_file_fields(&definition, &["core".to_string()]),
+		vec![
+			"workspace.dependencies.core.version".to_string(),
+			"workspace.version".to_string(),
+		]
+	);
 }
 
 #[test]
@@ -4957,7 +4985,11 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 		("Cargo.toml", monochange_core::EcosystemType::Cargo, "{"),
 		("package.json", monochange_core::EcosystemType::Npm, "{"),
 		("deno.json", monochange_core::EcosystemType::Deno, "{"),
-		("pubspec.yaml", monochange_core::EcosystemType::Dart, ": bad"),
+		(
+			"pubspec.yaml",
+			monochange_core::EcosystemType::Dart,
+			": bad",
+		),
 	] {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let path = tempdir.path().join(file_name);
@@ -4985,7 +5017,10 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 		)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error for {file_name}"));
-		assert!(error.to_string().contains("failed to parse"), "error: {error}");
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
 	}
 
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -5015,7 +5050,38 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected cached cargo parse error"));
-	assert!(error.to_string().contains("failed to parse"), "error: {error}");
+	assert!(
+		error.to_string().contains("failed to parse"),
+		"error: {error}"
+	);
+
+	let cached_dart_tempdir = tempfile::tempdir()
+		.unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = cached_dart_tempdir.path().join("pubspec.yaml");
+	fs::write(&path, "name: app\nversion: 1.0.0\n")
+		.unwrap_or_else(|error| panic!("write cached dart manifest path: {error}"));
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "pubspec.yaml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Dart,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		cached_dart_tempdir.path(),
+		&mut BTreeMap::from([(path, crate::CachedDocument::Text(": bad".to_string()))]),
+		&definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cached dart parse error"));
+	assert!(
+		error.to_string().contains("failed to parse"),
+		"error: {error}"
+	);
 }
 
 #[test]
@@ -5023,7 +5089,11 @@ fn read_cached_document_reports_parse_errors_for_manifest_text_updaters() {
 	for (file_name, ecosystem, contents) in [
 		("package.json", monochange_core::EcosystemType::Npm, "["),
 		("deno.json", monochange_core::EcosystemType::Deno, "["),
-		("pubspec.yaml", monochange_core::EcosystemType::Dart, ": bad"),
+		(
+			"pubspec.yaml",
+			monochange_core::EcosystemType::Dart,
+			": bad",
+		),
 	] {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let path = tempdir.path().join(file_name);
@@ -5031,7 +5101,10 @@ fn read_cached_document_reports_parse_errors_for_manifest_text_updaters() {
 		let error = crate::read_cached_document(&mut BTreeMap::new(), &path, ecosystem)
 			.err()
 			.unwrap_or_else(|| panic!("expected parse error for {}", path.display()));
-		assert!(error.to_string().contains("failed to parse"), "error: {error}");
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
 	}
 }
 
@@ -5090,7 +5163,10 @@ fn read_cached_document_rejects_invalid_utf8_manifest_text_formats() {
 		let error = crate::read_cached_document(&mut BTreeMap::new(), &path, ecosystem)
 			.err()
 			.unwrap_or_else(|| panic!("expected utf8 error for {}", path.display()));
-		assert!(error.to_string().contains("failed to parse"), "error: {error}");
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
 		assert!(error.to_string().contains("as text"), "error: {error}");
 	}
 }
@@ -5162,27 +5238,134 @@ fn apply_versioned_file_definition_rejects_unsupported_glob_matches() {
 		BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
 		&[],
 	);
+	let dep_names = vec!["core".to_string()];
+	for ecosystem_type in [
+		monochange_core::EcosystemType::Cargo,
+		monochange_core::EcosystemType::Npm,
+		monochange_core::EcosystemType::Deno,
+	] {
+		let definition = monochange_core::VersionedFileDefinition {
+			path: "*.txt".to_string(),
+			ecosystem_type,
+			prefix: None,
+			fields: None,
+			name: None,
+		};
+		let error = crate::apply_versioned_file_definition(
+			tempdir.path(),
+			&mut BTreeMap::new(),
+			&definition,
+			"2.0.0",
+			None,
+			&dep_names,
+			&context,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported match error"));
+		assert!(error.to_string().contains("matched unsupported file"));
+		assert!(error.to_string().contains("root.txt"), "error: {error}");
+	}
+}
+
+#[test]
+fn apply_versioned_file_definition_updates_cargo_workspace_dependencies_from_shorthand() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("Cargo.toml"),
+		r#"[workspace.dependencies]
+monochange = { path = "crates/monochange", version = "1.0.0" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write root cargo manifest: {error}"));
+	let configuration = versioned_test_configuration();
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("monochange".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
 	let definition = monochange_core::VersionedFileDefinition {
-		path: "*.txt".to_string(),
+		path: "Cargo.toml".to_string(),
 		ecosystem_type: monochange_core::EcosystemType::Cargo,
 		prefix: None,
 		fields: None,
 		name: None,
 	};
-	let dep_names = vec!["core".to_string()];
-	let error = crate::apply_versioned_file_definition(
+	let mut updates = BTreeMap::new();
+	crate::apply_versioned_file_definition(
 		tempdir.path(),
-		&mut BTreeMap::new(),
+		&mut updates,
 		&definition,
 		"2.0.0",
 		None,
-		&dep_names,
+		&["monochange".to_string()],
 		&context,
 	)
-	.err()
-	.unwrap_or_else(|| panic!("expected unsupported match error"));
-	assert!(error.to_string().contains("matched unsupported file"));
-	assert!(error.to_string().contains("root.txt"), "error: {error}");
+	.unwrap_or_else(|error| panic!("cargo shorthand update: {error}"));
+	let document = updates
+		.remove(&tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|| panic!("expected cargo manifest update"));
+	assert!(matches!(
+		document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("monochange = { path = \"crates/monochange\", version = \"2.0.0\" }")
+	));
+}
+
+#[test]
+fn apply_versioned_file_definition_expands_cargo_name_templates_in_fields() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("Cargo.toml"),
+		r#"[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+core = { path = "crates/core", version = "1.0.0" }
+extra = { path = "crates/extra", version = "1.0.0" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write root cargo manifest: {error}"));
+	let configuration = versioned_test_configuration();
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([
+			("core".to_string(), "2.0.0".to_string()),
+			("extra".to_string(), "3.0.0".to_string()),
+		]),
+		&[],
+	);
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "Cargo.toml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		prefix: None,
+		fields: Some(vec![
+			"workspace.version".to_string(),
+			"workspace.dependencies.{{ name }}.version".to_string(),
+		]),
+		name: None,
+	};
+	let mut updates = BTreeMap::new();
+	let shared_version = "4.0.0".to_string();
+	crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&definition,
+		"2.0.0",
+		Some(&shared_version),
+		&["core".to_string(), "extra".to_string()],
+		&context,
+	)
+	.unwrap_or_else(|error| panic!("cargo field template update: {error}"));
+	let document = updates
+		.remove(&tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|| panic!("expected cargo manifest update"));
+	assert!(matches!(
+		document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("[workspace.package]\nversion = \"4.0.0\"")
+				&& contents.contains("core = { path = \"crates/core\", version = \"2.0.0\" }")
+				&& contents.contains("extra = { path = \"crates/extra\", version = \"3.0.0\" }")
+	));
 }
 
 #[test]
