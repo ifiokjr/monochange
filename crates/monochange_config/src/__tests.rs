@@ -14,6 +14,11 @@ use monochange_core::ShellConfig;
 use semver::Version;
 use tempfile::tempdir;
 
+#[allow(dead_code)]
+#[path = "../../../testing/test_support/fs.rs"]
+mod shared_fs_test_support;
+use shared_fs_test_support::fixture_path;
+
 use crate::apply_version_groups;
 use crate::load_change_signals;
 use crate::load_changeset_file;
@@ -1903,12 +1908,6 @@ fn load_workspace_configuration_accepts_detailed_changelog_enabled_with_no_path_
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert!(!configuration.packages.is_empty());
-}
-
-fn fixture_path(relative: &str) -> PathBuf {
-	Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests")
-		.join(relative)
 }
 
 fn package_definition(id: &str, path: &str) -> monochange_core::PackageDefinition {
