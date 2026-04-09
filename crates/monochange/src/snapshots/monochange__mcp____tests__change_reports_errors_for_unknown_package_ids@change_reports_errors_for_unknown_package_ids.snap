@@ -1,0 +1,11 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "change",
+  "error": "config error: change package reference `missing` did not match any discovered package",
+  "ok": false,
+  "root": "[ROOT]
+  "summary": "config error: change package reference `missing` did not match any discovered package"
+}

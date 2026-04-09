@@ -1,0 +1,32 @@
+---
+source: crates/monochange/tests/affected.rs
+expression: json
+---
+{
+  "affectedPackageIds": [
+    "core"
+  ],
+  "changedPaths": [
+    ".changeset/feature.md",
+    "crates/core/src/lib.rs"
+  ],
+  "changesetPaths": [
+    ".changeset/feature.md"
+  ],
+  "comment": null,
+  "coveredPackageIds": [
+    "core"
+  ],
+  "enforce": false,
+  "errors": [],
+  "ignoredPaths": [],
+  "labels": [],
+  "matchedPaths": [
+    "crates/core/src/lib.rs"
+  ],
+  "matchedSkipLabels": [],
+  "required": true,
+  "status": "passed",
+  "summary": "changeset verification passed: attached changesets cover 1 changed package",
+  "uncoveredPackageIds": []
+}

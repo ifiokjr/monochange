@@ -1,0 +1,74 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "discover",
+  "ok": true,
+  "report": {
+    "dependencies": [
+      {
+        "dependency_kind": "runtime",
+        "from_package_id": "cargo:crates/app/Cargo.toml",
+        "is_direct": true,
+        "is_optional": false,
+        "source_kind": "manifest",
+        "to_package_id": "cargo:crates/core/Cargo.toml",
+        "version_constraint": null
+      }
+    ],
+    "packages": [
+      {
+        "current_version": "1.0.0",
+        "declared_dependencies": [
+          {
+            "kind": "runtime",
+            "name": "workflow-core",
+            "optional": false,
+            "version_constraint": null
+          }
+        ],
+        "ecosystem": "cargo",
+        "id": "cargo:crates/app/Cargo.toml",
+        "manifest_path": "[ROOT]/crates/app/Cargo.toml",
+        "metadata": {
+          "config_id": "app",
+          "uses_workspace_version": "true"
+        },
+        "name": "workflow-app",
+        "publish_state": "public",
+        "version_group_id": "sdk",
+        "workspace_root": "[ROOT]
+      },
+      {
+        "current_version": "1.0.0",
+        "declared_dependencies": [],
+        "ecosystem": "cargo",
+        "id": "cargo:crates/core/Cargo.toml",
+        "manifest_path": "[ROOT]/crates/core/Cargo.toml",
+        "metadata": {
+          "config_id": "core",
+          "uses_workspace_version": "true"
+        },
+        "name": "workflow-core",
+        "publish_state": "public",
+        "version_group_id": "sdk",
+        "workspace_root": "[ROOT]
+      }
+    ],
+    "version_groups": [
+      {
+        "display_name": "sdk",
+        "group_id": "sdk",
+        "members": [
+          "cargo:crates/core/Cargo.toml",
+          "cargo:crates/app/Cargo.toml"
+        ],
+        "mismatch_detected": false
+      }
+    ],
+    "warnings": [],
+    "workspace_root": "[ROOT]
+  },
+  "summary": "Discovered 2 package(s) and 1 dependency edge(s)."
+}

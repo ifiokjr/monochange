@@ -1,0 +1,129 @@
+---
+source: crates/monochange/tests/cli_step_input_overrides.rs
+expression: json
+---
+{
+  "issueComments": [],
+  "manifest": {
+    "changedFiles": [
+      "Cargo.toml",
+      "crates/core/CHANGELOG.md",
+      "crates/core/Cargo.toml"
+    ],
+    "changelogs": [
+      {
+        "format": "monochange",
+        "notes": {
+          "sections": [
+            {
+              "entries": [
+                "- add github fixture coverage"
+              ],
+              "title": "Features"
+            }
+          ],
+          "summary": [],
+          "title": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])"
+        },
+        "ownerId": "core",
+        "ownerKind": "package",
+        "path": "crates/core/CHANGELOG.md",
+        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Features\n\n- add github fixture coverage"
+      }
+    ],
+    "changesets": [
+      {
+        "context": {
+          "capabilities": {
+            "actorProfiles": true,
+            "commitWebUrls": true,
+            "issueComments": true,
+            "relatedIssues": true,
+            "reviewRequestLookup": true
+          },
+          "host": "github.com",
+          "introduced": null,
+          "lastUpdated": null,
+          "provider": "git_hub",
+          "relatedIssues": []
+        },
+        "details": null,
+        "path": ".changeset/feature.md",
+        "summary": "add github fixture coverage",
+        "targets": [
+          {
+            "bump": "minor",
+            "changeType": null,
+            "evidenceRefs": [],
+            "id": "core",
+            "kind": "package",
+            "origin": "direct-change"
+          }
+        ]
+      }
+    ],
+    "command": "publish-release",
+    "deletedChangesets": [],
+    "dryRun": true,
+    "groupVersion": null,
+    "plan": {
+      "compatibilityEvidence": [],
+      "decisions": [
+        {
+          "bump": "minor",
+          "package": "cargo:crates/core/Cargo.toml",
+          "plannedVersion": "1.1.0",
+          "reasons": [
+            "add github fixture coverage"
+          ],
+          "trigger": "direct-change",
+          "upstreamSources": [
+            "cargo:crates/core/Cargo.toml"
+          ]
+        }
+      ],
+      "groups": [],
+      "unresolvedItems": [],
+      "warnings": [],
+      "workspaceRoot": "."
+    },
+    "releaseTargets": [
+      {
+        "id": "core",
+        "kind": "package",
+        "members": [
+          "core"
+        ],
+        "release": true,
+        "renderedChangelogTitle": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])",
+        "renderedTitle": "core 1.1.0 ([DATE])",
+        "tag": true,
+        "tagName": "core/v1.1.0",
+        "version": "1.1.0",
+        "versionFormat": "namespaced"
+      }
+    ],
+    "releasedPackages": [
+      "workflow-core"
+    ],
+    "version": "1.1.0"
+  },
+  "releaseCommit": null,
+  "releaseRequest": null,
+  "releases": [
+    {
+      "body": null,
+      "draft": false,
+      "generateReleaseNotes": true,
+      "name": "core 1.1.0 ([DATE])",
+      "owner": "ifiokjr",
+      "prerelease": false,
+      "provider": "github",
+      "repo": "monochange",
+      "repository": "ifiokjr/monochange",
+      "tagName": "core/v1.1.0",
+      "targetId": "core",
+      "targetKind": "package"
+    }
+  ]
+}

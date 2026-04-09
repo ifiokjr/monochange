@@ -1,0 +1,11 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "change",
+  "ok": true,
+  "path": "[ROOT]/.changeset/core.md",
+  "root": "[ROOT]
+  "summary": "Wrote change file [ROOT]/.changeset/core.md"
+}

@@ -1,0 +1,10 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "validate",
+  "ok": true,
+  "root": "[ROOT]
+  "summary": "workspace validation passed"
+}
