@@ -1,0 +1,7 @@
+{
+  "name": "object-web",
+  "version": "1.0.0",
+  "dependencies": {
+    "object-private": "^1.0.0"
+  }
+}

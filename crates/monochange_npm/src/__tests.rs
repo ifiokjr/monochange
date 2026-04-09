@@ -127,6 +127,28 @@ fn discover_lockfiles_prefers_workspace_root_then_manifest_directory() {
 }
 
 #[test]
+fn discover_lockfiles_falls_back_to_manifest_directory() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/manifest-lockfile-workspace");
+	let package = PackageRecord::new(
+		Ecosystem::Npm,
+		"nested-web",
+		fixture_root.join("packages/web/package.json"),
+		fixture_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let lockfiles = discover_lockfiles(&package);
+	assert_eq!(lockfiles.len(), 1);
+	assert_eq!(
+		lockfiles.first(),
+		Some(&monochange_core::normalize_path(
+			&fixture_root.join("packages/web/package-lock.json")
+		))
+	);
+}
+
+#[test]
 fn update_json_dependency_fields_only_changes_declared_dependencies() {
 	let mut manifest = json!({
 		"dependencies": {
@@ -265,4 +287,87 @@ fn update_bun_lock_binary_rewrites_all_occurrences() {
 	);
 	let rendered = String::from_utf8(updated).unwrap_or_else(|error| panic!("utf8: {error}"));
 	assert_eq!(rendered.matches("2.1.0").count(), 2);
+}
+
+#[test]
+fn adapter_discover_matches_direct_npm_discovery() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/npm/workspace");
+	let from_adapter = adapter()
+		.discover(&fixture_root)
+		.unwrap_or_else(|error| panic!("adapter discovery: {error}"));
+	let direct = discover_npm_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("direct discovery: {error}"));
+	assert_eq!(from_adapter.packages, direct.packages);
+	assert_eq!(from_adapter.warnings, direct.warnings);
+}
+
+#[test]
+fn discovers_object_style_package_json_workspaces_and_warnings() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/workspace-object-patterns");
+	let discovery = discover_npm_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("npm discovery: {error}"));
+	assert_eq!(discovery.packages.len(), 3);
+	assert!(discovery
+		.warnings
+		.iter()
+		.any(|warning| warning.contains("missing/*") && warning.contains("matched no packages")));
+	assert!(discovery
+		.packages
+		.iter()
+		.any(|package| package.name == "root-workspace"));
+	let private_package = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "object-private")
+		.unwrap_or_else(|| panic!("expected object-private package"));
+	assert_eq!(private_package.publish_state, PublishState::Private);
+	let web_package = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "object-web")
+		.unwrap_or_else(|| panic!("expected object-web package"));
+	assert_eq!(
+		web_package.metadata.get("manager").map(String::as_str),
+		Some("npm")
+	);
+}
+
+#[test]
+fn discover_standalone_package_defaults_manager_to_npm() {
+	let fixture_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tests/npm/standalone-package");
+	let discovery = discover_npm_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("npm discovery: {error}"));
+	assert_eq!(discovery.warnings, Vec::<String>::new());
+	assert_eq!(discovery.packages.len(), 1);
+	let package = discovery
+		.packages
+		.first()
+		.unwrap_or_else(|| panic!("expected standalone package"));
+	assert_eq!(package.name, "standalone-app");
+	assert_eq!(package.metadata.get("manager").map(String::as_str), Some("npm"));
+}
+
+#[test]
+fn update_json_dependency_fields_ignores_missing_or_non_object_sections() {
+	let mut manifest = json!({
+		"dependencies": "not-an-object",
+		"scripts": {
+			"build": "vite build"
+		}
+	});
+	let versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
+
+	update_json_dependency_fields(
+		&mut manifest,
+		&["dependencies", "devDependencies"],
+		&versions,
+	);
+
+	assert_eq!(manifest.get("dependencies"), Some(&json!("not-an-object")));
+	assert_eq!(
+		manifest.get("scripts"),
+		Some(&json!({"build": "vite build"}))
+	);
 }
