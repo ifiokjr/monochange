@@ -153,7 +153,10 @@ pub(crate) fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 	)
 }
 
-fn run_git_process(mut command: ProcessCommand, error_message: &str) -> MonochangeResult<()> {
+pub(crate) fn run_git_process(
+	mut command: ProcessCommand,
+	error_message: &str,
+) -> MonochangeResult<()> {
 	let output = command
 		.output()
 		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;

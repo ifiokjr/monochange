@@ -405,17 +405,22 @@ mod __tests {
 	use super::SelectableTarget;
 	use super::TargetKind;
 
-	#[allow(dead_code)]
-	mod shared_fs_test_support {
-		include!(concat!(
-			env!("CARGO_MANIFEST_DIR"),
-			"/../../testing/test_support/fs.rs"
-		));
+	use monochange_test_helpers::current_test_name;
+
+	fn fixture_path(relative: &str) -> std::path::PathBuf {
+		monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
 	}
-	use shared_fs_test_support::current_test_name;
-	use shared_fs_test_support::fixture_path;
-	use shared_fs_test_support::setup_fixture;
-	use shared_fs_test_support::setup_scenario_workspace;
+
+	fn setup_fixture(relative: &str) -> tempfile::TempDir {
+		monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
+	}
+
+	fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
+		monochange_test_helpers::fs::setup_scenario_workspace_from(
+			env!("CARGO_MANIFEST_DIR"),
+			relative,
+		)
+	}
 
 	fn package_target(configured_types: Vec<String>) -> SelectableTarget {
 		SelectableTarget {

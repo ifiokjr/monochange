@@ -4,25 +4,27 @@ use std::process::Command;
 use insta_cmd::get_cargo_bin;
 use serde_json::{Map, Value};
 
-#[allow(dead_code)]
-#[path = "../../../testing/test_support/fs.rs"]
-mod shared_fs_test_support;
-#[allow(dead_code)]
-#[path = "../../../testing/test_support/insta.rs"]
-mod shared_insta_test_support;
+#[allow(unused_imports)]
+pub use monochange_test_helpers::copy_directory;
+#[allow(unused_imports)]
+pub use monochange_test_helpers::current_test_name;
+#[allow(unused_imports)]
+pub use monochange_test_helpers::snapshot_settings;
 
-#[allow(unused_imports)]
-pub use shared_fs_test_support::copy_directory;
-#[allow(unused_imports)]
-pub use shared_fs_test_support::current_test_name;
-#[allow(unused_imports)]
-pub use shared_fs_test_support::fixture_path;
-#[allow(unused_imports)]
-pub use shared_fs_test_support::setup_fixture;
-#[allow(unused_imports)]
-pub use shared_fs_test_support::setup_scenario_workspace;
-#[allow(unused_imports)]
-pub use shared_insta_test_support::snapshot_settings;
+#[allow(dead_code)]
+pub fn fixture_path(relative: &str) -> std::path::PathBuf {
+	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+#[allow(dead_code)]
+pub fn setup_fixture(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+#[allow(dead_code)]
+pub fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_scenario_workspace_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
 
 #[allow(dead_code)]
 pub fn monochange_command(release_date: Option<&str>) -> Command {
@@ -75,8 +77,8 @@ mod tests {
 	use super::copy_directory;
 	use super::current_test_name;
 	use super::fixture_path;
+	use super::setup_fixture;
 	use super::setup_scenario_workspace;
-	use super::shared_fs_test_support::setup_fixture;
 
 	#[test]
 	fn current_test_name_returns_plain_function_name() {
