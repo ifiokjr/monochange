@@ -1,21 +1,13 @@
 use std::fs;
-use std::process::Command;
-
-#[cfg(unix)]
 use std::path::Path;
 
-use insta_cmd::get_cargo_bin;
 use serde_json::Value;
-use tempfile::tempdir;
 
 mod test_support;
-use test_support::{copy_directory, fixture_path};
+use test_support::{monochange_command, setup_scenario_workspace};
 
-fn cli() -> Command {
-	let mut command = Command::new(get_cargo_bin("mc"));
-	command.env("NO_COLOR", "1");
-	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
-	command
+fn cli() -> std::process::Command {
+	monochange_command(Some("2026-04-06"))
 }
 
 #[cfg(unix)]
@@ -80,10 +72,10 @@ sys.stdout.buffer.write(transcript)
 sys.exit(proc.returncode)
 ";
 
-	Command::new("python3")
+	std::process::Command::new("python3")
 		.arg("-c")
 		.arg(SCRIPT)
-		.env("MC_BIN", get_cargo_bin("mc"))
+		.env("MC_BIN", insta_cmd::get_cargo_bin("mc"))
 		.env("MC_WORKSPACE", workspace)
 		.env("MC_OUTPUT", output_path)
 		.output()
@@ -92,11 +84,7 @@ sys.exit(proc.returncode)
 
 #[test]
 fn change_cli_writes_scalar_type_shorthand_when_no_default_bump_is_configured() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_directory(
-		&fixture_path("changeset-target-metadata/cli-type-only-change"),
-		tempdir.path(),
-	);
+	let tempdir = setup_scenario_workspace("changeset-target-metadata/cli-type-only-change");
 	let output_path = tempdir.path().join(".changeset/core-docs.md");
 
 	let output = cli()
@@ -125,11 +113,7 @@ fn change_cli_writes_scalar_type_shorthand_when_no_default_bump_is_configured() 
 
 #[test]
 fn change_cli_rejects_unknown_change_type_for_configured_target() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_directory(
-		&fixture_path("changeset-target-metadata/cli-type-only-change"),
-		tempdir.path(),
-	);
+	let tempdir = setup_scenario_workspace("changeset-target-metadata/cli-type-only-change");
 
 	let output = cli()
 		.current_dir(tempdir.path())
@@ -150,11 +134,7 @@ fn change_cli_rejects_unknown_change_type_for_configured_target() {
 
 #[test]
 fn validate_accepts_scalar_type_shorthand_changesets() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_directory(
-		&fixture_path("changeset-target-metadata/release-workspace"),
-		tempdir.path(),
-	);
+	let tempdir = setup_scenario_workspace("changeset-target-metadata/release-workspace");
 
 	let output = cli()
 		.current_dir(tempdir.path())
@@ -171,11 +151,7 @@ fn validate_accepts_scalar_type_shorthand_changesets() {
 
 #[test]
 fn release_dry_run_json_supports_scalar_type_default_bumps() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_directory(
-		&fixture_path("changeset-target-metadata/release-workspace"),
-		tempdir.path(),
-	);
+	let tempdir = setup_scenario_workspace("changeset-target-metadata/release-workspace");
 
 	let output = cli()
 		.current_dir(tempdir.path())
@@ -213,11 +189,7 @@ fn release_dry_run_json_supports_scalar_type_default_bumps() {
 #[cfg(unix)]
 #[test]
 fn interactive_change_cli_writes_selected_bump() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_directory(
-		&fixture_path("changeset-target-metadata/render-workspace"),
-		tempdir.path(),
-	);
+	let tempdir = setup_scenario_workspace("changeset-target-metadata/render-workspace");
 	let output_path = tempdir.path().join("interactive.md");
 
 	let output = run_interactive_change_cli(tempdir.path(), &output_path);
@@ -235,12 +207,18 @@ fn interactive_change_cli_writes_selected_bump() {
 
 #[test]
 fn release_rejects_legacy_reserved_metadata_blocks() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_directory(&fixture_path("monochange/release-base"), tempdir.path());
-	copy_directory(
-		&fixture_path("monochange/release-with-compat-evidence"),
-		tempdir.path(),
-	);
+	let tempdir = setup_scenario_workspace("monochange/release-base");
+	fs::copy(
+		tempdir.path().join(".changeset/feature.md"),
+		tempdir.path().join(".changeset/base.md"),
+	)
+	.unwrap_or_else(|error| panic!("preserve base changeset: {error}"));
+	fs::copy(
+		Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests/monochange/release-with-compat-evidence/.changeset/feature.md"),
+		tempdir.path().join(".changeset/feature.md"),
+	)
+	.unwrap_or_else(|error| panic!("seed legacy-style changeset: {error}"));
 
 	let output = cli()
 		.current_dir(tempdir.path())
