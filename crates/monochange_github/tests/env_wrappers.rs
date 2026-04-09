@@ -62,7 +62,7 @@ fn publish_release_requests_reads_github_env_configuration() {
 	create_release.assert();
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 	let server = MockServer::start();
 	let list_pull_requests = server.mock(|when, then| {

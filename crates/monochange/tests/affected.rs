@@ -233,7 +233,7 @@ fn affected_with_verify_flag_exits_zero_when_covered() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn affected_since_flag_detects_changes_from_git_revision() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -254,7 +254,7 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 		.is_some_and(|ids| ids.iter().any(|id| id == "core")));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn affected_since_flag_detects_changeset_added_after_revision() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -277,7 +277,7 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();

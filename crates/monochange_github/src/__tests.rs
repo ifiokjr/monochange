@@ -1,4 +1,3 @@
-use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -878,7 +877,7 @@ fn publish_release_pull_request_reports_auto_merge_payload_errors() {
 		.contains("auto merge returned no pull request payload"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_helpers_prepare_commit_and_push_release_branch() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let bare = tempdir.path().join("origin.git");
@@ -930,12 +929,8 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	assert!(commit_body.contains("<!-- monochange:release-record:start -->"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_reports_io_and_non_noop_failures() {
-	if env::var_os("PRE_COMMIT").is_some() {
-		return;
-	}
-
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
 	let io_error = git_commit_paths(
@@ -980,7 +975,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 		.contains("failed to commit release pull request changes"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path().join("repo");

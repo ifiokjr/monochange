@@ -45,6 +45,7 @@ toml = { workspace = true, default-features = true }
 typed-builder = { workspace = true, default-features = true }
 
 [dev-dependencies]
+etest = { workspace = true, default-features = true }
 httpmock = { workspace = true, default-features = true }
 insta = { workspace = true, default-features = true }
 insta-cmd = { workspace = true, default-features = true }
