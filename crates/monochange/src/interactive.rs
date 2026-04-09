@@ -407,7 +407,10 @@ mod __tests {
 
 	#[allow(dead_code)]
 	mod shared_fs_test_support {
-		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/fs.rs"));
+		include!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/../../testing/test_support/fs.rs"
+		));
 	}
 	use shared_fs_test_support::fixture_path;
 
