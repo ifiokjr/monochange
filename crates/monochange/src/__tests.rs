@@ -22,6 +22,7 @@ use monochange_test_helpers::current_test_name;
 use semver::Version;
 use tempfile::tempdir;
 
+use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
