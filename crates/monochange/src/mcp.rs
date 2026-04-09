@@ -387,8 +387,31 @@ mod __tests {
 	use shared_fs_test_support::copy_directory;
 	use shared_fs_test_support::current_test_name;
 	use shared_fs_test_support::setup_fixture;
+	use shared_fs_test_support::setup_scenario_workspace;
 	use shared_insta_test_support::snapshot_settings;
 	use shared_rmcp_test_support::content_text;
+
+	#[test]
+	fn shared_fs_test_support_helpers_cover_names_and_scenario_copying() {
+		assert_eq!(
+			current_test_name(),
+			"shared_fs_test_support_helpers_cover_names_and_scenario_copying"
+		);
+		let named = std::thread::Builder::new()
+			.name("case_1_mcp_helper_thread".to_string())
+			.spawn(current_test_name)
+			.unwrap_or_else(|error| panic!("spawn thread: {error}"))
+			.join()
+			.unwrap_or_else(|error| panic!("join thread: {error:?}"));
+		assert_eq!(named, "mcp_helper_thread");
+		let scenario = setup_scenario_workspace("test-support/scenario-workspace");
+		assert_eq!(
+			fs::read_to_string(scenario.path().join("workspace-only.txt"))
+				.unwrap_or_else(|error| panic!("read scenario: {error}")),
+			"workspace marker\n"
+		);
+		assert!(!scenario.path().join("expected").exists());
+	}
 
 	#[test]
 	fn get_info_exposes_tool_instructions_and_capabilities() {
