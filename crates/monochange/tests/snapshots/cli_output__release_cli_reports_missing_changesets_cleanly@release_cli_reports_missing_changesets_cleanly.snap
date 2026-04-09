@@ -1,0 +1,17 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 219
+info:
+  program: mc
+  args:
+    - release
+  env:
+    MONOCHANGE_RELEASE_DATE: 2026-04-06
+    NO_COLOR: "1"
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+config error: no markdown changesets found under .changeset

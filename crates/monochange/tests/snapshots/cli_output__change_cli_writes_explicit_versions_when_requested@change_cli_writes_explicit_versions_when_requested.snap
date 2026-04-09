@@ -1,0 +1,26 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 87
+info:
+  program: mc
+  args:
+    - change
+    - "--package"
+    - core
+    - "--bump"
+    - major
+    - "--version"
+    - 2.0.0
+    - "--reason"
+    - promote to stable
+    - "--output"
+    - /var/folders/lm/90xr38kd5y52p5y6jj2ny_dr0000gn/T/.tmpr81kDT/versioned.md
+  env:
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+wrote change file versioned.md
+
+----- stderr -----

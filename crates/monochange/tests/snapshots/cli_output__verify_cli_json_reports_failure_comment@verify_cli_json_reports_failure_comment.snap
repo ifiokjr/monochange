@@ -1,0 +1,46 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 166
+info:
+  program: mc
+  args:
+    - affected
+    - "--format"
+    - json
+    - "--changed-paths"
+    - crates/core/src/lib.rs
+  env:
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+{
+  "status": "failed",
+  "required": true,
+  "enforce": false,
+  "summary": "changeset verification failed: attached changesets do not cover 1 changed package",
+  "comment": "### monochange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `crates/core/src/lib.rs`\n\nAffected packages:\n- `core`\n\nErrors:\n- changed packages are not covered by attached changesets: core\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
+  "labels": [],
+  "matchedSkipLabels": [],
+  "changedPaths": [
+    "crates/core/src/lib.rs"
+  ],
+  "matchedPaths": [
+    "crates/core/src/lib.rs"
+  ],
+  "ignoredPaths": [],
+  "changesetPaths": [],
+  "affectedPackageIds": [
+    "core"
+  ],
+  "coveredPackageIds": [],
+  "uncoveredPackageIds": [
+    "core"
+  ],
+  "errors": [
+    "changed packages are not covered by attached changesets: core"
+  ]
+}
+
+----- stderr -----
