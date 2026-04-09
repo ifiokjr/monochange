@@ -76,7 +76,7 @@ in
         pass_filenames = false;
         name = "lint";
         description = "Run the local CI lint rules suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all";
+        entry = "bash -lc 'export PRE_COMMIT=1; ${config.env.DEVENV_PROFILE}/bin/lint:all'";
         stages = [ "pre-push" ];
       };
       "test" = {
@@ -85,7 +85,7 @@ in
         pass_filenames = false;
         name = "test";
         description = "Run the local CI validation suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/test:all";
+        entry = "bash -lc 'export PRE_COMMIT=1; ${config.env.DEVENV_PROFILE}/bin/test:all'";
         stages = [ "pre-push" ];
       };
     };
