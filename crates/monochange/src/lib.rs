@@ -175,7 +175,23 @@ pub(crate) use workspace_ops::render_change_target_markdown;
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
 #[cfg(test)]
+pub(crate) use assist::assistant_display_name;
+#[cfg(test)]
+pub(crate) use assist::assistant_setup_payload;
+#[cfg(test)]
+pub(crate) use cli::apply_runtime_change_type_choices;
+#[cfg(test)]
+pub(crate) use cli::build_assist_subcommand;
+#[cfg(test)]
+pub(crate) use cli::build_cli_command_subcommand;
+#[cfg(test)]
 pub(crate) use cli::build_command_for_root;
+#[cfg(test)]
+pub(crate) use cli::build_release_record_subcommand;
+#[cfg(test)]
+pub(crate) use cli::cli_command_after_help;
+#[cfg(test)]
+pub(crate) use cli::configured_change_type_choices;
 #[cfg(test)]
 pub(crate) use cli_runtime::build_cli_template_context;
 #[cfg(test)]
@@ -195,6 +211,8 @@ pub(crate) use cli_runtime::parse_change_bump;
 #[cfg(test)]
 pub(crate) use cli_runtime::parse_direct_template_reference;
 #[cfg(test)]
+pub(crate) use cli_runtime::parse_output_format;
+#[cfg(test)]
 pub(crate) use cli_runtime::render_cli_command_result;
 #[cfg(test)]
 pub(crate) use cli_runtime::render_retarget_release_report;
@@ -202,6 +220,14 @@ pub(crate) use cli_runtime::render_retarget_release_report;
 pub(crate) use cli_runtime::retarget_operation_label;
 #[cfg(test)]
 pub(crate) use cli_runtime::template_value_to_input_values;
+#[cfg(test)]
+pub(crate) use git_support::read_git_commit_message;
+#[cfg(test)]
+pub(crate) use git_support::run_git_capture;
+#[cfg(test)]
+pub(crate) use git_support::run_git_process;
+#[cfg(test)]
+pub(crate) use git_support::run_git_status;
 #[cfg(test)]
 pub(crate) use workspace_ops::change_type_default_bump;
 #[cfg(test)]

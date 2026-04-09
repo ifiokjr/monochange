@@ -16,7 +16,7 @@ pub fn build_command(bin_name: &'static str) -> Command {
 	build_command_for_root(bin_name, &root)
 }
 
-fn configured_change_type_choices(
+pub(crate) fn configured_change_type_choices(
 	configuration: &monochange_core::WorkspaceConfiguration,
 ) -> Vec<String> {
 	configuration
@@ -37,7 +37,7 @@ fn configured_change_type_choices(
 		.collect()
 }
 
-fn apply_runtime_change_type_choices(
+pub(crate) fn apply_runtime_change_type_choices(
 	cli: &mut [CliCommandDefinition],
 	configuration: &monochange_core::WorkspaceConfiguration,
 ) {
@@ -105,7 +105,7 @@ pub(crate) fn build_command_with_cli(
 	command
 }
 
-fn build_assist_subcommand() -> Command {
+pub(crate) fn build_assist_subcommand() -> Command {
 	Command::new("assist")
 		.about("Print assistant setup guidance, install steps, and MCP configuration")
 		.arg(
@@ -123,7 +123,7 @@ fn build_assist_subcommand() -> Command {
 		)
 }
 
-fn build_release_record_subcommand() -> Command {
+pub(crate) fn build_release_record_subcommand() -> Command {
 	Command::new("release-record")
 		.about("Inspect the monochange release record associated with a tag or commit")
 		.after_help(
@@ -152,7 +152,7 @@ Inspection notes:
 		)
 }
 
-fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
+pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
 	let mut command = Command::new(leak_string(cli_command.name.clone()))
 		.about(
 			cli_command
@@ -178,7 +178,7 @@ fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
 	command
 }
 
-fn cli_command_after_help(cli_command: &CliCommandDefinition) -> Option<&'static str> {
+pub(crate) fn cli_command_after_help(cli_command: &CliCommandDefinition) -> Option<&'static str> {
 	match cli_command.name.as_str() {
 		"change" => Some(
 			r#"Examples:

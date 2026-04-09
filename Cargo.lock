@@ -1706,6 +1706,7 @@ dependencies = [
  "monochange_graph",
  "monochange_npm",
  "monochange_semver",
+ "monochange_test_helpers",
  "rmcp",
  "rstest",
  "semver",
@@ -1775,6 +1776,7 @@ dependencies = [
  "monochange_github",
  "monochange_gitlab",
  "monochange_npm",
+ "monochange_test_helpers",
  "rstest",
  "semver",
  "serde",
@@ -1917,6 +1919,15 @@ dependencies = [
  "monochange_core",
  "rstest",
  "similar-asserts",
+]
+
+[[package]]
+name = "monochange_test_helpers"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "rmcp",
+ "tempfile",
 ]
 
 [[package]]

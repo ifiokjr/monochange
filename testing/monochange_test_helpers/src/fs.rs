@@ -22,8 +22,8 @@ pub fn current_test_name() -> String {
 	name.to_string()
 }
 
-pub fn fixture_path(relative: &str) -> PathBuf {
-	Path::new(env!("CARGO_MANIFEST_DIR"))
+pub fn fixture_path_from(manifest_dir: &str, relative: &str) -> PathBuf {
+	Path::new(manifest_dir)
 		.join("../../fixtures/tests")
 		.join(relative)
 }
@@ -32,14 +32,14 @@ pub fn copy_directory(source: &Path, destination: &Path) {
 	copy_directory_filtered(source, destination, &|_| false);
 }
 
-pub fn setup_fixture(relative: &str) -> TempDir {
+pub fn setup_fixture_from(manifest_dir: &str, relative: &str) -> TempDir {
 	let tempdir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_directory(&fixture_path(relative), tempdir.path());
+	copy_directory(&fixture_path_from(manifest_dir, relative), tempdir.path());
 	tempdir
 }
 
-pub fn setup_scenario_workspace(scenario_relative: &str) -> TempDir {
-	let scenario_root = fixture_path(scenario_relative);
+pub fn setup_scenario_workspace_from(manifest_dir: &str, scenario_relative: &str) -> TempDir {
+	let scenario_root = fixture_path_from(manifest_dir, scenario_relative);
 	let workspace_root = scenario_root.join("workspace");
 	let source_root = if workspace_root.is_dir() {
 		workspace_root

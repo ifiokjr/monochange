@@ -17,17 +17,10 @@ use monochange_core::Ecosystem;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PreparedChangesetTarget;
 use monochange_core::VersionFormat;
+use monochange_test_helpers::copy_directory;
+use monochange_test_helpers::current_test_name;
 use semver::Version;
 use tempfile::tempdir;
-
-#[allow(dead_code)]
-#[path = "../../../testing/test_support/fs.rs"]
-mod shared_fs_test_support;
-use shared_fs_test_support::copy_directory;
-use shared_fs_test_support::current_test_name;
-use shared_fs_test_support::fixture_path;
-use shared_fs_test_support::setup_fixture;
-use shared_fs_test_support::setup_scenario_workspace;
 
 use crate::add_change_file;
 use crate::add_interactive_change_file;
@@ -42,6 +35,18 @@ use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 use crate::CliContext;
+
+fn fixture_path(relative: &str) -> PathBuf {
+	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+fn setup_fixture(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_scenario_workspace_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
 
 fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
@@ -4607,25 +4612,32 @@ fn read_cached_document_reports_parse_errors_for_invalid_supported_formats() {
 fn read_cached_document_rejects_invalid_utf8_in_text_formats() {
 	let cases = [
 		(
-			"versioned-file-invalid-utf8/Cargo.toml",
+			"versioned-file-invalid-utf8/invalid-cargo.toml",
+			"Cargo.toml",
 			monochange_core::EcosystemType::Cargo,
 		),
 		(
-			"versioned-file-invalid-utf8/package-lock.json",
+			"versioned-file-invalid-utf8/invalid-package-lock.json",
+			"package-lock.json",
 			monochange_core::EcosystemType::Npm,
 		),
 		(
-			"versioned-file-invalid-utf8/pnpm-lock.yaml",
+			"versioned-file-invalid-utf8/invalid-pnpm-lock.yaml",
+			"pnpm-lock.yaml",
 			monochange_core::EcosystemType::Npm,
 		),
 		(
-			"versioned-file-invalid-utf8/bun.lock",
+			"versioned-file-invalid-utf8/invalid-bun.lock",
+			"bun.lock",
 			monochange_core::EcosystemType::Npm,
 		),
 	];
 
-	for (fixture, ecosystem) in cases {
-		let path = fixture_path(fixture);
+	for (fixture, file_name, ecosystem) in cases {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let path = tempdir.path().join(file_name);
+		fs::copy(fixture_path(fixture), &path)
+			.unwrap_or_else(|error| panic!("copy fixture {fixture}: {error}"));
 		let error = crate::read_cached_document(&mut BTreeMap::new(), &path, ecosystem)
 			.err()
 			.unwrap_or_else(|| panic!("expected utf8 error for {}", path.display()));
@@ -5364,14 +5376,17 @@ fn assistant_setup_payload_contains_mcp_config_and_guidance() {
 		payload["mcp_config"]["mcpServers"]["monochange"]["command"],
 		"monochange"
 	);
-	assert!(payload["repo_guidance"]
+	let repo_guidance = payload["repo_guidance"]
 		.as_array()
-		.is_some_and(|items| items.len() >= 5));
-	assert!(payload["notes"]
+		.unwrap_or_else(|| panic!("missing repo guidance array"));
+	assert!(repo_guidance.len() >= 5);
+	let notes = payload["notes"]
 		.as_array()
-		.is_some_and(|items| items.iter().any(|item| item
-			.as_str()
-			.is_some_and(|text| text.contains("monochange mcp")))));
+		.unwrap_or_else(|| panic!("missing notes array"));
+	assert!(notes.iter().any(|item| {
+		item.as_str()
+			.is_some_and(|text| text.contains("monochange mcp"))
+	}));
 }
 
 #[test]
@@ -5390,12 +5405,13 @@ fn assistant_setup_payload_includes_variant_specific_notes() {
 	];
 	for (assistant, expected_note) in cases {
 		let payload = crate::assistant_setup_payload(assistant);
-		assert!(payload["notes"]
+		let notes = payload["notes"]
 			.as_array()
-			.is_some_and(|items| items.iter().any(|item| {
-				item.as_str()
-					.is_some_and(|text| text.contains(expected_note))
-			})));
+			.unwrap_or_else(|| panic!("missing notes array"));
+		assert!(notes.iter().any(|item| {
+			item.as_str()
+				.is_some_and(|text| text.contains(expected_note))
+		}));
 	}
 }
 
@@ -6214,7 +6230,13 @@ fn tracked_release_pull_request_paths_include_manifest_path_and_deduplicate() {
 		command_logs: Vec::new(),
 	};
 	let tracked = crate::tracked_release_pull_request_paths(&context, &manifest);
-	assert_eq!(tracked, vec![PathBuf::from(".changeset/feature.md"), PathBuf::from("Cargo.lock")]);
+	assert_eq!(
+		tracked,
+		vec![
+			PathBuf::from(".changeset/feature.md"),
+			PathBuf::from("Cargo.lock")
+		]
+	);
 }
 
 #[test]
