@@ -1,9 +1,0 @@
----
-source: crates/monochange/tests/github_releases.rs
-expression: "github_releases[1][\"body\"].as_str().unwrap_or_else(||\npanic!(\"expected GitHub release body\"))"
----
-## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])
-
-### Features
-
-- add feature
