@@ -1,0 +1,11 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "validate",
+  "error": "config error: [release_notes].change_templates uses unsupported variables: commit_hash",
+  "ok": false,
+  "root": "[ROOT]
+  "summary": "config error: [release_notes].change_templates uses unsupported variables: commit_hash"
+}

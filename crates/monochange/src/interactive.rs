@@ -380,8 +380,10 @@ fn prompt_optional(label: &str) -> MonochangeResult<Option<String>> {
 mod __tests {
 	use std::collections::BTreeSet;
 
+	use monochange_config::load_workspace_configuration;
 	use monochange_core::BumpSeverity;
 
+	use super::build_selectable_targets;
 	use super::bump_options;
 	use super::change_type_options;
 	use super::parse_change_type_selection;
@@ -389,6 +391,12 @@ mod __tests {
 	use super::prompt_change_type_for_target;
 	use super::SelectableTarget;
 	use super::TargetKind;
+
+	fn fixture_path(relative: &str) -> std::path::PathBuf {
+		std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests")
+			.join(relative)
+	}
 
 	fn package_target(configured_types: Vec<String>) -> SelectableTarget {
 		SelectableTarget {
@@ -447,6 +455,43 @@ mod __tests {
 		assert_eq!(
 			parse_change_type_selection("security"),
 			Some("security".to_string())
+		);
+	}
+
+	#[test]
+	fn build_selectable_targets_lists_groups_then_standalone_then_group_members() {
+		let configuration = load_workspace_configuration(&fixture_path("monochange/release-base"))
+			.unwrap_or_else(|error| panic!("configuration: {error}"));
+		let targets = build_selectable_targets(&configuration);
+		let displays = targets
+			.iter()
+			.map(|target| target.display.clone())
+			.collect::<Vec<_>>();
+		assert_eq!(
+			displays,
+			vec![
+				"[group] sdk (core, app)".to_string(),
+				"[package] app (member of group `sdk`)".to_string(),
+				"[package] core (member of group `sdk`)".to_string(),
+			]
+		);
+	}
+
+	#[test]
+	fn build_selectable_targets_collects_configured_change_types_per_target() {
+		let configuration = load_workspace_configuration(&fixture_path(
+			"changeset-target-metadata/cli-type-only-change",
+		))
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+		let targets = build_selectable_targets(&configuration);
+		let core = targets
+			.iter()
+			.find(|target| target.id == "core")
+			.unwrap_or_else(|| panic!("expected core target"));
+		assert_eq!(core.kind, TargetKind::Package);
+		assert_eq!(
+			core.configured_types,
+			vec!["docs".to_string(), "test".to_string()]
 		);
 	}
 }

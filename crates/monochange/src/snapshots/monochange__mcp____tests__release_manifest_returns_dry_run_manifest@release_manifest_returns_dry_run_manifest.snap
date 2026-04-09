@@ -1,0 +1,186 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "release_manifest",
+  "manifest": {
+    "changedFiles": [
+      "Cargo.toml",
+      "changelog.md",
+      "crates/app/Cargo.toml",
+      "crates/app/changelog.md",
+      "crates/core/Cargo.toml",
+      "crates/core/changelog.md",
+      "crates/core/extra.toml",
+      "group.toml"
+    ],
+    "changelogs": [
+      {
+        "format": "monochange",
+        "notes": {
+          "sections": [
+            {
+              "entries": [
+                "- **core**: add release command"
+              ],
+              "title": "Features"
+            }
+          ],
+          "summary": [
+            "Grouped release for `sdk`.",
+            "Changed members: core",
+            "Synchronized members: app"
+          ],
+          "title": "1.1.0 ([DATE])"
+        },
+        "ownerId": "sdk",
+        "ownerKind": "group",
+        "path": "changelog.md",
+        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add release command"
+      },
+      {
+        "format": "monochange",
+        "notes": {
+          "sections": [
+            {
+              "entries": [
+                "- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
+              ],
+              "title": "Features"
+            }
+          ],
+          "summary": [],
+          "title": "1.1.0 ([DATE])"
+        },
+        "ownerId": "app",
+        "ownerKind": "package",
+        "path": "crates/app/changelog.md",
+        "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
+      },
+      {
+        "format": "monochange",
+        "notes": {
+          "sections": [
+            {
+              "entries": [
+                "- add release command"
+              ],
+              "title": "Features"
+            }
+          ],
+          "summary": [],
+          "title": "1.1.0 ([DATE])"
+        },
+        "ownerId": "core",
+        "ownerKind": "package",
+        "path": "crates/core/changelog.md",
+        "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add release command"
+      }
+    ],
+    "changesets": [
+      {
+        "context": {
+          "capabilities": {
+            "actorProfiles": false,
+            "commitWebUrls": false,
+            "issueComments": false,
+            "relatedIssues": false,
+            "reviewRequestLookup": false
+          },
+          "host": null,
+          "introduced": null,
+          "lastUpdated": null,
+          "provider": "generic_git",
+          "relatedIssues": []
+        },
+        "details": null,
+        "path": ".changeset/feature.md",
+        "summary": "add release command",
+        "targets": [
+          {
+            "bump": "minor",
+            "changeType": null,
+            "evidenceRefs": [],
+            "id": "core",
+            "kind": "package",
+            "origin": "direct-change"
+          }
+        ]
+      }
+    ],
+    "command": "release-manifest",
+    "deletedChangesets": [],
+    "dryRun": true,
+    "groupVersion": "1.1.0",
+    "plan": {
+      "compatibilityEvidence": [],
+      "decisions": [
+        {
+          "bump": "minor",
+          "package": "cargo:crates/app/Cargo.toml",
+          "plannedVersion": "1.1.0",
+          "reasons": [
+            "depends on `cargo:crates/core/Cargo.toml`",
+            "shares version group `sdk`"
+          ],
+          "trigger": "version-group-synchronization",
+          "upstreamSources": [
+            "cargo:crates/core/Cargo.toml"
+          ]
+        },
+        {
+          "bump": "minor",
+          "package": "cargo:crates/core/Cargo.toml",
+          "plannedVersion": "1.1.0",
+          "reasons": [
+            "add release command",
+            "shares version group `sdk`"
+          ],
+          "trigger": "direct-change",
+          "upstreamSources": [
+            "cargo:crates/core/Cargo.toml"
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "bump": "minor",
+          "id": "sdk",
+          "members": [
+            "cargo:crates/core/Cargo.toml",
+            "cargo:crates/app/Cargo.toml"
+          ],
+          "plannedVersion": "1.1.0"
+        }
+      ],
+      "unresolvedItems": [],
+      "warnings": [],
+      "workspaceRoot": "."
+    },
+    "releaseTargets": [
+      {
+        "id": "sdk",
+        "kind": "group",
+        "members": [
+          "core",
+          "app"
+        ],
+        "release": true,
+        "renderedChangelogTitle": "1.1.0 ([DATE])",
+        "renderedTitle": "1.1.0 ([DATE])",
+        "tag": true,
+        "tagName": "v1.1.0",
+        "version": "1.1.0",
+        "versionFormat": "primary"
+      }
+    ],
+    "releasedPackages": [
+      "workflow-app",
+      "workflow-core"
+    ],
+    "version": "1.1.0"
+  },
+  "ok": true,
+  "summary": "Generated dry-run release manifest with 1 release target(s)."
+}

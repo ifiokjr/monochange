@@ -346,11 +346,18 @@ pub async fn run_server() {
 #[allow(clippy::disallowed_methods)]
 mod __tests {
 	use std::fs;
+	use std::path::Path;
+	use std::path::PathBuf;
+	use std::thread;
 
 	use insta::assert_snapshot;
 	use rmcp::handler::server::wrapper::Parameters;
+	use rmcp::ServerHandler;
 	use tempfile::tempdir;
 
+	use super::json_error_result;
+	use super::json_result;
+	use super::resolve_root;
 	use super::AffectedParam;
 	use super::ChangeParam;
 	use super::McpChangeBump;
@@ -370,6 +377,59 @@ mod __tests {
 		settings
 	}
 
+	fn current_test_name() -> String {
+		thread::current()
+			.name()
+			.unwrap_or("unknown")
+			.split("::")
+			.last()
+			.unwrap_or("unknown")
+			.to_string()
+	}
+
+	fn fixture_path(relative: &str) -> PathBuf {
+		Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests")
+			.join(relative)
+	}
+
+	fn copy_directory(source: &Path, destination: &Path) {
+		fs::create_dir_all(destination).unwrap_or_else(|error| {
+			panic!("create destination {}: {error}", destination.display())
+		});
+		for entry in fs::read_dir(source)
+			.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
+		{
+			let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
+			let source_path = entry.path();
+			let destination_path = destination.join(entry.file_name());
+			let metadata = fs::metadata(&source_path)
+				.unwrap_or_else(|error| panic!("metadata {}: {error}", source_path.display()));
+			if metadata.is_dir() {
+				copy_directory(&source_path, &destination_path);
+			} else if metadata.is_file() {
+				if let Some(parent) = destination_path.parent() {
+					fs::create_dir_all(parent).unwrap_or_else(|error| {
+						panic!("create parent {}: {error}", parent.display())
+					});
+				}
+				fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
+					panic!(
+						"copy {} -> {}: {error}",
+						source_path.display(),
+						destination_path.display()
+					)
+				});
+			}
+		}
+	}
+
+	fn setup_fixture(relative: &str) -> tempfile::TempDir {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_directory(&fixture_path(relative), tempdir.path());
+		tempdir
+	}
+
 	fn content_text(result: &rmcp::model::CallToolResult) -> String {
 		result
 			.content
@@ -381,17 +441,94 @@ mod __tests {
 			.unwrap_or_default()
 	}
 
+	#[test]
+	fn get_info_exposes_tool_instructions_and_capabilities() {
+		let info = MonochangeMcpServer::new().get_info();
+		assert!(info
+			.instructions
+			.as_ref()
+			.is_some_and(|text| text.contains("Monochange manages versions and releases")));
+		assert!(info.capabilities.tools.is_some());
+	}
+
+	#[test]
+	fn resolve_root_prefers_explicit_paths() {
+		let explicit = PathBuf::from("/tmp/monochange-mcp-test");
+		assert_eq!(resolve_root(explicit.to_str()), explicit);
+	}
+
+	#[test]
+	fn resolve_root_defaults_to_current_directory() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let original =
+			std::env::current_dir().unwrap_or_else(|error| panic!("current dir: {error}"));
+		std::env::set_current_dir(tempdir.path())
+			.unwrap_or_else(|error| panic!("set current dir: {error}"));
+		let resolved = resolve_root(None);
+		std::env::set_current_dir(&original)
+			.unwrap_or_else(|error| panic!("restore current dir: {error}"));
+		assert_eq!(
+			monochange_core::normalize_path(&resolved),
+			monochange_core::normalize_path(tempdir.path())
+		);
+	}
+
+	#[test]
+	fn json_result_and_error_result_render_structured_content() {
+		let success = json_result(serde_json::json!({"ok": true, "summary": "done"}));
+		let failure = json_error_result(serde_json::json!({"ok": false, "summary": "bad"}));
+		assert!(success.is_error.is_none_or(|value| !value));
+		assert_eq!(
+			content_text(&success),
+			"{\n  \"ok\": true,\n  \"summary\": \"done\"\n}"
+		);
+		assert_eq!(failure.is_error, Some(true));
+		assert_eq!(
+			content_text(&failure),
+			"{\n  \"ok\": false,\n  \"summary\": \"bad\"\n}"
+		);
+	}
+
+	#[tokio::test]
+	async fn validate_reports_success_for_valid_workspace_fixture() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/release-base");
+
+		let result = MonochangeMcpServer::new()
+			.validate(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn validate_reports_config_errors_for_invalid_workspace_fixture() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("config/rejects-unknown-template-vars");
+
+		let result = MonochangeMcpServer::new()
+			.validate(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
 	#[tokio::test]
 	async fn discover_reports_workspace_packages() {
-		let _snapshot = snapshot_settings().bind_to_scope();
-		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		fs::create_dir_all(tempdir.path().join("crates/core"))
-			.unwrap_or_else(|error| panic!("mkdir: {error}"));
-		fs::write(
-			tempdir.path().join("crates/core/Cargo.toml"),
-			"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
-		)
-		.unwrap_or_else(|error| panic!("cargo write: {error}"));
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/release-base");
 
 		let result = MonochangeMcpServer::new()
 			.discover(Parameters(PathParam {
@@ -400,32 +537,15 @@ mod __tests {
 			.await
 			.unwrap_or_else(|error| panic!("discover: {error}"));
 
-		assert_snapshot!(
-			"discover_reports_workspace_packages__response",
-			content_text(&result)
-		);
+		assert_snapshot!(content_text(&result));
 	}
 
 	#[tokio::test]
 	async fn change_writes_markdown_changeset() {
-		let _snapshot = snapshot_settings().bind_to_scope();
-		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		fs::create_dir_all(tempdir.path().join("crates/core"))
-			.unwrap_or_else(|error| panic!("mkdir: {error}"));
-		fs::write(
-			tempdir.path().join("crates/core/Cargo.toml"),
-			"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
-		)
-		.unwrap_or_else(|error| panic!("cargo write: {error}"));
-		fs::write(
-			tempdir.path().join("monochange.toml"),
-			r#"
-[package.core]
-path = "crates/core"
-type = "cargo"
-"#,
-		)
-		.unwrap_or_else(|error| panic!("config write: {error}"));
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/release-base");
 
 		let result = MonochangeMcpServer::new()
 			.change(Parameters(ChangeParam {
@@ -447,43 +567,38 @@ type = "cargo"
 			.await
 			.unwrap_or_else(|error| panic!("change: {error}"));
 
-		assert_snapshot!(
-			"change_writes_markdown_changeset__response",
-			content_text(&result)
-		);
+		assert_snapshot!("response", content_text(&result));
 		let contents = fs::read_to_string(tempdir.path().join(".changeset/core.md"))
 			.unwrap_or_else(|error| panic!("changeset read: {error}"));
-		assert_snapshot!("change_writes_markdown_changeset__changeset", contents);
+		assert_snapshot!("changeset", contents);
 	}
 
 	#[test]
-	fn mcp_change_bump_none_maps_to_change_bump_none() {
+	fn mcp_change_bump_variants_map_to_change_bump_variants() {
 		assert_eq!(
 			crate::ChangeBump::from(McpChangeBump::None),
 			crate::ChangeBump::None
+		);
+		assert_eq!(
+			crate::ChangeBump::from(McpChangeBump::Patch),
+			crate::ChangeBump::Patch
+		);
+		assert_eq!(
+			crate::ChangeBump::from(McpChangeBump::Minor),
+			crate::ChangeBump::Minor
+		);
+		assert_eq!(
+			crate::ChangeBump::from(McpChangeBump::Major),
+			crate::ChangeBump::Major
 		);
 	}
 
 	#[tokio::test]
 	async fn change_writes_type_only_markdown_changeset() {
-		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		fs::create_dir_all(tempdir.path().join("crates/core"))
-			.unwrap_or_else(|error| panic!("mkdir: {error}"));
-		fs::write(
-			tempdir.path().join("crates/core/Cargo.toml"),
-			"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
-		)
-		.unwrap_or_else(|error| panic!("cargo write: {error}"));
-		fs::write(
-			tempdir.path().join("monochange.toml"),
-			r#"
-[package.core]
-path = "crates/core"
-type = "cargo"
-extra_changelog_sections = [{ name = "Documentation", types = ["docs"] }]
-"#,
-		)
-		.unwrap_or_else(|error| panic!("config write: {error}"));
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("changeset-target-metadata/cli-type-only-change");
 
 		let result = MonochangeMcpServer::new()
 			.change(Parameters(ChangeParam {
@@ -505,64 +620,156 @@ extra_changelog_sections = [{ name = "Documentation", types = ["docs"] }]
 			.await
 			.unwrap_or_else(|error| panic!("change: {error}"));
 
-		assert!(content_text(&result).contains("Wrote change file"));
+		assert_snapshot!("response", content_text(&result));
 		let contents = fs::read_to_string(tempdir.path().join(".changeset/core-docs.md"))
 			.unwrap_or_else(|error| panic!("changeset read: {error}"));
-		assert!(contents.contains("core: docs"));
-		assert!(!contents.contains("bump:"));
+		assert_snapshot!("changeset", contents);
 	}
 
 	#[tokio::test]
-	async fn affected_packages_reports_success_for_documentation_only_changes() {
-		let _snapshot = snapshot_settings().bind_to_scope();
-		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		fs::write(
-			tempdir.path().join("monochange.toml"),
-			r#"
-[changesets.verify]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required"]
-comment_on_failure = true
-changed_paths = ["crates/**"]
-ignored_paths = ["docs/**"]
+	async fn discover_reports_config_errors_for_invalid_workspace_fixture() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("config/rejects-unknown-template-vars");
 
-[cli.affected]
-help_text = "Evaluate pull-request changeset policy"
+		let result = MonochangeMcpServer::new()
+			.discover(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("discover: {error}"));
 
-[[cli.affected.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
+		assert_snapshot!(content_text(&result));
+	}
 
-[[cli.affected.inputs]]
-name = "changed_paths"
-type = "string_list"
-required = true
+	#[tokio::test]
+	async fn change_reports_errors_for_unknown_package_ids() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/release-base");
 
-[[cli.affected.inputs]]
-name = "label"
-type = "string_list"
+		let result = MonochangeMcpServer::new()
+			.change(Parameters(ChangeParam {
+				path: Some(tempdir.path().display().to_string()),
+				package: vec!["missing".to_string()],
+				bump: McpChangeBump::Patch,
+				version: None,
+				reason: "missing package".to_string(),
+				change_type: None,
+				details: None,
+				output: None,
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("change: {error}"));
 
-[[cli.affected.steps]]
-type = "AffectedPackages"
-"#,
-		)
-		.unwrap_or_else(|error| panic!("config write: {error}"));
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn release_preview_returns_dry_run_release_summary() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/release-base");
+
+		let result = MonochangeMcpServer::new()
+			.release_preview(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("release preview: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn release_manifest_returns_dry_run_manifest() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/release-base");
+
+		let result = MonochangeMcpServer::new()
+			.release_manifest(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("release manifest: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn release_preview_reports_config_errors_when_changesets_are_missing() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("cli-output/ungrouped-no-changeset");
+
+		let result = MonochangeMcpServer::new()
+			.release_preview(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("release preview: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn release_manifest_reports_config_errors_when_changesets_are_missing() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("cli-output/ungrouped-no-changeset");
+
+		let result = MonochangeMcpServer::new()
+			.release_manifest(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("release manifest: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn affected_packages_reports_failed_policy_for_uncovered_changes() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("changeset-policy/no-changeset");
 
 		let result = MonochangeMcpServer::new()
 			.affected_packages(Parameters(AffectedParam {
 				path: Some(tempdir.path().display().to_string()),
-				changed_paths: vec!["docs/readme.md".to_string()],
+				changed_paths: vec!["crates/core/src/lib.rs".to_string()],
 				labels: Vec::new(),
 			}))
 			.await
 			.unwrap_or_else(|error| panic!("affected: {error}"));
 
-		assert_snapshot!(
-			"affected_packages_reports_success_for_documentation_only_changes__response",
-			content_text(&result)
-		);
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn affected_packages_reports_success_for_documentation_only_changes() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("cli-step-input-overrides/workspace");
+
+		let result = MonochangeMcpServer::new()
+			.affected_packages(Parameters(AffectedParam {
+				path: Some(tempdir.path().display().to_string()),
+				changed_paths: vec!["docs/readme.md".to_string()],
+				labels: vec!["no-changeset-required".to_string()],
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("affected: {error}"));
+
+		assert_snapshot!(content_text(&result));
 	}
 }
