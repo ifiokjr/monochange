@@ -1,0 +1,24 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 59
+info:
+  program: mc
+  args:
+    - change
+    - "--package"
+    - core
+    - "--bump"
+    - minor
+    - "--reason"
+    - document cli snapshots
+    - "--output"
+    - /var/folders/lm/90xr38kd5y52p5y6jj2ny_dr0000gn/T/.tmpHWEuLj/feature.md
+  env:
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+wrote change file feature.md
+
+----- stderr -----

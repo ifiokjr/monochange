@@ -1,0 +1,16 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 22
+info:
+  program: mc
+  args:
+    - validate
+  env:
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+workspace validation passed for .
+
+----- stderr -----

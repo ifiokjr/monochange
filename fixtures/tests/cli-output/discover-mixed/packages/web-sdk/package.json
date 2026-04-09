@@ -1,0 +1,7 @@
+{
+  "name": "web-sdk",
+  "version": "1.0.0",
+  "dependencies": {
+    "sdk-core": "^1.0.0"
+  }
+}
