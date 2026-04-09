@@ -4466,6 +4466,80 @@ fn serialize_cached_document_formats_json_yaml_text_and_bytes() {
 	assert_eq!(bytes.content, vec![1, 2, 3, 4]);
 }
 
+#[test]
+fn read_cached_document_reports_parse_errors_for_invalid_supported_formats() {
+	let cases = [
+		(
+			"cargo/invalid-workspace/invalid-workspace.toml",
+			"Cargo.toml",
+			monochange_core::EcosystemType::Cargo,
+		),
+		(
+			"npm/invalid-package-json/invalid-package.json",
+			"package-lock.json",
+			monochange_core::EcosystemType::Npm,
+		),
+		(
+			"npm/invalid-pnpm-workspace/invalid-pnpm-workspace.yaml",
+			"pnpm-lock.yaml",
+			monochange_core::EcosystemType::Npm,
+		),
+		(
+			"dart/invalid-package/invalid-package.yaml",
+			"pubspec.lock",
+			monochange_core::EcosystemType::Dart,
+		),
+	];
+
+	for (source_fixture, target_name, ecosystem) in cases {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let target = tempdir.path().join(target_name);
+		fs::copy(fixture_path(source_fixture), &target)
+			.unwrap_or_else(|error| panic!("copy invalid fixture {source_fixture}: {error}"));
+		let error = crate::read_cached_document(&mut BTreeMap::new(), &target, ecosystem)
+			.err()
+			.unwrap_or_else(|| panic!("expected parse error for {target_name}"));
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
+	}
+}
+
+#[test]
+fn read_cached_document_rejects_invalid_utf8_in_text_formats() {
+	let cases = [
+		(
+			"versioned-file-invalid-utf8/Cargo.toml",
+			monochange_core::EcosystemType::Cargo,
+		),
+		(
+			"versioned-file-invalid-utf8/package-lock.json",
+			monochange_core::EcosystemType::Npm,
+		),
+		(
+			"versioned-file-invalid-utf8/pnpm-lock.yaml",
+			monochange_core::EcosystemType::Npm,
+		),
+		(
+			"versioned-file-invalid-utf8/bun.lock",
+			monochange_core::EcosystemType::Npm,
+		),
+	];
+
+	for (fixture, ecosystem) in cases {
+		let path = fixture_path(fixture);
+		let error = crate::read_cached_document(&mut BTreeMap::new(), &path, ecosystem)
+			.err()
+			.unwrap_or_else(|| panic!("expected utf8 error for {}", path.display()));
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
+		assert!(error.to_string().contains("as text"), "error: {error}");
+	}
+}
+
 fn write_blank_monochange_config(root: &Path) {
 	fs::write(root.join("monochange.toml"), "")
 		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
