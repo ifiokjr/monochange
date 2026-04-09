@@ -1,0 +1,27 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 115
+info:
+  program: mc
+  args:
+    - release
+    - "--dry-run"
+    - "--format"
+    - text
+  env:
+    MONOCHANGE_RELEASE_DATE: 2026-04-06
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+command `release` completed (dry-run)
+released packages: workflow-app, workflow-core
+release targets:
+- package app -> app/v1.0.1 (tag: false, release: false)
+- package core -> core/v1.1.0 (tag: false, release: false)
+changed files:
+- crates/app/Cargo.toml
+- crates/core/Cargo.toml
+
+----- stderr -----

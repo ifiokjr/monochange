@@ -1,0 +1,30 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 199
+info:
+  program: mc
+  args:
+    - release-manifest
+    - "--dry-run"
+  env:
+    MONOCHANGE_RELEASE_DATE: 2026-04-06
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+command `release-manifest` completed (dry-run)
+version: 1.1.0
+released packages: workflow-app, workflow-core
+release targets:
+- group sdk -> v1.1.0 (tag: true, release: true)
+release manifest: .monochange/release-manifest.json
+changed files:
+- Cargo.toml
+- changelog.md
+- crates/app/Cargo.toml
+- crates/core/CHANGELOG.md
+- crates/core/Cargo.toml
+- group.toml
+
+----- stderr -----
