@@ -47,38 +47,45 @@ in
     hooks = {
       "secrets:commit" = {
         enable = true;
-        name = "secrets:commit";
+        pass_filenames = true;
+        name = "secrets";
         description = "Scan staged changes for leaked secrets with gitleaks.";
         entry = "${pkgs.gitleaks}/bin/gitleaks protect --staged --verbose --redact";
-        pass_filenames = false;
         stages = [ "pre-commit" ];
       };
-
+      dprint = {
+        enable = true;
+        verbose = true;
+        pass_filenames = true;
+        name = "dprint check";
+        description = "Run workspace autofixes before commit and restage the results.";
+        entry = "${pkgs.dprint}/bin/dprint check --allow-no-files";
+        stages = [ "pre-commit" ];
+      };
       "secrets:push" = {
         enable = true;
-        name = "secrets:push";
+        pass_filenames = false;
+        name = "secrets";
         description = "Scan repository history for leaked secrets with gitleaks before push.";
         entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
-        pass_filenames = false;
         stages = [ "pre-push" ];
       };
-
-      fix = {
+      "lint" = {
         enable = true;
-        name = "fix";
-        description = "Run workspace autofixes before commit and restage the results.";
-        entry = "bash -lc '${config.env.DEVENV_PROFILE}/bin/fix:all && git add --update -- .'";
+        verbose = true;
         pass_filenames = false;
-        require_serial = true;
-        stages = [ "pre-commit" ];
+        name = "lint";
+        description = "Run the local CI lint rules suite before push.";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all";
+        stages = [ "pre-push" ];
       };
-
-      "ci:pre-push" = {
+      "test" = {
         enable = true;
-        name = "ci:pre-push";
-        description = "Run the local CI validation suite before push.";
-        entry = "bash -lc 'set -euo pipefail; ${config.env.DEVENV_PROFILE}/bin/lint:all; ${config.env.DEVENV_PROFILE}/bin/test:all; ${config.env.DEVENV_PROFILE}/bin/build:all; ${config.env.DEVENV_PROFILE}/bin/build:book; ${config.env.DEVENV_PROFILE}/bin/coverage:all'";
+        verbose = true;
         pass_filenames = false;
+        name = "test";
+        description = "Run the local CI validation suite before push.";
+        entry = "${config.env.DEVENV_PROFILE}/bin/test:all";
         stages = [ "pre-push" ];
       };
     };
