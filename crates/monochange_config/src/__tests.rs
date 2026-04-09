@@ -2145,18 +2145,10 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 
 #[test]
 fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	std::fs::create_dir_all(tempdir.path().join("crates/core"))
-		.unwrap_or_else(|error| panic!("create core dir: {error}"));
-	std::fs::create_dir_all(tempdir.path().join("crates/util"))
-		.unwrap_or_else(|error| panic!("create util dir: {error}"));
-	std::fs::write(tempdir.path().join("crates/core/Cargo.toml"), "[package]\nname='core'\n")
-		.unwrap_or_else(|error| panic!("write core manifest: {error}"));
-	std::fs::write(tempdir.path().join("crates/util/Cargo.toml"), "[package]\nname='util'\n")
-		.unwrap_or_else(|error| panic!("write util manifest: {error}"));
+	let root = fixture_path("config/validation-helper-branches");
 
 	let duplicate_path_error = crate::validate_package_and_group_definitions(
-		tempdir.path(),
+		&root,
 		"[package.core]\npath = 'crates/core'\n\n[package.util]\npath = 'crates/core'\n",
 		&[
 			package_definition("core", "crates/core"),
@@ -2175,7 +2167,7 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 	let mut primary_util = package_definition("util", "crates/util");
 	primary_util.version_format = monochange_core::VersionFormat::Primary;
 	let duplicate_primary_error = crate::validate_package_and_group_definitions(
-		tempdir.path(),
+		&root,
 		"[package.core]\nversion_format = 'primary'\n\n[package.util]\nversion_format = 'primary'\n",
 		&[primary_core, primary_util],
 		&[],
@@ -2186,24 +2178,25 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 		.to_string()
 		.contains("`version_format = \"primary\"` is already used by `core`"));
 
-	let github_error = crate::validate_github_configuration(Some(&monochange_core::GitHubConfiguration {
-		owner: "ifiokjr".to_string(),
-		repo: "monochange".to_string(),
-		releases: monochange_core::GitHubReleaseSettings::default(),
-		pull_requests: monochange_core::GitHubPullRequestSettings::default(),
-		bot: monochange_core::GitHubBotSettings {
-			changesets: monochange_core::GitHubChangesetBotSettings {
-				enabled: true,
-				required: true,
-				skip_labels: vec!["skip".to_string()],
-				comment_on_failure: true,
-				changed_paths: vec!["[".to_string()],
-				ignored_paths: Vec::new(),
+	let github_error =
+		crate::validate_github_configuration(Some(&monochange_core::GitHubConfiguration {
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			releases: monochange_core::GitHubReleaseSettings::default(),
+			pull_requests: monochange_core::GitHubPullRequestSettings::default(),
+			bot: monochange_core::GitHubBotSettings {
+				changesets: monochange_core::GitHubChangesetBotSettings {
+					enabled: true,
+					required: true,
+					skip_labels: vec!["skip".to_string()],
+					comment_on_failure: true,
+					changed_paths: vec!["[".to_string()],
+					ignored_paths: Vec::new(),
+				},
 			},
-		},
-	}))
-	.err()
-	.unwrap_or_else(|| panic!("expected invalid github glob error"));
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid github glob error"));
 	assert!(github_error
 		.to_string()
 		.contains("[github.bot.changesets].changed_paths contains invalid glob pattern"));

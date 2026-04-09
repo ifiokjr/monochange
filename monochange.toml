@@ -410,8 +410,8 @@ auto_merge = false
 # also trigger changeset requirements when changed. For example, workspace-level
 # Cargo.toml or Cargo.lock changes affect all packages.
 #
-# `ignored_paths` filters out files within package directories that should NOT
-# trigger changeset requirements (e.g. test files, snapshots).
+# `ignored_paths` filters out files that should NOT trigger changeset
+# requirements (e.g. test files, snapshots, fixture workspaces).
 #
 # Per-package `ignored_paths` and `additional_paths` in [package.<id>] tables
 # can further customize which files matter on a package-by-package basis.
@@ -437,6 +437,7 @@ ignored_paths = [
 	"**/tests/**",
 	"**/__tests.rs",
 	"**/snapshots/**",
+	"fixtures/tests/**",
 ]
 
 # =============================================================================

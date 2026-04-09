@@ -353,7 +353,10 @@ fn discover_standalone_package_defaults_manager_to_npm() {
 		.first()
 		.unwrap_or_else(|| panic!("expected standalone package"));
 	assert_eq!(package.name, "standalone-app");
-	assert_eq!(package.metadata.get("manager").map(String::as_str), Some("npm"));
+	assert_eq!(
+		package.metadata.get("manager").map(String::as_str),
+		Some("npm")
+	);
 }
 
 #[test]
@@ -389,7 +392,10 @@ fn workspace_pattern_helpers_cover_array_object_and_missing_cases() {
 		workspace_patterns_from_package_json(&json!({"workspaces": {"packages": ["apps/*"]}})),
 		vec!["apps/*".to_string()]
 	);
-	assert_eq!(workspace_patterns_from_package_json(&json!({})), Vec::<String>::new());
+	assert_eq!(
+		workspace_patterns_from_package_json(&json!({})),
+		Vec::<String>::new()
+	);
 }
 
 #[test]
@@ -415,7 +421,9 @@ fn explicit_file_workspace_patterns_discover_package_manifests() {
 	);
 	assert_eq!(warnings, Vec::<String>::new());
 	assert_eq!(manifests.len(), 1);
-	assert!(manifests.iter().any(|path| path.ends_with("packages/web/package.json")));
+	assert!(manifests
+		.iter()
+		.any(|path| path.ends_with("packages/web/package.json")));
 
 	let discovery = discover_npm_packages(&fixture_root)
 		.unwrap_or_else(|error| panic!("npm discovery: {error}"));
@@ -432,8 +440,9 @@ fn explicit_file_workspace_patterns_discover_package_manifests() {
 
 #[test]
 fn package_json_parsing_and_workspace_detection_report_parse_errors() {
-	let invalid_workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/npm/invalid-workspace-package-json/package.json");
+	let invalid_workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+		"../../fixtures/tests/npm/invalid-workspace-package-json/invalid-workspace-package.json",
+	);
 	let error = package_json_declares_workspaces(&invalid_workspace)
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid workspace parse error"));
@@ -445,14 +454,14 @@ fn package_json_parsing_and_workspace_detection_report_parse_errors() {
 	assert!(workspace_error.to_string().contains("failed to parse"));
 
 	let invalid_pnpm = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/npm/invalid-pnpm-workspace/pnpm-workspace.yaml");
+		.join("../../fixtures/tests/npm/invalid-pnpm-workspace/invalid-pnpm-workspace.yaml");
 	let pnpm_error = discover_pnpm_workspace(&invalid_pnpm)
 		.err()
 		.unwrap_or_else(|| panic!("expected pnpm parse error"));
 	assert!(pnpm_error.to_string().contains("failed to parse"));
 
 	let invalid_package = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/npm/invalid-package-json/package.json");
+		.join("../../fixtures/tests/npm/invalid-package-json/invalid-package.json");
 	let package_error = parse_package_json(&invalid_package, Path::new("."), "npm")
 		.err()
 		.unwrap_or_else(|| panic!("expected package parse error"));
@@ -481,7 +490,10 @@ fn update_package_lock_ignores_unmapped_root_and_non_object_entries() {
 
 	assert_eq!(lock.pointer("/version"), Some(&json!("1.0.0")));
 	assert_eq!(lock.pointer("/packages//version"), Some(&json!("1.0.0")));
-	assert_eq!(lock.pointer("/packages/packages~1core"), Some(&json!("not-an-object")));
+	assert_eq!(
+		lock.pointer("/packages/packages~1core"),
+		Some(&json!("not-an-object"))
+	);
 	assert_eq!(
 		lock.pointer("/packages/packages~1util/version"),
 		Some(&json!("2.0.0"))
