@@ -1,45 +1,32 @@
-use std::process::Command;
-
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use insta::{assert_json_snapshot, assert_snapshot};
+use rstest::rstest;
 use serde_json::Value;
-use tempfile::tempdir;
 
 mod test_support;
-use test_support::{copy_directory, fixture_path};
+use test_support::{monochange_command, run_json_command, setup_scenario_workspace, snapshot_settings};
 
-fn cli() -> Command {
-	let mut command = Command::new(get_cargo_bin("mc"));
-	command.env("NO_COLOR", "1");
-	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
-	command
-}
+#[rstest]
+#[case::pre_stable_major_text("pre-stable-versioning/pre-stable-major", "pre_stable_major_text")]
+#[case::stable_major_text("pre-stable-versioning/stable-major", "stable_major_text")]
+#[case::pre_stable_grouped_major_text(
+	"pre-stable-versioning/pre-stable-grouped-major",
+	"pre_stable_grouped_major_text"
+)]
+fn pre_stable_release_text_scenarios_match_snapshot(
+	#[case] fixture: &str,
+	#[case] snapshot_name: &str,
+) {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(snapshot_name);
+	let _guard = settings.bind_to_scope();
+	let tempdir = setup_scenario_workspace(fixture);
 
-#[test]
-fn pre_stable_major_bump_produces_minor_version_in_text_output() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = fixture_path("pre-stable-versioning/pre-stable-major");
-	copy_directory(&fixture_root, tempdir.path());
-
-	assert_cmd_snapshot!(cli()
+	let output = monochange_command(Some("2026-04-06"))
 		.current_dir(tempdir.path())
 		.arg("release")
 		.arg("--dry-run")
 		.arg("--format")
-		.arg("text"));
-}
-
-#[test]
-fn pre_stable_major_bump_produces_minor_version_in_json_output() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = fixture_path("pre-stable-versioning/pre-stable-major");
-	copy_directory(&fixture_root, tempdir.path());
-
-	let output = cli()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("json")
+		.arg("text")
 		.output()
 		.unwrap_or_else(|error| panic!("release output: {error}"));
 	assert!(
@@ -47,106 +34,23 @@ fn pre_stable_major_bump_produces_minor_version_in_json_output() {
 		"{}",
 		String::from_utf8_lossy(&output.stderr)
 	);
-
-	let json = serde_json::from_slice(&output.stdout)
-		.unwrap_or_else(|error| panic!("parse json: {error}"));
-
-	// core: major requested on 0.1.0 → planned 0.2.0
-	let core_decision = find_decision(&json, "core");
-	assert_eq!(core_decision["bump"], "major");
-	assert_eq!(core_decision["plannedVersion"], "0.2.0");
-	assert_eq!(core_decision["trigger"], "direct-change");
-
-	// app: transitive patch on 0.1.0 → planned 0.1.1
-	let app_decision = find_decision(&json, "app");
-	assert_eq!(app_decision["bump"], "patch");
-	assert_eq!(app_decision["plannedVersion"], "0.1.1");
-	assert_eq!(app_decision["trigger"], "transitive-dependency");
+	assert_snapshot!(String::from_utf8_lossy(&output.stdout));
 }
 
-#[test]
-fn pre_stable_minor_bump_produces_patch_version_in_json_output() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = fixture_path("pre-stable-versioning/pre-stable-minor");
-	copy_directory(&fixture_root, tempdir.path());
-
-	let output = cli()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("json")
-		.output()
-		.unwrap_or_else(|error| panic!("release output: {error}"));
-	assert!(
-		output.status.success(),
-		"{}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-
-	let json = serde_json::from_slice(&output.stdout)
-		.unwrap_or_else(|error| panic!("parse json: {error}"));
-
-	// core: minor requested on 0.1.0 → planned 0.1.1
-	let core_decision = find_decision(&json, "core");
-	assert_eq!(core_decision["bump"], "minor");
-	assert_eq!(core_decision["plannedVersion"], "0.1.1");
-}
-
-#[test]
-fn stable_major_bump_produces_next_major_version_in_text_output() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = fixture_path("pre-stable-versioning/stable-major");
-	copy_directory(&fixture_root, tempdir.path());
-
-	assert_cmd_snapshot!(cli()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("text"));
-}
-
-#[test]
-fn stable_major_bump_produces_next_major_version_in_json_output() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = fixture_path("pre-stable-versioning/stable-major");
-	copy_directory(&fixture_root, tempdir.path());
-
-	let output = cli()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("json")
-		.output()
-		.unwrap_or_else(|error| panic!("release output: {error}"));
-	assert!(
-		output.status.success(),
-		"{}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-
-	let json = serde_json::from_slice(&output.stdout)
-		.unwrap_or_else(|error| panic!("parse json: {error}"));
-
-	let core_decision = find_decision(&json, "core");
-	assert_eq!(core_decision["bump"], "major");
-	assert_eq!(core_decision["plannedVersion"], "2.0.0");
-}
-
-#[test]
-fn pre_stable_grouped_major_bump_shifts_group_version() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = fixture_path("pre-stable-versioning/pre-stable-grouped-major");
-	copy_directory(&fixture_root, tempdir.path());
-
-	assert_cmd_snapshot!(cli()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("text"));
+#[rstest]
+#[case::pre_stable_major_json("pre-stable-versioning/pre-stable-major", "pre_stable_major_json")]
+#[case::pre_stable_minor_json("pre-stable-versioning/pre-stable-minor", "pre_stable_minor_json")]
+#[case::stable_major_json("pre-stable-versioning/stable-major", "stable_major_json")]
+fn pre_stable_release_json_scenarios_match_snapshot(
+	#[case] fixture: &str,
+	#[case] snapshot_name: &str,
+) {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(snapshot_name);
+	let _guard = settings.bind_to_scope();
+	let tempdir = setup_scenario_workspace(fixture);
+	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
+	assert_json_snapshot!(json);
 }
 
 fn find_decision<'a>(json: &'a Value, package_name_fragment: &str) -> &'a Value {
@@ -160,4 +64,40 @@ fn find_decision<'a>(json: &'a Value, package_name_fragment: &str) -> &'a Value 
 				.is_some_and(|package| package.contains(package_name_fragment))
 		})
 		.unwrap_or_else(|| panic!("expected decision for {package_name_fragment}"))
+}
+
+#[test]
+fn pre_stable_major_bump_keeps_expected_decisions() {
+	let tempdir = setup_scenario_workspace("pre-stable-versioning/pre-stable-major");
+	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
+
+	let core_decision = find_decision(&json, "core");
+	assert_eq!(core_decision["bump"], "major");
+	assert_eq!(core_decision["plannedVersion"], "0.2.0");
+	assert_eq!(core_decision["trigger"], "direct-change");
+
+	let app_decision = find_decision(&json, "app");
+	assert_eq!(app_decision["bump"], "patch");
+	assert_eq!(app_decision["plannedVersion"], "0.1.1");
+	assert_eq!(app_decision["trigger"], "transitive-dependency");
+}
+
+#[test]
+fn pre_stable_minor_bump_keeps_expected_decisions() {
+	let tempdir = setup_scenario_workspace("pre-stable-versioning/pre-stable-minor");
+	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
+
+	let core_decision = find_decision(&json, "core");
+	assert_eq!(core_decision["bump"], "minor");
+	assert_eq!(core_decision["plannedVersion"], "0.1.1");
+}
+
+#[test]
+fn stable_major_bump_keeps_expected_decisions() {
+	let tempdir = setup_scenario_workspace("pre-stable-versioning/stable-major");
+	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
+
+	let core_decision = find_decision(&json, "core");
+	assert_eq!(core_decision["bump"], "major");
+	assert_eq!(core_decision["plannedVersion"], "2.0.0");
 }

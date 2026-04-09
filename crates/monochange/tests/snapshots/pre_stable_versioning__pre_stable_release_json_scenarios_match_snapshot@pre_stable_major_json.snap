@@ -1,0 +1,114 @@
+---
+source: crates/monochange/tests/pre_stable_versioning.rs
+expression: json
+---
+{
+  "changedFiles": [
+    "crates/app/Cargo.toml",
+    "crates/core/Cargo.toml"
+  ],
+  "changelogs": [],
+  "changesets": [
+    {
+      "context": {
+        "capabilities": {
+          "actorProfiles": false,
+          "commitWebUrls": false,
+          "issueComments": false,
+          "relatedIssues": false,
+          "reviewRequestLookup": false
+        },
+        "host": null,
+        "introduced": null,
+        "lastUpdated": null,
+        "provider": "generic_git",
+        "relatedIssues": []
+      },
+      "details": null,
+      "path": ".changeset/feature.md",
+      "summary": "breaking change in core",
+      "targets": [
+        {
+          "bump": "major",
+          "changeType": null,
+          "evidenceRefs": [],
+          "id": "core",
+          "kind": "package",
+          "origin": "direct-change"
+        }
+      ]
+    }
+  ],
+  "command": "release",
+  "deletedChangesets": [],
+  "dryRun": true,
+  "groupVersion": null,
+  "plan": {
+    "compatibilityEvidence": [],
+    "decisions": [
+      {
+        "bump": "patch",
+        "package": "cargo:crates/app/Cargo.toml",
+        "plannedVersion": "0.1.1",
+        "reasons": [
+          "depends on `cargo:crates/core/Cargo.toml`"
+        ],
+        "trigger": "transitive-dependency",
+        "upstreamSources": [
+          "cargo:crates/core/Cargo.toml"
+        ]
+      },
+      {
+        "bump": "major",
+        "package": "cargo:crates/core/Cargo.toml",
+        "plannedVersion": "0.2.0",
+        "reasons": [
+          "breaking change in core"
+        ],
+        "trigger": "direct-change",
+        "upstreamSources": [
+          "cargo:crates/core/Cargo.toml"
+        ]
+      }
+    ],
+    "groups": [],
+    "unresolvedItems": [],
+    "warnings": [],
+    "workspaceRoot": "."
+  },
+  "releaseTargets": [
+    {
+      "id": "app",
+      "kind": "package",
+      "members": [
+        "app"
+      ],
+      "release": false,
+      "renderedChangelogTitle": "app 0.1.1 ([DATE])",
+      "renderedTitle": "app 0.1.1 ([DATE])",
+      "tag": false,
+      "tagName": "app/v0.1.1",
+      "version": "0.1.1",
+      "versionFormat": "namespaced"
+    },
+    {
+      "id": "core",
+      "kind": "package",
+      "members": [
+        "core"
+      ],
+      "release": false,
+      "renderedChangelogTitle": "core 0.2.0 ([DATE])",
+      "renderedTitle": "core 0.2.0 ([DATE])",
+      "tag": false,
+      "tagName": "core/v0.2.0",
+      "version": "0.2.0",
+      "versionFormat": "namespaced"
+    }
+  ],
+  "releasedPackages": [
+    "workflow-app",
+    "workflow-core"
+  ],
+  "version": null
+}

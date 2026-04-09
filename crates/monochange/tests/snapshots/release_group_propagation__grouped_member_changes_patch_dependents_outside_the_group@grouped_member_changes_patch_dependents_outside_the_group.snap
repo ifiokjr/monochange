@@ -1,0 +1,168 @@
+---
+source: crates/monochange/tests/release_group_propagation.rs
+expression: json
+---
+{
+  "changedFiles": [
+    "cargo/sdk-core/Cargo.toml",
+    "dart/mobile_sdk/pubspec.yaml",
+    "packages/web-sdk/package.json"
+  ],
+  "changelogs": [],
+  "changesets": [
+    {
+      "context": {
+        "capabilities": {
+          "actorProfiles": false,
+          "commitWebUrls": false,
+          "issueComments": false,
+          "relatedIssues": false,
+          "reviewRequestLookup": false
+        },
+        "host": null,
+        "introduced": null,
+        "lastUpdated": null,
+        "provider": "generic_git",
+        "relatedIssues": []
+      },
+      "details": null,
+      "path": ".changeset/feature.md",
+      "summary": "public API addition",
+      "targets": [
+        {
+          "bump": "minor",
+          "changeType": null,
+          "evidenceRefs": [],
+          "id": "sdk-core",
+          "kind": "package",
+          "origin": "direct-change"
+        }
+      ]
+    }
+  ],
+  "command": "release",
+  "deletedChangesets": [],
+  "dryRun": true,
+  "groupVersion": "1.1.0",
+  "plan": {
+    "compatibilityEvidence": [],
+    "decisions": [
+      {
+        "bump": "minor",
+        "package": "cargo:cargo/sdk-core/Cargo.toml",
+        "plannedVersion": "1.1.0",
+        "reasons": [
+          "public API addition",
+          "shares version group `sdk`"
+        ],
+        "trigger": "direct-change",
+        "upstreamSources": [
+          "cargo:cargo/sdk-core/Cargo.toml"
+        ]
+      },
+      {
+        "bump": "patch",
+        "package": "dart:dart/mobile_sdk/pubspec.yaml",
+        "plannedVersion": "1.0.1",
+        "reasons": [
+          "depends on `npm:packages/web-sdk/package.json`"
+        ],
+        "trigger": "transitive-dependency",
+        "upstreamSources": [
+          "cargo:cargo/sdk-core/Cargo.toml"
+        ]
+      },
+      {
+        "bump": "patch",
+        "package": "deno:deno/tool/deno.json",
+        "plannedVersion": "1.0.1",
+        "reasons": [
+          "depends on `npm:packages/web-sdk/package.json`"
+        ],
+        "trigger": "transitive-dependency",
+        "upstreamSources": [
+          "cargo:cargo/sdk-core/Cargo.toml"
+        ]
+      },
+      {
+        "bump": "minor",
+        "package": "npm:packages/web-sdk/package.json",
+        "plannedVersion": "1.1.0",
+        "reasons": [
+          "depends on `cargo:cargo/sdk-core/Cargo.toml`",
+          "shares version group `sdk`"
+        ],
+        "trigger": "version-group-synchronization",
+        "upstreamSources": [
+          "cargo:cargo/sdk-core/Cargo.toml"
+        ]
+      }
+    ],
+    "groups": [
+      {
+        "bump": "minor",
+        "id": "sdk",
+        "members": [
+          "cargo:cargo/sdk-core/Cargo.toml",
+          "npm:packages/web-sdk/package.json"
+        ],
+        "plannedVersion": "1.1.0"
+      }
+    ],
+    "unresolvedItems": [],
+    "warnings": [],
+    "workspaceRoot": "."
+  },
+  "releaseTargets": [
+    {
+      "id": "deno-tool",
+      "kind": "package",
+      "members": [
+        "deno-tool"
+      ],
+      "release": false,
+      "renderedChangelogTitle": "deno-tool 1.0.1 ([DATE])",
+      "renderedTitle": "deno-tool 1.0.1 ([DATE])",
+      "tag": false,
+      "tagName": "deno-tool/v1.0.1",
+      "version": "1.0.1",
+      "versionFormat": "namespaced"
+    },
+    {
+      "id": "mobile-sdk",
+      "kind": "package",
+      "members": [
+        "mobile-sdk"
+      ],
+      "release": false,
+      "renderedChangelogTitle": "mobile-sdk 1.0.1 ([DATE])",
+      "renderedTitle": "mobile-sdk 1.0.1 ([DATE])",
+      "tag": false,
+      "tagName": "mobile-sdk/v1.0.1",
+      "version": "1.0.1",
+      "versionFormat": "namespaced"
+    },
+    {
+      "id": "sdk",
+      "kind": "group",
+      "members": [
+        "sdk-core",
+        "web-sdk"
+      ],
+      "release": false,
+      "renderedChangelogTitle": "sdk 1.1.0 ([DATE])",
+      "renderedTitle": "sdk 1.1.0 ([DATE])",
+      "tag": false,
+      "tagName": "sdk/v1.1.0",
+      "version": "1.1.0",
+      "versionFormat": "namespaced"
+    }
+  ],
+  "releasedPackages": [
+    "deno-tool",
+    "mobile_sdk",
+    "sdk-core",
+    "web-sdk"
+  ],
+  "version": null
+}
