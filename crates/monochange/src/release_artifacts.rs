@@ -441,21 +441,57 @@ pub(crate) fn build_npm_manifest_updates(
 				package.manifest_path.display()
 			))
 		})?;
-		let mut parsed = serde_json::from_str::<serde_json::Value>(&contents).map_err(|error| {
+		let rendered = monochange_core::update_json_manifest_text(
+			&contents,
+			Some(version),
+			&[],
+			&BTreeMap::new(),
+		)
+		.map_err(|error| {
 			MonochangeError::Config(format!(
 				"failed to parse {}: {error}",
 				package.manifest_path.display()
 			))
 		})?;
-		if let Some(obj) = parsed.as_object_mut() {
-			obj.insert(
-				"version".to_string(),
-				serde_json::Value::String(version.clone()),
-			);
-		}
-		let mut rendered = serde_json::to_string_pretty(&parsed)
-			.map_err(|error| MonochangeError::Config(error.to_string()))?;
-		rendered.push('\n');
+		updates.push(FileUpdate {
+			path: package.manifest_path.clone(),
+			content: rendered.into_bytes(),
+		});
+	}
+	Ok(updates)
+}
+
+pub(crate) fn build_deno_manifest_updates(
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let released_versions = released_versions_by_record_id(plan);
+	let mut updates = Vec::new();
+	for package in packages
+		.iter()
+		.filter(|package| package.ecosystem == Ecosystem::Deno)
+	{
+		let Some(version) = released_versions.get(&package.id) else {
+			continue;
+		};
+		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
+		let rendered = monochange_core::update_json_manifest_text(
+			&contents,
+			Some(version),
+			&[],
+			&BTreeMap::new(),
+		)
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to parse {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
 		updates.push(FileUpdate {
 			path: package.manifest_path.clone(),
 			content: rendered.into_bytes(),
@@ -482,19 +518,18 @@ pub(crate) fn build_dart_manifest_updates(
 				package.manifest_path.display()
 			))
 		})?;
-		let mut mapping =
-			serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&contents).map_err(|error| {
-				MonochangeError::Config(format!(
-					"failed to parse {}: {error}",
-					package.manifest_path.display()
-				))
-			})?;
-		mapping.insert(
-			serde_yaml_ng::Value::String("version".to_string()),
-			serde_yaml_ng::Value::String(version.clone()),
-		);
-		let rendered = serde_yaml_ng::to_string(&mapping)
-			.map_err(|error| MonochangeError::Config(error.to_string()))?;
+		let rendered = monochange_dart::update_manifest_text(
+			&contents,
+			Some(version),
+			&[],
+			&BTreeMap::new(),
+		)
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to parse {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
 		updates.push(FileUpdate {
 			path: package.manifest_path.clone(),
 			content: rendered.into_bytes(),

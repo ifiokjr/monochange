@@ -1,0 +1,29 @@
+[defaults]
+parent_bump = "patch"
+changelog = false
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[package.tool]
+path = "tools/deno"
+type = "deno"
+
+[package.mobile]
+path = "packages/mobile"
+type = "dart"
+
+[ecosystems.npm]
+enabled = true
+
+[ecosystems.deno]
+enabled = true
+
+[ecosystems.dart]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"

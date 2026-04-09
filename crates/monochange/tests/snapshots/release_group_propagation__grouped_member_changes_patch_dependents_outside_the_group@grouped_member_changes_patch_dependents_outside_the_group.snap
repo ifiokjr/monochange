@@ -6,6 +6,7 @@ expression: json
   "changedFiles": [
     "cargo/sdk-core/Cargo.toml",
     "dart/mobile_sdk/pubspec.yaml",
+    "deno/tool/deno.json",
     "packages/web-sdk/package.json"
   ],
   "changelogs": [],

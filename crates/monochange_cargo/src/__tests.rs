@@ -395,6 +395,39 @@ version = "1.0.0"
 }
 
 #[test]
+fn update_versioned_file_preserves_lock_formatting() {
+	let lock = r#"version = 4
+
+[[package]]
+name = "core"
+version = "1.0.0"
+source = "registry+https://example.test"
+
+[[package]]
+name = "app"
+version = "1.0.0"
+dependencies = ["core"]
+"#;
+	let updated = update_versioned_file_text(
+		lock,
+		CargoVersionedFileKind::Lock,
+		&[],
+		None,
+		None,
+		&BTreeMap::new(),
+		&BTreeMap::from([
+			("core".to_string(), "2.0.0".to_string()),
+			("app".to_string(), "2.0.0".to_string()),
+		]),
+	)
+	.unwrap_or_else(|error| panic!("update lock: {error}"));
+	assert!(updated.contains("source = \"registry+https://example.test\""));
+	assert!(updated.contains("dependencies = [\"core\"]"));
+	assert!(updated.contains("name = \"core\"\nversion = \"2.0.0\""));
+	assert!(updated.contains("name = \"app\"\nversion = \"2.0.0\""));
+}
+
+#[test]
 fn update_versioned_file_covers_workspace_owned_and_unstructured_entries() {
 	let manifest = r#"
 [package]

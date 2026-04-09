@@ -326,7 +326,8 @@ fn parse_json_manifest(manifest_path: &Path) -> MonochangeResult<Value> {
 			manifest_path.display()
 		))
 	})?;
-	serde_json::from_str::<Value>(&contents).map_err(|error| {
+	let normalized = monochange_core::strip_json_comments(&contents);
+	serde_json::from_str::<Value>(&normalized).map_err(|error| {
 		MonochangeError::Discovery(format!(
 			"failed to parse {}: {error}",
 			manifest_path.display()

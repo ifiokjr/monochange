@@ -1,0 +1,15 @@
+---
+source: crates/monochange/tests/manifest_formatting.rs
+expression: root_lock
+---
+version = 4
+
+[[package]]
+name = "workflow-core"
+version = "1.1.0"
+source = "registry+https://example.test"
+
+[[package]]
+name = "workflow-app"
+version = "1.1.0"
+dependencies = ["workflow-core"]

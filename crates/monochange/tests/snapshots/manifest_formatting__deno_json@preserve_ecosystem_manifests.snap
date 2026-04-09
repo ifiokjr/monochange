@@ -1,0 +1,11 @@
+---
+source: crates/monochange/tests/manifest_formatting.rs
+expression: deno_json
+---
+{
+  "name": "tool",
+  "version": "1.1.0",
+  "imports": {
+    "core": "^1.0.0"
+  }
+}

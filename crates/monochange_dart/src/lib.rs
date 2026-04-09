@@ -121,6 +121,199 @@ pub fn update_dependency_fields(
 	}
 }
 
+pub fn update_manifest_text(
+	contents: &str,
+	owner_version: Option<&str>,
+	fields: &[&str],
+	versioned_deps: &std::collections::BTreeMap<String, String>,
+) -> MonochangeResult<String> {
+	serde_yaml_ng::from_str::<Mapping>(contents).map_err(|error| {
+		MonochangeError::Config(format!("failed to parse pubspec yaml: {error}"))
+	})?;
+	let line_ranges = yaml_line_ranges(contents);
+	let mut replacements = Vec::<((usize, usize), String)>::new();
+	if let Some(owner_version) = owner_version {
+		if let Some(span) = find_yaml_scalar_for_key(contents, &line_ranges, 0, "version") {
+			replacements.push((span, render_yaml_scalar(&contents[span.0..span.1], owner_version)));
+		}
+	}
+	for field in fields {
+		let Some(section_index) = find_yaml_key_line(contents, &line_ranges, 0, field) else {
+			continue;
+		};
+		for (dep_name, dep_version) in versioned_deps {
+			if let Some(span) = find_yaml_dependency_scalar(
+				contents,
+				&line_ranges,
+				section_index,
+				dep_name,
+			) {
+				replacements.push((span, render_yaml_scalar(&contents[span.0..span.1], dep_version)));
+			}
+		}
+	}
+	replacements.sort_by(|left, right| right.0 .0.cmp(&left.0 .0));
+	let mut updated = contents.to_string();
+	for ((start, end), replacement) in replacements {
+		updated.replace_range(start..end, &replacement);
+	}
+	Ok(updated)
+}
+
+fn yaml_line_ranges(contents: &str) -> Vec<(usize, usize)> {
+	let mut ranges = Vec::new();
+	let mut start = 0usize;
+	for (index, ch) in contents.char_indices() {
+		if ch == '\n' {
+			ranges.push((start, index));
+			start = index + 1;
+		}
+	}
+	if start <= contents.len() {
+		ranges.push((start, contents.len()));
+	}
+	ranges
+}
+
+fn find_yaml_scalar_for_key(
+	contents: &str,
+	line_ranges: &[(usize, usize)],
+	indent: usize,
+	key: &str,
+) -> Option<(usize, usize)> {
+	let line_index = find_yaml_key_line(contents, line_ranges, indent, key)?;
+	parse_yaml_line(contents, line_ranges[line_index]).and_then(|line| line.value_span)
+}
+
+fn find_yaml_key_line(
+	contents: &str,
+	line_ranges: &[(usize, usize)],
+	indent: usize,
+	key: &str,
+) -> Option<usize> {
+	line_ranges.iter().position(|range| {
+		parse_yaml_line(contents, *range)
+			.is_some_and(|line| line.indent == indent && line.key == key)
+	})
+}
+
+fn find_yaml_dependency_scalar(
+	contents: &str,
+	line_ranges: &[(usize, usize)],
+	section_index: usize,
+	dep_name: &str,
+) -> Option<(usize, usize)> {
+	let section = parse_yaml_line(contents, line_ranges[section_index])?;
+	let section_indent = section.indent;
+	let mut index = section_index + 1;
+	while let Some(range) = line_ranges.get(index) {
+		let Some(line) = parse_yaml_line(contents, *range) else {
+			index += 1;
+			continue;
+		};
+		if line.indent <= section_indent {
+			break;
+		}
+		if line.key == dep_name {
+			if let Some(value_span) = line.value_span {
+				return Some(value_span);
+			}
+			let dep_indent = line.indent;
+			let mut nested_index = index + 1;
+			while let Some(nested_range) = line_ranges.get(nested_index) {
+				let Some(nested_line) = parse_yaml_line(contents, *nested_range) else {
+					nested_index += 1;
+					continue;
+				};
+				if nested_line.indent <= dep_indent {
+					break;
+				}
+				if nested_line.key == "version" {
+					return nested_line.value_span;
+				}
+				nested_index += 1;
+			}
+			return None;
+		}
+		index += 1;
+	}
+	None
+}
+
+struct ParsedYamlLine<'a> {
+	indent: usize,
+	key: &'a str,
+	value_span: Option<(usize, usize)>,
+}
+
+fn parse_yaml_line(contents: &str, range: (usize, usize)) -> Option<ParsedYamlLine<'_>> {
+	let line = &contents[range.0..range.1];
+	let trimmed = line.trim_start_matches([' ', '\t']);
+	if trimmed.is_empty() || trimmed.starts_with('#') {
+		return None;
+	}
+	let indent = line.len() - trimmed.len();
+	let colon = trimmed.find(':')?;
+	let key = trimmed[..colon].trim();
+	if key.is_empty() {
+		return None;
+	}
+	let value_span = yaml_value_span(line, range.0, indent + colon + 1);
+	Some(ParsedYamlLine {
+		indent,
+		key,
+		value_span,
+	})
+}
+
+fn yaml_value_span(
+	line: &str,
+	line_start: usize,
+	value_start_in_line: usize,
+) -> Option<(usize, usize)> {
+	let suffix = line.get(value_start_in_line..)?;
+	let value_offset = suffix.find(|ch: char| !matches!(ch, ' ' | '\t'))?;
+	let value = &suffix[value_offset..];
+	if value.starts_with('#') {
+		return None;
+	}
+	let span_start = line_start + value_start_in_line + value_offset;
+	let span_end = if let Some(quote) = value
+		.chars()
+		.next()
+		.filter(|quote| *quote == '"' || *quote == '\'')
+	{
+		let quote_end = find_yaml_quote_end(value, quote)?;
+		span_start + quote_end + 1
+	} else {
+		let comment_index = value.find('#').unwrap_or(value.len());
+		let trimmed_end = value[..comment_index].trim_end_matches([' ', '\t']).len();
+		span_start + trimmed_end
+	};
+	(span_end > span_start).then_some((span_start, span_end))
+}
+
+fn find_yaml_quote_end(value: &str, quote: char) -> Option<usize> {
+	let mut chars = value.char_indices();
+	chars.next()?;
+	for (index, ch) in chars {
+		if ch == quote {
+			return Some(index);
+		}
+	}
+	None
+}
+
+fn render_yaml_scalar(existing: &str, value: &str) -> String {
+	if existing.starts_with('"') && existing.ends_with('"') {
+		return format!("\"{value}\"");
+	}
+	if existing.starts_with('\'') && existing.ends_with('\'') {
+		return format!("'{value}'");
+	}
+	value.to_string()
+}
+
 pub fn update_pubspec_lock(
 	mapping: &mut Mapping,
 	raw_versions: &std::collections::BTreeMap<String, String>,
