@@ -162,6 +162,123 @@ fn gitea_token_requires_environment_variable() {
 }
 
 #[test]
+fn tag_and_compare_urls_use_trimmed_gitea_host() {
+	let source = sample_source(None, Some("https://codeberg.org/".to_string()));
+	assert_eq!(
+		tag_url(&source, "v1.2.3"),
+		"https://codeberg.org/org/monochange/releases/tag/v1.2.3"
+	);
+	assert_eq!(
+		compare_url(&source, "v1.2.2", "v1.2.3"),
+		"https://codeberg.org/org/monochange/compare/v1.2.2...v1.2.3"
+	);
+}
+
+#[test]
+fn auth_headers_reject_invalid_gitea_tokens() {
+	let error = auth_headers("bad\nvalue")
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid header error"));
+	assert!(error
+		.to_string()
+		.contains("invalid Gitea token header value"));
+}
+
+#[test]
+fn gitea_json_helpers_cover_not_found_and_status_errors() {
+	let server = MockServer::start();
+	let missing = server.mock(|when, then| {
+		when.method(GET).path("/missing");
+		then.status(404);
+	});
+	let failing_get = server.mock(|when, then| {
+		when.method(GET).path("/fail-get");
+		then.status(500);
+	});
+	let failing_post = server.mock(|when, then| {
+		when.method(POST).path("/fail-post");
+		then.status(500);
+	});
+	let failing_patch = server.mock(|when, then| {
+		when.method(PATCH).path("/fail-patch");
+		then.status(500);
+	});
+	let client = gitea_client().unwrap_or_else(|error| panic!("client: {error}"));
+	let base = server.base_url();
+
+	let missing_value = get_optional_json::<serde_json::Value>(
+		&client,
+		"token",
+		&format!("{base}/missing"),
+	)
+	.unwrap_or_else(|error| panic!("optional json: {error}"));
+	assert_eq!(missing_value, None);
+
+	let get_error = get_json::<serde_json::Value>(&client, "token", &format!("{base}/fail-get"))
+		.err()
+		.unwrap_or_else(|| panic!("expected get error"));
+	assert!(get_error.to_string().contains("Gitea API GET"));
+
+	let post_error = post_json::<_, serde_json::Value>(
+		&client,
+		"token",
+		&format!("{base}/fail-post"),
+		&serde_json::json!({"tag_name": "v1.2.3"}),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected post error"));
+	assert!(post_error.to_string().contains("Gitea API POST"));
+
+	let patch_error = patch_json::<_, serde_json::Value>(
+		&client,
+		"token",
+		&format!("{base}/fail-patch"),
+		&serde_json::json!({"name": "v1.2.3"}),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected patch error"));
+	assert!(patch_error.to_string().contains("Gitea API PATCH"));
+
+	missing.assert();
+	failing_get.assert();
+	failing_post.assert();
+	failing_patch.assert();
+}
+
+#[test]
+fn release_pull_request_branch_and_body_helpers_cover_sanitization_and_formatting() {
+	assert_eq!(
+		release_pull_request_branch("monochange/release/", "Release PR!"),
+		"monochange/release/release-pr"
+	);
+	assert_eq!(
+		release_pull_request_branch("monochange/release/", "!!!"),
+		"monochange/release/release"
+	);
+
+	let mut lines = Vec::new();
+	push_body_entries(
+		&mut lines,
+		&[
+			"plain entry".to_string(),
+			"- existing bullet".to_string(),
+			"# heading".to_string(),
+			"first line\nsecond line".to_string(),
+		],
+	);
+	assert_eq!(
+		lines,
+		vec![
+			"- plain entry".to_string(),
+			"- existing bullet".to_string(),
+			"# heading".to_string(),
+			"first line".to_string(),
+			"second line".to_string(),
+		]
+	);
+}
+
+#[test]
 fn release_body_supports_generated_notes_and_minimal_fallback() {
 	let generated_source = SourceConfiguration {
 		releases: ReleaseProviderSettings {
