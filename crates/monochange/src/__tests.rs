@@ -4464,6 +4464,41 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 }
 
 #[test]
+fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_configs() {
+	let configuration = monochange_core::WorkspaceConfiguration {
+		root_path: PathBuf::from("."),
+		defaults: monochange_core::WorkspaceDefaults::default(),
+		release_notes: monochange_core::ReleaseNotesSettings::default(),
+		packages: Vec::new(),
+		groups: Vec::new(),
+		cli: Vec::new(),
+		changesets: monochange_core::ChangesetSettings::default(),
+		source: None,
+		cargo: monochange_core::EcosystemSettings::default(),
+		npm: monochange_core::EcosystemSettings::default(),
+		deno: monochange_core::EcosystemSettings::default(),
+		dart: monochange_core::EcosystemSettings::default(),
+	};
+	let mut cli = vec![monochange_core::CliCommandDefinition {
+		name: "change".to_string(),
+		help_text: None,
+		inputs: vec![CliInputDefinition {
+			name: "type".to_string(),
+			kind: CliInputKind::Choice,
+			help_text: None,
+			required: false,
+			default: None,
+			choices: vec!["existing".to_string()],
+			short: None,
+		}],
+		steps: Vec::new(),
+	}];
+	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
+	assert_eq!(cli[0].inputs[0].choices, vec!["existing"]);
+	assert_eq!(cli[0].inputs[0].kind, CliInputKind::Choice);
+}
+
+#[test]
 fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 	let cli = crate::cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
 	assert_eq!(
@@ -4472,6 +4507,94 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 			.collect::<Vec<_>>(),
 		vec!["release"]
 	);
+}
+
+#[test]
+fn build_assist_subcommand_parses_valid_inputs_and_rejects_unknown_assistants() {
+	let command = clap::Command::new("mc").subcommand(crate::build_assist_subcommand());
+	let matches = command
+		.clone()
+		.try_get_matches_from([OsString::from("mc"), OsString::from("assist"), OsString::from("pi")])
+		.unwrap_or_else(|error| panic!("assist matches: {error}"));
+	let (_, assist_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected assist subcommand"));
+	assert_eq!(
+		assist_matches
+			.get_one::<String>("assistant")
+			.map(String::as_str),
+		Some("pi")
+	);
+	assert_eq!(
+		assist_matches.get_one::<String>("format").map(String::as_str),
+		Some("text")
+	);
+
+	let error = command
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("assist"),
+			OsString::from("unknown"),
+		])
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid assistant error"));
+	assert_eq!(error.kind(), clap::error::ErrorKind::InvalidValue);
+}
+
+#[test]
+fn build_release_record_subcommand_requires_from_and_supports_json_output() {
+	let command = clap::Command::new("mc").subcommand(crate::build_release_record_subcommand());
+	let matches = command
+		.clone()
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("release-record"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		])
+		.unwrap_or_else(|error| panic!("release-record matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected release-record subcommand"));
+	assert_eq!(
+		subcommand_matches.get_one::<String>("from").map(String::as_str),
+		Some("HEAD")
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("format")
+			.map(String::as_str),
+		Some("json")
+	);
+	let error = command
+		.try_get_matches_from([OsString::from("mc"), OsString::from("release-record")])
+		.err()
+		.unwrap_or_else(|| panic!("expected missing from error"));
+	assert_eq!(error.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+}
+
+#[test]
+fn build_command_with_cli_registers_custom_subcommands_and_default_help_text() {
+	let cli = vec![monochange_core::CliCommandDefinition {
+		name: "custom".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+	}];
+	let command = crate::build_command_with_cli("monochange", &cli);
+	assert!(command.clone().find_subcommand("custom").is_some());
+	let error = command
+		.try_get_matches_from([
+			OsString::from("monochange"),
+			OsString::from("custom"),
+			OsString::from("--help"),
+		])
+		.err()
+		.unwrap_or_else(|| panic!("expected help output"));
+	assert_eq!(error.kind(), clap::error::ErrorKind::DisplayHelp);
+	assert!(error.to_string().contains("Run the `custom` command"));
 }
 
 #[test]
