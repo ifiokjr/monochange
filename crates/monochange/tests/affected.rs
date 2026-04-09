@@ -1,7 +1,7 @@
 use std::path::Path;
-use std::process::Command;
 
 use insta::assert_json_snapshot;
+use monochange_test_helpers::git;
 use rstest::rstest;
 use serde_json::Value;
 
@@ -156,11 +156,11 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
 
-	run_git(root, &["init"]);
-	run_git(root, &["config", "user.name", "Test"]);
-	run_git(root, &["config", "user.email", "test@test.com"]);
-	run_git(root, &["add", "."]);
-	run_git(root, &["commit", "-m", "initial"]);
+	git(root, &["init"]);
+	git(root, &["config", "user.name", "Test"]);
+	git(root, &["config", "user.email", "test@test.com"]);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "initial"]);
 
 	copy_directory(&fixture_path("affected/since-changed-source"), root);
 
@@ -177,11 +177,11 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
 
-	run_git(root, &["init"]);
-	run_git(root, &["config", "user.name", "Test"]);
-	run_git(root, &["config", "user.email", "test@test.com"]);
-	run_git(root, &["add", "."]);
-	run_git(root, &["commit", "-m", "initial"]);
+	git(root, &["init"]);
+	git(root, &["config", "user.name", "Test"]);
+	git(root, &["config", "user.email", "test@test.com"]);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "initial"]);
 
 	copy_directory(&fixture_path("affected/since-changed-with-changeset"), root);
 
@@ -194,11 +194,11 @@ fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
 
-	run_git(root, &["init"]);
-	run_git(root, &["config", "user.name", "Test"]);
-	run_git(root, &["config", "user.email", "test@test.com"]);
-	run_git(root, &["add", "."]);
-	run_git(root, &["commit", "-m", "initial"]);
+	git(root, &["init"]);
+	git(root, &["config", "user.name", "Test"]);
+	git(root, &["config", "user.email", "test@test.com"]);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "initial"]);
 
 	let output = run_affected_raw(
 		root,
@@ -247,18 +247,4 @@ fn run_affected_raw(root: &Path, args: &[&str]) -> std::process::Output {
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("command output: {error}"))
-}
-
-fn run_git(root: &Path, args: &[&str]) {
-	let output = Command::new("git")
-		.current_dir(root)
-		.args(args)
-		.output()
-		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
-	assert!(
-		output.status.success(),
-		"git {args:?} failed: {}{}",
-		String::from_utf8_lossy(&output.stdout),
-		String::from_utf8_lossy(&output.stderr)
-	);
 }

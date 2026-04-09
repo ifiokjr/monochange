@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use insta::assert_json_snapshot;
 use insta::assert_snapshot;
@@ -11,6 +10,8 @@ use monochange_core::ReleaseRecordProvider;
 use monochange_core::ReleaseRecordTarget;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
+use monochange_test_helpers::git;
+use monochange_test_helpers::git_output_trimmed;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -241,40 +242,18 @@ fn commit_plain(root: &Path, subject: &str, fixture_relative: &str) -> String {
 	write_release_file_from_fixture(root, fixture_relative);
 	git(root, &["add", "release.txt"]);
 	git(root, &["commit", "-m", subject]);
-	git_output(root, &["rev-parse", "HEAD"])
+	git_output_trimmed(root, &["rev-parse", "HEAD"])
 }
 
 fn commit_with_body(root: &Path, subject: &str, body: &str, fixture_relative: &str) -> String {
 	write_release_file_from_fixture(root, fixture_relative);
 	git(root, &["add", "release.txt"]);
 	git(root, &["commit", "--message", subject, "--message", body]);
-	git_output(root, &["rev-parse", "HEAD"])
+	git_output_trimmed(root, &["rev-parse", "HEAD"])
 }
 
 fn write_release_file_from_fixture(root: &Path, fixture_relative: &str) {
 	let source = fixture_path(fixture_relative).join("release.txt");
 	fs::copy(&source, root.join("release.txt"))
 		.unwrap_or_else(|error| panic!("copy {} into repo: {error}", source.display()));
-}
-
-fn git(root: &Path, args: &[&str]) {
-	let status = Command::new("git")
-		.current_dir(root)
-		.args(args)
-		.status()
-		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
-	assert!(status.success(), "git {args:?} failed");
-}
-
-fn git_output(root: &Path, args: &[&str]) -> String {
-	let output = Command::new("git")
-		.current_dir(root)
-		.args(args)
-		.output()
-		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
-	assert!(output.status.success(), "git {args:?} failed");
-	String::from_utf8(output.stdout)
-		.unwrap_or_else(|error| panic!("git output utf8: {error}"))
-		.trim()
-		.to_string()
 }
