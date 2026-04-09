@@ -9,6 +9,7 @@ use semver::Version;
 use serde_yaml_ng::Value;
 
 use crate::adapter;
+use crate::default_lockfile_commands;
 use crate::discover_dart_packages;
 use crate::discover_lockfiles;
 use crate::discover_workspace_packages;
@@ -119,6 +120,55 @@ fn discover_lockfiles_falls_back_to_manifest_directory() {
 			&fixture_root.join("packages/app/pubspec.lock")
 		))
 	);
+}
+
+#[test]
+fn default_lockfile_commands_choose_dart_or_flutter_pub_get() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/dart/manifest-lockfile-workspace");
+	let dart_package = PackageRecord::new(
+		Ecosystem::Dart,
+		"nested_dart_app",
+		fixture_root.join("packages/app/pubspec.yaml"),
+		fixture_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	assert_eq!(
+		default_lockfile_commands(&dart_package),
+		vec![monochange_core::LockfileCommandExecution {
+			command: "dart pub get".to_string(),
+			cwd: monochange_core::normalize_path(&fixture_root.join("packages/app")),
+			shell: monochange_core::ShellConfig::None,
+		}]
+	);
+
+	let flutter_package = PackageRecord::new(
+		Ecosystem::Flutter,
+		"nested_flutter_app",
+		fixture_root.join("packages/app/pubspec.yaml"),
+		fixture_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	assert_eq!(
+		default_lockfile_commands(&flutter_package),
+		vec![monochange_core::LockfileCommandExecution {
+			command: "flutter pub get".to_string(),
+			cwd: monochange_core::normalize_path(&fixture_root.join("packages/app")),
+			shell: monochange_core::ShellConfig::None,
+		}]
+	);
+
+	let cargo_package = PackageRecord::new(
+		Ecosystem::Cargo,
+		"not-dart",
+		fixture_root.join("packages/app/pubspec.yaml"),
+		fixture_root,
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	assert!(default_lockfile_commands(&cargo_package).is_empty());
 }
 
 #[test]

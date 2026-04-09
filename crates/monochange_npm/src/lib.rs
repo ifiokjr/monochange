@@ -46,11 +46,13 @@ use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
+use monochange_core::LockfileCommandExecution;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::ShellConfig;
 use semver::Version;
 use serde_json::Value;
 use serde_yaml_ng::Value as YamlValue;
@@ -116,6 +118,33 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 		);
 	}
 	discovered
+}
+
+pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommandExecution> {
+	discover_lockfiles(package)
+		.into_iter()
+		.map(|lockfile| {
+			let file_name = lockfile
+				.file_name()
+				.and_then(|name| name.to_str())
+				.unwrap_or_default();
+			let command = if file_name == "package-lock.json" {
+				"npm install --package-lock-only"
+			} else if file_name == "pnpm-lock.yaml" {
+				"pnpm install --lockfile-only"
+			} else {
+				"bun install --lockfile-only"
+			};
+			LockfileCommandExecution {
+				command: command.to_string(),
+				cwd: lockfile
+					.parent()
+					.unwrap_or(&package.workspace_root)
+					.to_path_buf(),
+				shell: ShellConfig::None,
+			}
+		})
+		.collect()
 }
 
 pub fn update_json_dependency_fields(

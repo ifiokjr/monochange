@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+version=$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)
+cat > Cargo.lock <<EOF
+[[package]]
+name = "workflow-core"
+version = "$version"
+EOF

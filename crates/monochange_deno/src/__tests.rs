@@ -11,6 +11,7 @@ use semver::Version;
 use serde_json::json;
 
 use crate::adapter;
+use crate::default_lockfile_commands;
 use crate::discover_deno_packages;
 use crate::discover_lockfiles;
 use crate::supported_versioned_file_kind;
@@ -152,4 +153,19 @@ fn discover_lockfiles_returns_empty_when_no_lockfile_exists() {
 		PublishState::Public,
 	);
 	assert!(discover_lockfiles(&package).is_empty());
+}
+
+#[test]
+fn default_lockfile_commands_do_not_infer_a_deno_command() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/monochange/deno-lock-release");
+	let package = PackageRecord::new(
+		Ecosystem::Deno,
+		"workflow-app",
+		fixture_root.join("packages/app/deno.json"),
+		fixture_root,
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	assert!(default_lockfile_commands(&package).is_empty());
 }

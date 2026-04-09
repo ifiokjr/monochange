@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -26,11 +28,14 @@ use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
+use crate::build_lockfile_command_executions;
 use crate::discover_workspace;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
 use crate::parse_change_bump;
 use crate::plan_release;
+use crate::prepare_release_execution;
+use crate::release_artifacts::set_force_build_file_diff_previews_error;
 use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
@@ -1043,15 +1048,17 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 }
 
 #[test]
-fn command_release_auto_discovers_and_updates_cargo_lockfiles() {
+fn command_release_runs_inferred_cargo_lockfile_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_cargo_lock_release_fixture(tempdir.path());
 
-	run_cli(
-		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
-	)
-	.unwrap_or_else(|error| panic!("command output: {error}"));
+	with_path_prefixed(tempdir.path(), || {
+		run_cli(
+			tempdir.path(),
+			[OsString::from("mc"), OsString::from("release")],
+		)
+		.unwrap_or_else(|error| panic!("command output: {error}"));
+	});
 	let cargo_lock = fs::read_to_string(tempdir.path().join("Cargo.lock"))
 		.unwrap_or_else(|error| panic!("cargo lock: {error}"));
 
@@ -1059,15 +1066,17 @@ fn command_release_auto_discovers_and_updates_cargo_lockfiles() {
 }
 
 #[test]
-fn command_release_auto_discovers_and_updates_package_lockfiles() {
+fn command_release_runs_inferred_npm_lockfile_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_npm_lock_release_fixture(tempdir.path());
 
-	run_cli(
-		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
-	)
-	.unwrap_or_else(|error| panic!("command output: {error}"));
+	with_path_prefixed(tempdir.path(), || {
+		run_cli(
+			tempdir.path(),
+			[OsString::from("mc"), OsString::from("release")],
+		)
+		.unwrap_or_else(|error| panic!("command output: {error}"));
+	});
 	let package_lock = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
 		.unwrap_or_else(|error| panic!("package lock: {error}"));
 
@@ -1075,15 +1084,17 @@ fn command_release_auto_discovers_and_updates_package_lockfiles() {
 }
 
 #[test]
-fn command_release_auto_discovers_and_updates_bun_lockb_files() {
+fn command_release_runs_inferred_bun_lockfile_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_bun_lockb_release_fixture(tempdir.path());
 
-	run_cli(
-		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
-	)
-	.unwrap_or_else(|error| panic!("command output: {error}"));
+	with_path_prefixed(tempdir.path(), || {
+		run_cli(
+			tempdir.path(),
+			[OsString::from("mc"), OsString::from("release")],
+		)
+		.unwrap_or_else(|error| panic!("command output: {error}"));
+	});
 	let bun_lock = fs::read(tempdir.path().join("packages/app/bun.lockb"))
 		.unwrap_or_else(|error| panic!("bun lockb: {error}"));
 
@@ -1091,19 +1102,68 @@ fn command_release_auto_discovers_and_updates_bun_lockb_files() {
 }
 
 #[test]
-fn command_release_auto_discovers_and_updates_deno_lockfiles() {
+fn build_lockfile_command_executions_skips_default_deno_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_deno_lock_release_fixture(tempdir.path());
-
-	run_cli(
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let discovery =
+		discover_workspace(tempdir.path()).unwrap_or_else(|error| panic!("discovery: {error}"));
+	let plan = plan_release(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		&tempdir.path().join(".changeset/feature.md"),
 	)
-	.unwrap_or_else(|error| panic!("command output: {error}"));
-	let deno_lock = fs::read_to_string(tempdir.path().join("packages/app/deno.lock"))
-		.unwrap_or_else(|error| panic!("deno lock: {error}"));
+	.unwrap_or_else(|error| panic!("plan: {error}"));
 
-	assert!(deno_lock.contains("npm:app@1.1.0"));
+	assert!(build_lockfile_command_executions(
+		tempdir.path(),
+		&configuration,
+		&discovery.packages,
+		&plan,
+	)
+	.unwrap_or_else(|error| panic!("lockfile commands: {error}"))
+	.is_empty());
+}
+
+#[test]
+fn command_release_prefers_custom_lockfile_commands_over_defaults() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/custom-lockfile-command", tempdir.path());
+
+	with_path_prefixed(tempdir.path(), || {
+		run_cli(
+			tempdir.path(),
+			[OsString::from("mc"), OsString::from("release")],
+		)
+		.unwrap_or_else(|error| panic!("command output: {error}"));
+	});
+	let package_lock = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
+		.unwrap_or_else(|error| panic!("package lock: {error}"));
+
+	assert!(tempdir.path().join("packages/app/custom-ran.txt").exists());
+	assert!(!tempdir.path().join("packages/app/default-ran.txt").exists());
+	assert!(package_lock.contains("1.1.0-custom"));
+}
+
+#[test]
+fn prepare_release_execution_previews_lockfile_command_updates_without_mutating_the_workspace() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/custom-lockfile-command", tempdir.path());
+	let before = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
+		.unwrap_or_else(|error| panic!("package lock before dry-run: {error}"));
+
+	let prepared = with_path_prefixed(tempdir.path(), || {
+		prepare_release_execution(tempdir.path(), true)
+			.unwrap_or_else(|error| panic!("prepare release execution: {error}"))
+	});
+	let after = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
+		.unwrap_or_else(|error| panic!("package lock after dry-run: {error}"));
+
+	assert_eq!(before, after);
+	assert!(prepared.file_diffs.iter().any(|diff| {
+		diff.path.as_path() == Path::new("packages/app/package-lock.json")
+			&& diff.diff.contains("1.1.0-custom")
+	}));
 }
 
 #[test]
@@ -2168,6 +2228,35 @@ fn seed_step_outputs_fixture(root: &Path) {
 		fs::copy(&source, &target)
 			.unwrap_or_else(|error| panic!("copy {}: {error}", source.display()));
 	}
+}
+
+#[cfg(unix)]
+fn make_executable(path: &Path) {
+	let metadata =
+		fs::metadata(path).unwrap_or_else(|error| panic!("metadata {}: {error}", path.display()));
+	let mut permissions = metadata.permissions();
+	permissions.set_mode(0o755);
+	fs::set_permissions(path, permissions)
+		.unwrap_or_else(|error| panic!("set permissions {}: {error}", path.display()));
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &Path) {}
+
+fn with_path_prefixed<T>(root: &Path, action: impl FnOnce() -> T) -> T {
+	let bin_dir = root.join("tools/bin");
+	for tool in ["cargo", "npm", "pnpm", "bun", "custom-lock"] {
+		let candidate = bin_dir.join(tool);
+		if candidate.exists() {
+			make_executable(&candidate);
+		}
+	}
+	let existing = std::env::var_os("PATH").unwrap_or_default();
+	let mut combined = std::env::split_paths(&existing).collect::<Vec<_>>();
+	combined.insert(0, bin_dir);
+	let new_path =
+		std::env::join_paths(combined).unwrap_or_else(|error| panic!("join PATH entries: {error}"));
+	temp_env::with_var("PATH", Some(new_path), action)
 }
 
 fn copy_fixture(fixture_relative: &str, dest: &Path) {
@@ -6795,7 +6884,7 @@ fn build_file_diff_previews_reports_directory_read_errors() {
 fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
 	let prepared = temp_env::with_var("NO_COLOR", Some("1"), || {
-		crate::prepare_release_execution(tempdir.path(), true)
+		prepare_release_execution(tempdir.path(), true)
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"))
 	});
 	assert!(!prepared.prepared_release.changed_files.is_empty());
@@ -6809,11 +6898,11 @@ fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
 #[test]
 fn prepare_release_execution_propagates_file_diff_preview_errors() {
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
-	crate::set_force_build_file_diff_previews_error(true);
-	let error = crate::prepare_release_execution(tempdir.path(), true)
+	set_force_build_file_diff_previews_error(true);
+	let error = prepare_release_execution(tempdir.path(), true)
 		.err()
 		.unwrap_or_else(|| panic!("expected forced file diff preview error"));
-	crate::set_force_build_file_diff_previews_error(false);
+	set_force_build_file_diff_previews_error(false);
 	assert!(error
 		.to_string()
 		.contains("forced build_file_diff_previews test error"));

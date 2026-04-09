@@ -229,6 +229,8 @@ pub(crate) use git_support::run_git_process;
 #[cfg(test)]
 pub(crate) use git_support::run_git_status;
 #[cfg(test)]
+pub(crate) use workspace_ops::build_lockfile_command_executions;
+#[cfg(test)]
 pub(crate) use workspace_ops::change_type_default_bump;
 #[cfg(test)]
 pub(crate) use workspace_ops::render_interactive_changeset_markdown;

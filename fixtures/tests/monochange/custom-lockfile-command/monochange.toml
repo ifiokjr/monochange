@@ -1,0 +1,16 @@
+[defaults]
+package_type = "npm"
+changelog = false
+
+[package.app]
+path = "packages/app"
+
+[ecosystems.npm]
+lockfile_commands = [
+  { command = "custom-lock", cwd = "packages/app", shell = true },
+]
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"

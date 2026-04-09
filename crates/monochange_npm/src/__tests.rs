@@ -12,6 +12,7 @@ use serde_json::json;
 use serde_yaml_ng::Value as YamlValue;
 
 use crate::adapter;
+use crate::default_lockfile_commands;
 use crate::detect_npm_manager;
 use crate::discover_lockfiles;
 use crate::discover_npm_packages;
@@ -153,6 +154,66 @@ fn discover_lockfiles_falls_back_to_manifest_directory() {
 		Some(&monochange_core::normalize_path(
 			&fixture_root.join("packages/web/package-lock.json")
 		))
+	);
+}
+
+#[test]
+fn default_lockfile_commands_match_owned_npm_lockfile_kind() {
+	let package_lock_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/manifest-lockfile-workspace");
+	let package_lock_package = PackageRecord::new(
+		Ecosystem::Npm,
+		"nested-web",
+		package_lock_root.join("packages/web/package.json"),
+		package_lock_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	assert_eq!(
+		default_lockfile_commands(&package_lock_package),
+		vec![monochange_core::LockfileCommandExecution {
+			command: "npm install --package-lock-only".to_string(),
+			cwd: monochange_core::normalize_path(&package_lock_root.join("packages/web")),
+			shell: monochange_core::ShellConfig::None,
+		}]
+	);
+
+	let pnpm_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tests/npm/lockfile-workspace");
+	let pnpm_package = PackageRecord::new(
+		Ecosystem::Npm,
+		"nested-web",
+		pnpm_root.join("packages/web/package.json"),
+		pnpm_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	assert_eq!(
+		default_lockfile_commands(&pnpm_package),
+		vec![monochange_core::LockfileCommandExecution {
+			command: "pnpm install --lockfile-only".to_string(),
+			cwd: monochange_core::normalize_path(&pnpm_root),
+			shell: monochange_core::ShellConfig::None,
+		}]
+	);
+
+	let bun_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/monochange/bun-lock-release");
+	let bun_package = PackageRecord::new(
+		Ecosystem::Npm,
+		"workflow-app",
+		bun_root.join("packages/app/package.json"),
+		bun_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	assert_eq!(
+		default_lockfile_commands(&bun_package),
+		vec![monochange_core::LockfileCommandExecution {
+			command: "bun install --lockfile-only".to_string(),
+			cwd: monochange_core::normalize_path(&bun_root.join("packages/app")),
+			shell: monochange_core::ShellConfig::None,
+		}]
 	);
 }
 

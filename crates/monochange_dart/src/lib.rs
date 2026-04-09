@@ -45,11 +45,13 @@ use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
+use monochange_core::LockfileCommandExecution;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::ShellConfig;
 use semver::Version;
 use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value;
@@ -102,6 +104,25 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 		);
 	}
 	discovered
+}
+
+pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommandExecution> {
+	let command = match package.ecosystem {
+		Ecosystem::Flutter => "flutter pub get",
+		Ecosystem::Dart => "dart pub get",
+		_ => return Vec::new(),
+	};
+	discover_lockfiles(package)
+		.into_iter()
+		.map(|lockfile| LockfileCommandExecution {
+			command: command.to_string(),
+			cwd: lockfile
+				.parent()
+				.unwrap_or(&package.workspace_root)
+				.to_path_buf(),
+			shell: ShellConfig::None,
+		})
+		.collect()
 }
 
 pub fn update_dependency_fields(

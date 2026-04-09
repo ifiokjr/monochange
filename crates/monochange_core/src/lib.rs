@@ -933,6 +933,24 @@ pub struct EcosystemSettings {
 	pub dependency_version_prefix: Option<String>,
 	#[serde(default)]
 	pub versioned_files: Vec<VersionedFileDefinition>,
+	#[serde(default)]
+	pub lockfile_commands: Vec<LockfileCommandDefinition>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LockfileCommandDefinition {
+	pub command: String,
+	#[serde(default)]
+	pub cwd: Option<PathBuf>,
+	#[serde(default)]
+	pub shell: ShellConfig,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LockfileCommandExecution {
+	pub command: String,
+	pub cwd: PathBuf,
+	pub shell: ShellConfig,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]

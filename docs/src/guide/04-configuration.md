@@ -38,7 +38,7 @@ format = "keep_a_changelog"
 [package.sdk-core]
 path = "crates/sdk_core"
 versioned_files = [
-	"Cargo.lock",
+	"Cargo.toml",
 	{ path = "crates/sdk_core/extra.toml", type = "cargo" },
 ]
 tag = false
@@ -176,25 +176,45 @@ Examples:
 
 ```toml
 # package-scoped shorthand infers the package ecosystem
-versioned_files = ["Cargo.lock"]
+versioned_files = ["Cargo.toml"]
 versioned_files = ["**/crates/*/Cargo.toml"]
 
 # explicit typed entries remain available
-versioned_files = [{ path = "Cargo.lock", type = "cargo" }]
 versioned_files = [{ path = "group.toml", type = "cargo", name = "sdk-core" }]
-versioned_files = [{ path = "bun.lockb", type = "npm" }]
+versioned_files = [{ path = "docs/version.txt", type = "cargo" }]
 
 # ecosystem-level defaults inherited by matching packages
 [ecosystems.npm]
 versioned_files = ["**/packages/*/package.json"]
-
-[package.web]
-path = "packages/web"
-ignore_ecosystem_versioned_files = true
-versioned_files = ["package-lock.json"]
 ```
 
 Dependency targets in `versioned_files` must reference declared package ids. Groups must use explicit typed entries because monochange cannot infer a group ecosystem from a bare string.
+
+## Lockfile commands
+
+Lockfile refresh is command-driven. MonoChange runs lockfile commands only when at least one package in that ecosystem receives a planned version change, whether directly or through a group release.
+
+When you do not configure `lockfile_commands`, MonoChange infers sensible defaults:
+
+- Cargo: `cargo generate-lockfile`
+- npm-family: detects owned lockfiles and runs the matching command for each workspace root
+  - `package-lock.json` → `npm install --package-lock-only`
+  - `pnpm-lock.yaml` → `pnpm install --lockfile-only`
+  - `bun.lock` / `bun.lockb` → `bun install --lockfile-only`
+- Dart / Flutter: `dart pub get` or `flutter pub get`
+- Deno: no inferred default today
+
+If you configure `lockfile_commands` for an ecosystem, MonoChange stops inferring defaults for that ecosystem and those commands fully own lockfile refresh.
+
+```toml
+[ecosystems.npm]
+lockfile_commands = [
+	{ command = "pnpm install --lockfile-only", cwd = "packages/web" },
+	{ command = "npm install --package-lock-only", cwd = "packages/legacy", shell = true },
+]
+```
+
+`cwd` is resolved relative to the workspace root. `shell = false` runs the command directly, `shell = true` uses `sh -c`, and `shell = "bash"` uses a custom shell binary.
 
 ## CLI commands
 
@@ -396,7 +416,7 @@ These settings are parsed from config and document intended control points for d
 enabled = true
 roots = ["crates/*"]
 exclude = ["crates/experimental/*"]
-versioned_files = ["Cargo.lock"]
+lockfile_commands = [{ command = "cargo generate-lockfile" }]
 
 [ecosystems.npm]
 enabled = true
@@ -404,16 +424,17 @@ roots = ["packages/*"]
 exclude = ["packages/legacy/*"]
 dependency_version_prefix = "^"
 versioned_files = ["**/packages/*/package.json"]
-# npm-family lockfiles can include package-lock.json, pnpm-lock.yaml,
-# bun.lock, and bun.lockb depending on the workspace manager.
+lockfile_commands = [
+	{ command = "pnpm install --lockfile-only", cwd = "packages/web" },
+]
 
 [ecosystems.deno]
 enabled = true
-versioned_files = ["deno.lock"]
+# Deno currently has no inferred lockfile command.
 
 [ecosystems.dart]
 enabled = true
-versioned_files = ["pubspec.lock"]
+lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command as ProcessCommand;
 
 use monochange_cargo::discover_cargo_packages;
 use monochange_config::apply_version_groups;
@@ -11,6 +13,8 @@ use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
+use monochange_core::LockfileCommandDefinition;
+use monochange_core::LockfileCommandExecution;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
@@ -182,6 +186,78 @@ fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 		Ecosystem::Dart => PackageType::Dart,
 		Ecosystem::Flutter => PackageType::Flutter,
 	}
+}
+
+pub(crate) fn build_lockfile_command_executions(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> MonochangeResult<Vec<LockfileCommandExecution>> {
+	let released_versions = released_versions_by_record_id(plan);
+	#[rustfmt::skip]
+	let cargo_executions = resolve_lockfile_command_executions(root, &configuration.cargo.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)).collect(), monochange_cargo::default_lockfile_commands)?;
+	#[rustfmt::skip]
+	let npm_executions = resolve_lockfile_command_executions(root, &configuration.npm.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)).collect(), monochange_npm::default_lockfile_commands)?;
+	#[rustfmt::skip]
+	let deno_executions = resolve_lockfile_command_executions(root, &configuration.deno.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)).collect(), monochange_deno::default_lockfile_commands)?;
+	#[rustfmt::skip]
+	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().filter(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)).collect(), monochange_dart::default_lockfile_commands)?;
+	let mut executions = cargo_executions;
+	executions.extend(npm_executions);
+	executions.extend(deno_executions);
+	executions.extend(dart_executions);
+	Ok(dedup_lockfile_command_executions(executions))
+}
+
+fn resolve_lockfile_command_executions(
+	root: &Path,
+	configured_commands: &[LockfileCommandDefinition],
+	released_packages: Vec<&PackageRecord>,
+	infer_defaults: fn(&PackageRecord) -> Vec<LockfileCommandExecution>,
+) -> MonochangeResult<Vec<LockfileCommandExecution>> {
+	if released_packages.is_empty() {
+		return Ok(Vec::new());
+	}
+	if configured_commands.is_empty() {
+		return Ok(released_packages
+			.into_iter()
+			.flat_map(infer_defaults)
+			.collect());
+	}
+	configured_commands
+		.iter()
+		.map(|command| {
+			let cwd = command
+				.cwd
+				.as_ref()
+				.map_or_else(|| root.to_path_buf(), |cwd| resolve_config_path(root, cwd));
+			Ok(LockfileCommandExecution {
+				command: command.command.clone(),
+				cwd,
+				shell: command.shell.clone(),
+			})
+		})
+		.collect()
+}
+
+fn dedup_lockfile_command_executions(
+	executions: Vec<LockfileCommandExecution>,
+) -> Vec<LockfileCommandExecution> {
+	let mut seen = BTreeSet::new();
+	let mut deduped = Vec::new();
+	for execution in executions {
+		let key = format!(
+			"{}::{:?}::{}",
+			execution.cwd.display(),
+			execution.shell,
+			execution.command,
+		);
+		if seen.insert(key) {
+			deduped.push(execution);
+		}
+	}
+	deduped
 }
 
 pub(crate) fn validate_cargo_workspace_version_groups(root: &Path) -> MonochangeResult<()> {
@@ -428,6 +504,196 @@ pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<Releas
 	build_release_plan_from_signals(&configuration, &discovery, &change_signals)
 }
 
+fn materialize_lockfile_command_updates(
+	root: &Path,
+	base_updates: &[FileUpdate],
+	lockfile_commands: &[LockfileCommandExecution],
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let tempdir = tempfile::tempdir()
+		.map_err(|error| MonochangeError::Io(format!("tempdir error: {error}")))?;
+	let temp_root = tempdir.path();
+	copy_workspace_tree(root, temp_root)?;
+	let temp_updates = base_updates
+		.iter()
+		.map(|update| {
+			Ok(FileUpdate {
+				path: remap_workspace_path(root, temp_root, &update.path)?,
+				content: update.content.clone(),
+			})
+		})
+		.collect::<MonochangeResult<Vec<_>>>()?;
+	apply_file_updates(&temp_updates)?;
+	for command in lockfile_commands {
+		run_lockfile_command(root, temp_root, command)?;
+	}
+	collect_workspace_file_updates(root, temp_root)
+}
+
+fn remap_workspace_path(root: &Path, temp_root: &Path, path: &Path) -> MonochangeResult<PathBuf> {
+	let normalized_root = monochange_core::normalize_path(root);
+	let normalized_path = monochange_core::normalize_path(path);
+	let relative = normalized_path
+		.strip_prefix(&normalized_root)
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"path `{}` was outside workspace root `{}`: {error}",
+				path.display(),
+				root.display(),
+			))
+		})?;
+	Ok(temp_root.join(relative))
+}
+
+fn run_lockfile_command(
+	root: &Path,
+	temp_root: &Path,
+	command: &LockfileCommandExecution,
+) -> MonochangeResult<()> {
+	let cwd = remap_workspace_path(root, temp_root, &command.cwd)?;
+	let output = if let Some(shell_binary) = command.shell.shell_binary() {
+		ProcessCommand::new(shell_binary)
+			.arg("-c")
+			.arg(&command.command)
+			.current_dir(&cwd)
+			.output()
+	} else {
+		let parts = shlex::split(&command.command).ok_or_else(|| {
+			MonochangeError::Config(format!("failed to parse command `{}`", command.command))
+		})?;
+		let Some((program, args)) = parts.split_first() else {
+			return Err(MonochangeError::Config(
+				"lockfile command must not be empty".to_string(),
+			));
+		};
+		ProcessCommand::new(program)
+			.args(args)
+			.current_dir(&cwd)
+			.output()
+	};
+	let output = output.map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to run lockfile command `{}` in {}: {error}",
+			command.command,
+			root_relative(root, &command.cwd).display(),
+		))
+	})?;
+	if output.status.success() {
+		return Ok(());
+	}
+	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	let details = if stderr.is_empty() {
+		format!("exit status {}", output.status)
+	} else {
+		stderr
+	};
+	Err(MonochangeError::Discovery(format!(
+		"lockfile command `{}` failed in {}: {details}",
+		command.command,
+		root_relative(root, &command.cwd).display(),
+	)))
+}
+
+fn collect_workspace_file_updates(
+	root: &Path,
+	temp_root: &Path,
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let mut relative_paths = BTreeSet::new();
+	collect_workspace_files(root, root, &mut relative_paths)?;
+	collect_workspace_files(temp_root, temp_root, &mut relative_paths)?;
+	let mut updates = Vec::new();
+	for relative in relative_paths {
+		let before = read_optional_file(&root.join(&relative))?;
+		let after = read_optional_file(&temp_root.join(&relative))?;
+		if let Some(content) = after.filter(|content| before.as_ref() != Some(content)) {
+			updates.push(FileUpdate {
+				path: root.join(relative),
+				content,
+			});
+		}
+	}
+	updates.sort_by(|left, right| left.path.cmp(&right.path));
+	Ok(updates)
+}
+
+fn read_optional_file(path: &Path) -> MonochangeResult<Option<Vec<u8>>> {
+	match fs::read(path) {
+		Ok(contents) => Ok(Some(contents)),
+		Err(error)
+			if matches!(
+				error.kind(),
+				std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+			) =>
+		{
+			Ok(None)
+		}
+		Err(error) => Err(MonochangeError::Io(format!(
+			"failed to read {}: {error}",
+			path.display()
+		))),
+	}
+}
+
+fn entry_file_type(entry: &fs::DirEntry, path: &Path) -> MonochangeResult<fs::FileType> {
+	entry
+		.file_type()
+		.map_err(|error| MonochangeError::Io(format!("failed to stat {}: {error}", path.display())))
+}
+
+fn strip_workspace_prefix<'a>(path: &'a Path, root: &Path) -> MonochangeResult<&'a Path> {
+	path.strip_prefix(root).map_err(|error| {
+		MonochangeError::Config(format!(
+			"path `{}` was outside workspace root `{}`: {error}",
+			path.display(),
+			root.display()
+		))
+	})
+}
+
+#[rustfmt::skip]
+fn ensure_parent_directory(path: &Path) -> MonochangeResult<()> {
+	if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|error| MonochangeError::Io(format!("failed to create {}: {error}", parent.display())))?; }
+	Ok(())
+}
+
+fn copy_workspace_file(source: &Path, destination: &Path) -> MonochangeResult<()> {
+	fs::copy(source, destination).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to copy {} to {}: {error}",
+			source.display(),
+			destination.display()
+		))
+	})?;
+	Ok(())
+}
+
+#[rustfmt::skip]
+fn collect_workspace_files(root: &Path, current: &Path, relative_paths: &mut BTreeSet<PathBuf>) -> MonochangeResult<()> {
+	for entry in fs::read_dir(current).map_err(|error| MonochangeError::Io(format!("failed to read {}: {error}", current.display())))? {
+		let entry = entry.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
+		let path = entry.path();
+		if path.file_name().is_some_and(|name| name == ".git") { continue; }
+		let file_type = entry_file_type(&entry, &path)?;
+		if file_type.is_dir() { collect_workspace_files(root, &path, relative_paths)?; continue; }
+		if file_type.is_file() { relative_paths.insert(strip_workspace_prefix(&path, root)?.to_path_buf()); }
+	}
+	Ok(())
+}
+
+#[rustfmt::skip]
+fn copy_workspace_tree(source: &Path, destination: &Path) -> MonochangeResult<()> {
+	fs::create_dir_all(destination).map_err(|error| MonochangeError::Io(format!("failed to create {}: {error}", destination.display())))?;
+	for entry in fs::read_dir(source).map_err(|error| MonochangeError::Io(format!("failed to read {}: {error}", source.display())))? {
+		let entry = entry.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
+		let source_path = entry.path();
+		if source_path.file_name().is_some_and(|name| name == ".git") { continue; }
+		let destination_path = destination.join(entry.file_name());
+		let file_type = entry_file_type(&entry, &source_path)?;
+		if file_type.is_dir() { copy_workspace_tree(&source_path, &destination_path)?; continue; }
+		if file_type.is_file() { ensure_parent_directory(&destination_path)?; copy_workspace_file(&source_path, &destination_path)?; }
+	}
+	Ok(())
+}
+
 pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
 	prepare_release_execution(root, dry_run).map(|execution| execution.prepared_release)
 }
@@ -485,20 +751,27 @@ pub(crate) fn prepare_release_execution(
 			.release_targets(&release_targets)
 			.build(),
 	)?;
-	let mut changed_files = manifest_updates
+	let changelog_file_updates = changelog_updates
+		.iter()
+		.map(|update| update.file.clone())
+		.collect::<Vec<_>>();
+	let base_updates = [
+		manifest_updates.clone(),
+		versioned_file_updates.clone(),
+		changelog_file_updates.clone(),
+	]
+	.concat();
+	let lockfile_commands =
+		build_lockfile_command_executions(root, &configuration, &discovery.packages, &plan)?;
+	let file_updates = if lockfile_commands.is_empty() {
+		base_updates.clone()
+	} else {
+		materialize_lockfile_command_updates(root, &base_updates, &lockfile_commands)?
+	};
+	let mut changed_files = file_updates
 		.iter()
 		.map(|update| root_relative(root, &update.path))
 		.collect::<Vec<_>>();
-	changed_files.extend(
-		versioned_file_updates
-			.iter()
-			.map(|update| root_relative(root, &update.path)),
-	);
-	changed_files.extend(
-		changelog_updates
-			.iter()
-			.map(|update| root_relative(root, &update.file.path)),
-	);
 	changed_files.sort();
 	changed_files.dedup();
 	let changelogs = changelog_updates
@@ -516,27 +789,13 @@ pub(crate) fn prepare_release_execution(
 		.iter()
 		.map(|update| update.path.clone())
 		.collect::<Vec<_>>();
-	let changelog_file_updates = changelog_updates
-		.iter()
-		.map(|update| update.file.clone())
-		.collect::<Vec<_>>();
-	let file_diffs = build_file_diff_previews(
-		root,
-		&[
-			manifest_updates.clone(),
-			versioned_file_updates.clone(),
-			changelog_file_updates.clone(),
-		]
-		.concat(),
-	)?;
+	let file_diffs = build_file_diff_previews(root, &file_updates)?;
 
 	let version = shared_release_version(&plan);
 	let group_version = shared_group_version(&plan);
 	let mut deleted_changesets = Vec::new();
 	if !dry_run {
-		apply_file_updates(&manifest_updates)?;
-		apply_file_updates(&versioned_file_updates)?;
-		apply_file_updates(&changelog_file_updates)?;
+		apply_file_updates(&file_updates)?;
 		for path in &changeset_paths {
 			fs::remove_file(path).map_err(|error| {
 				MonochangeError::Io(format!("failed to delete {}: {error}", path.display()))
@@ -562,4 +821,246 @@ pub(crate) fn prepare_release_execution(
 		},
 		file_diffs,
 	})
+}
+
+#[cfg(test)]
+mod workspace_ops_tests {
+	use super::*;
+	#[cfg(unix)]
+	use std::os::unix::fs::PermissionsExt;
+
+	fn setup_workspace_ops_fixture() -> tempfile::TempDir {
+		monochange_test_helpers::fs::setup_fixture_from(
+			env!("CARGO_MANIFEST_DIR"),
+			"workspace-ops/lockfile-command-helpers",
+		)
+	}
+
+	#[cfg(unix)]
+	fn make_executable(path: &Path) {
+		let metadata = fs::metadata(path).unwrap_or_else(|error| panic!("metadata: {error}"));
+		let mut permissions = metadata.permissions();
+		permissions.set_mode(0o755);
+		fs::set_permissions(path, permissions)
+			.unwrap_or_else(|error| panic!("set permissions: {error}"));
+	}
+
+	#[cfg(not(unix))]
+	fn make_executable(_path: &Path) {}
+
+	#[test]
+	fn remap_workspace_path_rejects_paths_outside_the_workspace() {
+		let fixture = setup_workspace_ops_fixture();
+		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let error = remap_workspace_path(
+			fixture.path(),
+			temp_root.path(),
+			Path::new("/tmp/outside-workspace"),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected remap error"));
+		assert!(error.to_string().contains("was outside workspace root"));
+	}
+
+	#[test]
+	fn run_lockfile_command_reports_parse_spawn_and_exit_failures() {
+		let fixture = setup_workspace_ops_fixture();
+		for script in ["fail-no-stderr", "fail-stderr"] {
+			make_executable(&fixture.path().join("tools/bin").join(script));
+		}
+		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_workspace_tree(fixture.path(), temp_root.path())
+			.unwrap_or_else(|error| panic!("copy workspace: {error}"));
+		for script in ["fail-no-stderr", "fail-stderr"] {
+			make_executable(&temp_root.path().join("tools/bin").join(script));
+		}
+
+		let parse_error = run_lockfile_command(
+			fixture.path(),
+			temp_root.path(),
+			&LockfileCommandExecution {
+				command: "'".to_string(),
+				cwd: fixture.path().to_path_buf(),
+				shell: monochange_core::ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+		assert!(parse_error.to_string().contains("failed to parse command"));
+
+		let empty_error = run_lockfile_command(
+			fixture.path(),
+			temp_root.path(),
+			&LockfileCommandExecution {
+				command: "   ".to_string(),
+				cwd: fixture.path().to_path_buf(),
+				shell: monochange_core::ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected empty command error"));
+		assert!(empty_error
+			.to_string()
+			.contains("lockfile command must not be empty"));
+
+		let spawn_error = run_lockfile_command(
+			fixture.path(),
+			temp_root.path(),
+			&LockfileCommandExecution {
+				command: "definitely-not-a-real-command".to_string(),
+				cwd: fixture.path().to_path_buf(),
+				shell: monochange_core::ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected spawn error"));
+		assert!(spawn_error
+			.to_string()
+			.contains("failed to run lockfile command"));
+
+		let no_stderr_error = run_lockfile_command(
+			fixture.path(),
+			temp_root.path(),
+			&LockfileCommandExecution {
+				command: temp_root
+					.path()
+					.join("tools/bin/fail-no-stderr")
+					.display()
+					.to_string(),
+				cwd: fixture.path().to_path_buf(),
+				shell: monochange_core::ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected nonzero exit error"));
+		assert!(no_stderr_error.to_string().contains("exit status"));
+
+		let stderr_error = run_lockfile_command(
+			fixture.path(),
+			temp_root.path(),
+			&LockfileCommandExecution {
+				command: temp_root
+					.path()
+					.join("tools/bin/fail-stderr")
+					.display()
+					.to_string(),
+				cwd: fixture.path().to_path_buf(),
+				shell: monochange_core::ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected stderr error"));
+		assert!(stderr_error.to_string().contains("bad stderr"));
+	}
+
+	#[test]
+	fn workspace_copy_and_diff_helpers_skip_git_and_capture_new_files() {
+		let fixture = setup_workspace_ops_fixture();
+		make_executable(&fixture.path().join("tools/bin/write-new-file"));
+		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_workspace_tree(fixture.path(), temp_root.path())
+			.unwrap_or_else(|error| panic!("copy workspace: {error}"));
+		make_executable(&temp_root.path().join("tools/bin/write-new-file"));
+		assert!(temp_root.path().join("root.txt").exists());
+		assert!(!temp_root.path().join(".git").exists());
+
+		run_lockfile_command(
+			fixture.path(),
+			temp_root.path(),
+			&LockfileCommandExecution {
+				command: temp_root
+					.path()
+					.join("tools/bin/write-new-file")
+					.display()
+					.to_string(),
+				cwd: fixture.path().to_path_buf(),
+				shell: monochange_core::ShellConfig::None,
+			},
+		)
+		.unwrap_or_else(|error| panic!("write generated file: {error}"));
+
+		let updates = collect_workspace_file_updates(fixture.path(), temp_root.path())
+			.unwrap_or_else(|error| panic!("collect updates: {error}"));
+		assert!(updates
+			.iter()
+			.any(|update| update.path.ends_with("generated.txt")));
+
+		let mut paths = BTreeSet::new();
+		collect_workspace_files(fixture.path(), fixture.path(), &mut paths)
+			.unwrap_or_else(|error| panic!("collect files: {error}"));
+		assert!(paths.contains(Path::new("root.txt")));
+		assert!(!paths.iter().any(|path| path.starts_with(".git")));
+	}
+
+	#[test]
+	fn file_helpers_report_missing_and_invalid_paths() {
+		let fixture = setup_workspace_ops_fixture();
+		assert!(read_optional_file(&fixture.path().join("missing.txt"))
+			.unwrap_or_else(|error| panic!("missing file lookup: {error}"))
+			.is_none());
+		let read_error = read_optional_file(fixture.path())
+			.err()
+			.unwrap_or_else(|| panic!("expected directory read error"));
+		assert!(read_error.to_string().contains("failed to read"));
+
+		let collect_error = collect_workspace_files(
+			fixture.path(),
+			&fixture.path().join("missing-dir"),
+			&mut BTreeSet::new(),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected collect files error"));
+		assert!(collect_error.to_string().contains("failed to read"));
+		let strip_prefix_error = strip_workspace_prefix(
+			&fixture.path().join("root.txt"),
+			Path::new("/tmp/other-root"),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected strip-prefix error"));
+		assert!(strip_prefix_error
+			.to_string()
+			.contains("was outside workspace root"));
+
+		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let destination_file = temp_root.path().join("not-a-directory");
+		fs::write(&destination_file, "file")
+			.unwrap_or_else(|error| panic!("write destination file: {error}"));
+		let copy_error = copy_workspace_tree(fixture.path(), &destination_file)
+			.err()
+			.unwrap_or_else(|| panic!("expected copy workspace error"));
+		assert!(copy_error.to_string().contains("failed to create"));
+		let missing_source_error =
+			copy_workspace_tree(&fixture.path().join("missing-source"), temp_root.path())
+				.err()
+				.unwrap_or_else(|| panic!("expected missing source error"));
+		assert!(missing_source_error.to_string().contains("failed to read"));
+
+		let destination_dir = temp_root.path().join("destination-dir");
+		fs::create_dir_all(&destination_dir)
+			.unwrap_or_else(|error| panic!("create destination dir: {error}"));
+		let source_root = temp_root.path().join("copy-source");
+		fs::create_dir_all(source_root.join("nested"))
+			.unwrap_or_else(|error| panic!("create source dir: {error}"));
+		fs::write(source_root.join("nested/file.txt"), "file")
+			.unwrap_or_else(|error| panic!("write source file: {error}"));
+		fs::write(destination_dir.join("nested"), "blocking file")
+			.unwrap_or_else(|error| panic!("write blocking file: {error}"));
+		let parent_create_error = ensure_parent_directory(&destination_dir.join("nested/file.txt"))
+			.err()
+			.unwrap_or_else(|| panic!("expected parent create error"));
+		assert!(parent_create_error.to_string().contains("failed to create"));
+
+		let copy_target_root = temp_root.path().join("copy-target-root");
+		fs::create_dir_all(&copy_target_root)
+			.unwrap_or_else(|error| panic!("create copy target root: {error}"));
+		fs::create_dir_all(copy_target_root.join("root.txt"))
+			.unwrap_or_else(|error| panic!("create copy target dir collision: {error}"));
+		let copy_file_error = copy_workspace_file(
+			&fixture.path().join("root.txt"),
+			&copy_target_root.join("root.txt"),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected copy file error"));
+		assert!(copy_file_error.to_string().contains("failed to copy"));
+	}
 }

@@ -119,6 +119,7 @@ use monochange_core::GitHubReleaseNotesSource;
 use monochange_core::GitHubReleaseSettings;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::GroupDefinition;
+use monochange_core::LockfileCommandDefinition;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageDefinition;
@@ -349,6 +350,8 @@ struct RawEcosystemSettings {
 	dependency_version_prefix: Option<String>,
 	#[serde(default)]
 	versioned_files: Vec<RawVersionedFileDefinition>,
+	#[serde(default)]
+	lockfile_commands: Vec<LockfileCommandDefinition>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -865,6 +868,7 @@ fn normalize_ecosystem_settings(
 			owner_id,
 			true,
 		)?,
+		lockfile_commands: raw.lockfile_commands,
 	})
 }
 
@@ -1185,11 +1189,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	validate_changesets_configuration(&changesets, &packages)?;
 	validate_github_configuration(legacy_github.as_ref())?;
 	validate_source_configuration(source.as_ref())?;
-	for (ecosystem_id, versioned_files) in [
-		("cargo", &cargo_ecosystem.versioned_files),
-		("npm", &npm_ecosystem.versioned_files),
-		("deno", &deno_ecosystem.versioned_files),
-		("dart", &dart_ecosystem.versioned_files),
+	for (ecosystem_id, ecosystem_settings) in [
+		("cargo", &cargo_ecosystem),
+		("npm", &npm_ecosystem),
+		("deno", &deno_ecosystem),
+		("dart", &dart_ecosystem),
 	] {
 		let declared_packages = packages
 			.iter()
@@ -1198,11 +1202,12 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		validate_versioned_files(
 			root,
 			&contents,
-			versioned_files,
+			&ecosystem_settings.versioned_files,
 			&declared_packages,
 			"ecosystems",
 			ecosystem_id,
 		)?;
+		validate_lockfile_commands(root, ecosystem_id, &ecosystem_settings.lockfile_commands)?;
 	}
 	validate_package_and_group_definitions(root, &contents, &packages, &groups)?;
 	validate_cli_runtime_requirements(&cli, &changesets, source.as_ref())?;
@@ -2148,6 +2153,46 @@ fn validate_versioned_files(
 					)],
 					Some("narrow the glob so it only matches files for that ecosystem, or change the `type` to match the files you want to update".to_string()),
 				));
+			}
+		}
+	}
+
+	Ok(())
+}
+
+fn validate_lockfile_commands(
+	root: &Path,
+	ecosystem_id: &str,
+	lockfile_commands: &[LockfileCommandDefinition],
+) -> MonochangeResult<()> {
+	for lockfile_command in lockfile_commands {
+		if lockfile_command.command.trim().is_empty() {
+			return Err(MonochangeError::Config(format!(
+				"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty command"
+			)));
+		}
+		if let Some(cwd) = &lockfile_command.cwd {
+			if cwd.as_os_str().is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty cwd when set"
+				)));
+			}
+			let resolved = if cwd.is_absolute() {
+				cwd.clone()
+			} else {
+				root.join(cwd)
+			};
+			if !resolved.starts_with(root) {
+				return Err(MonochangeError::Config(format!(
+					"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` must stay within the workspace root",
+					cwd.display()
+				)));
+			}
+			if !resolved.is_dir() {
+				return Err(MonochangeError::Config(format!(
+					"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` does not exist or is not a directory",
+					cwd.display()
+				)));
 			}
 		}
 	}

@@ -48,7 +48,7 @@ format = "keep_a_changelog"
 [package.sdk-core]
 path = "crates/sdk_core"
 versioned_files = [
-	"Cargo.lock",
+	"Cargo.toml",
 	{ path = "crates/sdk_core/extra.toml", type = "cargo" },
 ]
 tag = false
@@ -295,7 +295,7 @@ requires = ["main"]
 enabled = true
 roots = ["crates/*"]
 exclude = ["crates/experimental/*"]
-versioned_files = ["Cargo.lock"]
+lockfile_commands = [{ command = "cargo generate-lockfile" }]
 
 [ecosystems.npm]
 enabled = true
@@ -303,16 +303,17 @@ roots = ["packages/*"]
 exclude = ["packages/legacy/*"]
 dependency_version_prefix = "^"
 versioned_files = ["**/packages/*/package.json"]
-# npm-family lockfiles can include package-lock.json, pnpm-lock.yaml,
-# bun.lock, and bun.lockb depending on the workspace manager.
+lockfile_commands = [
+	{ command = "pnpm install --lockfile-only", cwd = "packages/web" },
+]
 
 [ecosystems.deno]
 enabled = true
-versioned_files = ["deno.lock"]
+# Deno currently has no inferred lockfile command.
 
 [ecosystems.dart]
 enabled = true
-versioned_files = ["pubspec.lock"]
+lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

@@ -40,6 +40,7 @@ serde_json = { workspace = true, default-features = true }
 serde_yaml_ng = { workspace = true, default-features = true }
 shlex = { workspace = true, default-features = true }
 similar = { workspace = true }
+tempfile = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"], default-features = true }
 toml = { workspace = true, default-features = true }
@@ -54,7 +55,6 @@ monochange_test_helpers = { version = "0.0.0", path = "../../testing/monochange_
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 temp-env = { workspace = true, default-features = true }
-tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

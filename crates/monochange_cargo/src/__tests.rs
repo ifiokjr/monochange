@@ -16,6 +16,7 @@ use toml_edit::DocumentMut;
 use toml_edit::Item;
 
 use crate::adapter;
+use crate::default_lockfile_commands;
 use crate::dependency_constraint;
 use crate::discover_cargo_packages;
 use crate::discover_lockfiles;
@@ -271,6 +272,29 @@ fn discover_lockfiles_falls_back_to_manifest_directory() {
 		Some(&monochange_core::normalize_path(
 			&fixture_root.join("crates/core/Cargo.lock")
 		))
+	);
+}
+
+#[test]
+fn default_lockfile_commands_use_cargo_generate_lockfile_in_lockfile_directory() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/manifest-lockfile-workspace");
+	let package = PackageRecord::new(
+		Ecosystem::Cargo,
+		"lockfile-core",
+		fixture_root.join("crates/core/Cargo.toml"),
+		fixture_root.clone(),
+		None,
+		PublishState::Public,
+	);
+
+	assert_eq!(
+		default_lockfile_commands(&package),
+		vec![monochange_core::LockfileCommandExecution {
+			command: "cargo generate-lockfile".to_string(),
+			cwd: monochange_core::normalize_path(&fixture_root.join("crates/core")),
+			shell: monochange_core::ShellConfig::None,
+		}]
 	);
 }
 

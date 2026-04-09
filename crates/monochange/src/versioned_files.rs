@@ -42,36 +42,6 @@ pub(crate) fn versioned_file_kind(
 	}
 }
 
-fn auto_discovered_lockfile_definitions(
-	root: &Path,
-	package: &PackageRecord,
-) -> Vec<VersionedFileDefinition> {
-	let ecosystem_type = match package.ecosystem {
-		Ecosystem::Cargo => monochange_core::EcosystemType::Cargo,
-		Ecosystem::Npm => monochange_core::EcosystemType::Npm,
-		Ecosystem::Deno => monochange_core::EcosystemType::Deno,
-		Ecosystem::Dart | Ecosystem::Flutter => monochange_core::EcosystemType::Dart,
-	};
-	let discovered = match package.ecosystem {
-		Ecosystem::Cargo => monochange_cargo::discover_lockfiles(package),
-		Ecosystem::Npm => monochange_npm::discover_lockfiles(package),
-		Ecosystem::Deno => monochange_deno::discover_lockfiles(package),
-		Ecosystem::Dart | Ecosystem::Flutter => monochange_dart::discover_lockfiles(package),
-	};
-	discovered
-		.into_iter()
-		.filter_map(|path| {
-			relative_to_root(root, &path).map(|relative_path| VersionedFileDefinition {
-				path: relative_path.to_string_lossy().to_string(),
-				ecosystem_type,
-				prefix: None,
-				fields: None,
-				name: None,
-			})
-		})
-		.collect()
-}
-
 fn dedup_versioned_file_definitions(
 	versioned_files: Vec<VersionedFileDefinition>,
 ) -> Vec<VersionedFileDefinition> {
@@ -146,10 +116,7 @@ pub(crate) fn build_versioned_file_updates(
 		} else {
 			vec![package_definition.id.clone()]
 		};
-		let mut effective_versioned_files = package_definition.versioned_files.clone();
-		if let Some(package) = matched_package {
-			effective_versioned_files.extend(auto_discovered_lockfile_definitions(root, package));
-		}
+		let effective_versioned_files = package_definition.versioned_files.clone();
 		for versioned_file in dedup_versioned_file_definitions(effective_versioned_files) {
 			let effective_dep_names = if let Some(override_name) = &versioned_file.name {
 				vec![override_name.clone()]

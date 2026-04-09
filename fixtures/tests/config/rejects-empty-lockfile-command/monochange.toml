@@ -1,0 +1,8 @@
+[defaults]
+package_type = "npm"
+
+[ecosystems.npm]
+lockfile_commands = [{ command = "   ", cwd = "packages/app" }]
+
+[package.app]
+path = "packages/app"

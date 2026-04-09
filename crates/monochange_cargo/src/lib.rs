@@ -50,11 +50,13 @@ use monochange_core::CompatibilityAssessment;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
+use monochange_core::LockfileCommandExecution;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::ShellConfig;
 use monochange_semver::CompatibilityProvider;
 use semver::Version;
 use toml::Value;
@@ -128,6 +130,20 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 		);
 	}
 	discovered
+}
+
+pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommandExecution> {
+	discover_lockfiles(package)
+		.into_iter()
+		.map(|lockfile| LockfileCommandExecution {
+			command: "cargo generate-lockfile".to_string(),
+			cwd: lockfile
+				.parent()
+				.unwrap_or(&package.workspace_root)
+				.to_path_buf(),
+			shell: ShellConfig::None,
+		})
+		.collect()
 }
 
 pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> MonochangeResult<()> {

@@ -164,11 +164,12 @@ warn_on_group_mismatch = true
 #   empty_update_message    — per-package fallback text for transitive bumps
 #   versioned_files         — additional files to update with the new version
 #                             package-scoped string entries infer the package ecosystem,
-#                             e.g. ["Cargo.lock"] or ["**/Cargo.toml"]
+#                             e.g. ["Cargo.toml"] or ["**/crates/*/Cargo.toml"]
 #                             explicit typed entries remain supported, e.g.
-#                             [{ path = "lockfiles/shared/package-lock.json", type = "npm" }]
-#                             npm-family lockfiles include package-lock.json,
-#                             pnpm-lock.yaml, bun.lock, and bun.lockb
+#                             [{ path = "group.toml", type = "cargo" }]
+#                             lockfiles can still be listed explicitly, but
+#                             ecosystem-level lockfile refresh now prefers
+#                             [ecosystems.<name>].lockfile_commands
 #   ignore_ecosystem_versioned_files — opt out of inherited [ecosystems.<name>].versioned_files
 #                             defaults for this package (default: false)
 #   ignored_paths           — glob patterns for paths within this package to
@@ -281,6 +282,10 @@ version_format = "primary"
 #   exclude  — glob patterns to exclude from discovery
 #   dependency_version_prefix — default dependency prefix for typed versioned_files
 #   versioned_files — ecosystem-wide default versioned_files inherited by matching packages
+#   lockfile_commands — commands that refresh ecosystem lockfiles after a
+#                       release updates manifest versions; when set, inferred
+#                       defaults are disabled and these commands fully own
+#                       lockfile refresh for that ecosystem
 
 {% if has_cargo %}
 [ecosystems.cargo]

@@ -1,0 +1,12 @@
+[defaults]
+package_type = "npm"
+
+[ecosystems.npm]
+lockfile_commands = [
+  { command = "npm install --package-lock-only", cwd = "packages/app" },
+  { command = "printf shell", cwd = "packages/app", shell = "bash" },
+  { command = "npm install --package-lock-only" },
+]
+
+[package.app]
+path = "packages/app"

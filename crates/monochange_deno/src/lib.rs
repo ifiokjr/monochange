@@ -45,6 +45,7 @@ use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
+use monochange_core::LockfileCommandExecution;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageDependency;
@@ -133,6 +134,10 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 		);
 	}
 	discovered
+}
+
+pub fn default_lockfile_commands(_package: &PackageRecord) -> Vec<LockfileCommandExecution> {
+	Vec::new()
 }
 
 pub struct DenoAdapter;

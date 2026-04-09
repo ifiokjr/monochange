@@ -787,6 +787,88 @@ fn load_workspace_configuration_inherits_ecosystem_versioned_files_unless_packag
 }
 
 #[test]
+fn load_workspace_configuration_parses_ecosystem_lockfile_commands() {
+	let root = fixture_path("config/lockfile-commands");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+	assert_eq!(configuration.npm.lockfile_commands.len(), 3);
+	let first_command = configuration
+		.npm
+		.lockfile_commands
+		.first()
+		.unwrap_or_else(|| panic!("expected first lockfile command"));
+	assert_eq!(first_command.command, "npm install --package-lock-only");
+	assert_eq!(
+		first_command.cwd.as_deref(),
+		Some(Path::new("packages/app"))
+	);
+	let second_command = configuration
+		.npm
+		.lockfile_commands
+		.get(1)
+		.unwrap_or_else(|| panic!("expected second lockfile command"));
+	assert_eq!(
+		second_command.shell,
+		ShellConfig::Custom("bash".to_string())
+	);
+	let third_command = configuration
+		.npm
+		.lockfile_commands
+		.get(2)
+		.unwrap_or_else(|| panic!("expected third lockfile command"));
+	assert!(third_command.cwd.is_none());
+}
+
+#[test]
+fn load_workspace_configuration_rejects_empty_lockfile_commands() {
+	let root = fixture_path("config/rejects-empty-lockfile-command");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(error
+		.render()
+		.contains("lockfile_commands must provide a non-empty command"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_empty_lockfile_command_cwds() {
+	let root = fixture_path("config/rejects-empty-lockfile-command-cwd");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(error
+		.render()
+		.contains("lockfile_commands must provide a non-empty cwd when set"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_lockfile_command_cwds_outside_the_workspace() {
+	let root = fixture_path("config/rejects-lockfile-command-outside-workspace");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(error
+		.render()
+		.contains("lockfile_commands cwd `/tmp` must stay within the workspace root"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_missing_lockfile_command_cwds() {
+	let root = fixture_path("config/rejects-missing-lockfile-command-cwd");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(error
+		.render()
+		.contains("lockfile_commands cwd `packages/missing` does not exist or is not a directory"));
+}
+
+#[test]
 fn load_workspace_configuration_rejects_globs_that_match_unsupported_files_for_an_ecosystem() {
 	let root = fixture_path("config/rejects-bad-glob");
 	let error = load_workspace_configuration(&root)
