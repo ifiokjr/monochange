@@ -15,7 +15,7 @@ fn cli() -> Command {
 	command
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_manifest_records_git_changeset_context_and_renders_context_templates() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -85,7 +85,7 @@ fn release_manifest_records_git_changeset_context_and_renders_context_templates(
 	assert!(rendered.contains(&updated_sha[..7]));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
