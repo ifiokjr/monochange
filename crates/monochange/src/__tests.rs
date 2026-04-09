@@ -4514,7 +4514,11 @@ fn build_assist_subcommand_parses_valid_inputs_and_rejects_unknown_assistants() 
 	let command = clap::Command::new("mc").subcommand(crate::build_assist_subcommand());
 	let matches = command
 		.clone()
-		.try_get_matches_from([OsString::from("mc"), OsString::from("assist"), OsString::from("pi")])
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("assist"),
+			OsString::from("pi"),
+		])
 		.unwrap_or_else(|error| panic!("assist matches: {error}"));
 	let (_, assist_matches) = matches
 		.subcommand()
@@ -4526,7 +4530,9 @@ fn build_assist_subcommand_parses_valid_inputs_and_rejects_unknown_assistants() 
 		Some("pi")
 	);
 	assert_eq!(
-		assist_matches.get_one::<String>("format").map(String::as_str),
+		assist_matches
+			.get_one::<String>("format")
+			.map(String::as_str),
 		Some("text")
 	);
 
@@ -4559,7 +4565,9 @@ fn build_release_record_subcommand_requires_from_and_supports_json_output() {
 		.subcommand()
 		.unwrap_or_else(|| panic!("expected release-record subcommand"));
 	assert_eq!(
-		subcommand_matches.get_one::<String>("from").map(String::as_str),
+		subcommand_matches
+			.get_one::<String>("from")
+			.map(String::as_str),
 		Some("HEAD")
 	);
 	assert_eq!(
@@ -4572,7 +4580,10 @@ fn build_release_record_subcommand_requires_from_and_supports_json_output() {
 		.try_get_matches_from([OsString::from("mc"), OsString::from("release-record")])
 		.err()
 		.unwrap_or_else(|| panic!("expected missing from error"));
-	assert_eq!(error.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+	assert_eq!(
+		error.kind(),
+		clap::error::ErrorKind::MissingRequiredArgument
+	);
 }
 
 #[test]
