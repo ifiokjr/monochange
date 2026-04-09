@@ -459,20 +459,24 @@ fn changes_add_canonicalizes_package_references_to_package_names() {
 
 #[test]
 fn add_change_file_creates_default_path_under_changeset_directory() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
-	let output_path = crate::add_change_file(
-		&fixture_root,
-		crate::AddChangeFileRequest::builder()
-			.package_refs(&["sdk-core".to_string()])
-			.bump(BumpSeverity::Patch)
-			.reason("default output")
-			.build(),
+	copy_directory(&fixture_root, tempdir.path());
+	let output_path = add_change_file(
+		tempdir.path(),
+		&["sdk-core".to_string()],
+		BumpSeverity::Patch,
+		None,
+		"default output",
+		None,
+		None,
+		None,
 	)
 	.unwrap_or_else(|error| panic!("default change file: {error}"));
 	let content = fs::read_to_string(&output_path)
 		.unwrap_or_else(|error| panic!("read change file: {error}"));
 
-	assert!(output_path.starts_with(fixture_root.join(".changeset")));
+	assert!(output_path.starts_with(tempdir.path().join(".changeset")));
 	assert!(content.contains("sdk-core: patch"));
 	fs::remove_file(output_path).unwrap_or_else(|error| panic!("cleanup change file: {error}"));
 }

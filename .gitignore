@@ -6,6 +6,7 @@
 /.mdt
 # Devenv
 .devenv*
+.pre-commit-config.yaml
 devenv.local.nix
 
 **/dist/**
