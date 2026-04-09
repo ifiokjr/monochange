@@ -1,0 +1,26 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+tag = true
+release = true
+version_format = "primary"
+
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"

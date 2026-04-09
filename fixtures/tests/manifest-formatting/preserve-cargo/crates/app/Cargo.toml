@@ -1,0 +1,8 @@
+[package]
+name = "workflow-app"
+version = { workspace = true }
+edition = "2021"
+description = "app package"
+
+[dependencies]
+workflow-core = { workspace = true }

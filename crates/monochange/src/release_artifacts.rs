@@ -319,7 +319,7 @@ pub(crate) fn build_cargo_manifest_updates(
 		return Ok(Vec::new());
 	}
 
-	let mut updated_documents = BTreeMap::<PathBuf, Value>::new();
+	let mut updated_documents = BTreeMap::<PathBuf, String>::new();
 	for package in packages
 		.iter()
 		.filter(|package| package.ecosystem == Ecosystem::Cargo)
@@ -333,14 +333,28 @@ pub(crate) fn build_cargo_manifest_updates(
 			continue;
 		}
 
-		let mut document = read_toml_document(&package.manifest_path)?;
-		update_cargo_manifest(
-			&mut document,
-			package,
-			&released_versions,
+		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
+		let updated = monochange_cargo::update_versioned_file_text(
+			&contents,
+			monochange_cargo::CargoVersionedFileKind::Manifest,
+			&["dependencies", "dev-dependencies", "build-dependencies"],
+			released_versions.get(&package.id).map(String::as_str),
+			None,
 			&released_versions_by_name,
-		);
-		updated_documents.insert(package.manifest_path.clone(), document);
+			&BTreeMap::new(),
+		)
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to parse {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
+		updated_documents.insert(package.manifest_path.clone(), updated);
 	}
 
 	for workspace_root in packages
@@ -371,30 +385,41 @@ pub(crate) fn build_cargo_manifest_updates(
 		if !workspace_manifest.exists() {
 			continue;
 		}
-		let mut document = if let Some(document) = updated_documents.remove(&workspace_manifest) {
+		let contents = if let Some(document) = updated_documents.remove(&workspace_manifest) {
 			document
 		} else {
-			read_toml_document(&workspace_manifest)?
+			fs::read_to_string(&workspace_manifest).map_err(|error| {
+				MonochangeError::Io(format!(
+					"failed to read {}: {error}",
+					workspace_manifest.display()
+				))
+			})?
 		};
-		update_workspace_manifest(
-			&mut document,
-			&shared_workspace_version,
+		let updated = monochange_cargo::update_versioned_file_text(
+			&contents,
+			monochange_cargo::CargoVersionedFileKind::Manifest,
+			&["dependencies", "dev-dependencies", "build-dependencies"],
+			None,
+			Some(shared_workspace_version.as_str()),
 			&released_versions_by_name,
-		);
-		updated_documents.insert(workspace_manifest, document);
+			&BTreeMap::new(),
+		)
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to parse {}: {error}",
+				workspace_manifest.display()
+			))
+		})?;
+		updated_documents.insert(workspace_manifest, updated);
 	}
 
-	updated_documents
+	Ok(updated_documents
 		.into_iter()
-		.map(|(path, document)| {
-			toml::to_string_pretty(&document)
-				.map(|content| FileUpdate {
-					path,
-					content: content.into_bytes(),
-				})
-				.map_err(|error| MonochangeError::Config(error.to_string()))
+		.map(|(path, document)| FileUpdate {
+			path,
+			content: document.into_bytes(),
 		})
-		.collect()
+		.collect())
 }
 
 pub(crate) fn build_npm_manifest_updates(
@@ -476,99 +501,6 @@ pub(crate) fn build_dart_manifest_updates(
 		});
 	}
 	Ok(updates)
-}
-
-fn read_toml_document(path: &Path) -> MonochangeResult<Value> {
-	let contents = fs::read_to_string(path).map_err(|error| {
-		MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
-	})?;
-	toml::from_str::<Value>(&contents).map_err(|error| {
-		MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
-	})
-}
-
-fn update_cargo_manifest(
-	document: &mut Value,
-	package: &PackageRecord,
-	released_versions: &BTreeMap<String, String>,
-	released_versions_by_name: &BTreeMap<String, String>,
-) {
-	if let Some(version) = released_versions.get(&package.id) {
-		if let Some(package_table) = document.get_mut("package").and_then(Value::as_table_mut) {
-			let uses_workspace_version = package_table
-				.get("version")
-				.and_then(Value::as_table)
-				.and_then(|version_table| version_table.get("workspace"))
-				.and_then(Value::as_bool)
-				== Some(true);
-			if !uses_workspace_version {
-				package_table.insert("version".to_string(), Value::String(version.clone()));
-			}
-		}
-	}
-
-	for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
-		update_dependency_table(document, section, released_versions_by_name);
-	}
-}
-
-fn update_dependency_table(
-	document: &mut Value,
-	section: &str,
-	released_versions_by_name: &BTreeMap<String, String>,
-) {
-	let Some(table) = document.get_mut(section).and_then(Value::as_table_mut) else {
-		return;
-	};
-	for (dependency_name, version) in released_versions_by_name {
-		let Some(entry) = table.get_mut(dependency_name) else {
-			continue;
-		};
-		if let Some(version_value) = entry.as_str() {
-			let _ = version_value;
-			*entry = Value::String(version.clone());
-			continue;
-		}
-		let Some(entry_table) = entry.as_table_mut() else {
-			continue;
-		};
-		let uses_workspace_dependency =
-			entry_table.get("workspace").and_then(Value::as_bool) == Some(true);
-		if !uses_workspace_dependency {
-			entry_table.insert("version".to_string(), Value::String(version.clone()));
-		}
-	}
-}
-
-fn update_workspace_manifest(
-	document: &mut Value,
-	shared_workspace_version: &str,
-	released_versions_by_name: &BTreeMap<String, String>,
-) {
-	if let Some(workspace_table) = document.get_mut("workspace").and_then(Value::as_table_mut) {
-		if let Some(workspace_package_table) = workspace_table
-			.get_mut("package")
-			.and_then(Value::as_table_mut)
-		{
-			workspace_package_table.insert(
-				"version".to_string(),
-				Value::String(shared_workspace_version.to_string()),
-			);
-		}
-		if let Some(workspace_dependency_table) = workspace_table
-			.get_mut("dependencies")
-			.and_then(Value::as_table_mut)
-		{
-			for (package_name, version) in released_versions_by_name {
-				let Some(entry) = workspace_dependency_table.get_mut(package_name) else {
-					continue;
-				};
-				if let Some(entry_table) = entry.as_table_mut() {
-					entry_table.insert("version".to_string(), Value::String(version.clone()));
-				}
-			}
-		}
-	}
 }
 
 pub(crate) fn apply_file_updates(updates: &[FileUpdate]) -> MonochangeResult<()> {

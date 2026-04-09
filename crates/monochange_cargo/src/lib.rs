@@ -58,6 +58,11 @@ use monochange_core::PublishState;
 use monochange_semver::CompatibilityProvider;
 use semver::Version;
 use toml::Value;
+use toml_edit::value;
+use toml_edit::DocumentMut;
+use toml_edit::Item;
+use toml_edit::TableLike;
+use toml_edit::Value as EditValue;
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
@@ -170,97 +175,144 @@ pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> Monochan
 }
 
 pub fn update_versioned_file(
-	value: &mut Value,
+	document: &mut DocumentMut,
 	kind: CargoVersionedFileKind,
 	fields: &[&str],
-	owner_version: &str,
-	shared_release_version: Option<&String>,
+	owner_version: Option<&str>,
+	shared_release_version: Option<&str>,
 	versioned_deps: &BTreeMap<String, String>,
 	raw_versions: &BTreeMap<String, String>,
 ) {
 	match kind {
 		CargoVersionedFileKind::Lock => {
-			if let Some(packages) = value.get_mut("package").and_then(Value::as_array_mut) {
-				for package in packages {
-					let Some(package_table) = package.as_table_mut() else {
-						continue;
-					};
-					let Some(package_name) = package_table.get("name").and_then(Value::as_str)
-					else {
+			if let Some(packages) = document
+				.get_mut("package")
+				.and_then(Item::as_array_of_tables_mut)
+			{
+				for package in packages.iter_mut() {
+					let Some(package_name) = package.get("name").and_then(Item::as_str) else {
 						continue;
 					};
 					if let Some(version) = raw_versions.get(package_name) {
-						package_table.insert("version".to_string(), Value::String(version.clone()));
+						set_table_value(package, "version", version);
 					}
 				}
 			}
 		}
 		CargoVersionedFileKind::Manifest => {
-			if let Some(package_table) = value.get_mut("package").and_then(Value::as_table_mut) {
-				let uses_workspace_version = package_table
-					.get("version")
-					.and_then(Value::as_table)
-					.and_then(|t| t.get("workspace"))
-					.and_then(Value::as_bool)
-					== Some(true);
-				if !uses_workspace_version {
-					package_table.insert(
-						"version".to_string(),
-						Value::String(owner_version.to_string()),
-					);
-				}
-			}
-			for field in fields {
-				if let Some(table) = value.get_mut(*field).and_then(Value::as_table_mut) {
-					for (dep_name, dep_version) in versioned_deps {
-						if let Some(entry) = table.get_mut(dep_name) {
-							if entry.is_str() {
-								*entry = Value::String(dep_version.clone());
-							} else if let Some(entry_table) = entry.as_table_mut() {
-								let uses_workspace = entry_table
-									.get("workspace")
-									.and_then(Value::as_bool) == Some(true);
-								if !uses_workspace {
-									entry_table.insert(
-										"version".to_string(),
-										Value::String(dep_version.clone()),
-									);
-								}
-							}
-						}
+			if let Some(owner_version) = owner_version {
+				if let Some(package_table) = document
+					.get_mut("package")
+					.and_then(Item::as_table_like_mut)
+				{
+					let uses_workspace_version = package_table
+						.get("version")
+						.is_some_and(uses_workspace_marker);
+					if !uses_workspace_version {
+						set_table_value(package_table, "version", owner_version);
 					}
 				}
 			}
-			if let Some(workspace_table) = value.get_mut("workspace").and_then(Value::as_table_mut)
+			for field in fields {
+				if let Some(table) = document.get_mut(*field).and_then(Item::as_table_like_mut) {
+					for (dep_name, dep_version) in versioned_deps {
+						let Some(entry) = table.get_mut(dep_name) else {
+							continue;
+						};
+						update_dependency_entry(entry, dep_version);
+					}
+				}
+			}
+			if let Some(workspace_table) = document
+				.get_mut("workspace")
+				.and_then(Item::as_table_like_mut)
 			{
-				if let Some(workspace_package) = workspace_table
-					.get_mut("package")
-					.and_then(Value::as_table_mut)
-				{
-					if let Some(shared) = shared_release_version {
-						workspace_package
-							.insert("version".to_string(), Value::String(shared.clone()));
+				if let Some(shared) = shared_release_version {
+					if let Some(workspace_package) = workspace_table
+						.get_mut("package")
+						.and_then(Item::as_table_like_mut)
+					{
+						set_table_value(workspace_package, "version", shared);
 					}
 				}
 				if let Some(workspace_deps) = workspace_table
 					.get_mut("dependencies")
-					.and_then(Value::as_table_mut)
+					.and_then(Item::as_table_like_mut)
 				{
 					for (dep_name, dep_version) in versioned_deps {
-						if let Some(entry) = workspace_deps.get_mut(dep_name) {
-							if let Some(entry_table) = entry.as_table_mut() {
-								entry_table.insert(
-									"version".to_string(),
-									Value::String(dep_version.clone()),
-								);
-							} else {
-								*entry = Value::String(dep_version.clone());
-							}
-						}
+						let Some(entry) = workspace_deps.get_mut(dep_name) else {
+							continue;
+						};
+						update_dependency_entry(entry, dep_version);
 					}
 				}
 			}
 		}
+	}
+}
+
+pub fn update_versioned_file_text(
+	contents: &str,
+	kind: CargoVersionedFileKind,
+	fields: &[&str],
+	owner_version: Option<&str>,
+	shared_release_version: Option<&str>,
+	versioned_deps: &BTreeMap<String, String>,
+	raw_versions: &BTreeMap<String, String>,
+) -> Result<String, toml_edit::TomlError> {
+	let mut document = contents.parse::<DocumentMut>()?;
+	update_versioned_file(
+		&mut document,
+		kind,
+		fields,
+		owner_version,
+		shared_release_version,
+		versioned_deps,
+		raw_versions,
+	);
+	Ok(document.to_string())
+}
+
+fn update_dependency_entry(entry: &mut Item, version: &str) {
+	if entry.is_str() {
+		set_item_string(entry, version);
+		return;
+	}
+	let Some(entry_table) = entry.as_table_like_mut() else {
+		return;
+	};
+	let uses_workspace = entry_table
+		.get("workspace")
+		.is_some_and(uses_workspace_marker);
+	if !uses_workspace {
+		set_table_value(entry_table, "version", version);
+	}
+}
+
+fn uses_workspace_marker(item: &Item) -> bool {
+	item.as_bool() == Some(true)
+		|| item
+			.as_inline_table()
+			.and_then(|table| table.get("workspace"))
+			.and_then(EditValue::as_bool)
+			== Some(true)
+}
+
+fn set_table_value(table: &mut dyn TableLike, key: &str, version: &str) {
+	if let Some(item) = table.get_mut(key) {
+		set_item_string(item, version);
+	} else {
+		table.insert(key, value(version));
+	}
+}
+
+fn set_item_string(item: &mut Item, version: &str) {
+	if let Some(existing_value) = item.as_value() {
+		let mut new_value = EditValue::from(version);
+		*new_value.decor_mut() = existing_value.decor().clone();
+		*item = Item::Value(new_value);
+	} else {
+		*item = value(version);
 	}
 }
 

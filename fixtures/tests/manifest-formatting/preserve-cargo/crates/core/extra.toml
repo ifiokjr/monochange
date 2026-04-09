@@ -1,0 +1,6 @@
+[package]
+name = "workflow-core"
+version = "1.0.0"
+
+[dependencies]
+workflow-app = { version = "1.0.0", path = "../app" }

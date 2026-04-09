@@ -8,7 +8,6 @@ pub(crate) struct VersionedFileUpdateContext<'a> {
 
 #[derive(Debug)]
 pub(crate) enum CachedDocument {
-	Toml(Value),
 	Json(serde_json::Value),
 	Yaml(serde_yaml_ng::Mapping),
 	Text(String),
@@ -215,9 +214,6 @@ pub(crate) fn serialize_cached_document(
 	document: CachedDocument,
 ) -> MonochangeResult<FileUpdate> {
 	let content = match document {
-		CachedDocument::Toml(value) => toml::to_string_pretty(&value)
-			.map(String::into_bytes)
-			.map_err(|error| MonochangeError::Config(error.to_string()))?,
 		CachedDocument::Json(value) => {
 			let mut rendered = serde_json::to_string_pretty(&value)
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;
@@ -268,17 +264,26 @@ pub(crate) fn read_cached_document(
 		})
 		.ok();
 	match kind {
-		VersionedFileKind::Cargo(_) => {
-			let Some(contents) = text_contents.as_ref() else {
+		VersionedFileKind::Cargo(kind) => {
+			let Some(contents) = text_contents else {
 				return Err(MonochangeError::Config(format!(
 					"failed to parse {} as text",
 					path.display()
 				)));
 			};
-			let value = toml::from_str::<Value>(contents).map_err(|error| {
+			monochange_cargo::update_versioned_file_text(
+				&contents,
+				kind,
+				&[],
+				None,
+				None,
+				&BTreeMap::new(),
+				&BTreeMap::new(),
+			)
+			.map_err(|error| {
 				MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
 			})?;
-			Ok(CachedDocument::Toml(value))
+			Ok(CachedDocument::Text(contents))
 		}
 		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::PnpmLock)
 		| VersionedFileKind::Dart(_) => {
@@ -459,16 +464,22 @@ pub(crate) fn apply_versioned_file_definition(
 		let mut document =
 			read_cached_document(updates, &resolved_path, definition.ecosystem_type)?;
 		match (&mut document, kind) {
-			(CachedDocument::Toml(value), VersionedFileKind::Cargo(kind)) => {
-				monochange_cargo::update_versioned_file(
-					value,
+			(CachedDocument::Text(contents), VersionedFileKind::Cargo(kind)) => {
+				*contents = monochange_cargo::update_versioned_file_text(
+					contents,
 					kind,
 					&fields,
-					owner_version,
-					shared_release_version,
+					Some(owner_version),
+					shared_release_version.map(String::as_str),
 					&versioned_deps,
 					&raw_versions,
-				);
+				)
+				.map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to parse {}: {error}",
+						resolved_path.display()
+					))
+				})?;
 			}
 			(CachedDocument::Json(value), VersionedFileKind::Npm(kind)) => match kind {
 				monochange_npm::NpmVersionedFileKind::Manifest => {

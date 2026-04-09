@@ -66,6 +66,25 @@ fn release_group_alert_snapshots_match_expected_output(#[case] scenario: &str) {
 }
 
 #[test]
+fn release_uses_linked_keep_a_changelog_titles_without_double_wrapping() {
+	let tempdir = setup_scenario_workspace("changelog-formats/linked-title");
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+	assert_snapshot!(core_changelog);
+}
+
+#[test]
 fn release_filters_group_changelog_entries_to_selected_member_packages() {
 	let tempdir = setup_scenario_workspace("changelog-formats/group-include-selected");
 

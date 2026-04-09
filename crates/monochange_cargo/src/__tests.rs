@@ -22,7 +22,7 @@ use crate::has_workspace_section;
 use crate::parse_package_manifest;
 use crate::parse_package_version;
 use crate::supported_versioned_file_kind;
-use crate::update_versioned_file;
+use crate::update_versioned_file_text;
 use crate::validate_workspace_version_groups;
 use crate::workspace_package_version;
 use crate::CargoVersionedFileKind;
@@ -274,8 +274,7 @@ fn discover_lockfiles_falls_back_to_manifest_directory() {
 
 #[test]
 fn update_versioned_file_updates_manifest_and_workspace_dependencies() {
-	let mut manifest: Value = toml::from_str(
-		r#"
+	let manifest = r#"
 [package]
 name = "app"
 version = "1.0.0"
@@ -289,22 +288,21 @@ version = "1.0.0"
 
 [workspace.dependencies]
 core = { version = "1.0.0" }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("manifest toml: {error}"));
+"#;
 	let versioned_deps = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
 	let raw_versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
-	let shared_release_version = Some("3.0.0".to_string());
-
-	update_versioned_file(
-		&mut manifest,
+	let updated = update_versioned_file_text(
+		manifest,
 		CargoVersionedFileKind::Manifest,
 		&["dependencies"],
-		"2.0.0",
-		shared_release_version.as_ref(),
+		Some("2.0.0"),
+		Some("3.0.0"),
 		&versioned_deps,
 		&raw_versions,
-	);
+	)
+	.unwrap_or_else(|error| panic!("update manifest: {error}"));
+	let manifest: Value =
+		toml::from_str(&updated).unwrap_or_else(|error| panic!("manifest toml: {error}"));
 
 	assert_eq!(
 		manifest
@@ -358,8 +356,7 @@ core = { version = "1.0.0" }
 
 #[test]
 fn update_versioned_file_updates_lock_packages() {
-	let mut lock: Value = toml::from_str(
-		r#"
+	let lock = r#"
 [[package]]
 name = "core"
 version = "1.0.0"
@@ -367,23 +364,23 @@ version = "1.0.0"
 [[package]]
 name = "app"
 version = "1.0.0"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("lock toml: {error}"));
+"#;
 	let raw_versions = BTreeMap::from([
 		("core".to_string(), "2.0.0".to_string()),
 		("app".to_string(), "1.1.0".to_string()),
 	]);
 
-	update_versioned_file(
-		&mut lock,
+	let updated = update_versioned_file_text(
+		lock,
 		CargoVersionedFileKind::Lock,
 		&[],
-		"1.0.0",
+		None,
 		None,
 		&BTreeMap::new(),
 		&raw_versions,
-	);
+	)
+	.unwrap_or_else(|error| panic!("update lock: {error}"));
+	let lock: Value = toml::from_str(&updated).unwrap_or_else(|error| panic!("lock toml: {error}"));
 
 	let packages = lock
 		.get("package")
@@ -399,8 +396,7 @@ version = "1.0.0"
 
 #[test]
 fn update_versioned_file_covers_workspace_owned_and_unstructured_entries() {
-	let mut manifest: Value = toml::from_str(
-		r#"
+	let manifest = r#"
 [package]
 name = "app"
 version = { workspace = true }
@@ -416,23 +412,24 @@ version = "1.0.0"
 [workspace.dependencies]
 core = "1.0.0"
 serde = { version = "1.0.0" }
-"#,
-	)
-	.unwrap_or_else(|error| panic!("manifest toml: {error}"));
+"#;
 	let versioned_deps = BTreeMap::from([
 		("core".to_string(), "2.0.0".to_string()),
 		("serde".to_string(), "1.1.0".to_string()),
 	]);
 
-	update_versioned_file(
-		&mut manifest,
+	let updated = update_versioned_file_text(
+		manifest,
 		CargoVersionedFileKind::Manifest,
 		&["dependencies", "dev-dependencies"],
-		"9.9.9",
+		Some("9.9.9"),
 		None,
 		&versioned_deps,
 		&BTreeMap::new(),
-	);
+	)
+	.unwrap_or_else(|error| panic!("update manifest: {error}"));
+	let manifest: Value =
+		toml::from_str(&updated).unwrap_or_else(|error| panic!("manifest toml: {error}"));
 
 	assert_eq!(
 		manifest
@@ -505,8 +502,7 @@ serde = { version = "1.0.0" }
 		Some("1.1.0")
 	);
 
-	let mut lock: Value = toml::from_str(
-		r#"
+	let lock = r#"
 [[package]]
 version = "1.0.0"
 
@@ -517,18 +513,18 @@ version = "1.0.0"
 [[package]]
 name = "ignored"
 version = "0.1.0"
-"#,
-	)
-	.unwrap_or_else(|error| panic!("lock toml: {error}"));
-	update_versioned_file(
-		&mut lock,
+"#;
+	let updated = update_versioned_file_text(
+		lock,
 		CargoVersionedFileKind::Lock,
 		&[],
-		"1.0.0",
+		None,
 		None,
 		&BTreeMap::new(),
 		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
-	);
+	)
+	.unwrap_or_else(|error| panic!("update lock: {error}"));
+	let lock: Value = toml::from_str(&updated).unwrap_or_else(|error| panic!("lock toml: {error}"));
 	let packages = lock
 		.get("package")
 		.and_then(Value::as_array)

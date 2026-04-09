@@ -1,0 +1,13 @@
+---
+source: crates/monochange/tests/manifest_formatting.rs
+expression: core_manifest
+---
+[package]
+name = "workflow-core"
+version = { workspace = true }
+edition = "2021"
+# Keep these fields in place.
+description = "core package"
+
+[dependencies]
+serde = { workspace = true }

@@ -963,7 +963,7 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 }
 
 fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> String {
-	let mut lines = vec![format!("## [{}]", document.title), String::new()];
+	let mut lines = vec![format!("## {}", document.title), String::new()];
 	for (index, paragraph) in document.summary.iter().enumerate() {
 		if index > 0 {
 			lines.push(String::new());

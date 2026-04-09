@@ -4406,7 +4406,9 @@ fn read_cached_document_parses_supported_document_formats() {
 		monochange_core::EcosystemType::Cargo,
 	)
 	.unwrap_or_else(|error| panic!("cargo manifest: {error}"));
-	assert!(matches!(cargo, crate::CachedDocument::Toml(_)));
+	assert!(
+		matches!(cargo, crate::CachedDocument::Text(contents) if contents.contains("[package]"))
+	);
 
 	let npm_json = crate::read_cached_document(
 		&mut BTreeMap::new(),
