@@ -16,10 +16,14 @@ use crate::adapter;
 use crate::dependency_constraint;
 use crate::discover_cargo_packages;
 use crate::discover_lockfiles;
+use crate::discover_workspace_packages;
+use crate::has_workspace_section;
+use crate::parse_package_manifest;
 use crate::parse_package_version;
 use crate::supported_versioned_file_kind;
 use crate::update_versioned_file;
 use crate::validate_workspace_version_groups;
+use crate::workspace_package_version;
 use crate::CargoVersionedFileKind;
 use crate::RustSemverProvider;
 
@@ -393,6 +397,152 @@ version = "1.0.0"
 }
 
 #[test]
+fn update_versioned_file_covers_workspace_owned_and_unstructured_entries() {
+	let mut manifest: Value = toml::from_str(
+		r#"
+[package]
+name = "app"
+version = { workspace = true }
+
+[dependencies]
+core = { workspace = true }
+serde = { version = "1.0.0", optional = true }
+weird = true
+
+[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+core = "1.0.0"
+serde = { version = "1.0.0" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("manifest toml: {error}"));
+	let versioned_deps = BTreeMap::from([
+		("core".to_string(), "2.0.0".to_string()),
+		("serde".to_string(), "1.1.0".to_string()),
+	]);
+
+	update_versioned_file(
+		&mut manifest,
+		CargoVersionedFileKind::Manifest,
+		&["dependencies", "dev-dependencies"],
+		"9.9.9",
+		None,
+		&versioned_deps,
+		&BTreeMap::new(),
+	);
+
+	assert_eq!(
+		manifest
+			.get("package")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("workspace"))
+			.and_then(Value::as_bool),
+		Some(true)
+	);
+	assert_eq!(
+		manifest
+			.get("dependencies")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("core"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("workspace"))
+			.and_then(Value::as_bool),
+		Some(true)
+	);
+	assert_eq!(
+		manifest
+			.get("dependencies")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("serde"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("1.1.0")
+	);
+	assert_eq!(
+		manifest
+			.get("dependencies")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("weird"))
+			.and_then(Value::as_bool),
+		Some(true)
+	);
+	assert_eq!(
+		manifest
+			.get("workspace")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("package"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("1.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("workspace")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("dependencies"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("core"))
+			.and_then(Value::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		manifest
+			.get("workspace")
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("dependencies"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("serde"))
+			.and_then(Value::as_table)
+			.and_then(|table| table.get("version"))
+			.and_then(Value::as_str),
+		Some("1.1.0")
+	);
+
+	let mut lock: Value = toml::from_str(
+		r#"
+[[package]]
+version = "1.0.0"
+
+[[package]]
+name = "core"
+version = "1.0.0"
+
+[[package]]
+name = "ignored"
+version = "0.1.0"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("lock toml: {error}"));
+	update_versioned_file(
+		&mut lock,
+		CargoVersionedFileKind::Lock,
+		&[],
+		"1.0.0",
+		None,
+		&BTreeMap::new(),
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+	);
+	let packages = lock
+		.get("package")
+		.and_then(Value::as_array)
+		.unwrap_or_else(|| panic!("expected package array"));
+	assert!(packages.iter().any(|package| {
+		package.get("name").and_then(Value::as_str) == Some("core")
+			&& package.get("version").and_then(Value::as_str) == Some("2.0.0")
+	}));
+	assert!(packages.iter().any(|package| {
+		package.get("name").and_then(Value::as_str) == Some("ignored")
+			&& package.get("version").and_then(Value::as_str) == Some("0.1.0")
+	}));
+}
+
+#[test]
 fn adapter_discover_matches_direct_cargo_discovery() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/cargo/workspace");
 	let from_adapter = adapter()
@@ -505,6 +655,49 @@ fn rust_semver_provider_defaults_unknown_severity_to_none() {
 		.unwrap_or_else(|| panic!("expected assessment"));
 	assert_eq!(assessment.severity, monochange_core::BumpSeverity::None);
 	assert_eq!(assessment.summary, "manual review needed");
+}
+
+#[test]
+fn cargo_manifest_helpers_cover_workspace_and_error_paths() {
+	let versioned_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/cargo/workspace-versioned");
+	let root_manifest = versioned_root.join("Cargo.toml");
+	assert!(has_workspace_section(&root_manifest).unwrap());
+	let parsed = toml::from_str::<Value>(
+		&std::fs::read_to_string(&root_manifest)
+			.unwrap_or_else(|error| panic!("read workspace manifest: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("parse workspace manifest: {error}"));
+	assert_eq!(
+		workspace_package_version(&parsed)
+			.as_ref()
+			.map(ToString::to_string)
+			.as_deref(),
+		Some("2.3.4")
+	);
+
+	let virtual_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tests/cargo/virtual-manifest");
+	let virtual_manifest = virtual_root.join("Cargo.toml");
+	assert_eq!(
+		parse_package_manifest(&virtual_manifest, &virtual_root, None)
+			.unwrap_or_else(|error| panic!("parse virtual manifest: {error}")),
+		None
+	);
+
+	let invalid_workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/invalid-workspace/Cargo.toml");
+	let invalid_workspace_error = has_workspace_section(&invalid_workspace)
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid workspace error"));
+	assert!(invalid_workspace_error.to_string().contains("failed to parse"));
+
+	let invalid_package_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/invalid-package-name");
+	let discovery_error = discover_workspace_packages(&invalid_package_root.join("Cargo.toml"))
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid package discovery error"));
+	assert!(discovery_error.to_string().contains("missing package.name"));
 }
 
 #[test]
