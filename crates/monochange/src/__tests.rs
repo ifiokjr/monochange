@@ -18,6 +18,12 @@ use monochange_core::VersionFormat;
 use semver::Version;
 use tempfile::tempdir;
 
+#[allow(dead_code)]
+#[path = "../../../testing/test_support/fs.rs"]
+mod shared_fs_test_support;
+use shared_fs_test_support::copy_directory;
+use shared_fs_test_support::fixture_path;
+
 use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
@@ -1702,36 +1708,6 @@ fn assert_cli_release_pattern(
 	assert_eq!(dependent["bump"].as_str(), Some("patch"));
 }
 
-fn copy_directory(source: &Path, destination: &Path) {
-	fs::create_dir_all(destination)
-		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
-	for entry in fs::read_dir(source)
-		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
-	{
-		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
-		let source_path = entry.path();
-		let destination_path = destination.join(entry.file_name());
-		let file_type = entry
-			.file_type()
-			.unwrap_or_else(|error| panic!("file type {}: {error}", source_path.display()));
-		if file_type.is_dir() {
-			copy_directory(&source_path, &destination_path);
-		} else if file_type.is_file() {
-			if let Some(parent) = destination_path.parent() {
-				fs::create_dir_all(parent)
-					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
-			}
-			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
-				panic!(
-					"copy {} -> {}: {error}",
-					source_path.display(),
-					destination_path.display()
-				)
-			});
-		}
-	}
-}
-
 fn seed_diagnostics_fixture(root: &Path, with_second_changeset: bool) {
 	if with_second_changeset {
 		copy_fixture("monochange/diagnostics-two-changesets", root);
@@ -1919,12 +1895,6 @@ fn seed_step_outputs_fixture(root: &Path) {
 		fs::copy(&source, &target)
 			.unwrap_or_else(|error| panic!("copy {}: {error}", source.display()));
 	}
-}
-
-fn fixture_path(relative: &str) -> PathBuf {
-	Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests")
-		.join(relative)
 }
 
 fn copy_fixture(fixture_relative: &str, dest: &Path) {

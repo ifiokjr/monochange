@@ -346,14 +346,25 @@ pub async fn run_server() {
 #[allow(clippy::disallowed_methods)]
 mod __tests {
 	use std::fs;
-	use std::path::Path;
 	use std::path::PathBuf;
-	use std::thread;
 
 	use insta::assert_snapshot;
 	use rmcp::handler::server::wrapper::Parameters;
 	use rmcp::ServerHandler;
 	use tempfile::tempdir;
+
+	#[allow(dead_code)]
+	mod shared_fs_test_support {
+		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/fs.rs"));
+	}
+	#[allow(dead_code)]
+	mod shared_insta_test_support {
+		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/insta.rs"));
+	}
+	#[allow(dead_code)]
+	mod shared_rmcp_test_support {
+		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/rmcp.rs"));
+	}
 
 	use super::json_error_result;
 	use super::json_result;
@@ -364,90 +375,17 @@ mod __tests {
 	use super::MonochangeMcpServer;
 	use super::PathParam;
 
-	fn snapshot_settings() -> insta::Settings {
-		let mut settings = insta::Settings::clone_current();
-		settings.add_filter(r"/private/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
-		settings.add_filter(r"/var/folders/[^\s]+?/T/[^/\s]+", "[ROOT]");
-		settings.add_filter(r"/private/tmp/[^/\s]+", "[ROOT]");
-		settings.add_filter(r"/tmp/[^/\s]+", "[ROOT]");
-		settings.add_filter(r"/home/runner/work/_temp/[^/\s]+", "[ROOT]");
-		settings.add_filter(r"\b[A-Z]:\\[^\s]+?\\Temp\\[^\\\s]+", "[ROOT]");
-		settings.add_filter(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "[DATETIME]");
-		settings.add_filter(r"\d{4}-\d{2}-\d{2}", "[DATE]");
-		settings
-	}
-
-	fn current_test_name() -> String {
-		thread::current()
-			.name()
-			.unwrap_or("unknown")
-			.split("::")
-			.last()
-			.unwrap_or("unknown")
-			.to_string()
-	}
-
-	fn fixture_path(relative: &str) -> PathBuf {
-		Path::new(env!("CARGO_MANIFEST_DIR"))
-			.join("../../fixtures/tests")
-			.join(relative)
-	}
-
-	fn copy_directory(source: &Path, destination: &Path) {
-		fs::create_dir_all(destination).unwrap_or_else(|error| {
-			panic!("create destination {}: {error}", destination.display())
-		});
-		for entry in fs::read_dir(source)
-			.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
-		{
-			let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
-			let source_path = entry.path();
-			let destination_path = destination.join(entry.file_name());
-			let metadata = fs::metadata(&source_path)
-				.unwrap_or_else(|error| panic!("metadata {}: {error}", source_path.display()));
-			if metadata.is_dir() {
-				copy_directory(&source_path, &destination_path);
-			} else if metadata.is_file() {
-				if let Some(parent) = destination_path.parent() {
-					fs::create_dir_all(parent).unwrap_or_else(|error| {
-						panic!("create parent {}: {error}", parent.display())
-					});
-				}
-				fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
-					panic!(
-						"copy {} -> {}: {error}",
-						source_path.display(),
-						destination_path.display()
-					)
-				});
-			}
-		}
-	}
-
-	fn setup_fixture(relative: &str) -> tempfile::TempDir {
-		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		copy_directory(&fixture_path(relative), tempdir.path());
-		tempdir
-	}
-
-	fn content_text(result: &rmcp::model::CallToolResult) -> String {
-		result
-			.content
-			.first()
-			.and_then(|content| match &content.raw {
-				rmcp::model::RawContent::Text(text) => Some(text.text.clone()),
-				_ => None,
-			})
-			.unwrap_or_default()
-	}
+	use shared_fs_test_support::copy_directory;
+	use shared_fs_test_support::current_test_name;
+	use shared_fs_test_support::setup_fixture;
+	use shared_insta_test_support::snapshot_settings;
+	use shared_rmcp_test_support::content_text;
 
 	#[test]
 	fn get_info_exposes_tool_instructions_and_capabilities() {
 		let info = MonochangeMcpServer::new().get_info();
-		assert!(info
-			.instructions
-			.as_ref()
-			.is_some_and(|text| text.contains("Monochange manages versions and releases")));
+		assert!(info.instructions.as_ref().is_some_and(|text| text
+			.contains("monochange manages versions and releases across Cargo, npm, Deno, and Dart/Flutter workspaces")));
 		assert!(info.capabilities.tools.is_some());
 	}
 
