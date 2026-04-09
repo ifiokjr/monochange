@@ -18,7 +18,6 @@ use monochange_core::VersionFormat;
 use semver::Version;
 use tempfile::tempdir;
 
-use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
@@ -461,15 +460,13 @@ fn changes_add_canonicalizes_package_references_to_package_names() {
 #[test]
 fn add_change_file_creates_default_path_under_changeset_directory() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
-	let output_path = add_change_file(
+	let output_path = crate::add_change_file(
 		&fixture_root,
-		&["sdk-core".to_string()],
-		BumpSeverity::Patch,
-		None,
-		"default output",
-		None,
-		None,
-		None,
+		crate::AddChangeFileRequest::builder()
+			.package_refs(&["sdk-core".to_string()])
+			.bump(BumpSeverity::Patch)
+			.reason("default output")
+			.build(),
 	)
 	.unwrap_or_else(|error| panic!("default change file: {error}"));
 	let content = fs::read_to_string(&output_path)
@@ -603,15 +600,16 @@ fn add_change_file_renders_type_and_explicit_version_without_bump() {
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 	let output_path = tempdir.path().join("security-version.md");
 
-	add_change_file(
+	crate::add_change_file(
 		tempdir.path(),
-		&["core".to_string()],
-		BumpSeverity::None,
-		Some("2.0.0"),
-		"pin a secure release",
-		Some("security"),
-		None,
-		Some(&output_path),
+		crate::AddChangeFileRequest::builder()
+			.package_refs(&["core".to_string()])
+			.bump(BumpSeverity::None)
+			.reason("pin a secure release")
+			.version(Some("2.0.0"))
+			.change_type(Some("security"))
+			.output(Some(&output_path))
+			.build(),
 	)
 	.unwrap_or_else(|error| panic!("change file output: {error}"));
 
@@ -628,15 +626,15 @@ fn add_change_file_renders_object_metadata_when_bump_differs_from_type_default()
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 	let output_path = tempdir.path().join("security-major.md");
 
-	add_change_file(
+	crate::add_change_file(
 		tempdir.path(),
-		&["core".to_string()],
-		BumpSeverity::Major,
-		None,
-		"break the api",
-		Some("security"),
-		None,
-		Some(&output_path),
+		crate::AddChangeFileRequest::builder()
+			.package_refs(&["core".to_string()])
+			.bump(BumpSeverity::Major)
+			.reason("break the api")
+			.change_type(Some("security"))
+			.output(Some(&output_path))
+			.build(),
 	)
 	.unwrap_or_else(|error| panic!("change file output: {error}"));
 
@@ -651,15 +649,13 @@ fn add_change_file_rejects_none_without_type_or_version() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 
-	let error = add_change_file(
+	let error = crate::add_change_file(
 		tempdir.path(),
-		&["core".to_string()],
-		BumpSeverity::None,
-		None,
-		"type required",
-		None,
-		None,
-		None,
+		crate::AddChangeFileRequest::builder()
+			.package_refs(&["core".to_string()])
+			.bump(BumpSeverity::None)
+			.reason("type required")
+			.build(),
 	)
 	.expect_err("none bump without type/version should fail");
 	assert!(error
@@ -672,15 +668,14 @@ fn add_change_file_rejects_unknown_change_type() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 
-	let error = add_change_file(
+	let error = crate::add_change_file(
 		tempdir.path(),
-		&["core".to_string()],
-		BumpSeverity::Patch,
-		None,
-		"unknown type",
-		Some("docs"),
-		None,
-		None,
+		crate::AddChangeFileRequest::builder()
+			.package_refs(&["core".to_string()])
+			.bump(BumpSeverity::Patch)
+			.reason("unknown type")
+			.change_type(Some("docs"))
+			.build(),
 	)
 	.expect_err("unknown type should fail");
 	assert!(error
