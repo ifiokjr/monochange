@@ -1,0 +1,35 @@
+---
+source: crates/monochange/tests/changeset_policy.rs
+expression: json
+---
+{
+  "affectedPackageIds": [
+    "core"
+  ],
+  "changedPaths": [
+    "crates/core/src/lib.rs",
+    ".changeset/feature.md"
+  ],
+  "changesetPaths": [
+    ".changeset/feature.md"
+  ],
+  "comment": "### MonoChange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `crates/core/src/lib.rs`\n\nAffected packages:\n- `core`\n\nAttached changeset files:\n- `.changeset/feature.md`\n\nErrors:\n- config error: failed to parse [ROOT]/.changeset/feature.md: target `core` has invalid scalar value `nope`; expected one of `none`, `patch`, `minor`, `major``\n- changed packages are not covered by attached changesets: core\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
+  "coveredPackageIds": [],
+  "enforce": false,
+  "errors": [
+    "config error: failed to parse [ROOT]/.changeset/feature.md: target `core` has invalid scalar value `nope`; expected one of `none`, `patch`, `minor`, `major``",
+    "changed packages are not covered by attached changesets: core"
+  ],
+  "ignoredPaths": [],
+  "labels": [],
+  "matchedPaths": [
+    "crates/core/src/lib.rs"
+  ],
+  "matchedSkipLabels": [],
+  "required": true,
+  "status": "failed",
+  "summary": "changeset verification failed: attached changesets do not cover 1 changed package",
+  "uncoveredPackageIds": [
+    "core"
+  ]
+}

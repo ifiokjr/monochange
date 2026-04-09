@@ -1,11 +1,12 @@
 use std::path::Path;
 
+use insta::assert_json_snapshot;
 use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
 use test_support::{
-	assert_json_fixture, expected_fixture_path, monochange_command, setup_scenario_workspace,
+	current_test_name, monochange_command, setup_scenario_workspace, snapshot_settings,
 };
 
 #[rstest]
@@ -16,23 +17,19 @@ use test_support::{
 		"crates/core/src/lib.rs",
 		"--label",
 		"no-changeset-required",
-	],
-	"skip-label.json"
+	]
 )]
 #[case::non_package_changes(
 	"changeset-policy/with-changeset-core",
-	&["--changed-paths", "docs/readme.md"],
-	"non-package-changes.json"
+	&["--changed-paths", "docs/readme.md"]
 )]
 #[case::ignored_paths(
 	"changeset-policy/with-changeset-core",
-	&["--changed-paths", "crates/core/tests/smoke.rs"],
-	"ignored-paths.json"
+	&["--changed-paths", "crates/core/tests/smoke.rs"]
 )]
 #[case::additional_paths(
 	"changeset-policy/with-changeset-core",
-	&["--changed-paths", "Cargo.lock"],
-	"additional-paths.json"
+	&["--changed-paths", "Cargo.lock"]
 )]
 #[case::wrong_target(
 	"changeset-policy/with-changeset-other",
@@ -41,8 +38,7 @@ use test_support::{
 		"crates/core/src/lib.rs",
 		"--changed-paths",
 		".changeset/feature.md",
-	],
-	"wrong-target.json"
+	]
 )]
 #[case::covered(
 	"changeset-policy/with-changeset-core",
@@ -51,8 +47,7 @@ use test_support::{
 		"crates/core/src/lib.rs",
 		"--changed-paths",
 		".changeset/feature.md",
-	],
-	"covered.json"
+	]
 )]
 #[case::invalid_changeset(
 	"changeset-policy/with-changeset-invalid-core",
@@ -61,20 +56,19 @@ use test_support::{
 		"crates/core/src/lib.rs",
 		"--changed-paths",
 		".changeset/feature.md",
-	],
-	"invalid-changeset.json"
+	]
 )]
-fn verify_changeset_policy_scenarios_match_expected_fixture(
+fn verify_changeset_policy_scenarios_match_snapshot(
 	#[case] scenario_relative: &str,
 	#[case] args: &[&str],
-	#[case] expected_name: &str,
 ) {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
 	let tempdir = setup_scenario_workspace(scenario_relative);
 	let json = run_affected_json(tempdir.path(), args);
-	assert_json_fixture(
-		&json,
-		&expected_fixture_path(scenario_relative, expected_name),
-	);
+	assert_json_snapshot!(json);
 }
 
 fn run_affected_json(root: &Path, args: &[&str]) -> Value {

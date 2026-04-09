@@ -1,19 +1,21 @@
+use insta::assert_json_snapshot;
 use rstest::rstest;
 
 mod test_support;
 use test_support::{
-	assert_json_fixture, expected_fixture_path, run_json_command, setup_scenario_workspace,
+	current_test_name, run_json_command, setup_scenario_workspace, snapshot_settings,
 };
 
 #[rstest]
 #[case::group("group")]
 #[case::ungrouped("ungrouped")]
-fn open_release_pull_request_dry_run_matches_expected_fixture(#[case] scenario: &str) {
+fn open_release_pull_request_dry_run_matches_snapshot(#[case] scenario: &str) {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
 	let scenario_relative = format!("release-pr/{scenario}");
 	let tempdir = setup_scenario_workspace(&scenario_relative);
 	let json = run_json_command(tempdir.path(), "release-pr", Some("2026-04-06"));
-	assert_json_fixture(
-		&json,
-		&expected_fixture_path(&scenario_relative, "release-pr.json"),
-	);
+	assert_json_snapshot!(json);
 }
