@@ -4,8 +4,13 @@
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
+use monochange_core::git::git_checkout_branch_command;
+use monochange_core::git::git_commit_paths_command;
+use monochange_core::git::git_push_branch_command;
+use monochange_core::git::git_stage_paths_command;
+use monochange_core::git::run_command;
+use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -502,88 +507,30 @@ where
 
 fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
 	run_command(
-		{
-			let mut command = Command::new("git");
-			command
-				.current_dir(root)
-				.arg("checkout")
-				.arg("-B")
-				.arg(branch);
-			command
-		},
+		git_checkout_branch_command(root, branch),
 		"prepare release pull request branch",
 	)
 }
 
 fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
-	let mut command = Command::new("git");
-	command.current_dir(root).arg("add").arg("-A").arg("--");
-	for path in tracked_paths {
-		command.arg(path);
-	}
-	run_command(command, "stage release pull request files")
+	run_command(
+		git_stage_paths_command(root, tracked_paths),
+		"stage release pull request files",
+	)
 }
 
 fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
-	let output = {
-		let mut command = Command::new("git");
-		command
-			.current_dir(root)
-			.arg("commit")
-			.arg("--message")
-			.arg(&message.subject);
-		if let Some(body) = &message.body {
-			command.arg("--message").arg(body);
-		}
-		command
-	}
-	.output()
-	.map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to commit release pull request changes: {error}"
-		))
-	})?;
-	if output.status.success() {
-		return Ok(());
-	}
-	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-	if stderr.contains("nothing to commit") || stdout.contains("nothing to commit") {
-		return Ok(());
-	}
-	let detail = if stderr.is_empty() { stdout } else { stderr };
-	Err(MonochangeError::Config(format!(
-		"failed to commit release pull request changes: {detail}"
-	)))
+	run_commit_command_allow_nothing_to_commit(
+		git_commit_paths_command(root, message),
+		"commit release pull request changes",
+	)
 }
 
 fn git_push_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
 	run_command(
-		{
-			let mut command = Command::new("git");
-			command
-				.current_dir(root)
-				.arg("push")
-				.arg("--force-with-lease")
-				.arg("origin")
-				.arg(format!("HEAD:{branch}"));
-			command
-		},
+		git_push_branch_command(root, branch),
 		"push release pull request branch",
 	)
-}
-
-fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
-	let output = command
-		.output()
-		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
-	if !output.status.success() {
-		return Err(MonochangeError::Config(format!(
-			"failed to {action}: {}",
-			String::from_utf8_lossy(&output.stderr).trim()
-		)));
-	}
-	Ok(())
 }
 
 fn release_body(

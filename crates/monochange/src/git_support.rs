@@ -2,6 +2,12 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
+use monochange_core::git::git_command_output;
+use monochange_core::git::git_commit_paths_command;
+use monochange_core::git::git_error_detail;
+use monochange_core::git::git_stage_paths_command;
+use monochange_core::git::git_stderr_trimmed;
+use monochange_core::git::git_stdout_trimmed;
 use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -23,19 +29,14 @@ pub(crate) fn git_is_ancestor(
 	ancestor: &str,
 	descendant: &str,
 ) -> MonochangeResult<bool> {
-	let output = ProcessCommand::new("git")
-		.current_dir(root)
-		.args(["merge-base", "--is-ancestor", ancestor, descendant])
-		.output()
+	let output = git_command_output(root, &["merge-base", "--is-ancestor", ancestor, descendant])
 		.map_err(|error| {
-			MonochangeError::Discovery(format!("failed to compare commit ancestry: {error}"))
-		})?;
+		MonochangeError::Discovery(format!("failed to compare commit ancestry: {error}"))
+	})?;
 	match output.status.code() {
 		Some(0) => Ok(true),
 		Some(1) => Ok(false),
-		_ => Err(MonochangeError::Discovery(
-			String::from_utf8_lossy(&output.stderr).trim().to_string(),
-		)),
+		_ => Err(MonochangeError::Discovery(git_stderr_trimmed(&output))),
 	}
 }
 
@@ -98,13 +99,10 @@ pub(crate) fn run_git_capture(
 	args: &[&str],
 	error_message: &str,
 ) -> MonochangeResult<String> {
-	let output = ProcessCommand::new("git")
-		.current_dir(root)
-		.args(args)
-		.output()
+	let output = git_command_output(root, args)
 		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
 	if !output.status.success() {
-		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+		let stderr = git_stderr_trimmed(&output);
 		let detail = [error_message, stderr.as_str()]
 			.into_iter()
 			.filter(|part| !part.is_empty())
@@ -112,7 +110,7 @@ pub(crate) fn run_git_capture(
 			.join(": ");
 		return Err(MonochangeError::Discovery(detail));
 	}
-	Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+	Ok(git_stdout_trimmed(&output))
 }
 
 pub(crate) fn run_git_status(
@@ -124,25 +122,17 @@ pub(crate) fn run_git_status(
 }
 
 pub(crate) fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
-	let mut command = ProcessCommand::new("git");
-	command.current_dir(root).arg("add").arg("-A").arg("--");
-	for path in tracked_paths {
-		command.arg(path);
-	}
-	run_git_process(command, "failed to stage release commit files")
+	run_git_process(
+		git_stage_paths_command(root, tracked_paths),
+		"failed to stage release commit files",
+	)
 }
 
 pub(crate) fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
-	let mut command = ProcessCommand::new("git");
-	command
-		.current_dir(root)
-		.arg("commit")
-		.arg("--message")
-		.arg(&message.subject);
-	if let Some(body) = &message.body {
-		command.arg("--message").arg(body);
-	}
-	run_git_process(command, "failed to create release commit")
+	run_git_process(
+		git_commit_paths_command(root, message),
+		"failed to create release commit",
+	)
 }
 
 pub(crate) fn git_head_commit(root: &Path) -> MonochangeResult<String> {
@@ -161,7 +151,7 @@ pub(crate) fn run_git_process(
 		.output()
 		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
 	if !output.status.success() {
-		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+		let stderr = git_error_detail(&output);
 		let detail = [error_message, stderr.as_str()]
 			.into_iter()
 			.filter(|part| !part.is_empty())
