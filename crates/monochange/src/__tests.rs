@@ -2675,7 +2675,10 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 	};
 	let inputs = BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
 	let variables = BTreeMap::from([
-		("custom_version".to_string(), monochange_core::CommandVariable::Version),
+		(
+			"custom_version".to_string(),
+			monochange_core::CommandVariable::Version,
+		),
 		(
 			"custom_changesets".to_string(),
 			monochange_core::CommandVariable::Changesets,
@@ -2917,9 +2920,9 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected github source requirement error"));
-	assert!(error
-		.to_string()
-		.contains("`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"));
+	assert!(error.to_string().contains(
+		"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
+	));
 }
 
 #[test]
@@ -2931,12 +2934,15 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		.open(tempdir.path().join("monochange.toml"))
 		.and_then(|mut file| {
 			use std::io::Write;
-			writeln!(file, "\n[source]\nprovider = \"github\"\nowner = \"ifiokjr\"\nrepo = \"monochange\"\n")
+			writeln!(
+				file,
+				"\n[source]\nprovider = \"github\"\nowner = \"ifiokjr\"\nrepo = \"monochange\"\n"
+			)
 		})
 		.unwrap_or_else(|error| panic!("append source config: {error}"));
 	let root = tempdir.path();
-	let configuration = load_workspace_configuration(root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 
 	let manifest_path = root.join("target/release-manifest.json");
 	let render_manifest = monochange_core::CliCommandDefinition {
@@ -2962,8 +2968,8 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 	)
 	.unwrap_or_else(|error| panic!("render manifest: {error}"));
 	assert!(render_output.contains("release manifest: target/release-manifest.json"));
-	let manifest_contents = fs::read_to_string(&manifest_path)
-		.unwrap_or_else(|error| panic!("read manifest: {error}"));
+	let manifest_contents =
+		fs::read_to_string(&manifest_path).unwrap_or_else(|error| panic!("read manifest: {error}"));
 	assert!(manifest_contents.contains("\"releaseTargets\""));
 
 	let publish_release = monochange_core::CliCommandDefinition {
@@ -3027,14 +3033,9 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 			},
 		],
 	};
-	let comments_output = crate::execute_cli_command(
-		root,
-		&configuration,
-		&issue_comments,
-		true,
-		BTreeMap::new(),
-	)
-	.unwrap_or_else(|error| panic!("comment released issues: {error}"));
+	let comments_output =
+		crate::execute_cli_command(root, &configuration, &issue_comments, true, BTreeMap::new())
+			.unwrap_or_else(|error| panic!("comment released issues: {error}"));
 	assert!(!comments_output.is_empty());
 }
 
@@ -4288,14 +4289,23 @@ fn assistant_setup_payload_includes_variant_specific_notes() {
 	let cases = [
 		(crate::Assistant::Generic, "supports stdio MCP servers"),
 		(crate::Assistant::Claude, "Claude's MCP configuration"),
-		(crate::Assistant::Cursor, "Configure the MCP server in Cursor"),
-		(crate::Assistant::Copilot, "support MCP-compatible server definitions"),
+		(
+			crate::Assistant::Cursor,
+			"Configure the MCP server in Cursor",
+		),
+		(
+			crate::Assistant::Copilot,
+			"support MCP-compatible server definitions",
+		),
 	];
 	for (assistant, expected_note) in cases {
 		let payload = crate::assistant_setup_payload(assistant);
-		assert!(payload["notes"].as_array().is_some_and(|items| items.iter().any(|item| {
-			item.as_str().is_some_and(|text| text.contains(expected_note))
-		})));
+		assert!(payload["notes"]
+			.as_array()
+			.is_some_and(|items| items.iter().any(|item| {
+				item.as_str()
+					.is_some_and(|text| text.contains(expected_note))
+			})));
 	}
 }
 
@@ -4359,7 +4369,11 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 	};
 	assert_eq!(
 		crate::configured_change_type_choices(&configuration),
-		vec!["docs".to_string(), "security".to_string(), "test".to_string()]
+		vec![
+			"docs".to_string(),
+			"security".to_string(),
+			"test".to_string()
+		]
 	);
 }
 

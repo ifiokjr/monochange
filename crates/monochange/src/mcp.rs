@@ -821,6 +821,10 @@ mod __tests {
 			.unwrap_or_else(|error| panic!("affected: {error}"));
 		let rendered = content_text(&result);
 		assert!(rendered.contains("\"ok\": false"));
-		assert!(rendered.contains("unknown" ) || rendered.contains("empty id") || rendered.contains("step"));
+		assert!(
+			rendered.contains("unknown")
+				|| rendered.contains("empty id")
+				|| rendered.contains("step")
+		);
 	}
 }
