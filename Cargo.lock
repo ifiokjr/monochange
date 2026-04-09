@@ -737,6 +737,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "etest"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef7edfc358adbfe7e55d49667e64182d9f3415abd2bf9fee5957b0625c798dc9"
+dependencies = [
+ "etest-derive",
+ "once_cell",
+]
+
+[[package]]
+name = "etest-derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5506c5b7f7665cf8640c43af2d260fa5aed404347a4134c67a7f7f74ebb8a4be"
+dependencies = [
+ "etest-impl",
+]
+
+[[package]]
+name = "etest-impl"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ddc4ba667f4257b0f8e80b4cecc57fbd39f46a761f8d6af10823abf5ce38de9"
+
+[[package]]
 name = "event-listener"
 version = "5.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1663,6 +1688,7 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "clap",
+ "etest",
  "glob",
  "httpmock",
  "inquire",
@@ -1808,6 +1834,7 @@ dependencies = [
 name = "monochange_gitea"
 version = "0.0.0"
 dependencies = [
+ "etest",
  "httpmock",
  "insta",
  "monochange_core",
@@ -1823,6 +1850,7 @@ dependencies = [
 name = "monochange_github"
 version = "0.0.0"
 dependencies = [
+ "etest",
  "httpmock",
  "insta",
  "monochange_core",
@@ -1840,6 +1868,7 @@ dependencies = [
 name = "monochange_gitlab"
 version = "0.0.0"
 dependencies = [
+ "etest",
  "httpmock",
  "insta",
  "monochange_core",

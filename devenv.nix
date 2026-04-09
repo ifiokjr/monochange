@@ -57,6 +57,7 @@ in
         enable = true;
         verbose = true;
         pass_filenames = true;
+        after = [ "secrets:commit" ];
         name = "dprint check";
         description = "Run workspace autofixes before commit and restage the results.";
         entry = "${pkgs.dprint}/bin/dprint check --allow-no-files";
@@ -74,18 +75,20 @@ in
         enable = true;
         verbose = true;
         pass_filenames = false;
+        after = [ "secrets:push" ];
         name = "lint";
         description = "Run the local CI lint rules suite before push.";
-        entry = "bash -lc 'export PRE_COMMIT=1; ${config.env.DEVENV_PROFILE}/bin/lint:all'";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all";
         stages = [ "pre-push" ];
       };
       "test" = {
         enable = true;
         verbose = true;
         pass_filenames = false;
+        after = [ "lint" ];
         name = "test";
         description = "Run the local CI validation suite before push.";
-        entry = "bash -lc 'export PRE_COMMIT=1; ${config.env.DEVENV_PROFILE}/bin/test:all'";
+        entry = "${config.env.DEVENV_PROFILE}/bin/test:all";
         stages = [ "pre-push" ];
       };
     };

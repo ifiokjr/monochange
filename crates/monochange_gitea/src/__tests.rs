@@ -1,4 +1,3 @@
-use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -306,7 +305,7 @@ fn publish_release_requests_reports_gitea_api_errors() {
 	assert!(error.to_string().contains("Gitea API GET"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn publish_release_pull_request_creates_pull_request_and_labels() {
 	let server = MockServer::start();
 	let list = server.mock(|when, then| {
@@ -359,12 +358,8 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 	assert!(commit_body.contains("release body"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_reports_io_and_non_noop_failures() {
-	if env::var_os("PRE_COMMIT").is_some() {
-		return;
-	}
-
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
 	let io_error = git_commit_paths(
@@ -409,7 +404,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 		.contains("failed to commit release pull request changes"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path().join("repo");

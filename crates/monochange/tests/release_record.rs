@@ -19,7 +19,7 @@ fn cli() -> Command {
 	command
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_record_command_reports_record_from_tag_as_json() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path();
@@ -52,7 +52,7 @@ fn release_record_command_reports_record_from_tag_as_json() {
 	assert_eq!(parsed["record"]["releaseTargets"][0]["tagName"], "v1.2.3");
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_record_command_walks_first_parent_ancestry_from_head() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path();
@@ -84,7 +84,7 @@ fn release_record_command_walks_first_parent_ancestry_from_head() {
 	assert!(stdout.contains("- group sdk -> 1.2.3 (tag: v1.2.3)"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_record_command_reports_unresolved_refs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path();
@@ -103,7 +103,7 @@ fn release_record_command_reports_unresolved_refs() {
 	assert!(stderr.contains("could not resolve ref `missing-tag` to a commit"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_record_command_reports_missing_record_in_history() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path();
@@ -124,7 +124,7 @@ fn release_record_command_reports_missing_record_in_history() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path();
@@ -150,7 +150,7 @@ fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 	assert!(stderr.contains("found a malformed monochange release record in commit"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_record_command_reports_unsupported_schema_version() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path();

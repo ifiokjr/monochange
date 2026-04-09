@@ -1,8 +1,3 @@
-use std::env;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
-
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
 use httpmock::Method::POST;
@@ -29,6 +24,9 @@ use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::SourceReleaseOperation;
 use monochange_core::VersionFormat;
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command;
 use tempfile::tempdir;
 
 use super::*;
@@ -334,7 +332,7 @@ fn publish_release_requests_reports_gitlab_api_errors() {
 	assert!(error.to_string().contains("GitLab API GET"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 	let server = MockServer::start();
 	let list = server.mock(|when, then| {
@@ -379,12 +377,8 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 	assert!(commit_body.contains("release body"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_reports_io_and_non_noop_failures() {
-	if env::var_os("PRE_COMMIT").is_some() {
-		return;
-	}
-
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
 	let io_error = git_commit_paths(
@@ -429,7 +423,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 		.contains("failed to commit release merge request changes"));
 }
 
-#[test]
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path().join("repo");

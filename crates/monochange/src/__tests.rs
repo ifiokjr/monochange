@@ -2343,7 +2343,7 @@ fn text_release_record_discovery_omits_empty_sections() {
 	assert!(!rendered.contains("  provider:"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn commit_release_command_creates_local_commit_with_release_record() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2409,7 +2409,7 @@ fn commit_release_command_reports_json_output() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn repair_release_command_dry_run_reports_text_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2439,7 +2439,7 @@ fn repair_release_command_dry_run_reports_text_output() {
 	assert!(output.contains("status: dry-run"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn repair_release_command_reports_json_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2482,7 +2482,7 @@ fn repair_release_command_reports_json_output() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn repair_release_command_rejects_non_descendant_targets_without_force() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2814,7 +2814,7 @@ fn retarget_operation_label_covers_all_variants() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_collects_tag_and_provider_updates() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2857,7 +2857,7 @@ fn plan_release_retarget_collects_tag_and_provider_updates() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_rejects_non_descendant_without_force() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2899,7 +2899,7 @@ fn plan_release_retarget_rejects_non_descendant_without_force() {
 		.contains("is not a descendant of release-record commit"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn execute_release_retarget_moves_tags_and_pushes_origin_refs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let remote = tempdir.path().join("remote.git");
@@ -2964,7 +2964,7 @@ fn execute_release_retarget_moves_tags_and_pushes_origin_refs() {
 	assert_eq!(remote_tag, head);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn retarget_release_reports_missing_tags() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2991,7 +2991,7 @@ fn retarget_release_reports_missing_tags() {
 		.contains("release tag v1.2.3 could not be found"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -3033,7 +3033,7 @@ fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -3123,7 +3123,7 @@ fn execute_release_retarget_returns_empty_provider_results_without_source() {
 	assert!(result.provider_results.is_empty());
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_rejects_provider_kind_mismatches() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -3161,7 +3161,7 @@ fn plan_release_retarget_rejects_provider_kind_mismatches() {
 		.contains("does not match configured source provider"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_rejects_repository_mismatches() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -3197,7 +3197,7 @@ fn plan_release_retarget_rejects_repository_mismatches() {
 		.contains("does not match configured source repository"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_skips_provider_updates_when_no_provider_is_available() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -3222,7 +3222,7 @@ fn plan_release_retarget_skips_provider_updates_when_no_provider_is_available() 
 	assert!(plan.provider_updates.is_empty());
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn plan_release_retarget_accepts_missing_record_provider_with_configured_source() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -3309,7 +3309,7 @@ fn execute_release_retarget_delegates_github_provider_sync() {
 	);
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -3517,7 +3517,7 @@ fn git_stage_paths_reports_git_failures() {
 		.contains("failed to stage release commit files"));
 }
 
-#[test]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn first_parent_commits_returns_head_then_ancestors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();

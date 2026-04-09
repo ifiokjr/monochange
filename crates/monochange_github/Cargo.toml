@@ -22,6 +22,7 @@ tokio = { workspace = true, default-features = true }
 urlencoding = { workspace = true, default-features = true }
 
 [dev-dependencies]
+etest = { workspace = true, default-features = true }
 httpmock = { workspace = true, default-features = true }
 insta = { workspace = true, default-features = true }
 temp-env = { workspace = true, default-features = true }
