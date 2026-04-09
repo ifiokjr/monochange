@@ -12,14 +12,21 @@ use serde_json::json;
 use serde_yaml_ng::Value as YamlValue;
 
 use crate::adapter;
+use crate::detect_npm_manager;
 use crate::discover_lockfiles;
 use crate::discover_npm_packages;
+use crate::discover_package_json_workspace;
+use crate::discover_pnpm_workspace;
+use crate::expand_member_patterns;
+use crate::package_json_declares_workspaces;
+use crate::parse_package_json;
 use crate::supported_versioned_file_kind;
 use crate::update_bun_lock;
 use crate::update_bun_lock_binary;
 use crate::update_json_dependency_fields;
 use crate::update_package_lock;
 use crate::update_pnpm_lock;
+use crate::workspace_patterns_from_package_json;
 use crate::NpmVersionedFileKind;
 
 #[test]
@@ -370,4 +377,172 @@ fn update_json_dependency_fields_ignores_missing_or_non_object_sections() {
 		manifest.get("scripts"),
 		Some(&json!({"build": "vite build"}))
 	);
+}
+
+#[test]
+fn workspace_pattern_helpers_cover_array_object_and_missing_cases() {
+	assert_eq!(
+		workspace_patterns_from_package_json(&json!({"workspaces": ["packages/*"]})),
+		vec!["packages/*".to_string()]
+	);
+	assert_eq!(
+		workspace_patterns_from_package_json(&json!({"workspaces": {"packages": ["apps/*"]}})),
+		vec!["apps/*".to_string()]
+	);
+	assert_eq!(workspace_patterns_from_package_json(&json!({})), Vec::<String>::new());
+}
+
+#[test]
+fn detect_npm_manager_prefers_bun_then_pnpm_then_npm() {
+	let bun_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/npm/workspace-bun");
+	assert_eq!(detect_npm_manager(&bun_root), "bun");
+	let pnpm_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/npm/workspace-pnpm");
+	assert_eq!(detect_npm_manager(&pnpm_root), "pnpm");
+	let npm_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tests/npm/standalone-package");
+	assert_eq!(detect_npm_manager(&npm_root), "npm");
+}
+
+#[test]
+fn explicit_file_workspace_patterns_discover_package_manifests() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/workspace-explicit-file");
+	let mut warnings = Vec::new();
+	let manifests = expand_member_patterns(
+		&fixture_root,
+		&["packages/web/package.json".to_string()],
+		&mut warnings,
+	);
+	assert_eq!(warnings, Vec::<String>::new());
+	assert_eq!(manifests.len(), 1);
+	assert!(manifests.iter().any(|path| path.ends_with("packages/web/package.json")));
+
+	let discovery = discover_npm_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("npm discovery: {error}"));
+	assert_eq!(discovery.packages.len(), 1);
+	assert_eq!(
+		discovery
+			.packages
+			.first()
+			.unwrap_or_else(|| panic!("expected explicit package"))
+			.name,
+		"explicit-web"
+	);
+}
+
+#[test]
+fn package_json_parsing_and_workspace_detection_report_parse_errors() {
+	let invalid_workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/invalid-workspace-package-json/package.json");
+	let error = package_json_declares_workspaces(&invalid_workspace)
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid workspace parse error"));
+	assert!(error.to_string().contains("failed to parse"));
+
+	let workspace_error = discover_package_json_workspace(&invalid_workspace)
+		.err()
+		.unwrap_or_else(|| panic!("expected workspace discovery error"));
+	assert!(workspace_error.to_string().contains("failed to parse"));
+
+	let invalid_pnpm = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/invalid-pnpm-workspace/pnpm-workspace.yaml");
+	let pnpm_error = discover_pnpm_workspace(&invalid_pnpm)
+		.err()
+		.unwrap_or_else(|| panic!("expected pnpm parse error"));
+	assert!(pnpm_error.to_string().contains("failed to parse"));
+
+	let invalid_package = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/invalid-package-json/package.json");
+	let package_error = parse_package_json(&invalid_package, Path::new("."), "npm")
+		.err()
+		.unwrap_or_else(|| panic!("expected package parse error"));
+	assert!(package_error.to_string().contains("failed to parse"));
+}
+
+#[test]
+fn update_package_lock_ignores_unmapped_root_and_non_object_entries() {
+	let mut lock = json!({
+		"name": "app",
+		"version": "1.0.0",
+		"packages": {
+			"": {"name": "app", "version": "1.0.0"},
+			"packages/core": "not-an-object",
+			"packages/util": {"version": "1.0.0"}
+		},
+		"dependencies": {
+			"core": "1.0.0",
+			"util": {"version": "1.0.0"}
+		}
+	});
+	let package_paths = BTreeMap::from([("util".to_string(), PathBuf::from("packages/util"))]);
+	let raw_versions = BTreeMap::from([("util".to_string(), "2.0.0".to_string())]);
+
+	update_package_lock(&mut lock, &package_paths, &raw_versions);
+
+	assert_eq!(lock.pointer("/version"), Some(&json!("1.0.0")));
+	assert_eq!(lock.pointer("/packages//version"), Some(&json!("1.0.0")));
+	assert_eq!(lock.pointer("/packages/packages~1core"), Some(&json!("not-an-object")));
+	assert_eq!(
+		lock.pointer("/packages/packages~1util/version"),
+		Some(&json!("2.0.0"))
+	);
+	assert_eq!(lock.pointer("/dependencies/core"), Some(&json!("1.0.0")));
+	assert_eq!(
+		lock.pointer("/dependencies/util/version"),
+		Some(&json!("2.0.0"))
+	);
+}
+
+#[test]
+fn update_pnpm_lock_covers_missing_sections_and_non_string_versions() {
+	let mut lock: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
+		r"
+importers:
+  .:
+    devDependencies:
+      core: 1.0.0
+packages:
+  ignored: plain-text
+snapshots:
+  core@1.0.0:
+    peerDependencies:
+      core:
+        version: 1
+      linked:
+        version: link:../linked
+",
+	)
+	.unwrap_or_else(|error| panic!("pnpm lock yaml: {error}"));
+	let raw_versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
+
+	update_pnpm_lock(&mut lock, &raw_versions);
+
+	let rendered = serde_yaml_ng::to_string(&YamlValue::Mapping(lock))
+		.unwrap_or_else(|error| panic!("render pnpm lock: {error}"));
+	assert!(rendered.contains("core: 2.0.0"));
+	assert!(rendered.contains("version: 1"));
+	assert!(rendered.contains("link:../linked"));
+}
+
+#[test]
+fn update_bun_lock_and_binary_skip_unusable_replacements() {
+	let unchanged = update_bun_lock(
+		"{\n  \"core\": \"1.0.0\n}",
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+	);
+	assert_eq!(unchanged, "{\n  \"core\": \"1.0.0\n}");
+
+	let binary = update_bun_lock_binary(
+		b"core@1.0.0\0same@2.0.0\0empty@\0",
+		&BTreeMap::from([
+			("missing".to_string(), "1.0.0".to_string()),
+			("same".to_string(), "2.0.0".to_string()),
+			("empty".to_string(), String::new()),
+		]),
+		&BTreeMap::from([
+			("same".to_string(), "2.0.0".to_string()),
+			("empty".to_string(), "3.0.0".to_string()),
+		]),
+	);
+	assert_eq!(binary, b"core@1.0.0\0same@2.0.0\0empty@\0");
 }
