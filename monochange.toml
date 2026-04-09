@@ -265,7 +265,7 @@ extra_changelog_sections = [
 tag = true
 release = true
 version_format = "primary"
-versioned_files = [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.version"] }]
+versioned_files = [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] }]
 # Optional: filter member-targeted notes in the group changelog.
 # Omit `include` (or set it to "all") to keep current behavior.
 # Use "group-only" to show only direct group-targeted changesets.
@@ -324,6 +324,7 @@ comment_on_failure = true
 
 [ecosystems.cargo]
 enabled = true
+versioned_files = ["Cargo.toml"]
 
 [ecosystems.npm]
 enabled = true
