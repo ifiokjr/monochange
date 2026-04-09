@@ -384,7 +384,13 @@ mod __tests {
 	use monochange_core::BumpSeverity;
 	use monochange_core::ChangesetSettings;
 	use monochange_core::EcosystemSettings;
+	use monochange_core::ExtraChangelogSection;
+	use monochange_core::GroupChangelogInclude;
+	use monochange_core::GroupDefinition;
+	use monochange_core::PackageDefinition;
+	use monochange_core::PackageType;
 	use monochange_core::ReleaseNotesSettings;
+	use monochange_core::VersionFormat;
 	use monochange_core::WorkspaceConfiguration;
 	use monochange_core::WorkspaceDefaults;
 
@@ -531,6 +537,155 @@ mod __tests {
 		assert_eq!(
 			core.configured_types,
 			vec!["docs".to_string(), "test".to_string()]
+		);
+	}
+
+	#[test]
+	fn build_selectable_targets_includes_standalone_packages_before_group_members() {
+		let configuration = WorkspaceConfiguration {
+			root_path: std::path::PathBuf::from("."),
+			defaults: WorkspaceDefaults::default(),
+			release_notes: ReleaseNotesSettings::default(),
+			packages: vec![
+				PackageDefinition {
+					id: "app".to_string(),
+					path: std::path::PathBuf::from("crates/app"),
+					package_type: PackageType::Cargo,
+					changelog: None,
+					extra_changelog_sections: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: VersionFormat::Primary,
+				},
+				PackageDefinition {
+					id: "core".to_string(),
+					path: std::path::PathBuf::from("crates/core"),
+					package_type: PackageType::Cargo,
+					changelog: None,
+					extra_changelog_sections: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: VersionFormat::Primary,
+				},
+				PackageDefinition {
+					id: "web".to_string(),
+					path: std::path::PathBuf::from("packages/web"),
+					package_type: PackageType::Npm,
+					changelog: None,
+					extra_changelog_sections: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: VersionFormat::Primary,
+				},
+			],
+			groups: vec![GroupDefinition {
+				id: "sdk".to_string(),
+				packages: vec!["app".to_string(), "core".to_string()],
+				changelog: None,
+				changelog_include: GroupChangelogInclude::All,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+			}],
+			cli: Vec::new(),
+			changesets: ChangesetSettings::default(),
+			source: None,
+			cargo: EcosystemSettings::default(),
+			npm: EcosystemSettings::default(),
+			deno: EcosystemSettings::default(),
+			dart: EcosystemSettings::default(),
+		};
+		let displays = build_selectable_targets(&configuration)
+			.into_iter()
+			.map(|target| target.display)
+			.collect::<Vec<_>>();
+		assert_eq!(
+			displays,
+			vec![
+				"[group] sdk (app, core)".to_string(),
+				"[package] web".to_string(),
+				"[package] app (member of group `sdk`)".to_string(),
+				"[package] core (member of group `sdk`)".to_string(),
+			]
+		);
+	}
+
+	#[test]
+	fn build_selectable_targets_deduplicates_and_sorts_change_types() {
+		let configuration = WorkspaceConfiguration {
+			root_path: std::path::PathBuf::from("."),
+			defaults: WorkspaceDefaults::default(),
+			release_notes: ReleaseNotesSettings::default(),
+			packages: vec![PackageDefinition {
+				id: "web".to_string(),
+				path: std::path::PathBuf::from("packages/web"),
+				package_type: PackageType::Npm,
+				changelog: None,
+				extra_changelog_sections: vec![
+					ExtraChangelogSection {
+						name: "Docs".to_string(),
+						types: vec!["test".to_string(), "docs".to_string()],
+						default_bump: None,
+					},
+					ExtraChangelogSection {
+						name: "More".to_string(),
+						types: vec!["docs".to_string(), "security".to_string()],
+						default_bump: None,
+					},
+				],
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+			}],
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: ChangesetSettings::default(),
+			source: None,
+			cargo: EcosystemSettings::default(),
+			npm: EcosystemSettings::default(),
+			deno: EcosystemSettings::default(),
+			dart: EcosystemSettings::default(),
+		};
+		let target = build_selectable_targets(&configuration)
+			.into_iter()
+			.next()
+			.unwrap_or_else(|| panic!("expected target"));
+		assert_eq!(
+			target.configured_types,
+			vec!["docs".to_string(), "security".to_string(), "test".to_string()]
 		);
 	}
 }
