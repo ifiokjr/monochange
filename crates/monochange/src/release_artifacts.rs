@@ -115,7 +115,7 @@ pub(crate) fn build_release_targets(
 	release_targets
 }
 
-fn render_tag_name(id: &str, version: &str, version_format: VersionFormat) -> String {
+pub(crate) fn render_tag_name(id: &str, version: &str, version_format: VersionFormat) -> String {
 	match version_format {
 		VersionFormat::Namespaced => format!("{id}/v{version}"),
 		VersionFormat::Primary => format!("v{version}"),
@@ -123,7 +123,7 @@ fn render_tag_name(id: &str, version: &str, version_format: VersionFormat) -> St
 }
 
 /// Dispatch tag URL generation to the appropriate provider crate.
-fn tag_url_for_provider(source: &SourceConfiguration, tag_name: &str) -> String {
+pub(crate) fn tag_url_for_provider(source: &SourceConfiguration, tag_name: &str) -> String {
 	match source.provider {
 		SourceProvider::GitHub => github_provider::tag_url(source, tag_name),
 		SourceProvider::GitLab => gitlab_provider::tag_url(source, tag_name),
@@ -132,7 +132,7 @@ fn tag_url_for_provider(source: &SourceConfiguration, tag_name: &str) -> String 
 }
 
 /// Dispatch compare URL generation to the appropriate provider crate.
-fn compare_url_for_provider(
+pub(crate) fn compare_url_for_provider(
 	source: &SourceConfiguration,
 	previous_tag: &str,
 	current_tag: &str,
@@ -144,7 +144,7 @@ fn compare_url_for_provider(
 	}
 }
 
-fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
+pub(crate) fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
 	let output = std::process::Command::new("git")
 		.current_dir(root)
 		.args(["tag", "--list", "--sort=-v:refname"])
@@ -167,7 +167,7 @@ fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
 		.map(|(tag, _)| tag)
 }
 
-fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
+pub(crate) fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
 	let v_pos = tag.rfind('v')?;
 	let prefix = &tag[..=v_pos];
 	let version_str = &tag[v_pos + 1..];
@@ -241,7 +241,7 @@ impl TitleRenderContext {
 	}
 }
 
-fn resolve_release_datetime() -> chrono::NaiveDateTime {
+pub(crate) fn resolve_release_datetime() -> chrono::NaiveDateTime {
 	use chrono::NaiveDate;
 	use chrono::NaiveDateTime;
 
@@ -256,7 +256,7 @@ fn resolve_release_datetime() -> chrono::NaiveDateTime {
 	chrono::Local::now().naive_local()
 }
 
-fn effective_title_template<'a>(
+pub(crate) fn effective_title_template<'a>(
 	specific: Option<&'a str>,
 	defaults: Option<&'a str>,
 	builtin: &'a str,
@@ -264,14 +264,16 @@ fn effective_title_template<'a>(
 	specific.or(defaults).unwrap_or(builtin)
 }
 
-fn default_release_title_for_format(version_format: VersionFormat) -> &'static str {
+pub(crate) fn default_release_title_for_format(version_format: VersionFormat) -> &'static str {
 	match version_format {
 		VersionFormat::Primary => DEFAULT_RELEASE_TITLE_PRIMARY,
 		VersionFormat::Namespaced => DEFAULT_RELEASE_TITLE_NAMESPACED,
 	}
 }
 
-fn default_changelog_version_title_for_format(version_format: VersionFormat) -> &'static str {
+pub(crate) fn default_changelog_version_title_for_format(
+	version_format: VersionFormat,
+) -> &'static str {
 	match version_format {
 		VersionFormat::Primary => DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY,
 		VersionFormat::Namespaced => DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED,
@@ -966,7 +968,7 @@ pub(crate) fn tracked_release_pull_request_paths(
 	tracked_paths
 }
 
-fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {
+pub(crate) fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {
 	json!({
 		"workspaceRoot": PathBuf::from("."),
 		"packages": report.packages.iter().map(|package| {
@@ -1000,7 +1002,7 @@ fn json_discovery_report(report: &DiscoveryReport) -> serde_json::Value {
 	})
 }
 
-fn text_discovery_report(report: &DiscoveryReport) -> String {
+pub(crate) fn text_discovery_report(report: &DiscoveryReport) -> String {
 	let mut counts = BTreeMap::<Ecosystem, usize>::new();
 	for package in &report.packages {
 		*counts.entry(package.ecosystem).or_default() += 1;
