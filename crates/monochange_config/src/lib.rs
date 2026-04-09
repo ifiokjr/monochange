@@ -133,6 +133,7 @@ use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
+use regex::Regex;
 use semver::Version;
 use serde::Deserialize;
 use serde_yaml_ng::Mapping;
@@ -823,10 +824,11 @@ fn normalize_versioned_files(
 			RawVersionedFileDefinition::Path(path) if allow_shorthand => {
 				Ok(VersionedFileDefinition {
 					path,
-					ecosystem_type: inferred_ecosystem_type,
+					ecosystem_type: Some(inferred_ecosystem_type),
 					prefix: None,
 					fields: None,
 					name: None,
+					regex: None,
 				})
 			}
 			RawVersionedFileDefinition::Path(_) => Err(config_diagnostic(
@@ -2097,6 +2099,89 @@ fn validate_versioned_files(
 	owner_id: &str,
 ) -> MonochangeResult<()> {
 	for versioned_file in versioned_files {
+		if let Some(regex) = &versioned_file.regex {
+			if versioned_file.ecosystem_type.is_some() {
+				return Err(config_diagnostic(
+					config_contents,
+					format!(
+						"{owner_kind} `{owner_id}` regex versioned_files cannot also set `type`"
+					),
+					vec![config_section_label(
+						config_contents,
+						owner_kind,
+						owner_id,
+						"regex versioned_files cannot set `type`",
+					)],
+					Some("remove `type` when using `regex`; regex versioned_files operate on plain text files without ecosystem-specific parsing".to_string()),
+				));
+			}
+			if versioned_file.prefix.is_some()
+				|| versioned_file.fields.is_some()
+				|| versioned_file.name.is_some()
+			{
+				return Err(config_diagnostic(
+					config_contents,
+					format!(
+						"{owner_kind} `{owner_id}` regex versioned_files cannot also set `prefix`, `fields`, or `name`"
+					),
+					vec![config_section_label(
+						config_contents,
+						owner_kind,
+						owner_id,
+						"regex versioned_files cannot mix text and dependency settings",
+					)],
+					Some("remove `prefix`, `fields`, and `name` when using `regex`; those options only apply to ecosystem-aware manifest updates".to_string()),
+				));
+			}
+			let compiled = Regex::new(regex).map_err(|error| {
+				config_diagnostic(
+					config_contents,
+					format!(
+						"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` is invalid"
+					),
+					vec![config_section_label(
+						config_contents,
+						owner_kind,
+						owner_id,
+						"invalid regex versioned_files pattern",
+					)],
+					Some(error.to_string()),
+				)
+			})?;
+			if !compiled.capture_names().any(|name| name == Some("version")) {
+				return Err(config_diagnostic(
+					config_contents,
+					format!(
+						"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` must include a named `version` capture"
+					),
+					vec![config_section_label(
+						config_contents,
+						owner_kind,
+						owner_id,
+						"regex versioned_files must capture the version",
+					)],
+					Some("use a named capture like `(?<version>\\d+\\.\\d+\\.\\d+)` so MonoChange knows which substring to replace".to_string()),
+				));
+			}
+			continue;
+		}
+
+		let Some(ecosystem_type) = versioned_file.ecosystem_type else {
+			return Err(config_diagnostic(
+				config_contents,
+				format!(
+					"{owner_kind} `{owner_id}` versioned_files must set `type` unless they use `regex` or package-scoped shorthand"
+				),
+				vec![config_section_label(
+					config_contents,
+					owner_kind,
+					owner_id,
+					"versioned_files entry is missing `type`",
+				)],
+				Some("set `type = \"cargo\"` (or another ecosystem) for ecosystem-aware file updates, or add `regex = '...'` for plain-text replacement".to_string()),
+			));
+		};
+
 		if let Some(name) = &versioned_file.name {
 			if !declared_packages.contains(name.as_str()) {
 				return Err(config_diagnostic(
@@ -2129,16 +2214,17 @@ fn validate_versioned_files(
 				})?
 				.filter_map(Result::ok)
 				.collect::<Vec<_>>();
-			if let Some(unsupported_path) = matches.into_iter().find(|matched_path| {
-				!path_is_supported_for_ecosystem(matched_path, versioned_file.ecosystem_type)
-			}) {
+			if let Some(unsupported_path) = matches
+				.into_iter()
+				.find(|matched_path| !path_is_supported_for_ecosystem(matched_path, ecosystem_type))
+			{
 				return Err(config_diagnostic(
 					config_contents,
 					format!(
 						"{owner_kind} `{owner_id}` versioned_files glob `{}` matched unsupported file `{}` for ecosystem `{}`",
 						versioned_file.path,
 						unsupported_path.display(),
-						match versioned_file.ecosystem_type {
+						match ecosystem_type {
 							EcosystemType::Cargo => "cargo",
 							EcosystemType::Npm => "npm",
 							EcosystemType::Deno => "deno",

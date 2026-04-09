@@ -183,12 +183,17 @@ versioned_files = ["**/crates/*/Cargo.toml"]
 versioned_files = [{ path = "group.toml", type = "cargo", name = "sdk-core" }]
 versioned_files = [{ path = "docs/version.txt", type = "cargo" }]
 
+# regex entries update plain-text files and must capture the version
+versioned_files = [
+	{ path = "README.md", regex = 'https://example.com/download/v(?<version>\\d+\\.\\d+\\.\\d+)\\.tgz' },
+]
+
 # ecosystem-level defaults inherited by matching packages
 [ecosystems.npm]
 versioned_files = ["**/packages/*/package.json"]
 ```
 
-Dependency targets in `versioned_files` must reference declared package ids. Groups must use explicit typed entries because monochange cannot infer a group ecosystem from a bare string.
+Dependency targets in `versioned_files` must reference declared package ids. Groups must use explicit typed entries because monochange cannot infer a group ecosystem from a bare string. Regex entries operate on plain text, do not use ecosystem parsing, and must include a named `version` capture.
 
 ## Lockfile commands
 

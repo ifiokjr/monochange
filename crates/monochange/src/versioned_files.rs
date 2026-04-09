@@ -1,5 +1,7 @@
 use super::*;
 
+use regex::Regex;
+
 pub(crate) struct VersionedFileUpdateContext<'a> {
 	pub(crate) package_by_record_id: BTreeMap<&'a str, &'a PackageRecord>,
 	pub(crate) released_versions_by_native_name: BTreeMap<String, String>,
@@ -49,12 +51,13 @@ fn dedup_versioned_file_definitions(
 	let mut deduped = Vec::new();
 	for definition in versioned_files {
 		let key = format!(
-			"{}::{:?}::{:?}::{:?}::{:?}",
+			"{}::{:?}::{:?}::{:?}::{:?}::{:?}",
 			definition.path,
 			definition.ecosystem_type,
 			definition.prefix,
 			definition.fields,
 			definition.name,
+			definition.regex,
 		);
 		if seen.insert(key) {
 			deduped.push(definition);
@@ -176,26 +179,59 @@ pub(crate) fn build_versioned_file_updates(
 		.collect()
 }
 
-pub(crate) fn serialize_cached_document(
-	path: &Path,
+fn render_cached_document_bytes(
+	_path: &Path,
 	document: CachedDocument,
-) -> MonochangeResult<FileUpdate> {
-	let content = match document {
+) -> MonochangeResult<Vec<u8>> {
+	match document {
 		CachedDocument::Json(value) => {
 			let mut rendered = serde_json::to_string_pretty(&value)
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;
 			rendered.push('\n');
-			rendered.into_bytes()
+			Ok(rendered.into_bytes())
 		}
 		CachedDocument::Yaml(mapping) => serde_yaml_ng::to_string(&mapping)
 			.map(String::into_bytes)
-			.map_err(|error| MonochangeError::Config(error.to_string()))?,
-		CachedDocument::Text(contents) => contents.into_bytes(),
-		CachedDocument::Bytes(contents) => contents,
-	};
+			.map_err(|error| MonochangeError::Config(error.to_string())),
+		CachedDocument::Text(contents) => Ok(contents.into_bytes()),
+		CachedDocument::Bytes(contents) => Ok(contents),
+	}
+}
+
+fn render_cached_document_text(path: &Path, document: CachedDocument) -> MonochangeResult<String> {
+	String::from_utf8(render_cached_document_bytes(path, document)?).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {} as text: {error}",
+			path.display()
+		))
+	})
+}
+
+pub(crate) fn serialize_cached_document(
+	path: &Path,
+	document: CachedDocument,
+) -> MonochangeResult<FileUpdate> {
 	Ok(FileUpdate {
 		path: path.to_path_buf(),
-		content,
+		content: render_cached_document_bytes(path, document)?,
+	})
+}
+
+fn read_cached_text_document(
+	updates: &mut BTreeMap<PathBuf, CachedDocument>,
+	path: &Path,
+) -> MonochangeResult<String> {
+	if let Some(cached) = updates.remove(path) {
+		return render_cached_document_text(path, cached);
+	}
+	let contents = fs::read(path).map_err(|error| {
+		MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
+	})?;
+	String::from_utf8(contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {} as text: {error}",
+			path.display()
+		))
 	})
 }
 
@@ -225,7 +261,7 @@ pub(crate) fn read_cached_document(
 	let text_contents = String::from_utf8(contents.clone())
 		.map_err(|error| {
 			MonochangeError::Config(format!(
-				"failed to parse {} as utf-8 text: {error}",
+				"failed to parse {} as text: {error}",
 				path.display()
 			))
 		})
@@ -341,7 +377,10 @@ pub(crate) fn resolve_versioned_prefix(
 	if let Some(prefix) = &definition.prefix {
 		return prefix.clone();
 	}
-	let ecosystem_prefix = match definition.ecosystem_type {
+	let ecosystem_type = definition
+		.ecosystem_type
+		.expect("typed versioned_files should always have an ecosystem type");
+	let ecosystem_prefix = match ecosystem_type {
 		monochange_core::EcosystemType::Cargo => context
 			.configuration
 			.cargo
@@ -357,17 +396,19 @@ pub(crate) fn resolve_versioned_prefix(
 			context.configuration.dart.dependency_version_prefix.clone()
 		}
 	};
-	ecosystem_prefix.unwrap_or_else(|| definition.ecosystem_type.default_prefix().to_string())
+	ecosystem_prefix.unwrap_or_else(|| ecosystem_type.default_prefix().to_string())
 }
 
 pub(crate) fn expand_versioned_file_fields(
 	definition: &VersionedFileDefinition,
 	dep_names: &[String],
 ) -> Vec<String> {
+	let ecosystem_type = definition
+		.ecosystem_type
+		.expect("typed versioned_files should always have an ecosystem type");
 	let field_templates = definition.fields.as_ref().map_or_else(
 		|| {
-			definition
-				.ecosystem_type
+			ecosystem_type
 				.default_fields()
 				.iter()
 				.map(ToString::to_string)
@@ -398,6 +439,31 @@ pub(crate) fn expand_versioned_file_fields(
 	fields
 }
 
+fn update_versioned_file_regex(
+	contents: &str,
+	pattern: &str,
+	version: &str,
+) -> MonochangeResult<String> {
+	let regex = Regex::new(pattern).map_err(|error| {
+		MonochangeError::Config(format!(
+			"invalid versioned_files regex `{pattern}`: {error}"
+		))
+	})?;
+	Ok(regex
+		.replace_all(contents, |captures: &regex::Captures<'_>| {
+			let whole_match = captures
+				.get(0)
+				.expect("regex replacement should always receive the full match");
+			let version_match = captures
+				.name("version")
+				.expect("validated versioned_files regex should always capture `version`");
+			let prefix = &whole_match.as_str()[..version_match.start() - whole_match.start()];
+			let suffix = &whole_match.as_str()[version_match.end() - whole_match.start()..];
+			format!("{prefix}{version}{suffix}")
+		})
+		.into_owned())
+}
+
 pub(crate) fn apply_versioned_file_definition(
 	root: &Path,
 	updates: &mut BTreeMap<PathBuf, CachedDocument>,
@@ -407,6 +473,37 @@ pub(crate) fn apply_versioned_file_definition(
 	dep_names: &[String],
 	context: &VersionedFileUpdateContext<'_>,
 ) -> MonochangeResult<()> {
+	if let Some(pattern) = &definition.regex {
+		let glob_pattern = root.join(&definition.path).to_string_lossy().to_string();
+		let matched_paths = glob::glob(&glob_pattern)
+			.map_err(|error| {
+				MonochangeError::Config(format!(
+					"invalid glob pattern `{}`: {error}",
+					definition.path
+				))
+			})?
+			.collect::<Result<Vec<_>, _>>()
+			.map_err(|error| MonochangeError::Config(error.to_string()))?;
+		for resolved_path in matched_paths {
+			let contents = read_cached_text_document(updates, &resolved_path)?;
+			updates.insert(
+				resolved_path,
+				CachedDocument::Text(update_versioned_file_regex(
+					&contents,
+					pattern,
+					owner_version,
+				)?),
+			);
+		}
+		return Ok(());
+	}
+
+	let ecosystem_type = definition.ecosystem_type.ok_or_else(|| {
+		MonochangeError::Config(format!(
+			"versioned file `{}` is missing an ecosystem type",
+			definition.path
+		))
+	})?;
 	let prefix = resolve_versioned_prefix(definition, context);
 	let expanded_fields = expand_versioned_file_fields(definition, dep_names);
 	let fields = expanded_fields
@@ -447,12 +544,12 @@ pub(crate) fn apply_versioned_file_definition(
 		.map_err(|error| MonochangeError::Config(error.to_string()))?;
 
 	for resolved_path in matched_paths {
-		let Some(kind) = versioned_file_kind(definition.ecosystem_type, &resolved_path) else {
+		let Some(kind) = versioned_file_kind(ecosystem_type, &resolved_path) else {
 			return Err(MonochangeError::Config(format!(
 				"versioned_files glob `{}` matched unsupported file `{}` for ecosystem `{}`; narrow the glob or change the `type`",
 				definition.path,
 				resolved_path.display(),
-				match definition.ecosystem_type {
+				match ecosystem_type {
 					monochange_core::EcosystemType::Cargo => "cargo",
 					monochange_core::EcosystemType::Npm => "npm",
 					monochange_core::EcosystemType::Deno => "deno",
@@ -486,8 +583,7 @@ pub(crate) fn apply_versioned_file_definition(
 				})
 			})
 			.collect::<BTreeMap<_, _>>();
-		let mut document =
-			read_cached_document(updates, &resolved_path, definition.ecosystem_type)?;
+		let mut document = read_cached_document(updates, &resolved_path, ecosystem_type)?;
 		match (&mut document, kind) {
 			(CachedDocument::Text(contents), VersionedFileKind::Cargo(kind)) => {
 				*contents = monochange_cargo::update_versioned_file_text(

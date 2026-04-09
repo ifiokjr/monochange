@@ -777,14 +777,23 @@ fn json_span_is_object(contents: &str, span: JsonSpan) -> bool {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VersionedFileDefinition {
 	pub path: String,
-	#[serde(rename = "type")]
-	pub ecosystem_type: EcosystemType,
+	#[serde(rename = "type", default)]
+	pub ecosystem_type: Option<EcosystemType>,
 	#[serde(default)]
 	pub prefix: Option<String>,
 	#[serde(default)]
 	pub fields: Option<Vec<String>>,
 	#[serde(default)]
 	pub name: Option<String>,
+	#[serde(default)]
+	pub regex: Option<String>,
+}
+
+impl VersionedFileDefinition {
+	#[must_use]
+	pub fn uses_regex(&self) -> bool {
+		self.regex.is_some()
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

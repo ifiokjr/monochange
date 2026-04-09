@@ -738,7 +738,76 @@ fn load_workspace_configuration_infers_package_versioned_file_types_from_string_
 	assert!(package
 		.versioned_files
 		.iter()
-		.all(|definition| definition.ecosystem_type == EcosystemType::Cargo));
+		.all(|definition| definition.ecosystem_type == Some(EcosystemType::Cargo)));
+}
+
+#[test]
+fn load_workspace_configuration_accepts_regex_versioned_files_without_explicit_type() {
+	let root = fixture_path("config/regex-versioned-files");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.packages
+		.first()
+		.unwrap_or_else(|| panic!("expected package"));
+	let definition = package
+		.versioned_files
+		.first()
+		.unwrap_or_else(|| panic!("expected versioned file definition"));
+
+	assert_eq!(definition.path, "README.md");
+	assert_eq!(
+		definition.regex.as_deref(),
+		Some(r"https:\/\/example.com\/download\/v(?<version>\d+\.\d+\.\d+)\.tgz")
+	);
+	assert_eq!(definition.ecosystem_type, None);
+	assert_eq!(definition.fields, None);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_regex_versioned_files_without_version_capture() {
+	let root = fixture_path("config/rejects-regex-versioned-file-without-version-capture");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("must include a named `version` capture"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_regex_versioned_files_with_type() {
+	let root = fixture_path("config/rejects-regex-versioned-file-with-type");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("regex versioned_files cannot also set `type`"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_invalid_regex_versioned_file_patterns() {
+	let root = fixture_path("config/rejects-invalid-regex-versioned-file");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("pattern `(` is invalid"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_regex_versioned_files_with_prefix() {
+	let root = fixture_path("config/rejects-regex-versioned-file-with-prefix");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(
+		rendered.contains("regex versioned_files cannot also set `prefix`, `fields`, or `name`")
+	);
 }
 
 #[test]

@@ -28,3 +28,5 @@ lockfile_commands = [
 ```
 
 MonoChange now infers default lockfile commands for Cargo, npm-family, and Dart/Flutter workspaces when packages in that ecosystem are released, and stops inferring defaults when explicit `lockfile_commands` are configured for that ecosystem.
+
+`versioned_files` also now support plain-text regex replacements without an explicit ecosystem `type`, as long as the regex includes a named `version` capture.

@@ -33,6 +33,7 @@ monochange_gitlab = { workspace = true }
 monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }
+regex = { workspace = true, default-features = true }
 rmcp = { workspace = true, features = ["server", "transport-io", "macros"], default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }

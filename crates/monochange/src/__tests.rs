@@ -1183,6 +1183,23 @@ fn command_release_honors_explicit_lockfile_paths_in_versioned_files() {
 }
 
 #[test]
+fn command_release_updates_regex_versioned_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/regex-versioned-file", tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let readme = fs::read_to_string(tempdir.path().join("README.md"))
+		.unwrap_or_else(|error| panic!("readme: {error}"));
+
+	assert!(readme.contains("https://example.com/download/v1.1.0.tgz"));
+	assert!(!readme.contains("https://example.com/download/v1.0.0.tgz"));
+}
+
+#[test]
 fn command_release_uses_empty_update_message_precedence_for_grouped_changelogs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_group_empty_update_message_fixture(tempdir.path());
@@ -4583,19 +4600,21 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 
 	let explicit = monochange_core::VersionedFileDefinition {
 		path: "packages/app/package.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: Some("~".to_string()),
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	assert_eq!(crate::resolve_versioned_prefix(&explicit, &context), "~");
 
 	let ecosystem = monochange_core::VersionedFileDefinition {
 		path: "packages/app/package.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	assert_eq!(
 		crate::resolve_versioned_prefix(&ecosystem, &context),
@@ -4604,10 +4623,11 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 
 	let fallback = monochange_core::VersionedFileDefinition {
 		path: "packages/app/deno.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Deno,
+		ecosystem_type: Some(monochange_core::EcosystemType::Deno),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	assert_eq!(
 		crate::resolve_versioned_prefix(&fallback, &context),
@@ -5053,13 +5073,14 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 fn expand_versioned_file_fields_supports_name_templates_and_passthrough_fields() {
 	let definition = monochange_core::VersionedFileDefinition {
 		path: "Cargo.toml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		ecosystem_type: Some(monochange_core::EcosystemType::Cargo),
 		prefix: None,
 		fields: Some(vec![
 			"workspace.dependencies.{{name}}.version".to_string(),
 			"workspace.version".to_string(),
 		]),
 		name: None,
+		regex: None,
 	};
 	assert_eq!(
 		crate::versioned_files::expand_versioned_file_fields(&definition, &["core".to_string()]),
@@ -5093,10 +5114,11 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 		);
 		let definition = monochange_core::VersionedFileDefinition {
 			path: file_name.to_string(),
-			ecosystem_type,
+			ecosystem_type: Some(ecosystem_type),
 			prefix: None,
 			fields: None,
 			name: None,
+			regex: None,
 		};
 		let error = crate::apply_versioned_file_definition(
 			tempdir.path(),
@@ -5126,10 +5148,11 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 	);
 	let definition = monochange_core::VersionedFileDefinition {
 		path: "Cargo.toml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		ecosystem_type: Some(monochange_core::EcosystemType::Cargo),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let error = crate::apply_versioned_file_definition(
 		tempdir.path(),
@@ -5153,10 +5176,11 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 		.unwrap_or_else(|error| panic!("write cached pnpm lock path: {error}"));
 	let pnpm_definition = monochange_core::VersionedFileDefinition {
 		path: "pnpm-lock.yaml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let error = crate::apply_versioned_file_definition(
 		pnpm_tempdir.path(),
@@ -5181,10 +5205,11 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 		.unwrap_or_else(|error| panic!("write cached dart manifest path: {error}"));
 	let definition = monochange_core::VersionedFileDefinition {
 		path: "pubspec.yaml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Dart,
+		ecosystem_type: Some(monochange_core::EcosystemType::Dart),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let error = crate::apply_versioned_file_definition(
 		cached_dart_tempdir.path(),
@@ -5297,10 +5322,11 @@ fn apply_versioned_file_definition_returns_early_without_matching_versions() {
 	let context = versioned_test_context(&configuration, BTreeMap::new(), &[]);
 	let definition = monochange_core::VersionedFileDefinition {
 		path: "package.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let dep_names = vec!["core".to_string()];
 	let mut updates = BTreeMap::new();
@@ -5328,10 +5354,11 @@ fn apply_versioned_file_definition_rejects_invalid_glob_patterns() {
 	);
 	let definition = monochange_core::VersionedFileDefinition {
 		path: "[".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let dep_names = vec!["core".to_string()];
 	let error = crate::apply_versioned_file_definition(
@@ -5365,10 +5392,11 @@ fn apply_versioned_file_definition_rejects_unsupported_glob_matches() {
 	] {
 		let definition = monochange_core::VersionedFileDefinition {
 			path: "*.txt".to_string(),
-			ecosystem_type,
+			ecosystem_type: Some(ecosystem_type),
 			prefix: None,
 			fields: None,
 			name: None,
+			regex: None,
 		};
 		let error = crate::apply_versioned_file_definition(
 			tempdir.path(),
@@ -5404,10 +5432,11 @@ monochange = { path = "crates/monochange", version = "1.0.0" }
 	);
 	let definition = monochange_core::VersionedFileDefinition {
 		path: "Cargo.toml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		ecosystem_type: Some(monochange_core::EcosystemType::Cargo),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let mut updates = BTreeMap::new();
 	crate::apply_versioned_file_definition(
@@ -5455,13 +5484,14 @@ extra = { path = "crates/extra", version = "1.0.0" }
 	);
 	let definition = monochange_core::VersionedFileDefinition {
 		path: "Cargo.toml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		ecosystem_type: Some(monochange_core::EcosystemType::Cargo),
 		prefix: None,
 		fields: Some(vec![
 			"workspace.version".to_string(),
 			"workspace.dependencies.{{ name }}.version".to_string(),
 		]),
 		name: None,
+		regex: None,
 	};
 	let mut updates = BTreeMap::new();
 	let shared_version = "4.0.0".to_string();
@@ -5507,10 +5537,11 @@ fn apply_versioned_file_definition_updates_bun_lockb_and_deno_text_variants() {
 	);
 	let bun_definition = monochange_core::VersionedFileDefinition {
 		path: "packages/app/bun.lockb".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let bun_path = bun_tempdir.path().join("packages/app/bun.lockb");
 	let original_bun =
@@ -5542,10 +5573,11 @@ fn apply_versioned_file_definition_updates_bun_lockb_and_deno_text_variants() {
 	);
 	let deno_definition = monochange_core::VersionedFileDefinition {
 		path: "deno.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Deno,
+		ecosystem_type: Some(monochange_core::EcosystemType::Deno),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let mut deno_updates = BTreeMap::new();
 	crate::apply_versioned_file_definition(
@@ -5569,6 +5601,88 @@ fn apply_versioned_file_definition_updates_bun_lockb_and_deno_text_variants() {
 }
 
 #[test]
+fn apply_versioned_file_definition_updates_regex_versioned_files_from_cached_text() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("README.md"),
+		"Download core from https://example.com/download/v1.0.0.tgz\n",
+	)
+	.unwrap_or_else(|error| panic!("write readme: {error}"));
+	let configuration = versioned_test_configuration();
+	let context = versioned_test_context(&configuration, BTreeMap::new(), &[]);
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "README.md".to_string(),
+		ecosystem_type: None,
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: Some(
+			r"https:\/\/example.com\/download\/v(?<version>\d+\.\d+\.\d+)\.tgz".to_string(),
+		),
+	};
+	let mut updates = BTreeMap::from([(
+		tempdir.path().join("README.md"),
+		crate::CachedDocument::Text(
+			"Download core from https://example.com/download/v1.0.0.tgz\n".to_string(),
+		),
+	)]);
+	crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&definition,
+		"2.0.0",
+		None,
+		&[],
+		&context,
+	)
+	.unwrap_or_else(|error| panic!("regex versioned file update: {error}"));
+	let updated_document = updates
+		.remove(&tempdir.path().join("README.md"))
+		.unwrap_or_else(|| panic!("expected regex versioned file update"));
+	assert!(matches!(
+		updated_document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("https://example.com/download/v2.0.0.tgz")
+				&& !contents.contains("https://example.com/download/v1.0.0.tgz")
+	));
+}
+
+#[test]
+fn apply_versioned_file_definition_reports_invalid_regex_patterns() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("README.md"),
+		"Download core from https://example.com/download/v1.0.0.tgz\n",
+	)
+	.unwrap_or_else(|error| panic!("write readme: {error}"));
+	let configuration = versioned_test_configuration();
+	let context = versioned_test_context(&configuration, BTreeMap::new(), &[]);
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "README.md".to_string(),
+		ecosystem_type: None,
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: Some("(".to_string()),
+	};
+	let mut updates = BTreeMap::new();
+	let error = crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&definition,
+		"2.0.0",
+		None,
+		&[],
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid regex error"));
+	assert!(error
+		.to_string()
+		.contains("invalid versioned_files regex `(`"));
+}
+
+#[test]
 fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 	let configuration = versioned_test_configuration();
 
@@ -5580,10 +5694,11 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 	);
 	let manifest_definition = monochange_core::VersionedFileDefinition {
 		path: "package.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let manifest_dep_names = vec!["core".to_string()];
 	let mut manifest_updates = BTreeMap::new();
@@ -5625,10 +5740,11 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 	);
 	let package_lock_definition = monochange_core::VersionedFileDefinition {
 		path: "packages/app/package-lock.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let package_lock_dep_names = vec!["app".to_string()];
 	let mut package_lock_updates = BTreeMap::new();
@@ -5664,10 +5780,11 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 	);
 	let pnpm_definition = monochange_core::VersionedFileDefinition {
 		path: "pnpm-lock.yaml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let pnpm_dep_names = vec!["core".to_string()];
 	let mut pnpm_updates = BTreeMap::new();
@@ -5700,10 +5817,11 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 	);
 	let bun_definition = monochange_core::VersionedFileDefinition {
 		path: "packages/app/bun.lock".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Npm,
+		ecosystem_type: Some(monochange_core::EcosystemType::Npm),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let bun_dep_names = vec!["left-pad".to_string()];
 	let mut bun_updates = BTreeMap::new();
@@ -5739,10 +5857,11 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 	);
 	let deno_manifest_definition = monochange_core::VersionedFileDefinition {
 		path: "deno.json".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Deno,
+		ecosystem_type: Some(monochange_core::EcosystemType::Deno),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let deno_manifest_dep_names = vec!["core".to_string()];
 	let mut deno_manifest_updates = BTreeMap::new();
@@ -5774,10 +5893,11 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 	);
 	let deno_lock_definition = monochange_core::VersionedFileDefinition {
 		path: "packages/app/deno.lock".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Deno,
+		ecosystem_type: Some(monochange_core::EcosystemType::Deno),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let deno_lock_dep_names = vec!["app".to_string()];
 	let mut deno_lock_updates = BTreeMap::new();
@@ -5808,10 +5928,11 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 	);
 	let dart_manifest_definition = monochange_core::VersionedFileDefinition {
 		path: "packages/app/pubspec.yaml".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Dart,
+		ecosystem_type: Some(monochange_core::EcosystemType::Dart),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let dart_manifest_dep_names = vec!["shared".to_string()];
 	let mut dart_manifest_updates = BTreeMap::new();
@@ -5845,10 +5966,11 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 	);
 	let dart_lock_definition = monochange_core::VersionedFileDefinition {
 		path: "packages/app/pubspec.lock".to_string(),
-		ecosystem_type: monochange_core::EcosystemType::Dart,
+		ecosystem_type: Some(monochange_core::EcosystemType::Dart),
 		prefix: None,
 		fields: None,
 		name: None,
+		regex: None,
 	};
 	let dart_lock_dep_names = vec!["nested_dart_app".to_string()];
 	let mut dart_lock_updates = BTreeMap::new();
