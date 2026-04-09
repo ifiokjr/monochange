@@ -412,7 +412,10 @@ mod __tests {
 			"/../../testing/test_support/fs.rs"
 		));
 	}
+	use shared_fs_test_support::current_test_name;
 	use shared_fs_test_support::fixture_path;
+	use shared_fs_test_support::setup_fixture;
+	use shared_fs_test_support::setup_scenario_workspace;
 
 	fn package_target(configured_types: Vec<String>) -> SelectableTarget {
 		SelectableTarget {
@@ -439,6 +442,33 @@ mod __tests {
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
 		}
+	}
+
+	#[test]
+	fn shared_fs_test_support_helpers_cover_names_and_fixture_copying() {
+		assert_eq!(
+			current_test_name(),
+			"shared_fs_test_support_helpers_cover_names_and_fixture_copying"
+		);
+		let named = std::thread::Builder::new()
+			.name("case_1_interactive_helper_thread".to_string())
+			.spawn(current_test_name)
+			.unwrap_or_else(|error| panic!("spawn thread: {error}"))
+			.join()
+			.unwrap_or_else(|error| panic!("join thread: {error:?}"));
+		assert_eq!(named, "interactive_helper_thread");
+		let fixture = setup_fixture("test-support/setup-fixture");
+		assert_eq!(
+			std::fs::read_to_string(fixture.path().join("root.txt"))
+				.unwrap_or_else(|error| panic!("read fixture: {error}")),
+			"root fixture\n"
+		);
+		let scenario = setup_scenario_workspace("test-support/scenario-root");
+		assert_eq!(
+			std::fs::read_to_string(scenario.path().join("root-only.txt"))
+				.unwrap_or_else(|error| panic!("read scenario: {error}")),
+			"root scenario\n"
+		);
 	}
 
 	#[test]
