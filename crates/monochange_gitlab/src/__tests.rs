@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::path::PathBuf;
 
 use httpmock::Method::GET;
