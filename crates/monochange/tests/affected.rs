@@ -4,11 +4,11 @@ use std::process::Command;
 use insta::assert_json_snapshot;
 use rstest::rstest;
 use serde_json::Value;
-use tempfile::tempdir;
 
 mod test_support;
 use test_support::{
-	copy_directory, current_test_name, fixture_path, monochange_command, snapshot_settings,
+	copy_directory, current_test_name, fixture_path, monochange_command,
+	setup_scenario_workspace, snapshot_settings,
 };
 
 #[rstest]
@@ -153,9 +153,8 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
 
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
-	copy_directory(&fixture_path("affected/since-base"), root);
 
 	run_git(root, &["init"]);
 	run_git(root, &["config", "user.name", "Test"]);
@@ -175,9 +174,8 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
 
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
-	copy_directory(&fixture_path("affected/since-base"), root);
 
 	run_git(root, &["init"]);
 	run_git(root, &["config", "user.name", "Test"]);
@@ -193,9 +191,8 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn affected_since_takes_priority_over_changed_paths_with_warning() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
-	copy_directory(&fixture_path("affected/since-base"), root);
 
 	run_git(root, &["init"]);
 	run_git(root, &["config", "user.name", "Test"]);
