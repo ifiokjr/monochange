@@ -489,6 +489,41 @@ mod __tests {
 		);
 	}
 
+	#[test]
+	fn content_text_returns_empty_for_non_text_content() {
+		let result = rmcp::model::CallToolResult::success(vec![rmcp::model::Content::new(
+			rmcp::model::RawContent::image("aGVsbG8=", "image/png"),
+			None,
+		)]);
+		assert_eq!(content_text(&result), String::new());
+	}
+
+	#[test]
+	fn manifest_helpers_expose_release_preview_shapes() {
+		let tempdir = setup_fixture("monochange/release-base");
+		let prepared = crate::prepare_release(tempdir.path(), true)
+			.unwrap_or_else(|error| panic!("prepare release: {error}"));
+		let manifest = super::manifest_for_prepared_release(&prepared);
+		assert_eq!(manifest.command, "release-manifest");
+		assert!(!manifest.release_targets.is_empty());
+		let prepared_value = super::prepared_release_value(&prepared);
+		assert_eq!(prepared_value["dry_run"].as_bool(), Some(true));
+		assert!(prepared_value["release_targets"].is_array());
+	}
+
+	#[test]
+	fn copy_directory_panics_when_destination_is_not_a_directory() {
+		let source = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::write(source.path().join("file.txt"), "hello\n")
+			.unwrap_or_else(|error| panic!("write source file: {error}"));
+		let destination_root = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let destination_file = destination_root.path().join("already-a-file");
+		fs::write(&destination_file, "occupied\n")
+			.unwrap_or_else(|error| panic!("write destination file: {error}"));
+		let result = std::panic::catch_unwind(|| copy_directory(source.path(), &destination_file));
+		assert!(result.is_err());
+	}
+
 	#[tokio::test]
 	async fn validate_reports_success_for_valid_workspace_fixture() {
 		let mut settings = snapshot_settings();
@@ -771,5 +806,21 @@ mod __tests {
 			.unwrap_or_else(|error| panic!("affected: {error}"));
 
 		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn affected_packages_reports_configuration_errors() {
+		let tempdir = setup_fixture("config/rejects-empty-step-id");
+		let result = MonochangeMcpServer::new()
+			.affected_packages(Parameters(AffectedParam {
+				path: Some(tempdir.path().display().to_string()),
+				changed_paths: vec!["crates/core/src/lib.rs".to_string()],
+				labels: Vec::new(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("affected: {error}"));
+		let rendered = content_text(&result);
+		assert!(rendered.contains("\"ok\": false"));
+		assert!(rendered.contains("unknown" ) || rendered.contains("empty id") || rendered.contains("step"));
 	}
 }
