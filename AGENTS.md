@@ -9,6 +9,11 @@
 - Quality/typecheck: `lint:all`
 - Validation: `mc validate`
 
+## Git rules
+
+- Never use `--no-verify` with `git commit` or `git push`.
+- The only allowed exception is during `git rebase` workflows when a rebase continuation or amend step would otherwise block on hooks/editor behavior.
+
 ## Task-specific guidance
 
 - [Tooling and commands](docs/agents/tooling.md)
