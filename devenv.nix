@@ -1,6 +1,7 @@
 {
   pkgs,
   lib,
+  config,
   inputs,
   ...
 }:
@@ -18,6 +19,7 @@ in
       dprint
       extra.mdt
       extra.pnpm-standalone
+      gitleaks
       mdbook
       nixfmt
       rustup
@@ -38,6 +40,49 @@ in
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
   dotenv.disableHint = true;
+
+  git-hooks = {
+    package = pkgs.prek;
+
+    hooks = {
+      "secrets:commit" = {
+        enable = true;
+        name = "secrets:commit";
+        description = "Scan staged changes for leaked secrets with gitleaks.";
+        entry = "${pkgs.gitleaks}/bin/gitleaks protect --staged --verbose --redact";
+        pass_filenames = false;
+        stages = [ "pre-commit" ];
+      };
+
+      "secrets:push" = {
+        enable = true;
+        name = "secrets:push";
+        description = "Scan repository history for leaked secrets with gitleaks before push.";
+        entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
+        pass_filenames = false;
+        stages = [ "pre-push" ];
+      };
+
+      fix = {
+        enable = true;
+        name = "fix";
+        description = "Run workspace autofixes before commit and restage the results.";
+        entry = "bash -lc '${config.env.DEVENV_PROFILE}/bin/fix:all && git add --update -- .'";
+        pass_filenames = false;
+        require_serial = true;
+        stages = [ "pre-commit" ];
+      };
+
+      "ci:pre-push" = {
+        enable = true;
+        name = "ci:pre-push";
+        description = "Run the local CI validation suite before push.";
+        entry = "bash -lc 'set -euo pipefail; ${config.env.DEVENV_PROFILE}/bin/lint:all; ${config.env.DEVENV_PROFILE}/bin/test:all; ${config.env.DEVENV_PROFILE}/bin/build:all; ${config.env.DEVENV_PROFILE}/bin/build:book; ${config.env.DEVENV_PROFILE}/bin/coverage:all'";
+        pass_filenames = false;
+        stages = [ "pre-push" ];
+      };
+    };
+  };
 
   scripts = {
     "monochange" = {
