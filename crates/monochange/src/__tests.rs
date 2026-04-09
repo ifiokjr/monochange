@@ -1412,6 +1412,133 @@ fn cli_command_command_steps_expose_namespaced_inputs_and_step_overrides() {
 }
 
 #[test]
+fn command_step_without_dry_run_override_reports_skipped_command() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "announce".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::Command {
+			command: "echo hello".to_string(),
+			dry_run_command: None,
+			shell: monochange_core::ShellConfig::default(),
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let output = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		true,
+		BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("dry-run output: {error}"));
+	assert!(output.contains("skipped command `echo hello` (dry-run)"));
+}
+
+#[test]
+fn command_step_rejects_unparseable_commands() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "announce".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::Command {
+			command: "\"unterminated".to_string(),
+			dry_run_command: None,
+			shell: monochange_core::ShellConfig::default(),
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected parse failure"));
+	assert!(error
+		.to_string()
+		.contains("failed to parse command `\"unterminated`"));
+}
+
+#[test]
+fn command_step_rejects_empty_commands() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "announce".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::Command {
+			command: "".to_string(),
+			dry_run_command: None,
+			shell: monochange_core::ShellConfig::default(),
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected empty command failure"));
+	assert!(error.to_string().contains("command must not be empty"));
+}
+
+#[test]
+fn command_step_reports_process_spawn_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "announce".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::Command {
+			command: "definitely-not-a-real-command-12345".to_string(),
+			dry_run_command: None,
+			shell: monochange_core::ShellConfig::default(),
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected process spawn failure"));
+	assert!(error.to_string().contains(
+		"failed to run command `definitely-not-a-real-command-12345`"
+	));
+}
+
+#[test]
 fn affected_packages_requires_attached_coverage_for_changed_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
