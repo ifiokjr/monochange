@@ -61,6 +61,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub mod git;
+
 use semver::Version;
 use serde::Deserialize;
 use serde::Serialize;
