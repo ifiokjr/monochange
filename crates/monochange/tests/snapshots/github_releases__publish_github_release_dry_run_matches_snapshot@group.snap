@@ -1,3 +1,7 @@
+---
+source: crates/monochange/tests/github_releases.rs
+expression: json
+---
 {
   "issueComments": [],
   "manifest": {
@@ -26,12 +30,12 @@
             "Changed members: core",
             "Synchronized members: app"
           ],
-          "title": "[1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) (2026-04-06)"
+          "title": "[1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])"
         },
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) (2026-04-06)\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
+        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
       },
       {
         "format": "monochange",
@@ -45,12 +49,12 @@
             }
           ],
           "summary": [],
-          "title": "[1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) (2026-04-06)"
+          "title": "[1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])"
         },
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) (2026-04-06)\n\n### Features\n\n- add feature"
+        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\n### Features\n\n- add feature"
       }
     ],
     "changesets": [
@@ -142,8 +146,8 @@
           "app"
         ],
         "release": true,
-        "renderedChangelogTitle": "[1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) (2026-04-06)",
-        "renderedTitle": "1.1.0 (2026-04-06)",
+        "renderedChangelogTitle": "[1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])",
+        "renderedTitle": "1.1.0 ([DATE])",
         "tag": true,
         "tagName": "v1.1.0",
         "version": "1.1.0",
@@ -160,10 +164,10 @@
   "releaseRequest": null,
   "releases": [
     {
-      "body": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) (2026-04-06)\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature",
+      "body": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature",
       "draft": false,
       "generateReleaseNotes": false,
-      "name": "1.1.0 (2026-04-06)",
+      "name": "1.1.0 ([DATE])",
       "owner": "ifiokjr",
       "prerelease": false,
       "provider": "github",

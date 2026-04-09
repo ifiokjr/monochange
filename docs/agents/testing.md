@@ -11,7 +11,7 @@
 - Fixture files (e.g. `monochange.toml`, `Cargo.toml`, `.changeset/*.md`) live under `fixtures/tests/<test-suite>/<scenario>/` and can be copied into a `tempdir` at test time when the test needs a writable workspace.
 - Prefer scenario folders with a layout like:
   - `fixtures/tests/<suite>/<scenario>/workspace/...` for the input workspace when the test suite needs a writable copy
-  - `fixtures/tests/<suite>/<scenario>/expected/...` for checked-in expected outputs such as JSON payloads or generated files
+  - additional checked-in files under the scenario only when they are part of the input being exercised
 - Read-only tests (e.g. config validation that only calls `load_workspace_configuration`) may point directly at the fixture path without copying.
 - If a scenario needs a different file payload or expected output, add a new fixture variant rather than writing inline strings in the test body.
 - This rule applies to unit tests in `__tests.rs` modules as well as integration tests in `tests/*.rs` — if a test writes config or manifest files to disk, those files must originate from the fixtures directory.
@@ -20,9 +20,11 @@
 
 ## Output assertions
 
-- Prefer **external snapshots** over inline snapshots when comparing human-readable output such as CLI help, stdout/stderr text, changelog text, markdown, or rendered release bodies.
-- Prefer checked-in `expected/` fixture files for **machine-readable structured output** such as JSON manifests or dry-run payloads.
-- If a test can be expressed as “copy scenario workspace, run command, compare output to a checked-in expectation”, prefer that pattern over large in-test `assert_eq!` trees.
+- Prefer **external `insta` snapshots** over inline snapshots when comparing output.
+- This applies to human-readable output such as CLI help, stdout/stderr text, changelog text, markdown, and rendered release bodies **and** to structured machine-readable output such as JSON manifests or dry-run payloads.
+- For Rust tests, prefer built-in snapshot generation via `insta::assert_snapshot!`, `insta::assert_json_snapshot!`, or `insta_cmd::assert_cmd_snapshot!` instead of maintaining parallel hand-authored `expected` files.
+- When using `rstest`, give each parametrized case a stable snapshot suffix so every case gets its own external snapshot file.
+- If a test can be expressed as “copy scenario workspace, run command, snapshot the output”, prefer that pattern over large in-test `assert_eq!` trees.
 - Keep imperative assertions for scenarios that are genuinely stateful or easier to understand as focused semantic checks (for example multi-step git history setup, partial property assertions, or intentionally dynamic output).
 
 ## rstest usage

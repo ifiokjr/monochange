@@ -1,0 +1,23 @@
+---
+source: crates/monochange/tests/changeset_policy.rs
+expression: json
+---
+{
+  "affectedPackageIds": [],
+  "changedPaths": [
+    "docs/readme.md"
+  ],
+  "changesetPaths": [],
+  "comment": null,
+  "coveredPackageIds": [],
+  "enforce": false,
+  "errors": [],
+  "ignoredPaths": [],
+  "labels": [],
+  "matchedPaths": [],
+  "matchedSkipLabels": [],
+  "required": false,
+  "status": "not_required",
+  "summary": "changeset verification passed: no configured packages were affected by the changed files",
+  "uncoveredPackageIds": []
+}
