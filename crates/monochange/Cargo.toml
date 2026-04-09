@@ -39,6 +39,7 @@ serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 serde_yaml_ng = { workspace = true, default-features = true }
 shlex = { workspace = true, default-features = true }
+similar = { workspace = true }
 thiserror = { workspace = true, default-features = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"], default-features = true }
 toml = { workspace = true, default-features = true }

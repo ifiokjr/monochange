@@ -17,6 +17,7 @@ use monochange_core::ShellConfig;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 
+use crate::cli::command_supports_release_diff_preview;
 use crate::*;
 
 pub(crate) fn execute_matches(
@@ -36,8 +37,14 @@ pub(crate) fn execute_matches(
 	};
 
 	let dry_run = cli_command_matches.get_flag("dry-run");
+	let show_diff =
+		command_supports_release_diff_preview(cli_command) && cli_command_matches.get_flag("diff");
 	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
-	execute_cli_command(root, configuration, cli_command, dry_run, inputs)
+	if show_diff {
+		execute_cli_command_with_options(root, configuration, cli_command, dry_run, true, inputs)
+	} else {
+		execute_cli_command(root, configuration, cli_command, dry_run, inputs)
+	}
 }
 
 pub(crate) fn collect_cli_command_inputs(
@@ -186,12 +193,25 @@ pub(crate) fn execute_cli_command(
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
+	execute_cli_command_with_options(root, configuration, cli_command, dry_run, false, inputs)
+}
+
+pub(crate) fn execute_cli_command_with_options(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	cli_command: &CliCommandDefinition,
+	dry_run: bool,
+	show_diff: bool,
+	inputs: BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<String> {
 	let mut context = CliContext {
 		root: root.to_path_buf(),
 		dry_run,
+		show_diff,
 		last_step_inputs: inputs.clone(),
 		inputs,
 		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
 		release_manifest_path: None,
 		release_requests: Vec::new(),
 		release_results: Vec::new(),
@@ -319,7 +339,9 @@ pub(crate) fn execute_cli_command(
 				}
 			}
 			CliStepDefinition::PrepareRelease { .. } => {
-				context.prepared_release = Some(prepare_release(root, dry_run)?);
+				let prepared_execution = prepare_release_execution(root, dry_run)?;
+				context.prepared_file_diffs = prepared_execution.file_diffs;
+				context.prepared_release = Some(prepared_execution.prepared_release);
 				output = None;
 			}
 			CliStepDefinition::RenderReleaseManifest { path, .. } => {
@@ -590,6 +612,11 @@ pub(crate) fn execute_cli_command(
 					context.release_request.as_ref(),
 					&context.issue_comment_plans,
 					context.release_commit_report.as_ref(),
+					if context.show_diff {
+						&context.prepared_file_diffs
+					} else {
+						&[]
+					},
 				)
 			}
 			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
@@ -985,6 +1012,20 @@ fn build_release_template_value(context: &CliContext) -> serde_json::Value {
 				.collect(),
 		),
 	);
+	let file_diffs = context
+		.prepared_file_diffs
+		.iter()
+		.map(|file_diff| {
+			serde_json::json!({
+				"path": file_diff.path,
+				"diff": file_diff.diff,
+			})
+		})
+		.collect();
+	release_map.insert(
+		"file_diffs".to_string(),
+		serde_json::Value::Array(file_diffs),
+	);
 
 	let targets: Vec<serde_json::Value> = prepared
 		.release_targets
@@ -1282,6 +1323,15 @@ pub(crate) fn render_cli_command_result(
 			lines.push("changed files:".to_string());
 			for path in &prepared_release.changed_files {
 				lines.push(format!("- {}", path.display()));
+			}
+		}
+		if context.show_diff && !context.prepared_file_diffs.is_empty() {
+			lines.push("file diffs:".to_string());
+			for (index, file_diff) in context.prepared_file_diffs.iter().enumerate() {
+				if index > 0 {
+					lines.push(String::new());
+				}
+				lines.push(file_diff.display_diff.clone());
 			}
 		}
 		if !prepared_release.deleted_changesets.is_empty() {

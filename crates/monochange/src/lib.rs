@@ -171,6 +171,7 @@ pub(crate) use changesets::*;
 pub(crate) use release_artifacts::*;
 pub(crate) use versioned_files::*;
 pub(crate) use workspace_ops::add_interactive_change_file;
+pub(crate) use workspace_ops::prepare_release_execution;
 pub(crate) use workspace_ops::render_change_target_markdown;
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
@@ -327,6 +328,21 @@ pub struct PreparedRelease {
 	pub dry_run: bool,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreparedFileDiff {
+	path: PathBuf,
+	diff: String,
+	#[serde(skip_serializing)]
+	display_diff: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct PreparedReleaseExecution {
+	prepared_release: PreparedRelease,
+	file_diffs: Vec<PreparedFileDiff>,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct FileUpdate {
 	path: PathBuf,
@@ -453,9 +469,11 @@ struct CommitReleaseReport {
 struct CliContext {
 	root: PathBuf,
 	dry_run: bool,
+	show_diff: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 	last_step_inputs: BTreeMap<String, Vec<String>>,
 	prepared_release: Option<PreparedRelease>,
+	prepared_file_diffs: Vec<PreparedFileDiff>,
 	release_manifest_path: Option<PathBuf>,
 	release_requests: Vec<SourceReleaseRequest>,
 	release_results: Vec<String>,

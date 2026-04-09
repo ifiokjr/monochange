@@ -1714,6 +1714,7 @@ dependencies = [
  "serde_json",
  "serde_yaml_ng",
  "shlex",
+ "similar 3.0.0",
  "similar-asserts",
  "temp-env",
  "tempfile",

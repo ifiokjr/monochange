@@ -147,6 +147,38 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 }
 
 #[test]
+fn release_dry_run_cli_text_renders_diff_preview() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	assert_cmd_snapshot!(release_cli_command()
+		.current_dir(tempdir.path())
+		.arg("release")
+		.arg("--dry-run")
+		.arg("--diff")
+		.arg("--format")
+		.arg("text"));
+}
+
+#[test]
+fn release_dry_run_cli_json_renders_diff_preview() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	assert_cmd_snapshot!(release_cli_command()
+		.current_dir(tempdir.path())
+		.arg("release")
+		.arg("--dry-run")
+		.arg("--diff")
+		.arg("--format")
+		.arg("json"));
+}
+
+#[test]
 fn verify_cli_json_reports_failure_comment() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());

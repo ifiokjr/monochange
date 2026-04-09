@@ -1,0 +1,129 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 156
+info:
+  program: mc
+  args:
+    - release
+    - "--dry-run"
+    - "--diff"
+    - "--format"
+    - text
+  env:
+    MONOCHANGE_RELEASE_DATE: 2026-04-06
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+command `release` completed (dry-run)
+version: 1.1.0
+released packages: workflow-app, workflow-core
+release targets:
+- group sdk -> v1.1.0 (tag: true, release: true)
+changed files:
+- Cargo.toml
+- changelog.md
+- crates/app/Cargo.toml
+- crates/core/CHANGELOG.md
+- crates/core/Cargo.toml
+- group.toml
+file diffs:
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,10 +1,14 @@
+ [workspace]
+ members = ["crates/*"]
+ resolver = "2"
+ 
+-[workspace.package]
+-version = "1.0.0"
++[workspace.dependencies.workflow-app]
++path = "./crates/app"
++version = "1.1.0"
++
++[workspace.dependencies.workflow-core]
++path = "./crates/core"
++version = "1.1.0"
+ 
+-[workspace.dependencies]
+-workflow-core = { path = "./crates/core", version = "1.0.0" }
+-workflow-app = { path = "./crates/app", version = "1.0.0" }
++[workspace.package]
++version = "1.1.0"
+
+--- a/changelog.md
++++ b/changelog.md
+@@ -1 +1,13 @@
+ # Changelog
++
++## 1.1.0 ([DATE])
++
++Grouped release for `sdk`.
++
++Changed members: core
++
++Synchronized members: app
++
++### Features
++
++- **core**: add feature
+
+--- a/crates/app/Cargo.toml
++++ b/crates/app/Cargo.toml
+@@ -1,7 +1,9 @@
++[dependencies.workflow-core]
++workspace = true
++
+ [package]
++edition = "2021"
+ name = "workflow-app"
+-version = { workspace = true }
+-edition = "2021"
+ 
+-[dependencies]
+-workflow-core = { workspace = true }
++[package.version]
++workspace = true
+
+--- a/crates/core/CHANGELOG.md
++++ b/crates/core/CHANGELOG.md
+@@ -1 +1,7 @@
+ # Changelog
++
++## 1.1.0 ([DATE])
++
++### Features
++
++- add feature
+
+--- a/crates/core/Cargo.toml
++++ b/crates/core/Cargo.toml
+@@ -1,4 +1,6 @@
+ [package]
++edition = "2021"
+ name = "workflow-core"
+-version = { workspace = true }
+-edition = "2021"
++
++[package.version]
++workspace = true
+
+--- a/group.toml
++++ b/group.toml
+@@ -1,6 +1,8 @@
++[workspace.dependencies.workflow-app]
++version = "1.1.0"
++
++[workspace.dependencies.workflow-core]
++version = "1.1.0"
++
+ [workspace.package]
+-version = "1.0.0"
+-
+-[workspace.dependencies]
+-workflow-core = { version = "1.0.0" }
+-workflow-app = { version = "1.0.0" }
++version = "1.1.0"
+
+----- stderr -----

@@ -112,6 +112,15 @@ mc release --dry-run --format json
 
 <!-- {/projectDryRunCommand} -->
 
+When you want a reviewable patch-style preview of the filesystem changes without mutating the workspace, add `--diff`:
+
+```bash
+mc release --dry-run --diff
+mc release --dry-run --format json --diff
+```
+
+Text output renders unified diffs directly in the terminal. JSON output wraps the normal manifest payload under `manifest` and adds `fileDiffs` entries for each changed file.
+
 <!-- {=projectReleaseCommand} -->
 
 ```bash
