@@ -1539,6 +1539,103 @@ fn command_step_reports_process_spawn_failures() {
 }
 
 #[test]
+fn command_step_reports_nonzero_exit_status_without_stderr() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "announce".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::Command {
+			command: "sh -c 'exit 7'".to_string(),
+			dry_run_command: None,
+			shell: monochange_core::ShellConfig::default(),
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected exit-status failure"));
+	assert!(
+		error.to_string().contains("failed: exit status"),
+		"error: {error}"
+	);
+}
+
+#[test]
+fn command_step_reports_stderr_text_for_nonzero_exit_status() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "announce".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::Command {
+			command: "sh -c 'echo boom 1>&2; exit 1'".to_string(),
+			dry_run_command: None,
+			shell: monochange_core::ShellConfig::default(),
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected stderr failure"));
+	assert!(error.to_string().contains("boom"), "error: {error}");
+}
+
+#[test]
+fn execute_cli_command_without_steps_reports_completion_status() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "noop".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+	};
+	let output = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("noop output: {error}"));
+	assert_eq!(output, "command `noop` completed");
+	let dry_run_output = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		true,
+		BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("noop dry-run output: {error}"));
+	assert_eq!(dry_run_output, "command `noop` completed (dry-run)");
+}
+
+#[test]
 fn affected_packages_requires_attached_coverage_for_changed_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
