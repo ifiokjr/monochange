@@ -2661,6 +2661,44 @@ fn render_cli_command_result_prefers_retarget_report() {
 }
 
 #[test]
+fn render_cli_command_result_renders_release_follow_up_sections() {
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+	};
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: Some(sample_prepared_release_for_cli_render()),
+		release_manifest_path: Some(PathBuf::from("target/release-manifest.json")),
+		release_requests: Vec::new(),
+		release_results: vec!["dry-run org/repo v1.2.3 (sdk) via github".to_string()],
+		release_request: None,
+		release_request_result: Some(
+			"dry-run org/repo monochange/release/release -> main via github".to_string(),
+		),
+		release_commit_report: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: vec!["dry-run org/repo 123".to_string()],
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let rendered = crate::render_cli_command_result(&cli_command, &context);
+	assert!(rendered.contains("release manifest: target/release-manifest.json"));
+	assert!(rendered.contains("releases:"));
+	assert!(rendered.contains("release request:"));
+	assert!(rendered.contains("issue comments:"));
+	assert!(rendered.contains("changed files:"));
+}
+
+#[test]
 fn execute_cli_command_retarget_release_requires_from_input() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
@@ -4509,6 +4547,52 @@ fn sample_planned_group() -> monochange_core::PlannedVersionGroup {
 			Version::parse("1.2.3").unwrap_or_else(|error| panic!("version: {error}")),
 		),
 		recommended_bump: BumpSeverity::Minor,
+	}
+}
+
+fn sample_prepared_release_for_cli_render() -> crate::PreparedRelease {
+	crate::PreparedRelease {
+		plan: monochange_core::ReleasePlan {
+			workspace_root: PathBuf::from("."),
+			decisions: vec![monochange_core::ReleaseDecision {
+				package_id: "core".to_string(),
+				trigger_type: "changeset".to_string(),
+				recommended_bump: BumpSeverity::Minor,
+				planned_version: Some(
+					Version::parse("1.2.3").unwrap_or_else(|error| panic!("version: {error}")),
+				),
+				group_id: Some("sdk".to_string()),
+				reasons: vec!["release core".to_string()],
+				upstream_sources: Vec::new(),
+				warnings: Vec::new(),
+			}],
+			groups: vec![sample_planned_group()],
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		},
+		changeset_paths: Vec::new(),
+		changesets: Vec::new(),
+		released_packages: vec!["core".to_string()],
+		version: Some("1.2.3".to_string()),
+		group_version: Some("1.2.3".to_string()),
+		release_targets: vec![crate::ReleaseTarget {
+			id: "sdk".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Group,
+			version: "1.2.3".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v1.2.3".to_string(),
+			members: vec!["core".to_string(), "app".to_string()],
+			rendered_title: "sdk 1.2.3".to_string(),
+			rendered_changelog_title: "sdk changelog".to_string(),
+		}],
+		changed_files: vec![PathBuf::from("Cargo.toml")],
+		changelogs: Vec::new(),
+		updated_changelogs: Vec::new(),
+		deleted_changesets: Vec::new(),
+		dry_run: true,
 	}
 }
 
