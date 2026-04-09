@@ -148,7 +148,7 @@ dev_dependencies:
 
 #[test]
 fn update_manifest_text_preserves_pubspec_formatting() {
-	let manifest = r#"name: sample_app
+	let manifest = r"name: sample_app
 version: '1.0.0' # keep quote
 
 dependencies:
@@ -159,7 +159,7 @@ dependencies:
 
 dev_dependencies:
   test: ^1.0.0
-"#;
+";
 	let updated = update_manifest_text(
 		manifest,
 		Some("2.0.0"),
@@ -182,7 +182,7 @@ fn yaml_helper_functions_cover_missing_and_inline_paths() {
 	let contents = "version: # comment only\n\n  nested: value\nshared:\n  path: ../shared\n";
 	let ranges = crate::yaml_line_ranges(contents);
 	assert_eq!(ranges.len(), 6);
-	assert!(crate::parse_yaml_line(contents, ranges[1]).is_none());
+	assert!(crate::parse_yaml_line(contents, *ranges.get(1).expect("blank line range")).is_none());
 	assert!(crate::parse_yaml_line(": nope", (0, 6)).is_none());
 	assert!(crate::yaml_value_span("version: # comment", 0, 8).is_none());
 	assert_eq!(crate::find_yaml_quote_end("\"1.0.0\"", '"'), Some(6));
@@ -191,13 +191,13 @@ fn yaml_helper_functions_cover_missing_and_inline_paths() {
 	assert_eq!(crate::render_yaml_scalar("'1.0.0'", "2.0.0"), "'2.0.0'");
 	assert_eq!(crate::render_yaml_scalar("1.0.0", "2.0.0"), "2.0.0");
 
-	let nested = r#"dependencies:
+	let nested = r"dependencies:
   shared:
     path: ../shared
 
     # keep spacing
   other: ^1.0.0
-"#;
+";
 	let nested_ranges = crate::yaml_line_ranges(nested);
 	let section_index = crate::find_yaml_key_line(nested, &nested_ranges, 0, "dependencies")
 		.unwrap_or_else(|| panic!("expected dependencies section"));

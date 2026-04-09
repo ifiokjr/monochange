@@ -84,9 +84,10 @@ fn discovers_deno_jsonc_manifests_with_comments() {
 	let discovery = discover_deno_packages(&tempdir)
 		.unwrap_or_else(|error| panic!("discover deno jsonc: {error}"));
 	assert_eq!(discovery.packages.len(), 1);
-	assert_eq!(discovery.packages[0].name, "jsonc-tool");
+	let package = discovery.packages.first().expect("discovered deno package");
+	assert_eq!(package.name, "jsonc-tool");
 	assert_eq!(
-		discovery.packages[0]
+		package
 			.current_version
 			.as_ref()
 			.map(ToString::to_string)

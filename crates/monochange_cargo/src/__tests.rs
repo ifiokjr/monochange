@@ -12,6 +12,8 @@ use monochange_core::PublishState;
 use monochange_semver::CompatibilityProvider;
 use tempfile::tempdir;
 use toml::Value;
+use toml_edit::DocumentMut;
+use toml_edit::Item;
 
 use crate::adapter;
 use crate::dependency_constraint;
@@ -570,6 +572,43 @@ version = "0.1.0"
 		package.get("name").and_then(Value::as_str) == Some("ignored")
 			&& package.get("version").and_then(Value::as_str) == Some("0.1.0")
 	}));
+}
+
+#[test]
+fn cargo_versioned_file_helpers_cover_non_table_and_insertion_paths() {
+	let mut dependency_document = "[dependencies]\nweird = true\n"
+		.parse::<DocumentMut>()
+		.unwrap_or_else(|error| panic!("parse dependency document: {error}"));
+	let dependency_table = dependency_document
+		.get_mut("dependencies")
+		.and_then(Item::as_table_like_mut)
+		.unwrap_or_else(|| panic!("expected dependencies table"));
+	let weird_entry = dependency_table
+		.get_mut("weird")
+		.unwrap_or_else(|| panic!("expected weird entry"));
+	crate::update_dependency_entry(weird_entry, "2.0.0");
+	assert_eq!(weird_entry.as_bool(), Some(true));
+
+	let mut insert_document = "[dependencies]\n"
+		.parse::<DocumentMut>()
+		.unwrap_or_else(|error| panic!("parse insert document: {error}"));
+	let insert_table = insert_document
+		.get_mut("dependencies")
+		.and_then(Item::as_table_like_mut)
+		.unwrap_or_else(|| panic!("expected insert dependencies table"));
+	crate::set_table_value(insert_table, "core", "2.0.0");
+	assert_eq!(
+		insert_document
+			.get("dependencies")
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("core"))
+			.and_then(Item::as_str),
+		Some("2.0.0")
+	);
+
+	let mut empty_item = Item::None;
+	crate::set_item_string(&mut empty_item, "3.0.0");
+	assert_eq!(empty_item.as_str(), Some("3.0.0"));
 }
 
 #[test]

@@ -4716,6 +4716,19 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
 		monochange_core::PublishState::Public,
 	);
+	let deno_invalid_path = tempdir.path().join("invalid/deno.json");
+	fs::create_dir_all(deno_invalid_path.parent().expect("deno manifest parent"))
+		.unwrap_or_else(|error| panic!("create invalid deno dir: {error}"));
+	fs::write(&deno_invalid_path, "{")
+		.unwrap_or_else(|error| panic!("write invalid deno manifest: {error}"));
+	let deno_invalid = monochange_core::PackageRecord::new(
+		Ecosystem::Deno,
+		"tool-invalid",
+		deno_invalid_path,
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
 	let dart = monochange_core::PackageRecord::new(
 		Ecosystem::Dart,
 		"mobile",
@@ -4724,9 +4737,23 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
 		monochange_core::PublishState::Public,
 	);
+	let dart_missing = monochange_core::PackageRecord::new(
+		Ecosystem::Dart,
+		"mobile-missing",
+		tempdir.path().join("missing/pubspec.yaml"),
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
 	let plan = monochange_core::ReleasePlan {
 		workspace_root: tempdir.path().to_path_buf(),
-		decisions: vec![npm.id.clone(), deno_missing.id.clone(), dart.id.clone()]
+		decisions: vec![
+			npm.id.clone(),
+			deno_missing.id.clone(),
+			deno_invalid.id.clone(),
+			dart.id.clone(),
+			dart_missing.id.clone(),
+		]
 			.into_iter()
 			.map(|package_id| monochange_core::ReleaseDecision {
 				package_id,
@@ -4747,18 +4774,168 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 		unresolved_items: Vec::new(),
 		compatibility_evidence: Vec::new(),
 	};
-	let npm_error = crate::build_npm_manifest_updates(&[npm.clone()], &plan)
+	let npm_error = crate::build_npm_manifest_updates(std::slice::from_ref(&npm), &plan)
 		.err()
 		.unwrap_or_else(|| panic!("expected npm parse error"));
 	assert!(npm_error.to_string().contains("failed to parse"), "error: {npm_error}");
-	let deno_error = crate::build_deno_manifest_updates(&[deno_missing.clone()], &plan)
+	let deno_error = crate::build_deno_manifest_updates(std::slice::from_ref(&deno_missing), &plan)
 		.err()
 		.unwrap_or_else(|| panic!("expected deno io error"));
 	assert!(deno_error.to_string().contains("failed to read"), "error: {deno_error}");
-	let dart_error = crate::build_dart_manifest_updates(&[dart.clone()], &plan)
+	let deno_parse_error = crate::build_deno_manifest_updates(
+		std::slice::from_ref(&deno_invalid),
+		&plan,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected deno parse error"));
+	assert!(
+		deno_parse_error.to_string().contains("failed to parse"),
+		"error: {deno_parse_error}"
+	);
+	let dart_error = crate::build_dart_manifest_updates(std::slice::from_ref(&dart), &plan)
 		.err()
 		.unwrap_or_else(|| panic!("expected dart parse error"));
 	assert!(dart_error.to_string().contains("failed to parse"), "error: {dart_error}");
+	let dart_read_error = crate::build_dart_manifest_updates(std::slice::from_ref(&dart_missing), &plan)
+		.err()
+		.unwrap_or_else(|| panic!("expected dart read error"));
+	assert!(
+		dart_read_error.to_string().contains("failed to read"),
+		"error: {dart_read_error}"
+	);
+
+	let cargo_missing_dir = tempdir.path().join("cargo-missing-dir");
+	fs::create_dir_all(&cargo_missing_dir)
+		.unwrap_or_else(|error| panic!("create cargo missing dir: {error}"));
+	let cargo_missing = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-missing",
+		cargo_missing_dir,
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_invalid_path = tempdir.path().join("invalid-package/Cargo.toml");
+	fs::create_dir_all(cargo_invalid_path.parent().expect("cargo package parent"))
+		.unwrap_or_else(|error| panic!("create invalid cargo package dir: {error}"));
+	fs::write(&cargo_invalid_path, "{")
+		.unwrap_or_else(|error| panic!("write invalid cargo manifest: {error}"));
+	let cargo_invalid = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-invalid",
+		cargo_invalid_path,
+		tempdir.path().join("cargo-invalid-workspace"),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_workspace_dir = tempdir.path().join("cargo-workspace-dir");
+	fs::create_dir_all(cargo_workspace_dir.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create cargo workspace package dir: {error}"));
+	fs::write(
+		cargo_workspace_dir.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo workspace package manifest: {error}"));
+	fs::create_dir_all(cargo_workspace_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("create workspace cargo root dir: {error}"));
+	let cargo_workspace_read = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-workspace-read",
+		cargo_workspace_dir.join("crates/core/Cargo.toml"),
+		cargo_workspace_dir.clone(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_workspace_invalid = tempdir.path().join("cargo-workspace-invalid");
+	fs::create_dir_all(cargo_workspace_invalid.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create cargo workspace invalid dir: {error}"));
+	fs::write(
+		cargo_workspace_invalid.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write valid package manifest: {error}"));
+	fs::write(cargo_workspace_invalid.join("Cargo.toml"), "{")
+		.unwrap_or_else(|error| panic!("write invalid workspace manifest: {error}"));
+	let cargo_workspace_parse = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-workspace-parse",
+		cargo_workspace_invalid.join("crates/core/Cargo.toml"),
+		cargo_workspace_invalid,
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: vec![
+			cargo_missing.id.clone(),
+			cargo_invalid.id.clone(),
+			cargo_workspace_read.id.clone(),
+			cargo_workspace_parse.id.clone(),
+		]
+		.into_iter()
+		.map(|package_id| monochange_core::ReleaseDecision {
+			package_id,
+			trigger_type: "changeset".to_string(),
+			recommended_bump: BumpSeverity::Minor,
+			planned_version: Some(
+				Version::parse("1.1.0")
+					.unwrap_or_else(|error| panic!("planned version: {error}")),
+			),
+			group_id: None,
+			reasons: vec!["release".to_string()],
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		})
+		.collect(),
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+	let cargo_read_error = crate::build_cargo_manifest_updates(
+		std::slice::from_ref(&cargo_missing),
+		&cargo_plan,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cargo read error"));
+	assert!(
+		cargo_read_error.to_string().contains("failed to read"),
+		"error: {cargo_read_error}"
+	);
+	let cargo_parse_error = crate::build_cargo_manifest_updates(
+		std::slice::from_ref(&cargo_invalid),
+		&cargo_plan,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cargo parse error"));
+	assert!(
+		cargo_parse_error.to_string().contains("failed to parse"),
+		"error: {cargo_parse_error}"
+	);
+	let cargo_workspace_read_error = crate::build_cargo_manifest_updates(
+		std::slice::from_ref(&cargo_workspace_read),
+		&cargo_plan,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cargo workspace read error"));
+	assert!(
+		cargo_workspace_read_error
+			.to_string()
+			.contains("failed to read"),
+		"error: {cargo_workspace_read_error}"
+	);
+	let cargo_workspace_parse_error = crate::build_cargo_manifest_updates(
+		std::slice::from_ref(&cargo_workspace_parse),
+		&cargo_plan,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cargo workspace parse error"));
+	assert!(
+		cargo_workspace_parse_error
+			.to_string()
+			.contains("failed to parse"),
+		"error: {cargo_workspace_parse_error}"
+	);
 
 	let unreleased_plan = monochange_core::ReleasePlan {
 		workspace_root: tempdir.path().to_path_buf(),
@@ -4777,6 +4954,7 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_updaters() {
 	let configuration = versioned_test_configuration();
 	for (file_name, ecosystem_type, contents) in [
+		("Cargo.toml", monochange_core::EcosystemType::Cargo, "{"),
 		("package.json", monochange_core::EcosystemType::Npm, "{"),
 		("deno.json", monochange_core::EcosystemType::Deno, "{"),
 		("pubspec.yaml", monochange_core::EcosystemType::Dart, ": bad"),
@@ -4809,6 +4987,35 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 		.unwrap_or_else(|| panic!("expected parse error for {file_name}"));
 		assert!(error.to_string().contains("failed to parse"), "error: {error}");
 	}
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("Cargo.toml");
+	fs::write(&path, "[package]\nname = \"core\"\nversion = \"1.0.0\"\n")
+		.unwrap_or_else(|error| panic!("write cached cargo manifest path: {error}"));
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "Cargo.toml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut BTreeMap::from([(path, crate::CachedDocument::Text("{".to_string()))]),
+		&definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cached cargo parse error"));
+	assert!(error.to_string().contains("failed to parse"), "error: {error}");
 }
 
 #[test]

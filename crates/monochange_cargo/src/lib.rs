@@ -214,7 +214,7 @@ pub fn update_versioned_file(
 				}
 			}
 			for field in fields {
-				if let Some(table) = document.get_mut(*field).and_then(Item::as_table_like_mut) {
+				if let Some(table) = document.get_mut(field).and_then(Item::as_table_like_mut) {
 					for (dep_name, dep_version) in versioned_deps {
 						let Some(entry) = table.get_mut(dep_name) else {
 							continue;

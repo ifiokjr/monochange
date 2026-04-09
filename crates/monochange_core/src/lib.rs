@@ -673,7 +673,7 @@ fn skip_json_primitive(contents: &str, start: usize) -> usize {
 		if matches!(byte, b',' | b'}' | b']') || byte.is_ascii_whitespace() {
 			break;
 		}
-		if byte == b'/' && matches!(bytes.get(cursor + 1), Some(b'/') | Some(b'*')) {
+		if byte == b'/' && matches!(bytes.get(cursor + 1), Some(b'/' | b'*')) {
 			break;
 		}
 		cursor += 1;

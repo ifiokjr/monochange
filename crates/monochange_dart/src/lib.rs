@@ -182,7 +182,8 @@ fn find_yaml_scalar_for_key(
 	key: &str,
 ) -> Option<(usize, usize)> {
 	let line_index = find_yaml_key_line(contents, line_ranges, indent, key)?;
-	parse_yaml_line(contents, line_ranges[line_index]).and_then(|line| line.value_span)
+	let range = *line_ranges.get(line_index)?;
+	parse_yaml_line(contents, range).and_then(|line| line.value_span)
 }
 
 fn find_yaml_key_line(
@@ -203,7 +204,7 @@ fn find_yaml_dependency_scalar(
 	section_index: usize,
 	dep_name: &str,
 ) -> Option<(usize, usize)> {
-	let section = parse_yaml_line(contents, line_ranges[section_index])?;
+	let section = parse_yaml_line(contents, *line_ranges.get(section_index)?)?;
 	let section_indent = section.indent;
 	let mut index = section_index + 1;
 	while let Some(range) = line_ranges.get(index) {
