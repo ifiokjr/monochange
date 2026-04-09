@@ -213,13 +213,15 @@ impl MonochangeMcpServer {
 		let bump = ChangeBump::from(params.bump);
 		match crate::add_change_file(
 			&root,
-			&params.package,
-			bump.into(),
-			params.version.as_deref(),
-			&params.reason,
-			params.change_type.as_deref(),
-			params.details.as_deref(),
-			output,
+			crate::AddChangeFileRequest::builder()
+				.package_refs(&params.package)
+				.bump(bump.into())
+				.reason(&params.reason)
+				.version(params.version.as_deref())
+				.change_type(params.change_type.as_deref())
+				.details(params.details.as_deref())
+				.output(output)
+				.build(),
 		) {
 			Ok(path) => Ok(json_result(json!({
 				"ok": true,

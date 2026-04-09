@@ -302,13 +302,15 @@ pub(crate) fn execute_cli_command(
 						.map(PathBuf::from);
 					let path = add_change_file(
 						root,
-						&package_refs,
-						bump.into(),
-						version.as_deref(),
-						&reason,
-						change_type.as_deref(),
-						details.as_deref(),
-						output_path.as_deref(),
+						AddChangeFileRequest::builder()
+							.package_refs(&package_refs)
+							.bump(bump.into())
+							.reason(&reason)
+							.version(version.as_deref())
+							.change_type(change_type.as_deref())
+							.details(details.as_deref())
+							.output(output_path.as_deref())
+							.build(),
 					)?;
 					output = Some(format!(
 						"wrote change file {}",

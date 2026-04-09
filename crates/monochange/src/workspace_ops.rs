@@ -22,6 +22,7 @@ use monochange_deno::discover_deno_packages;
 use monochange_github as github_provider;
 use monochange_npm::discover_npm_packages;
 use serde_json::json;
+use typed_builder::TypedBuilder;
 
 use crate::interactive;
 use crate::*;
@@ -231,30 +232,43 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	})
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy, Debug, TypedBuilder)]
+pub struct AddChangeFileRequest<'a> {
+	pub package_refs: &'a [String],
+	pub bump: BumpSeverity,
+	pub reason: &'a str,
+	#[builder(default)]
+	pub version: Option<&'a str>,
+	#[builder(default)]
+	pub change_type: Option<&'a str>,
+	#[builder(default)]
+	pub details: Option<&'a str>,
+	#[builder(default)]
+	pub output: Option<&'a Path>,
+}
+
 pub fn add_change_file(
 	root: &Path,
-	package_refs: &[String],
-	bump: BumpSeverity,
-	version: Option<&str>,
-	reason: &str,
-	change_type: Option<&str>,
-	details: Option<&str>,
-	output: Option<&Path>,
+	request: AddChangeFileRequest<'_>,
 ) -> MonochangeResult<PathBuf> {
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
-	let packages =
-		canonical_change_packages(root, package_refs, &configuration, &discovery.packages)?;
-	let output_path =
-		output.map_or_else(|| default_change_path(root, &packages), Path::to_path_buf);
+	let packages = canonical_change_packages(
+		root,
+		request.package_refs,
+		&configuration,
+		&discovery.packages,
+	)?;
+	let output_path = request
+		.output
+		.map_or_else(|| default_change_path(root, &packages), Path::to_path_buf);
 	if let Some(parent) = output_path.parent() {
 		fs::create_dir_all(parent).map_err(|error| {
 			MonochangeError::Io(format!("failed to create {}: {error}", parent.display()))
 		})?;
 	}
 
-	if let Some(version) = version {
+	if let Some(version) = request.version {
 		semver::Version::parse(version).map_err(|error| {
 			MonochangeError::Config(format!(
 				"invalid explicit version `{version}` passed to `change`: {error}"
@@ -265,11 +279,11 @@ pub fn add_change_file(
 	let content = render_changeset_markdown(
 		&configuration,
 		&packages,
-		bump,
-		version,
-		reason,
-		change_type,
-		details,
+		request.bump,
+		request.version,
+		request.reason,
+		request.change_type,
+		request.details,
 	)?;
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
@@ -452,14 +466,16 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	let release_targets =
 		build_release_targets(&configuration, &discovery.packages, &plan, &changeset_paths);
 	let changelog_updates = build_changelog_updates(
-		root,
-		&configuration,
-		&discovery.packages,
-		&plan,
-		&change_signals,
-		&changesets,
-		&changelog_targets,
-		&release_targets,
+		ChangelogBuildContext::builder()
+			.root(root)
+			.configuration(&configuration)
+			.packages(&discovery.packages)
+			.plan(&plan)
+			.change_signals(&change_signals)
+			.changesets(&changesets)
+			.changelog_targets(&changelog_targets)
+			.release_targets(&release_targets)
+			.build(),
 	)?;
 	let mut changed_files = manifest_updates
 		.iter()
