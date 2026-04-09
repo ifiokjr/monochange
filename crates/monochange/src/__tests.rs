@@ -2675,6 +2675,137 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 }
 
 #[test]
+fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cases = [
+		(
+			"release-manifest",
+			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				path: None,
+				inputs: BTreeMap::new(),
+			},
+			"`RenderReleaseManifest` requires a previous `PrepareRelease` step",
+		),
+		(
+			"publish-release",
+			monochange_core::CliStepDefinition::PublishRelease {
+				inputs: BTreeMap::new(),
+			},
+			"`PublishRelease` requires a previous `PrepareRelease` step",
+		),
+		(
+			"release-pr",
+			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				inputs: BTreeMap::new(),
+			},
+			"`OpenReleaseRequest` requires a previous `PrepareRelease` step",
+		),
+		(
+			"release-comments",
+			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				inputs: BTreeMap::new(),
+			},
+			"`CommentReleasedIssues` requires a previous `PrepareRelease` step",
+		),
+	];
+	for (name, step, expected) in cases {
+		let cli_command = monochange_core::CliCommandDefinition {
+			name: name.to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: vec![step],
+		};
+		let error = crate::execute_cli_command(
+			tempdir.path(),
+			&configuration,
+			&cli_command,
+			true,
+			BTreeMap::new(),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing PrepareRelease error for {name}"));
+		assert!(error.to_string().contains(expected), "error: {error}");
+	}
+}
+
+#[test]
+fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
+	let root = fixture_path("monochange/release-base");
+	let mut configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	configuration.source = Some(monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::GitLab,
+		host: Some("https://gitlab.example.com".to_string()),
+		api_url: Some("https://gitlab.example.com/api/v4".to_string()),
+		owner: "org".to_string(),
+		repo: "repo".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	});
+	let prepare_and_publish = monochange_core::CliCommandDefinition {
+		name: "publish-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+	let error = crate::execute_cli_command(
+		&root,
+		&configuration,
+		&prepare_and_publish,
+		true,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected github source requirement error"));
+	assert!(error
+		.to_string()
+		.contains("`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"));
+}
+
+#[test]
+fn execute_matches_rejects_unknown_cli_command_names() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let matches = clap::Command::new("dummy")
+		.try_get_matches_from(["dummy"])
+		.unwrap_or_else(|error| panic!("matches: {error}"));
+	let error = crate::execute_matches(tempdir.path(), &configuration, "missing", &matches)
+		.err()
+		.unwrap_or_else(|| panic!("expected unknown command error"));
+	assert!(error.to_string().contains("unknown command `missing`"));
+}
+
+#[test]
+fn run_git_capture_and_process_report_io_failures_for_missing_worktrees() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let missing = tempdir.path().join("missing");
+	let capture_error = crate::run_git_capture(&missing, &["status"], "capture failure")
+		.err()
+		.unwrap_or_else(|| panic!("expected capture error"));
+	assert!(capture_error.to_string().contains("capture failure"));
+
+	let mut command = std::process::Command::new("git");
+	command.current_dir(&missing).arg("status");
+	let process_error = crate::run_git_process(command, "process failure")
+		.err()
+		.unwrap_or_else(|| panic!("expected process error"));
+	assert!(process_error.to_string().contains("process failure"));
+}
+
+#[test]
 fn parse_boolean_step_input_rejects_invalid_values() {
 	let inputs = BTreeMap::from([("force".to_string(), vec!["maybe".to_string()])]);
 	let error = crate::parse_boolean_step_input(&inputs, "force")
