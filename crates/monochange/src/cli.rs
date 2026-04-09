@@ -152,6 +152,15 @@ Inspection notes:
 		)
 }
 
+pub(crate) fn command_supports_release_diff_preview(cli_command: &CliCommandDefinition) -> bool {
+	cli_command.steps.iter().any(|step| {
+		matches!(
+			step,
+			monochange_core::CliStepDefinition::PrepareRelease { .. }
+		)
+	})
+}
+
 pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
 	let mut command = Command::new(leak_string(cli_command.name.clone()))
 		.about(
@@ -166,6 +175,15 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 				.help("Run the command in dry-run mode when supported")
 				.action(ArgAction::SetTrue),
 		);
+
+	if command_supports_release_diff_preview(cli_command) {
+		command = command.arg(
+			Arg::new("diff")
+				.long("diff")
+				.help("Show unified file diffs for prepared release changes")
+				.action(ArgAction::SetTrue),
+		);
+	}
 
 	if let Some(after_help) = cli_command_after_help(cli_command) {
 		command = command.after_help(after_help);
@@ -196,6 +214,7 @@ Rules:
 			r"Examples:
   mc release --dry-run --format text
   mc release --dry-run --format json
+  mc release --dry-run --diff
   mc release
 
 Planning reminders:
@@ -206,6 +225,7 @@ Planning reminders:
 		"commit-release" => Some(
 			r"Examples:
   mc commit-release --dry-run --format json
+  mc commit-release --dry-run --diff
   mc commit-release
 
 Commit notes:

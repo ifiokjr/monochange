@@ -78,6 +78,12 @@ Preview the release plan safely:
 mc release --dry-run --format json
 ```
 
+Add `--diff` when you want unified file previews for version and changelog updates without mutating the workspace:
+
+```bash
+mc release --dry-run --diff
+```
+
 This first run is safe: nothing is published. Stop here until you are ready to prepare release files locally.
 
 When you are ready to prepare the release locally, run `mc release`.

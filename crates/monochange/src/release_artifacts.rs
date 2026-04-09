@@ -1,4 +1,16 @@
+use std::io::IsTerminal;
+
+#[cfg(test)]
+use std::cell::Cell;
+
+use similar::TextDiff;
+
 use super::*;
+
+#[cfg(test)]
+thread_local! {
+	static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
+}
 
 pub(crate) fn build_release_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -576,6 +588,124 @@ pub(crate) fn apply_file_updates(updates: &[FileUpdate]) -> MonochangeResult<()>
 	Ok(())
 }
 
+#[rustfmt::skip]
+pub(crate) fn build_file_diff_previews(root: &Path, updates: &[FileUpdate]) -> MonochangeResult<Vec<PreparedFileDiff>> { let colorize_diffs = diff_output_colors_enabled();
+	#[cfg(test)]
+	if FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(Cell::get) {
+		return Err(MonochangeError::Io(
+			"forced build_file_diff_previews test error".to_string(),
+		));
+	}
+	let mut previews = updates
+		.iter()
+		.filter_map(|update| {
+			let path = root_relative(root, &update.path);
+			let before = match fs::read(&update.path) {
+				Ok(content) => content,
+				Err(error)
+					if matches!(
+						error.kind(),
+						std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+					) =>
+				{
+					Vec::new()
+				}
+				Err(error) => {
+					return Some(Err(MonochangeError::Io(format!(
+						"failed to read {}: {error}",
+						update.path.display()
+					))));
+				}
+			};
+			(before != update.content).then(|| {
+				let diff = render_unified_file_diff(&path, &before, &update.content);
+				Ok(PreparedFileDiff {
+					path: path.clone(),
+					display_diff: render_display_file_diff(&diff, colorize_diffs),
+					diff,
+				})
+			})
+		})
+		.collect::<MonochangeResult<Vec<_>>>()?;
+	previews.sort_by(|left, right| left.path.cmp(&right.path));
+	Ok(previews)
+}
+
+fn render_unified_file_diff(path: &Path, before: &[u8], after: &[u8]) -> String {
+	let before_text = String::from_utf8_lossy(before);
+	let after_text = String::from_utf8_lossy(after);
+	let context_radius = before_text.lines().count().max(after_text.lines().count());
+	let diff = TextDiff::from_lines(before_text.as_ref(), after_text.as_ref());
+	let mut unified = diff.unified_diff();
+	unified.context_radius(context_radius).header(
+		&format!("a/{}", path.display()),
+		&format!("b/{}", path.display()),
+	);
+	unified.to_string().trim_end_matches('\n').to_string()
+}
+
+fn render_display_file_diff(diff: &str, colorize: bool) -> String {
+	if !colorize {
+		return diff.to_string();
+	}
+	colorize_diff_output(diff)
+}
+
+fn diff_output_colors_enabled() -> bool {
+	diff_output_supports_color(std::io::stdout().is_terminal())
+}
+
+#[cfg(test)]
+pub(crate) fn set_force_build_file_diff_previews_error(enabled: bool) {
+	FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
+}
+
+pub(crate) fn diff_output_supports_color(stdout_is_terminal: bool) -> bool {
+	if std::env::var_os("NO_COLOR").is_some() {
+		return false;
+	}
+	if std::env::var("CLICOLOR_FORCE")
+		.ok()
+		.is_some_and(|value| value != "0")
+	{
+		return true;
+	}
+	if std::env::var("CLICOLOR")
+		.ok()
+		.is_some_and(|value| value == "0")
+	{
+		return false;
+	}
+	stdout_is_terminal
+}
+
+fn colorize_diff_output(diff: &str) -> String {
+	diff.lines()
+		.map(colorize_diff_line)
+		.collect::<Vec<_>>()
+		.join("\n")
+}
+
+pub(crate) fn colorize_diff_line(line: &str) -> String {
+	if line.starts_with("--- ") || line.starts_with("+++ ") {
+		apply_ansi_style(line, "1;36")
+	} else if line.starts_with("@@ ") {
+		apply_ansi_style(line, "36")
+	} else if line.starts_with('+') && !line.starts_with("+++") {
+		apply_ansi_style(line, "32")
+	} else if line.starts_with('-') && !line.starts_with("---") {
+		apply_ansi_style(line, "31")
+	} else if line == r"\ No newline at end of file" {
+		apply_ansi_style(line, "33")
+	} else {
+		line.to_string()
+	}
+}
+
+fn apply_ansi_style(line: &str, style: &str) -> String {
+	format!("\u{1b}[{style}m{line}\u{1b}[0m")
+}
+
 pub(crate) fn shared_release_version(plan: &ReleasePlan) -> Option<String> {
 	let versions = plan
 		.decisions
@@ -906,22 +1036,34 @@ pub(crate) fn render_release_cli_command_json(
 	release_request: Option<&SourceChangeRequest>,
 	issue_comments: &[github_provider::GitHubIssueCommentPlan],
 	release_commit: Option<&CommitReleaseReport>,
+	file_diffs: &[PreparedFileDiff],
 ) -> MonochangeResult<String> {
 	if releases.is_empty()
 		&& release_request.is_none()
 		&& issue_comments.is_empty()
 		&& release_commit.is_none()
+		&& file_diffs.is_empty()
 	{
 		return render_release_manifest_json(manifest);
 	}
-	serde_json::to_string_pretty(&json!({
+	let mut value = json!({
 		"manifest": manifest,
 		"releaseCommit": release_commit,
 		"releases": releases,
 		"releaseRequest": release_request,
 		"issueComments": issue_comments,
-	}))
-	.map_err(|error| MonochangeError::Discovery(error.to_string()))
+	});
+	if !file_diffs.is_empty() {
+		value
+			.as_object_mut()
+			.unwrap_or_else(|| panic!("release json wrapper must stay object"))
+			.insert(
+				"fileDiffs".to_string(),
+				serde_json::to_value(file_diffs).unwrap_or_default(),
+			);
+	}
+	serde_json::to_string_pretty(&value)
+		.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
 pub(crate) fn commit_release(

@@ -131,6 +131,8 @@ fn commit_release_help_describes_local_commit_workflow() {
 
 	assert!(output.contains("Prepare a release and create a local release commit"));
 	assert!(output.contains("mc commit-release --dry-run --format json"));
+	assert!(output.contains("mc commit-release --dry-run --diff"));
+	assert!(output.contains("--diff"));
 	assert!(output.contains("Embeds a durable release record block in the commit body"));
 }
 
@@ -2802,9 +2804,11 @@ fn template_context_exposes_release_commit_namespace() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
 		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
 		release_manifest_path: None,
 		release_requests: Vec::new(),
 		release_results: Vec::new(),
@@ -2841,9 +2845,11 @@ fn template_context_exposes_retarget_namespace() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
 		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
 		release_manifest_path: None,
 		release_requests: Vec::new(),
 		release_results: Vec::new(),
@@ -2881,9 +2887,11 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
 		prepared_release: Some(sample_prepared_release_for_cli_render()),
+		prepared_file_diffs: Vec::new(),
 		release_manifest_path: Some(PathBuf::from("target/release-manifest.json")),
 		release_requests: Vec::new(),
 		release_results: Vec::new(),
@@ -2979,9 +2987,11 @@ fn render_cli_command_result_prefers_retarget_report() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
 		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
 		release_manifest_path: None,
 		release_requests: Vec::new(),
 		release_results: Vec::new(),
@@ -3012,9 +3022,11 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
 		prepared_release: Some(sample_prepared_release_for_cli_render()),
+		prepared_file_diffs: Vec::new(),
 		release_manifest_path: Some(PathBuf::from("target/release-manifest.json")),
 		release_requests: Vec::new(),
 		release_results: vec!["dry-run org/repo v1.2.3 (sdk) via github".to_string()],
@@ -5943,6 +5955,156 @@ fn resolve_release_datetime_honors_env_overrides() {
 }
 
 #[test]
+fn diff_output_supports_color_respects_common_terminal_env_controls() {
+	temp_env::with_var("NO_COLOR", Some("1"), || {
+		assert!(!crate::diff_output_supports_color(true));
+	});
+	temp_env::with_var("NO_COLOR", None::<&str>, || {
+		temp_env::with_var("CLICOLOR", Some("0"), || {
+			assert!(!crate::diff_output_supports_color(true));
+		});
+		temp_env::with_var("CLICOLOR", None::<&str>, || {
+			temp_env::with_var("CLICOLOR_FORCE", Some("1"), || {
+				assert!(crate::diff_output_supports_color(false));
+			});
+			temp_env::with_var("CLICOLOR_FORCE", None::<&str>, || {
+				assert!(crate::diff_output_supports_color(true));
+				assert!(!crate::diff_output_supports_color(false));
+			});
+		});
+	});
+}
+
+#[test]
+fn colorize_diff_line_styles_unified_diff_markers() {
+	assert_eq!(
+		crate::colorize_diff_line("--- a/Cargo.toml"),
+		"\u{1b}[1;36m--- a/Cargo.toml\u{1b}[0m"
+	);
+	assert_eq!(
+		crate::colorize_diff_line("+++ b/Cargo.toml"),
+		"\u{1b}[1;36m+++ b/Cargo.toml\u{1b}[0m"
+	);
+	assert_eq!(
+		crate::colorize_diff_line("@@ -1,1 +1,1 @@"),
+		"\u{1b}[36m@@ -1,1 +1,1 @@\u{1b}[0m"
+	);
+	assert_eq!(
+		crate::colorize_diff_line("-version = \"1.0.0\""),
+		"\u{1b}[31m-version = \"1.0.0\"\u{1b}[0m"
+	);
+	assert_eq!(
+		crate::colorize_diff_line("+version = \"1.1.0\""),
+		"\u{1b}[32m+version = \"1.1.0\"\u{1b}[0m"
+	);
+	assert_eq!(
+		crate::colorize_diff_line(r"\ No newline at end of file"),
+		"\u{1b}[33m\\ No newline at end of file\u{1b}[0m"
+	);
+	assert_eq!(crate::colorize_diff_line(" unchanged"), " unchanged");
+}
+
+#[test]
+fn build_file_diff_previews_handles_missing_files_and_color_modes() {
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	let existing_path = tempdir.path().join("Cargo.toml");
+	let missing_path = tempdir.path().join("new-file.md");
+	let existing_content =
+		fs::read(&existing_path).unwrap_or_else(|error| panic!("read existing file: {error}"));
+	let mut updated_existing_content = existing_content.clone();
+	updated_existing_content.extend_from_slice(b"\n# diff coverage\n");
+	let updates = vec![
+		crate::FileUpdate {
+			path: existing_path.clone(),
+			content: updated_existing_content.clone(),
+		},
+		crate::FileUpdate {
+			path: missing_path.clone(),
+			content: b"# created by coverage\n".to_vec(),
+		},
+	];
+
+	let plain_previews = temp_env::with_var("NO_COLOR", Some("1"), || {
+		crate::build_file_diff_previews(tempdir.path(), &updates)
+			.unwrap_or_else(|error| panic!("plain previews: {error}"))
+	});
+	assert_eq!(plain_previews.len(), 2);
+	assert!(plain_previews
+		.iter()
+		.all(|preview| preview.display_diff == preview.diff));
+	let rendered_plain_diffs = plain_previews
+		.iter()
+		.map(|preview| preview.diff.clone())
+		.collect::<Vec<_>>()
+		.join("\n---\n");
+	assert!(rendered_plain_diffs.contains("new-file.md"));
+
+	let colored_previews = temp_env::with_var("NO_COLOR", None::<&str>, || {
+		temp_env::with_var("CLICOLOR", None::<&str>, || {
+			temp_env::with_var("CLICOLOR_FORCE", Some("1"), || {
+				crate::build_file_diff_previews(
+					tempdir.path(),
+					&[crate::FileUpdate {
+						path: existing_path.clone(),
+						content: updated_existing_content,
+					}],
+				)
+				.unwrap_or_else(|error| panic!("colored previews: {error}"))
+			})
+		})
+	});
+	assert_eq!(colored_previews.len(), 1);
+	assert!(colored_previews[0].display_diff.contains("\u{1b}["));
+	assert!(!colored_previews[0].diff.contains("\u{1b}["));
+}
+
+#[test]
+fn build_file_diff_previews_reports_directory_read_errors() {
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	let directory_path = tempdir.path().join("crates");
+	let error = crate::build_file_diff_previews(
+		tempdir.path(),
+		&[crate::FileUpdate {
+			path: directory_path.clone(),
+			content: b"unused".to_vec(),
+		}],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected directory read failure"));
+	assert!(error
+		.to_string()
+		.contains(&format!("failed to read {}", directory_path.display())));
+}
+
+#[test]
+fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	let prepared = temp_env::with_var("NO_COLOR", Some("1"), || {
+		crate::prepare_release_execution(tempdir.path(), true)
+			.unwrap_or_else(|error| panic!("prepare release execution: {error}"))
+	});
+	assert!(!prepared.prepared_release.changed_files.is_empty());
+	assert!(!prepared.file_diffs.is_empty());
+	assert!(prepared
+		.file_diffs
+		.iter()
+		.all(|file_diff| file_diff.display_diff == file_diff.diff));
+}
+
+#[test]
+fn prepare_release_execution_propagates_file_diff_preview_errors() {
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	crate::set_force_build_file_diff_previews_error(true);
+	let error = crate::prepare_release_execution(tempdir.path(), true)
+		.err()
+		.unwrap_or_else(|| panic!("expected forced file diff preview error"));
+	crate::set_force_build_file_diff_previews_error(false);
+	assert!(error
+		.to_string()
+		.contains("forced build_file_diff_previews test error"));
+}
+
+#[test]
 fn default_change_path_sluggifies_first_package_reference() {
 	let path = crate::default_change_path(
 		Path::new("/workspace"),
@@ -6201,9 +6363,11 @@ fn tracked_release_pull_request_paths_include_manifest_path_and_deduplicate() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
 		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
 		release_manifest_path: Some(PathBuf::from("Cargo.lock")),
 		release_requests: Vec::new(),
 		release_results: Vec::new(),

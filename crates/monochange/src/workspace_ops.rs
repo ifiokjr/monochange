@@ -429,6 +429,13 @@ pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<Releas
 }
 
 pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
+	prepare_release_execution(root, dry_run).map(|execution| execution.prepared_release)
+}
+
+pub(crate) fn prepare_release_execution(
+	root: &Path,
+	dry_run: bool,
+) -> MonochangeResult<PreparedReleaseExecution> {
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
 	let changeset_paths = discover_changeset_paths(root)?;
@@ -512,6 +519,15 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		.iter()
 		.map(|update| update.file.clone())
 		.collect::<Vec<_>>();
+	let file_diffs = build_file_diff_previews(
+		root,
+		&[
+			manifest_updates.clone(),
+			versioned_file_updates.clone(),
+			changelog_file_updates.clone(),
+		]
+		.concat(),
+	)?;
 
 	let version = shared_release_version(&plan);
 	let group_version = shared_group_version(&plan);
@@ -528,18 +544,21 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		}
 	}
 
-	Ok(PreparedRelease {
-		plan,
-		changeset_paths,
-		changesets,
-		released_packages,
-		version,
-		group_version,
-		release_targets,
-		changed_files,
-		changelogs,
-		updated_changelogs,
-		deleted_changesets,
-		dry_run,
+	Ok(PreparedReleaseExecution {
+		prepared_release: PreparedRelease {
+			plan,
+			changeset_paths,
+			changesets,
+			released_packages,
+			version,
+			group_version,
+			release_targets,
+			changed_files,
+			changelogs,
+			updated_changelogs,
+			deleted_changesets,
+			dry_run,
+		},
+		file_diffs,
 	})
 }
