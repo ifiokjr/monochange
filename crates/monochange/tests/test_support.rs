@@ -18,6 +18,8 @@ pub use shared_fs_test_support::current_test_name;
 #[allow(unused_imports)]
 pub use shared_fs_test_support::fixture_path;
 #[allow(unused_imports)]
+pub use shared_fs_test_support::setup_fixture;
+#[allow(unused_imports)]
 pub use shared_fs_test_support::setup_scenario_workspace;
 #[allow(unused_imports)]
 pub use shared_insta_test_support::snapshot_settings;

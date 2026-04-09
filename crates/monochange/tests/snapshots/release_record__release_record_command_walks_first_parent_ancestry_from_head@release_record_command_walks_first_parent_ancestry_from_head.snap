@@ -1,0 +1,17 @@
+---
+source: crates/monochange/tests/release_record.rs
+expression: "String::from_utf8(output.stdout).unwrap_or_else(|error|\npanic!(\"stdout utf8: {error}\"))"
+---
+release record:
+  input ref: HEAD
+  resolved commit: [SHA]
+  record commit: [SHA]
+  distance: 2
+  version: 1.2.3
+  group version: 1.2.3
+  targets:
+    - group sdk -> 1.2.3 (tag: v1.2.3)
+  packages:
+    - monochange
+    - monochange_core
+  provider: github ifiokjr/monochange

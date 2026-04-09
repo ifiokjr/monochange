@@ -14,7 +14,10 @@ fn release_manifest_records_git_changeset_context_and_renders_context_templates(
 
 	run_git(root, &["init"]);
 	run_git(root, &["config", "user.name", "monochange Tests"]);
-	run_git(root, &["config", "user.email", "monochange-tests@example.com"]);
+	run_git(
+		root,
+		&["config", "user.email", "monochange-tests@example.com"],
+	);
 	run_git(root, &["add", "Cargo.toml", "crates", "monochange.toml"]);
 	run_git(root, &["commit", "-m", "chore: seed release fixture"]);
 	run_git(root, &["add", ".changeset/feature.md"]);
@@ -74,7 +77,10 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 
 	run_git(root, &["init"]);
 	run_git(root, &["config", "user.name", "monochange Tests"]);
-	run_git(root, &["config", "user.email", "monochange-tests@example.com"]);
+	run_git(
+		root,
+		&["config", "user.email", "monochange-tests@example.com"],
+	);
 	run_git(root, &["add", "Cargo.toml", "crates", "monochange.toml"]);
 	run_git(root, &["commit", "-m", "chore: seed release fixture"]);
 	run_git(root, &["add", ".changeset/feature.md"]);
@@ -97,8 +103,8 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 		"diagnostics command failed: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
-	let stdout =
-		String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("diagnostics output utf8: {error}"));
+	let stdout = String::from_utf8(output.stdout)
+		.unwrap_or_else(|error| panic!("diagnostics output utf8: {error}"));
 	let parsed: Value =
 		serde_json::from_str(&stdout).unwrap_or_else(|error| panic!("diagnostics json: {error}"));
 
@@ -164,12 +170,16 @@ fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs()
 		.as_array()
 		.unwrap_or_else(|| panic!("requested changesets"));
 	assert_eq!(duplicate_requested.len(), 1);
-	assert_eq!(duplicate_requested[0].as_str(), Some(".changeset/feature.md"));
+	assert_eq!(
+		duplicate_requested[0].as_str(),
+		Some(".changeset/feature.md")
+	);
 }
 
 fn copy_updated_changeset(root: &Path) {
-	let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/changeset-context/with-updated-changeset/.changeset/feature.md");
+	let source = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+		"../../fixtures/tests/changeset-context/with-updated-changeset/.changeset/feature.md",
+	);
 	fs::copy(source, root.join(".changeset/feature.md"))
 		.unwrap_or_else(|error| panic!("copy updated changeset: {error}"));
 }
