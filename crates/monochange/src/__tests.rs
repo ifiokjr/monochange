@@ -1485,7 +1485,7 @@ fn command_step_rejects_empty_commands() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
-			command: "".to_string(),
+			command: String::new(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
 			id: None,
@@ -1533,9 +1533,9 @@ fn command_step_reports_process_spawn_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected process spawn failure"));
-	assert!(error.to_string().contains(
-		"failed to run command `definitely-not-a-real-command-12345`"
-	));
+	assert!(error
+		.to_string()
+		.contains("failed to run command `definitely-not-a-real-command-12345`"));
 }
 
 #[test]
@@ -3100,15 +3100,10 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 				step,
 			],
 		};
-		let error = crate::execute_cli_command(
-			&root,
-			&configuration,
-			&cli_command,
-			true,
-			BTreeMap::new(),
-		)
-		.err()
-		.unwrap_or_else(|| panic!("expected missing source error for {name}"));
+		let error =
+			crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
+				.err()
+				.unwrap_or_else(|| panic!("expected missing source error for {name}"));
 		assert!(error.to_string().contains(expected), "error: {error}");
 	}
 }
@@ -3116,8 +3111,8 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 #[test]
 fn execute_cli_command_change_step_requires_reason_input() {
 	let root = fixture_path("monochange/release-base");
-	let configuration =
-		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let cli_command = monochange_core::CliCommandDefinition {
 		name: "change".to_string(),
 		help_text: None,
@@ -4206,6 +4201,269 @@ fn sample_retarget_release_report() -> crate::RetargetReleaseReport {
 		provider_results: Vec::new(),
 		status: "dry_run".to_string(),
 	}
+}
+
+#[test]
+fn versioned_file_kind_detects_supported_paths_across_ecosystems() {
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Cargo,
+			&fixture_path("cargo/manifest-lockfile-workspace/crates/core/Cargo.toml"),
+		),
+		Some(crate::VersionedFileKind::Cargo(_))
+	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Npm,
+			&fixture_path("npm/manifest-lockfile-workspace/packages/web/package-lock.json"),
+		),
+		Some(crate::VersionedFileKind::Npm(_))
+	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Npm,
+			&fixture_path("npm/lockfile-workspace/pnpm-lock.yaml"),
+		),
+		Some(crate::VersionedFileKind::Npm(_))
+	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Npm,
+			&fixture_path("npm/bun-text-lock/packages/app/bun.lock"),
+		),
+		Some(crate::VersionedFileKind::Npm(_))
+	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Npm,
+			&fixture_path("monochange/bun-lock-release/packages/app/bun.lockb"),
+		),
+		Some(crate::VersionedFileKind::Npm(_))
+	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Deno,
+			&fixture_path("monochange/deno-lock-release/packages/app/deno.json"),
+		),
+		Some(crate::VersionedFileKind::Deno(_))
+	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Dart,
+			&fixture_path("dart/manifest-lockfile-workspace/packages/app/pubspec.lock"),
+		),
+		Some(crate::VersionedFileKind::Dart(_))
+	));
+}
+
+#[test]
+fn read_cached_document_returns_cached_entries_before_disk_lookup() {
+	let path = fixture_path("test-support/setup-fixture/root.txt");
+	let mut updates = BTreeMap::from([(
+		path.clone(),
+		crate::CachedDocument::Text("cached".to_string()),
+	)]);
+	let cached =
+		crate::read_cached_document(&mut updates, &path, monochange_core::EcosystemType::Cargo)
+			.unwrap_or_else(|error| panic!("cached document: {error}"));
+	assert!(matches!(cached, crate::CachedDocument::Text(contents) if contents == "cached"));
+	assert!(updates.is_empty());
+}
+
+#[test]
+fn read_cached_document_rejects_unsupported_versioned_files() {
+	let path = fixture_path("test-support/setup-fixture/root.txt");
+	let error = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&path,
+		monochange_core::EcosystemType::Cargo,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported file error"));
+	assert!(error.to_string().contains("unsupported versioned file"));
+	assert!(error.to_string().contains("cargo"));
+}
+
+#[test]
+fn read_cached_document_parses_supported_document_formats() {
+	let cargo = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("cargo/manifest-lockfile-workspace/crates/core/Cargo.toml"),
+		monochange_core::EcosystemType::Cargo,
+	)
+	.unwrap_or_else(|error| panic!("cargo manifest: {error}"));
+	assert!(matches!(cargo, crate::CachedDocument::Toml(_)));
+
+	let npm_json = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("npm/manifest-lockfile-workspace/packages/web/package-lock.json"),
+		monochange_core::EcosystemType::Npm,
+	)
+	.unwrap_or_else(|error| panic!("npm json: {error}"));
+	assert!(matches!(npm_json, crate::CachedDocument::Json(_)));
+
+	let npm_yaml = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("npm/lockfile-workspace/pnpm-lock.yaml"),
+		monochange_core::EcosystemType::Npm,
+	)
+	.unwrap_or_else(|error| panic!("pnpm lock: {error}"));
+	assert!(matches!(npm_yaml, crate::CachedDocument::Yaml(_)));
+
+	let bun_text = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("npm/bun-text-lock/packages/app/bun.lock"),
+		monochange_core::EcosystemType::Npm,
+	)
+	.unwrap_or_else(|error| panic!("bun lock: {error}"));
+	assert!(
+		matches!(bun_text, crate::CachedDocument::Text(contents) if contents.contains("left-pad"))
+	);
+
+	let bun_binary = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("monochange/bun-lock-release/packages/app/bun.lockb"),
+		monochange_core::EcosystemType::Npm,
+	)
+	.unwrap_or_else(|error| panic!("bun lockb: {error}"));
+	assert!(matches!(bun_binary, crate::CachedDocument::Bytes(contents) if !contents.is_empty()));
+
+	let deno_json = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("monochange/deno-lock-release/packages/app/deno.json"),
+		monochange_core::EcosystemType::Deno,
+	)
+	.unwrap_or_else(|error| panic!("deno json: {error}"));
+	assert!(matches!(deno_json, crate::CachedDocument::Json(_)));
+
+	let dart_yaml = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("dart/manifest-lockfile-workspace/packages/app/pubspec.lock"),
+		monochange_core::EcosystemType::Dart,
+	)
+	.unwrap_or_else(|error| panic!("dart lock: {error}"));
+	assert!(matches!(dart_yaml, crate::CachedDocument::Yaml(_)));
+}
+
+#[test]
+fn update_json_dependency_fields_updates_only_present_dependency_entries() {
+	let mut value = serde_json::json!({
+		"dependencies": {
+			"core": "^0.1.0",
+			"other": "^0.2.0"
+		},
+		"devDependencies": {
+			"core": "^0.1.0"
+		},
+		"keywords": ["monochange"]
+	});
+	let versions = BTreeMap::from([
+		("core".to_string(), "workspace:1.2.3".to_string()),
+		("missing".to_string(), "workspace:9.9.9".to_string()),
+	]);
+
+	crate::update_json_dependency_fields(
+		&mut value,
+		&[
+			"dependencies",
+			"devDependencies",
+			"keywords",
+			"peerDependencies",
+		],
+		&versions,
+	);
+
+	assert_eq!(value["dependencies"]["core"], "workspace:1.2.3");
+	assert_eq!(value["dependencies"]["other"], "^0.2.0");
+	assert_eq!(value["devDependencies"]["core"], "workspace:1.2.3");
+	assert_eq!(value["keywords"], serde_json::json!(["monochange"]));
+	assert!(value["peerDependencies"].is_null());
+}
+
+#[test]
+fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
+	let mut configuration = load_workspace_configuration(&fixture_path("monochange/release-base"))
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	configuration.npm.dependency_version_prefix = Some("workspace:".to_string());
+	configuration.deno.dependency_version_prefix = None;
+	let context = crate::VersionedFileUpdateContext {
+		package_by_record_id: BTreeMap::new(),
+		released_versions_by_native_name: BTreeMap::new(),
+		configuration: &configuration,
+	};
+
+	let explicit = monochange_core::VersionedFileDefinition {
+		path: "packages/app/package.json".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Npm,
+		prefix: Some("~".to_string()),
+		fields: None,
+		name: None,
+	};
+	assert_eq!(crate::resolve_versioned_prefix(&explicit, &context), "~");
+
+	let ecosystem = monochange_core::VersionedFileDefinition {
+		path: "packages/app/package.json".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Npm,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	assert_eq!(
+		crate::resolve_versioned_prefix(&ecosystem, &context),
+		"workspace:"
+	);
+
+	let fallback = monochange_core::VersionedFileDefinition {
+		path: "packages/app/deno.json".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Deno,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	assert_eq!(
+		crate::resolve_versioned_prefix(&fallback, &context),
+		monochange_core::EcosystemType::Deno.default_prefix()
+	);
+}
+
+#[test]
+fn serialize_cached_document_formats_json_yaml_text_and_bytes() {
+	let json = crate::serialize_cached_document(
+		Path::new("package-lock.json"),
+		crate::CachedDocument::Json(serde_json::json!({"name": "web"})),
+	)
+	.unwrap_or_else(|error| panic!("serialize json: {error}"));
+	assert!(String::from_utf8(json.content)
+		.unwrap_or_else(|error| panic!("json utf8: {error}"))
+		.ends_with('\n'));
+
+	let mut yaml_mapping = serde_yaml_ng::Mapping::new();
+	yaml_mapping.insert(
+		serde_yaml_ng::Value::String("lockfileVersion".to_string()),
+		serde_yaml_ng::Value::Number(serde_yaml_ng::Number::from(9)),
+	);
+	let yaml = crate::serialize_cached_document(
+		Path::new("pnpm-lock.yaml"),
+		crate::CachedDocument::Yaml(yaml_mapping),
+	)
+	.unwrap_or_else(|error| panic!("serialize yaml: {error}"));
+	assert!(String::from_utf8(yaml.content)
+		.unwrap_or_else(|error| panic!("yaml utf8: {error}"))
+		.contains("lockfileVersion"));
+
+	let text = crate::serialize_cached_document(
+		Path::new("bun.lock"),
+		crate::CachedDocument::Text("text lock".to_string()),
+	)
+	.unwrap_or_else(|error| panic!("serialize text: {error}"));
+	assert_eq!(text.content, b"text lock");
+
+	let bytes = crate::serialize_cached_document(
+		Path::new("bun.lockb"),
+		crate::CachedDocument::Bytes(vec![1, 2, 3, 4]),
+	)
+	.unwrap_or_else(|error| panic!("serialize bytes: {error}"));
+	assert_eq!(bytes.content, vec![1, 2, 3, 4]);
 }
 
 fn write_blank_monochange_config(root: &Path) {
