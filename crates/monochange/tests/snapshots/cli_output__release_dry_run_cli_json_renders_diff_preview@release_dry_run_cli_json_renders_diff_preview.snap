@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 172
 info:
   program: mc
   args:
@@ -19,7 +18,7 @@ exit_code: 0
 {
   "fileDiffs": [
     {
-      "diff": "--- a/Cargo.toml\n+++ b/Cargo.toml\n@@ -1,10 +1,14 @@\n [workspace]\n members = [\"crates/*\"]\n resolver = \"2\"\n \n-[workspace.package]\n-version = \"1.0.0\"\n+[workspace.dependencies.workflow-app]\n+path = \"./crates/app\"\n+version = \"1.1.0\"\n+\n+[workspace.dependencies.workflow-core]\n+path = \"./crates/core\"\n+version = \"1.1.0\"\n \n-[workspace.dependencies]\n-workflow-core = { path = \"./crates/core\", version = \"1.0.0\" }\n-workflow-app = { path = \"./crates/app\", version = \"1.0.0\" }\n+[workspace.package]\n+version = \"1.1.0\"",
+      "diff": "--- a/Cargo.toml\n+++ b/Cargo.toml\n@@ -1,10 +1,10 @@\n [workspace]\n members = [\"crates/*\"]\n resolver = \"2\"\n \n [workspace.package]\n-version = \"1.0.0\"\n+version = \"1.1.0\"\n \n [workspace.dependencies]\n-workflow-core = { path = \"./crates/core\", version = \"1.0.0\" }\n-workflow-app = { path = \"./crates/app\", version = \"1.0.0\" }\n+workflow-core = { path = \"./crates/core\", version = \"1.1.0\" }\n+workflow-app = { path = \"./crates/app\", version = \"1.1.0\" }",
       "path": "Cargo.toml"
     },
     {
@@ -27,19 +26,11 @@ exit_code: 0
       "path": "changelog.md"
     },
     {
-      "diff": "--- a/crates/app/Cargo.toml\n+++ b/crates/app/Cargo.toml\n@@ -1,7 +1,9 @@\n+[dependencies.workflow-core]\n+workspace = true\n+\n [package]\n+edition = \"2021\"\n name = \"workflow-app\"\n-version = { workspace = true }\n-edition = \"2021\"\n \n-[dependencies]\n-workflow-core = { workspace = true }\n+[package.version]\n+workspace = true",
-      "path": "crates/app/Cargo.toml"
-    },
-    {
       "diff": "--- a/crates/core/CHANGELOG.md\n+++ b/crates/core/CHANGELOG.md\n@@ -1 +1,7 @@\n # Changelog\n+\n+## 1.1.0 ([DATE])\n+\n+### Features\n+\n+- add feature",
       "path": "crates/core/CHANGELOG.md"
     },
     {
-      "diff": "--- a/crates/core/Cargo.toml\n+++ b/crates/core/Cargo.toml\n@@ -1,4 +1,6 @@\n [package]\n+edition = \"2021\"\n name = \"workflow-core\"\n-version = { workspace = true }\n-edition = \"2021\"\n+\n+[package.version]\n+workspace = true",
-      "path": "crates/core/Cargo.toml"
-    },
-    {
-      "diff": "--- a/group.toml\n+++ b/group.toml\n@@ -1,6 +1,8 @@\n+[workspace.dependencies.workflow-app]\n+version = \"1.1.0\"\n+\n+[workspace.dependencies.workflow-core]\n+version = \"1.1.0\"\n+\n [workspace.package]\n-version = \"1.0.0\"\n-\n-[workspace.dependencies]\n-workflow-core = { version = \"1.0.0\" }\n-workflow-app = { version = \"1.0.0\" }\n+version = \"1.1.0\"",
+      "diff": "--- a/group.toml\n+++ b/group.toml\n@@ -1,6 +1,6 @@\n [workspace.package]\n-version = \"1.0.0\"\n+version = \"1.1.0\"\n \n [workspace.dependencies]\n-workflow-core = { version = \"1.0.0\" }\n-workflow-app = { version = \"1.0.0\" }\n+workflow-core = { version = \"1.1.0\" }\n+workflow-app = { version = \"1.1.0\" }",
       "path": "group.toml"
     }
   ],

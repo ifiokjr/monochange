@@ -4,6 +4,7 @@
 "monochange_core": patch
 "monochange_dart": patch
 "monochange_deno": patch
+"monochange_npm": patch
 ---
 
 Preserve release-time manifest formatting across ecosystems instead of rewriting files through pretty-printers.
@@ -21,9 +22,9 @@ became
 [dependencies.rmcp]
 default-features = true
 features = [
-    "server",
-    "transport-io",
-    "macros",
+	"server",
+	"transport-io",
+	"macros",
 ]
 workspace = true
 ```
@@ -50,9 +51,10 @@ continues to update the matching root `workspace.dependencies.monochange.version
 { path = "Cargo.toml", type = "cargo", fields = ["workspace.dependencies.{{ name }}.version"] }
 ```
 
-The same release flow now preserves existing formatting for non-TOML manifests too:
+The same release flow now preserves existing formatting for non-TOML manifests and npm-family lockfiles too:
 
 - `package.json`
+- `pnpm-lock.yaml`
 - `deno.json` and `deno.jsonc`
 - `pubspec.yaml`
 

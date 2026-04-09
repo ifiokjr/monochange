@@ -225,6 +225,270 @@ pub fn update_pnpm_lock(
 	}
 }
 
+pub fn update_pnpm_lock_text(
+	contents: &str,
+	raw_versions: &BTreeMap<String, String>,
+) -> MonochangeResult<String> {
+	serde_yaml_ng::from_str::<serde_yaml_ng::Value>(contents).map_err(|error| {
+		MonochangeError::Config(format!("failed to parse pnpm lock yaml: {error}"))
+	})?;
+	let line_ranges = yaml_line_ranges(contents);
+	let mut replacements = Vec::<((usize, usize), String)>::new();
+	for section_name in ["importers", "packages", "snapshots"] {
+		let Some(section_index) = find_yaml_key_line(contents, &line_ranges, 0, section_name)
+		else {
+			continue;
+		};
+		collect_pnpm_section_replacements(
+			contents,
+			&line_ranges,
+			section_index,
+			raw_versions,
+			&mut replacements,
+		);
+	}
+	replacements.sort_by(|left, right| right.0 .0.cmp(&left.0 .0));
+	let mut updated = contents.to_string();
+	for ((start, end), replacement) in replacements {
+		updated.replace_range(start..end, &replacement);
+	}
+	Ok(updated)
+}
+
+fn collect_pnpm_section_replacements(
+	contents: &str,
+	line_ranges: &[(usize, usize)],
+	section_index: usize,
+	raw_versions: &BTreeMap<String, String>,
+	replacements: &mut Vec<((usize, usize), String)>,
+) {
+	let Some(section) = line_ranges
+		.get(section_index)
+		.and_then(|range| parse_yaml_line(contents, *range))
+	else {
+		return;
+	};
+	let mut index = section_index + 1;
+	while let Some(range) = line_ranges.get(index) {
+		let Some(line) = parse_yaml_line(contents, *range) else {
+			index += 1;
+			continue;
+		};
+		if line.indent <= section.indent {
+			break;
+		}
+		let entry_indent = line.indent;
+		index += 1;
+		while let Some(nested_range) = line_ranges.get(index) {
+			let Some(nested_line) = parse_yaml_line(contents, *nested_range) else {
+				index += 1;
+				continue;
+			};
+			if nested_line.indent <= entry_indent {
+				break;
+			}
+			if is_pnpm_dependency_field(nested_line.key) {
+				collect_pnpm_dependency_replacements(
+					contents,
+					line_ranges,
+					index,
+					raw_versions,
+					replacements,
+				);
+			}
+			index += 1;
+		}
+	}
+}
+
+fn collect_pnpm_dependency_replacements(
+	contents: &str,
+	line_ranges: &[(usize, usize)],
+	section_index: usize,
+	raw_versions: &BTreeMap<String, String>,
+	replacements: &mut Vec<((usize, usize), String)>,
+) {
+	let Some(section) = line_ranges
+		.get(section_index)
+		.and_then(|range| parse_yaml_line(contents, *range))
+	else {
+		return;
+	};
+	let mut index = section_index + 1;
+	while let Some(range) = line_ranges.get(index) {
+		let Some(line) = parse_yaml_line(contents, *range) else {
+			index += 1;
+			continue;
+		};
+		if line.indent <= section.indent {
+			break;
+		}
+		let Some(version) = raw_versions.get(line.key) else {
+			index += 1;
+			continue;
+		};
+		if let Some(value_span) = line.value_span {
+			push_pnpm_scalar_replacement(contents, value_span, version, replacements);
+			index += 1;
+			continue;
+		}
+		let dependency_indent = line.indent;
+		index += 1;
+		while let Some(nested_range) = line_ranges.get(index) {
+			let Some(nested_line) = parse_yaml_line(contents, *nested_range) else {
+				index += 1;
+				continue;
+			};
+			if nested_line.indent <= dependency_indent {
+				break;
+			}
+			if nested_line.key == "version" {
+				if let Some(value_span) = nested_line.value_span {
+					push_pnpm_scalar_replacement(contents, value_span, version, replacements);
+				}
+				break;
+			}
+			index += 1;
+		}
+	}
+}
+
+fn push_pnpm_scalar_replacement(
+	contents: &str,
+	span: (usize, usize),
+	version: &str,
+	replacements: &mut Vec<((usize, usize), String)>,
+) {
+	let Some(existing) = contents.get(span.0..span.1) else {
+		return;
+	};
+	if !yaml_scalar_is_updatable(existing) {
+		return;
+	}
+	let replacement = render_yaml_scalar(existing, version);
+	if replacement != existing {
+		replacements.push((span, replacement));
+	}
+}
+
+fn yaml_scalar_is_updatable(existing: &str) -> bool {
+	serde_yaml_ng::from_str::<serde_yaml_ng::Value>(existing)
+		.ok()
+		.and_then(|value| value.as_str().map(str::to_string))
+		.is_some_and(|text| !text.starts_with("link:") && !text.starts_with("workspace:"))
+}
+
+fn is_pnpm_dependency_field(key: &str) -> bool {
+	matches!(
+		key,
+		"dependencies" | "devDependencies" | "optionalDependencies" | "peerDependencies"
+	)
+}
+
+fn yaml_line_ranges(contents: &str) -> Vec<(usize, usize)> {
+	let mut ranges = Vec::new();
+	let mut start = 0usize;
+	for (index, ch) in contents.char_indices() {
+		if ch == '\n' {
+			ranges.push((start, index));
+			start = index + 1;
+		}
+	}
+	if start <= contents.len() {
+		ranges.push((start, contents.len()));
+	}
+	ranges
+}
+
+fn find_yaml_key_line(
+	contents: &str,
+	line_ranges: &[(usize, usize)],
+	indent: usize,
+	key: &str,
+) -> Option<usize> {
+	line_ranges.iter().position(|range| {
+		parse_yaml_line(contents, *range)
+			.is_some_and(|line| line.indent == indent && line.key == key)
+	})
+}
+
+struct ParsedYamlLine<'a> {
+	indent: usize,
+	key: &'a str,
+	value_span: Option<(usize, usize)>,
+}
+
+fn parse_yaml_line(contents: &str, range: (usize, usize)) -> Option<ParsedYamlLine<'_>> {
+	let line = contents.get(range.0..range.1)?;
+	let trimmed = line.trim_start_matches([' ', '\t']);
+	if trimmed.is_empty() || trimmed.starts_with('#') {
+		return None;
+	}
+	let indent = line.len() - trimmed.len();
+	let colon = trimmed.find(':')?;
+	let key = trimmed.get(..colon)?.trim();
+	if key.is_empty() {
+		return None;
+	}
+	let value_span = yaml_value_span(line, range.0, indent + colon + 1);
+	Some(ParsedYamlLine {
+		indent,
+		key,
+		value_span,
+	})
+}
+
+fn yaml_value_span(
+	line: &str,
+	line_start: usize,
+	value_start_in_line: usize,
+) -> Option<(usize, usize)> {
+	let suffix = line.get(value_start_in_line..)?;
+	let value_offset = suffix.find(|ch: char| !matches!(ch, ' ' | '\t'))?;
+	let value = suffix.get(value_offset..)?;
+	if value.starts_with('#') {
+		return None;
+	}
+	let span_start = line_start + value_start_in_line + value_offset;
+	let span_end = if let Some(quote) = value
+		.chars()
+		.next()
+		.filter(|quote| *quote == '"' || *quote == '\'')
+	{
+		let quote_end = find_yaml_quote_end(value, quote)?;
+		span_start + quote_end + 1
+	} else {
+		let comment_index = value.find('#').unwrap_or(value.len());
+		let trimmed_end = value
+			.get(..comment_index)?
+			.trim_end_matches([' ', '\t'])
+			.len();
+		span_start + trimmed_end
+	};
+	(span_end > span_start).then_some((span_start, span_end))
+}
+
+fn find_yaml_quote_end(value: &str, quote: char) -> Option<usize> {
+	let mut chars = value.char_indices();
+	chars.next()?;
+	for (index, ch) in chars {
+		if ch == quote {
+			return Some(index);
+		}
+	}
+	None
+}
+
+fn render_yaml_scalar(existing: &str, value: &str) -> String {
+	if existing.starts_with('"') && existing.ends_with('"') {
+		return format!("\"{value}\"");
+	}
+	if existing.starts_with('\'') && existing.ends_with('\'') {
+		return format!("'{value}'");
+	}
+	value.to_string()
+}
+
 pub fn update_bun_lock(contents: &str, raw_versions: &BTreeMap<String, String>) -> String {
 	let mut updated = contents.to_string();
 	for (name, version) in raw_versions {

@@ -285,8 +285,21 @@ pub(crate) fn read_cached_document(
 			})?;
 			Ok(CachedDocument::Text(contents))
 		}
-		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::PnpmLock)
-		| VersionedFileKind::Dart(monochange_dart::DartVersionedFileKind::Lock) => {
+		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::PnpmLock) => {
+			let Some(contents) = text_contents else {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {} as text",
+					path.display()
+				)));
+			};
+			monochange_npm::update_pnpm_lock_text(&contents, &BTreeMap::new()).map_err(
+				|error| {
+					MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
+				},
+			)?;
+			Ok(CachedDocument::Text(contents))
+		}
+		VersionedFileKind::Dart(monochange_dart::DartVersionedFileKind::Lock) => {
 			let Some(contents) = text_contents.as_ref() else {
 				return Err(MonochangeError::Config(format!(
 					"failed to parse {} as text",
@@ -542,6 +555,14 @@ pub(crate) fn apply_versioned_file_definition(
 					})?;
 				} else if kind == monochange_npm::NpmVersionedFileKind::BunLock {
 					*contents = monochange_npm::update_bun_lock(contents, &raw_versions);
+				} else if kind == monochange_npm::NpmVersionedFileKind::PnpmLock {
+					*contents = monochange_npm::update_pnpm_lock_text(contents, &raw_versions)
+						.map_err(|error| {
+							MonochangeError::Config(format!(
+								"failed to parse {}: {error}",
+								resolved_path.display()
+							))
+						})?;
 				}
 			}
 			(CachedDocument::Json(value), VersionedFileKind::Npm(kind)) => {
@@ -553,50 +574,44 @@ pub(crate) fn apply_versioned_file_definition(
 					);
 				}
 			}
-			(CachedDocument::Yaml(mapping), VersionedFileKind::Npm(kind)) => {
-				if kind == monochange_npm::NpmVersionedFileKind::PnpmLock {
-					monochange_npm::update_pnpm_lock(mapping, &raw_versions);
-				}
-			}
-			(CachedDocument::Bytes(contents), VersionedFileKind::Npm(kind)) => {
-				if kind == monochange_npm::NpmVersionedFileKind::BunLockBinary {
-					let old_versions = dep_names
-						.iter()
-						.filter_map(|name| {
-							context.package_by_record_id.values().find_map(|package| {
-								(package.name == *name)
-									.then_some(
-										package
-											.current_version
-											.as_ref()
-											.map(|version| (name.clone(), version.to_string())),
-									)
-									.flatten()
-							})
+			(
+				CachedDocument::Bytes(contents),
+				VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::BunLockBinary),
+			) => {
+				let old_versions = dep_names
+					.iter()
+					.filter_map(|name| {
+						context.package_by_record_id.values().find_map(|package| {
+							(package.name == *name)
+								.then_some(
+									package
+										.current_version
+										.as_ref()
+										.map(|version| (name.clone(), version.to_string())),
+								)
+								.flatten()
 						})
-						.collect::<BTreeMap<_, _>>();
-					*contents = monochange_npm::update_bun_lock_binary(
-						contents,
-						&old_versions,
-						&raw_versions,
-					);
-				}
+					})
+					.collect::<BTreeMap<_, _>>();
+				*contents =
+					monochange_npm::update_bun_lock_binary(contents, &old_versions, &raw_versions);
 			}
-			(CachedDocument::Text(contents), VersionedFileKind::Deno(kind)) => {
-				if kind == monochange_deno::DenoVersionedFileKind::Manifest {
-					*contents = monochange_core::update_json_manifest_text(
-						contents,
-						None,
-						&fields,
-						&versioned_deps,
-					)
-					.map_err(|error| {
-						MonochangeError::Config(format!(
-							"failed to parse {}: {error}",
-							resolved_path.display()
-						))
-					})?;
-				}
+			(
+				CachedDocument::Text(contents),
+				VersionedFileKind::Deno(monochange_deno::DenoVersionedFileKind::Manifest),
+			) => {
+				*contents = monochange_core::update_json_manifest_text(
+					contents,
+					None,
+					&fields,
+					&versioned_deps,
+				)
+				.map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to parse {}: {error}",
+						resolved_path.display()
+					))
+				})?;
 			}
 			(CachedDocument::Json(value), VersionedFileKind::Deno(kind)) => {
 				if kind == monochange_deno::DenoVersionedFileKind::Lock {

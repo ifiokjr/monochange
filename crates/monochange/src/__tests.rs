@@ -4424,7 +4424,10 @@ fn read_cached_document_parses_supported_document_formats() {
 		monochange_core::EcosystemType::Npm,
 	)
 	.unwrap_or_else(|error| panic!("pnpm lock: {error}"));
-	assert!(matches!(npm_yaml, crate::CachedDocument::Yaml(_)));
+	assert!(matches!(
+		npm_yaml,
+		crate::CachedDocument::Text(contents) if contents.contains("lockfileVersion")
+	));
 
 	let bun_text = crate::read_cached_document(
 		&mut BTreeMap::new(),
@@ -5055,8 +5058,35 @@ fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_update
 		"error: {error}"
 	);
 
-	let cached_dart_tempdir = tempfile::tempdir()
-		.unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let pnpm_tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let pnpm_path = pnpm_tempdir.path().join("pnpm-lock.yaml");
+	fs::write(&pnpm_path, "lockfileVersion: '9.0'\n")
+		.unwrap_or_else(|error| panic!("write cached pnpm lock path: {error}"));
+	let pnpm_definition = monochange_core::VersionedFileDefinition {
+		path: "pnpm-lock.yaml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Npm,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		pnpm_tempdir.path(),
+		&mut BTreeMap::from([(pnpm_path, crate::CachedDocument::Text(": bad".to_string()))]),
+		&pnpm_definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cached pnpm parse error"));
+	assert!(
+		error.to_string().contains("failed to parse"),
+		"error: {error}"
+	);
+
+	let cached_dart_tempdir =
+		tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let path = cached_dart_tempdir.path().join("pubspec.yaml");
 	fs::write(&path, "name: app\nversion: 1.0.0\n")
 		.unwrap_or_else(|error| panic!("write cached dart manifest path: {error}"));
@@ -5369,6 +5399,87 @@ extra = { path = "crates/extra", version = "1.0.0" }
 }
 
 #[test]
+fn apply_versioned_file_definition_updates_bun_lockb_and_deno_text_variants() {
+	let configuration = versioned_test_configuration();
+
+	let bun_tempdir = setup_fixture("monochange/bun-lock-release");
+	let bun_package = monochange_core::PackageRecord::new(
+		Ecosystem::Npm,
+		"app",
+		bun_tempdir.path().join("packages/app/package.json"),
+		bun_tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let bun_context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("app".to_string(), "2.0.0".to_string())]),
+		std::slice::from_ref(&bun_package),
+	);
+	let bun_definition = monochange_core::VersionedFileDefinition {
+		path: "packages/app/bun.lockb".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Npm,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let bun_path = bun_tempdir.path().join("packages/app/bun.lockb");
+	let original_bun =
+		fs::read(&bun_path).unwrap_or_else(|error| panic!("read bun lockb: {error}"));
+	let mut bun_updates = BTreeMap::new();
+	crate::apply_versioned_file_definition(
+		bun_tempdir.path(),
+		&mut bun_updates,
+		&bun_definition,
+		"2.0.0",
+		None,
+		&["app".to_string()],
+		&bun_context,
+	)
+	.unwrap_or_else(|error| panic!("bun lockb update: {error}"));
+	let bun_document = bun_updates
+		.remove(&bun_path)
+		.unwrap_or_else(|| panic!("expected bun lockb update"));
+	assert!(matches!(
+		bun_document,
+		crate::CachedDocument::Bytes(contents) if !contents.is_empty() && contents != original_bun
+	));
+
+	let deno_tempdir = setup_fixture("versioned-file-updates/deno-manifest");
+	let deno_context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
+	let deno_definition = monochange_core::VersionedFileDefinition {
+		path: "deno.json".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Deno,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let mut deno_updates = BTreeMap::new();
+	crate::apply_versioned_file_definition(
+		deno_tempdir.path(),
+		&mut deno_updates,
+		&deno_definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&deno_context,
+	)
+	.unwrap_or_else(|error| panic!("deno manifest text update: {error}"));
+	let deno_document = deno_updates
+		.remove(&deno_tempdir.path().join("deno.json"))
+		.unwrap_or_else(|| panic!("expected deno manifest text update"));
+	assert!(matches!(
+		deno_document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("\"core\": \"^2.0.0\"")
+	));
+}
+
+#[test]
 fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 	let configuration = versioned_test_configuration();
 
@@ -5487,17 +5598,9 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 		.unwrap_or_else(|| panic!("expected pnpm lock update"));
 	assert!(matches!(
 		pnpm_document,
-		crate::CachedDocument::Yaml(mapping)
-			if mapping
-				.get(serde_yaml_ng::Value::String("importers".to_string()))
-				.and_then(serde_yaml_ng::Value::as_mapping)
-				.and_then(|importers| importers.get(serde_yaml_ng::Value::String(".".to_string())))
-				.and_then(serde_yaml_ng::Value::as_mapping)
-				.and_then(|entry| entry.get(serde_yaml_ng::Value::String("dependencies".to_string())))
-				.and_then(serde_yaml_ng::Value::as_mapping)
-				.and_then(|deps| deps.get(serde_yaml_ng::Value::String("core".to_string())))
-				.and_then(serde_yaml_ng::Value::as_str)
-				== Some("2.0.0")
+		crate::CachedDocument::Text(contents)
+			if contents.contains("core: 2.0.0")
+				&& contents.contains("lockfileVersion: '9.0'")
 	));
 
 	let bun_tempdir = setup_fixture("npm/bun-text-lock");
