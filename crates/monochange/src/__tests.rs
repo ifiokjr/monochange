@@ -11,6 +11,8 @@ use httpmock::MockServer;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangesetTargetKind;
+use monochange_core::CliInputDefinition;
+use monochange_core::CliInputKind;
 use monochange_core::Ecosystem;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PreparedChangesetTarget;
@@ -22,7 +24,10 @@ use tempfile::tempdir;
 #[path = "../../../testing/test_support/fs.rs"]
 mod shared_fs_test_support;
 use shared_fs_test_support::copy_directory;
+use shared_fs_test_support::current_test_name;
 use shared_fs_test_support::fixture_path;
+use shared_fs_test_support::setup_fixture;
+use shared_fs_test_support::setup_scenario_workspace;
 
 use crate::add_change_file;
 use crate::add_interactive_change_file;
@@ -43,6 +48,43 @@ where
 	I: IntoIterator<Item = OsString>,
 {
 	run_with_args_in_dir("mc", args, root)
+}
+
+#[test]
+fn shared_fs_test_support_current_test_name_covers_plain_and_case_prefixes() {
+	assert_eq!(
+		current_test_name(),
+		"shared_fs_test_support_current_test_name_covers_plain_and_case_prefixes"
+	);
+	let named = std::thread::Builder::new()
+		.name("case_1_current_test_name_thread".to_string())
+		.spawn(current_test_name)
+		.unwrap_or_else(|error| panic!("spawn thread: {error}"))
+		.join()
+		.unwrap_or_else(|error| panic!("join thread: {error:?}"));
+	assert_eq!(named, "current_test_name_thread");
+}
+
+#[test]
+fn shared_fs_test_support_setup_fixture_copies_fixture_files() {
+	let tempdir = setup_fixture("test-support/setup-fixture");
+	assert_eq!(
+		fs::read_to_string(tempdir.path().join("nested/child.txt"))
+			.unwrap_or_else(|error| panic!("read nested fixture: {error}")),
+		"nested child\n"
+	);
+}
+
+#[test]
+fn shared_fs_test_support_setup_scenario_workspace_prefers_workspace_and_skips_expected() {
+	let tempdir = setup_scenario_workspace("test-support/scenario-workspace");
+	assert_eq!(
+		fs::read_to_string(tempdir.path().join("workspace-only.txt"))
+			.unwrap_or_else(|error| panic!("read workspace fixture: {error}")),
+		"workspace marker\n"
+	);
+	assert!(!tempdir.path().join("scenario-root-only.txt").exists());
+	assert!(!tempdir.path().join("expected").exists());
 }
 
 #[test]
@@ -4344,6 +4386,239 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 			"security".to_string(),
 			"test".to_string()
 		]
+	);
+}
+
+#[test]
+fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
+	let configuration = monochange_core::WorkspaceConfiguration {
+		root_path: PathBuf::from("."),
+		defaults: monochange_core::WorkspaceDefaults::default(),
+		release_notes: monochange_core::ReleaseNotesSettings::default(),
+		packages: vec![monochange_core::PackageDefinition {
+			id: "core".to_string(),
+			path: PathBuf::from("crates/core"),
+			package_type: monochange_core::PackageType::Cargo,
+			changelog: None,
+			extra_changelog_sections: vec![monochange_core::ExtraChangelogSection {
+				name: "Docs".to_string(),
+				types: vec!["docs".to_string(), "test".to_string()],
+				default_bump: None,
+			}],
+			empty_update_message: None,
+			release_title: None,
+			changelog_version_title: None,
+			versioned_files: Vec::new(),
+			ignore_ecosystem_versioned_files: false,
+			ignored_paths: Vec::new(),
+			additional_paths: Vec::new(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+		}],
+		groups: Vec::new(),
+		cli: Vec::new(),
+		changesets: monochange_core::ChangesetSettings::default(),
+		source: None,
+		cargo: monochange_core::EcosystemSettings::default(),
+		npm: monochange_core::EcosystemSettings::default(),
+		deno: monochange_core::EcosystemSettings::default(),
+		dart: monochange_core::EcosystemSettings::default(),
+	};
+	let mut cli = vec![
+		monochange_core::CliCommandDefinition {
+			name: "change".to_string(),
+			help_text: Some("Create a change".to_string()),
+			inputs: vec![CliInputDefinition {
+				name: "type".to_string(),
+				kind: CliInputKind::String,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: Vec::new(),
+				short: None,
+			}],
+			steps: Vec::new(),
+		},
+		monochange_core::CliCommandDefinition {
+			name: "change-with-existing-choices".to_string(),
+			help_text: None,
+			inputs: vec![CliInputDefinition {
+				name: "type".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: vec!["existing".to_string()],
+				short: None,
+			}],
+			steps: Vec::new(),
+		},
+	];
+
+	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
+
+	assert_eq!(cli[0].inputs[0].kind, CliInputKind::Choice);
+	assert_eq!(cli[0].inputs[0].choices, vec!["docs", "test"]);
+	assert_eq!(cli[1].inputs[0].choices, vec!["existing"]);
+}
+
+#[test]
+fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
+	let cli = crate::cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
+	assert_eq!(
+		cli.iter().map(|command| command.name.as_str()).collect::<Vec<_>>(),
+		vec!["release"]
+	);
+}
+
+#[test]
+fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
+	let cases = [
+		("change", "Prefer configured package ids"),
+		("release", "Direct package changes propagate to dependents"),
+		("commit-release", "Embeds a durable release record block"),
+		("affected", "Group-owned changesets cover all members"),
+		("diagnostics", "linked review request"),
+		("repair-release", "Defaults to descendant-only retargets"),
+	];
+	for (name, expected) in cases {
+		let after_help = crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
+			name: name.to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: Vec::new(),
+		})
+		.unwrap_or_else(|| panic!("expected after_help for {name}"));
+		assert!(after_help.contains(expected));
+	}
+	assert!(crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
+		name: "custom".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+	})
+	.is_none());
+}
+
+#[test]
+fn build_cli_command_subcommand_parses_supported_input_kinds() {
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "custom".to_string(),
+		help_text: Some("Run a custom command".to_string()),
+		inputs: vec![
+			CliInputDefinition {
+				name: "package".to_string(),
+				kind: CliInputKind::String,
+				help_text: Some("Target package".to_string()),
+				required: true,
+				default: None,
+				choices: Vec::new(),
+				short: Some('p'),
+			},
+			CliInputDefinition {
+				name: "changed_paths".to_string(),
+				kind: CliInputKind::StringList,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: Vec::new(),
+				short: None,
+			},
+			CliInputDefinition {
+				name: "output".to_string(),
+				kind: CliInputKind::Path,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: Vec::new(),
+				short: None,
+			},
+			CliInputDefinition {
+				name: "enabled".to_string(),
+				kind: CliInputKind::Boolean,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: Vec::new(),
+				short: None,
+			},
+			CliInputDefinition {
+				name: "sync_provider".to_string(),
+				kind: CliInputKind::Boolean,
+				help_text: None,
+				required: false,
+				default: Some("true".to_string()),
+				choices: Vec::new(),
+				short: None,
+			},
+			CliInputDefinition {
+				name: "type".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: None,
+				required: false,
+				default: Some("docs".to_string()),
+				choices: vec!["docs".to_string(), "test".to_string()],
+				short: None,
+			},
+		],
+		steps: Vec::new(),
+	};
+
+	let command = clap::Command::new("mc").subcommand(crate::build_cli_command_subcommand(
+		&cli_command,
+	));
+	let matches = command
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("custom"),
+			OsString::from("-p"),
+			OsString::from("core"),
+			OsString::from("--changed-paths"),
+			OsString::from("crates/core/src/lib.rs"),
+			OsString::from("--changed-paths"),
+			OsString::from("Cargo.toml"),
+			OsString::from("--output"),
+			OsString::from("out.json"),
+			OsString::from("--enabled"),
+			OsString::from("--sync-provider=false"),
+		])
+		.unwrap_or_else(|error| panic!("matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected subcommand matches"));
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("package")
+			.map(String::as_str),
+		Some("core")
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_many::<String>("changed_paths")
+			.unwrap_or_else(|| panic!("expected changed_paths"))
+			.map(String::as_str)
+			.collect::<Vec<_>>(),
+		vec!["crates/core/src/lib.rs", "Cargo.toml"]
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("output")
+			.map(String::as_str),
+		Some("out.json")
+	);
+	assert!(subcommand_matches.get_flag("enabled"));
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("sync_provider")
+			.map(String::as_str),
+		Some("false")
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("type")
+			.map(String::as_str),
+		Some("docs")
 	);
 }
 
