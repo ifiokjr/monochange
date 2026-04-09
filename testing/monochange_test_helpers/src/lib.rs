@@ -1,9 +1,13 @@
 pub mod fs;
+pub mod git;
 pub mod insta;
 pub mod rmcp;
 
 pub use fs::copy_directory;
 pub use fs::current_test_name;
+pub use git::git;
+pub use git::git_output;
+pub use git::git_output_trimmed;
 pub use insta::snapshot_settings;
 pub use rmcp::content_text;
 
