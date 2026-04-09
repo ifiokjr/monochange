@@ -2788,6 +2788,122 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 }
 
 #[test]
+fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	fs::OpenOptions::new()
+		.append(true)
+		.open(tempdir.path().join("monochange.toml"))
+		.and_then(|mut file| {
+			use std::io::Write;
+			writeln!(file, "\n[source]\nprovider = \"github\"\nowner = \"ifiokjr\"\nrepo = \"monochange\"\n")
+		})
+		.unwrap_or_else(|error| panic!("append source config: {error}"));
+	let root = tempdir.path();
+	let configuration = load_workspace_configuration(root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+	let manifest_path = root.join("target/release-manifest.json");
+	let render_manifest = monochange_core::CliCommandDefinition {
+		name: "release-manifest".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				path: Some(PathBuf::from("target/release-manifest.json")),
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+	let render_output = crate::execute_cli_command(
+		root,
+		&configuration,
+		&render_manifest,
+		true,
+		BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("render manifest: {error}"));
+	assert!(render_output.contains("release manifest: target/release-manifest.json"));
+	let manifest_contents = fs::read_to_string(&manifest_path)
+		.unwrap_or_else(|error| panic!("read manifest: {error}"));
+	assert!(manifest_contents.contains("\"releaseTargets\""));
+
+	let publish_release = monochange_core::CliCommandDefinition {
+		name: "publish-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::PublishRelease {
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+	let publish_output = crate::execute_cli_command(
+		root,
+		&configuration,
+		&publish_release,
+		true,
+		BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("publish release: {error}"));
+	assert!(publish_output.contains("releases:"));
+	assert!(publish_output.contains("dry-run"));
+
+	let release_request = monochange_core::CliCommandDefinition {
+		name: "release-pr".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+	let request_output = crate::execute_cli_command(
+		root,
+		&configuration,
+		&release_request,
+		true,
+		BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("open release request: {error}"));
+	assert!(request_output.contains("release request:"));
+	assert!(request_output.contains("dry-run"));
+
+	let issue_comments = monochange_core::CliCommandDefinition {
+		name: "release-comments".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+	let comments_output = crate::execute_cli_command(
+		root,
+		&configuration,
+		&issue_comments,
+		true,
+		BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("comment released issues: {error}"));
+	assert!(!comments_output.is_empty());
+}
+
+#[test]
 fn execute_matches_rejects_unknown_cli_command_names() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
