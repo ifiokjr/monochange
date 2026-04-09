@@ -1,5 +1,8 @@
 ---
 monochange: patch
+monochange_gitea: patch
+monochange_github: patch
+monochange_gitlab: patch
 ---
 
 #### add devenv-managed git hooks for local validation
