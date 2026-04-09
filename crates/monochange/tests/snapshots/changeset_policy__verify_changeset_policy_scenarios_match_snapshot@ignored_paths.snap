@@ -1,0 +1,25 @@
+---
+source: crates/monochange/tests/changeset_policy.rs
+expression: json
+---
+{
+  "affectedPackageIds": [],
+  "changedPaths": [
+    "crates/core/tests/smoke.rs"
+  ],
+  "changesetPaths": [],
+  "comment": null,
+  "coveredPackageIds": [],
+  "enforce": false,
+  "errors": [],
+  "ignoredPaths": [
+    "crates/core/tests/smoke.rs"
+  ],
+  "labels": [],
+  "matchedPaths": [],
+  "matchedSkipLabels": [],
+  "required": false,
+  "status": "not_required",
+  "summary": "changeset verification passed: no configured packages were affected by the changed files",
+  "uncoveredPackageIds": []
+}

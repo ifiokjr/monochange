@@ -1,3 +1,7 @@
+---
+source: crates/monochange/tests/github_releases.rs
+expression: json
+---
 {
   "issueComments": [],
   "manifest": {
@@ -20,12 +24,12 @@
             }
           ],
           "summary": [],
-          "title": "app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-06)"
+          "title": "app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])"
         },
         "ownerId": "app",
         "ownerKind": "package",
         "path": "crates/app/CHANGELOG.md",
-        "rendered": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-06)\n\n### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
+        "rendered": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])\n\n### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
       },
       {
         "format": "monochange",
@@ -39,12 +43,12 @@
             }
           ],
           "summary": [],
-          "title": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)"
+          "title": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])"
         },
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)\n\n### Features\n\n- add feature"
+        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Features\n\n- add feature"
       }
     ],
     "changesets": [
@@ -123,8 +127,8 @@
           "app"
         ],
         "release": true,
-        "renderedChangelogTitle": "app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-06)",
-        "renderedTitle": "app 1.0.1 (2026-04-06)",
+        "renderedChangelogTitle": "app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])",
+        "renderedTitle": "app 1.0.1 ([DATE])",
         "tag": false,
         "tagName": "app/v1.0.1",
         "version": "1.0.1",
@@ -137,8 +141,8 @@
           "core"
         ],
         "release": true,
-        "renderedChangelogTitle": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)",
-        "renderedTitle": "core 1.1.0 (2026-04-06)",
+        "renderedChangelogTitle": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])",
+        "renderedTitle": "core 1.1.0 ([DATE])",
         "tag": true,
         "tagName": "core/v1.1.0",
         "version": "1.1.0",
@@ -155,10 +159,10 @@
   "releaseRequest": null,
   "releases": [
     {
-      "body": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-06)\n\n### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.",
+      "body": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])\n\n### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.",
       "draft": true,
       "generateReleaseNotes": false,
-      "name": "app 1.0.1 (2026-04-06)",
+      "name": "app 1.0.1 ([DATE])",
       "owner": "ifiokjr",
       "prerelease": true,
       "provider": "github",
@@ -169,10 +173,10 @@
       "targetKind": "package"
     },
     {
-      "body": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)\n\n### Features\n\n- add feature",
+      "body": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Features\n\n- add feature",
       "draft": true,
       "generateReleaseNotes": false,
-      "name": "core 1.1.0 (2026-04-06)",
+      "name": "core 1.1.0 ([DATE])",
       "owner": "ifiokjr",
       "prerelease": true,
       "provider": "github",
