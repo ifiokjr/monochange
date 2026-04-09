@@ -1,0 +1,19 @@
+{
+  "status": "not_required",
+  "required": false,
+  "enforce": false,
+  "summary": "changeset verification passed: no configured packages were affected by the changed files",
+  "comment": null,
+  "labels": [],
+  "matchedSkipLabels": [],
+  "changedPaths": [
+    "docs/readme.md"
+  ],
+  "matchedPaths": [],
+  "ignoredPaths": [],
+  "changesetPaths": [],
+  "affectedPackageIds": [],
+  "coveredPackageIds": [],
+  "uncoveredPackageIds": [],
+  "errors": []
+}

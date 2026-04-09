@@ -1,0 +1,176 @@
+{
+  "issueComments": [],
+  "manifest": {
+    "changedFiles": [
+      "crates/app/CHANGELOG.md",
+      "crates/app/Cargo.toml",
+      "crates/core/CHANGELOG.md",
+      "crates/core/Cargo.toml"
+    ],
+    "changelogs": [
+      {
+        "format": "monochange",
+        "notes": {
+          "sections": [
+            {
+              "entries": [
+                "- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
+              ],
+              "title": "Fixes"
+            }
+          ],
+          "summary": [],
+          "title": "app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-06)"
+        },
+        "ownerId": "app",
+        "ownerKind": "package",
+        "path": "crates/app/CHANGELOG.md",
+        "rendered": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-06)\n\n### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
+      },
+      {
+        "format": "monochange",
+        "notes": {
+          "sections": [
+            {
+              "entries": [
+                "- add feature"
+              ],
+              "title": "Features"
+            }
+          ],
+          "summary": [],
+          "title": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)"
+        },
+        "ownerId": "core",
+        "ownerKind": "package",
+        "path": "crates/core/CHANGELOG.md",
+        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)\n\n### Features\n\n- add feature"
+      }
+    ],
+    "changesets": [
+      {
+        "context": {
+          "capabilities": {
+            "actorProfiles": true,
+            "commitWebUrls": true,
+            "issueComments": true,
+            "relatedIssues": true,
+            "reviewRequestLookup": true
+          },
+          "host": "github.com",
+          "introduced": null,
+          "lastUpdated": null,
+          "provider": "git_hub",
+          "relatedIssues": []
+        },
+        "details": null,
+        "path": ".changeset/feature.md",
+        "summary": "add feature",
+        "targets": [
+          {
+            "bump": "minor",
+            "changeType": null,
+            "evidenceRefs": [],
+            "id": "core",
+            "kind": "package",
+            "origin": "direct-change"
+          }
+        ]
+      }
+    ],
+    "command": "release-pr",
+    "deletedChangesets": [],
+    "dryRun": true,
+    "groupVersion": null,
+    "plan": {
+      "compatibilityEvidence": [],
+      "decisions": [
+        {
+          "bump": "patch",
+          "package": "cargo:crates/app/Cargo.toml",
+          "plannedVersion": "1.0.1",
+          "reasons": [
+            "depends on `cargo:crates/core/Cargo.toml`"
+          ],
+          "trigger": "transitive-dependency",
+          "upstreamSources": [
+            "cargo:crates/core/Cargo.toml"
+          ]
+        },
+        {
+          "bump": "minor",
+          "package": "cargo:crates/core/Cargo.toml",
+          "plannedVersion": "1.1.0",
+          "reasons": [
+            "add feature"
+          ],
+          "trigger": "direct-change",
+          "upstreamSources": [
+            "cargo:crates/core/Cargo.toml"
+          ]
+        }
+      ],
+      "groups": [],
+      "unresolvedItems": [],
+      "warnings": [],
+      "workspaceRoot": "."
+    },
+    "releaseTargets": [
+      {
+        "id": "app",
+        "kind": "package",
+        "members": [
+          "app"
+        ],
+        "release": true,
+        "renderedChangelogTitle": "app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-06)",
+        "renderedTitle": "app 1.0.1 (2026-04-06)",
+        "tag": false,
+        "tagName": "app/v1.0.1",
+        "version": "1.0.1",
+        "versionFormat": "namespaced"
+      },
+      {
+        "id": "core",
+        "kind": "package",
+        "members": [
+          "core"
+        ],
+        "release": true,
+        "renderedChangelogTitle": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)",
+        "renderedTitle": "core 1.1.0 (2026-04-06)",
+        "tag": true,
+        "tagName": "core/v1.1.0",
+        "version": "1.1.0",
+        "versionFormat": "namespaced"
+      }
+    ],
+    "releasedPackages": [
+      "workflow-app",
+      "workflow-core"
+    ],
+    "version": null
+  },
+  "releaseCommit": null,
+  "releaseRequest": {
+    "autoMerge": true,
+    "baseBranch": "develop",
+    "body": "## Prepared release\n\n- command: `release-pr`\n- package `app` -> `app/v1.0.1`\n- package `core` -> `core/v1.1.0`\n\n## Release notes\n\n### app 1.0.1\n\n#### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.\n\n### core 1.1.0\n\n#### Features\n\n- add feature\n\n## Changed files\n\n- crates/app/CHANGELOG.md\n- crates/app/Cargo.toml\n- crates/core/CHANGELOG.md\n- crates/core/Cargo.toml",
+    "commitMessage": {
+      "body": "Prepare release.\n\n- release targets: app (1.0.1), core (1.1.0)\n- released packages: workflow-app, workflow-core\n- updated changelogs: crates/app/CHANGELOG.md, crates/core/CHANGELOG.md\n\n## MonoChange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{\n  \"schemaVersion\": 1,\n  \"kind\": \"monochange.releaseRecord\",\n  \"createdAt\": \"2026-04-06T00:00:00Z\",\n  \"command\": \"release-pr\",\n  \"version\": null,\n  \"groupVersion\": null,\n  \"releaseTargets\": [\n    {\n      \"id\": \"app\",\n      \"kind\": \"package\",\n      \"version\": \"1.0.1\",\n      \"versionFormat\": \"namespaced\",\n      \"tag\": false,\n      \"release\": true,\n      \"tagName\": \"app/v1.0.1\",\n      \"members\": [\n        \"app\"\n      ]\n    },\n    {\n      \"id\": \"core\",\n      \"kind\": \"package\",\n      \"version\": \"1.1.0\",\n      \"versionFormat\": \"namespaced\",\n      \"tag\": true,\n      \"release\": true,\n      \"tagName\": \"core/v1.1.0\",\n      \"members\": [\n        \"core\"\n      ]\n    }\n  ],\n  \"releasedPackages\": [\n    \"workflow-app\",\n    \"workflow-core\"\n  ],\n  \"changedFiles\": [\n    \"crates/app/CHANGELOG.md\",\n    \"crates/app/Cargo.toml\",\n    \"crates/core/CHANGELOG.md\",\n    \"crates/core/Cargo.toml\"\n  ],\n  \"updatedChangelogs\": [\n    \"crates/app/CHANGELOG.md\",\n    \"crates/core/CHANGELOG.md\"\n  ],\n  \"deletedChangesets\": [],\n  \"provider\": {\n    \"kind\": \"github\",\n    \"owner\": \"ifiokjr\",\n    \"repo\": \"monochange\",\n    \"host\": null\n  }\n}\n```\n<!-- monochange:release-record:end -->",
+      "subject": "chore(release): prepare release"
+    },
+    "headBranch": "automation/release/release-pr",
+    "labels": [
+      "release",
+      "automated",
+      "preview"
+    ],
+    "owner": "ifiokjr",
+    "provider": "github",
+    "repo": "monochange",
+    "repository": "ifiokjr/monochange",
+    "title": "chore(release): prepare release"
+  },
+  "releases": []
+}

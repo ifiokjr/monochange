@@ -1,0 +1,104 @@
+{
+  "command": "release-comments",
+  "dryRun": true,
+  "version": "1.1.0",
+  "groupVersion": null,
+  "releaseTargets": [
+    {
+      "id": "core",
+      "kind": "package",
+      "version": "1.1.0",
+      "tag": true,
+      "release": true,
+      "versionFormat": "namespaced",
+      "tagName": "core/v1.1.0",
+      "members": [
+        "core"
+      ],
+      "renderedTitle": "core 1.1.0 (2026-04-06)",
+      "renderedChangelogTitle": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)"
+    }
+  ],
+  "releasedPackages": [
+    "workflow-core"
+  ],
+  "changedFiles": [
+    "Cargo.toml",
+    "crates/core/CHANGELOG.md",
+    "crates/core/Cargo.toml"
+  ],
+  "changelogs": [
+    {
+      "ownerId": "core",
+      "ownerKind": "package",
+      "path": "crates/core/CHANGELOG.md",
+      "format": "monochange",
+      "notes": {
+        "title": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)",
+        "summary": [],
+        "sections": [
+          {
+            "title": "Features",
+            "entries": [
+              "- add github fixture coverage"
+            ]
+          }
+        ]
+      },
+      "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-06)\n\n### Features\n\n- add github fixture coverage"
+    }
+  ],
+  "changesets": [
+    {
+      "path": ".changeset/feature.md",
+      "summary": "add github fixture coverage",
+      "details": null,
+      "targets": [
+        {
+          "id": "core",
+          "kind": "package",
+          "bump": "minor",
+          "origin": "direct-change",
+          "evidenceRefs": [],
+          "changeType": null
+        }
+      ],
+      "context": {
+        "provider": "git_hub",
+        "host": "github.com",
+        "capabilities": {
+          "commitWebUrls": true,
+          "actorProfiles": true,
+          "reviewRequestLookup": true,
+          "relatedIssues": true,
+          "issueComments": true
+        },
+        "introduced": null,
+        "lastUpdated": null,
+        "relatedIssues": []
+      }
+    }
+  ],
+  "deletedChangesets": [],
+  "plan": {
+    "workspaceRoot": ".",
+    "decisions": [
+      {
+        "package": "cargo:crates/core/Cargo.toml",
+        "bump": "minor",
+        "trigger": "direct-change",
+        "plannedVersion": "1.1.0",
+        "reasons": [
+          "add github fixture coverage"
+        ],
+        "upstreamSources": [
+          "cargo:crates/core/Cargo.toml"
+        ]
+      }
+    ],
+    "groups": [],
+    "warnings": [],
+    "unresolvedItems": [],
+    "compatibilityEvidence": []
+  }
+}
