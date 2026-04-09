@@ -501,6 +501,20 @@ fn change_command_sources_type_choices_from_workspace_configuration() {
 }
 
 #[test]
+fn build_command_for_root_falls_back_to_default_cli_when_config_load_fails() {
+	let root = fixture_path("config/rejects-unknown-template-vars");
+	let matches = build_command_for_root("mc", &root)
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("repair-release"),
+			OsString::from("--from"),
+			OsString::from("v1.2.3"),
+		])
+		.unwrap_or_else(|error| panic!("matches: {error}"));
+	assert_eq!(matches.subcommand_name(), Some("repair-release"));
+}
+
+#[test]
 fn collect_cli_command_inputs_omits_default_bump_for_type_only_changes() {
 	let root = fixture_path("changeset-target-metadata/cli-type-only-change");
 	let command = build_command_for_root("mc", &root);
@@ -3671,6 +3685,37 @@ fn first_parent_commits_returns_head_then_ancestors() {
 	assert_eq!(commits.len(), 2);
 }
 
+#[test]
+fn git_head_commit_and_read_commit_message_roundtrip() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join("release.txt"), "hello\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "subject line", "-m", "body line"]);
+
+	let head = crate::git_head_commit(root).unwrap_or_else(|error| panic!("head commit: {error}"));
+	let message = crate::read_git_commit_message(root, &head)
+		.unwrap_or_else(|error| panic!("read commit message: {error}"));
+	assert!(message.contains("subject line"));
+	assert!(message.contains("body line"));
+}
+
+#[test]
+fn run_git_status_reports_nonzero_exit_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	init_git_repo(tempdir.path());
+	let error = crate::run_git_status(
+		tempdir.path(),
+		&["definitely-not-a-real-git-command"],
+		"git status failure",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected git status failure"));
+	assert!(error.to_string().contains("git status failure"));
+}
+
 fn sample_retarget_release_report() -> crate::RetargetReleaseReport {
 	crate::RetargetReleaseReport {
 		from: "v1.2.3".to_string(),
@@ -4079,6 +4124,23 @@ fn run_assist_renders_json_and_text_outputs() {
 	assert!(text_output.contains("monochange assist"));
 	assert!(text_output.contains("Notes for GitHub Copilot:"));
 	assert!(text_output.contains("Suggested repo-local guidance:"));
+}
+
+#[test]
+fn render_release_record_discovery_supports_text_and_json_formats() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	write_blank_monochange_config(root);
+	create_release_record_history(root);
+	let text = crate::render_release_record_discovery(root, "HEAD", crate::OutputFormat::Text)
+		.unwrap_or_else(|error| panic!("release-record text: {error}"));
+	assert!(text.contains("release record:"));
+	assert!(text.contains("input ref: HEAD"));
+	let json = crate::render_release_record_discovery(root, "HEAD", crate::OutputFormat::Json)
+		.unwrap_or_else(|error| panic!("release-record json: {error}"));
+	assert!(json.contains("\"record\""));
+	assert!(json.contains("\"resolvedCommit\""));
+	assert!(json.contains("\"inputRef\": "));
 }
 
 #[test]
