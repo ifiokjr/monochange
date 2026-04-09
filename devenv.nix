@@ -47,6 +47,7 @@ in
     hooks = {
       "secrets:commit" = {
         enable = true;
+        verbose = true;
         pass_filenames = true;
         name = "secrets";
         description = "Scan staged changes for leaked secrets with gitleaks.";
@@ -65,6 +66,7 @@ in
       };
       "secrets:push" = {
         enable = true;
+        verbose = true;
         pass_filenames = false;
         name = "secrets";
         description = "Scan repository history for leaked secrets with gitleaks before push.";
@@ -85,7 +87,6 @@ in
         enable = true;
         verbose = true;
         pass_filenames = false;
-        after = [ "lint" ];
         name = "test";
         description = "Run the local CI validation suite before push.";
         entry = "${config.env.DEVENV_PROFILE}/bin/test:all";
