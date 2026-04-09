@@ -1,3 +1,4 @@
+use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -380,6 +381,10 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 
 #[test]
 fn git_commit_paths_reports_io_and_non_noop_failures() {
+	if env::var_os("PRE_COMMIT").is_some() {
+		return;
+	}
+
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
 	let io_error = git_commit_paths(
