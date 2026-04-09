@@ -355,15 +355,24 @@ mod __tests {
 
 	#[allow(dead_code)]
 	mod shared_fs_test_support {
-		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/fs.rs"));
+		include!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/../../testing/test_support/fs.rs"
+		));
 	}
 	#[allow(dead_code)]
 	mod shared_insta_test_support {
-		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/insta.rs"));
+		include!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/../../testing/test_support/insta.rs"
+		));
 	}
 	#[allow(dead_code)]
 	mod shared_rmcp_test_support {
-		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/rmcp.rs"));
+		include!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/../../testing/test_support/rmcp.rs"
+		));
 	}
 
 	use super::json_error_result;

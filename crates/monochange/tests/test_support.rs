@@ -78,12 +78,18 @@ mod tests {
 
 	#[test]
 	fn current_test_name_returns_plain_function_name() {
-		assert_eq!(current_test_name(), "current_test_name_returns_plain_function_name");
+		assert_eq!(
+			current_test_name(),
+			"current_test_name_returns_plain_function_name"
+		);
 	}
 
 	#[rstest]
 	fn case_1_strips_numeric_rstest_prefix_from_current_test_name() {
-		assert_eq!(current_test_name(), "strips_numeric_rstest_prefix_from_current_test_name");
+		assert_eq!(
+			current_test_name(),
+			"strips_numeric_rstest_prefix_from_current_test_name"
+		);
 	}
 
 	#[test]
