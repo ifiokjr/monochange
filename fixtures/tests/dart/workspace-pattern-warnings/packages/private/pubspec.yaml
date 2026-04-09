@@ -1,0 +1,4 @@
+name: warning_private
+publish_to: false
+flutter:
+  uses-material-design: true
