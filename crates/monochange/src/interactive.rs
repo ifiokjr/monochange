@@ -382,6 +382,11 @@ mod __tests {
 
 	use monochange_config::load_workspace_configuration;
 	use monochange_core::BumpSeverity;
+	use monochange_core::ChangesetSettings;
+	use monochange_core::EcosystemSettings;
+	use monochange_core::ReleaseNotesSettings;
+	use monochange_core::WorkspaceConfiguration;
+	use monochange_core::WorkspaceDefaults;
 
 	use super::build_selectable_targets;
 	use super::bump_options;
@@ -389,6 +394,8 @@ mod __tests {
 	use super::parse_change_type_selection;
 	use super::parse_selected_bump;
 	use super::prompt_change_type_for_target;
+	use super::run_interactive_change;
+	use super::InteractiveOptions;
 	use super::SelectableTarget;
 	use super::TargetKind;
 
@@ -406,6 +413,38 @@ mod __tests {
 			member_package_ids: BTreeSet::new(),
 			configured_types,
 		}
+	}
+
+	fn empty_configuration() -> WorkspaceConfiguration {
+		WorkspaceConfiguration {
+			root_path: std::path::PathBuf::from("."),
+			defaults: WorkspaceDefaults::default(),
+			release_notes: ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: ChangesetSettings::default(),
+			source: None,
+			cargo: EcosystemSettings::default(),
+			npm: EcosystemSettings::default(),
+			deno: EcosystemSettings::default(),
+			dart: EcosystemSettings::default(),
+		}
+	}
+
+	#[test]
+	fn selectable_target_display_uses_display_label() {
+		assert_eq!(package_target(Vec::new()).to_string(), "core");
+	}
+
+	#[test]
+	fn run_interactive_change_rejects_empty_workspace_configuration() {
+		let error = run_interactive_change(&empty_configuration(), &InteractiveOptions::default())
+			.err()
+			.unwrap_or_else(|| panic!("expected interactive error"));
+		assert!(error
+			.to_string()
+			.contains("no packages or groups found in workspace configuration"));
 	}
 
 	#[test]
