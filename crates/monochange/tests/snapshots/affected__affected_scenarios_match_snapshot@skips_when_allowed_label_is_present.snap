@@ -1,0 +1,33 @@
+---
+source: crates/monochange/tests/affected.rs
+expression: output
+---
+{
+  "affectedPackageIds": [
+    "core"
+  ],
+  "changedPaths": [
+    "crates/core/src/lib.rs"
+  ],
+  "changesetPaths": [],
+  "comment": null,
+  "coveredPackageIds": [],
+  "enforce": false,
+  "errors": [],
+  "ignoredPaths": [],
+  "labels": [
+    "no-changeset-required"
+  ],
+  "matchedPaths": [
+    "crates/core/src/lib.rs"
+  ],
+  "matchedSkipLabels": [
+    "no-changeset-required"
+  ],
+  "required": false,
+  "status": "skipped",
+  "summary": "changeset verification skipped because the change has an allowed label: no-changeset-required",
+  "uncoveredPackageIds": [
+    "core"
+  ]
+}

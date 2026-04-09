@@ -1,8 +1,26 @@
+use std::collections::BTreeMap;
 use std::path::Path;
+use std::path::PathBuf;
 
 use monochange_core::materialize_dependency_edges;
+use monochange_core::Ecosystem;
+use monochange_core::EcosystemAdapter;
+use monochange_core::PackageRecord;
+use monochange_core::PublishState;
+use semver::Version;
+use serde_json::json;
+use serde_yaml_ng::Value as YamlValue;
 
+use crate::adapter;
+use crate::discover_lockfiles;
 use crate::discover_npm_packages;
+use crate::supported_versioned_file_kind;
+use crate::update_bun_lock;
+use crate::update_bun_lock_binary;
+use crate::update_json_dependency_fields;
+use crate::update_package_lock;
+use crate::update_pnpm_lock;
+use crate::NpmVersionedFileKind;
 
 #[test]
 fn discovers_npm_workspace_packages() {
@@ -54,4 +72,197 @@ fn discovers_bun_workspace_packages() {
 		web_package.metadata.get("manager").map(String::as_str),
 		Some("bun")
 	);
+}
+
+#[test]
+fn adapter_reports_npm_ecosystem() {
+	assert_eq!(adapter().ecosystem(), Ecosystem::Npm);
+}
+
+#[test]
+fn supported_versioned_file_kind_recognizes_known_files() {
+	assert_eq!(
+		supported_versioned_file_kind(Path::new("package.json")),
+		Some(NpmVersionedFileKind::Manifest)
+	);
+	assert_eq!(
+		supported_versioned_file_kind(Path::new("package-lock.json")),
+		Some(NpmVersionedFileKind::PackageLock)
+	);
+	assert_eq!(
+		supported_versioned_file_kind(Path::new("pnpm-lock.yaml")),
+		Some(NpmVersionedFileKind::PnpmLock)
+	);
+	assert_eq!(
+		supported_versioned_file_kind(Path::new("bun.lock")),
+		Some(NpmVersionedFileKind::BunLock)
+	);
+	assert_eq!(
+		supported_versioned_file_kind(Path::new("bun.lockb")),
+		Some(NpmVersionedFileKind::BunLockBinary)
+	);
+	assert_eq!(supported_versioned_file_kind(Path::new("README.md")), None);
+}
+
+#[test]
+fn discover_lockfiles_prefers_workspace_root_then_manifest_directory() {
+	let fixture_root =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tests/npm/lockfile-workspace");
+	let package = PackageRecord::new(
+		Ecosystem::Npm,
+		"pnpm-web",
+		fixture_root.join("packages/web/package.json"),
+		fixture_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let lockfiles = discover_lockfiles(&package);
+	assert_eq!(lockfiles.len(), 1);
+	assert_eq!(
+		lockfiles.first(),
+		Some(&monochange_core::normalize_path(
+			&fixture_root.join("pnpm-lock.yaml")
+		))
+	);
+}
+
+#[test]
+fn update_json_dependency_fields_only_changes_declared_dependencies() {
+	let mut manifest = json!({
+		"dependencies": {
+			"core": "^1.0.0",
+			"left-pad": "1.3.0"
+		},
+		"devDependencies": {
+			"core": "^1.0.0"
+		}
+	});
+	let versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
+
+	update_json_dependency_fields(
+		&mut manifest,
+		&["dependencies", "devDependencies"],
+		&versions,
+	);
+
+	assert_eq!(
+		manifest.pointer("/dependencies/core"),
+		Some(&json!("2.0.0"))
+	);
+	assert_eq!(
+		manifest.pointer("/dependencies/left-pad"),
+		Some(&json!("1.3.0"))
+	);
+	assert_eq!(
+		manifest.pointer("/devDependencies/core"),
+		Some(&json!("2.0.0"))
+	);
+}
+
+#[test]
+fn update_package_lock_updates_root_packages_and_dependencies() {
+	let mut lock = json!({
+		"name": "app",
+		"version": "1.0.0",
+		"packages": {
+			"": {
+				"name": "app",
+				"version": "1.0.0"
+			},
+			"packages/core": {
+				"name": "core",
+				"version": "1.0.0"
+			},
+			"packages/util": {
+				"version": "1.0.0"
+			}
+		},
+		"dependencies": {
+			"core": {
+				"version": "1.0.0"
+			}
+		}
+	});
+	let package_paths = BTreeMap::from([
+		("util".to_string(), PathBuf::from("packages/util")),
+		("core".to_string(), PathBuf::from("packages/core")),
+	]);
+	let raw_versions = BTreeMap::from([
+		("app".to_string(), "2.0.0".to_string()),
+		("core".to_string(), "2.1.0".to_string()),
+		("util".to_string(), "3.0.0".to_string()),
+	]);
+
+	update_package_lock(&mut lock, &package_paths, &raw_versions);
+
+	assert_eq!(lock.pointer("/version"), Some(&json!("2.0.0")));
+	assert_eq!(lock.pointer("/packages//version"), Some(&json!("2.0.0")));
+	assert_eq!(
+		lock.pointer("/packages/packages~1core/version"),
+		Some(&json!("2.1.0"))
+	);
+	assert_eq!(
+		lock.pointer("/packages/packages~1util/version"),
+		Some(&json!("3.0.0"))
+	);
+	assert_eq!(
+		lock.pointer("/dependencies/core/version"),
+		Some(&json!("2.1.0"))
+	);
+}
+
+#[test]
+fn update_pnpm_lock_skips_link_and_workspace_dependencies() {
+	let mut lock: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
+		r"
+importers:
+  .:
+    dependencies:
+      core: 1.0.0
+      linked: link:../linked
+      workspace_dep: workspace:*
+packages:
+  core@1.0.0:
+    dependencies:
+      core: 1.0.0
+snapshots:
+  core@1.0.0:
+    dependencies:
+      core:
+        version: 1.0.0
+      linked:
+        version: link:../linked
+",
+	)
+	.unwrap_or_else(|error| panic!("pnpm lock yaml: {error}"));
+	let raw_versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
+
+	update_pnpm_lock(&mut lock, &raw_versions);
+
+	let rendered = serde_yaml_ng::to_string(&YamlValue::Mapping(lock))
+		.unwrap_or_else(|error| panic!("render pnpm lock: {error}"));
+	assert!(rendered.contains("core: 2.0.0"));
+	assert!(rendered.contains("linked: link:../linked"));
+	assert!(rendered.contains("workspace_dep: workspace:*"));
+}
+
+#[test]
+fn update_bun_lock_rewrites_matching_versions() {
+	let updated = update_bun_lock(
+		"{\n  \"core\": \"1.0.0\",\n  \"other\": \"0.1.0\"\n}",
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+	);
+	assert!(updated.contains("\"core\": \"2.0.0\""));
+	assert!(updated.contains("\"other\": \"0.1.0\""));
+}
+
+#[test]
+fn update_bun_lock_binary_rewrites_all_occurrences() {
+	let updated = update_bun_lock_binary(
+		b"core@1.0.0\0core@1.0.0\0",
+		&BTreeMap::from([("core".to_string(), "1.0.0".to_string())]),
+		&BTreeMap::from([("core".to_string(), "2.1.0".to_string())]),
+	);
+	let rendered = String::from_utf8(updated).unwrap_or_else(|error| panic!("utf8: {error}"));
+	assert_eq!(rendered.matches("2.1.0").count(), 2);
 }

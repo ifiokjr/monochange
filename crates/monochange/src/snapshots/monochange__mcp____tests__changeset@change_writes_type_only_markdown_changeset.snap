@@ -1,0 +1,9 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: contents
+---
+---
+core: docs
+---
+
+# document the migration

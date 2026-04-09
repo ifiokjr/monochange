@@ -1,0 +1,31 @@
+---
+source: crates/monochange/tests/affected.rs
+expression: output
+---
+{
+  "affectedPackageIds": [
+    "core"
+  ],
+  "changedPaths": [
+    "Cargo.lock"
+  ],
+  "changesetPaths": [],
+  "comment": "### MonoChange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `Cargo.lock`\n\nAffected packages:\n- `core`\n\nErrors:\n- changed packages are not covered by attached changesets: core\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`",
+  "coveredPackageIds": [],
+  "enforce": false,
+  "errors": [
+    "changed packages are not covered by attached changesets: core"
+  ],
+  "ignoredPaths": [],
+  "labels": [],
+  "matchedPaths": [
+    "Cargo.lock"
+  ],
+  "matchedSkipLabels": [],
+  "required": true,
+  "status": "failed",
+  "summary": "changeset verification failed: attached changesets do not cover 1 changed package",
+  "uncoveredPackageIds": [
+    "core"
+  ]
+}

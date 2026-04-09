@@ -3817,6 +3817,180 @@ fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::G
 	}
 }
 
+#[test]
+fn assistant_display_name_covers_all_variants() {
+	assert_eq!(
+		crate::assistant_display_name(crate::Assistant::Generic),
+		"Generic MCP client"
+	);
+	assert_eq!(
+		crate::assistant_display_name(crate::Assistant::Claude),
+		"Claude"
+	);
+	assert_eq!(
+		crate::assistant_display_name(crate::Assistant::Cursor),
+		"Cursor"
+	);
+	assert_eq!(
+		crate::assistant_display_name(crate::Assistant::Copilot),
+		"GitHub Copilot"
+	);
+	assert_eq!(crate::assistant_display_name(crate::Assistant::Pi), "Pi");
+}
+
+#[test]
+fn assistant_setup_payload_contains_mcp_config_and_guidance() {
+	let payload = crate::assistant_setup_payload(crate::Assistant::Pi);
+	assert_eq!(payload["assistant"].as_str(), Some("Pi"));
+	assert_eq!(
+		payload["mcp_config"]["mcpServers"]["monochange"]["command"],
+		"monochange"
+	);
+	assert!(payload["repo_guidance"]
+		.as_array()
+		.is_some_and(|items| items.len() >= 5));
+	assert!(payload["notes"]
+		.as_array()
+		.is_some_and(|items| items.iter().any(|item| item
+			.as_str()
+			.is_some_and(|text| text.contains("monochange mcp")))));
+}
+
+#[test]
+fn run_assist_renders_json_and_text_outputs() {
+	let json_output = crate::run_assist(crate::Assistant::Cursor, crate::AssistOutputFormat::Json)
+		.unwrap_or_else(|error| panic!("assist json: {error}"));
+	assert!(json_output.contains("\"assistant\": \"Cursor\""));
+	assert!(json_output.contains("\"mcp_config\""));
+
+	let text_output = crate::run_assist(crate::Assistant::Copilot, crate::AssistOutputFormat::Text)
+		.unwrap_or_else(|error| panic!("assist text: {error}"));
+	assert!(text_output.contains("monochange assist"));
+	assert!(text_output.contains("Notes for GitHub Copilot:"));
+	assert!(text_output.contains("Suggested repo-local guidance:"));
+}
+
+#[test]
+fn render_tag_name_and_provider_urls_follow_provider_conventions() {
+	let github = sample_github_source_configuration("https://api.github.com");
+	assert_eq!(
+		crate::render_tag_name("core", "1.2.3", VersionFormat::Primary),
+		"v1.2.3"
+	);
+	assert_eq!(
+		crate::render_tag_name("core", "1.2.3", VersionFormat::Namespaced),
+		"core/v1.2.3"
+	);
+	assert!(crate::tag_url_for_provider(&github, "v1.2.3").contains("/releases/tag/v1.2.3"));
+	assert!(crate::compare_url_for_provider(&github, "v1.2.2", "v1.2.3")
+		.contains("compare/v1.2.2...v1.2.3"));
+
+	let gitlab = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::GitLab,
+		host: Some("gitlab.example.com".to_string()),
+		api_url: None,
+		owner: "group".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	};
+	assert!(crate::tag_url_for_provider(&gitlab, "v1.2.3").contains("gitlab.example.com"));
+	assert!(crate::compare_url_for_provider(&gitlab, "v1.2.2", "v1.2.3").contains("/-/compare/"));
+}
+
+#[test]
+fn parse_tag_prefix_and_version_parses_primary_and_namespaced_tags() {
+	let primary = crate::parse_tag_prefix_and_version("v1.2.3")
+		.unwrap_or_else(|| panic!("expected primary tag"));
+	assert_eq!(primary.0, "v");
+	assert_eq!(primary.1, Version::new(1, 2, 3));
+
+	let namespaced = crate::parse_tag_prefix_and_version("core/v2.0.0")
+		.unwrap_or_else(|| panic!("expected namespaced tag"));
+	assert_eq!(namespaced.0, "core/v");
+	assert_eq!(namespaced.1, Version::new(2, 0, 0));
+	assert_eq!(crate::parse_tag_prefix_and_version("not-a-tag"), None);
+}
+
+#[test]
+fn resolve_release_datetime_honors_env_overrides() {
+	temp_env::with_var("MONOCHANGE_RELEASE_DATE", Some("2026-04-07"), || {
+		assert_eq!(
+			crate::resolve_release_datetime(),
+			chrono::NaiveDate::from_ymd_opt(2026, 4, 7)
+				.unwrap_or_else(|| panic!("valid date"))
+				.and_hms_opt(0, 0, 0)
+				.unwrap_or_else(|| panic!("valid time"))
+		);
+	});
+	temp_env::with_var(
+		"MONOCHANGE_RELEASE_DATE",
+		Some("2026-04-07T12:34:56"),
+		|| {
+			assert_eq!(
+				crate::resolve_release_datetime(),
+				chrono::NaiveDate::from_ymd_opt(2026, 4, 7)
+					.unwrap_or_else(|| panic!("valid date"))
+					.and_hms_opt(12, 34, 56)
+					.unwrap_or_else(|| panic!("valid time"))
+			);
+		},
+	);
+}
+
+#[test]
+fn default_change_path_sluggifies_first_package_reference() {
+	let path = crate::default_change_path(
+		Path::new("/workspace"),
+		&["cargo:crates/core/Cargo.toml".to_string()],
+	);
+	assert!(path.starts_with("/workspace/.changeset"));
+	assert!(path
+		.to_string_lossy()
+		.ends_with("-cargo-crates-core-cargo-toml.md"));
+}
+
+#[test]
+fn format_publish_state_and_source_operation_labels_are_stable() {
+	assert_eq!(
+		crate::format_publish_state(monochange_core::PublishState::Public),
+		"public"
+	);
+	assert_eq!(
+		crate::format_publish_state(monochange_core::PublishState::Private),
+		"private"
+	);
+	assert_eq!(
+		crate::format_publish_state(monochange_core::PublishState::Unpublished),
+		"unpublished"
+	);
+	assert_eq!(
+		crate::format_publish_state(monochange_core::PublishState::Excluded),
+		"excluded"
+	);
+	assert_eq!(
+		crate::format_source_operation(&monochange_core::SourceReleaseOperation::Created),
+		"created"
+	);
+	assert_eq!(
+		crate::format_source_operation(&monochange_core::SourceReleaseOperation::Updated),
+		"updated"
+	);
+	assert_eq!(
+		crate::format_change_request_operation(
+			&monochange_core::SourceChangeRequestOperation::Created
+		),
+		"created"
+	);
+	assert_eq!(
+		crate::format_change_request_operation(
+			&monochange_core::SourceChangeRequestOperation::Updated
+		),
+		"updated"
+	);
+}
+
 fn sample_planned_group() -> monochange_core::PlannedVersionGroup {
 	monochange_core::PlannedVersionGroup {
 		group_id: "sdk".to_string(),

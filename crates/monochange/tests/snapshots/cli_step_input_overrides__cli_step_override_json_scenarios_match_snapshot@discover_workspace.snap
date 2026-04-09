@@ -1,0 +1,48 @@
+---
+source: crates/monochange/tests/cli_step_input_overrides.rs
+expression: json
+---
+{
+  "dependencies": [
+    {
+      "direct": true,
+      "from": "cargo:crates/app/Cargo.toml",
+      "kind": "runtime",
+      "to": "cargo:crates/core/Cargo.toml"
+    }
+  ],
+  "packages": [
+    {
+      "ecosystem": "cargo",
+      "id": "cargo:crates/app/Cargo.toml",
+      "manifestPath": "crates/app/Cargo.toml",
+      "name": "workflow-app",
+      "publishState": "public",
+      "version": "1.0.0",
+      "versionGroup": "sdk",
+      "workspaceRoot": "."
+    },
+    {
+      "ecosystem": "cargo",
+      "id": "cargo:crates/core/Cargo.toml",
+      "manifestPath": "crates/core/Cargo.toml",
+      "name": "workflow-core",
+      "publishState": "public",
+      "version": "1.0.0",
+      "versionGroup": "sdk",
+      "workspaceRoot": "."
+    }
+  ],
+  "versionGroups": [
+    {
+      "id": "sdk",
+      "members": [
+        "cargo:crates/core/Cargo.toml",
+        "cargo:crates/app/Cargo.toml"
+      ],
+      "mismatchDetected": false
+    }
+  ],
+  "warnings": [],
+  "workspaceRoot": "."
+}
