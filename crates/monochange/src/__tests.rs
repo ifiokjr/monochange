@@ -2938,6 +2938,82 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 }
 
 #[test]
+fn execute_cli_command_publish_and_request_steps_require_source_configuration() {
+	let root = fixture_path("monochange/release-base");
+	let mut configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	configuration.source = None;
+
+	let cases = [
+		(
+			"publish-release",
+			monochange_core::CliStepDefinition::PublishRelease {
+				inputs: BTreeMap::new(),
+			},
+			"`PublishRelease` requires `[source]` configuration",
+		),
+		(
+			"release-pr",
+			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				inputs: BTreeMap::new(),
+			},
+			"`OpenReleaseRequest` requires `[source]` configuration",
+		),
+	];
+
+	for (name, step, expected) in cases {
+		let cli_command = monochange_core::CliCommandDefinition {
+			name: name.to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: vec![
+				monochange_core::CliStepDefinition::PrepareRelease {
+					inputs: BTreeMap::new(),
+				},
+				step,
+			],
+		};
+		let error = crate::execute_cli_command(
+			&root,
+			&configuration,
+			&cli_command,
+			true,
+			BTreeMap::new(),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing source error for {name}"));
+		assert!(error.to_string().contains(expected), "error: {error}");
+	}
+}
+
+#[test]
+fn execute_cli_command_change_step_requires_reason_input() {
+	let root = fixture_path("monochange/release-base");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "change".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::CreateChangeFile {
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let error = crate::execute_cli_command(
+		&root,
+		&configuration,
+		&cli_command,
+		true,
+		BTreeMap::from([("package".to_string(), vec!["core".to_string()])]),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing reason error"));
+	assert!(error
+		.to_string()
+		.contains("command `change` requires a `--reason` value"));
+}
+
+#[test]
 fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
