@@ -2,49 +2,31 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use insta_cmd::get_cargo_bin;
 use serde_json::Value;
-use tempfile::tempdir;
 
 mod test_support;
-use test_support::{copy_directory, fixture_path};
-
-fn cli() -> Command {
-	let mut command = Command::new(get_cargo_bin("mc"));
-	command.env("NO_COLOR", "1");
-	command
-}
+use test_support::{monochange_command, setup_scenario_workspace};
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_manifest_records_git_changeset_context_and_renders_context_templates() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = setup_scenario_workspace("changeset-context/base");
 	let root = tempdir.path();
-
-	let fixture_root = fixture_path("changeset-context/base");
-	copy_directory(&fixture_root, root);
 
 	run_git(root, &["init"]);
 	run_git(root, &["config", "user.name", "monochange Tests"]);
-	run_git(
-		root,
-		&["config", "user.email", "monochange-tests@example.com"],
-	);
+	run_git(root, &["config", "user.email", "monochange-tests@example.com"]);
 	run_git(root, &["add", "Cargo.toml", "crates", "monochange.toml"]);
 	run_git(root, &["commit", "-m", "chore: seed release fixture"]);
 	run_git(root, &["add", ".changeset/feature.md"]);
 	run_git(root, &["commit", "-m", "feat: add changeset"]);
 	let introduced_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
 
-	let updated_fixture = fixture_path("changeset-context/with-updated-changeset");
-	copy_directory(
-		&updated_fixture.join(".changeset"),
-		&root.join(".changeset"),
-	);
+	copy_updated_changeset(root);
 	run_git(root, &["add", ".changeset/feature.md"]);
 	run_git(root, &["commit", "-m", "docs: refine changeset details"]);
 	let updated_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
 
-	let output = cli()
+	let output = monochange_command(Some("2026-04-06"))
 		.current_dir(root)
 		.arg("release-manifest")
 		.arg("--dry-run")
@@ -87,34 +69,24 @@ fn release_manifest_records_git_changeset_context_and_renders_context_templates(
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = setup_scenario_workspace("changeset-context/base");
 	let root = tempdir.path();
-
-	let fixture_root = fixture_path("changeset-context/base");
-	copy_directory(&fixture_root, root);
 
 	run_git(root, &["init"]);
 	run_git(root, &["config", "user.name", "monochange Tests"]);
-	run_git(
-		root,
-		&["config", "user.email", "monochange-tests@example.com"],
-	);
+	run_git(root, &["config", "user.email", "monochange-tests@example.com"]);
 	run_git(root, &["add", "Cargo.toml", "crates", "monochange.toml"]);
 	run_git(root, &["commit", "-m", "chore: seed release fixture"]);
 	run_git(root, &["add", ".changeset/feature.md"]);
 	run_git(root, &["commit", "-m", "feat: add changeset"]);
 	let introduced_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
 
-	let updated_fixture = fixture_path("changeset-context/with-updated-changeset");
-	copy_directory(
-		&updated_fixture.join(".changeset"),
-		&root.join(".changeset"),
-	);
+	copy_updated_changeset(root);
 	run_git(root, &["add", ".changeset/feature.md"]);
 	run_git(root, &["commit", "-m", "docs: refine changeset details"]);
 	let updated_sha = git_stdout(root, &["rev-parse", "HEAD"]).trim().to_string();
 
-	let output = cli()
+	let output = monochange_command(None)
 		.current_dir(root)
 		.arg("diagnostics")
 		.args(["--changeset", ".changeset/feature.md", "--format", "json"])
@@ -125,8 +97,8 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 		"diagnostics command failed: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
-	let stdout = String::from_utf8(output.stdout)
-		.unwrap_or_else(|error| panic!("diagnostics output utf8: {error}"));
+	let stdout =
+		String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("diagnostics output utf8: {error}"));
 	let parsed: Value =
 		serde_json::from_str(&stdout).unwrap_or_else(|error| panic!("diagnostics json: {error}"));
 
@@ -146,13 +118,10 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 
 #[test]
 fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = setup_scenario_workspace("changeset-context/base");
 	let root = tempdir.path();
 
-	let fixture_root = fixture_path("changeset-context/base");
-	copy_directory(&fixture_root, root);
-
-	let output = cli()
+	let output = monochange_command(None)
 		.current_dir(root)
 		.arg("diagnostics")
 		.arg("--format")
@@ -173,7 +142,7 @@ fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs()
 	assert_eq!(requested[0].as_str(), Some(".changeset/feature.md"));
 	assert_eq!(requested[1].as_str(), Some(".changeset/performance.md"));
 
-	let duplicate_output = cli()
+	let duplicate_output = monochange_command(None)
 		.current_dir(root)
 		.arg("diagnostics")
 		.arg("--changeset")
@@ -195,10 +164,14 @@ fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs()
 		.as_array()
 		.unwrap_or_else(|| panic!("requested changesets"));
 	assert_eq!(duplicate_requested.len(), 1);
-	assert_eq!(
-		duplicate_requested[0].as_str(),
-		Some(".changeset/feature.md")
-	);
+	assert_eq!(duplicate_requested[0].as_str(), Some(".changeset/feature.md"));
+}
+
+fn copy_updated_changeset(root: &Path) {
+	let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/changeset-context/with-updated-changeset/.changeset/feature.md");
+	fs::copy(source, root.join(".changeset/feature.md"))
+		.unwrap_or_else(|error| panic!("copy updated changeset: {error}"));
 }
 
 fn run_git(root: &Path, args: &[&str]) {
