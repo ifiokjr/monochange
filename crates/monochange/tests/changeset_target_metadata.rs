@@ -214,8 +214,9 @@ fn release_rejects_legacy_reserved_metadata_blocks() {
 	)
 	.unwrap_or_else(|error| panic!("preserve base changeset: {error}"));
 	fs::copy(
-		Path::new(env!("CARGO_MANIFEST_DIR"))
-			.join("../../fixtures/tests/monochange/release-with-compat-evidence/.changeset/feature.md"),
+		Path::new(env!("CARGO_MANIFEST_DIR")).join(
+			"../../fixtures/tests/monochange/release-with-compat-evidence/.changeset/feature.md",
+		),
 		tempdir.path().join(".changeset/feature.md"),
 	)
 	.unwrap_or_else(|error| panic!("seed legacy-style changeset: {error}"));

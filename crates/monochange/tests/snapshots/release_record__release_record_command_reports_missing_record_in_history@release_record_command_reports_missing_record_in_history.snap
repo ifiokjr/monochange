@@ -1,0 +1,5 @@
+---
+source: crates/monochange/tests/release_record.rs
+expression: "String::from_utf8(output.stderr).unwrap_or_else(|error|\npanic!(\"stderr utf8: {error}\"))"
+---
+discovery error: no monochange release record found in first-parent ancestry from `HEAD`
