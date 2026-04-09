@@ -47,7 +47,7 @@
 //!
 //! let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
 //!
-//! assert!(rendered.contains("## [1.2.3]"));
+//! assert!(rendered.contains("## 1.2.3"));
 //! assert!(rendered.contains("### Features"));
 //! assert!(rendered.contains("- add keep-a-changelog output"));
 //! ```
@@ -470,15 +470,17 @@ pub fn update_json_manifest_text(
 		}
 	}
 	for field in fields {
-		let Some(section_span) = find_json_object_field_value_span(contents, root_start, field)? else {
+		let Some(section_span) = find_json_object_field_value_span(contents, root_start, field)?
+		else {
 			continue;
 		};
 		if !json_span_is_object(contents, section_span) {
 			continue;
 		}
 		for (dep_name, dep_version) in versioned_deps {
-			let Some(dep_span) = find_json_object_field_value_span(contents, section_span.start, dep_name)?
-				.filter(|span| json_span_is_string(contents, *span))
+			let Some(dep_span) =
+				find_json_object_field_value_span(contents, section_span.start, dep_name)?
+					.filter(|span| json_span_is_string(contents, *span))
 			else {
 				continue;
 			};
@@ -607,8 +609,16 @@ fn skip_json_object(contents: &str, object_start: usize) -> MonochangeResult<usi
 		match bytes.get(cursor) {
 			Some(b'}') => return Ok(cursor + 1),
 			Some(b'"') => {}
-			Some(_) => return Err(MonochangeError::Config("expected JSON object key".to_string())),
-			None => return Err(MonochangeError::Config("unterminated JSON object".to_string())),
+			Some(_) => {
+				return Err(MonochangeError::Config(
+					"expected JSON object key".to_string(),
+				))
+			}
+			None => {
+				return Err(MonochangeError::Config(
+					"unterminated JSON object".to_string(),
+				))
+			}
 		}
 		let (_, next) = parse_json_string_span(contents, cursor)?;
 		cursor = skip_json_ws_and_comments(contents, next);
@@ -658,10 +668,18 @@ fn skip_json_array(contents: &str, array_start: usize) -> MonochangeResult<usize
 							"expected `,` or `]` after JSON array value".to_string(),
 						));
 					}
-					None => return Err(MonochangeError::Config("unterminated JSON array".to_string())),
+					None => {
+						return Err(MonochangeError::Config(
+							"unterminated JSON array".to_string(),
+						))
+					}
 				}
 			}
-			None => return Err(MonochangeError::Config("unterminated JSON array".to_string())),
+			None => {
+				return Err(MonochangeError::Config(
+					"unterminated JSON array".to_string(),
+				))
+			}
 		}
 	}
 }
@@ -684,9 +702,7 @@ fn skip_json_primitive(contents: &str, start: usize) -> usize {
 fn parse_json_string_span(contents: &str, start: usize) -> MonochangeResult<(JsonSpan, usize)> {
 	let bytes = contents.as_bytes();
 	if bytes.get(start) != Some(&b'"') {
-		return Err(MonochangeError::Config(
-			"expected JSON string".to_string(),
-		));
+		return Err(MonochangeError::Config("expected JSON string".to_string()));
 	}
 	let mut cursor = start + 1;
 	while let Some(&byte) = bytes.get(cursor) {

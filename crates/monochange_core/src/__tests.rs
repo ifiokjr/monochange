@@ -1453,7 +1453,9 @@ fn json_helper_functions_cover_error_paths() {
 	let locate_error = crate::find_json_object_field_value_span("[]", 0, "name")
 		.err()
 		.unwrap_or_else(|| panic!("expected locate error"));
-	assert!(locate_error.to_string().contains("expected JSON object when locating field"));
+	assert!(locate_error
+		.to_string()
+		.contains("expected JSON object when locating field"));
 
 	for (contents, key) in [
 		("{1:2}", "a"),
@@ -1508,9 +1510,20 @@ fn json_helper_functions_cover_success_paths() {
 		crate::skip_json_ws_and_comments(" // comment\n /* block */ {", 0),
 		25
 	);
-	assert_eq!(crate::skip_json_object("{}", 0).unwrap_or_else(|error| panic!("skip empty object: {error}")), 2);
-	assert_eq!(crate::skip_json_object("{\"a\":1,\"b\":2}", 0).unwrap_or_else(|error| panic!("skip object with comma: {error}")), 13);
-	assert_eq!(crate::skip_json_array("[]", 0).unwrap_or_else(|error| panic!("skip empty array: {error}")), 2);
+	assert_eq!(
+		crate::skip_json_object("{}", 0)
+			.unwrap_or_else(|error| panic!("skip empty object: {error}")),
+		2
+	);
+	assert_eq!(
+		crate::skip_json_object("{\"a\":1,\"b\":2}", 0)
+			.unwrap_or_else(|error| panic!("skip object with comma: {error}")),
+		13
+	);
+	assert_eq!(
+		crate::skip_json_array("[]", 0).unwrap_or_else(|error| panic!("skip empty array: {error}")),
+		2
+	);
 	assert_eq!(
 		crate::find_json_object_field_value_span("{}", 0, "name")
 			.unwrap_or_else(|error| panic!("find empty object field: {error}")),
@@ -1534,5 +1547,8 @@ fn json_helper_functions_cover_success_paths() {
 		&BTreeMap::from([("core".to_string(), "^2.0.0".to_string())]),
 	)
 	.unwrap_or_else(|error| panic!("update json manifest with non-string values: {error}"));
-	assert_eq!(updated, r#"{"version":1,"imports":{"core":{"path":"./core"}}}"#);
+	assert_eq!(
+		updated,
+		r#"{"version":1,"imports":{"core":{"path":"./core"}}}"#
+	);
 }

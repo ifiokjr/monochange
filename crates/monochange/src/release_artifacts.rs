@@ -518,18 +518,14 @@ pub(crate) fn build_dart_manifest_updates(
 				package.manifest_path.display()
 			))
 		})?;
-		let rendered = monochange_dart::update_manifest_text(
-			&contents,
-			Some(version),
-			&[],
-			&BTreeMap::new(),
-		)
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"failed to parse {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
+		let rendered =
+			monochange_dart::update_manifest_text(&contents, Some(version), &[], &BTreeMap::new())
+				.map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to parse {}: {error}",
+						package.manifest_path.display()
+					))
+				})?;
 		updates.push(FileUpdate {
 			path: package.manifest_path.clone(),
 			content: rendered.into_bytes(),

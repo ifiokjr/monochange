@@ -771,7 +771,13 @@ core = { version = "1.0.0" }
 	.unwrap_or_else(|error| panic!("parse field helper document: {error}"));
 	let versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
 
-	crate::update_manifest_field(&mut document, "package.version", Some("2.0.0"), None, &versions);
+	crate::update_manifest_field(
+		&mut document,
+		"package.version",
+		Some("2.0.0"),
+		None,
+		&versions,
+	);
 	crate::update_manifest_field(
 		&mut document,
 		"workspace.dependencies",
@@ -894,8 +900,12 @@ core = { version = "1.0.0" }
 		&versions,
 	);
 
-	assert!(crate::fields_target_workspace_dependencies(&["workspace.dependencies"]));
-	assert!(!crate::fields_target_workspace_dependencies(&["dependencies"]));
+	assert!(crate::fields_target_workspace_dependencies(&[
+		"workspace.dependencies"
+	]));
+	assert!(!crate::fields_target_workspace_dependencies(&[
+		"dependencies"
+	]));
 
 	let mut helpers_document = "[dependencies]\n"
 		.parse::<DocumentMut>()

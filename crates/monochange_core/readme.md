@@ -55,7 +55,7 @@ let notes = ReleaseNotesDocument {
 
 let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
 
-assert!(rendered.contains("## [1.2.3]"));
+assert!(rendered.contains("## 1.2.3"));
 assert!(rendered.contains("### Features"));
 assert!(rendered.contains("- add keep-a-changelog output"));
 ```

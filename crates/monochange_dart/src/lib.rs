@@ -134,7 +134,10 @@ pub fn update_manifest_text(
 	let mut replacements = Vec::<((usize, usize), String)>::new();
 	if let Some(owner_version) = owner_version {
 		if let Some(span) = find_yaml_scalar_for_key(contents, &line_ranges, 0, "version") {
-			replacements.push((span, render_yaml_scalar(&contents[span.0..span.1], owner_version)));
+			replacements.push((
+				span,
+				render_yaml_scalar(&contents[span.0..span.1], owner_version),
+			));
 		}
 	}
 	for field in fields {
@@ -142,13 +145,13 @@ pub fn update_manifest_text(
 			continue;
 		};
 		for (dep_name, dep_version) in versioned_deps {
-			if let Some(span) = find_yaml_dependency_scalar(
-				contents,
-				&line_ranges,
-				section_index,
-				dep_name,
-			) {
-				replacements.push((span, render_yaml_scalar(&contents[span.0..span.1], dep_version)));
+			if let Some(span) =
+				find_yaml_dependency_scalar(contents, &line_ranges, section_index, dep_name)
+			{
+				replacements.push((
+					span,
+					render_yaml_scalar(&contents[span.0..span.1], dep_version),
+				));
 			}
 		}
 	}
