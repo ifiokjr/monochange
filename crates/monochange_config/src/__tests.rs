@@ -17,7 +17,10 @@ use tempfile::tempdir;
 #[allow(dead_code)]
 #[path = "../../../testing/test_support/fs.rs"]
 mod shared_fs_test_support;
+use shared_fs_test_support::current_test_name;
 use shared_fs_test_support::fixture_path;
+use shared_fs_test_support::setup_fixture;
+use shared_fs_test_support::setup_scenario_workspace;
 
 use crate::apply_version_groups;
 use crate::load_change_signals;
@@ -25,6 +28,36 @@ use crate::load_changeset_file;
 use crate::load_workspace_configuration;
 use crate::resolve_package_reference;
 use crate::validate_workspace;
+
+#[test]
+fn shared_fs_test_support_helpers_cover_plain_and_case_names_and_fixture_copying() {
+	assert_eq!(
+		current_test_name(),
+		"shared_fs_test_support_helpers_cover_plain_and_case_names_and_fixture_copying"
+	);
+	let named = std::thread::Builder::new()
+		.name("case_1_config_helper_thread".to_string())
+		.spawn(current_test_name)
+		.unwrap_or_else(|error| panic!("spawn thread: {error}"))
+		.join()
+		.unwrap_or_else(|error| panic!("join thread: {error:?}"));
+	assert_eq!(named, "config_helper_thread");
+
+	let copied_fixture = setup_fixture("test-support/setup-fixture");
+	assert_eq!(
+		std::fs::read_to_string(copied_fixture.path().join("root.txt"))
+			.unwrap_or_else(|error| panic!("read copied fixture: {error}")),
+		"root fixture\n"
+	);
+
+	let scenario = setup_scenario_workspace("test-support/scenario-root");
+	assert_eq!(
+		std::fs::read_to_string(scenario.path().join("root-only.txt"))
+			.unwrap_or_else(|error| panic!("read copied scenario: {error}")),
+		"root scenario\n"
+	);
+	assert!(!scenario.path().join("expected").exists());
+}
 
 #[test]
 fn load_workspace_configuration_uses_defaults_when_file_is_missing() {

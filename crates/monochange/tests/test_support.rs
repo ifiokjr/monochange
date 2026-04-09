@@ -62,3 +62,84 @@ pub fn json_subset(value: &Value, fields: &[(&str, &str)]) -> Value {
 	}
 	Value::Object(subset)
 }
+
+#[cfg(test)]
+mod tests {
+	use std::fs;
+
+	use rstest::rstest;
+	use tempfile::TempDir;
+
+	use super::copy_directory;
+	use super::current_test_name;
+	use super::fixture_path;
+	use super::setup_scenario_workspace;
+	use super::shared_fs_test_support::setup_fixture;
+
+	#[test]
+	fn current_test_name_returns_plain_function_name() {
+		assert_eq!(current_test_name(), "current_test_name_returns_plain_function_name");
+	}
+
+	#[rstest]
+	fn case_1_strips_numeric_rstest_prefix_from_current_test_name() {
+		assert_eq!(current_test_name(), "strips_numeric_rstest_prefix_from_current_test_name");
+	}
+
+	#[test]
+	fn fixture_path_resolves_known_fixture_directory() {
+		let path = fixture_path("test-support/setup-fixture");
+		assert!(path.is_dir());
+		assert!(path.ends_with("fixtures/tests/test-support/setup-fixture"));
+	}
+
+	#[test]
+	fn copy_directory_copies_nested_fixture_files() {
+		let destination_root = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let destination = destination_root.path().join("copied");
+		copy_directory(&fixture_path("test-support/setup-fixture"), &destination);
+		assert_eq!(
+			fs::read_to_string(destination.join("root.txt"))
+				.unwrap_or_else(|error| panic!("read root fixture: {error}")),
+			"root fixture\n"
+		);
+		assert_eq!(
+			fs::read_to_string(destination.join("nested/child.txt"))
+				.unwrap_or_else(|error| panic!("read nested fixture: {error}")),
+			"nested child\n"
+		);
+	}
+
+	#[test]
+	fn setup_fixture_copies_fixture_contents_into_tempdir() {
+		let tempdir = setup_fixture("test-support/setup-fixture");
+		assert_eq!(
+			fs::read_to_string(tempdir.path().join("nested/child.txt"))
+				.unwrap_or_else(|error| panic!("read setup fixture: {error}")),
+			"nested child\n"
+		);
+	}
+
+	#[test]
+	fn setup_scenario_workspace_prefers_workspace_directory_and_skips_expected_outputs() {
+		let tempdir = setup_scenario_workspace("test-support/scenario-workspace");
+		assert_eq!(
+			fs::read_to_string(tempdir.path().join("workspace-only.txt"))
+				.unwrap_or_else(|error| panic!("read workspace scenario file: {error}")),
+			"workspace marker\n"
+		);
+		assert!(!tempdir.path().join("scenario-root-only.txt").exists());
+		assert!(!tempdir.path().join("expected").exists());
+	}
+
+	#[test]
+	fn setup_scenario_workspace_falls_back_to_scenario_root_when_no_workspace_exists() {
+		let tempdir = setup_scenario_workspace("test-support/scenario-root");
+		assert_eq!(
+			fs::read_to_string(tempdir.path().join("root-only.txt"))
+				.unwrap_or_else(|error| panic!("read root scenario file: {error}")),
+			"root scenario\n"
+		);
+		assert!(!tempdir.path().join("expected").exists());
+	}
+}
