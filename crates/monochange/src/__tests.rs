@@ -18,6 +18,7 @@ use monochange_core::VersionFormat;
 use semver::Version;
 use tempfile::tempdir;
 
+use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
@@ -464,13 +465,11 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 	copy_directory(&fixture_root, tempdir.path());
 	let output_path = add_change_file(
 		tempdir.path(),
-		&["sdk-core".to_string()],
-		BumpSeverity::Patch,
-		None,
-		"default output",
-		None,
-		None,
-		None,
+		crate::AddChangeFileRequest::builder()
+			.package_refs(&["sdk-core".to_string()])
+			.bump(BumpSeverity::Patch)
+			.reason("default output")
+			.build(),
 	)
 	.unwrap_or_else(|error| panic!("default change file: {error}"));
 	let content = fs::read_to_string(&output_path)
@@ -604,7 +603,7 @@ fn add_change_file_renders_type_and_explicit_version_without_bump() {
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 	let output_path = tempdir.path().join("security-version.md");
 
-	crate::add_change_file(
+	add_change_file(
 		tempdir.path(),
 		crate::AddChangeFileRequest::builder()
 			.package_refs(&["core".to_string()])
@@ -630,7 +629,7 @@ fn add_change_file_renders_object_metadata_when_bump_differs_from_type_default()
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 	let output_path = tempdir.path().join("security-major.md");
 
-	crate::add_change_file(
+	add_change_file(
 		tempdir.path(),
 		crate::AddChangeFileRequest::builder()
 			.package_refs(&["core".to_string()])
@@ -653,7 +652,7 @@ fn add_change_file_rejects_none_without_type_or_version() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 
-	let error = crate::add_change_file(
+	let error = add_change_file(
 		tempdir.path(),
 		crate::AddChangeFileRequest::builder()
 			.package_refs(&["core".to_string()])
@@ -672,7 +671,7 @@ fn add_change_file_rejects_unknown_change_type() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
 
-	let error = crate::add_change_file(
+	let error = add_change_file(
 		tempdir.path(),
 		crate::AddChangeFileRequest::builder()
 			.package_refs(&["core".to_string()])
