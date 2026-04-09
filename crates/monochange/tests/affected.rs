@@ -7,8 +7,8 @@ use serde_json::Value;
 
 mod test_support;
 use test_support::{
-	copy_directory, current_test_name, fixture_path, monochange_command,
-	setup_scenario_workspace, snapshot_settings,
+	copy_directory, current_test_name, fixture_path, monochange_command, setup_scenario_workspace,
+	snapshot_settings,
 };
 
 #[rstest]

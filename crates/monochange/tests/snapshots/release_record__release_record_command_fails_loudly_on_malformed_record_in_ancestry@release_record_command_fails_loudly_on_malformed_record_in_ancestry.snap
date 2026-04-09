@@ -1,0 +1,5 @@
+---
+source: crates/monochange/tests/release_record.rs
+expression: "String::from_utf8(output.stderr).unwrap_or_else(|error|\npanic!(\"stderr utf8: {error}\"))"
+---
+discovery error: found a malformed monochange release record in commit [SHA]: found a release record start marker without a matching end marker

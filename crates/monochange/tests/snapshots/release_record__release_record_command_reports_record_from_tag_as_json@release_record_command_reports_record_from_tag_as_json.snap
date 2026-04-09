@@ -1,0 +1,52 @@
+---
+source: crates/monochange/tests/release_record.rs
+expression: parsed
+---
+{
+  "distance": 0,
+  "inputRef": "v1.2.3",
+  "record": {
+    "changedFiles": [
+      "Cargo.lock"
+    ],
+    "command": "release-pr",
+    "createdAt": "[DATETIME]Z",
+    "deletedChangesets": [
+      ".changeset/feature.md"
+    ],
+    "groupVersion": "1.2.3",
+    "kind": "monochange.releaseRecord",
+    "provider": {
+      "host": null,
+      "kind": "github",
+      "owner": "ifiokjr",
+      "repo": "monochange"
+    },
+    "releaseTargets": [
+      {
+        "id": "sdk",
+        "kind": "group",
+        "members": [
+          "monochange",
+          "monochange_core"
+        ],
+        "release": true,
+        "tag": true,
+        "tagName": "v1.2.3",
+        "version": "1.2.3",
+        "versionFormat": "primary"
+      }
+    ],
+    "releasedPackages": [
+      "monochange",
+      "monochange_core"
+    ],
+    "schemaVersion": 1,
+    "updatedChangelogs": [
+      "crates/monochange/CHANGELOG.md"
+    ],
+    "version": "1.2.3"
+  },
+  "recordCommit": "[SHA]",
+  "resolvedCommit": "[SHA]"
+}
