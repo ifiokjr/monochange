@@ -4467,7 +4467,9 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 	let cli = crate::cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
 	assert_eq!(
-		cli.iter().map(|command| command.name.as_str()).collect::<Vec<_>>(),
+		cli.iter()
+			.map(|command| command.name.as_str())
+			.collect::<Vec<_>>(),
 		vec!["release"]
 	);
 }
@@ -4492,13 +4494,15 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		.unwrap_or_else(|| panic!("expected after_help for {name}"));
 		assert!(after_help.contains(expected));
 	}
-	assert!(crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
-		name: "custom".to_string(),
-		help_text: None,
-		inputs: Vec::new(),
-		steps: Vec::new(),
-	})
-	.is_none());
+	assert!(
+		crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
+			name: "custom".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: Vec::new(),
+		})
+		.is_none()
+	);
 }
 
 #[test]
@@ -4565,9 +4569,8 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 		steps: Vec::new(),
 	};
 
-	let command = clap::Command::new("mc").subcommand(crate::build_cli_command_subcommand(
-		&cli_command,
-	));
+	let command =
+		clap::Command::new("mc").subcommand(crate::build_cli_command_subcommand(&cli_command));
 	let matches = command
 		.try_get_matches_from([
 			OsString::from("mc"),
