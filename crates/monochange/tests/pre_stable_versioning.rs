@@ -3,7 +3,9 @@ use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
-use test_support::{monochange_command, run_json_command, setup_scenario_workspace, snapshot_settings};
+use test_support::{
+	monochange_command, run_json_command, setup_scenario_workspace, snapshot_settings,
+};
 
 #[rstest]
 #[case::pre_stable_major_text("pre-stable-versioning/pre-stable-major", "pre_stable_major_text")]

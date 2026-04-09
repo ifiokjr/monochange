@@ -1,0 +1,19 @@
+---
+source: crates/monochange/tests/cli_main_binary.rs
+info:
+  program: monochange
+  args:
+    - not-a-command
+  env:
+    NO_COLOR: "1"
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+config error: error: unrecognized subcommand 'not-a-command'
+
+Usage: monochange <COMMAND>
+
+For more information, try '--help'.

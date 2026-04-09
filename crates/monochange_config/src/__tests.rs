@@ -1950,3 +1950,236 @@ fn load_workspace_configuration_accepts_command_step_with_shell_string() {
 		_ => panic!("expected Command step"),
 	}
 }
+
+#[test]
+fn raw_changelog_config_resolves_package_and_group_paths() {
+	let package_path = Path::new("packages/core");
+	let legacy_disabled =
+		crate::RawChangelogConfig::Legacy(crate::RawChangelogDefinition::Enabled(false));
+	assert!(legacy_disabled.is_disabled());
+	assert_eq!(
+		legacy_disabled.resolve_for_package(package_path, true),
+		None
+	);
+	assert_eq!(legacy_disabled.resolve_for_group(), None);
+
+	let legacy_pattern = crate::RawChangelogConfig::Legacy(crate::RawChangelogDefinition::Path(
+		"{{ path }}/notes.md".to_string(),
+	));
+	assert_eq!(
+		legacy_pattern.resolve_for_package(package_path, true),
+		Some(PathBuf::from("packages/core/notes.md"))
+	);
+	assert_eq!(
+		legacy_pattern.resolve_for_package(package_path, false),
+		Some(PathBuf::from("{{ path }}/notes.md"))
+	);
+	assert_eq!(
+		legacy_pattern.resolve_for_group(),
+		Some(PathBuf::from("{{ path }}/notes.md"))
+	);
+
+	let detailed_disabled = crate::RawChangelogConfig::Detailed(crate::RawChangelogTable {
+		enabled: Some(false),
+		path: Some("group/CHANGELOG.md".to_string()),
+		format: None,
+		include: None,
+	});
+	assert!(detailed_disabled.is_disabled());
+	assert_eq!(
+		detailed_disabled.resolve_for_package(package_path, true),
+		None
+	);
+	assert_eq!(detailed_disabled.resolve_for_group(), None);
+
+	let detailed_default = crate::RawChangelogConfig::Detailed(crate::RawChangelogTable {
+		enabled: Some(true),
+		path: None,
+		format: None,
+		include: Some(crate::RawGroupChangelogInclude::Mode(
+			"group-only".to_string(),
+		)),
+	});
+	assert_eq!(
+		detailed_default.resolve_for_package(package_path, true),
+		Some(PathBuf::from("packages/core/CHANGELOG.md"))
+	);
+	assert_eq!(detailed_default.resolve_for_group(), None);
+	assert!(matches!(
+		detailed_default.include(),
+		Some(crate::RawGroupChangelogInclude::Mode(mode)) if mode == "group-only"
+	));
+}
+
+#[test]
+fn infer_bump_helpers_cover_major_minor_patch_and_none() {
+	assert_eq!(
+		crate::infer_bump_from_versions(&Version::new(1, 2, 3), &Version::new(2, 0, 0)),
+		BumpSeverity::Major
+	);
+	assert_eq!(
+		crate::infer_bump_from_versions(&Version::new(1, 2, 3), &Version::new(1, 3, 0)),
+		BumpSeverity::Minor
+	);
+	assert_eq!(
+		crate::infer_bump_from_versions(&Version::new(1, 2, 3), &Version::new(1, 2, 4)),
+		BumpSeverity::Patch
+	);
+	assert_eq!(
+		crate::infer_bump_from_versions(
+			&Version::new(1, 2, 3),
+			&Version::parse("1.2.3-beta.1").unwrap_or_else(|error| panic!("version: {error}"))
+		),
+		BumpSeverity::Patch
+	);
+	assert_eq!(
+		crate::infer_bump_from_versions(&Version::new(1, 2, 3), &Version::new(1, 2, 3)),
+		BumpSeverity::None
+	);
+
+	let workspace_root = PathBuf::from("/workspace");
+	let core = PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		workspace_root.join("crates/core/Cargo.toml"),
+		workspace_root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let app = PackageRecord::new(
+		Ecosystem::Cargo,
+		"app",
+		workspace_root.join("crates/app/Cargo.toml"),
+		workspace_root.clone(),
+		Some(Version::new(2, 0, 0)),
+		PublishState::Public,
+	);
+	let group = monochange_core::GroupDefinition {
+		id: "sdk".to_string(),
+		packages: vec![core.id.clone(), "missing".to_string(), app.id.clone()],
+		changelog: None,
+		changelog_include: GroupChangelogInclude::All,
+		extra_changelog_sections: Vec::new(),
+		empty_update_message: None,
+		release_title: None,
+		changelog_version_title: None,
+		versioned_files: Vec::new(),
+		tag: true,
+		release: true,
+		version_format: monochange_core::VersionFormat::Primary,
+	};
+	assert_eq!(
+		crate::infer_group_bump_from_explicit_version(
+			&group,
+			&workspace_root,
+			&[core.clone(), app.clone()],
+			Some(&Version::new(2, 1, 0))
+		),
+		Some(BumpSeverity::Minor)
+	);
+	let core_id = core.id.clone();
+	assert_eq!(
+		crate::infer_package_bump_from_explicit_version(
+			&core_id,
+			&[core, app],
+			Some(&Version::new(1, 0, 1))
+		),
+		Some(BumpSeverity::Patch)
+	);
+}
+
+#[test]
+fn validate_source_and_changeset_settings_reject_empty_values() {
+	let source_error =
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: monochange_core::SourceProvider::GitHub,
+			host: None,
+			api_url: None,
+			owner: " ".to_string(),
+			repo: "monochange".to_string(),
+			releases: monochange_core::ReleaseProviderSettings::default(),
+			pull_requests: monochange_core::ChangeRequestSettings::default(),
+			bot: monochange_core::BotSettings::default(),
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected source validation error"));
+	assert!(source_error
+		.to_string()
+		.contains("[source].owner must not be empty"));
+
+	let changeset_error = crate::validate_changesets_configuration(
+		&monochange_core::ChangesetSettings {
+			verify: monochange_core::ChangesetVerificationSettings {
+				skip_labels: vec![String::new()],
+				..Default::default()
+			},
+		},
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected changeset validation error"));
+	assert!(changeset_error
+		.to_string()
+		.contains("[changesets.verify].skip_labels must not include empty values"));
+}
+
+#[test]
+fn matching_package_helpers_cover_references_and_definitions() {
+	let root = PathBuf::from("/workspace");
+	let core = PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let web = PackageRecord::new(
+		Ecosystem::Npm,
+		"web",
+		root.join("packages/web/package.json"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let packages = vec![core.clone(), web.clone()];
+	assert_eq!(
+		crate::find_matching_package_indices(&packages, &root, "core"),
+		vec![0]
+	);
+	assert_eq!(
+		crate::find_matching_package_indices(&packages, &root, "packages/web"),
+		vec![1]
+	);
+	let definition = monochange_core::PackageDefinition {
+		id: "web".to_string(),
+		path: PathBuf::from("packages/web"),
+		package_type: monochange_core::PackageType::Npm,
+		changelog: None,
+		extra_changelog_sections: Vec::new(),
+		empty_update_message: None,
+		release_title: None,
+		changelog_version_title: None,
+		versioned_files: Vec::new(),
+		ignore_ecosystem_versioned_files: false,
+		ignored_paths: Vec::new(),
+		additional_paths: Vec::new(),
+		tag: true,
+		release: true,
+		version_format: monochange_core::VersionFormat::Primary,
+	};
+	assert_eq!(
+		crate::find_matching_package_indices_for_definition(&packages, &root, &definition),
+		vec![1]
+	);
+	assert!(crate::package_matches_definition(&web, &root, &definition));
+	assert!(!crate::package_matches_definition(
+		&core,
+		&root,
+		&definition
+	));
+	assert!(crate::ecosystem_matches_package_type(
+		Ecosystem::Flutter,
+		monochange_core::PackageType::Flutter
+	));
+}
