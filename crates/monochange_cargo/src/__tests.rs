@@ -10,6 +10,7 @@ use monochange_core::EcosystemAdapter;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_semver::CompatibilityProvider;
+use tempfile::tempdir;
 use toml::Value;
 
 use crate::adapter;
@@ -686,17 +687,33 @@ fn cargo_manifest_helpers_cover_workspace_and_error_paths() {
 	);
 
 	let invalid_workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/cargo/invalid-workspace/Cargo.toml");
+		.join("../../fixtures/tests/cargo/invalid-workspace/invalid-workspace.toml");
 	let invalid_workspace_error = has_workspace_section(&invalid_workspace)
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid workspace error"));
-	assert!(invalid_workspace_error.to_string().contains("failed to parse"));
+	assert!(invalid_workspace_error
+		.to_string()
+		.contains("failed to parse"));
 
 	let invalid_package_root = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/cargo/invalid-package-name");
-	let discovery_error = discover_workspace_packages(&invalid_package_root.join("Cargo.toml"))
-		.err()
-		.unwrap_or_else(|| panic!("expected invalid package discovery error"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::create_dir_all(tempdir.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("create temp package dir: {error}"));
+	std::fs::copy(
+		invalid_package_root.join("invalid-workspace.toml"),
+		tempdir.path().join("invalid-workspace.toml"),
+	)
+	.unwrap_or_else(|error| panic!("copy workspace manifest: {error}"));
+	std::fs::copy(
+		invalid_package_root.join("crates/core/invalid-package.toml"),
+		tempdir.path().join("crates/core/Cargo.toml"),
+	)
+	.unwrap_or_else(|error| panic!("copy package manifest: {error}"));
+	let discovery_error =
+		discover_workspace_packages(&tempdir.path().join("invalid-workspace.toml"))
+			.err()
+			.unwrap_or_else(|| panic!("expected invalid package discovery error"));
 	assert!(discovery_error.to_string().contains("missing package.name"));
 }
 

@@ -685,7 +685,11 @@ mod __tests {
 			.unwrap_or_else(|| panic!("expected target"));
 		assert_eq!(
 			target.configured_types,
-			vec!["docs".to_string(), "security".to_string(), "test".to_string()]
+			vec![
+				"docs".to_string(),
+				"security".to_string(),
+				"test".to_string()
+			]
 		);
 	}
 }

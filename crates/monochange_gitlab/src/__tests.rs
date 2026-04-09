@@ -252,12 +252,9 @@ fn gitlab_json_helpers_cover_not_found_and_status_errors() {
 	let client = gitlab_client().unwrap_or_else(|error| panic!("client: {error}"));
 	let base = server.base_url();
 
-	let missing_value = get_optional_json::<serde_json::Value>(
-		&client,
-		"token",
-		&format!("{base}/missing"),
-	)
-	.unwrap_or_else(|error| panic!("optional json: {error}"));
+	let missing_value =
+		get_optional_json::<serde_json::Value>(&client, "token", &format!("{base}/missing"))
+			.unwrap_or_else(|error| panic!("optional json: {error}"));
 	assert_eq!(missing_value, None);
 
 	let get_error = get_json::<serde_json::Value>(&client, "token", &format!("{base}/fail-get"))

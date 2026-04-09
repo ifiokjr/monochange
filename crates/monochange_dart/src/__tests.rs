@@ -206,7 +206,10 @@ fn workspace_and_manifest_helpers_cover_yaml_and_error_paths() {
 	assert_eq!(app.ecosystem, Ecosystem::Dart);
 	assert_eq!(app.publish_state, PublishState::Public);
 	assert_eq!(
-		app.current_version.as_ref().map(ToString::to_string).as_deref(),
+		app.current_version
+			.as_ref()
+			.map(ToString::to_string)
+			.as_deref(),
 		Some("1.2.3")
 	);
 	assert!(app.declared_dependencies.iter().any(|dependency| {
@@ -235,22 +238,26 @@ dependencies:
   core: ^1.0.0
 ",
 	)
-		.unwrap_or_else(|error| panic!("yaml: {error}"));
+	.unwrap_or_else(|error| panic!("yaml: {error}"));
 	assert_eq!(yaml_string(&nameless_manifest, "name"), None);
 	assert!(yaml_mapping(&nameless_manifest, "dependencies").is_some());
 	assert_eq!(yaml_bool(&nameless_manifest, "publish_to"), None);
 
 	let invalid_workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/dart/invalid-workspace/pubspec.yaml");
+		.join("../../fixtures/tests/dart/invalid-workspace/invalid-workspace.yaml");
 	let invalid_workspace_error = has_workspace_section(&invalid_workspace)
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid workspace error"));
-	assert!(invalid_workspace_error.to_string().contains("failed to parse"));
+	assert!(invalid_workspace_error
+		.to_string()
+		.contains("failed to parse"));
 
 	let invalid_package = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/dart/invalid-package/pubspec.yaml");
+		.join("../../fixtures/tests/dart/invalid-package/invalid-package.yaml");
 	let invalid_package_error = parse_manifest(&invalid_package, Path::new("."))
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid package error"));
-	assert!(invalid_package_error.to_string().contains("failed to parse"));
+	assert!(invalid_package_error
+		.to_string()
+		.contains("failed to parse"));
 }
