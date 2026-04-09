@@ -405,11 +405,11 @@ mod __tests {
 	use super::SelectableTarget;
 	use super::TargetKind;
 
-	fn fixture_path(relative: &str) -> std::path::PathBuf {
-		std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-			.join("../../fixtures/tests")
-			.join(relative)
+	#[allow(dead_code)]
+	mod shared_fs_test_support {
+		include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/test_support/fs.rs"));
 	}
+	use shared_fs_test_support::fixture_path;
 
 	fn package_target(configured_types: Vec<String>) -> SelectableTarget {
 		SelectableTarget {
