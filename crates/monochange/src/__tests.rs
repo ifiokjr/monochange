@@ -6167,6 +6167,105 @@ fn sample_prepared_release_for_cli_render() -> crate::PreparedRelease {
 	}
 }
 
+#[test]
+fn build_source_release_requests_and_change_request_cover_gitea_dispatch() {
+	let source = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::Gitea,
+		host: Some("https://gitea.example.com".to_string()),
+		api_url: Some("https://gitea.example.com/api/v1".to_string()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ReleaseProviderSettings::default(),
+		pull_requests: monochange_core::ChangeRequestSettings::default(),
+		bot: monochange_core::BotSettings::default(),
+	};
+	let manifest = sample_release_manifest_for_commit_message(true, true);
+	let requests = crate::build_source_release_requests(&source, &manifest);
+	assert_eq!(requests.len(), 1);
+	assert_eq!(requests[0].provider, monochange_core::SourceProvider::Gitea);
+	assert_eq!(requests[0].repository, "ifiokjr/monochange");
+	let request = crate::build_source_change_request(&source, &manifest);
+	assert_eq!(request.provider, monochange_core::SourceProvider::Gitea);
+	assert_eq!(request.repository, "ifiokjr/monochange");
+	assert!(!request.commit_message.subject.is_empty());
+}
+
+#[test]
+fn tracked_release_pull_request_paths_include_manifest_path_and_deduplicate() {
+	let manifest = sample_release_manifest_for_commit_message(false, true);
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		release_manifest_path: Some(PathBuf::from("Cargo.lock")),
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let tracked = crate::tracked_release_pull_request_paths(&context, &manifest);
+	assert_eq!(tracked, vec![PathBuf::from(".changeset/feature.md"), PathBuf::from("Cargo.lock")]);
+}
+
+#[test]
+fn discovery_report_helpers_include_version_groups_and_warnings() {
+	let package = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		PathBuf::from("/workspace/crates/core/Cargo.toml"),
+		PathBuf::from("/workspace"),
+		Some(Version::parse("1.2.3").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let report = monochange_core::DiscoveryReport {
+		workspace_root: PathBuf::from("/workspace"),
+		packages: vec![package.clone()],
+		dependencies: vec![monochange_core::DependencyEdge {
+			from_package_id: package.id.clone(),
+			to_package_id: package.id.clone(),
+			dependency_kind: monochange_core::DependencyKind::Runtime,
+			source_kind: monochange_core::DependencySourceKind::Manifest,
+			version_constraint: Some("^1.2.3".to_string()),
+			is_optional: false,
+			is_direct: true,
+		}],
+		version_groups: vec![monochange_core::VersionGroup {
+			group_id: "sdk".to_string(),
+			display_name: "sdk".to_string(),
+			members: vec![package.id.clone()],
+			mismatch_detected: true,
+		}],
+		warnings: vec!["workspace warning".to_string()],
+	};
+
+	let json = crate::json_discovery_report(&report);
+	assert_eq!(json["versionGroups"][0]["id"], "sdk");
+	assert_eq!(json["warnings"][0], "workspace warning");
+
+	let text = crate::text_discovery_report(&report);
+	assert!(text.contains("Version groups:"));
+	assert!(text.contains("- sdk (1)"));
+	assert!(text.contains("Warnings:"));
+	assert!(text.contains("- workspace warning"));
+}
+
+#[test]
+fn default_change_path_falls_back_to_change_when_slug_is_empty() {
+	let path = crate::default_change_path(Path::new("/workspace"), &["!!!".to_string()]);
+	assert!(path.starts_with("/workspace/.changeset"));
+	assert!(path.to_string_lossy().ends_with("-change.md"));
+}
+
 fn sample_github_source_configuration(api_url: &str) -> monochange_core::SourceConfiguration {
 	monochange_core::SourceConfiguration {
 		provider: monochange_core::SourceProvider::GitHub,
