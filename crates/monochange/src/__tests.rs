@@ -3857,6 +3857,86 @@ fn assistant_setup_payload_contains_mcp_config_and_guidance() {
 }
 
 #[test]
+fn assistant_setup_payload_includes_variant_specific_notes() {
+	let cases = [
+		(crate::Assistant::Generic, "supports stdio MCP servers"),
+		(crate::Assistant::Claude, "Claude's MCP configuration"),
+		(crate::Assistant::Cursor, "Configure the MCP server in Cursor"),
+		(crate::Assistant::Copilot, "support MCP-compatible server definitions"),
+	];
+	for (assistant, expected_note) in cases {
+		let payload = crate::assistant_setup_payload(assistant);
+		assert!(payload["notes"].as_array().is_some_and(|items| items.iter().any(|item| {
+			item.as_str().is_some_and(|text| text.contains(expected_note))
+		})));
+	}
+}
+
+#[test]
+fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
+	let command = crate::build_command("monochange");
+	assert_eq!(command.get_name(), "monochange");
+	assert!(command.clone().find_subcommand("assist").is_some());
+	assert!(command.clone().find_subcommand("release-record").is_some());
+
+	let configuration = monochange_core::WorkspaceConfiguration {
+		root_path: PathBuf::from("."),
+		defaults: monochange_core::WorkspaceDefaults::default(),
+		release_notes: monochange_core::ReleaseNotesSettings::default(),
+		packages: vec![monochange_core::PackageDefinition {
+			id: "core".to_string(),
+			path: PathBuf::from("crates/core"),
+			package_type: monochange_core::PackageType::Cargo,
+			changelog: None,
+			extra_changelog_sections: vec![monochange_core::ExtraChangelogSection {
+				name: "Docs".to_string(),
+				types: vec![" docs ".to_string(), "test".to_string()],
+				default_bump: None,
+			}],
+			empty_update_message: None,
+			release_title: None,
+			changelog_version_title: None,
+			versioned_files: Vec::new(),
+			ignore_ecosystem_versioned_files: false,
+			ignored_paths: Vec::new(),
+			additional_paths: Vec::new(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+		}],
+		groups: vec![monochange_core::GroupDefinition {
+			id: "sdk".to_string(),
+			packages: vec!["core".to_string()],
+			changelog: None,
+			changelog_include: GroupChangelogInclude::All,
+			extra_changelog_sections: vec![monochange_core::ExtraChangelogSection {
+				name: "Security".to_string(),
+				types: vec!["security".to_string(), "docs".to_string()],
+				default_bump: None,
+			}],
+			empty_update_message: None,
+			release_title: None,
+			changelog_version_title: None,
+			versioned_files: Vec::new(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+		}],
+		cli: Vec::new(),
+		changesets: monochange_core::ChangesetSettings::default(),
+		source: None,
+		cargo: monochange_core::EcosystemSettings::default(),
+		npm: monochange_core::EcosystemSettings::default(),
+		deno: monochange_core::EcosystemSettings::default(),
+		dart: monochange_core::EcosystemSettings::default(),
+	};
+	assert_eq!(
+		crate::configured_change_type_choices(&configuration),
+		vec!["docs".to_string(), "security".to_string(), "test".to_string()]
+	);
+}
+
+#[test]
 fn run_assist_renders_json_and_text_outputs() {
 	let json_output = crate::run_assist(crate::Assistant::Cursor, crate::AssistOutputFormat::Json)
 		.unwrap_or_else(|error| panic!("assist json: {error}"));
