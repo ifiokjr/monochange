@@ -246,6 +246,28 @@ fn discover_lockfiles_prefers_workspace_root_then_manifest_directory() {
 }
 
 #[test]
+fn discover_lockfiles_falls_back_to_manifest_directory() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/manifest-lockfile-workspace");
+	let package = PackageRecord::new(
+		Ecosystem::Cargo,
+		"lockfile-core",
+		fixture_root.join("crates/core/Cargo.toml"),
+		fixture_root.clone(),
+		None,
+		PublishState::Public,
+	);
+	let lockfiles = discover_lockfiles(&package);
+	assert_eq!(lockfiles.len(), 1);
+	assert_eq!(
+		lockfiles.first(),
+		Some(&monochange_core::normalize_path(
+			&fixture_root.join("crates/core/Cargo.lock")
+		))
+	);
+}
+
+#[test]
 fn update_versioned_file_updates_manifest_and_workspace_dependencies() {
 	let mut manifest: Value = toml::from_str(
 		r#"
@@ -371,6 +393,67 @@ version = "1.0.0"
 }
 
 #[test]
+fn adapter_discover_matches_direct_cargo_discovery() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/cargo/workspace");
+	let from_adapter = adapter()
+		.discover(&fixture_root)
+		.unwrap_or_else(|error| panic!("adapter discovery: {error}"));
+	let direct = discover_cargo_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("direct discovery: {error}"));
+	assert_eq!(from_adapter.packages, direct.packages);
+	assert_eq!(from_adapter.warnings, direct.warnings);
+}
+
+#[test]
+fn discover_cargo_packages_reports_workspace_warnings_and_private_packages() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/workspace-pattern-warnings");
+	let discovery = discover_cargo_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
+
+	assert_eq!(discovery.packages.len(), 3);
+	assert!(discovery
+		.warnings
+		.iter()
+		.any(|warning| warning.contains("missing/*") && warning.contains("matched no packages")));
+	let excluded_package = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "warning-excluded")
+		.unwrap_or_else(|| panic!("expected excluded package to be discovered standalone"));
+	assert_eq!(
+		excluded_package.workspace_root,
+		monochange_core::normalize_path(&fixture_root.join("crates/excluded"))
+	);
+	let private_package = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "warning-private")
+		.unwrap_or_else(|| panic!("expected private package"));
+	assert_eq!(private_package.publish_state, PublishState::Private);
+	let workspace_versioned = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "warning-core")
+		.unwrap_or_else(|| panic!("expected warning-core package"));
+	assert_eq!(
+		workspace_versioned
+			.current_version
+			.as_ref()
+			.map(ToString::to_string)
+			.as_deref(),
+		Some("3.2.1")
+	);
+	assert_eq!(
+		workspace_versioned
+			.metadata
+			.get("uses_workspace_version")
+			.map(String::as_str),
+		Some("true")
+	);
+}
+
+#[test]
 fn parse_package_version_prefers_workspace_version_when_requested() {
 	let workspace_version = semver::Version::new(2, 3, 4);
 	let version = parse_package_version(
@@ -394,6 +477,34 @@ fn dependency_constraint_supports_strings_and_tables() {
 		Some("~2.0".to_string())
 	);
 	assert_eq!(dependency_constraint(&Value::Boolean(true)), None);
+}
+
+#[test]
+fn rust_semver_provider_defaults_unknown_severity_to_none() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/cargo/workspace");
+	let discovery = discover_cargo_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
+	let package = discovery
+		.packages
+		.iter()
+		.find(|package| package.name == "cargo-core")
+		.unwrap_or_else(|| panic!("expected cargo-core package"));
+	let signal = ChangeSignal {
+		package_id: package.id.clone(),
+		requested_bump: None,
+		explicit_version: None,
+		change_origin: "direct-change".to_string(),
+		evidence_refs: vec!["cargo-semver:unexpected:manual review needed".to_string()],
+		notes: None,
+		details: None,
+		change_type: None,
+		source_path: PathBuf::from(".changeset/feature.md"),
+	};
+	let assessment = RustSemverProvider
+		.assess(package, &signal)
+		.unwrap_or_else(|| panic!("expected assessment"));
+	assert_eq!(assessment.severity, monochange_core::BumpSeverity::None);
+	assert_eq!(assessment.summary, "manual review needed");
 }
 
 #[test]

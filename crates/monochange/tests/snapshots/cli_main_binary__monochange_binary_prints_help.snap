@@ -1,0 +1,36 @@
+---
+source: crates/monochange/tests/cli_main_binary.rs
+info:
+  program: monochange
+  args:
+    - "--help"
+  env:
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Manage versions and releases for your multiplatform, multilanguage monorepo
+
+Usage: monochange <COMMAND>
+
+Commands:
+  init            Generate monochange.toml with detected packages, groups, and default CLI commands
+  assist          Print assistant setup guidance, install steps, and MCP configuration
+  release-record  Inspect the MonoChange release record associated with a tag or commit
+  mcp             Start the monochange MCP (Model Context Protocol) server over stdin/stdout
+  validate        Validate monochange configuration and changesets
+  discover        Discover packages across supported ecosystems
+  change          Create a change file for one or more packages
+  release         Prepare a release from discovered change files
+  commit-release  Prepare a release and create a local release commit with an embedded MonoChange release record
+  affected        Show packages affected by file changes and their changeset coverage
+  diagnostics     Show per-changeset diagnostics including context and commit/PR context
+  repair-release  Repair a recent release by moving its release tags to a later commit
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+
+----- stderr -----

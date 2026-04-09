@@ -1,0 +1,6 @@
+[workspace]
+members = ["crates/*", "missing/*"]
+exclude = ["crates/excluded/Cargo.toml"]
+
+[workspace.package]
+version = "3.2.1"

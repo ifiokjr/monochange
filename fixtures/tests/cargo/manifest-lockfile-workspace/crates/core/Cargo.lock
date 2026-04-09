@@ -1,0 +1,5 @@
+version = 3
+
+[[package]]
+name = "lockfile-core"
+version = "1.0.0"

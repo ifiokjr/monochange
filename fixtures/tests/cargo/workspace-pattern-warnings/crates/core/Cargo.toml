@@ -1,0 +1,3 @@
+[package]
+name = "warning-core"
+version.workspace = true

@@ -3991,6 +3991,122 @@ fn format_publish_state_and_source_operation_labels_are_stable() {
 	);
 }
 
+#[test]
+fn parse_output_format_accepts_text_and_json_and_rejects_invalid_values() {
+	assert_eq!(
+		crate::parse_output_format("text").unwrap(),
+		crate::OutputFormat::Text
+	);
+	assert_eq!(
+		crate::parse_output_format("json").unwrap(),
+		crate::OutputFormat::Json
+	);
+	let error = crate::parse_output_format("yaml")
+		.err()
+		.unwrap_or_else(|| panic!("expected output format error"));
+	assert!(error.to_string().contains("unsupported output format"));
+}
+
+#[test]
+fn effective_title_template_prefers_specific_then_defaults_then_builtin() {
+	assert_eq!(
+		crate::effective_title_template(Some("specific"), Some("default"), "builtin"),
+		"specific"
+	);
+	assert_eq!(
+		crate::effective_title_template(None, Some("default"), "builtin"),
+		"default"
+	);
+	assert_eq!(
+		crate::effective_title_template(None, None, "builtin"),
+		"builtin"
+	);
+}
+
+#[test]
+fn default_title_templates_follow_version_format_defaults() {
+	assert_eq!(
+		crate::default_release_title_for_format(VersionFormat::Primary),
+		monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY
+	);
+	assert_eq!(
+		crate::default_release_title_for_format(VersionFormat::Namespaced),
+		monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED
+	);
+	assert_eq!(
+		crate::default_changelog_version_title_for_format(VersionFormat::Primary),
+		monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY
+	);
+	assert_eq!(
+		crate::default_changelog_version_title_for_format(VersionFormat::Namespaced),
+		monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED
+	);
+}
+
+#[test]
+fn current_dir_or_dot_returns_current_directory() {
+	let current = std::env::current_dir().unwrap_or_else(|error| panic!("current dir: {error}"));
+	assert_eq!(crate::current_dir_or_dot(), current);
+}
+
+#[test]
+fn render_discovery_report_supports_json_and_text_formats() {
+	let report = monochange_core::DiscoveryReport {
+		workspace_root: PathBuf::from("."),
+		packages: vec![monochange_core::PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			PathBuf::from("crates/core/Cargo.toml"),
+			PathBuf::from("."),
+			Some(Version::new(1, 0, 0)),
+			monochange_core::PublishState::Public,
+		)],
+		dependencies: Vec::new(),
+		version_groups: vec![monochange_core::VersionGroup {
+			group_id: "sdk".to_string(),
+			display_name: "sdk".to_string(),
+			members: vec!["cargo:crates/core/Cargo.toml".to_string()],
+			mismatch_detected: false,
+		}],
+		warnings: vec!["warning text".to_string()],
+	};
+	let json = crate::render_discovery_report(&report, crate::OutputFormat::Json)
+		.unwrap_or_else(|error| panic!("json discovery: {error}"));
+	assert!(json.contains("\"workspaceRoot\""));
+	assert!(json.contains("\"warning text\""));
+
+	let text = crate::render_discovery_report(&report, crate::OutputFormat::Text)
+		.unwrap_or_else(|error| panic!("text discovery: {error}"));
+	assert!(text.contains("Workspace discovery for ."));
+	assert!(text.contains("Packages: 1"));
+	assert!(text.contains("Warnings:"));
+}
+
+#[test]
+fn find_previous_tag_returns_previous_matching_prefix() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	init_git_repo(tempdir.path());
+	fs::write(tempdir.path().join("release.txt"), "first\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(tempdir.path(), &["add", "release.txt"]);
+	git_in_temp_repo(tempdir.path(), &["commit", "-m", "first release"]);
+	git_in_temp_repo(tempdir.path(), &["tag", "core/v1.0.0"]);
+	fs::write(tempdir.path().join("release.txt"), "second\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git_in_temp_repo(tempdir.path(), &["add", "release.txt"]);
+	git_in_temp_repo(tempdir.path(), &["commit", "-m", "second release"]);
+	git_in_temp_repo(tempdir.path(), &["tag", "core/v1.2.0"]);
+	git_in_temp_repo(tempdir.path(), &["tag", "app/v9.9.9"]);
+	assert_eq!(
+		crate::find_previous_tag(tempdir.path(), "core/v1.2.0"),
+		Some("core/v1.0.0".to_string())
+	);
+	assert_eq!(
+		crate::find_previous_tag(tempdir.path(), "core/v1.0.0"),
+		None
+	);
+}
+
 fn sample_planned_group() -> monochange_core::PlannedVersionGroup {
 	monochange_core::PlannedVersionGroup {
 		group_id: "sdk".to_string(),
