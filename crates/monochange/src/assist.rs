@@ -7,7 +7,7 @@ use serde_json::json;
 use crate::AssistOutputFormat;
 use crate::Assistant;
 
-fn assistant_display_name(assistant: Assistant) -> &'static str {
+pub(crate) fn assistant_display_name(assistant: Assistant) -> &'static str {
 	match assistant {
 		Assistant::Generic => "Generic MCP client",
 		Assistant::Claude => "Claude",
@@ -17,7 +17,7 @@ fn assistant_display_name(assistant: Assistant) -> &'static str {
 	}
 }
 
-fn assistant_setup_payload(assistant: Assistant) -> serde_json::Value {
+pub(crate) fn assistant_setup_payload(assistant: Assistant) -> serde_json::Value {
 	let mcp_config = json!({
 		"mcpServers": {
 			"monochange": {

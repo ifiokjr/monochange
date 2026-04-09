@@ -1,4 +1,5 @@
 [workspace]
+exclude = ["testing/monochange_test_helpers"]
 members = [
 	"crates/monochange",
 	"crates/monochange_cargo",

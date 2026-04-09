@@ -349,31 +349,13 @@ mod __tests {
 	use std::path::PathBuf;
 
 	use insta::assert_snapshot;
+	use monochange_test_helpers::content_text;
+	use monochange_test_helpers::copy_directory;
+	use monochange_test_helpers::current_test_name;
+	use monochange_test_helpers::snapshot_settings;
 	use rmcp::handler::server::wrapper::Parameters;
 	use rmcp::ServerHandler;
 	use tempfile::tempdir;
-
-	#[allow(dead_code)]
-	mod shared_fs_test_support {
-		include!(concat!(
-			env!("CARGO_MANIFEST_DIR"),
-			"/../../testing/test_support/fs.rs"
-		));
-	}
-	#[allow(dead_code)]
-	mod shared_insta_test_support {
-		include!(concat!(
-			env!("CARGO_MANIFEST_DIR"),
-			"/../../testing/test_support/insta.rs"
-		));
-	}
-	#[allow(dead_code)]
-	mod shared_rmcp_test_support {
-		include!(concat!(
-			env!("CARGO_MANIFEST_DIR"),
-			"/../../testing/test_support/rmcp.rs"
-		));
-	}
 
 	use super::json_error_result;
 	use super::json_result;
@@ -384,12 +366,16 @@ mod __tests {
 	use super::MonochangeMcpServer;
 	use super::PathParam;
 
-	use shared_fs_test_support::copy_directory;
-	use shared_fs_test_support::current_test_name;
-	use shared_fs_test_support::setup_fixture;
-	use shared_fs_test_support::setup_scenario_workspace;
-	use shared_insta_test_support::snapshot_settings;
-	use shared_rmcp_test_support::content_text;
+	fn setup_fixture(relative: &str) -> tempfile::TempDir {
+		monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
+	}
+
+	fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
+		monochange_test_helpers::fs::setup_scenario_workspace_from(
+			env!("CARGO_MANIFEST_DIR"),
+			relative,
+		)
+	}
 
 	#[test]
 	fn shared_fs_test_support_helpers_cover_names_and_scenario_copying() {

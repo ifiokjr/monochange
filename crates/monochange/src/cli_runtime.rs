@@ -1340,7 +1340,7 @@ fn cli_command_output_format(
 		.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))
 }
 
-fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
+pub(crate) fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
 	match value {
 		"text" => Ok(OutputFormat::Text),
 		"json" => Ok(OutputFormat::Json),

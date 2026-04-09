@@ -11,16 +11,9 @@ use monochange_core::GroupChangelogInclude;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_test_helpers::current_test_name;
 use semver::Version;
 use tempfile::tempdir;
-
-#[allow(dead_code)]
-#[path = "../../../testing/test_support/fs.rs"]
-mod shared_fs_test_support;
-use shared_fs_test_support::current_test_name;
-use shared_fs_test_support::fixture_path;
-use shared_fs_test_support::setup_fixture;
-use shared_fs_test_support::setup_scenario_workspace;
 
 use crate::apply_version_groups;
 use crate::load_change_signals;
@@ -28,6 +21,18 @@ use crate::load_changeset_file;
 use crate::load_workspace_configuration;
 use crate::resolve_package_reference;
 use crate::validate_workspace;
+
+fn fixture_path(relative: &str) -> PathBuf {
+	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+fn setup_fixture(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_scenario_workspace_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
 
 #[test]
 fn shared_fs_test_support_helpers_cover_plain_and_case_names_and_fixture_copying() {
