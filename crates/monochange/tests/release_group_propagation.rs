@@ -1,41 +1,19 @@
-use std::process::Command;
-
-use insta_cmd::get_cargo_bin;
+use insta::assert_json_snapshot;
 use serde_json::Value;
-use tempfile::tempdir;
 
 mod test_support;
-use test_support::{copy_directory, fixture_path};
-
-fn cli() -> Command {
-	let mut command = Command::new(get_cargo_bin("mc"));
-	command.env("NO_COLOR", "1");
-	command.env("MONOCHANGE_RELEASE_DATE", "2026-04-06");
-	command
-}
+use test_support::{run_json_command, setup_scenario_workspace, snapshot_settings};
 
 #[test]
 fn grouped_member_changes_patch_dependents_outside_the_group() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_root = fixture_path("integration/grouped-dependent-propagation");
-	copy_directory(&fixture_root, tempdir.path());
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix("grouped_member_changes_patch_dependents_outside_the_group");
+	let _guard = settings.bind_to_scope();
 
-	let output = cli()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("json")
-		.output()
-		.unwrap_or_else(|error| panic!("release output: {error}"));
-	assert!(
-		output.status.success(),
-		"{}",
-		String::from_utf8_lossy(&output.stderr)
-	);
+	let tempdir = setup_scenario_workspace("integration/grouped-dependent-propagation");
+	let json: Value = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
+	assert_json_snapshot!(json);
 
-	let json: Value = serde_json::from_slice(&output.stdout)
-		.unwrap_or_else(|error| panic!("parse json: {error}"));
 	let decisions = json["plan"]["decisions"]
 		.as_array()
 		.unwrap_or_else(|| panic!("decisions array"));
