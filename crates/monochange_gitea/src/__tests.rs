@@ -1,6 +1,4 @@
-use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -27,6 +25,8 @@ use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::SourceReleaseOperation;
 use monochange_core::VersionFormat;
+use monochange_test_helpers::git;
+use monochange_test_helpers::git_output;
 use tempfile::tempdir;
 
 use super::*;
@@ -701,23 +701,4 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 	std::fs::write(repo.join("release.txt"), "after\n")
 		.unwrap_or_else(|error| panic!("update release file: {error}"));
 	(tempdir, repo)
-}
-
-fn git(root: &Path, args: &[&str]) {
-	let status = Command::new("git")
-		.current_dir(root)
-		.args(args)
-		.status()
-		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
-	assert!(status.success(), "git {args:?} failed");
-}
-
-fn git_output(root: &Path, args: &[&str]) -> String {
-	let output = Command::new("git")
-		.current_dir(root)
-		.args(args)
-		.output()
-		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
-	assert!(output.status.success(), "git {args:?} failed");
-	String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("utf8: {error}"))
 }
