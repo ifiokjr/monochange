@@ -2628,6 +2628,103 @@ fn template_context_exposes_retarget_namespace() {
 }
 
 #[test]
+fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
+	let mut step_outputs = BTreeMap::new();
+	step_outputs.insert(
+		"lint".to_string(),
+		crate::CommandStepOutput {
+			stdout: "ok".to_string(),
+			stderr: String::new(),
+		},
+	);
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: Some(sample_prepared_release_for_cli_render()),
+		release_manifest_path: Some(PathBuf::from("target/release-manifest.json")),
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: Some(monochange_core::ChangesetPolicyEvaluation {
+			status: monochange_core::ChangesetPolicyStatus::Passed,
+			required: true,
+			enforce: false,
+			summary: "covered".to_string(),
+			comment: None,
+			labels: Vec::new(),
+			matched_skip_labels: Vec::new(),
+			changed_paths: vec!["crates/core/src/lib.rs".to_string()],
+			matched_paths: vec!["crates/core/src/lib.rs".to_string()],
+			ignored_paths: Vec::new(),
+			changeset_paths: vec![".changeset/core.md".to_string()],
+			affected_package_ids: vec!["core".to_string()],
+			covered_package_ids: vec!["core".to_string()],
+			uncovered_package_ids: Vec::new(),
+			errors: Vec::new(),
+		}),
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs,
+		command_logs: Vec::new(),
+	};
+	let inputs = BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
+	let variables = BTreeMap::from([
+		("custom_version".to_string(), monochange_core::CommandVariable::Version),
+		(
+			"custom_changesets".to_string(),
+			monochange_core::CommandVariable::Changesets,
+		),
+	]);
+	let template_context = crate::build_cli_template_context(&context, &inputs, Some(&variables));
+	assert_eq!(
+		template_context
+			.get("manifest")
+			.and_then(|value| value.pointer("/path"))
+			.and_then(serde_json::Value::as_str),
+		Some("target/release-manifest.json")
+	);
+	assert_eq!(
+		template_context
+			.get("affected")
+			.and_then(|value| value.pointer("/status"))
+			.and_then(serde_json::Value::as_str),
+		Some("passed")
+	);
+	assert_eq!(
+		template_context
+			.get("steps")
+			.and_then(|value| value.pointer("/lint/stdout"))
+			.and_then(serde_json::Value::as_str),
+		Some("ok")
+	);
+	assert_eq!(
+		template_context
+			.get("custom_version")
+			.and_then(serde_json::Value::as_str),
+		Some("1.2.3")
+	);
+	assert_eq!(
+		template_context
+			.get("custom_changesets")
+			.and_then(serde_json::Value::as_str),
+		Some("")
+	);
+	assert_eq!(
+		template_context
+			.get("released_packages_list")
+			.and_then(serde_json::Value::as_array)
+			.map(Vec::len),
+		Some(1)
+	);
+}
+
+#[test]
 fn render_cli_command_result_prefers_retarget_report() {
 	let cli_command = monochange_core::CliCommandDefinition {
 		name: "repair-release".to_string(),
