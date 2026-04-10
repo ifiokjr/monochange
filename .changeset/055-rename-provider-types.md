@@ -2,6 +2,8 @@
 monochange_core: minor
 monochange_config: patch
 monochange_github: patch
+monochange_gitea: patch
+monochange_gitlab: patch
 monochange: patch
 ---
 
