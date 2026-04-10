@@ -229,6 +229,7 @@ pub enum Ecosystem {
 	Deno,
 	Dart,
 	Flutter,
+	Python,
 }
 
 impl Ecosystem {
@@ -241,6 +242,7 @@ impl Ecosystem {
 			Self::Deno => "deno",
 			Self::Dart => "dart",
 			Self::Flutter => "flutter",
+			Self::Python => "python",
 		}
 	}
 }
@@ -489,6 +491,7 @@ pub enum PackageType {
 	Deno,
 	Dart,
 	Flutter,
+	Python,
 }
 
 impl PackageType {
@@ -501,6 +504,7 @@ impl PackageType {
 			Self::Deno => "deno",
 			Self::Dart => "dart",
 			Self::Flutter => "flutter",
+			Self::Python => "python",
 		}
 	}
 }
@@ -522,6 +526,7 @@ pub enum EcosystemType {
 	Npm,
 	Deno,
 	Dart,
+	Python,
 }
 
 impl EcosystemType {
@@ -531,6 +536,7 @@ impl EcosystemType {
 		match self {
 			Self::Cargo => "",
 			Self::Npm | Self::Deno | Self::Dart => "^",
+			Self::Python => ">=",
 		}
 	}
 
@@ -542,6 +548,7 @@ impl EcosystemType {
 			Self::Npm => &["dependencies", "devDependencies", "peerDependencies"],
 			Self::Deno => &["imports"],
 			Self::Dart => &["dependencies", "dev_dependencies"],
+			Self::Python => &["dependencies"],
 		}
 	}
 }
@@ -3652,6 +3659,7 @@ pub struct WorkspaceConfiguration {
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,
 	pub dart: EcosystemSettings,
+	pub python: EcosystemSettings,
 }
 
 impl WorkspaceConfiguration {

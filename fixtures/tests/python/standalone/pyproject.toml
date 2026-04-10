@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "standalone-tool"
+version = "2.5.0"
+requires-python = ">=3.8"
+dependencies = [
+	"requests>=2.28.0",
+	"numpy>=1.20.0; python_version < '3.9'",
+]

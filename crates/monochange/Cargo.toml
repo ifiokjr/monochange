@@ -22,11 +22,12 @@ pkg-fmt = "tgz"
 bin-dir = "{ bin }{ binary-ext }"
 
 [features]
-default = ["cargo", "npm", "deno", "dart", "github", "gitlab", "gitea"]
+default = ["cargo", "npm", "deno", "dart", "python", "github", "gitlab", "gitea"]
 cargo = ["monochange_cargo"]
 npm = ["monochange_npm"]
 deno = ["monochange_deno"]
 dart = ["monochange_dart"]
+python = ["monochange_python"]
 github = ["monochange_github", "monochange_core/http"]
 gitlab = ["monochange_gitlab", "monochange_core/http"]
 gitea = ["monochange_gitea", "monochange_core/http"]
@@ -50,6 +51,7 @@ monochange_gitlab = { workspace = true, optional = true }
 monochange_graph = { workspace = true }
 monochange_lint = { workspace = true }
 monochange_npm = { workspace = true, optional = true }
+monochange_python = { workspace = true, optional = true }
 monochange_semver = { workspace = true }
 rayon = { workspace = true, default-features = true }
 regex = { workspace = true, default-features = true }
