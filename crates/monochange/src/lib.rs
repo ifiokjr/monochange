@@ -140,6 +140,8 @@ use serde_json::json;
 
 use assist::run_assist;
 use cli::build_command_with_cli;
+use cli::cli_commands_from_config;
+#[cfg(test)]
 use cli::cli_commands_for_root;
 use cli::current_dir_or_dot;
 use cli_runtime::execute_matches;
@@ -522,7 +524,7 @@ where
 {
 	let args = args.into_iter().collect::<Vec<_>>();
 	let configuration = load_workspace_configuration(root);
-	let cli = cli_commands_for_root(root);
+	let cli = cli_commands_from_config(&configuration);
 	let matches = match build_command_with_cli(bin_name, &cli).try_get_matches_from(args) {
 		Ok(matches) => matches,
 		Err(error)

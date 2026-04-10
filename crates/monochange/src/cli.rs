@@ -58,14 +58,23 @@ pub(crate) fn apply_runtime_change_type_choices(
 }
 
 pub(crate) fn cli_commands_for_root(root: &Path) -> Vec<CliCommandDefinition> {
-	load_workspace_configuration(root).map_or_else(
-		|_| default_cli_commands(),
-		|configuration| {
+	let configuration = load_workspace_configuration(root);
+	cli_commands_from_config(&configuration)
+}
+
+/// Extract CLI commands from an already-loaded configuration result, avoiding
+/// a redundant config load when the caller has already parsed the config.
+pub(crate) fn cli_commands_from_config(
+	configuration: &Result<monochange_core::WorkspaceConfiguration, monochange_core::MonochangeError>,
+) -> Vec<CliCommandDefinition> {
+	match configuration {
+		Ok(configuration) => {
 			let mut cli = configuration.cli.clone();
-			apply_runtime_change_type_choices(&mut cli, &configuration);
+			apply_runtime_change_type_choices(&mut cli, configuration);
 			cli
-		},
-	)
+		}
+		Err(_) => default_cli_commands(),
+	}
 }
 
 pub(crate) fn build_command_for_root(bin_name: &'static str, root: &Path) -> Command {
