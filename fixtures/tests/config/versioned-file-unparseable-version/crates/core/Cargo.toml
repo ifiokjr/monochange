@@ -1,0 +1,3 @@
+[package]
+name = "workflow-core"
+edition = "2021"
