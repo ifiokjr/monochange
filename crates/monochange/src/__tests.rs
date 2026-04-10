@@ -7540,3 +7540,48 @@ fn template_rendering_does_not_interpret_variable_content_as_template_syntax() {
 		"- fix: handle {{ curly_braces }} in output (core@1.0.0)"
 	);
 }
+
+#[test]
+fn release_command_updates_versioned_files_and_changelogs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	copy_fixture("monochange/release-base", root);
+	init_git_repo(root);
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+
+	let output = run_cli(root, [OsString::from("mc"), OsString::from("release")])
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+
+	// Release should report the planned version.
+	assert!(
+		output.contains("1.1.0"),
+		"expected version 1.1.0 in output: {output}"
+	);
+
+	// Verify the group versioned file was updated.
+	let group_toml = fs::read_to_string(root.join("group.toml"))
+		.unwrap_or_else(|error| panic!("group: {error}"));
+	assert!(
+		group_toml.contains("1.1.0"),
+		"expected group.toml to contain 1.1.0: {group_toml}"
+	);
+
+	// Verify the changelog was generated with the release section.
+	let changelog = fs::read_to_string(root.join("changelog.md"))
+		.unwrap_or_else(|error| panic!("changelog: {error}"));
+	assert!(
+		changelog.contains("1.1.0"),
+		"expected changelog to contain 1.1.0: {changelog}"
+	);
+	assert!(
+		changelog.contains("add release command"),
+		"expected changelog to contain changeset summary"
+	);
+
+	// Verify changeset files were consumed (deleted).
+	assert!(
+		!root.join(".changeset/feature.md").exists(),
+		"expected changeset file to be deleted after release"
+	);
+}
