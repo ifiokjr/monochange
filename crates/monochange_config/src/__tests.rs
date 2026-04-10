@@ -2463,3 +2463,15 @@ fn matching_package_helpers_cover_references_and_definitions() {
 		monochange_core::PackageType::Flutter
 	));
 }
+
+#[test]
+fn load_workspace_configuration_rejects_versioned_file_without_type_or_regex() {
+	let root = fixture_path("config/rejects-versioned-file-without-type-or-regex");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(rendered.contains("versioned_files must set `type`"));
+	assert!(rendered.contains("versioned_files entry is missing `type`"));
+}

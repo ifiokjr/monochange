@@ -1,0 +1,8 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+versioned_files = [
+    { path = "extra.toml" }
+]

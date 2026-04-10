@@ -48,7 +48,62 @@ use crate::RELEASE_RECORD_END_MARKER;
 use crate::RELEASE_RECORD_HEADING;
 use crate::RELEASE_RECORD_KIND;
 use crate::RELEASE_RECORD_SCHEMA_VERSION;
+use crate::VersionedFileDefinition;
 use crate::RELEASE_RECORD_START_MARKER;
+use crate::git::git_checkout_branch_command;
+use crate::git::git_push_branch_command;
+
+#[test]
+fn git_checkout_branch_command_builds_expected_arguments() {
+	let root = PathBuf::from("/tmp/test-repo");
+	let command = git_checkout_branch_command(&root, "release/v1.0.0");
+	let args: Vec<_> = command.get_args().collect();
+	assert_eq!(args, &["checkout", "-B", "release/v1.0.0"]);
+	assert_eq!(command.get_current_dir(), Some(root.as_path()));
+}
+
+#[test]
+fn git_push_branch_command_builds_expected_arguments() {
+	let root = PathBuf::from("/tmp/test-repo");
+	let command = git_push_branch_command(&root, "release/v1.0.0");
+	let args: Vec<_> = command.get_args().collect();
+	assert_eq!(
+		args,
+		&[
+			"push",
+			"--force-with-lease",
+			"origin",
+			"HEAD:release/v1.0.0"
+		]
+	);
+	assert_eq!(command.get_current_dir(), Some(root.as_path()));
+}
+
+#[test]
+fn versioned_file_definition_uses_regex_returns_true_when_set() {
+	let definition = VersionedFileDefinition {
+		path: "README.md".to_string(),
+		ecosystem_type: None,
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: Some(r"v(?<version>\d+\.\d+\.\d+)".to_string()),
+	};
+	assert!(definition.uses_regex());
+}
+
+#[test]
+fn versioned_file_definition_uses_regex_returns_false_when_unset() {
+	let definition = VersionedFileDefinition {
+		path: "Cargo.toml".to_string(),
+		ecosystem_type: Some(crate::EcosystemType::Cargo),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	assert!(!definition.uses_regex());
+}
 
 #[test]
 fn workspace_defaults_default_has_no_extra_changelog_sections() {

@@ -198,7 +198,7 @@ fn render_cached_document_bytes(
 	}
 }
 
-fn render_cached_document_text(path: &Path, document: CachedDocument) -> MonochangeResult<String> {
+pub(crate) fn render_cached_document_text(path: &Path, document: CachedDocument) -> MonochangeResult<String> {
 	String::from_utf8(render_cached_document_bytes(path, document)?).map_err(|error| {
 		MonochangeError::Config(format!(
 			"failed to parse {} as text: {error}",
@@ -217,7 +217,7 @@ pub(crate) fn serialize_cached_document(
 	})
 }
 
-fn read_cached_text_document(
+pub(crate) fn read_cached_text_document(
 	updates: &mut BTreeMap<PathBuf, CachedDocument>,
 	path: &Path,
 ) -> MonochangeResult<String> {
