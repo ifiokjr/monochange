@@ -1,0 +1,5 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: error.to_string()
+---
+config error: failed to parse [ROOT]/binary.bin as text: invalid utf-8 sequence of 1 bytes from index 0

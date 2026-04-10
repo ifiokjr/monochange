@@ -21,6 +21,7 @@ use monochange_core::PreparedChangesetTarget;
 use monochange_core::VersionFormat;
 use monochange_test_helpers::copy_directory;
 use monochange_test_helpers::current_test_name;
+use monochange_test_helpers::snapshot_settings;
 use semver::Version;
 use tempfile::tempdir;
 
@@ -7449,40 +7450,41 @@ fn git_output_in_temp_repo(root: &Path, args: &[&str]) -> String {
 
 #[test]
 fn render_cached_document_text_rejects_invalid_utf8() {
+	let _guard = snapshot_settings().bind_to_scope();
 	let path = PathBuf::from("binary.bin");
 	let document = crate::CachedDocument::Bytes(vec![0xFF, 0xFE, 0x00]);
 	let error = crate::versioned_files::render_cached_document_text(&path, document)
 		.err()
 		.unwrap_or_else(|| panic!("expected utf8 error"));
-	assert!(error.to_string().contains("failed to parse binary.bin as text"));
+	insta::assert_snapshot!(error.to_string());
 }
 
 #[test]
 fn read_cached_text_document_returns_error_for_nonexistent_file() {
+	let _guard = snapshot_settings().bind_to_scope();
 	let mut updates = BTreeMap::new();
 	let path = PathBuf::from("/nonexistent/path/to/file.txt");
 	let error = crate::versioned_files::read_cached_text_document(&mut updates, &path)
 		.err()
 		.unwrap_or_else(|| panic!("expected io error"));
-	assert!(error.to_string().contains("failed to read /nonexistent/path/to/file.txt"));
+	insta::assert_snapshot!(error.to_string());
 }
 
 #[test]
 fn read_cached_text_document_returns_error_for_invalid_utf8_on_disk() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let file_path = tempdir.path().join("binary.bin");
-	fs::write(&file_path, [0xFF, 0xFE, 0x00])
-		.unwrap_or_else(|error| panic!("write binary: {error}"));
+	let _guard = snapshot_settings().bind_to_scope();
+	let fixture = setup_fixture("monochange/invalid-utf8-file");
+	let file_path = fixture.path().join("binary.bin");
 	let mut updates = BTreeMap::new();
 	let error = crate::versioned_files::read_cached_text_document(&mut updates, &file_path)
 		.err()
 		.unwrap_or_else(|| panic!("expected utf8 error"));
-	assert!(error.to_string().contains("failed to parse"));
-	assert!(error.to_string().contains("as text"));
+	insta::assert_snapshot!(error.to_string());
 }
 
 #[test]
 fn apply_versioned_file_definition_reports_invalid_glob_pattern() {
+	let _guard = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = versioned_test_configuration();
 	let context = versioned_test_context(&configuration, BTreeMap::new(), &[]);
@@ -7506,11 +7508,12 @@ fn apply_versioned_file_definition_reports_invalid_glob_pattern() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected glob error"));
-	assert!(error.to_string().contains("invalid glob pattern `[invalid`"));
+	insta::assert_snapshot!(error.to_string());
 }
 
 #[test]
 fn apply_versioned_file_definition_reports_missing_ecosystem_type() {
+	let _guard = snapshot_settings().bind_to_scope();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = versioned_test_configuration();
 	let context = versioned_test_context(&configuration, BTreeMap::new(), &[]);
@@ -7534,7 +7537,5 @@ fn apply_versioned_file_definition_reports_missing_ecosystem_type() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing ecosystem type error"));
-	assert!(error
-		.to_string()
-		.contains("is missing an ecosystem type"));
+	insta::assert_snapshot!(error.to_string());
 }

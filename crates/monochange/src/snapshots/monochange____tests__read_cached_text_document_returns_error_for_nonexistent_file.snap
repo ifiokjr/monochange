@@ -1,0 +1,5 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: error.to_string()
+---
+io error: failed to read /nonexistent/path/to/file.txt: No such file or directory (os error 2)
