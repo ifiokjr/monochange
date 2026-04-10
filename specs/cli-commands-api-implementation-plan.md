@@ -22,7 +22,7 @@
 3. **CLI runtime update**
    - build clap subcommands from configured CLI commands
    - keep implicit `--dry-run` support
-   - preserve default synthesized commands when config omits `cli`
+   - preserve the built-in default command set and let same-name config entries replace individual commands
 
 4. **Init output update**
    - emit `[cli.<command>]` definitions from `mc init`

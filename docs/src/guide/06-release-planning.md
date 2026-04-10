@@ -131,7 +131,7 @@ mc release
 
 <!-- {=releaseWorkflowBehavior} -->
 
-`mc release` is a config-defined top-level command. When your config omits `[cli.<command>]` entries, monochange synthesizes the default `release` command automatically.
+`mc release` is part of monochange's built-in default command set. You only need to add `[cli.release]` when you want to replace that default definition with your own steps, inputs, or help text.
 
 During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
 

@@ -257,7 +257,7 @@ lockfile_commands = [
 
 ## CLI commands
 
-CLI commands are user-defined top-level commands. Each `[cli.<command>]` entry becomes invocable as `mc <command>`, and legacy `[[workflows]]` tables are no longer supported.
+CLI commands are user-defined top-level commands. monochange starts from its built-in default command set, then applies each `[cli.<command>]` entry as a full command override when the name matches or as an additional command when it does not. Each resulting command becomes invocable as `mc <command>`, and legacy `[[workflows]]` tables are no longer supported.
 
 <!-- {=configurationWorkflowsSnippet} -->
 

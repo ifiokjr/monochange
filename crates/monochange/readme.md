@@ -43,7 +43,7 @@ mc mcp
 
 - aggregate all supported ecosystem adapters
 - load `monochange.toml`
-- synthesize default CLI commands when config does not declare any
+- start from the built-in default CLI commands and let matching config entries replace them
 - resolve change input files
 - render discovery and release command output in text or JSON
 - execute configured CLI commands plus built-in assistant setup and MCP commands

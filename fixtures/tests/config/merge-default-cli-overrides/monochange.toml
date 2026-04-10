@@ -1,0 +1,19 @@
+[cli.release]
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[[cli.release.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+
+[cli.release-manifest]
+help_text = "Prepare a release and write a stable JSON manifest"
+
+[[cli.release-manifest.steps]]
+type = "PrepareRelease"
+
+[[cli.release-manifest.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
