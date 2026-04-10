@@ -135,6 +135,8 @@ mc release
 
 Commands like `commit-release` (which combines `PrepareRelease` + `CommitRelease` steps) are not included in the defaults — define them explicitly in your `monochange.toml` when you need them.
 
+During migration, you may still see references to `[[package_overrides]]` in older documentation or repositories, but release preparation now expects package/group declarations and consumes `.changeset/*.md` files through that new model.
+
 Current `PrepareRelease` behavior:
 
 - reads `.changeset/*.md`
