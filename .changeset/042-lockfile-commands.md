@@ -39,23 +39,23 @@ Regex entries let you version-stamp any plain-text file — README badges, downl
 [package.core]
 path = "crates/core"
 versioned_files = [
-    # update a download link in the README
-    { path = "README.md", regex = 'https://example\.com/download/v(?<version>\d+\.\d+\.\d+)\.tgz' },
-    # update a version badge
-    { path = "README.md", regex = 'img\.shields\.io/badge/version-(?<version>\d+\.\d+\.\d+)-blue' },
+	# update a download link in the README
+	{ path = "README.md", regex = 'https://example\.com/download/v(?<version>\d+\.\d+\.\d+)\.tgz' },
+	# update a version badge
+	{ path = "README.md", regex = 'img\.shields\.io/badge/version-(?<version>\d+\.\d+\.\d+)-blue' },
 ]
 
 [group.sdk]
 packages = ["core", "cli"]
 versioned_files = [
-    # update the install script across all packages (glob pattern)
-    { path = "**/install.sh", regex = 'SDK_VERSION="(?<version>\d+\.\d+\.\d+)"' },
+	# update the install script across all packages (glob pattern)
+	{ path = "**/install.sh", regex = 'SDK_VERSION="(?<version>\d+\.\d+\.\d+)"' },
 ]
 
 [ecosystems.cargo]
 versioned_files = [
-    # update a workspace-wide version constant
-    { path = "crates/constants/src/lib.rs", regex = 'pub const VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' },
+	# update a workspace-wide version constant
+	{ path = "crates/constants/src/lib.rs", regex = 'pub const VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' },
 ]
 ```
 

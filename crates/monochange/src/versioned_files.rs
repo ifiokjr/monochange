@@ -198,7 +198,10 @@ fn render_cached_document_bytes(
 	}
 }
 
-pub(crate) fn render_cached_document_text(path: &Path, document: CachedDocument) -> MonochangeResult<String> {
+pub(crate) fn render_cached_document_text(
+	path: &Path,
+	document: CachedDocument,
+) -> MonochangeResult<String> {
 	String::from_utf8(render_cached_document_bytes(path, document)?).map_err(|error| {
 		MonochangeError::Config(format!(
 			"failed to parse {} as text: {error}",

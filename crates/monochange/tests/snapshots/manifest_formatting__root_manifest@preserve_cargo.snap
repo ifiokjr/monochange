@@ -9,7 +9,7 @@ resolver = "2"
 # Keep this comment exactly where it is.
 [workspace.package]
 version = "1.1.0"
-authors = ["Monochange Maintainers"]
+authors = ["monochange Maintainers"]
 
 [workspace.dependencies]
 workflow-core = { path = "./crates/core", version = "1.1.0", default-features = false }

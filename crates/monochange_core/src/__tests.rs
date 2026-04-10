@@ -15,6 +15,8 @@ use crate::ChangesetVerificationSettings;
 use crate::CliStepDefinition;
 use crate::DependencyKind;
 
+use crate::git::git_checkout_branch_command;
+use crate::git::git_push_branch_command;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
 use crate::GroupChangelogInclude;
@@ -42,16 +44,14 @@ use crate::RetargetTagResult;
 use crate::ShellConfig;
 use crate::SourceProvider;
 use crate::VersionFormat;
+use crate::VersionedFileDefinition;
 use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
 use crate::RELEASE_RECORD_END_MARKER;
 use crate::RELEASE_RECORD_HEADING;
 use crate::RELEASE_RECORD_KIND;
 use crate::RELEASE_RECORD_SCHEMA_VERSION;
-use crate::VersionedFileDefinition;
 use crate::RELEASE_RECORD_START_MARKER;
-use crate::git::git_checkout_branch_command;
-use crate::git::git_push_branch_command;
 
 #[test]
 fn git_checkout_branch_command_builds_expected_arguments() {

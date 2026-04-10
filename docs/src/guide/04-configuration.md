@@ -200,23 +200,23 @@ Regex entries let you version-stamp any plain-text file — README badges, downl
 [package.core]
 path = "crates/core"
 versioned_files = [
-    # update a download link in the README
-    { path = "README.md", regex = 'https://example\.com/download/v(?<version>\d+\.\d+\.\d+)\.tgz' },
-    # update a version badge
-    { path = "README.md", regex = 'img\.shields\.io/badge/version-(?<version>\d+\.\d+\.\d+)-blue' },
+	# update a download link in the README
+	{ path = "README.md", regex = 'https://example\.com/download/v(?<version>\d+\.\d+\.\d+)\.tgz' },
+	# update a version badge
+	{ path = "README.md", regex = 'img\.shields\.io/badge/version-(?<version>\d+\.\d+\.\d+)-blue' },
 ]
 
 [group.sdk]
 packages = ["core", "cli"]
 versioned_files = [
-    # update the install script across all packages (glob pattern)
-    { path = "**/install.sh", regex = 'SDK_VERSION="(?<version>\d+\.\d+\.\d+)"' },
+	# update the install script across all packages (glob pattern)
+	{ path = "**/install.sh", regex = 'SDK_VERSION="(?<version>\d+\.\d+\.\d+)"' },
 ]
 
 [ecosystems.cargo]
 versioned_files = [
-    # update a workspace-wide version constant
-    { path = "crates/constants/src/lib.rs", regex = 'pub const VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' },
+	# update a workspace-wide version constant
+	{ path = "crates/constants/src/lib.rs", regex = 'pub const VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' },
 ]
 ```
 
@@ -231,9 +231,9 @@ Key rules:
 
 ## Lockfile commands
 
-Lockfile refresh is command-driven. MonoChange runs lockfile commands only when at least one package in that ecosystem receives a planned version change, whether directly or through a group release.
+Lockfile refresh is command-driven. monochange runs lockfile commands only when at least one package in that ecosystem receives a planned version change, whether directly or through a group release.
 
-When you do not configure `lockfile_commands`, MonoChange infers sensible defaults:
+When you do not configure `lockfile_commands`, monochange infers sensible defaults:
 
 - Cargo: `cargo generate-lockfile`
 - npm-family: detects owned lockfiles and runs the matching command for each workspace root
@@ -243,7 +243,7 @@ When you do not configure `lockfile_commands`, MonoChange infers sensible defaul
 - Dart / Flutter: `dart pub get` or `flutter pub get`
 - Deno: no inferred default today
 
-If you configure `lockfile_commands` for an ecosystem, MonoChange stops inferring defaults for that ecosystem and those commands fully own lockfile refresh.
+If you configure `lockfile_commands` for an ecosystem, monochange stops inferring defaults for that ecosystem and those commands fully own lockfile refresh.
 
 ```toml
 [ecosystems.npm]
