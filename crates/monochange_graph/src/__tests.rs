@@ -580,3 +580,48 @@ fn build_release_plan_returns_error_for_unknown_group_in_changeset() {
 	assert!(error.to_string().contains("nonexistent-group"));
 	assert!(error.to_string().contains("not found"));
 }
+
+#[test]
+fn build_release_plan_warns_on_missing_group_member_during_traversal() {
+	// Group has a member "ghost" that doesn't exist in packages.
+	// The BFS should warn but not crash, and the present member
+	// should still be synchronized.
+	let mut core = package("cargo:core", Version::new(1, 0, 0));
+	core.version_group_id = Some("sdk".to_string());
+	let version_group = VersionGroup {
+		group_id: "sdk".to_string(),
+		display_name: "sdk".to_string(),
+		members: vec![core.id.clone(), "ghost".to_string()],
+		mismatch_detected: false,
+	};
+
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/mixed").as_path(),
+		&[core.clone()],
+		&[],
+		&[version_group],
+		&[ChangeSignal {
+			package_id: core.id.clone(),
+			requested_bump: Some(BumpSeverity::Minor),
+			explicit_version: None,
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: Some("feature".to_string()),
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/feature.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	// core should still get its bump despite the ghost member.
+	let core_decision = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == core.id)
+		.unwrap_or_else(|| panic!("expected core decision"));
+	assert_eq!(core_decision.recommended_bump, BumpSeverity::Minor);
+}
