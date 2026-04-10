@@ -624,21 +624,6 @@ default = "text"
 [[cli.release.steps]]
 type = "PrepareRelease"
 
-[cli.commit-release]
-help_text = "Prepare a release and create a local release commit"
-
-[[cli.commit-release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.commit-release.steps]]
-type = "PrepareRelease"
-
-[[cli.commit-release.steps]]
-type = "CommitRelease"
-
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"
 

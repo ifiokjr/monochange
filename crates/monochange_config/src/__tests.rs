@@ -83,7 +83,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 8);
+	assert_eq!(configuration.cli.len(), 7);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -96,7 +96,6 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 			"discover",
 			"change",
 			"release",
-			"commit-release",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -2474,4 +2473,51 @@ fn load_workspace_configuration_rejects_versioned_file_without_type_or_regex() {
 
 	assert!(rendered.contains("versioned_files must set `type`"));
 	assert!(rendered.contains("versioned_files entry is missing `type`"));
+}
+
+// -- validate_versioned_files_content tests --
+
+#[test]
+fn validate_versioned_files_content_rejects_missing_file() {
+	let root = fixture_path("config/versioned-file-missing");
+	let error = crate::validate_versioned_files_content(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for missing versioned file"));
+	assert!(
+		error
+			.to_string()
+			.contains("does-not-exist.toml")
+	);
+	assert!(error.to_string().contains("does not exist"));
+}
+
+#[test]
+fn validate_versioned_files_content_rejects_regex_without_match() {
+	let root = fixture_path("config/versioned-file-regex-no-match");
+	let error = crate::validate_versioned_files_content(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for regex without match"));
+	assert!(error.to_string().contains("does not match any content"));
+}
+
+#[test]
+fn validate_versioned_files_content_rejects_unparseable_version() {
+	let root = fixture_path("config/versioned-file-unparseable-version");
+	let error = crate::validate_versioned_files_content(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for missing version field"));
+	assert!(
+		error
+			.to_string()
+			.contains("does not contain a readable version field")
+	);
+}
+
+#[test]
+fn validate_versioned_files_content_warns_on_empty_glob() {
+	let root = fixture_path("config/versioned-file-empty-glob");
+	let warnings = crate::validate_versioned_files_content(&root)
+		.unwrap_or_else(|error| panic!("expected Ok with warnings, got error: {error}"));
+	assert_eq!(warnings.len(), 1);
+	assert!(warnings.first().unwrap().contains("matches no files"));
 }

@@ -24,7 +24,6 @@ Commands:
   discover        Discover packages across supported ecosystems
   change          Create a change file for one or more packages
   release         Prepare a release from discovered change files
-  commit-release  Prepare a release and create a local release commit with an embedded monochange release record
   affected        Show packages affected by file changes and their changeset coverage
   diagnostics     Show per-changeset diagnostics including context and commit/PR context
   repair-release  Repair a recent release by moving its release tags to a later commit

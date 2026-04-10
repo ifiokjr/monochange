@@ -2586,30 +2586,6 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			}],
 		},
 		CliCommandDefinition {
-			name: "commit-release".to_string(),
-			help_text: Some(
-				"Prepare a release and create a local release commit with an embedded monochange release record"
-					.to_string(),
-			),
-			inputs: vec![CliInputDefinition {
-				name: "format".to_string(),
-				kind: CliInputKind::Choice,
-				help_text: Some("Output format".to_string()),
-				required: false,
-				default: Some("text".to_string()),
-				choices: vec!["text".to_string(), "json".to_string()],
-				short: None,
-			}],
-			steps: vec![
-				CliStepDefinition::PrepareRelease {
-					inputs: BTreeMap::new(),
-				},
-				CliStepDefinition::CommitRelease {
-					inputs: BTreeMap::new(),
-				},
-			],
-		},
-		CliCommandDefinition {
 			name: "affected".to_string(),
 			help_text: Some(
 				"Show packages affected by file changes and their changeset coverage".to_string(),

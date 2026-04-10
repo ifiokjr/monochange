@@ -117,30 +117,11 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("assist"));
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
-	assert!(output.contains("commit-release"));
 	assert!(output.contains("diagnostics"));
 	assert!(output.contains("repair-release"));
 	assert!(output.contains("release-record"));
 }
 
-#[test]
-fn commit_release_help_describes_local_commit_workflow() {
-	let output = run_with_args(
-		"mc",
-		[
-			OsString::from("mc"),
-			OsString::from("commit-release"),
-			OsString::from("--help"),
-		],
-	)
-	.unwrap_or_else(|error| panic!("commit-release help: {error}"));
-
-	assert!(output.contains("Prepare a release and create a local release commit"));
-	assert!(output.contains("mc commit-release --dry-run --format json"));
-	assert!(output.contains("mc commit-release --dry-run --diff"));
-	assert!(output.contains("--diff"));
-	assert!(output.contains("Embeds a durable release record block in the commit body"));
-}
 
 #[test]
 fn repair_release_help_describes_retargeting_workflow() {
