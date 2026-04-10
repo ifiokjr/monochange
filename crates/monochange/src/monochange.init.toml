@@ -9,7 +9,7 @@
     packages         -- list of { id, path, type, changelog? }
     has_group        -- true when more than one package was discovered
     package_ids_toml -- pre-formatted TOML array contents
-    has_cargo / has_npm / has_deno / has_dart -- ecosystem detected flags
+    has_cargo / has_npm / has_deno / has_dart / has_ruby -- ecosystem detected flags
 #}
 # =============================================================================
 # monochange.toml — repository configuration for monochange
@@ -51,7 +51,7 @@ warn_on_group_mismatch = true
 # Default package type for all packages that don't declare their own `type`.
 # Setting this avoids repeating `type = "cargo"` on every [package.*] entry.
 #
-# Options: "cargo", "npm", "deno", "dart", "flutter"
+# Options: "cargo", "npm", "deno", "dart", "flutter", "ruby"
 # Default: none (each package must declare its own type)
 # package_type = "cargo"
 
@@ -191,7 +191,7 @@ warn_on_group_mismatch = true
 #   path  — relative path from repo root to the package directory
 #
 # Optional fields:
-#   type                    — "cargo", "npm", "deno", "dart", "flutter"
+#   type                    — "cargo", "npm", "deno", "dart", "flutter", "ruby"
 #                             (not needed when defaults.package_type is set)
 #   changelog               — true, false, "path/to/changelog.md", or a table
 #                             with { path, format }; overrides [defaults.changelog]
@@ -360,6 +360,14 @@ enabled = true
 enabled = true
 {% else %}
 # [ecosystems.dart]
+# enabled = true
+{% endif %}
+
+{% if has_ruby %}
+[ecosystems.ruby]
+enabled = true
+{% else %}
+# [ecosystems.ruby]
 # enabled = true
 {% endif %}
 

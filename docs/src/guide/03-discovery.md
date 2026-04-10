@@ -10,6 +10,7 @@ Supported sources in this milestone:
 - npm workspaces, pnpm workspaces, Bun workspaces, and standalone `package.json` packages
 - Deno workspaces and standalone `deno.json` / `deno.jsonc` packages
 - Dart and Flutter workspaces plus standalone `pubspec.yaml` packages
+- Ruby gems from `.gemspec` files with `version.rb` version constants
 
 <!-- {/discoverySupportedSources} -->
 

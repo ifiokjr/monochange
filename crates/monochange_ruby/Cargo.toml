@@ -1,0 +1,30 @@
+[package]
+name = "monochange_ruby"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_ruby"
+edition = { workspace = true }
+include = { workspace = true }
+keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
+license = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Ruby ecosystem adapter for monochange — discovers gems from .gemspec files and version.rb constants"
+
+[dependencies]
+glob = { workspace = true, default-features = true }
+monochange_core = { workspace = true }
+regex = { workspace = true, default-features = true }
+semver = { workspace = true, default-features = true }
+walkdir = { workspace = true, default-features = true }
+
+[dev-dependencies]
+insta = { workspace = true, default-features = true }
+monochange_test_helpers = { version = "0.0.0", path = "../../testing/monochange_test_helpers" }
+rstest = { workspace = true, default-features = true }
+similar-asserts = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

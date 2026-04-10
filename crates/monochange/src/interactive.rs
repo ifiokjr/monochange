@@ -396,6 +396,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			ruby: EcosystemSettings::default(),
 		}
 	}
 
@@ -608,6 +609,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			ruby: EcosystemSettings::default(),
 		};
 		let displays = build_selectable_targets(&configuration)
 			.into_iter()
@@ -666,6 +668,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			ruby: EcosystemSettings::default(),
 		};
 		let target = build_selectable_targets(&configuration)
 			.into_iter()

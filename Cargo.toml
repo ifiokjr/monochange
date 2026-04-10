@@ -12,6 +12,7 @@ members = [
 	"crates/monochange_gitlab",
 	"crates/monochange_graph",
 	"crates/monochange_npm",
+	"crates/monochange_ruby",
 	"crates/monochange_semver",
 	"docs",
 ]
@@ -27,6 +28,7 @@ default-members = [
 	"crates/monochange_gitea",
 	"crates/monochange_gitlab",
 	"crates/monochange_npm",
+	"crates/monochange_ruby",
 	"crates/monochange_semver",
 	"docs",
 ]
@@ -96,6 +98,7 @@ monochange_github = { version = "0.0.0", path = "./crates/monochange_github" }
 monochange_gitlab = { version = "0.0.0", path = "./crates/monochange_gitlab" }
 monochange_graph = { version = "0.0.0", path = "./crates/monochange_graph" }
 monochange_npm = { version = "0.0.0", path = "./crates/monochange_npm" }
+monochange_ruby = { version = "0.0.0", path = "./crates/monochange_ruby" }
 monochange_semver = { version = "0.0.0", path = "./crates/monochange_semver" }
 
 [workspace.metadata.bin]

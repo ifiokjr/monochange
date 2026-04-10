@@ -22,6 +22,7 @@ pub(crate) enum VersionedFileKind {
 	Npm(monochange_npm::NpmVersionedFileKind),
 	Deno(monochange_deno::DenoVersionedFileKind),
 	Dart(monochange_dart::DartVersionedFileKind),
+	Ruby(monochange_ruby::RubyVersionedFileKind),
 }
 
 pub(crate) fn versioned_file_kind(
@@ -40,6 +41,9 @@ pub(crate) fn versioned_file_kind(
 		}
 		monochange_core::EcosystemType::Dart => {
 			monochange_dart::supported_versioned_file_kind(path).map(VersionedFileKind::Dart)
+		}
+		monochange_core::EcosystemType::Ruby => {
+			monochange_ruby::supported_versioned_file_kind(path).map(VersionedFileKind::Ruby)
 		}
 	}
 }
@@ -255,6 +259,7 @@ pub(crate) fn read_cached_document(
 				monochange_core::EcosystemType::Npm => "npm",
 				monochange_core::EcosystemType::Deno => "deno",
 				monochange_core::EcosystemType::Dart => "dart",
+				monochange_core::EcosystemType::Ruby => "ruby",
 			},
 		)));
 	};
@@ -358,6 +363,15 @@ pub(crate) fn read_cached_document(
 			}
 			Ok(CachedDocument::Text(contents))
 		}
+		VersionedFileKind::Ruby(_) => {
+			let Some(contents) = text_contents else {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {} as text",
+					path.display()
+				)));
+			};
+			Ok(CachedDocument::Text(contents))
+		}
 		VersionedFileKind::Npm(_) | VersionedFileKind::Deno(_) => {
 			let Some(contents) = text_contents.as_ref() else {
 				return Err(MonochangeError::Config(format!(
@@ -397,6 +411,9 @@ pub(crate) fn resolve_versioned_prefix(
 		}
 		monochange_core::EcosystemType::Dart => {
 			context.configuration.dart.dependency_version_prefix.clone()
+		}
+		monochange_core::EcosystemType::Ruby => {
+			context.configuration.ruby.dependency_version_prefix.clone()
 		}
 	};
 	ecosystem_prefix.unwrap_or_else(|| ecosystem_type.default_prefix().to_string())
@@ -557,6 +574,7 @@ pub(crate) fn apply_versioned_file_definition(
 					monochange_core::EcosystemType::Npm => "npm",
 					monochange_core::EcosystemType::Deno => "deno",
 					monochange_core::EcosystemType::Dart => "dart",
+					monochange_core::EcosystemType::Ruby => "ruby",
 				},
 			)));
 		};
@@ -703,6 +721,11 @@ pub(crate) fn apply_versioned_file_definition(
 			(CachedDocument::Yaml(mapping), VersionedFileKind::Dart(kind)) => {
 				if kind == monochange_dart::DartVersionedFileKind::Lock {
 					monochange_dart::update_pubspec_lock(mapping, &raw_versions);
+				}
+			}
+			(CachedDocument::Text(contents), VersionedFileKind::Ruby(kind)) => {
+				if kind == monochange_ruby::RubyVersionedFileKind::VersionFile {
+					*contents = monochange_ruby::update_version_file_text(contents, owner_version);
 				}
 			}
 			_ => {}

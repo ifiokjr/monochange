@@ -25,6 +25,7 @@ monochange_gitea = { workspace = true }
 monochange_github = { workspace = true }
 monochange_gitlab = { workspace = true }
 monochange_npm = { workspace = true }
+monochange_ruby = { workspace = true }
 regex = { workspace = true, default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
