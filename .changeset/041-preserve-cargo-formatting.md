@@ -29,7 +29,7 @@ features = [
 workspace = true
 ```
 
-After this change, MonoChange updates only the relevant Cargo version values in place:
+After this change, monochange updates only the relevant Cargo version values in place:
 
 - `package.version`
 - `workspace.package.version`

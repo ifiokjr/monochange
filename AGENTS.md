@@ -9,6 +9,15 @@
 - Quality/typecheck: `lint:all`
 - Validation: `mc validate`
 
+## Naming convention
+
+- The project name is always written in **all lowercase**: `monochange`.
+- Never use `MonoChange`, `Monochange`, or `MONOCHANGE` in prose, docs, comments, or string literals.
+- **Rust code exception**: standard Rust naming conventions apply.
+  - Structs and enums may use PascalCase (e.g. `MonochangeError`, `MonochangeResult`).
+  - Constants use UPPER_SNAKE_CASE (e.g. `MONOCHANGE_VERSION`).
+  - Variables and functions use snake_case (e.g. `monochange_config`).
+
 ## Git rules
 
 - Never use `--no-verify` with `git commit` or `git push`.

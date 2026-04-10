@@ -2160,7 +2160,7 @@ fn validate_versioned_files(
 						owner_id,
 						"regex versioned_files must capture the version",
 					)],
-					Some("use a named capture like `(?<version>\\d+\\.\\d+\\.\\d+)` so MonoChange knows which substring to replace".to_string()),
+					Some("use a named capture like `(?<version>\\d+\\.\\d+\\.\\d+)` so monochange knows which substring to replace".to_string()),
 				));
 			}
 			continue;
