@@ -3589,7 +3589,7 @@ fn validate_ecosystem_version_readable(
 			})?;
 
 			let field_name = match fields {
-				Some(f) if !f.is_empty() => f.first().map(String::as_str).unwrap_or("version"),
+				Some(f) if !f.is_empty() => f.first().map_or("version", String::as_str),
 				_ => "version",
 			};
 
