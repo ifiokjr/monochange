@@ -572,141 +572,61 @@ comment_on_failure = true
 
 [cli.validate]
 help_text = "Validate monochange configuration and changesets"
-
-[[cli.validate.steps]]
-type = "Validate"
+steps = [{ type = "Validate" }]
 
 [cli.discover]
 help_text = "Discover packages across supported ecosystems"
-
-[[cli.discover.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.discover.steps]]
-type = "Discover"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [{ type = "Discover" }]
 
 [cli.change]
 help_text = "Create a change file for one or more packages"
-
-[[cli.change.inputs]]
-name = "package"
-type = "string_list"
-required = true
-
-[[cli.change.inputs]]
-name = "bump"
-type = "choice"
-choices = ["none", "patch", "minor", "major"]
-default = "patch"
-
-[[cli.change.inputs]]
-name = "reason"
-type = "string"
-required = true
-
-[[cli.change.inputs]]
-name = "type"
-type = "string"
-
-[[cli.change.inputs]]
-name = "details"
-type = "string"
-
-[[cli.change.inputs]]
-name = "output"
-type = "path"
-
-[[cli.change.steps]]
-type = "CreateChangeFile"
+inputs = [
+	{ name = "package", type = "string_list", required = true },
+	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
+	{ name = "reason", type = "string", required = true },
+	{ name = "type", type = "string" },
+	{ name = "details", type = "string" },
+	{ name = "output", type = "path" },
+]
+steps = [{ type = "CreateChangeFile" }]
 
 [cli.release]
 help_text = "Prepare a release from discovered change files"
-
-[[cli.release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release.steps]]
-type = "PrepareRelease"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [{ type = "PrepareRelease" }]
 
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"
-
-[[cli.affected.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.affected.inputs]]
-name = "changed_paths"
-type = "string_list"
-required = true
-
-[[cli.affected.inputs]]
-name = "label"
-type = "string_list"
-
-[[cli.affected.steps]]
-type = "AffectedPackages"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+	{ name = "changed_paths", type = "string_list", required = true },
+	{ name = "label", type = "string_list" },
+]
 {% raw -%}
-# inputs = { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
+# Step inputs example: { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
 {% endraw -%}
+steps = [{ type = "AffectedPackages" }]
 
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"
-
-[[cli.diagnostics.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.diagnostics.inputs]]
-name = "changeset"
-type = "string_list"
-help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)"
-
-[[cli.diagnostics.steps]]
-type = "DiagnoseChangesets"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+	{ name = "changeset", type = "string_list", help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)" },
+]
+steps = [{ type = "DiagnoseChangesets" }]
 
 [cli.repair-release]
 help_text = "Repair a recent release by moving its release tags to a later commit"
-
-[[cli.repair-release.inputs]]
-name = "from"
-type = "string"
-help_text = "tag or commit-ish used to locate the release record"
-required = true
-
-[[cli.repair-release.inputs]]
-name = "target"
-type = "string"
-help_text = "commit-ish the release set should move to"
-default = "HEAD"
-
-[[cli.repair-release.inputs]]
-name = "force"
-type = "boolean"
-help_text = "allow non-descendant retargets"
-default = false
-
-[[cli.repair-release.inputs]]
-name = "sync_provider"
-type = "boolean"
-help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)"
-default = true
-
-[[cli.repair-release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.repair-release.steps]]
-type = "RetargetRelease"
+inputs = [
+	{ name = "from", type = "string", help_text = "tag or commit-ish used to locate the release record", required = true },
+	{ name = "target", type = "string", help_text = "commit-ish the release set should move to", default = "HEAD" },
+	{ name = "force", type = "boolean", help_text = "allow non-descendant retargets", default = "false" },
+	{ name = "sync_provider", type = "boolean", help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)", default = "true" },
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [{ type = "RetargetRelease" }]
