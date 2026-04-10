@@ -1459,8 +1459,7 @@ fn infer_group_bump_from_explicit_version(
 	};
 	let mut max_version: Option<&Version> = None;
 	for member_id in &group.packages {
-		let package_id =
-			resolve_package_reference(member_id, workspace_root, packages)?;
+		let package_id = resolve_package_reference(member_id, workspace_root, packages)?;
 		if let Some(current_version) = packages
 			.iter()
 			.find(|package| package.id == package_id)
@@ -1473,7 +1472,8 @@ fn infer_group_bump_from_explicit_version(
 			});
 		}
 	}
-	Ok(max_version.map(|current_version| infer_bump_from_versions(current_version, explicit_version)))
+	Ok(max_version
+		.map(|current_version| infer_bump_from_versions(current_version, explicit_version)))
 }
 
 fn infer_bump_from_versions(current_version: &Version, explicit_version: &Version) -> BumpSeverity {
