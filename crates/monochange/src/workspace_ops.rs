@@ -466,8 +466,9 @@ pub(crate) fn prepare_release_execution(
 	let changelog_targets = resolve_changelog_targets(&configuration, &discovery.packages)?;
 	let cargo_updates = build_cargo_manifest_updates(&discovery.packages, &plan)?;
 	let npm_updates = build_npm_manifest_updates(&discovery.packages, &plan)?;
+	let deno_updates = build_deno_manifest_updates(&discovery.packages, &plan)?;
 	let dart_updates = build_dart_manifest_updates(&discovery.packages, &plan)?;
-	let manifest_updates = [cargo_updates, npm_updates, dart_updates].concat();
+	let manifest_updates = [cargo_updates, npm_updates, deno_updates, dart_updates].concat();
 	let versioned_file_updates =
 		build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)?;
 	let release_targets =

@@ -59,6 +59,46 @@ fn supported_versioned_file_kind_recognizes_manifest_and_lockfiles() {
 }
 
 #[test]
+fn discovers_deno_jsonc_manifests_with_comments() {
+	let tempdir = std::env::temp_dir().join(format!(
+		"monochange-deno-jsonc-{}-{}",
+		std::process::id(),
+		std::thread::current().name().unwrap_or("unnamed")
+	));
+	let _ = std::fs::remove_dir_all(&tempdir);
+	std::fs::create_dir_all(&tempdir)
+		.unwrap_or_else(|error| panic!("create tempdir {}: {error}", tempdir.display()));
+	std::fs::write(
+		tempdir.join("deno.jsonc"),
+		r#"{
+  // keep comment
+  "name": "jsonc-tool",
+  "version": "1.0.0",
+  "imports": {
+    "core": "^1.0.0"
+  }
+}
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write deno.jsonc: {error}"));
+	let discovery = discover_deno_packages(&tempdir)
+		.unwrap_or_else(|error| panic!("discover deno jsonc: {error}"));
+	assert_eq!(discovery.packages.len(), 1);
+	let package = discovery.packages.first().expect("discovered deno package");
+	assert_eq!(package.name, "jsonc-tool");
+	assert_eq!(
+		package
+			.current_version
+			.as_ref()
+			.map(ToString::to_string)
+			.as_deref(),
+		Some("1.0.0")
+	);
+	std::fs::remove_dir_all(&tempdir)
+		.unwrap_or_else(|error| panic!("cleanup tempdir {}: {error}", tempdir.display()));
+}
+
+#[test]
 fn update_lockfile_rewrites_npm_dependency_versions() {
 	let mut lock = json!({
 		"packages": {

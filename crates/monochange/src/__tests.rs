@@ -4406,7 +4406,9 @@ fn read_cached_document_parses_supported_document_formats() {
 		monochange_core::EcosystemType::Cargo,
 	)
 	.unwrap_or_else(|error| panic!("cargo manifest: {error}"));
-	assert!(matches!(cargo, crate::CachedDocument::Toml(_)));
+	assert!(
+		matches!(cargo, crate::CachedDocument::Text(contents) if contents.contains("[package]"))
+	);
 
 	let npm_json = crate::read_cached_document(
 		&mut BTreeMap::new(),
@@ -4422,7 +4424,10 @@ fn read_cached_document_parses_supported_document_formats() {
 		monochange_core::EcosystemType::Npm,
 	)
 	.unwrap_or_else(|error| panic!("pnpm lock: {error}"));
-	assert!(matches!(npm_yaml, crate::CachedDocument::Yaml(_)));
+	assert!(matches!(
+		npm_yaml,
+		crate::CachedDocument::Text(contents) if contents.contains("lockfileVersion")
+	));
 
 	let bun_text = crate::read_cached_document(
 		&mut BTreeMap::new(),
@@ -4442,13 +4447,29 @@ fn read_cached_document_parses_supported_document_formats() {
 	.unwrap_or_else(|error| panic!("bun lockb: {error}"));
 	assert!(matches!(bun_binary, crate::CachedDocument::Bytes(contents) if !contents.is_empty()));
 
+	let npm_manifest = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("versioned-file-updates/npm-manifest/package.json"),
+		monochange_core::EcosystemType::Npm,
+	)
+	.unwrap_or_else(|error| panic!("npm manifest: {error}"));
+	assert!(matches!(npm_manifest, crate::CachedDocument::Text(_)));
+
 	let deno_json = crate::read_cached_document(
 		&mut BTreeMap::new(),
 		&fixture_path("monochange/deno-lock-release/packages/app/deno.json"),
 		monochange_core::EcosystemType::Deno,
 	)
 	.unwrap_or_else(|error| panic!("deno json: {error}"));
-	assert!(matches!(deno_json, crate::CachedDocument::Json(_)));
+	assert!(matches!(deno_json, crate::CachedDocument::Text(_)));
+
+	let dart_manifest = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("dart/workspace-pattern-warnings/packages/app/pubspec.yaml"),
+		monochange_core::EcosystemType::Dart,
+	)
+	.unwrap_or_else(|error| panic!("dart manifest: {error}"));
+	assert!(matches!(dart_manifest, crate::CachedDocument::Text(_)));
 
 	let dart_yaml = crate::read_cached_document(
 		&mut BTreeMap::new(),
@@ -4457,41 +4478,6 @@ fn read_cached_document_parses_supported_document_formats() {
 	)
 	.unwrap_or_else(|error| panic!("dart lock: {error}"));
 	assert!(matches!(dart_yaml, crate::CachedDocument::Yaml(_)));
-}
-
-#[test]
-fn update_json_dependency_fields_updates_only_present_dependency_entries() {
-	let mut value = serde_json::json!({
-		"dependencies": {
-			"core": "^0.1.0",
-			"other": "^0.2.0"
-		},
-		"devDependencies": {
-			"core": "^0.1.0"
-		},
-		"keywords": ["monochange"]
-	});
-	let versions = BTreeMap::from([
-		("core".to_string(), "workspace:1.2.3".to_string()),
-		("missing".to_string(), "workspace:9.9.9".to_string()),
-	]);
-
-	crate::update_json_dependency_fields(
-		&mut value,
-		&[
-			"dependencies",
-			"devDependencies",
-			"keywords",
-			"peerDependencies",
-		],
-		&versions,
-	);
-
-	assert_eq!(value["dependencies"]["core"], "workspace:1.2.3");
-	assert_eq!(value["dependencies"]["other"], "^0.2.0");
-	assert_eq!(value["devDependencies"]["core"], "workspace:1.2.3");
-	assert_eq!(value["keywords"], serde_json::json!(["monochange"]));
-	assert!(value["peerDependencies"].is_null());
 }
 
 #[test]
@@ -4621,6 +4607,538 @@ fn read_cached_document_reports_parse_errors_for_invalid_supported_formats() {
 }
 
 #[test]
+fn build_manifest_updates_preserve_npm_deno_and_dart_formatting() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let npm_path = tempdir.path().join("packages/web/package.json");
+	let deno_path = tempdir.path().join("tools/deno/deno.json");
+	let dart_path = tempdir.path().join("packages/mobile/pubspec.yaml");
+	fs::create_dir_all(npm_path.parent().unwrap_or_else(|| panic!("npm parent")))
+		.unwrap_or_else(|error| panic!("create npm parent: {error}"));
+	fs::create_dir_all(deno_path.parent().unwrap_or_else(|| panic!("deno parent")))
+		.unwrap_or_else(|error| panic!("create deno parent: {error}"));
+	fs::create_dir_all(dart_path.parent().unwrap_or_else(|| panic!("dart parent")))
+		.unwrap_or_else(|error| panic!("create dart parent: {error}"));
+	fs::write(
+		&npm_path,
+		"{\n    \"name\": \"web\",\n    \"version\": \"1.0.0\",\n    \"private\": false\n}\n",
+	)
+	.unwrap_or_else(|error| panic!("write package.json: {error}"));
+	fs::write(
+		&deno_path,
+		"{\n  \"name\": \"tool\",\n  \"version\": \"1.0.0\",\n  \"imports\": {\n    \"core\": \"^1.0.0\"\n  }\n}\n",
+	)
+	.unwrap_or_else(|error| panic!("write deno.json: {error}"));
+	fs::write(&dart_path, "name: mobile\nversion: '1.0.0' # keep quote\n")
+		.unwrap_or_else(|error| panic!("write pubspec.yaml: {error}"));
+
+	let packages = vec![
+		monochange_core::PackageRecord::new(
+			Ecosystem::Npm,
+			"web",
+			npm_path.clone(),
+			tempdir.path().to_path_buf(),
+			Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+			monochange_core::PublishState::Public,
+		),
+		monochange_core::PackageRecord::new(
+			Ecosystem::Deno,
+			"tool",
+			deno_path.clone(),
+			tempdir.path().to_path_buf(),
+			Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+			monochange_core::PublishState::Public,
+		),
+		monochange_core::PackageRecord::new(
+			Ecosystem::Dart,
+			"mobile",
+			dart_path.clone(),
+			tempdir.path().to_path_buf(),
+			Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+			monochange_core::PublishState::Public,
+		),
+	];
+	let plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: packages
+			.iter()
+			.map(|package| monochange_core::ReleaseDecision {
+				package_id: package.id.clone(),
+				trigger_type: "changeset".to_string(),
+				recommended_bump: BumpSeverity::Minor,
+				planned_version: Some(
+					Version::parse("1.1.0")
+						.unwrap_or_else(|error| panic!("planned version: {error}")),
+				),
+				group_id: None,
+				reasons: vec!["release".to_string()],
+				upstream_sources: Vec::new(),
+				warnings: Vec::new(),
+			})
+			.collect(),
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+
+	let npm_updates = crate::build_npm_manifest_updates(&packages, &plan)
+		.unwrap_or_else(|error| panic!("npm manifest updates: {error}"));
+	let deno_updates = crate::build_deno_manifest_updates(&packages, &plan)
+		.unwrap_or_else(|error| panic!("deno manifest updates: {error}"));
+	let dart_updates = crate::build_dart_manifest_updates(&packages, &plan)
+		.unwrap_or_else(|error| panic!("dart manifest updates: {error}"));
+
+	assert_eq!(
+		String::from_utf8_lossy(&npm_updates[0].content),
+		"{\n    \"name\": \"web\",\n    \"version\": \"1.1.0\",\n    \"private\": false\n}\n"
+	);
+	assert_eq!(String::from_utf8_lossy(&deno_updates[0].content), "{\n  \"name\": \"tool\",\n  \"version\": \"1.1.0\",\n  \"imports\": {\n    \"core\": \"^1.0.0\"\n  }\n}\n");
+	assert_eq!(
+		String::from_utf8_lossy(&dart_updates[0].content),
+		"name: mobile\nversion: '1.1.0' # keep quote\n"
+	);
+}
+
+#[test]
+fn build_manifest_updates_report_parse_and_io_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let npm_path = tempdir.path().join("package.json");
+	let dart_path = tempdir.path().join("pubspec.yaml");
+	fs::write(&npm_path, "{").unwrap_or_else(|error| panic!("write package.json: {error}"));
+	fs::write(&dart_path, ": bad").unwrap_or_else(|error| panic!("write pubspec.yaml: {error}"));
+	let npm = monochange_core::PackageRecord::new(
+		Ecosystem::Npm,
+		"web",
+		npm_path,
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let deno_missing = monochange_core::PackageRecord::new(
+		Ecosystem::Deno,
+		"tool",
+		tempdir.path().join("missing/deno.json"),
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let deno_invalid_path = tempdir.path().join("invalid/deno.json");
+	fs::create_dir_all(deno_invalid_path.parent().expect("deno manifest parent"))
+		.unwrap_or_else(|error| panic!("create invalid deno dir: {error}"));
+	fs::write(&deno_invalid_path, "{")
+		.unwrap_or_else(|error| panic!("write invalid deno manifest: {error}"));
+	let deno_invalid = monochange_core::PackageRecord::new(
+		Ecosystem::Deno,
+		"tool-invalid",
+		deno_invalid_path,
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let dart = monochange_core::PackageRecord::new(
+		Ecosystem::Dart,
+		"mobile",
+		dart_path,
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let dart_missing = monochange_core::PackageRecord::new(
+		Ecosystem::Dart,
+		"mobile-missing",
+		tempdir.path().join("missing/pubspec.yaml"),
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: vec![
+			npm.id.clone(),
+			deno_missing.id.clone(),
+			deno_invalid.id.clone(),
+			dart.id.clone(),
+			dart_missing.id.clone(),
+		]
+		.into_iter()
+		.map(|package_id| monochange_core::ReleaseDecision {
+			package_id,
+			trigger_type: "changeset".to_string(),
+			recommended_bump: BumpSeverity::Minor,
+			planned_version: Some(
+				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
+			),
+			group_id: None,
+			reasons: vec!["release".to_string()],
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		})
+		.collect(),
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+	let npm_error = crate::build_npm_manifest_updates(std::slice::from_ref(&npm), &plan)
+		.err()
+		.unwrap_or_else(|| panic!("expected npm parse error"));
+	assert!(
+		npm_error.to_string().contains("failed to parse"),
+		"error: {npm_error}"
+	);
+	let deno_error = crate::build_deno_manifest_updates(std::slice::from_ref(&deno_missing), &plan)
+		.err()
+		.unwrap_or_else(|| panic!("expected deno io error"));
+	assert!(
+		deno_error.to_string().contains("failed to read"),
+		"error: {deno_error}"
+	);
+	let deno_parse_error =
+		crate::build_deno_manifest_updates(std::slice::from_ref(&deno_invalid), &plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected deno parse error"));
+	assert!(
+		deno_parse_error.to_string().contains("failed to parse"),
+		"error: {deno_parse_error}"
+	);
+	let dart_error = crate::build_dart_manifest_updates(std::slice::from_ref(&dart), &plan)
+		.err()
+		.unwrap_or_else(|| panic!("expected dart parse error"));
+	assert!(
+		dart_error.to_string().contains("failed to parse"),
+		"error: {dart_error}"
+	);
+	let dart_read_error =
+		crate::build_dart_manifest_updates(std::slice::from_ref(&dart_missing), &plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected dart read error"));
+	assert!(
+		dart_read_error.to_string().contains("failed to read"),
+		"error: {dart_read_error}"
+	);
+
+	let cargo_missing_dir = tempdir.path().join("cargo-missing-dir");
+	fs::create_dir_all(&cargo_missing_dir)
+		.unwrap_or_else(|error| panic!("create cargo missing dir: {error}"));
+	let cargo_missing = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-missing",
+		cargo_missing_dir,
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_invalid_path = tempdir.path().join("invalid-package/Cargo.toml");
+	fs::create_dir_all(cargo_invalid_path.parent().expect("cargo package parent"))
+		.unwrap_or_else(|error| panic!("create invalid cargo package dir: {error}"));
+	fs::write(&cargo_invalid_path, "{")
+		.unwrap_or_else(|error| panic!("write invalid cargo manifest: {error}"));
+	let cargo_invalid = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-invalid",
+		cargo_invalid_path,
+		tempdir.path().join("cargo-invalid-workspace"),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_workspace_dir = tempdir.path().join("cargo-workspace-dir");
+	fs::create_dir_all(cargo_workspace_dir.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create cargo workspace package dir: {error}"));
+	fs::write(
+		cargo_workspace_dir.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo workspace package manifest: {error}"));
+	fs::create_dir_all(cargo_workspace_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("create workspace cargo root dir: {error}"));
+	let cargo_workspace_read = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-workspace-read",
+		cargo_workspace_dir.join("crates/core/Cargo.toml"),
+		cargo_workspace_dir.clone(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_workspace_invalid = tempdir.path().join("cargo-workspace-invalid");
+	fs::create_dir_all(cargo_workspace_invalid.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create cargo workspace invalid dir: {error}"));
+	fs::write(
+		cargo_workspace_invalid.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write valid package manifest: {error}"));
+	fs::write(cargo_workspace_invalid.join("Cargo.toml"), "{")
+		.unwrap_or_else(|error| panic!("write invalid workspace manifest: {error}"));
+	let cargo_workspace_parse = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-workspace-parse",
+		cargo_workspace_invalid.join("crates/core/Cargo.toml"),
+		cargo_workspace_invalid,
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let cargo_plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: vec![
+			cargo_missing.id.clone(),
+			cargo_invalid.id.clone(),
+			cargo_workspace_read.id.clone(),
+			cargo_workspace_parse.id.clone(),
+		]
+		.into_iter()
+		.map(|package_id| monochange_core::ReleaseDecision {
+			package_id,
+			trigger_type: "changeset".to_string(),
+			recommended_bump: BumpSeverity::Minor,
+			planned_version: Some(
+				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
+			),
+			group_id: None,
+			reasons: vec!["release".to_string()],
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		})
+		.collect(),
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+	let cargo_read_error =
+		crate::build_cargo_manifest_updates(std::slice::from_ref(&cargo_missing), &cargo_plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected cargo read error"));
+	assert!(
+		cargo_read_error.to_string().contains("failed to read"),
+		"error: {cargo_read_error}"
+	);
+	let cargo_parse_error =
+		crate::build_cargo_manifest_updates(std::slice::from_ref(&cargo_invalid), &cargo_plan)
+			.err()
+			.unwrap_or_else(|| panic!("expected cargo parse error"));
+	assert!(
+		cargo_parse_error.to_string().contains("failed to parse"),
+		"error: {cargo_parse_error}"
+	);
+	let cargo_workspace_read_error = crate::build_cargo_manifest_updates(
+		std::slice::from_ref(&cargo_workspace_read),
+		&cargo_plan,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cargo workspace read error"));
+	assert!(
+		cargo_workspace_read_error
+			.to_string()
+			.contains("failed to read"),
+		"error: {cargo_workspace_read_error}"
+	);
+	let cargo_workspace_parse_error = crate::build_cargo_manifest_updates(
+		std::slice::from_ref(&cargo_workspace_parse),
+		&cargo_plan,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cargo workspace parse error"));
+	assert!(
+		cargo_workspace_parse_error
+			.to_string()
+			.contains("failed to parse"),
+		"error: {cargo_workspace_parse_error}"
+	);
+
+	let unreleased_plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: Vec::new(),
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+	assert!(
+		crate::build_deno_manifest_updates(&[deno_missing], &unreleased_plan)
+			.unwrap_or_else(|error| panic!("unreleased deno updates: {error}"))
+			.is_empty()
+	);
+}
+
+#[test]
+fn expand_versioned_file_fields_supports_name_templates_and_passthrough_fields() {
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "Cargo.toml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		prefix: None,
+		fields: Some(vec![
+			"workspace.dependencies.{{name}}.version".to_string(),
+			"workspace.version".to_string(),
+		]),
+		name: None,
+	};
+	assert_eq!(
+		crate::versioned_files::expand_versioned_file_fields(&definition, &["core".to_string()]),
+		vec![
+			"workspace.dependencies.core.version".to_string(),
+			"workspace.version".to_string(),
+		]
+	);
+}
+
+#[test]
+fn apply_versioned_file_definition_reports_manifest_parse_errors_for_text_updaters() {
+	let configuration = versioned_test_configuration();
+	for (file_name, ecosystem_type, contents) in [
+		("Cargo.toml", monochange_core::EcosystemType::Cargo, "{"),
+		("package.json", monochange_core::EcosystemType::Npm, "{"),
+		("deno.json", monochange_core::EcosystemType::Deno, "{"),
+		(
+			"pubspec.yaml",
+			monochange_core::EcosystemType::Dart,
+			": bad",
+		),
+	] {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let path = tempdir.path().join(file_name);
+		fs::write(&path, contents).unwrap_or_else(|error| panic!("write {file_name}: {error}"));
+		let context = versioned_test_context(
+			&configuration,
+			BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+			&[],
+		);
+		let definition = monochange_core::VersionedFileDefinition {
+			path: file_name.to_string(),
+			ecosystem_type,
+			prefix: None,
+			fields: None,
+			name: None,
+		};
+		let error = crate::apply_versioned_file_definition(
+			tempdir.path(),
+			&mut BTreeMap::new(),
+			&definition,
+			"2.0.0",
+			None,
+			&["core".to_string()],
+			&context,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error for {file_name}"));
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
+	}
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("Cargo.toml");
+	fs::write(&path, "[package]\nname = \"core\"\nversion = \"1.0.0\"\n")
+		.unwrap_or_else(|error| panic!("write cached cargo manifest path: {error}"));
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "Cargo.toml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut BTreeMap::from([(path, crate::CachedDocument::Text("{".to_string()))]),
+		&definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cached cargo parse error"));
+	assert!(
+		error.to_string().contains("failed to parse"),
+		"error: {error}"
+	);
+
+	let pnpm_tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let pnpm_path = pnpm_tempdir.path().join("pnpm-lock.yaml");
+	fs::write(&pnpm_path, "lockfileVersion: '9.0'\n")
+		.unwrap_or_else(|error| panic!("write cached pnpm lock path: {error}"));
+	let pnpm_definition = monochange_core::VersionedFileDefinition {
+		path: "pnpm-lock.yaml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Npm,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		pnpm_tempdir.path(),
+		&mut BTreeMap::from([(pnpm_path, crate::CachedDocument::Text(": bad".to_string()))]),
+		&pnpm_definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cached pnpm parse error"));
+	assert!(
+		error.to_string().contains("failed to parse"),
+		"error: {error}"
+	);
+
+	let cached_dart_tempdir =
+		tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = cached_dart_tempdir.path().join("pubspec.yaml");
+	fs::write(&path, "name: app\nversion: 1.0.0\n")
+		.unwrap_or_else(|error| panic!("write cached dart manifest path: {error}"));
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "pubspec.yaml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Dart,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		cached_dart_tempdir.path(),
+		&mut BTreeMap::from([(path, crate::CachedDocument::Text(": bad".to_string()))]),
+		&definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected cached dart parse error"));
+	assert!(
+		error.to_string().contains("failed to parse"),
+		"error: {error}"
+	);
+}
+
+#[test]
+fn read_cached_document_reports_parse_errors_for_manifest_text_updaters() {
+	for (file_name, ecosystem, contents) in [
+		("package.json", monochange_core::EcosystemType::Npm, "["),
+		("deno.json", monochange_core::EcosystemType::Deno, "["),
+		(
+			"pubspec.yaml",
+			monochange_core::EcosystemType::Dart,
+			": bad",
+		),
+	] {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let path = tempdir.path().join(file_name);
+		fs::write(&path, contents).unwrap_or_else(|error| panic!("write {file_name}: {error}"));
+		let error = crate::read_cached_document(&mut BTreeMap::new(), &path, ecosystem)
+			.err()
+			.unwrap_or_else(|| panic!("expected parse error for {}", path.display()));
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
+	}
+}
+
+#[test]
 fn read_cached_document_rejects_invalid_utf8_in_text_formats() {
 	let cases = [
 		(
@@ -4650,6 +5168,28 @@ fn read_cached_document_rejects_invalid_utf8_in_text_formats() {
 		let path = tempdir.path().join(file_name);
 		fs::copy(fixture_path(fixture), &path)
 			.unwrap_or_else(|error| panic!("copy fixture {fixture}: {error}"));
+		let error = crate::read_cached_document(&mut BTreeMap::new(), &path, ecosystem)
+			.err()
+			.unwrap_or_else(|| panic!("expected utf8 error for {}", path.display()));
+		assert!(
+			error.to_string().contains("failed to parse"),
+			"error: {error}"
+		);
+		assert!(error.to_string().contains("as text"), "error: {error}");
+	}
+}
+
+#[test]
+fn read_cached_document_rejects_invalid_utf8_manifest_text_formats() {
+	for (file_name, ecosystem) in [
+		("package.json", monochange_core::EcosystemType::Npm),
+		("deno.json", monochange_core::EcosystemType::Deno),
+		("pubspec.yaml", monochange_core::EcosystemType::Dart),
+	] {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let path = tempdir.path().join(file_name);
+		fs::write(&path, [0xff_u8, 0xfe_u8])
+			.unwrap_or_else(|error| panic!("write invalid utf8 {file_name}: {error}"));
 		let error = crate::read_cached_document(&mut BTreeMap::new(), &path, ecosystem)
 			.err()
 			.unwrap_or_else(|| panic!("expected utf8 error for {}", path.display()));
@@ -4728,27 +5268,215 @@ fn apply_versioned_file_definition_rejects_unsupported_glob_matches() {
 		BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
 		&[],
 	);
+	let dep_names = vec!["core".to_string()];
+	for ecosystem_type in [
+		monochange_core::EcosystemType::Cargo,
+		monochange_core::EcosystemType::Npm,
+		monochange_core::EcosystemType::Deno,
+	] {
+		let definition = monochange_core::VersionedFileDefinition {
+			path: "*.txt".to_string(),
+			ecosystem_type,
+			prefix: None,
+			fields: None,
+			name: None,
+		};
+		let error = crate::apply_versioned_file_definition(
+			tempdir.path(),
+			&mut BTreeMap::new(),
+			&definition,
+			"2.0.0",
+			None,
+			&dep_names,
+			&context,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported match error"));
+		assert!(error.to_string().contains("matched unsupported file"));
+		assert!(error.to_string().contains("root.txt"), "error: {error}");
+	}
+}
+
+#[test]
+fn apply_versioned_file_definition_updates_cargo_workspace_dependencies_from_shorthand() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("Cargo.toml"),
+		r#"[workspace.dependencies]
+monochange = { path = "crates/monochange", version = "1.0.0" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write root cargo manifest: {error}"));
+	let configuration = versioned_test_configuration();
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("monochange".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
 	let definition = monochange_core::VersionedFileDefinition {
-		path: "*.txt".to_string(),
+		path: "Cargo.toml".to_string(),
 		ecosystem_type: monochange_core::EcosystemType::Cargo,
 		prefix: None,
 		fields: None,
 		name: None,
 	};
-	let dep_names = vec!["core".to_string()];
-	let error = crate::apply_versioned_file_definition(
+	let mut updates = BTreeMap::new();
+	crate::apply_versioned_file_definition(
 		tempdir.path(),
-		&mut BTreeMap::new(),
+		&mut updates,
 		&definition,
 		"2.0.0",
 		None,
-		&dep_names,
+		&["monochange".to_string()],
 		&context,
 	)
-	.err()
-	.unwrap_or_else(|| panic!("expected unsupported match error"));
-	assert!(error.to_string().contains("matched unsupported file"));
-	assert!(error.to_string().contains("root.txt"), "error: {error}");
+	.unwrap_or_else(|error| panic!("cargo shorthand update: {error}"));
+	let document = updates
+		.remove(&tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|| panic!("expected cargo manifest update"));
+	assert!(matches!(
+		document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("monochange = { path = \"crates/monochange\", version = \"2.0.0\" }")
+	));
+}
+
+#[test]
+fn apply_versioned_file_definition_expands_cargo_name_templates_in_fields() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("Cargo.toml"),
+		r#"[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+core = { path = "crates/core", version = "1.0.0" }
+extra = { path = "crates/extra", version = "1.0.0" }
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write root cargo manifest: {error}"));
+	let configuration = versioned_test_configuration();
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([
+			("core".to_string(), "2.0.0".to_string()),
+			("extra".to_string(), "3.0.0".to_string()),
+		]),
+		&[],
+	);
+	let definition = monochange_core::VersionedFileDefinition {
+		path: "Cargo.toml".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Cargo,
+		prefix: None,
+		fields: Some(vec![
+			"workspace.version".to_string(),
+			"workspace.dependencies.{{ name }}.version".to_string(),
+		]),
+		name: None,
+	};
+	let mut updates = BTreeMap::new();
+	let shared_version = "4.0.0".to_string();
+	crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&definition,
+		"2.0.0",
+		Some(&shared_version),
+		&["core".to_string(), "extra".to_string()],
+		&context,
+	)
+	.unwrap_or_else(|error| panic!("cargo field template update: {error}"));
+	let document = updates
+		.remove(&tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|| panic!("expected cargo manifest update"));
+	assert!(matches!(
+		document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("[workspace.package]\nversion = \"4.0.0\"")
+				&& contents.contains("core = { path = \"crates/core\", version = \"2.0.0\" }")
+				&& contents.contains("extra = { path = \"crates/extra\", version = \"3.0.0\" }")
+	));
+}
+
+#[test]
+fn apply_versioned_file_definition_updates_bun_lockb_and_deno_text_variants() {
+	let configuration = versioned_test_configuration();
+
+	let bun_tempdir = setup_fixture("monochange/bun-lock-release");
+	let bun_package = monochange_core::PackageRecord::new(
+		Ecosystem::Npm,
+		"app",
+		bun_tempdir.path().join("packages/app/package.json"),
+		bun_tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let bun_context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("app".to_string(), "2.0.0".to_string())]),
+		std::slice::from_ref(&bun_package),
+	);
+	let bun_definition = monochange_core::VersionedFileDefinition {
+		path: "packages/app/bun.lockb".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Npm,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let bun_path = bun_tempdir.path().join("packages/app/bun.lockb");
+	let original_bun =
+		fs::read(&bun_path).unwrap_or_else(|error| panic!("read bun lockb: {error}"));
+	let mut bun_updates = BTreeMap::new();
+	crate::apply_versioned_file_definition(
+		bun_tempdir.path(),
+		&mut bun_updates,
+		&bun_definition,
+		"2.0.0",
+		None,
+		&["app".to_string()],
+		&bun_context,
+	)
+	.unwrap_or_else(|error| panic!("bun lockb update: {error}"));
+	let bun_document = bun_updates
+		.remove(&bun_path)
+		.unwrap_or_else(|| panic!("expected bun lockb update"));
+	assert!(matches!(
+		bun_document,
+		crate::CachedDocument::Bytes(contents) if !contents.is_empty() && contents != original_bun
+	));
+
+	let deno_tempdir = setup_fixture("versioned-file-updates/deno-manifest");
+	let deno_context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
+	let deno_definition = monochange_core::VersionedFileDefinition {
+		path: "deno.json".to_string(),
+		ecosystem_type: monochange_core::EcosystemType::Deno,
+		prefix: None,
+		fields: None,
+		name: None,
+	};
+	let mut deno_updates = BTreeMap::new();
+	crate::apply_versioned_file_definition(
+		deno_tempdir.path(),
+		&mut deno_updates,
+		&deno_definition,
+		"2.0.0",
+		None,
+		&["core".to_string()],
+		&deno_context,
+	)
+	.unwrap_or_else(|error| panic!("deno manifest text update: {error}"));
+	let deno_document = deno_updates
+		.remove(&deno_tempdir.path().join("deno.json"))
+		.unwrap_or_else(|| panic!("expected deno manifest text update"));
+	assert!(matches!(
+		deno_document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("\"core\": \"^2.0.0\"")
+	));
 }
 
 #[test]
@@ -4786,8 +5514,8 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 		.unwrap_or_else(|| panic!("expected npm manifest update"));
 	assert!(matches!(
 		manifest_document,
-		crate::CachedDocument::Json(value)
-			if value["dependencies"]["core"] == serde_json::Value::String("^2.0.0".to_string())
+		crate::CachedDocument::Text(contents)
+			if contents.contains("\"core\": \"^2.0.0\"")
 	));
 
 	let package_lock_tempdir = setup_fixture("monochange/npm-lock-release");
@@ -4870,17 +5598,9 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 		.unwrap_or_else(|| panic!("expected pnpm lock update"));
 	assert!(matches!(
 		pnpm_document,
-		crate::CachedDocument::Yaml(mapping)
-			if mapping
-				.get(serde_yaml_ng::Value::String("importers".to_string()))
-				.and_then(serde_yaml_ng::Value::as_mapping)
-				.and_then(|importers| importers.get(serde_yaml_ng::Value::String(".".to_string())))
-				.and_then(serde_yaml_ng::Value::as_mapping)
-				.and_then(|entry| entry.get(serde_yaml_ng::Value::String("dependencies".to_string())))
-				.and_then(serde_yaml_ng::Value::as_mapping)
-				.and_then(|deps| deps.get(serde_yaml_ng::Value::String("core".to_string())))
-				.and_then(serde_yaml_ng::Value::as_str)
-				== Some("2.0.0")
+		crate::CachedDocument::Text(contents)
+			if contents.contains("core: 2.0.0")
+				&& contents.contains("lockfileVersion: '9.0'")
 	));
 
 	let bun_tempdir = setup_fixture("npm/bun-text-lock");
@@ -4953,8 +5673,8 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 		.unwrap_or_else(|| panic!("expected deno manifest update"));
 	assert!(matches!(
 		deno_manifest_document,
-		crate::CachedDocument::Json(value)
-			if value["imports"]["core"] == serde_json::Value::String("^2.0.0".to_string())
+		crate::CachedDocument::Text(contents)
+			if contents.contains("\"core\": \"^2.0.0\"")
 	));
 
 	let deno_lock_tempdir = setup_fixture("monochange/deno-lock-release");
@@ -5024,13 +5744,8 @@ fn apply_versioned_file_definition_updates_deno_and_dart_variants() {
 		.unwrap_or_else(|| panic!("expected dart manifest update"));
 	assert!(matches!(
 		dart_manifest_document,
-		crate::CachedDocument::Yaml(mapping)
-			if mapping
-				.get(serde_yaml_ng::Value::String("dependencies".to_string()))
-				.and_then(serde_yaml_ng::Value::as_mapping)
-				.and_then(|deps| deps.get(serde_yaml_ng::Value::String("shared".to_string())))
-				.and_then(serde_yaml_ng::Value::as_str)
-				== Some("^2.0.0")
+		crate::CachedDocument::Text(contents)
+			if contents.contains("shared: ^2.0.0")
 	));
 
 	let dart_lock_tempdir = setup_fixture("dart/manifest-lockfile-workspace");

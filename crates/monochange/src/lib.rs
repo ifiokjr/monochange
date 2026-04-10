@@ -136,7 +136,6 @@ use monochange_semver::collect_assessments;
 use monochange_semver::CompatibilityProvider;
 use serde::Serialize;
 use serde_json::json;
-use toml::Value;
 
 use assist::run_assist;
 use cli::build_command_with_cli;

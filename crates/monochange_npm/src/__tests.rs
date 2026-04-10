@@ -26,6 +26,7 @@ use crate::update_bun_lock_binary;
 use crate::update_json_dependency_fields;
 use crate::update_package_lock;
 use crate::update_pnpm_lock;
+use crate::update_pnpm_lock_text;
 use crate::workspace_patterns_from_package_json;
 use crate::NpmVersionedFileKind;
 
@@ -273,6 +274,171 @@ snapshots:
 	assert!(rendered.contains("core: 2.0.0"));
 	assert!(rendered.contains("linked: link:../linked"));
 	assert!(rendered.contains("workspace_dep: workspace:*"));
+}
+
+#[test]
+fn update_pnpm_lock_text_preserves_existing_formatting() {
+	let lock = r#"lockfileVersion: "9.0"
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+  .:
+    dependencies:
+      core: 1.0.0
+      linked: link:../linked
+
+  npm/skill: {}
+"#;
+	let updated = update_pnpm_lock_text(
+		lock,
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+	)
+	.unwrap_or_else(|error| panic!("update pnpm lock text: {error}"));
+	assert_eq!(
+		updated,
+		r#"lockfileVersion: "9.0"
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+  .:
+    dependencies:
+      core: 2.0.0
+      linked: link:../linked
+
+  npm/skill: {}
+"#
+	);
+}
+
+#[test]
+fn update_pnpm_lock_text_returns_original_contents_when_no_entries_match() {
+	let lock = "lockfileVersion: \"9.0\"\n\nimporters:\n  .: {}\n";
+	let updated = update_pnpm_lock_text(
+		lock,
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+	)
+	.unwrap_or_else(|error| panic!("update pnpm lock text: {error}"));
+	assert_eq!(updated, lock);
+}
+
+#[test]
+fn pnpm_text_helper_functions_cover_edge_cases() {
+	let contents = "importers:\n\n  # comment\n";
+	let ranges = crate::yaml_line_ranges(contents);
+	assert_eq!(
+		crate::find_yaml_key_line(contents, &ranges, 0, "importers"),
+		Some(0)
+	);
+	assert!(crate::parse_yaml_line(contents, *ranges.get(1).expect("blank line range")).is_none());
+	assert!(crate::parse_yaml_line(": nope", (0, 6)).is_none());
+	let mut replacements = Vec::new();
+	crate::collect_pnpm_section_replacements(
+		contents,
+		&ranges,
+		1,
+		&BTreeMap::new(),
+		&mut replacements,
+	);
+	let outer_blank = "importers:\n\n  .:\n";
+	let outer_blank_ranges = crate::yaml_line_ranges(outer_blank);
+	let outer_blank_index =
+		crate::find_yaml_key_line(outer_blank, &outer_blank_ranges, 0, "importers")
+			.unwrap_or_else(|| panic!("expected importers section"));
+	crate::collect_pnpm_section_replacements(
+		outer_blank,
+		&outer_blank_ranges,
+		outer_blank_index,
+		&BTreeMap::new(),
+		&mut replacements,
+	);
+	crate::collect_pnpm_dependency_replacements(
+		contents,
+		&ranges,
+		1,
+		&BTreeMap::new(),
+		&mut replacements,
+	);
+	assert!(replacements.is_empty());
+	assert!(crate::yaml_value_span("version: # comment", 0, 8).is_none());
+	assert_eq!(crate::find_yaml_quote_end("\"1.0.0\"", '"'), Some(6));
+	assert_eq!(crate::find_yaml_quote_end("\"1.0.0", '"'), None);
+	assert_eq!(crate::render_yaml_scalar("\"1.0.0\"", "2.0.0"), "\"2.0.0\"");
+	assert_eq!(crate::render_yaml_scalar("'1.0.0'", "2.0.0"), "'2.0.0'");
+	assert_eq!(crate::render_yaml_scalar("1.0.0", "2.0.0"), "2.0.0");
+	assert!(crate::yaml_scalar_is_updatable("1.0.0"));
+	assert!(!crate::yaml_scalar_is_updatable("1"));
+	assert!(!crate::yaml_scalar_is_updatable("link:../linked"));
+	assert!(crate::is_pnpm_dependency_field("dependencies"));
+	assert!(!crate::is_pnpm_dependency_field("resolution"));
+}
+
+#[test]
+fn update_pnpm_lock_text_updates_nested_versions_and_preserves_quotes() {
+	let lock = r#"lockfileVersion: '9.0'
+
+importers:
+  .:
+    dependencies:
+      core:
+        version: "1.0.0"
+      linked:
+        version: link:../linked
+      numeric:
+        version: 1
+      missing:
+        path: ../missing
+
+snapshots:
+  core@1.0.0:
+    optionalDependencies:
+      core: '1.0.0'
+"#;
+	let updated = update_pnpm_lock_text(
+		lock,
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+	)
+	.unwrap_or_else(|error| panic!("update pnpm lock text: {error}"));
+	assert!(updated.contains("version: \"2.0.0\""));
+	assert!(updated.contains("core: '2.0.0'"));
+	assert!(updated.contains("version: link:../linked"));
+	assert!(updated.contains("version: 1"));
+	assert!(updated.contains("path: ../missing"));
+}
+
+#[test]
+fn pnpm_replacement_helpers_skip_invalid_spans_and_blank_lines() {
+	let mut replacements = Vec::new();
+	crate::push_pnpm_scalar_replacement("link:../linked", (0, 14), "2.0.0", &mut replacements);
+	crate::push_pnpm_scalar_replacement("1.0.0", (0, 99), "2.0.0", &mut replacements);
+	assert!(replacements.is_empty());
+
+	let contents = r"importers:
+  .:
+
+    dependencies:
+      other: 1.0.0
+      core:
+        path: ../core
+
+      next: 1.0.0
+";
+	let ranges = crate::yaml_line_ranges(contents);
+	let section_index = crate::find_yaml_key_line(contents, &ranges, 0, "importers")
+		.unwrap_or_else(|| panic!("expected importers section"));
+	crate::collect_pnpm_section_replacements(
+		contents,
+		&ranges,
+		section_index,
+		&BTreeMap::from([("core".to_string(), "2.0.0".to_string())]),
+		&mut replacements,
+	);
+	assert!(replacements.is_empty());
 }
 
 #[test]

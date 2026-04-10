@@ -42,7 +42,7 @@ in
   dotenv.disableHint = true;
 
   git-hooks = {
-    package = pkgs.prek;
+    # package = pkgs.prek;
 
     hooks = {
       "secrets:commit" = {
@@ -58,7 +58,6 @@ in
         enable = true;
         verbose = true;
         pass_filenames = true;
-        after = [ "secrets:commit" ];
         name = "dprint check";
         description = "Run workspace autofixes before commit and restage the results.";
         entry = "${pkgs.dprint}/bin/dprint check --allow-no-files";
@@ -77,7 +76,6 @@ in
         enable = true;
         verbose = true;
         pass_filenames = false;
-        after = [ "secrets:push" ];
         name = "lint";
         description = "Run the local CI lint rules suite before push.";
         entry = "${config.env.DEVENV_PROFILE}/bin/lint:all";

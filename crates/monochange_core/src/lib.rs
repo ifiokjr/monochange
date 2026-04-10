@@ -47,7 +47,7 @@
 //!
 //! let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
 //!
-//! assert!(rendered.contains("## [1.2.3]"));
+//! assert!(rendered.contains("## 1.2.3"));
 //! assert!(rendered.contains("### Features"));
 //! assert!(rendered.contains("- add keep-a-changelog output"));
 //! ```
@@ -398,6 +398,380 @@ impl EcosystemType {
 			Self::Dart => &["dependencies", "dev_dependencies"],
 		}
 	}
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct JsonSpan {
+	start: usize,
+	end: usize,
+}
+
+pub fn strip_json_comments(contents: &str) -> String {
+	let bytes = contents.as_bytes();
+	let mut output = String::with_capacity(contents.len());
+	let mut cursor = 0usize;
+	while let Some(&byte) = bytes.get(cursor) {
+		if byte == b'"' {
+			let start = cursor;
+			cursor += 1;
+			while let Some(&string_byte) = bytes.get(cursor) {
+				cursor += 1;
+				if string_byte == b'\\' {
+					cursor += usize::from(bytes.get(cursor).is_some());
+					continue;
+				}
+				if string_byte == b'"' {
+					break;
+				}
+			}
+			output.push_str(&contents[start..cursor]);
+			continue;
+		}
+		if byte == b'/' && bytes.get(cursor + 1) == Some(&b'/') {
+			cursor += 2;
+			while let Some(&line_byte) = bytes.get(cursor) {
+				if line_byte == b'\n' {
+					break;
+				}
+				cursor += 1;
+			}
+			continue;
+		}
+		if byte == b'/' && bytes.get(cursor + 1) == Some(&b'*') {
+			cursor += 2;
+			while bytes.get(cursor).is_some() {
+				if bytes.get(cursor) == Some(&b'*') && bytes.get(cursor + 1) == Some(&b'/') {
+					cursor += 2;
+					break;
+				}
+				cursor += 1;
+			}
+			continue;
+		}
+		output.push(char::from(byte));
+		cursor += 1;
+	}
+	output
+}
+
+pub fn update_json_manifest_text(
+	contents: &str,
+	owner_version: Option<&str>,
+	fields: &[&str],
+	versioned_deps: &BTreeMap<String, String>,
+) -> MonochangeResult<String> {
+	let root_start = json_root_object_start(contents)?;
+	let mut replacements = Vec::<(JsonSpan, String)>::new();
+	if let Some(owner_version) = owner_version {
+		if let Some(span) = find_json_object_field_value_span(contents, root_start, "version")?
+			.filter(|span| json_span_is_string(contents, *span))
+		{
+			replacements.push((span, render_json_string(owner_version)?));
+		}
+	}
+	for field in fields {
+		let Some(section_span) = find_json_object_field_value_span(contents, root_start, field)?
+		else {
+			continue;
+		};
+		if !json_span_is_object(contents, section_span) {
+			continue;
+		}
+		for (dep_name, dep_version) in versioned_deps {
+			let Some(dep_span) =
+				find_json_object_field_value_span(contents, section_span.start, dep_name)?
+					.filter(|span| json_span_is_string(contents, *span))
+			else {
+				continue;
+			};
+			replacements.push((dep_span, render_json_string(dep_version)?));
+		}
+	}
+	apply_json_replacements(contents, replacements)
+}
+
+fn render_json_string(value: &str) -> MonochangeResult<String> {
+	serde_json::to_string(value).map_err(|error| MonochangeError::Config(error.to_string()))
+}
+
+fn apply_json_replacements(
+	contents: &str,
+	mut replacements: Vec<(JsonSpan, String)>,
+) -> MonochangeResult<String> {
+	replacements.sort_by(|left, right| right.0.start.cmp(&left.0.start));
+	let mut updated = contents.to_string();
+	for (span, replacement) in replacements {
+		if span.start > span.end || span.end > updated.len() {
+			return Err(MonochangeError::Config(
+				"json edit range was out of bounds".to_string(),
+			));
+		}
+		updated.replace_range(span.start..span.end, &replacement);
+	}
+	Ok(updated)
+}
+
+fn json_root_object_start(contents: &str) -> MonochangeResult<usize> {
+	let start = skip_json_ws_and_comments(contents, 0);
+	if contents.as_bytes().get(start) == Some(&b'{') {
+		Ok(start)
+	} else {
+		Err(MonochangeError::Config(
+			"expected JSON object at document root".to_string(),
+		))
+	}
+}
+
+fn find_json_object_field_value_span(
+	contents: &str,
+	object_start: usize,
+	key: &str,
+) -> MonochangeResult<Option<JsonSpan>> {
+	let bytes = contents.as_bytes();
+	if bytes.get(object_start) != Some(&b'{') {
+		return Err(MonochangeError::Config(
+			"expected JSON object when locating field".to_string(),
+		));
+	}
+	let mut cursor = object_start + 1;
+	loop {
+		cursor = skip_json_ws_and_comments(contents, cursor);
+		match bytes.get(cursor) {
+			Some(b'}') => return Ok(None),
+			Some(b'"') => {}
+			Some(_) => {
+				return Err(MonochangeError::Config(
+					"expected JSON object key".to_string(),
+				));
+			}
+			None => {
+				return Err(MonochangeError::Config(
+					"unterminated JSON object".to_string(),
+				));
+			}
+		}
+		let (key_span, next) = parse_json_string_span(contents, cursor)?;
+		let key_text = &contents[key_span.start..key_span.end];
+		cursor = skip_json_ws_and_comments(contents, next);
+		if bytes.get(cursor) != Some(&b':') {
+			return Err(MonochangeError::Config(
+				"expected `:` after JSON object key".to_string(),
+			));
+		}
+		cursor = skip_json_ws_and_comments(contents, cursor + 1);
+		let value_start = cursor;
+		let value_end = skip_json_value(contents, value_start)?;
+		if key_text == key {
+			return Ok(Some(JsonSpan {
+				start: value_start,
+				end: value_end,
+			}));
+		}
+		cursor = skip_json_ws_and_comments(contents, value_end);
+		match bytes.get(cursor) {
+			Some(b',') => {
+				cursor += 1;
+			}
+			Some(b'}') => return Ok(None),
+			Some(_) => {
+				return Err(MonochangeError::Config(
+					"expected `,` or `}` after JSON object value".to_string(),
+				));
+			}
+			None => {
+				return Err(MonochangeError::Config(
+					"unterminated JSON object".to_string(),
+				));
+			}
+		}
+	}
+}
+
+fn skip_json_value(contents: &str, start: usize) -> MonochangeResult<usize> {
+	let bytes = contents.as_bytes();
+	let cursor = skip_json_ws_and_comments(contents, start);
+	match bytes.get(cursor) {
+		Some(b'"') => parse_json_string_span(contents, cursor).map(|(_, next)| next),
+		Some(b'{') => skip_json_object(contents, cursor),
+		Some(b'[') => skip_json_array(contents, cursor),
+		Some(_) => Ok(skip_json_primitive(contents, cursor)),
+		None => Err(MonochangeError::Config(
+			"unexpected end of JSON input".to_string(),
+		)),
+	}
+}
+
+fn skip_json_object(contents: &str, object_start: usize) -> MonochangeResult<usize> {
+	let bytes = contents.as_bytes();
+	let mut cursor = object_start + 1;
+	loop {
+		cursor = skip_json_ws_and_comments(contents, cursor);
+		match bytes.get(cursor) {
+			Some(b'}') => return Ok(cursor + 1),
+			Some(b'"') => {}
+			Some(_) => {
+				return Err(MonochangeError::Config(
+					"expected JSON object key".to_string(),
+				))
+			}
+			None => {
+				return Err(MonochangeError::Config(
+					"unterminated JSON object".to_string(),
+				))
+			}
+		}
+		let (_, next) = parse_json_string_span(contents, cursor)?;
+		cursor = skip_json_ws_and_comments(contents, next);
+		if bytes.get(cursor) != Some(&b':') {
+			return Err(MonochangeError::Config(
+				"expected `:` after JSON object key".to_string(),
+			));
+		}
+		cursor = skip_json_value(contents, cursor + 1)?;
+		cursor = skip_json_ws_and_comments(contents, cursor);
+		match bytes.get(cursor) {
+			Some(b',') => {
+				cursor += 1;
+			}
+			Some(b'}') => return Ok(cursor + 1),
+			Some(_) => {
+				return Err(MonochangeError::Config(
+					"expected `,` or `}` after JSON object value".to_string(),
+				));
+			}
+			None => {
+				return Err(MonochangeError::Config(
+					"unterminated JSON object".to_string(),
+				));
+			}
+		}
+	}
+}
+
+fn skip_json_array(contents: &str, array_start: usize) -> MonochangeResult<usize> {
+	let bytes = contents.as_bytes();
+	let mut cursor = array_start + 1;
+	loop {
+		cursor = skip_json_ws_and_comments(contents, cursor);
+		match bytes.get(cursor) {
+			Some(b']') => return Ok(cursor + 1),
+			Some(_) => {
+				cursor = skip_json_value(contents, cursor)?;
+				cursor = skip_json_ws_and_comments(contents, cursor);
+				match bytes.get(cursor) {
+					Some(b',') => {
+						cursor += 1;
+					}
+					Some(b']') => return Ok(cursor + 1),
+					Some(_) => {
+						return Err(MonochangeError::Config(
+							"expected `,` or `]` after JSON array value".to_string(),
+						));
+					}
+					None => {
+						return Err(MonochangeError::Config(
+							"unterminated JSON array".to_string(),
+						))
+					}
+				}
+			}
+			None => {
+				return Err(MonochangeError::Config(
+					"unterminated JSON array".to_string(),
+				))
+			}
+		}
+	}
+}
+
+fn skip_json_primitive(contents: &str, start: usize) -> usize {
+	let bytes = contents.as_bytes();
+	let mut cursor = start;
+	while let Some(&byte) = bytes.get(cursor) {
+		if matches!(byte, b',' | b'}' | b']') || byte.is_ascii_whitespace() {
+			break;
+		}
+		if byte == b'/' && matches!(bytes.get(cursor + 1), Some(b'/' | b'*')) {
+			break;
+		}
+		cursor += 1;
+	}
+	cursor
+}
+
+fn parse_json_string_span(contents: &str, start: usize) -> MonochangeResult<(JsonSpan, usize)> {
+	let bytes = contents.as_bytes();
+	if bytes.get(start) != Some(&b'"') {
+		return Err(MonochangeError::Config("expected JSON string".to_string()));
+	}
+	let mut cursor = start + 1;
+	while let Some(&byte) = bytes.get(cursor) {
+		if byte == b'\\' {
+			cursor += 2;
+			continue;
+		}
+		if byte == b'"' {
+			return Ok((
+				JsonSpan {
+					start: start + 1,
+					end: cursor,
+				},
+				cursor + 1,
+			));
+		}
+		cursor += 1;
+	}
+	Err(MonochangeError::Config(
+		"unterminated JSON string".to_string(),
+	))
+}
+
+fn skip_json_ws_and_comments(contents: &str, start: usize) -> usize {
+	let bytes = contents.as_bytes();
+	let mut cursor = start;
+	loop {
+		while let Some(&byte) = bytes.get(cursor) {
+			if !byte.is_ascii_whitespace() {
+				break;
+			}
+			cursor += 1;
+		}
+		if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+			cursor += 2;
+			while let Some(&byte) = bytes.get(cursor) {
+				if byte == b'\n' {
+					break;
+				}
+				cursor += 1;
+			}
+			continue;
+		}
+		if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+			cursor += 2;
+			while bytes.get(cursor).is_some() {
+				if bytes.get(cursor) == Some(&b'*') && bytes.get(cursor + 1) == Some(&b'/') {
+					cursor += 2;
+					break;
+				}
+				cursor += 1;
+			}
+			continue;
+		}
+		break;
+	}
+	cursor
+}
+
+fn json_span_is_string(contents: &str, span: JsonSpan) -> bool {
+	contents.as_bytes().get(span.start) == Some(&b'"')
+		&& span.end > span.start
+		&& contents.as_bytes().get(span.end - 1) == Some(&b'"')
+}
+
+fn json_span_is_object(contents: &str, span: JsonSpan) -> bool {
+	contents.as_bytes().get(span.start) == Some(&b'{')
+		&& span.end > span.start
+		&& contents.as_bytes().get(span.end - 1) == Some(&b'}')
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -963,7 +1337,7 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 }
 
 fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> String {
-	let mut lines = vec![format!("## [{}]", document.title), String::new()];
+	let mut lines = vec![format!("## {}", document.title), String::new()];
 	for (index, paragraph) in document.summary.iter().enumerate() {
 		if index > 0 {
 			lines.push(String::new());

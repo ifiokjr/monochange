@@ -1367,3 +1367,188 @@ fn retarget_plan_and_result_serialize_with_camel_case_keys() {
 		"planned"
 	);
 }
+
+#[test]
+fn update_json_manifest_text_preserves_existing_formatting() {
+	let contents = r#"{
+  // keep comment
+  "name": "tool",
+  "version": "1.0.0",
+  "imports": {
+    "core": "^1.0.0"
+  },
+  "dependencies": { "left-pad": "^1.0.0" }
+}
+"#;
+	let updated = crate::update_json_manifest_text(
+		contents,
+		Some("2.0.0"),
+		&["imports"],
+		&BTreeMap::from([("core".to_string(), "^2.0.0".to_string())]),
+	)
+	.unwrap_or_else(|error| panic!("update json manifest: {error}"));
+
+	assert!(updated.contains("// keep comment"));
+	assert!(updated.contains("\"version\": \"2.0.0\""));
+	assert!(updated.contains("\"core\": \"^2.0.0\""));
+	assert!(updated.contains("\"left-pad\": \"^1.0.0\""));
+	assert!(updated.contains("  \"dependencies\": { \"left-pad\": \"^1.0.0\" }"));
+}
+
+#[test]
+fn update_json_manifest_text_ignores_missing_or_non_object_sections() {
+	let contents = r#"{
+  "version": "1.0.0",
+  "dependencies": ["core"],
+  "imports": {
+    "core": "^1.0.0"
+  }
+}
+"#;
+	let updated = crate::update_json_manifest_text(
+		contents,
+		None,
+		&["dependencies", "imports"],
+		&BTreeMap::from([("core".to_string(), "^2.0.0".to_string())]),
+	)
+	.unwrap_or_else(|error| panic!("update json manifest: {error}"));
+
+	assert!(updated.contains("\"dependencies\": [\"core\"]"));
+	assert!(updated.contains("\"core\": \"^2.0.0\""));
+}
+
+#[test]
+fn strip_json_comments_removes_comments_but_preserves_string_literals() {
+	let stripped = crate::strip_json_comments(
+		r#"{
+  // comment
+  "text": "https://example.com//still-string",
+  "escaped": "quote: \" // still string",
+  /* block */
+  "value": 1
+}
+"#,
+	);
+	assert!(!stripped.contains("// comment"));
+	assert!(!stripped.contains("/* block */"));
+	assert!(stripped.contains("https://example.com//still-string"));
+	assert!(stripped.contains("quote: \\\" // still string"));
+}
+
+#[test]
+fn json_helper_functions_cover_error_paths() {
+	let range_error = crate::apply_json_replacements(
+		"{}",
+		vec![(crate::JsonSpan { start: 10, end: 11 }, "\"x\"".to_string())],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected range error"));
+	assert!(range_error.to_string().contains("out of bounds"));
+
+	let root_error = crate::json_root_object_start("[]")
+		.err()
+		.unwrap_or_else(|| panic!("expected root error"));
+	assert!(root_error.to_string().contains("expected JSON object"));
+
+	let locate_error = crate::find_json_object_field_value_span("[]", 0, "name")
+		.err()
+		.unwrap_or_else(|| panic!("expected locate error"));
+	assert!(locate_error
+		.to_string()
+		.contains("expected JSON object when locating field"));
+
+	for (contents, key) in [
+		("{1:2}", "a"),
+		("{\"a\" 1}", "a"),
+		("{\"a\":1 !}", "missing"),
+		("{\"a\":1", "missing"),
+	] {
+		assert!(
+			crate::find_json_object_field_value_span(contents, 0, key).is_err(),
+			"contents: {contents}"
+		);
+	}
+
+	assert!(crate::skip_json_value("", 0).is_err());
+	assert!(crate::skip_json_array("[1 !]", 0).is_err());
+	assert!(crate::skip_json_array("[1", 0).is_err());
+	assert!(crate::skip_json_array("[", 0).is_err());
+	assert!(crate::skip_json_object("{\"a\":1 !}", 0).is_err());
+	assert!(crate::skip_json_object("{\"a\":1", 0).is_err());
+	assert!(crate::skip_json_object("{", 0).is_err());
+	assert!(crate::skip_json_object("{1}", 0).is_err());
+	assert!(crate::skip_json_object("{\"a\" 1}", 0).is_err());
+	assert!(crate::parse_json_string_span("abc", 0).is_err());
+	assert!(crate::parse_json_string_span("\"abc", 0).is_err());
+}
+
+#[test]
+fn json_helper_functions_cover_success_paths() {
+	let (string_span, next) = crate::parse_json_string_span("\"a\\\"b\"", 0)
+		.unwrap_or_else(|error| panic!("parse string span: {error}"));
+	assert_eq!(string_span, crate::JsonSpan { start: 1, end: 5 });
+	assert_eq!(next, 6);
+
+	assert_eq!(
+		crate::skip_json_value("\"text\"", 0)
+			.unwrap_or_else(|error| panic!("skip string value: {error}")),
+		6
+	);
+	assert_eq!(
+		crate::skip_json_value("{\"a\":1}", 0)
+			.unwrap_or_else(|error| panic!("skip object value: {error}")),
+		7
+	);
+	assert_eq!(
+		crate::skip_json_value("[1,2]", 0)
+			.unwrap_or_else(|error| panic!("skip array value: {error}")),
+		5
+	);
+	assert_eq!(crate::skip_json_primitive("true /* comment */", 0), 4);
+	assert_eq!(crate::skip_json_primitive("true//comment", 0), 4);
+	assert_eq!(
+		crate::skip_json_ws_and_comments(" // comment\n /* block */ {", 0),
+		25
+	);
+	assert_eq!(
+		crate::skip_json_object("{}", 0)
+			.unwrap_or_else(|error| panic!("skip empty object: {error}")),
+		2
+	);
+	assert_eq!(
+		crate::skip_json_object("{\"a\":1,\"b\":2}", 0)
+			.unwrap_or_else(|error| panic!("skip object with comma: {error}")),
+		13
+	);
+	assert_eq!(
+		crate::skip_json_array("[]", 0).unwrap_or_else(|error| panic!("skip empty array: {error}")),
+		2
+	);
+	assert_eq!(
+		crate::find_json_object_field_value_span("{}", 0, "name")
+			.unwrap_or_else(|error| panic!("find empty object field: {error}")),
+		None
+	);
+	let field_span = crate::find_json_object_field_value_span(
+		r#"{"name":"tool","deps":{"core":"^1.0.0"}}"#,
+		0,
+		"deps",
+	)
+	.unwrap_or_else(|error| panic!("find field span: {error}"))
+	.unwrap_or_else(|| panic!("expected deps field"));
+	assert!(crate::json_span_is_object(
+		r#"{"name":"tool","deps":{"core":"^1.0.0"}}"#,
+		field_span
+	));
+	let updated = crate::update_json_manifest_text(
+		r#"{"version":1,"imports":{"core":{"path":"./core"}}}"#,
+		Some("2.0.0"),
+		&["imports"],
+		&BTreeMap::from([("core".to_string(), "^2.0.0".to_string())]),
+	)
+	.unwrap_or_else(|error| panic!("update json manifest with non-string values: {error}"));
+	assert_eq!(
+		updated,
+		r#"{"version":1,"imports":{"core":{"path":"./core"}}}"#
+	);
+}

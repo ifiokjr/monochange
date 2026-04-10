@@ -1,0 +1,11 @@
+---
+source: crates/monochange/tests/manifest_formatting.rs
+expression: group_file
+---
+[workspace.package]
+# group file should keep this comment and layout
+version = "1.1.0"
+
+[workspace.dependencies]
+workflow-core = { path = "./crates/core", version = "1.1.0" }
+workflow-app = { path = "./crates/app", version = "1.1.0", features = ["cli"] }

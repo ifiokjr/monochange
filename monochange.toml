@@ -265,15 +265,13 @@ extra_changelog_sections = [
 tag = true
 release = true
 version_format = "primary"
-
-[group.main.changelog]
-path = "changelog.md"
-format = "monochange"
+versioned_files = [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] }]
 # Optional: filter member-targeted notes in the group changelog.
 # Omit `include` (or set it to "all") to keep current behavior.
 # Use "group-only" to show only direct group-targeted changesets.
 # Use an array to allow only specific group members to contribute notes.
 # include = ["monochange"]
+changelog = { path = "changelog.md", format = "monochange" }
 
 # =============================================================================
 # [changesets.verify] — changeset verification settings
@@ -326,6 +324,7 @@ comment_on_failure = true
 
 [ecosystems.cargo]
 enabled = true
+versioned_files = ["Cargo.toml"]
 
 [ecosystems.npm]
 enabled = true

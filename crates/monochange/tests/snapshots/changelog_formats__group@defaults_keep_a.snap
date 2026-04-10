@@ -2,7 +2,7 @@
 source: crates/monochange/tests/changelog_formats.rs
 expression: group_changelog
 ---
-## [1.1.0 ([DATE])]
+## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.
 

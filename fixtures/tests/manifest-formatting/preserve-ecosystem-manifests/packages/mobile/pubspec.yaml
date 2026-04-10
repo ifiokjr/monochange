@@ -1,0 +1,8 @@
+name: mobile
+version: '1.0.0' # keep quote
+publish_to: none
+
+dependencies:
+  shared:
+    path: ../shared
+    version: ^1.0.0
