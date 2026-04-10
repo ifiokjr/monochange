@@ -2528,11 +2528,46 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 			"[source].repo must not be empty".to_string(),
 		));
 	}
+	if let Some(api_url) = &source.api_url {
+		validate_api_url_host(api_url, source.provider)?;
+	}
+	if let Some(host) = &source.host {
+		validate_api_url_host(host, source.provider)?;
+	}
 	match source.provider {
 		SourceProvider::GitHub => monochange_github::validate_source_configuration(source),
 		SourceProvider::GitLab => monochange_gitlab::validate_source_configuration(source),
 		SourceProvider::Gitea => monochange_gitea::validate_source_configuration(source),
 	}
+}
+
+/// Reject `api_url` or `host` values that use insecure schemes. API tokens are
+/// sent as Authorization headers, so an `http://` endpoint would transmit them
+/// in cleartext.
+fn validate_api_url_host(url: &str, provider: SourceProvider) -> MonochangeResult<()> {
+	let lower = url.to_lowercase();
+	if lower.starts_with("http://") {
+		return Err(MonochangeError::Config(format!(
+			"[source] url `{url}` uses an insecure scheme (http://); \
+			 API tokens would be transmitted in cleartext — use https:// instead"
+		)));
+	}
+	// Warn about non-standard hosts for GitHub — GitLab and Gitea are commonly
+	// self-hosted, so custom hosts are expected for those providers.
+	if provider == SourceProvider::GitHub && lower.starts_with("https://") {
+		let without_scheme = &lower["https://".len()..];
+		let host_part = without_scheme.split('/').next().unwrap_or("");
+		let is_standard = host_part == "api.github.com"
+			|| host_part.ends_with(".github.com")
+			|| host_part.ends_with(".githubusercontent.com");
+		if !is_standard {
+			eprintln!(
+				"warning: [source] url points to non-standard GitHub host `{url}`; \
+				 verify this is intentional — API tokens will be sent to this host"
+			);
+		}
+	}
+	Ok(())
 }
 
 fn validate_changesets_configuration(
