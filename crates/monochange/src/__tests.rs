@@ -2702,12 +2702,12 @@ fn sample_source_configuration_for_release_commit() -> monochange_core::SourceCo
 		repo: "monochange".to_string(),
 		host: None,
 		api_url: None,
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings {
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings {
 			title: "chore(release): prepare release".to_string(),
-			..monochange_core::ChangeRequestSettings::default()
+			..monochange_core::ProviderMergeRequestSettings::default()
 		},
-		bot: monochange_core::BotSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	}
 }
 
@@ -3404,9 +3404,9 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 		api_url: Some("https://gitlab.example.com/api/v4".to_string()),
 		owner: "org".to_string(),
 		repo: "repo".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	});
 	let prepare_and_publish = monochange_core::CliCommandDefinition {
 		name: "publish-release".to_string(),
@@ -4055,9 +4055,9 @@ fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	};
 
 	let plan =
@@ -4138,9 +4138,9 @@ fn plan_release_retarget_rejects_provider_kind_mismatches() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	};
 
 	let error =
@@ -4381,9 +4381,9 @@ fn sync_retargeted_provider_releases_reports_unsupported_provider_in_dry_run() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	};
 	let updates = vec![monochange_core::RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -4412,9 +4412,9 @@ fn sync_retargeted_provider_releases_rejects_unsupported_provider_in_real_mode()
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	};
 	let updates = vec![monochange_core::RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -4456,9 +4456,9 @@ fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	};
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let error = crate::execute_release_retarget(tempdir.path(), Some(&source), &plan)
@@ -7007,9 +7007,9 @@ fn render_tag_name_and_provider_urls_follow_provider_conventions() {
 		api_url: None,
 		owner: "group".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	};
 	assert!(crate::tag_url_for_provider(&gitlab, "v1.2.3").contains("gitlab.example.com"));
 	assert!(crate::compare_url_for_provider(&gitlab, "v1.2.2", "v1.2.3").contains("/-/compare/"));
@@ -7443,9 +7443,9 @@ fn build_source_release_requests_and_change_request_cover_gitea_dispatch() {
 		api_url: Some("https://gitea.example.com/api/v1".to_string()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	};
 	let manifest = sample_release_manifest_for_commit_message(true, true);
 	let requests = crate::build_source_release_requests(&source, &manifest);
@@ -7549,9 +7549,9 @@ fn sample_github_source_configuration(api_url: &str) -> monochange_core::SourceC
 		api_url: Some(api_url.to_string()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	}
 }
 

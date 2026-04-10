@@ -6,8 +6,6 @@ use httpmock::Method::POST;
 use httpmock::MockServer;
 use insta::assert_json_snapshot;
 use insta::assert_snapshot;
-use monochange_core::BotSettings;
-use monochange_core::ChangeRequestSettings;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
 use monochange_core::CommitMessage;
@@ -20,15 +18,17 @@ use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
 use monochange_core::PreparedChangeset;
+use monochange_core::ProviderBotSettings;
+use monochange_core::ProviderMergeRequestSettings;
+use monochange_core::ProviderReleaseNotesSource;
+use monochange_core::ProviderReleaseSettings;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestPlan;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
-use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
-use monochange_core::ReleaseProviderSettings;
 use monochange_core::RetargetOperation;
 use monochange_core::RetargetProviderOperation;
 use monochange_core::RetargetTagResult;
@@ -50,9 +50,9 @@ fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -82,13 +82,13 @@ fn build_release_requests_can_defer_to_github_generated_notes() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings {
-			source: ReleaseNotesSource::GitHubGenerated,
+		releases: ProviderReleaseSettings {
+			source: ProviderReleaseNotesSource::GitHubGenerated,
 			generate_notes: true,
-			..ReleaseProviderSettings::default()
+			..ProviderReleaseSettings::default()
 		},
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -125,9 +125,9 @@ fn github_url_helpers_use_source_configuration_coordinates() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 
 	temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
@@ -150,13 +150,13 @@ fn validate_source_configuration_rejects_conflicting_release_note_modes() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings {
+		releases: ProviderReleaseSettings {
 			generate_notes: true,
-			source: ReleaseNotesSource::Monochange,
-			..ReleaseProviderSettings::default()
+			source: ProviderReleaseNotesSource::Monochange,
+			..ProviderReleaseSettings::default()
 		},
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
@@ -188,9 +188,9 @@ fn comment_released_issues_public_api_uses_source_configuration() {
 		api_url: Some(server.base_url()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let mut manifest = sample_manifest();
 	manifest.changesets = vec![PreparedChangeset {
@@ -244,9 +244,9 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let manifest = ReleaseManifest {
 		command: "release".to_string(),
@@ -310,16 +310,16 @@ fn build_release_pull_request_request_renders_branch_and_body() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings {
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings {
 			branch_prefix: "automation/release".to_string(),
 			base: "develop".to_string(),
 			title: "chore(release): prepare release".to_string(),
 			labels: vec!["release".to_string(), "automated".to_string()],
 			auto_merge: true,
-			..ChangeRequestSettings::default()
+			..ProviderMergeRequestSettings::default()
 		},
-		bot: BotSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -428,9 +428,9 @@ fn sync_retargeted_releases_plans_updates_in_dry_run_mode() {
 		api_url: Some("https://example.com".to_string()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -482,9 +482,9 @@ fn sync_retargeted_releases_updates_existing_release_target_commitish() {
 		api_url: Some(server.base_url()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -532,9 +532,9 @@ fn sync_retargeted_releases_reports_already_aligned_release() {
 		api_url: Some(server.base_url()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -577,9 +577,9 @@ fn sync_retargeted_releases_errors_when_release_lookup_is_missing() {
 		api_url: Some(server.base_url()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -630,9 +630,9 @@ fn sync_retargeted_releases_public_api_uses_source_configuration_and_env() {
 		api_url: Some(server.base_url()),
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -1028,9 +1028,9 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let mut changesets = vec![PreparedChangeset {
 		path: PathBuf::from(".changeset/feature.md"),
@@ -1129,9 +1129,9 @@ fn enrich_changeset_context_public_api_uses_source_configuration() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let mut changesets = vec![PreparedChangeset {
 		path: PathBuf::from(".changeset/feature.md"),
@@ -1217,9 +1217,9 @@ fn comment_released_issues_skips_existing_markers_and_posts_missing_comments() {
 		api_url: None,
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	};
 	let mut manifest = sample_manifest();
 	manifest.changesets = vec![PreparedChangeset {

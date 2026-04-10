@@ -107,9 +107,6 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 
-use monochange_core::BotSettings;
-use monochange_core::ChangeRequestSettings;
-use monochange_core::ChangesetBotSettings;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
@@ -123,9 +120,12 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
+use monochange_core::ProviderBotSettings;
+use monochange_core::ProviderChangesetBotSettings;
+use monochange_core::ProviderMergeRequestSettings;
+use monochange_core::ProviderReleaseNotesSource;
+use monochange_core::ProviderReleaseSettings;
 use monochange_core::ReleaseNotesSettings;
-use monochange_core::ReleaseNotesSource;
-use monochange_core::ReleaseProviderSettings;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
@@ -409,11 +409,11 @@ struct RawSourceConfiguration {
 	#[serde(default)]
 	api_url: Option<String>,
 	#[serde(default)]
-	releases: RawReleaseProviderSettings,
+	releases: RawProviderReleaseSettings,
 	#[serde(default)]
-	pull_requests: RawChangeRequestSettings,
+	pull_requests: RawProviderMergeRequestSettings,
 	#[serde(default)]
-	bot: RawBotSettings,
+	bot: RawProviderBotSettings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -421,16 +421,16 @@ struct RawGitHubConfiguration {
 	owner: String,
 	repo: String,
 	#[serde(default)]
-	releases: RawReleaseProviderSettings,
+	releases: RawProviderReleaseSettings,
 	#[serde(default)]
-	pull_requests: RawChangeRequestSettings,
+	pull_requests: RawProviderMergeRequestSettings,
 	#[serde(default)]
-	bot: RawBotSettings,
+	bot: RawProviderBotSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawReleaseProviderSettings {
+struct RawProviderReleaseSettings {
 	#[serde(default = "default_true")]
 	enabled: bool,
 	#[serde(default)]
@@ -440,24 +440,24 @@ struct RawReleaseProviderSettings {
 	#[serde(default)]
 	generate_notes: bool,
 	#[serde(default)]
-	source: ReleaseNotesSource,
+	source: ProviderReleaseNotesSource,
 }
 
-impl Default for RawReleaseProviderSettings {
+impl Default for RawProviderReleaseSettings {
 	fn default() -> Self {
 		Self {
 			enabled: default_true(),
 			draft: false,
 			prerelease: false,
 			generate_notes: false,
-			source: ReleaseNotesSource::Monochange,
+			source: ProviderReleaseNotesSource::Monochange,
 		}
 	}
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawChangeRequestSettings {
+struct RawProviderMergeRequestSettings {
 	#[serde(default = "default_true")]
 	enabled: bool,
 	#[serde(default = "default_pull_request_branch_prefix")]
@@ -472,7 +472,7 @@ struct RawChangeRequestSettings {
 	auto_merge: bool,
 }
 
-impl Default for RawChangeRequestSettings {
+impl Default for RawProviderMergeRequestSettings {
 	fn default() -> Self {
 		Self {
 			enabled: default_true(),
@@ -487,7 +487,7 @@ impl Default for RawChangeRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawChangesetBotSettings {
+struct RawProviderChangesetBotSettings {
 	#[serde(default)]
 	enabled: bool,
 	#[serde(default = "default_true")]
@@ -502,7 +502,7 @@ struct RawChangesetBotSettings {
 	ignored_paths: Vec<String>,
 }
 
-impl Default for RawChangesetBotSettings {
+impl Default for RawProviderChangesetBotSettings {
 	fn default() -> Self {
 		Self {
 			enabled: false,
@@ -516,9 +516,9 @@ impl Default for RawChangesetBotSettings {
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct RawBotSettings {
+struct RawProviderBotSettings {
 	#[serde(default)]
-	changesets: RawChangesetBotSettings,
+	changesets: RawProviderChangesetBotSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -1112,14 +1112,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		repo: source.repo,
 		host: source.host,
 		api_url: source.api_url,
-		releases: ReleaseProviderSettings {
+		releases: ProviderReleaseSettings {
 			enabled: source.releases.enabled,
 			draft: source.releases.draft,
 			prerelease: source.releases.prerelease,
 			generate_notes: source.releases.generate_notes,
 			source: source.releases.source,
 		},
-		pull_requests: ChangeRequestSettings {
+		pull_requests: ProviderMergeRequestSettings {
 			enabled: source.pull_requests.enabled,
 			branch_prefix: source.pull_requests.branch_prefix,
 			base: source.pull_requests.base,
@@ -1127,8 +1127,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			labels: source.pull_requests.labels,
 			auto_merge: source.pull_requests.auto_merge,
 		},
-		bot: BotSettings {
-			changesets: ChangesetBotSettings {
+		bot: ProviderBotSettings {
+			changesets: ProviderChangesetBotSettings {
 				enabled: source.bot.changesets.enabled,
 				required: source.bot.changesets.required,
 				skip_labels: source.bot.changesets.skip_labels,
@@ -1150,14 +1150,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		github.map(|github| GitHubConfiguration {
 			owner: github.owner,
 			repo: github.repo,
-			releases: ReleaseProviderSettings {
+			releases: ProviderReleaseSettings {
 				enabled: github.releases.enabled,
 				draft: github.releases.draft,
 				prerelease: github.releases.prerelease,
 				generate_notes: github.releases.generate_notes,
 				source: github.releases.source,
 			},
-			pull_requests: ChangeRequestSettings {
+			pull_requests: ProviderMergeRequestSettings {
 				enabled: github.pull_requests.enabled,
 				branch_prefix: github.pull_requests.branch_prefix,
 				base: github.pull_requests.base,
@@ -1165,8 +1165,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				labels: github.pull_requests.labels,
 				auto_merge: github.pull_requests.auto_merge,
 			},
-			bot: BotSettings {
-				changesets: ChangesetBotSettings {
+			bot: ProviderBotSettings {
+				changesets: ProviderChangesetBotSettings {
 					enabled: github.bot.changesets.enabled,
 					required: github.bot.changesets.required,
 					skip_labels: github.bot.changesets.skip_labels,

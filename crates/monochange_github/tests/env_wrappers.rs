@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use httpmock::Method::GET;
 use httpmock::Method::POST;
 use httpmock::MockServer;
-use monochange_core::BotSettings;
-use monochange_core::ChangeRequestSettings;
 use monochange_core::CommitMessage;
+use monochange_core::ProviderBotSettings;
+use monochange_core::ProviderMergeRequestSettings;
+use monochange_core::ProviderReleaseSettings;
 use monochange_core::ReleaseOwnerKind;
-use monochange_core::ReleaseProviderSettings;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_github::publish_release_pull_request;
@@ -148,9 +148,9 @@ fn sample_github_source() -> SourceConfiguration {
 		repo: "monochange".to_string(),
 		host: None,
 		api_url: None,
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	}
 }
 

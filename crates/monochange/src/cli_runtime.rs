@@ -1208,9 +1208,9 @@ pub(crate) fn inferred_retarget_source_configuration(
 		repo: provider.repo.clone(),
 		host: provider.host.clone(),
 		api_url: None,
-		releases: monochange_core::ReleaseProviderSettings::default(),
-		pull_requests: monochange_core::ChangeRequestSettings::default(),
-		bot: monochange_core::BotSettings::default(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		bot: monochange_core::ProviderBotSettings::default(),
 	})
 }
 

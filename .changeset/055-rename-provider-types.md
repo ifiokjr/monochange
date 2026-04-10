@@ -5,4 +5,4 @@ monochange_github: patch
 monochange: patch
 ---
 
-Rename GitHub-specific provider types to generic names in monochange_core. `GitHubReleaseSettings` becomes `ReleaseProviderSettings`, `GitHubPullRequestSettings` becomes `ChangeRequestSettings`, etc. Type aliases removed. This is a breaking change for downstream consumers of the public API.
+Rename GitHub-specific provider types to provider-prefixed generic names in monochange_core. `GitHubReleaseSettings` → `ProviderReleaseSettings`, `GitHubPullRequestSettings` → `ProviderMergeRequestSettings`, `GitHubBotSettings` → `ProviderBotSettings`, etc. Type aliases removed. This is a breaking change for downstream consumers of the public API.
