@@ -143,3 +143,131 @@ jobs:
           comment-always: ${{ github.event_name == 'pull_request' }}
           save-data-file: ${{ github.ref == 'refs/heads/main' }}
           auto-push: ${{ github.ref == 'refs/heads/main' }}
+
+  benchmark-binary:
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          path: pr-branch
+
+      - name: checkout main branch
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          path: main-branch
+
+      - name: setup (PR branch)
+        uses: ./pr-branch/.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build PR binary
+        run: cd pr-branch && cargo build --release --bin mc
+        shell: devenv shell -- bash -e {0}
+
+      - name: build main binary
+        run: cd main-branch && cargo build --release --bin mc
+        shell: devenv shell -- bash -e {0}
+
+      - name: generate benchmark fixture
+        run: |
+          mkdir -p /tmp/bench-fixture/.changeset
+          cd /tmp/bench-fixture
+
+          # Create a Cargo workspace with 20 packages.
+          echo '[workspace]' > Cargo.toml
+          echo 'members = [' >> Cargo.toml
+          for i in $(seq 0 19); do echo "  \"crates/pkg-$i\"," >> Cargo.toml; done
+          echo ']' >> Cargo.toml
+          echo 'resolver = "2"' >> Cargo.toml
+
+          # monochange.toml
+          echo '[defaults]' > monochange.toml
+          echo 'package_type = "cargo"' >> monochange.toml
+          for i in $(seq 0 19); do
+            echo "" >> monochange.toml
+            echo "[package.pkg-$i]" >> monochange.toml
+            echo "path = \"crates/pkg-$i\"" >> monochange.toml
+          done
+          echo "" >> monochange.toml
+          echo "[ecosystems.cargo]" >> monochange.toml
+          echo "enabled = true" >> monochange.toml
+
+          # Package manifests
+          for i in $(seq 0 19); do
+            mkdir -p crates/pkg-$i
+            echo "[package]" > crates/pkg-$i/Cargo.toml
+            echo "name = \"pkg-$i\"" >> crates/pkg-$i/Cargo.toml
+            echo 'version = "1.0.0"' >> crates/pkg-$i/Cargo.toml
+            echo 'edition = "2021"' >> crates/pkg-$i/Cargo.toml
+          done
+
+          # Git history with changesets
+          git init -b main
+          git config user.name "bench" && git config user.email "bench@test"
+          git add . && git commit -m "initial"
+          for i in $(seq 0 49); do
+            pkg=$((i % 20))
+            echo "---" > .changeset/change-$(printf "%04d" $i).md
+            echo "pkg-$pkg: patch" >> .changeset/change-$(printf "%04d" $i).md
+            echo "---" >> .changeset/change-$(printf "%04d" $i).md
+            echo "" >> .changeset/change-$(printf "%04d" $i).md
+            echo "Fix issue #$i." >> .changeset/change-$(printf "%04d" $i).md
+            echo "// commit $i" > crates/pkg-$pkg/src.rs
+            git add . && git commit -m "change $i"
+          done
+        shell: bash -e {0}
+
+      - name: time CLI commands
+        id: bench
+        run: |
+          PR_BIN="$PWD/pr-branch/target/release/mc"
+          MAIN_BIN="$PWD/main-branch/target/release/mc"
+          FIXTURE="/tmp/bench-fixture"
+          RESULTS=""
+
+          for cmd in "validate" "discover --format json" "release --dry-run"; do
+            cmd_label=$(echo "$cmd" | tr ' ' '_' | tr '-' '_')
+
+            # Time PR binary (3 runs, take median).
+            pr_times=""
+            for run in 1 2 3; do
+              pr_t=$( { time "$PR_BIN" $cmd; } 2>&1 | grep real | awk '{print $2}' )
+              pr_ms=$(echo "$pr_t" | awk -F'[ms]' '{print ($1*60000 + $2*1000 + $3)}')
+              pr_times="$pr_times $pr_ms"
+            done
+            pr_median=$(echo $pr_times | tr ' ' '\n' | sort -n | head -2 | tail -1)
+
+            # Time main binary (3 runs, take median).
+            main_times=""
+            for run in 1 2 3; do
+              main_t=$( { time "$MAIN_BIN" $cmd; } 2>&1 | grep real | awk '{print $2}' )
+              main_ms=$(echo "$main_t" | awk -F'[ms]' '{print ($1*60000 + $2*1000 + $3)}')
+              main_times="$main_times $main_ms"
+            done
+            main_median=$(echo $main_times | tr ' ' '\n' | sort -n | head -2 | tail -1)
+
+            RESULTS="$RESULTS| \`mc $cmd\` | ${main_median}ms | ${pr_median}ms |\n"
+          done
+
+          echo "results<<EOF" >> $GITHUB_OUTPUT
+          echo -e "## Binary Benchmark: main vs PR\n" >> $GITHUB_OUTPUT
+          echo -e "Fixture: 20 packages, 50 changesets, 100 git commits\n" >> $GITHUB_OUTPUT
+          echo -e "| Command | main | PR |" >> $GITHUB_OUTPUT
+          echo -e "|---------|------|-----|" >> $GITHUB_OUTPUT
+          echo -e "$RESULTS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        working-directory: /tmp/bench-fixture
+        shell: bash -e {0}
+
+      - name: comment benchmark results on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: binary-benchmark
+          message: ${{ steps.bench.outputs.results }}

@@ -580,7 +580,7 @@ fn render_jinja_template_with_behavior(
 			cache.borrow_mut().entry(template_source.to_owned()).or_insert_with(|| {
 				let mut env = Environment::new();
 				env.set_undefined_behavior(undefined_behavior);
-				env.add_template_owned("t", template_source.to_owned()).unwrap_or_else(|_| {});
+				let _ = env.add_template_owned("t", template_source.to_owned());
 				env
 			});
 			let cache_ref = cache.borrow();

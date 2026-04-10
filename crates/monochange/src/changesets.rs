@@ -335,15 +335,17 @@ fn batch_git_log(
 	for line in stdout.lines() {
 		let trimmed = line.trim();
 		if trimmed.is_empty() {
-			current_fields = None;
+			// Blank lines separate the header from filenames AND separate
+			// commits from each other. Don't reset current_fields here —
+			// a new header line (containing \x1f) will replace it.
 			continue;
 		}
 		if trimmed.contains('\u{1f}') {
-			// This is a commit header line.
+			// This is a commit header line — start a new commit block.
 			current_fields = Some(trimmed.split('\u{1f}').collect());
 			continue;
 		}
-		// This is a filename line.
+		// This is a filename line associated with the current commit.
 		let Some(ref fields) = current_fields else {
 			continue;
 		};
