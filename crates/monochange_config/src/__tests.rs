@@ -2313,7 +2313,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 	);
 	let group = monochange_core::GroupDefinition {
 		id: "sdk".to_string(),
-		packages: vec![core.id.clone(), "missing".to_string(), app.id.clone()],
+		packages: vec![core.id.clone(), app.id.clone()],
 		changelog: None,
 		changelog_include: GroupChangelogInclude::All,
 		extra_changelog_sections: Vec::new(),
@@ -2331,9 +2331,36 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 			&workspace_root,
 			&[core.clone(), app.clone()],
 			Some(&Version::new(2, 1, 0))
-		),
+		)
+		.unwrap_or_else(|error| panic!("expected Ok, got: {error}")),
 		Some(BumpSeverity::Minor)
 	);
+
+	// A group with an unresolvable member should now produce an error
+	// instead of silently dropping the member.
+	let group_with_missing = monochange_core::GroupDefinition {
+		id: "sdk-missing".to_string(),
+		packages: vec![core.id.clone(), "missing".to_string(), app.id.clone()],
+		changelog: None,
+		changelog_include: GroupChangelogInclude::All,
+		extra_changelog_sections: Vec::new(),
+		empty_update_message: None,
+		release_title: None,
+		changelog_version_title: None,
+		versioned_files: Vec::new(),
+		tag: true,
+		release: true,
+		version_format: monochange_core::VersionFormat::Primary,
+	};
+	let error = crate::infer_group_bump_from_explicit_version(
+		&group_with_missing,
+		&workspace_root,
+		&[core.clone(), app.clone()],
+		Some(&Version::new(2, 1, 0)),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected error for unresolvable group member"));
+	assert!(error.to_string().contains("missing"));
 	let core_id = core.id.clone();
 	assert_eq!(
 		crate::infer_package_bump_from_explicit_version(
