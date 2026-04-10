@@ -1539,9 +1539,7 @@ fn json_helper_functions_cover_error_paths() {
 		.err()
 		.unwrap_or_else(|| panic!("expected error for truncated escape"));
 	assert!(
-		error
-			.to_string()
-			.contains("unterminated escape sequence"),
+		error.to_string().contains("unterminated escape sequence"),
 		"expected truncated-escape error, got: {error}"
 	);
 	// Escaped quote should not close the string.
