@@ -1524,9 +1524,9 @@ fn parse_markdown_change_file(
 	changes_path: &Path,
 	configuration: &WorkspaceConfiguration,
 ) -> MonochangeResult<RawChangeFile> {
-	// Normalize CRLF to LF so frontmatter splitting works regardless of
-	// line-ending style (Windows checkouts with core.autocrlf = true).
-	let contents = &contents.replace("\r\n", "\n");
+	// Normalize all line ending styles to LF: CRLF (Windows), bare CR
+	// (classic Mac), and mixed endings.
+	let contents = &contents.replace("\r\n", "\n").replace('\r', "\n");
 	let Some(without_opening) = contents.strip_prefix("---") else {
 		return Err(MonochangeError::Config(format!(
 			"failed to parse {}: missing markdown frontmatter",

@@ -708,12 +708,33 @@ fn parse_json_string_span(contents: &str, start: usize) -> MonochangeResult<(Jso
 	while let Some(&byte) = bytes.get(cursor) {
 		if byte == b'\\' {
 			// Escape sequence: verify there is a character after the backslash.
-			if cursor + 1 >= bytes.len() {
+			let Some(&escape_char) = bytes.get(cursor + 1) else {
 				return Err(MonochangeError::Config(
 					"unterminated escape sequence in JSON string".to_string(),
 				));
+			};
+			if escape_char == b'u' {
+				// Unicode escape \uXXXX requires exactly 4 hex digits.
+				for offset in 2..6 {
+					match bytes.get(cursor + offset) {
+						Some(b) if b.is_ascii_hexdigit() => {}
+						Some(_) => {
+							return Err(MonochangeError::Config(format!(
+								"invalid unicode escape sequence in JSON string: expected hex digit at position {}",
+								cursor + offset
+							)));
+						}
+						None => {
+							return Err(MonochangeError::Config(
+								"incomplete unicode escape sequence in JSON string".to_string(),
+							));
+						}
+					}
+				}
+				cursor += 6;
+			} else {
+				cursor += 2;
 			}
-			cursor += 2;
 			continue;
 		}
 		if byte == b'"' {

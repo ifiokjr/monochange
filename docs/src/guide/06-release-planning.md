@@ -246,3 +246,7 @@ Planning rules in this milestone:
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
+
+## Concurrency
+
+`mc release` is designed for sequential execution. Do not run multiple `mc release` commands concurrently on the same workspace — there is no file locking, so concurrent runs could produce duplicate changelog entries, inconsistent version files, or corrupted release records. If you need parallel release preparation across workspaces, use separate working copies.

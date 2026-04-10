@@ -8075,3 +8075,40 @@ fn release_command_updates_versioned_files_and_changelogs() {
 		"expected changeset file to be deleted after release"
 	);
 }
+
+#[cfg(unix)]
+#[test]
+fn atomic_write_preserves_file_permissions() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let file_path = tempdir.path().join("test-perms.txt");
+
+	// Create file with custom permissions (rwxr-xr-x = 0o755).
+	fs::write(&file_path, b"original").unwrap_or_else(|error| panic!("write: {error}"));
+	fs::set_permissions(&file_path, fs::Permissions::from_mode(0o755))
+		.unwrap_or_else(|error| panic!("chmod: {error}"));
+
+	// Overwrite via atomic_write.
+	crate::release_artifacts::apply_file_updates(&[crate::FileUpdate {
+		path: file_path.clone(),
+		content: b"updated".to_vec(),
+	}])
+	.unwrap_or_else(|error| panic!("atomic write: {error}"));
+
+	// Verify content updated.
+	let content = fs::read_to_string(&file_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert_eq!(content, "updated");
+
+	// Verify permissions preserved.
+	let mode = fs::metadata(&file_path)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions()
+		.mode();
+	assert_eq!(
+		mode & 0o777,
+		0o755,
+		"expected permissions 0o755, got 0o{:o}",
+		mode & 0o777
+	);
+}

@@ -55,6 +55,12 @@ use monochange_semver::propagated_release_severity;
 use monochange_semver::strongest_assessment_for_package;
 use semver::Version;
 
+/// Reverse-dependency graph over discovered packages.
+///
+/// `NormalizedGraph` borrows string slices from the input `PackageRecord` and
+/// `DependencyEdge` slices. It must be consumed (queried and dropped) before
+/// the input data goes out of scope. If you need to store the graph across
+/// async boundaries or function returns, clone the relevant data first.
 #[derive(Debug, Clone)]
 pub struct NormalizedGraph<'a> {
 	package_ids: BTreeSet<&'a str>,
@@ -267,15 +273,18 @@ pub fn build_release_plan(
 		.iter()
 		.filter_map(|group| planned_group(group, &package_by_id, &states, &explicit_group_versions))
 		.collect::<Vec<_>>();
+	let planned_group_by_id: BTreeMap<&str, &PlannedVersionGroup> = planned_groups
+		.iter()
+		.map(|group| (group.group_id.as_str(), group))
+		.collect();
 
 	let decisions = packages
 		.iter()
 		.map(|package| {
 			let state = states.get(package.id.as_str()).cloned().unwrap_or_default();
 			let planned_version = package.version_group_id.as_deref().and_then(|group_id| {
-				planned_groups
-					.iter()
-					.find(|group| group.group_id == group_id)
+				planned_group_by_id
+					.get(group_id)
 					.and_then(|group| group.planned_version.clone())
 			});
 			let standalone_planned_version =
