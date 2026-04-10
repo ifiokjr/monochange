@@ -18,6 +18,7 @@ monochange_core = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
+semver = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 
 [lints]

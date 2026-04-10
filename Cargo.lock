@@ -1926,6 +1926,7 @@ dependencies = [
  "insta",
  "monochange_core",
  "rstest",
+ "semver",
  "similar-asserts",
 ]
 
