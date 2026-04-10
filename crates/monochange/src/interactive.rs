@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -17,8 +16,6 @@ struct SelectableTarget {
 	id: String,
 	kind: TargetKind,
 	display: String,
-	/// Group member package ids (empty for standalone packages).
-	member_package_ids: BTreeSet<String>,
 	/// Configured change types from `extra_changelog_sections` for this target.
 	configured_types: Vec<String>,
 }
@@ -139,7 +136,7 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 			id: group.id.clone(),
 			kind: TargetKind::Group,
 			display: format!("[group] {} ({})", group.id, members),
-			member_package_ids: group.packages.iter().cloned().collect(),
+
 			configured_types,
 		});
 	}
@@ -158,14 +155,13 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				id: package.id.clone(),
 				kind: TargetKind::Package,
 				display: format!("[package] {}", package.id),
-				member_package_ids: BTreeSet::new(),
+
 				configured_types,
 			});
 		}
 	}
 
-	// Then grouped packages (selectable individually, but conflicts with group selection
-	// are prevented)
+	// Then grouped packages (selectable individually or alongside their group)
 	for package in &configuration.packages {
 		if grouped_package_ids.contains(&package.id) {
 			let group = configuration
@@ -183,7 +179,7 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				id: package.id.clone(),
 				kind: TargetKind::Package,
 				display: format!("[package] {}{group}", package.id),
-				member_package_ids: BTreeSet::new(),
+
 				configured_types,
 			});
 		}
@@ -193,53 +189,10 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 }
 
 fn prompt_select_targets(targets: &[SelectableTarget]) -> MonochangeResult<Vec<SelectableTarget>> {
-	let group_members: BTreeMap<String, BTreeSet<String>> = targets
-		.iter()
-		.filter(|target| target.kind == TargetKind::Group)
-		.map(|target| (target.id.clone(), target.member_package_ids.clone()))
-		.collect();
-
-	let package_to_group: BTreeMap<String, String> = group_members
-		.iter()
-		.flat_map(|(group_id, members)| {
-			members
-				.iter()
-				.map(move |member| (member.clone(), group_id.clone()))
-		})
-		.collect();
-
-	let validator = move |selections: &[inquire::list_option::ListOption<&SelectableTarget>]| {
-		let selected_group_ids: BTreeSet<&str> = selections
-			.iter()
-			.filter(|selection| selection.value.kind == TargetKind::Group)
-			.map(|selection| selection.value.id.as_str())
-			.collect();
-
-		// Check: if a group is selected, none of its member packages should be selected
-		for selection in selections {
-			if selection.value.kind == TargetKind::Package {
-				if let Some(owning_group) = package_to_group.get(&selection.value.id) {
-					if selected_group_ids.contains(owning_group.as_str()) {
-						return Ok(Validation::Invalid(
-							format!(
-								"cannot select both group `{owning_group}` and its member `{}`; select only the group or individual members",
-								selection.value.id
-							)
-							.into(),
-						));
-					}
-				}
-			}
-		}
-
-		Ok(Validation::Valid)
-	};
-
 	let selected = MultiSelect::new(
 		"Select packages/groups to include in this changeset:",
 		targets.to_vec(),
 	)
-	.with_validator(validator)
 	.with_page_size(15)
 	.prompt()
 	.map_err(|error| {
@@ -378,8 +331,6 @@ fn prompt_optional(label: &str) -> MonochangeResult<Option<String>> {
 
 #[cfg(test)]
 mod __tests {
-	use std::collections::BTreeSet;
-
 	use monochange_config::load_workspace_configuration;
 	use monochange_core::BumpSeverity;
 	use monochange_core::ChangesetSettings;
@@ -427,7 +378,6 @@ mod __tests {
 			id: "core".to_string(),
 			kind: TargetKind::Package,
 			display: "core".to_string(),
-			member_package_ids: BTreeSet::new(),
 			configured_types,
 		}
 	}

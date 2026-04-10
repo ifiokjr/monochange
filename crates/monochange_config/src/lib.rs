@@ -1284,18 +1284,12 @@ pub fn load_changeset_file(
 		.iter()
 		.map(|group| (group.id.as_str(), group))
 		.collect::<BTreeMap<_, _>>();
-	let referenced_packages = raw
+	let referenced_packages: BTreeSet<String> = raw
 		.changes
 		.iter()
 		.filter(|change| package_ids.contains(change.package.as_str()))
-		.map(|change| change.package.as_str())
-		.collect::<BTreeSet<_>>();
-	let referenced_groups = raw
-		.changes
-		.iter()
-		.filter(|change| groups_by_id.contains_key(change.package.as_str()))
-		.map(|change| change.package.as_str())
-		.collect::<BTreeSet<_>>();
+		.map(|change| change.package.clone())
+		.collect();
 
 	for change in &raw.changes {
 		if !package_ids.contains(change.package.as_str())
@@ -1315,31 +1309,6 @@ pub fn load_changeset_file(
 					"unknown package or group",
 				)],
 				Some("declare the package or group id in monochange.toml before referencing it in a changeset".to_string()),
-			));
-		}
-	}
-
-	for group_id in referenced_groups {
-		let Some(group) = groups_by_id.get(group_id) else {
-			continue;
-		};
-		if let Some(member_id) = group
-			.packages
-			.iter()
-			.find(|member_id| referenced_packages.contains(member_id.as_str()))
-		{
-			return Err(changeset_diagnostic(
-				&contents,
-				changes_path,
-				format!(
-					"changeset `{}` references both group `{group_id}` and member package `{member_id}`",
-					changes_path.display(),
-				),
-				vec![
-					changeset_key_label(&contents, group_id, "group target"),
-					changeset_key_label(&contents, member_id, "member package target"),
-				],
-				Some("reference either the group or one of its member packages, but not both in the same changeset".to_string()),
 			));
 		}
 	}
@@ -1373,6 +1342,9 @@ pub fn load_changeset_file(
 				change_type: change.change_type.clone(),
 			});
 			for member_id in &group.packages {
+				if referenced_packages.contains(member_id.as_str()) {
+					continue;
+				}
 				let package_id =
 					resolve_package_reference(member_id, &configuration.root_path, packages)?;
 				if !seen_package_ids.insert(package_id.clone()) {
@@ -3641,18 +3613,6 @@ fn validate_changeset_targets(
 			)
 		})
 		.collect::<BTreeMap<_, _>>();
-	let referenced_packages = raw
-		.changes
-		.iter()
-		.filter(|change| package_ids.contains(change.package.as_str()))
-		.map(|change| change.package.as_str())
-		.collect::<BTreeSet<_>>();
-	let referenced_groups = raw
-		.changes
-		.iter()
-		.filter(|change| group_members.contains_key(change.package.as_str()))
-		.map(|change| change.package.as_str())
-		.collect::<BTreeSet<_>>();
 
 	for change in &raw.changes {
 		if !package_ids.contains(change.package.as_str())
@@ -3672,30 +3632,6 @@ fn validate_changeset_targets(
 					"unknown package or group",
 				)],
 				Some("declare the package or group id in monochange.toml before referencing it in a changeset".to_string()),
-			));
-		}
-	}
-
-	for group_id in referenced_groups {
-		let Some(members) = group_members.get(group_id) else {
-			continue;
-		};
-		if let Some(member_id) = referenced_packages
-			.iter()
-			.find(|member_id| members.contains(**member_id))
-		{
-			return Err(changeset_diagnostic(
-				&contents,
-				changeset_path,
-				format!(
-					"changeset `{}` references both group `{group_id}` and member package `{member_id}`",
-					changeset_path.display(),
-				),
-				vec![
-					changeset_key_label(&contents, group_id, "group target"),
-					changeset_key_label(&contents, member_id, "member package target"),
-				],
-				Some("reference either the group or one of its member packages, but not both in the same changeset".to_string()),
 			));
 		}
 	}

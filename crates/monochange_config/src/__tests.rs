@@ -1549,6 +1549,61 @@ fn load_change_signals_expands_group_targets_into_member_packages() {
 }
 
 #[test]
+fn load_change_signals_handles_mixed_group_and_member_targets() {
+	let root = fixture_path("config/change-signals-group-mixed");
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			root.join("crates/core/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Npm,
+			"web",
+			root.join("packages/web/package.json"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let signals = load_change_signals(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| panic!("change signals: {error}"));
+
+	assert_eq!(
+		signals.len(),
+		2,
+		"expected exactly 2 signals (no duplicates)"
+	);
+	let core_signal = signals
+		.iter()
+		.find(|signal| signal.package_id.contains("core"))
+		.unwrap_or_else(|| panic!("expected core signal"));
+	let web_signal = signals
+		.iter()
+		.find(|signal| signal.package_id.contains("web"))
+		.unwrap_or_else(|| panic!("expected web signal"));
+
+	assert_eq!(
+		core_signal.requested_bump,
+		Some(BumpSeverity::Patch),
+		"explicitly-listed member should get its own bump"
+	);
+	assert_eq!(
+		web_signal.requested_bump,
+		Some(BumpSeverity::Minor),
+		"unlisted member should get the group bump"
+	);
+}
+
+#[test]
 fn load_change_signals_rejects_invalid_explicit_versions() {
 	let root = fixture_path("config/rejects-change-invalid-version");
 	let configuration = load_workspace_configuration(&root)
@@ -1643,15 +1698,10 @@ fn resolve_package_reference_rejects_ambiguous_package_names() {
 }
 
 #[test]
-fn validate_workspace_rejects_changesets_that_mix_group_and_member_references() {
-	let root = fixture_path("config/rejects-mixed-changeset");
-	let error = validate_workspace(&root)
-		.err()
-		.unwrap_or_else(|| panic!("expected changeset validation error"));
-	let rendered = error.render();
-
-	assert!(rendered.contains("references both group `sdk` and member package `core`"));
-	assert!(rendered.contains("reference either the group or one of its member packages"));
+fn validate_workspace_accepts_changesets_that_mix_group_and_member_references() {
+	let root = fixture_path("config/accepts-mixed-changeset");
+	validate_workspace(&root)
+		.unwrap_or_else(|error| panic!("should accept mixed group+member references: {error}"));
 }
 
 #[test]
