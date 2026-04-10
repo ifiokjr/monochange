@@ -78,7 +78,11 @@ That keeps your first changes simple while still letting monochange synchronize 
 
 ### `mc init` says a config already exists
 
-Keep the existing `monochange.toml`, inspect it, and continue with `mc validate`.
+Keep the existing `monochange.toml`, inspect it, and continue with `mc validate`. If you want to regenerate the config from scratch, pass the `--force` flag:
+
+```sh
+mc init --force
+```
 
 ### `mc validate` reports config or changeset errors
 

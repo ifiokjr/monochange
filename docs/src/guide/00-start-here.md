@@ -92,7 +92,7 @@ That is why most beginner flows should start with package ids, not groups.
 
 ## If you hit a problem
 
-- `mc init` says a config already exists: keep the existing `monochange.toml` and continue with `mc validate`.
+- `mc init` says a config already exists: keep the existing `monochange.toml` and continue with `mc validate`, or pass `--force` to regenerate.
 - `mc validate` reports problems: fix the reported config or changeset issue, then rerun `mc validate`.
 - `mc change` rejects your target: rerun `mc discover --format json` and copy a valid package id.
 - You are not sure what to do next: continue with [Your first release plan](./02-setup.md).
