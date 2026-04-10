@@ -62,6 +62,43 @@ format = "monochange"
 
 <!-- {/configurationVersionGroupsSnippet} -->
 
+<!-- {@configurationRegexVersionedFilesSnippet} -->
+
+Regex entries let you version-stamp any plain-text file — README badges, download links, install scripts — without needing an ecosystem-specific parser. The regex must contain a named `version` capture group; MonoChange replaces the captured substring with the new version while preserving the surrounding text.
+
+```toml
+[package.core]
+path = "crates/core"
+versioned_files = [
+    # update a download link in the README
+    { path = "README.md", regex = 'https://example\.com/download/v(?<version>\d+\.\d+\.\d+)\.tgz' },
+    # update a version badge
+    { path = "README.md", regex = 'img\.shields\.io/badge/version-(?<version>\d+\.\d+\.\d+)-blue' },
+]
+
+[group.sdk]
+packages = ["core", "cli"]
+versioned_files = [
+    # update the install script across all packages (glob pattern)
+    { path = "**/install.sh", regex = 'SDK_VERSION="(?<version>\d+\.\d+\.\d+)"' },
+]
+
+[ecosystems.cargo]
+versioned_files = [
+    # update a workspace-wide version constant
+    { path = "crates/constants/src/lib.rs", regex = 'pub const VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' },
+]
+```
+
+Key rules:
+
+- `regex` entries cannot set `type`, `prefix`, `fields`, or `name` — they operate on raw text
+- the regex must include a `(?<version>...)` named capture group
+- the `path` field supports glob patterns (e.g. `**/README.md`)
+- regex entries work on packages, groups, and ecosystem-level `versioned_files`
+
+<!-- {/configurationRegexVersionedFilesSnippet} -->
+
 <!-- {@configurationPackageOverridesSnippet} -->
 
 Legacy repositories may still contain `[[package_overrides]]` entries such as:

@@ -167,6 +167,10 @@ warn_on_group_mismatch = true
 #                             e.g. ["Cargo.toml"] or ["**/crates/*/Cargo.toml"]
 #                             explicit typed entries remain supported, e.g.
 #                             [{ path = "group.toml", type = "cargo" }]
+#                             regex entries update plain-text files and must include a
+#                             named `version` capture group, e.g.
+#                             [{ path = "README.md", regex = 'v(?<version>\d+\.\d+\.\d+)' }]
+#                             regex entries cannot set `type`, `prefix`, `fields`, or `name`
 #                             lockfiles can still be listed explicitly, but
 #                             ecosystem-level lockfile refresh now prefers
 #                             [ecosystems.<name>].lockfile_commands
@@ -215,7 +219,9 @@ changelog = "{{ pkg.changelog }}"
 #                             specific member has no direct changeset entries
 #   versioned_files         — additional files to version-bump with the group
 #                             groups must use explicit typed entries because the
-#                             ecosystem cannot be inferred from a bare string
+#                             ecosystem cannot be inferred from a bare string;
+#                             regex entries are also supported, e.g.
+#                             [{ path = "**/install.sh", regex = 'SDK_VERSION="(?<version>\d+\.\d+\.\d+)"' }]
 #   tag                     — create a git tag for the group release (default: false)
 #   release                 — create a provider release for the group (default: false)
 #   version_format          — "namespaced" (default) or "primary"
@@ -282,7 +288,9 @@ version_format = "primary"
 #   exclude  — glob patterns to exclude from discovery
 #   dependency_version_prefix — default dependency prefix for typed versioned_files
 #   versioned_files — ecosystem-wide default versioned_files inherited by matching packages;
-#                     entries may be typed manifest updates or plain-text regex replacements
+#                     entries may be typed manifest updates or plain-text regex
+#                     replacements with a named `version` capture, e.g.
+#                     [{ path = "src/lib.rs", regex = 'VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' }]
 #   lockfile_commands — commands that refresh ecosystem lockfiles after a
 #                       release updates manifest versions; when set, inferred
 #                       defaults are disabled and these commands fully own
