@@ -314,7 +314,6 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 			"discover",
 			"change",
 			"release",
-			"commit-release",
 			"affected",
 			"diagnostics",
 			"repair-release"
