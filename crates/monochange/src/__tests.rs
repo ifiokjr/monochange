@@ -1424,7 +1424,7 @@ fn command_release_prefers_custom_lockfile_commands_over_defaults() {
 }
 
 #[test]
-fn prepare_release_execution_previews_lockfile_command_updates_without_mutating_the_workspace() {
+fn prepare_release_execution_dry_run_skips_lockfile_commands_for_performance() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/custom-lockfile-command", tempdir.path());
 	let before = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
@@ -1437,11 +1437,22 @@ fn prepare_release_execution_previews_lockfile_command_updates_without_mutating_
 	let after = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
 		.unwrap_or_else(|error| panic!("package lock after dry-run: {error}"));
 
+	// Workspace must not be mutated during dry-run.
 	assert_eq!(before, after);
-	assert!(prepared.file_diffs.iter().any(|diff| {
-		diff.path.as_path() == Path::new("packages/app/package-lock.json")
-			&& diff.diff.contains("1.1.0-custom")
-	}));
+	// Lockfile diffs are intentionally omitted from dry-run preview
+	// to avoid copying the entire workspace (which can take minutes).
+	assert!(
+		!prepared
+			.file_diffs
+			.iter()
+			.any(|diff| { diff.path.as_path() == Path::new("packages/app/package-lock.json") }),
+		"lockfile diffs should be skipped during dry-run"
+	);
+	// Custom lockfile command marker file should NOT exist (command was skipped).
+	assert!(
+		!tempdir.path().join("packages/app/custom-ran.txt").exists(),
+		"lockfile command should not run during dry-run"
+	);
 }
 
 #[test]
