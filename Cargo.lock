@@ -1784,6 +1784,7 @@ dependencies = [
  "rstest",
  "semver",
  "serde",
+ "serde_json",
  "serde_yaml_ng",
  "similar-asserts",
  "tempfile",

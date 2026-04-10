@@ -235,6 +235,10 @@ pub(crate) fn execute_cli_command_with_options(
 			CliStepDefinition::Validate { .. } => {
 				validate_workspace(root)?;
 				validate_cargo_workspace_version_groups(root)?;
+				let warnings = validate_versioned_files_content(root)?;
+				for warning in &warnings {
+					eprintln!("warning: {warning}");
+				}
 				output = Some(format!(
 					"workspace validation passed for {}",
 					root_relative(root, root).display()
