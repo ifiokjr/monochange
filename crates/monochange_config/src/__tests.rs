@@ -1578,7 +1578,11 @@ fn load_change_signals_handles_mixed_group_and_member_targets() {
 	let signals = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.unwrap_or_else(|error| panic!("change signals: {error}"));
 
-	assert_eq!(signals.len(), 2, "expected exactly 2 signals (no duplicates)");
+	assert_eq!(
+		signals.len(),
+		2,
+		"expected exactly 2 signals (no duplicates)"
+	);
 	let core_signal = signals
 		.iter()
 		.find(|signal| signal.package_id.contains("core"))
