@@ -38,55 +38,214 @@ npm install -g @monochange/skill
 monochange-skill --print-install
 ```
 
-The `@monochange/skill` package should provide a helper that can print or copy the bundled skill files for agent setups.
-
 ## Recommended command flow
 
-### Validate first
+<!-- {=recommendedCommandFlow} -->
 
-```bash
-mc validate
+1. **Validate** — `mc validate` checks config and changeset targets.
+2. **Discover** — `mc discover --format json` inspects the workspace model.
+3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
+4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
+5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
+6. **Generate manifest** — `mc release-manifest --dry-run` writes a stable JSON artifact for downstream automation.
+7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
+
+<!-- {/recommendedCommandFlow} -->
+
+## Changeset authoring
+
+Changesets are markdown files in `.changeset/` with YAML frontmatter:
+
+```markdown
+---
+core: minor
+---
+
+#### add release automation
+
+Introduce automated release preparation with changelog rendering and version bumps.
 ```
 
-Run this before changing config, changesets, or release workflows.
+Frontmatter keys are package or group ids. Values are bump severities (`none`, `patch`, `minor`, `major`) or configured change types. Object syntax supports `bump`, `version`, and `type`:
 
-### Discover the workspace model
+```markdown
+---
+core:
+  bump: major
+  version: "2.0.0"
+  type: security
+---
 
-```bash
-mc discover --format json
+#### breaking API change
+
+Redesign the public API surface.
 ```
 
-Use this to inspect configured package ids, inferred packages, paths, dependency edges, and group ownership.
+## CLI step types and composition
 
-### Create explicit release intent
+`monochange.toml` defines top-level CLI commands with `[cli.<command>]` entries. Each command has `help_text`, optional `inputs`, and ordered `steps`.
 
-```bash
-mc change --package monochange --bump minor --reason "describe the change"
+### Input types
+
+| Type          | Description                            |
+| ------------- | -------------------------------------- |
+| `string`      | Single string value                    |
+| `string_list` | Repeatable value (`--flag a --flag b`) |
+| `path`        | File path value                        |
+| `choice`      | Constrained to a set of `choices`      |
+| `boolean`     | Boolean flag (`true`/`false`)          |
+
+### Step types
+
+<!-- {=cliStepTypes} -->
+
+**Standalone steps** (no prerequisites):
+
+- `Validate` — validate config and changeset targets
+- `Discover` — discover packages across ecosystems
+- `CreateChangeFile` — write a `.changeset/*.md` file
+- `AffectedPackages` — evaluate changeset policy from CI-supplied paths and labels
+- `DiagnoseChangesets` — show changeset context and review metadata
+- `RetargetRelease` — repair a recent release by moving its tags
+
+**Release-state consumer steps** (require `PrepareRelease`):
+
+- `PrepareRelease` — compute release plan, update versions, changelogs, and versioned files
+- `CommitRelease` — create a local release commit
+- `RenderReleaseManifest` — write a stable JSON manifest
+- `PublishRelease` — create provider releases
+- `OpenReleaseRequest` — open or update a release pull request
+- `CommentReleasedIssues` — comment on issues referenced in changesets
+
+**Generic step:**
+
+- `Command` — run an arbitrary shell command with template interpolation
+
+<!-- {/cliStepTypes} -->
+
+### Command step features
+
+`Command` steps support template interpolation with built-in variables (`{{ version }}`, `{{ group_version }}`, `{{ released_packages }}`, `{{ changed_files }}`, `{{ changesets }}`), CLI input forwarding via `{{ inputs.name }}`, and step output references via `{{ steps.ID.stdout }}`.
+
+```toml
+[cli.post-release]
+help_text = "Release and run post-release commands"
+
+[[cli.post-release.steps]]
+type = "PrepareRelease"
+
+[[cli.post-release.steps]]
+type = "Command"
+id = "notify"
+command = "echo Released {{ version }}"
+shell = true
 ```
 
-Prefer explicit change files over ad hoc notes. Keep `.changeset/*.md` aligned with configured package or group ids.
+`shell` accepts `true` (uses `sh -c`), a shell name like `"bash"`, or `false`/omitted for direct execution.
 
-### Preview release effects
+## Configuration reference
 
-```bash
-mc release --dry-run --format json
+### Defaults
+
+```toml
+[defaults]
+parent_bump = "patch"
+include_private = false
+warn_on_group_mismatch = true
+strict_version_conflicts = false
+# package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/changelog.md"
+format = "keep_a_changelog"
 ```
 
-Use dry-run output before real release preparation. Review:
+### Release titles
 
-- release targets
-- propagated bumps
-- changelog output
-- deleted changesets
-- changed files
+<!-- {=releaseTitleConfig} -->
 
-### Generate downstream automation input
+Two template fields control how release names and changelog version headings render:
 
-```bash
-mc release-manifest --dry-run
+- **`release_title`** — plain text title for provider releases (GitHub, GitLab, Gitea)
+- **`changelog_version_title`** — markdown-capable title for changelog version headings
+
+Both are configurable at `[defaults]`, `[package.*]`, and `[group.*]` levels.
+
+Available template variables: `{{ version }}`, `{{ id }}`, `{{ date }}`, `{{ time }}`, `{{ datetime }}`, `{{ changes_count }}`, `{{ tag_url }}`, `{{ compare_url }}`.
+
+```toml
+[defaults]
+release_title = "{{ version }} ({{ date }})"
+changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
+
+[group.main]
+release_title = "v{{ version }} — released {{ date }}"
 ```
 
-Use this when downstream CI or source-provider automation needs stable machine-readable release data.
+<!-- {/releaseTitleConfig} -->
+
+### Versioned files
+
+`versioned_files` update additional managed files beyond native manifests when versions change:
+
+```toml
+# package-scoped shorthand infers the package ecosystem
+versioned_files = ["Cargo.toml"]
+versioned_files = ["**/crates/*/Cargo.toml"]
+
+# explicit typed entries
+versioned_files = [{ path = "group.toml", type = "cargo", name = "sdk-core" }]
+
+# regex entries update plain-text files (must include (?<version>...) capture)
+versioned_files = [
+	{ path = "README.md", regex = 'v(?<version>\d+\.\d+\.\d+)' },
+]
+```
+
+### Lockfile commands
+
+Lockfile refresh is command-driven. monochange infers defaults when not configured:
+
+- Cargo: `cargo generate-lockfile`
+- npm-family: detects owned lockfiles and runs the matching command (`npm install --package-lock-only`, `pnpm install --lockfile-only`, `bun install --lockfile-only`)
+- Dart / Flutter: `dart pub get` or `flutter pub get`
+- Deno: no inferred default
+
+Explicit configuration overrides inference:
+
+```toml
+[ecosystems.npm]
+lockfile_commands = [
+	{ command = "pnpm install --lockfile-only", cwd = "packages/web" },
+	{ command = "npm install --package-lock-only", cwd = "packages/legacy", shell = true },
+]
+```
+
+### Groups
+
+Groups synchronize versions across packages:
+
+```toml
+[group.sdk]
+packages = ["sdk-core", "web-sdk"]
+tag = true
+release = true
+version_format = "primary"
+
+[group.sdk.changelog]
+path = "changelog.md"
+include = ["sdk-cli"]
+```
+
+### Changeset verification
+
+```toml
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+```
 
 ## Important modeling rules
 
@@ -94,21 +253,28 @@ Use this when downstream CI or source-provider automation needs stable machine-r
 - Groups own outward release identity for their member packages.
 - Package changelogs and package versioned files may still apply even when a group owns versioning.
 - Changesets should reference configured package ids or group ids.
+- Prefer package ids over group ids when the change is package-specific — monochange propagates to dependents and groups automatically.
 - Source-provider release publishing is downstream from prepared release data, not a substitute for planning.
+- Changelog version headings now include the release date by default. Set `changelog_version_title = "{{ version }}"` to restore the previous format.
 
-## Assistant setup guidance
+## MCP server
 
-Recommended repo-local guidance for agents:
+The MCP server exposes reviewable, JSON-first tools for workspace inspection and release planning:
 
-- Read `monochange.toml` before proposing release changes.
-- Prefer `mc validate` before and after config edits.
-- Use `mc discover --format json` to verify package ids and group ownership.
-- Use `mc release --dry-run --format json` before mutating release state.
-- Keep docs, templates, changelog behavior, and CLI config examples synchronized with code changes.
+<!-- {=mcpToolsList} -->
 
-## MCP setup target
+- `monochange_validate` — validate `monochange.toml` and `.changeset` targets
+- `monochange_discover` — discover packages, dependencies, and groups across the repository
+- `monochange_change` — write a `.changeset` markdown file for one or more package or group ids
+- `monochange_release_preview` — prepare a dry-run release preview from discovered `.changeset` files
+- `monochange_release_manifest` — generate a dry-run release manifest JSON document for downstream automation
+- `monochange_affected_packages` — evaluate changeset policy from changed paths and optional labels
 
-The planned MCP setup should look like:
+<!-- {/mcpToolsList} -->
+
+### MCP configuration
+
+<!-- {=mcpConfigSnippet} -->
 
 ```json
 {
@@ -121,4 +287,23 @@ The planned MCP setup should look like:
 }
 ```
 
-The initial MCP server should focus on safe, reviewable tools such as validation, discovery, changeset verification, release preview, and release-manifest generation.
+<!-- {/mcpConfigSnippet} -->
+
+Start the server manually: `mc mcp`
+
+Print assistant-specific setup guidance: `mc assist claude`, `mc assist generic`, `mc assist pi`
+
+## Repo-local guidance for assistants
+
+<!-- {=assistantRepoGuidance} -->
+
+- Read `monochange.toml` before proposing release workflow changes.
+- Run `mc validate` before and after release-affecting edits.
+- Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
+- Use `mc diagnostics --format json` for a structured view of all pending changesets with git and review context.
+- Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
+- Use `mc release --dry-run --format json` before mutating release state.
+
+<!-- {/assistantRepoGuidance} -->
+
+When you need full changeset context — introduced commit, linked PR, related issues — use `mc diagnostics --format json` directly. It returns stable workspace-relative paths and structured records that agents can parse without reading raw markdown files.

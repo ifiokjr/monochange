@@ -44,6 +44,8 @@ The profile includes:
 
 Typical client configuration:
 
+<!-- {=mcpConfigSnippet} -->
+
 ```json
 {
 	"mcpServers": {
@@ -55,6 +57,8 @@ Typical client configuration:
 }
 ```
 
+<!-- {/mcpConfigSnippet} -->
+
 Start the server manually with:
 
 ```bash
@@ -65,23 +69,31 @@ mc mcp
 
 Keep instructions like these close to your project guidance:
 
+<!-- {=assistantRepoGuidance} -->
+
 - Read `monochange.toml` before proposing release workflow changes.
 - Run `mc validate` before and after release-affecting edits.
 - Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
-- Use `mc diagnostics --format json` to get a structured view of all pending changesets with git and review context — useful for auditing what has changed before a release or PR review.
+- Use `mc diagnostics --format json` for a structured view of all pending changesets with git and review context.
 - Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
 - Use `mc release --dry-run --format json` before mutating release state.
 
+<!-- {/assistantRepoGuidance} -->
+
 ## Current MCP tools
 
-The first MCP slice is JSON-first and focuses on reviewable operations:
+The MCP server is JSON-first and focuses on reviewable operations:
 
-- `monochange_validate`
-- `monochange_discover`
-- `monochange_change`
-- `monochange_release_preview`
-- `monochange_release_manifest`
-- `monochange_verify_changesets`
+<!-- {=mcpToolsList} -->
+
+- `monochange_validate` — validate `monochange.toml` and `.changeset` targets
+- `monochange_discover` — discover packages, dependencies, and groups across the repository
+- `monochange_change` — write a `.changeset` markdown file for one or more package or group ids
+- `monochange_release_preview` — prepare a dry-run release preview from discovered `.changeset` files
+- `monochange_release_manifest` — generate a dry-run release manifest JSON document for downstream automation
+- `monochange_affected_packages` — evaluate changeset policy from changed paths and optional labels
+
+<!-- {/mcpToolsList} -->
 
 These tools are designed to help assistants inspect the workspace, write explicit release intent, and preview release effects before a human or CI system performs mutating follow-up commands.
 

@@ -779,3 +779,100 @@ The monochange repository itself can dogfood this model by:
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`
 
 <!-- {/githubAutomationDogfoodNotes} -->
+
+<!-- {@mcpToolsList} -->
+
+- `monochange_validate` — validate `monochange.toml` and `.changeset` targets
+- `monochange_discover` — discover packages, dependencies, and groups across the repository
+- `monochange_change` — write a `.changeset` markdown file for one or more package or group ids
+- `monochange_release_preview` — prepare a dry-run release preview from discovered `.changeset` files
+- `monochange_release_manifest` — generate a dry-run release manifest JSON document for downstream automation
+- `monochange_affected_packages` — evaluate changeset policy from changed paths and optional labels
+
+<!-- {/mcpToolsList} -->
+
+<!-- {@mcpConfigSnippet} -->
+
+```json
+{
+	"mcpServers": {
+		"monochange": {
+			"command": "monochange",
+			"args": ["mcp"]
+		}
+	}
+}
+```
+
+<!-- {/mcpConfigSnippet} -->
+
+<!-- {@recommendedCommandFlow} -->
+
+1. **Validate** — `mc validate` checks config and changeset targets.
+2. **Discover** — `mc discover --format json` inspects the workspace model.
+3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
+4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
+5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
+6. **Generate manifest** — `mc release-manifest --dry-run` writes a stable JSON artifact for downstream automation.
+7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
+
+<!-- {/recommendedCommandFlow} -->
+
+<!-- {@assistantRepoGuidance} -->
+
+- Read `monochange.toml` before proposing release workflow changes.
+- Run `mc validate` before and after release-affecting edits.
+- Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
+- Use `mc diagnostics --format json` for a structured view of all pending changesets with git and review context.
+- Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
+- Use `mc release --dry-run --format json` before mutating release state.
+
+<!-- {/assistantRepoGuidance} -->
+
+<!-- {@cliStepTypes} -->
+
+**Standalone steps** (no prerequisites):
+
+- `Validate` — validate config and changeset targets
+- `Discover` — discover packages across ecosystems
+- `CreateChangeFile` — write a `.changeset/*.md` file
+- `AffectedPackages` — evaluate changeset policy from CI-supplied paths and labels
+- `DiagnoseChangesets` — show changeset context and review metadata
+- `RetargetRelease` — repair a recent release by moving its tags
+
+**Release-state consumer steps** (require `PrepareRelease`):
+
+- `PrepareRelease` — compute release plan, update versions, changelogs, and versioned files
+- `CommitRelease` — create a local release commit
+- `RenderReleaseManifest` — write a stable JSON manifest
+- `PublishRelease` — create provider releases
+- `OpenReleaseRequest` — open or update a release pull request
+- `CommentReleasedIssues` — comment on issues referenced in changesets
+
+**Generic step:**
+
+- `Command` — run an arbitrary shell command with template interpolation
+
+<!-- {/cliStepTypes} -->
+
+<!-- {@releaseTitleConfig} -->
+
+Two template fields control how release names and changelog version headings render:
+
+- **`release_title`** — plain text title for provider releases (GitHub, GitLab, Gitea)
+- **`changelog_version_title`** — markdown-capable title for changelog version headings
+
+Both are configurable at `[defaults]`, `[package.*]`, and `[group.*]` levels.
+
+Available template variables: `{{ version }}`, `{{ id }}`, `{{ date }}`, `{{ time }}`, `{{ datetime }}`, `{{ changes_count }}`, `{{ tag_url }}`, `{{ compare_url }}`.
+
+```toml
+[defaults]
+release_title = "{{ version }} ({{ date }})"
+changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
+
+[group.main]
+release_title = "v{{ version }} — released {{ date }}"
+```
+
+<!-- {/releaseTitleConfig} -->

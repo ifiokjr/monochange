@@ -110,6 +110,41 @@ warn_on_group_mismatch = true
 # empty_update_message = "No direct changes; {{ package }} updated to {{ version }}."
 {% endraw %}
 
+# Default release_title applied when creating provider releases.
+# This is a plain-text title used for GitHub, GitLab, and Gitea releases.
+#
+# Available placeholders:
+{% raw -%}
+#   {{ version }}, {{ id }}, {{ date }}, {{ time }}, {{ datetime }}
+#   {{ changes_count }}, {{ tag_url }}, {{ compare_url }}
+{% endraw -%}
+#
+# Defaults:
+#   Primary versioning:    "{{ version }} ({{ date }})"
+#   Namespaced versioning: "{{ id }} {{ version }} ({{ date }})"
+#
+{% raw -%}
+# release_title = "{{ version }} ({{ date }})"
+{% endraw %}
+
+# Default changelog_version_title controls how changelog version headings render.
+# This is markdown-capable and supports links.
+#
+# Available placeholders: same as release_title above.
+#
+# Defaults:
+#   Primary:    "[{{ version }}]({{ tag_url }}) ({{ date }})" (linked when source configured)
+#   Namespaced: "{{ id }} [{{ version }}]({{ tag_url }}) ({{ date }})"
+#
+# To restore headings without dates (the previous default), set:
+{% raw -%}
+#   changelog_version_title = "{{ version }}"
+{% endraw -%}
+#
+{% raw -%}
+# changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
+{% endraw %}
+
 # =============================================================================
 # [release_notes] — workspace-wide release-note rendering settings
 # =============================================================================
