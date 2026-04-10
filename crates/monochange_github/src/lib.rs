@@ -30,9 +30,9 @@
 //! ## Example
 //!
 //! ```rust
-//! use monochange_core::BotSettings;
-//! use monochange_core::ChangeRequestSettings;
-//! use monochange_core::ReleaseProviderSettings;
+//! use monochange_core::ProviderBotSettings;
+//! use monochange_core::ProviderMergeRequestSettings;
+//! use monochange_core::ProviderReleaseSettings;
 //! use monochange_core::SourceConfiguration;
 //! use monochange_core::SourceProvider;
 //! use monochange_core::ReleaseManifest;
@@ -79,9 +79,9 @@
 //!     repo: "monochange".to_string(),
 //!     host: None,
 //!     api_url: None,
-//!     releases: ReleaseProviderSettings::default(),
-//!     pull_requests: ChangeRequestSettings::default(),
-//!     bot: BotSettings::default(),
+//!     releases: ProviderReleaseSettings::default(),
+//!     pull_requests: ProviderMergeRequestSettings::default(),
+//!     bot: ProviderBotSettings::default(),
 //! };
 //!
 //! let requests = build_release_requests(&github, &manifest);
@@ -114,9 +114,9 @@ use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
+use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
-use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::RetargetOperation;
 use monochange_core::RetargetProviderOperation;
@@ -160,8 +160,10 @@ pub const fn source_capabilities() -> SourceCapabilities {
 
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
 	if source.releases.generate_notes
-		&& matches!(source.releases.source, ReleaseNotesSource::Monochange)
-	{
+		&& matches!(
+			source.releases.source,
+			ProviderReleaseNotesSource::Monochange
+		) {
 		return Err(MonochangeError::Config(
 			"[source.releases].generate_notes cannot be true when `source = \"monochange\"`; choose one release-note source"
 				.to_string(),
@@ -1246,8 +1248,8 @@ fn release_body(
 	target: &ReleaseManifestTarget,
 ) -> Option<String> {
 	match github.releases.source {
-		ReleaseNotesSource::GitHubGenerated => None,
-		ReleaseNotesSource::Monochange => manifest
+		ProviderReleaseNotesSource::GitHubGenerated => None,
+		ProviderReleaseNotesSource::Monochange => manifest
 			.changelogs
 			.iter()
 			.find(|changelog| {

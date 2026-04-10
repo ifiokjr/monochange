@@ -14,9 +14,9 @@ use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
-use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequest;
@@ -56,8 +56,10 @@ pub fn validate_source_configuration(source: &SourceConfiguration) -> Monochange
 		));
 	}
 	if source.releases.generate_notes
-		|| matches!(source.releases.source, ReleaseNotesSource::GitHubGenerated)
-	{
+		|| matches!(
+			source.releases.source,
+			ProviderReleaseNotesSource::GitHubGenerated
+		) {
 		return Err(MonochangeError::Config(
 			"provider-generated release notes are not supported for `provider = \"gitea\"`; use `source = \"monochange\"`"
 				.to_string(),
@@ -539,8 +541,8 @@ fn release_body(
 	target: &ReleaseManifestTarget,
 ) -> Option<String> {
 	match source.releases.source {
-		ReleaseNotesSource::GitHubGenerated => None,
-		ReleaseNotesSource::Monochange => manifest
+		ProviderReleaseNotesSource::GitHubGenerated => None,
+		ProviderReleaseNotesSource::Monochange => manifest
 			.changelogs
 			.iter()
 			.find(|changelog| {

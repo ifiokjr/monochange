@@ -2125,7 +2125,7 @@ fn extract_release_record_json(block_contents: &str) -> ReleaseRecordResult<Stri
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum GitHubReleaseNotesSource {
+pub enum ProviderReleaseNotesSource {
 	#[default]
 	Monochange,
 	#[serde(rename = "github_generated")]
@@ -2134,17 +2134,17 @@ pub enum GitHubReleaseNotesSource {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct GitHubReleaseSettings {
+pub struct ProviderReleaseSettings {
 	pub enabled: bool,
 	pub draft: bool,
 	pub prerelease: bool,
 	pub generate_notes: bool,
-	pub source: GitHubReleaseNotesSource,
+	pub source: ProviderReleaseNotesSource,
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct GitHubPullRequestSettings {
+pub struct ProviderMergeRequestSettings {
 	pub enabled: bool,
 	pub branch_prefix: String,
 	pub base: String,
@@ -2155,7 +2155,7 @@ pub struct GitHubPullRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct GitHubChangesetBotSettings {
+pub struct ProviderChangesetBotSettings {
 	pub enabled: bool,
 	pub required: bool,
 	pub skip_labels: Vec<String>,
@@ -2165,9 +2165,9 @@ pub struct GitHubChangesetBotSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
-pub struct GitHubBotSettings {
+pub struct ProviderBotSettings {
 	#[serde(default)]
-	pub changesets: GitHubChangesetBotSettings,
+	pub changesets: ProviderChangesetBotSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -2244,19 +2244,19 @@ pub struct ChangesetPolicyEvaluation {
 	pub errors: Vec<String>,
 }
 
-impl Default for GitHubReleaseSettings {
+impl Default for ProviderReleaseSettings {
 	fn default() -> Self {
 		Self {
 			enabled: true,
 			draft: false,
 			prerelease: false,
 			generate_notes: false,
-			source: GitHubReleaseNotesSource::Monochange,
+			source: ProviderReleaseNotesSource::Monochange,
 		}
 	}
 }
 
-impl Default for GitHubPullRequestSettings {
+impl Default for ProviderMergeRequestSettings {
 	fn default() -> Self {
 		Self {
 			enabled: true,
@@ -2269,7 +2269,7 @@ impl Default for GitHubPullRequestSettings {
 	}
 }
 
-impl Default for GitHubChangesetBotSettings {
+impl Default for ProviderChangesetBotSettings {
 	fn default() -> Self {
 		Self {
 			enabled: false,
@@ -2298,11 +2298,11 @@ pub struct GitHubConfiguration {
 	pub owner: String,
 	pub repo: String,
 	#[serde(default)]
-	pub releases: GitHubReleaseSettings,
+	pub releases: ProviderReleaseSettings,
 	#[serde(default)]
-	pub pull_requests: GitHubPullRequestSettings,
+	pub pull_requests: ProviderMergeRequestSettings,
 	#[serde(default)]
-	pub bot: GitHubBotSettings,
+	pub bot: ProviderBotSettings,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -2344,12 +2344,6 @@ pub struct SourceCapabilities {
 	pub requires_host: bool,
 }
 
-pub type ReleaseNotesSource = GitHubReleaseNotesSource;
-pub type ReleaseProviderSettings = GitHubReleaseSettings;
-pub type ChangeRequestSettings = GitHubPullRequestSettings;
-pub type ChangesetBotSettings = GitHubChangesetBotSettings;
-pub type BotSettings = GitHubBotSettings;
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SourceConfiguration {
 	#[serde(default)]
@@ -2361,11 +2355,11 @@ pub struct SourceConfiguration {
 	#[serde(default)]
 	pub api_url: Option<String>,
 	#[serde(default)]
-	pub releases: ReleaseProviderSettings,
+	pub releases: ProviderReleaseSettings,
 	#[serde(default)]
-	pub pull_requests: ChangeRequestSettings,
+	pub pull_requests: ProviderMergeRequestSettings,
 	#[serde(default)]
-	pub bot: BotSettings,
+	pub bot: ProviderBotSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

@@ -6,10 +6,12 @@ use httpmock::Method::POST;
 use httpmock::Method::PUT;
 use httpmock::MockServer;
 use insta::assert_snapshot;
-use monochange_core::BotSettings;
 use monochange_core::BumpSeverity;
-use monochange_core::ChangeRequestSettings;
 use monochange_core::CommitMessage;
+use monochange_core::ProviderBotSettings;
+use monochange_core::ProviderMergeRequestSettings;
+use monochange_core::ProviderReleaseNotesSource;
+use monochange_core::ProviderReleaseSettings;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestPlan;
@@ -17,9 +19,7 @@ use monochange_core::ReleaseManifestPlanDecision;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
-use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
-use monochange_core::ReleaseProviderSettings;
 use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequestOperation;
 use monochange_core::SourceConfiguration;
@@ -85,9 +85,9 @@ fn gitlab_source_capabilities_capture_provider_limits() {
 #[test]
 fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 	let error = validate_source_configuration(&SourceConfiguration {
-		pull_requests: ChangeRequestSettings {
+		pull_requests: ProviderMergeRequestSettings {
 			auto_merge: true,
-			..ChangeRequestSettings::default()
+			..ProviderMergeRequestSettings::default()
 		},
 		..sample_source(None)
 	})
@@ -98,9 +98,9 @@ fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 		.contains("[source.pull_requests].auto_merge is not supported"));
 
 	let error = validate_source_configuration(&SourceConfiguration {
-		releases: ReleaseProviderSettings {
+		releases: ProviderReleaseSettings {
 			draft: true,
-			..ReleaseProviderSettings::default()
+			..ProviderReleaseSettings::default()
 		},
 		..sample_source(None)
 	})
@@ -111,9 +111,9 @@ fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 		.contains("[source.releases].draft is not supported"));
 
 	let error = validate_source_configuration(&SourceConfiguration {
-		releases: ReleaseProviderSettings {
+		releases: ProviderReleaseSettings {
 			prerelease: true,
-			..ReleaseProviderSettings::default()
+			..ProviderReleaseSettings::default()
 		},
 		..sample_source(None)
 	})
@@ -124,9 +124,9 @@ fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 		.contains("[source.releases].prerelease is not supported"));
 
 	let error = validate_source_configuration(&SourceConfiguration {
-		releases: ReleaseProviderSettings {
-			source: ReleaseNotesSource::GitHubGenerated,
-			..ReleaseProviderSettings::default()
+		releases: ProviderReleaseSettings {
+			source: ProviderReleaseNotesSource::GitHubGenerated,
+			..ProviderReleaseSettings::default()
 		},
 		..sample_source(None)
 	})
@@ -336,9 +336,9 @@ fn release_pull_request_branch_and_body_helpers_cover_sanitization_and_formattin
 #[test]
 fn release_body_supports_generated_notes_and_minimal_fallback() {
 	let generated_source = SourceConfiguration {
-		releases: ReleaseProviderSettings {
-			source: ReleaseNotesSource::GitHubGenerated,
-			..ReleaseProviderSettings::default()
+		releases: ProviderReleaseSettings {
+			source: ProviderReleaseNotesSource::GitHubGenerated,
+			..ProviderReleaseSettings::default()
 		},
 		..sample_source(None)
 	};
@@ -633,9 +633,9 @@ fn sample_source(api_url: Option<String>) -> SourceConfiguration {
 		repo: "monochange".to_string(),
 		host: Some("https://gitlab.com".to_string()),
 		api_url,
-		releases: ReleaseProviderSettings::default(),
-		pull_requests: ChangeRequestSettings::default(),
-		bot: BotSettings::default(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
 	}
 }
 

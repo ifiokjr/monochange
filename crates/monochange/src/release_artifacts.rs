@@ -873,7 +873,7 @@ pub(crate) fn build_release_commit_message(
 ) -> CommitMessage {
 	CommitMessage {
 		subject: source.map_or_else(
-			|| monochange_core::ChangeRequestSettings::default().title,
+			|| monochange_core::ProviderMergeRequestSettings::default().title,
 			|source| source.pull_requests.title.clone(),
 		),
 		body: Some(render_release_commit_body(source, manifest)),
