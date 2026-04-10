@@ -1523,3 +1523,86 @@ pub(crate) fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 		))),
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::{collections::BTreeMap, path::PathBuf};
+
+	fn cli_context() -> CliContext {
+		CliContext {
+			root: PathBuf::from("."),
+			dry_run: false,
+			show_diff: false,
+			inputs: BTreeMap::new(),
+			last_step_inputs: BTreeMap::new(),
+			prepared_release: None,
+			prepared_file_diffs: Vec::new(),
+			release_manifest_path: None,
+			release_requests: Vec::new(),
+			release_results: Vec::new(),
+			release_request: None,
+			release_request_result: None,
+			release_commit_report: None,
+			issue_comment_plans: Vec::new(),
+			issue_comment_results: Vec::new(),
+			changeset_policy_evaluation: None,
+			changeset_diagnostics: None,
+			retarget_report: None,
+			step_outputs: BTreeMap::new(),
+			command_logs: Vec::new(),
+		}
+	}
+
+	#[test]
+	fn evaluate_cli_step_condition_returns_false_for_blank_conditions() {
+		assert!(
+			!evaluate_cli_step_condition("   ", &cli_context(), &BTreeMap::new()).unwrap_or_else(
+				|error| panic!("blank conditions should be treated as false: {error}")
+			)
+		);
+	}
+
+	#[test]
+	fn parse_template_as_boolean_supports_number_null_and_single_item_arrays() {
+		assert!(
+			parse_template_as_boolean(&serde_json::json!(2), "{{ count }}")
+				.unwrap_or_else(|error| panic!("non-zero numbers should be truthy: {error}"))
+		);
+		assert!(
+			!parse_template_as_boolean(&serde_json::Value::Null, "{{ release }}")
+				.unwrap_or_else(|error| panic!("null values should be falsey: {error}"))
+		);
+		assert!(
+			!parse_template_as_boolean(&serde_json::json!([""]), "{{ items }}").unwrap_or_else(
+				|error| panic!("single-item arrays should recurse into the item value: {error}")
+			)
+		);
+	}
+
+	#[test]
+	fn parse_template_as_boolean_rejects_objects() {
+		let error =
+			parse_template_as_boolean(&serde_json::json!({ "nested": true }), "{{ inputs }}")
+				.unwrap_err();
+		assert!(error.to_string().contains("is not a scalar boolean value"));
+	}
+
+	#[test]
+	fn normalize_when_expression_preserves_inequality_and_mid_token_bangs() {
+		assert_eq!(
+			normalize_when_expression("{{ flag != other }}"),
+			"{{ flag != other }}"
+		);
+		assert_eq!(normalize_when_expression("{{ foo!bar }}"), "{{ foo!bar }}");
+	}
+
+	#[test]
+	fn parse_string_as_boolean_rejects_invalid_values() {
+		let error = parse_string_as_boolean("maybe", "{{ inputs.run }}").unwrap_err();
+		assert_eq!(
+			error.to_string(),
+			"config error: `when` condition `{{ inputs.run }}` must be a boolean, got `maybe`"
+		);
+	}
+}
