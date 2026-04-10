@@ -800,24 +800,123 @@ fn materialize_lockfile_command_updates(
 	base_updates: &[FileUpdate],
 	lockfile_commands: &[LockfileCommandExecution],
 ) -> MonochangeResult<Vec<FileUpdate>> {
-	let tempdir = tempfile::tempdir()
-		.map_err(|error| MonochangeError::Io(format!("tempdir error: {error}")))?;
-	let temp_root = tempdir.path();
-	copy_workspace_tree(root, temp_root)?;
-	let temp_updates = base_updates
+	// Snapshot lockfile-adjacent files before running commands so we can
+	// detect what the commands changed.
+	let lockfile_dirs: Vec<PathBuf> = lockfile_commands
 		.iter()
-		.map(|update| {
-			Ok(FileUpdate {
-				path: remap_workspace_path(root, temp_root, &update.path)?,
-				content: update.content.clone(),
-			})
-		})
-		.collect::<MonochangeResult<Vec<_>>>()?;
-	apply_file_updates(&temp_updates)?;
-	for command in lockfile_commands {
-		run_lockfile_command(root, temp_root, command)?;
+		.map(|cmd| cmd.cwd.clone())
+		.collect();
+	let mut before_snapshots = BTreeMap::new();
+	for dir in &lockfile_dirs {
+		let full_dir = root.join(dir);
+		if full_dir.is_dir() {
+			snapshot_directory_files(root, &full_dir, &mut before_snapshots)?;
+		}
 	}
-	collect_workspace_file_updates(root, temp_root, base_updates, lockfile_commands)
+
+	// Apply version updates in-place so lockfile commands see updated manifests.
+	apply_file_updates(base_updates)?;
+
+	// Run lockfile commands in the real workspace.
+	for command in lockfile_commands {
+		run_lockfile_command_in_place(root, command)?;
+	}
+
+	// Snapshot the same directories after commands ran.
+	let mut after_snapshots = BTreeMap::new();
+	for dir in &lockfile_dirs {
+		let full_dir = root.join(dir);
+		if full_dir.is_dir() {
+			snapshot_directory_files(root, &full_dir, &mut after_snapshots)?;
+		}
+	}
+
+	// Collect all updates: base updates + any lockfile changes.
+	let mut all_updates = base_updates.to_vec();
+	for (relative_path, after_content) in &after_snapshots {
+		let before = before_snapshots.get(relative_path);
+		if before != Some(after_content) {
+			all_updates.push(FileUpdate {
+				path: root.join(relative_path),
+				content: after_content.clone(),
+			});
+		}
+	}
+	all_updates.sort_by(|a, b| a.path.cmp(&b.path));
+	all_updates.dedup_by(|a, b| a.path == b.path);
+	Ok(all_updates)
+}
+
+fn snapshot_directory_files(
+	root: &Path,
+	dir: &Path,
+	snapshots: &mut BTreeMap<PathBuf, Vec<u8>>,
+) -> MonochangeResult<()> {
+	let entries = fs::read_dir(dir).map_err(|error| {
+		MonochangeError::Io(format!("failed to read {}: {error}", dir.display()))
+	})?;
+	for entry in entries {
+		let entry = entry
+			.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
+		let path = entry.path();
+		if path.is_file() {
+			let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
+			let content = fs::read(&path).map_err(|error| {
+				MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
+			})?;
+			snapshots.insert(relative, content);
+		}
+	}
+	Ok(())
+}
+
+/// Run a lockfile command directly in the workspace (no temp copy).
+fn run_lockfile_command_in_place(
+	root: &Path,
+	command: &LockfileCommandExecution,
+) -> MonochangeResult<()> {
+	let cwd = root.join(&command.cwd);
+	let output = if let Some(shell_binary) = command.shell.shell_binary() {
+		ProcessCommand::new(shell_binary)
+			.arg("-c")
+			.arg(&command.command)
+			.current_dir(&cwd)
+			.output()
+	} else {
+		let parts = shlex::split(&command.command).ok_or_else(|| {
+			MonochangeError::Config(format!("failed to parse command `{}`", command.command))
+		})?;
+		let Some((program, args)) = parts.split_first() else {
+			return Err(MonochangeError::Config(
+				"lockfile command must not be empty".to_string(),
+			));
+		};
+		ProcessCommand::new(program)
+			.args(args)
+			.current_dir(&cwd)
+			.output()
+	};
+	let output = output.map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to run lockfile command `{}` in {}: {error}",
+			command.command,
+			root_relative(root, &command.cwd).display(),
+		))
+	})?;
+	if output.status.success() {
+		return Ok(());
+	}
+	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	let details = if stderr.is_empty() {
+		format!("exit status {}", output.status)
+	} else {
+		stderr
+	};
+	Err(MonochangeError::Config(format!(
+		"lockfile command `{}` failed in {}: {details}",
+		command.command,
+		root_relative(root, &command.cwd).display(),
+	)))
 }
 
 fn remap_workspace_path(root: &Path, temp_root: &Path, path: &Path) -> MonochangeResult<PathBuf> {
@@ -1089,7 +1188,12 @@ pub(crate) fn prepare_release_execution(
 	.concat();
 	let lockfile_commands =
 		build_lockfile_command_executions(root, &configuration, &discovery.packages, &plan)?;
-	let file_updates = if lockfile_commands.is_empty() {
+	let file_updates = if lockfile_commands.is_empty() || dry_run {
+		// During dry-run, skip the expensive workspace copy and lockfile
+		// command execution. The base updates already contain all version
+		// file and changelog changes; lockfile diffs are omitted from the
+		// preview but this avoids copying the entire workspace to a temp
+		// directory (which can take minutes for large repos).
 		base_updates.clone()
 	} else {
 		materialize_lockfile_command_updates(root, &base_updates, &lockfile_commands)?
@@ -1121,7 +1225,12 @@ pub(crate) fn prepare_release_execution(
 	let group_version = shared_group_version(&plan);
 	let mut deleted_changesets = Vec::new();
 	if !dry_run {
-		apply_file_updates(&file_updates)?;
+		// When lockfile commands ran, materialize_lockfile_command_updates
+		// already applied base_updates in-place. Only apply when we
+		// skipped that path (no lockfile commands).
+		if lockfile_commands.is_empty() {
+			apply_file_updates(&file_updates)?;
+		}
 		for path in &changeset_paths {
 			fs::remove_file(path).map_err(|error| {
 				MonochangeError::Io(format!("failed to delete {}: {error}", path.display()))
@@ -1152,6 +1261,7 @@ pub(crate) fn prepare_release_execution(
 #[cfg(test)]
 mod workspace_ops_tests {
 	use super::*;
+	use monochange_core::ShellConfig;
 	#[cfg(unix)]
 	use std::os::unix::fs::PermissionsExt;
 
@@ -1394,5 +1504,109 @@ mod workspace_ops_tests {
 		.err()
 		.unwrap_or_else(|| panic!("expected copy file error"));
 		assert!(copy_file_error.to_string().contains("failed to copy"));
+	}
+
+	#[test]
+	fn snapshot_directory_files_captures_file_contents() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("pkg")).unwrap();
+		fs::write(root.join("pkg/lock.json"), b"lockfile-content").unwrap();
+		fs::write(root.join("pkg/other.txt"), b"other").unwrap();
+
+		let mut snapshots = BTreeMap::new();
+		snapshot_directory_files(root, &root.join("pkg"), &mut snapshots)
+			.unwrap_or_else(|error| panic!("snapshot: {error}"));
+
+		assert_eq!(snapshots.len(), 2);
+		assert_eq!(
+			snapshots.get(Path::new("pkg/lock.json")).map(Vec::as_slice),
+			Some(b"lockfile-content".as_slice())
+		);
+	}
+
+	#[test]
+	fn snapshot_directory_files_skips_subdirectories() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("pkg/subdir")).unwrap();
+		fs::write(root.join("pkg/top.txt"), b"top").unwrap();
+		fs::write(root.join("pkg/subdir/nested.txt"), b"nested").unwrap();
+
+		let mut snapshots = BTreeMap::new();
+		snapshot_directory_files(root, &root.join("pkg"), &mut snapshots)
+			.unwrap_or_else(|error| panic!("snapshot: {error}"));
+
+		// Only top-level files, not nested.
+		assert_eq!(snapshots.len(), 1);
+		assert!(snapshots.contains_key(Path::new("pkg/top.txt")));
+	}
+
+	#[test]
+	fn materialize_lockfile_updates_captures_in_place_changes() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+
+		fs::create_dir_all(root.join("tools/bin")).unwrap();
+		let script_path = root.join("tools/bin/update-lock");
+		fs::write(
+			&script_path,
+			"#!/bin/sh\necho 'updated-lockfile' > \"$PWD/lock.txt\"\n",
+		)
+		.unwrap();
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755)).unwrap();
+		}
+
+		fs::write(root.join("lock.txt"), b"original").unwrap();
+		fs::write(root.join("manifest.json"), b"old-version").unwrap();
+
+		let base_updates = vec![FileUpdate {
+			path: root.join("manifest.json"),
+			content: b"new-version".to_vec(),
+		}];
+		let lockfile_commands = vec![LockfileCommandExecution {
+			command: script_path.display().to_string(),
+			cwd: root.to_path_buf(),
+			shell: ShellConfig::None,
+		}];
+
+		let updates = materialize_lockfile_command_updates(root, &base_updates, &lockfile_commands)
+			.unwrap_or_else(|error| panic!("materialize: {error}"));
+
+		assert!(
+			updates.iter().any(|u| u.path.ends_with("manifest.json")),
+			"expected manifest update"
+		);
+		assert!(
+			updates.iter().any(|u| u.path.ends_with("lock.txt")),
+			"expected lockfile update"
+		);
+		let lock_content = fs::read_to_string(root.join("lock.txt")).unwrap();
+		assert!(
+			lock_content.contains("updated-lockfile"),
+			"lockfile should be updated in-place"
+		);
+	}
+
+	#[test]
+	fn run_lockfile_command_in_place_reports_failures() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+
+		let error = run_lockfile_command_in_place(
+			root,
+			&LockfileCommandExecution {
+				command: "false".to_string(),
+				cwd: root.to_path_buf(),
+				shell: ShellConfig::Default,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected error from failing command"));
+
+		assert!(error.to_string().contains("failed"));
 	}
 }
