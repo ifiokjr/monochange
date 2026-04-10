@@ -689,13 +689,13 @@ default = "HEAD"
 name = "force"
 type = "boolean"
 help_text = "allow non-descendant retargets"
-default = "false"
+default = false
 
 [[cli.repair-release.inputs]]
 name = "sync_provider"
 type = "boolean"
 help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)"
-default = "true"
+default = true
 
 [[cli.repair-release.inputs]]
 name = "format"

@@ -211,6 +211,30 @@ command = "echo should not run"
 }
 
 #[test]
+fn load_workspace_configuration_supports_boolean_input_default_values() {
+	let root = fixture_path("config/accepts-boolean-input-defaults");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let command = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "pr-check")
+		.unwrap_or_else(|| panic!("expected pr-check command"));
+	let dry_run = command
+		.inputs
+		.iter()
+		.find(|input| input.name == "dry_run")
+		.unwrap_or_else(|| panic!("missing dry_run input"));
+	let sync = command
+		.inputs
+		.iter()
+		.find(|input| input.name == "sync")
+		.unwrap_or_else(|| panic!("missing sync input"));
+	assert_eq!(dry_run.default.as_deref(), Some("true"));
+	assert_eq!(sync.default.as_deref(), Some("false"));
+}
+
+#[test]
 fn load_workspace_configuration_parses_package_group_and_cli_command_declarations() {
 	let root = fixture_path("config/package-group-and-cli");
 	let configuration = load_workspace_configuration(&root)
@@ -2665,16 +2689,16 @@ fn changeset_files_with_crlf_line_endings_parse_correctly() {
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("config: {error}"));
 
-	let packages = vec![monochange_core::PackageRecord::new(
-		monochange_core::Ecosystem::Cargo,
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
 		"core",
 		root.join("crates/core/Cargo.toml"),
 		root.to_path_buf(),
 		Some(Version::new(1, 0, 0)),
-		monochange_core::PublishState::Public,
+		PublishState::Public,
 	)];
 
-	let changeset = crate::load_changeset_file(
+	let changeset = load_changeset_file(
 		&root.join(".changeset/crlf-test.md"),
 		&configuration,
 		&packages,

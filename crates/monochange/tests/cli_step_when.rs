@@ -59,9 +59,11 @@ fn run_command(root: &Path, command: &str, args: &[&str]) -> Output {
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("command output: {error}"));
-	if !output.status.success() {
-		panic!("command failed: {}", to_stderr(&output));
-	}
+	assert!(
+		output.status.success(),
+		"command failed: {}",
+		to_stderr(&output)
+	);
 	output
 }
 

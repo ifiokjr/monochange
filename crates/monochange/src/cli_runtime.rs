@@ -775,10 +775,13 @@ pub(crate) fn normalize_when_expression(condition: &str) -> String {
 }
 
 fn parse_string_as_boolean(value: &str, condition: &str) -> MonochangeResult<bool> {
-	match value.trim().to_ascii_lowercase().as_str() {
+	let value = value.trim().to_ascii_lowercase();
+	if let Ok(number) = value.parse::<i64>() {
+		return Ok(number != 0);
+	}
+	match value.as_str() {
 		"true" => Ok(true),
-		"false" => Ok(false),
-		"" => Ok(false),
+		"false" | "0" | "" => Ok(false),
 		other => Err(MonochangeError::Config(format!(
 			"`when` condition `{condition}` must be a boolean, got `{other}`"
 		))),

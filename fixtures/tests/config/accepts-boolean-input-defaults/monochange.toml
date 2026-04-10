@@ -1,0 +1,23 @@
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "core"
+
+[changesets.verify]
+enabled = true
+
+[cli.pr-check]
+
+[[cli.pr-check.inputs]]
+name = "dry_run"
+type = "boolean"
+default = true
+
+[[cli.pr-check.inputs]]
+name = "sync"
+type = "boolean"
+default = false
+
+[[cli.pr-check.steps]]
+type = "Validate"

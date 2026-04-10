@@ -987,7 +987,7 @@ pub struct CliInputDefinition {
 	pub help_text: Option<String>,
 	#[serde(default)]
 	pub required: bool,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "deserialize_cli_input_default")]
 	pub default: Option<String>,
 	#[serde(default)]
 	pub choices: Vec<String>,
@@ -997,12 +997,29 @@ pub struct CliInputDefinition {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+enum CliInputDefault {
+	String(String),
+	Boolean(bool),
+}
+
+fn deserialize_cli_input_default<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+	D: serde::Deserializer<'de>,
+{
+	let value = Option::<CliInputDefault>::deserialize(deserializer)?;
+	Ok(value.map(|value| match value {
+		CliInputDefault::String(value) => value,
+		CliInputDefault::Boolean(value) => value.to_string(),
+	}))
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum CliStepInputValue {
 	String(String),
 	Boolean(bool),
 	List(Vec<String>),
 }
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CommandVariable {

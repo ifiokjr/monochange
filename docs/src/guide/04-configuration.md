@@ -385,7 +385,6 @@ CLI command interpolation variables:
 
 - default command substitution when `variables` is omitted: `{{ version }}`, `$group_version`, `$released_packages`, `$changed_files`, and `$changesets`
 - command templates can read CLI inputs through `{{ inputs.name }}`; bare input names still work for backward compatibility
-- every step can define a `when` expression to control execution, e.g. `when = "{{ inputs.publish && !inputs.dry_run }}"`
 - every step can override the inputs it receives with `inputs = { ... }`; direct references like `"{{ inputs.labels }}"` preserve list and boolean values when rebinding to built-in steps
 - custom command substitution when `variables` is present: map your own replacement strings to variable names such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
 - `dry_run_command` on a `Command` step replaces `command` only when the CLI command is run with `--dry-run`

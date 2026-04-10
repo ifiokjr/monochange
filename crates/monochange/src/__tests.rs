@@ -2450,6 +2450,40 @@ fn should_execute_cli_step_skips_when_condition_is_false() {
 }
 
 #[test]
+fn should_execute_cli_step_skips_for_zero_value() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([("run".to_string(), vec!["0".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.run }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!should_execute_cli_step(&step, &context, &step_inputs)
+		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+}
+
+#[test]
+fn should_execute_cli_step_trims_and_treats_1_as_true() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([("run".to_string(), vec![" 1 ".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.run }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(should_execute_cli_step(&step, &context, &step_inputs)
+		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+}
+
+#[test]
 fn should_execute_cli_step_skips_with_not_operator() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("skip".to_string(), vec!["true".to_string()])]);

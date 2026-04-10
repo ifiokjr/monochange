@@ -25,6 +25,16 @@ This makes it especially useful for debugging rich release-note context and CI p
 - `format` — `text` or `json`
 - `changeset` — one or more explicit changeset paths; omit to inspect all discovered changesets
 
+## Step-level `when` condition
+
+All CLI steps support an optional `when = "..."` condition.
+
+If the expression resolves to false at runtime, monochange skips the step and continues with the next step.
+
+```toml
+when = "{{ inputs.enabled }}"
+```
+
 ## Prerequisites
 
 None. `DiagnoseChangesets` is standalone.
