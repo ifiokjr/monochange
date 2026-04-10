@@ -583,6 +583,27 @@ fn default_warn_on_group_mismatch() -> bool {
 	true
 }
 
+fn merge_cli_commands(cli: BTreeMap<String, RawCliCommandDefinition>) -> Vec<CliCommandDefinition> {
+	let mut merged = default_cli_commands();
+	for (name, definition) in cli {
+		let command = CliCommandDefinition {
+			name: name.clone(),
+			help_text: definition.help_text,
+			inputs: definition.inputs,
+			steps: definition.steps,
+		};
+		if let Some(existing) = merged
+			.iter_mut()
+			.find(|cli_command| cli_command.name == name)
+		{
+			*existing = command;
+		} else {
+			merged.push(command);
+		}
+	}
+	merged
+}
+
 fn default_true() -> bool {
 	true
 }
@@ -908,18 +929,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			"legacy `[[workflows]]` configuration is no longer supported; use `[cli.<command>]` with `[[cli.<command>.steps]]` instead".to_string(),
 		));
 	}
-	let cli = if cli.is_empty() {
-		default_cli_commands()
-	} else {
-		cli.into_iter()
-			.map(|(name, definition)| CliCommandDefinition {
-				name,
-				help_text: definition.help_text,
-				inputs: definition.inputs,
-				steps: definition.steps,
-			})
-			.collect::<Vec<_>>()
-	};
+	let cli = merge_cli_commands(cli);
 	let default_package_type = defaults.package_type;
 	let default_package_changelog = defaults.changelog.clone();
 	let default_extra_changelog_sections = defaults.extra_changelog_sections.clone();

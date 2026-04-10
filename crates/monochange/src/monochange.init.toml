@@ -490,6 +490,11 @@ comment_on_failure = true
 # Each [cli.<name>] table becomes a top-level `mc <name>` command.
 # Legacy [[workflows]] tables are no longer supported.
 #
+# monochange starts from its built-in default command set. If you redefine a
+# built-in command like [cli.release], your definition fully replaces the
+# default for that command. You can delete unchanged built-in command tables
+# from your real monochange.toml and keep only the overrides you care about.
+#
 # Reserved names that cannot be used: "init", "help", "version"
 #
 # Fields:

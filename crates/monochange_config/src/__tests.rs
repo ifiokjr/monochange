@@ -126,6 +126,78 @@ fn load_workspace_configuration_supports_diagnostics_cli_command_definition() {
 }
 
 #[test]
+fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_custom_commands() {
+	let root = fixture_path("config/merge-default-cli-overrides");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command_names = configuration
+		.cli
+		.iter()
+		.map(|cli_command| cli_command.name.as_str())
+		.collect::<Vec<_>>();
+	assert_eq!(
+		cli_command_names,
+		vec![
+			"validate",
+			"discover",
+			"change",
+			"release",
+			"affected",
+			"diagnostics",
+			"repair-release",
+			"release-manifest"
+		]
+	);
+
+	let discover = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "discover")
+		.unwrap_or_else(|| panic!("expected discover command"));
+	assert_eq!(
+		discover.help_text.as_deref(),
+		Some("Discover packages across supported ecosystems")
+	);
+	assert_eq!(discover.inputs.len(), 1);
+
+	let release = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "release")
+		.unwrap_or_else(|| panic!("expected release command"));
+	assert_eq!(
+		release.help_text.as_deref(),
+		Some("Prepare a release and write a stable JSON manifest")
+	);
+	assert!(release.inputs.is_empty());
+	assert!(matches!(
+		release.steps.first(),
+		Some(CliStepDefinition::PrepareRelease { .. })
+	));
+	assert!(matches!(
+		release.steps.get(1),
+		Some(CliStepDefinition::RenderReleaseManifest {
+			path: Some(path),
+			..
+		}) if path == &PathBuf::from(".monochange/release-manifest.json")
+	));
+
+	let release_manifest = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "release-manifest")
+		.unwrap_or_else(|| panic!("expected release-manifest command"));
+	assert!(matches!(
+		release_manifest.steps.first(),
+		Some(CliStepDefinition::PrepareRelease { .. })
+	));
+	assert!(matches!(
+		release_manifest.steps.get(1),
+		Some(CliStepDefinition::RenderReleaseManifest { .. })
+	));
+}
+
+#[test]
 fn load_workspace_configuration_supports_commit_release_cli_command_definition() {
 	let root = fixture_path("config/commit-release-cli");
 	let configuration = load_workspace_configuration(&root)
@@ -213,12 +285,12 @@ fn load_workspace_configuration_parses_package_group_and_cli_command_declaration
 	);
 	assert_eq!(configuration.packages.len(), 2);
 	assert_eq!(configuration.groups.len(), 1);
-	assert_eq!(configuration.cli.len(), 1);
 	assert_eq!(
 		configuration
 			.cli
-			.first()
-			.unwrap_or_else(|| panic!("expected CLI command"))
+			.iter()
+			.find(|command| command.name == "release")
+			.unwrap_or_else(|| panic!("expected release CLI command"))
 			.steps
 			.len(),
 		2
@@ -1750,7 +1822,10 @@ fn load_workspace_configuration_accepts_comment_released_issues_for_github() {
 	let root = fixture_path("config/accepts-comment-github");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert_eq!(configuration.cli.len(), 1);
+	assert!(configuration
+		.cli
+		.iter()
+		.any(|command| command.name == "comment"));
 }
 
 #[test]
@@ -1780,7 +1855,10 @@ fn load_workspace_configuration_accepts_affected_packages_step_input_overrides()
 	let root = fixture_path("config/affected-step-overrides");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert_eq!(configuration.cli.len(), 1);
+	assert!(configuration
+		.cli
+		.iter()
+		.any(|command| command.name == "pr-check"));
 }
 
 #[test]
@@ -1788,7 +1866,10 @@ fn load_workspace_configuration_accepts_affected_packages_with_since_in_step_ove
 	let root = fixture_path("config/affected-step-since");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert_eq!(configuration.cli.len(), 1);
+	assert!(configuration
+		.cli
+		.iter()
+		.any(|command| command.name == "pr-check"));
 }
 
 #[test]
@@ -2644,16 +2725,16 @@ fn changeset_files_with_crlf_line_endings_parse_correctly() {
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("config: {error}"));
 
-	let packages = vec![monochange_core::PackageRecord::new(
-		monochange_core::Ecosystem::Cargo,
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
 		"core",
 		root.join("crates/core/Cargo.toml"),
 		root.to_path_buf(),
 		Some(Version::new(1, 0, 0)),
-		monochange_core::PublishState::Public,
+		PublishState::Public,
 	)];
 
-	let changeset = crate::load_changeset_file(
+	let changeset = load_changeset_file(
 		&root.join(".changeset/crlf-test.md"),
 		&configuration,
 		&packages,

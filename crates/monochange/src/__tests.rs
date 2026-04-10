@@ -1949,7 +1949,7 @@ fn release_planning_guide_describes_release_cli_command_requirements() {
 		fs::read_to_string(release_guide).unwrap_or_else(|error| panic!("release guide: {error}"));
 
 	for expected in [
-		"`mc release` is a config-defined top-level command.",
+		"`mc release` is part of monochange's built-in default command set.",
 		"`[[package_overrides]]`",
 		"`.changeset/*.md`",
 		"`--dry-run`",
@@ -6503,11 +6503,20 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 #[test]
 fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 	let cli = crate::cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
+	let command_names = cli
+		.iter()
+		.map(|command| command.name.as_str())
+		.collect::<Vec<_>>();
+	assert!(command_names.contains(&"validate"));
+	assert!(command_names.contains(&"discover"));
+	assert!(command_names.contains(&"release"));
 	assert_eq!(
 		cli.iter()
-			.map(|command| command.name.as_str())
-			.collect::<Vec<_>>(),
-		vec!["release"]
+			.find(|command| command.name == "release")
+			.unwrap_or_else(|| panic!("expected release command"))
+			.steps
+			.len(),
+		2
 	);
 }
 

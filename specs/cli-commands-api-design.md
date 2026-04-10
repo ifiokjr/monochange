@@ -85,7 +85,7 @@ Future non-command automation can live under separate namespaces such as:
 
 ## Behavioral rules
 
-- if no `[cli.<command>]` entries are declared, monochange synthesizes `validate`, `discover`, `change`, and `release`
+- monochange starts from its built-in default command set; any configured `[cli.<command>]` entry with the same name replaces that built-in definition, and new names are added alongside the defaults
 - built-in reserved names remain `init`, `help`, and `version`
 - command inputs become CLI flags
 - all configured commands implicitly support `--help` and `--dry-run`
