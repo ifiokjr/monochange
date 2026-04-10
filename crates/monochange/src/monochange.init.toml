@@ -519,6 +519,11 @@ comment_on_failure = true
 #   Command              — run an arbitrary shell command
 #
 # Common step fields:
+#   when            — optional condition controlling whether this step runs (e.g.
+#{% raw -%}
+#                     "{{ inputs.enabled }}", "{{ inputs.debug and not inputs.skip }}")
+#{% endraw -%}
+#                     If the expression resolves to false, the step is skipped.
 #   inputs          — optional map of step-local input overrides. Values can be
 #                     strings, booleans, or string arrays.
 {% raw -%}

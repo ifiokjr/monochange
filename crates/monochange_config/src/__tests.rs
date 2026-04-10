@@ -190,6 +190,27 @@ type = "RetargetRelease"
 }
 
 #[test]
+fn load_workspace_configuration_rejects_empty_when_conditions() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[cli.announce]
+
+[[cli.announce.steps]]
+type = "Command"
+when = ""
+command = "echo should not run"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected empty-when error"));
+	assert!(error.to_string().contains("has an empty `when` condition"));
+}
+
+#[test]
 fn load_workspace_configuration_parses_package_group_and_cli_command_declarations() {
 	let root = fixture_path("config/package-group-and-cli");
 	let configuration = load_workspace_configuration(&root)
