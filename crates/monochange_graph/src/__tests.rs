@@ -43,14 +43,13 @@ fn edge(from: &str, to: &str) -> DependencyEdge {
 
 #[test]
 fn transitive_dependents_walks_the_reverse_graph() {
-	let graph = NormalizedGraph::new(
-		&[
-			package("a", Version::new(1, 0, 0)),
-			package("b", Version::new(1, 0, 0)),
-			package("c", Version::new(1, 0, 0)),
-		],
-		&[edge("b", "a"), edge("c", "b")],
-	);
+	let packages = [
+		package("a", Version::new(1, 0, 0)),
+		package("b", Version::new(1, 0, 0)),
+		package("c", Version::new(1, 0, 0)),
+	];
+	let edges = [edge("b", "a"), edge("c", "b")];
+	let graph = NormalizedGraph::new(&packages, &edges);
 
 	let dependents = graph.transitive_dependents("a");
 	assert!(dependents.contains("b"));
@@ -59,13 +58,12 @@ fn transitive_dependents_walks_the_reverse_graph() {
 
 #[test]
 fn transitive_dependents_handles_cycles_without_looping_forever() {
-	let graph = NormalizedGraph::new(
-		&[
-			package("a", Version::new(1, 0, 0)),
-			package("b", Version::new(1, 0, 0)),
-		],
-		&[edge("a", "b"), edge("b", "a")],
-	);
+	let packages = [
+		package("a", Version::new(1, 0, 0)),
+		package("b", Version::new(1, 0, 0)),
+	];
+	let edges = [edge("a", "b"), edge("b", "a")];
+	let graph = NormalizedGraph::new(&packages, &edges);
 
 	let dependents = graph.transitive_dependents("a");
 	assert!(dependents.contains("b"));
