@@ -1324,14 +1324,15 @@ pub fn load_changeset_file(
 	for change in raw.changes {
 		if let Some(group) = groups_by_id.get(change.package.as_str()) {
 			let explicit_version = change.version.clone();
-			let inferred_bump = change.bump.or_else(|| {
-				infer_group_bump_from_explicit_version(
+			let inferred_bump = match change.bump {
+				Some(bump) => Some(bump),
+				None => infer_group_bump_from_explicit_version(
 					group,
 					&configuration.root_path,
 					packages,
 					explicit_version.as_ref(),
-				)
-			});
+				)?,
+			};
 			targets.push(LoadedChangesetTarget {
 				id: change.package.clone(),
 				kind: ChangesetTargetKind::Group,
@@ -1452,20 +1453,27 @@ fn infer_group_bump_from_explicit_version(
 	workspace_root: &Path,
 	packages: &[PackageRecord],
 	explicit_version: Option<&Version>,
-) -> Option<BumpSeverity> {
-	let explicit_version = explicit_version?;
-	group
-		.packages
-		.iter()
-		.filter_map(|member_id| resolve_package_reference(member_id, workspace_root, packages).ok())
-		.filter_map(|package_id| {
-			packages
-				.iter()
-				.find(|package| package.id == package_id)
-				.and_then(|package| package.current_version.as_ref())
-		})
-		.max()
-		.map(|current_version| infer_bump_from_versions(current_version, explicit_version))
+) -> MonochangeResult<Option<BumpSeverity>> {
+	let Some(explicit_version) = explicit_version else {
+		return Ok(None);
+	};
+	let mut max_version: Option<&Version> = None;
+	for member_id in &group.packages {
+		let package_id =
+			resolve_package_reference(member_id, workspace_root, packages)?;
+		if let Some(current_version) = packages
+			.iter()
+			.find(|package| package.id == package_id)
+			.and_then(|package| package.current_version.as_ref())
+		{
+			max_version = Some(match max_version {
+				Some(current_max) if current_version > current_max => current_version,
+				Some(current_max) => current_max,
+				None => current_version,
+			});
+		}
+	}
+	Ok(max_version.map(|current_version| infer_bump_from_versions(current_version, explicit_version)))
 }
 
 fn infer_bump_from_versions(current_version: &Version, explicit_version: &Version) -> BumpSeverity {
