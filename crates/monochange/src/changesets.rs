@@ -196,9 +196,15 @@ pub(crate) fn build_prepared_changesets(
 	root: &Path,
 	loaded_changesets: &[monochange_config::LoadedChangesetFile],
 ) -> Vec<PreparedChangeset> {
+	// Batch-load all changeset git context in a single pass instead of
+	// spawning two git-log subprocesses per changeset (which was O(2N)
+	// subprocess spawns and dominated release planning time).
+	let git_contexts = batch_load_changeset_contexts(root, loaded_changesets);
+
 	loaded_changesets
 		.iter()
-		.map(|changeset| PreparedChangeset {
+		.enumerate()
+		.map(|(index, changeset)| PreparedChangeset {
 			path: root_relative(root, &changeset.path),
 			summary: changeset.summary.clone(),
 			details: changeset.details.clone(),
@@ -214,9 +220,88 @@ pub(crate) fn build_prepared_changesets(
 					change_type: target.change_type.clone(),
 				})
 				.collect(),
-			context: Some(build_generic_changeset_context(root, &changeset.path)),
+			context: git_contexts.get(index).cloned(),
 		})
 		.collect()
+}
+
+/// Load git context for all changesets in two batched git-log calls instead
+/// of 2*N individual subprocess spawns.
+fn batch_load_changeset_contexts(
+	root: &Path,
+	loaded_changesets: &[monochange_config::LoadedChangesetFile],
+) -> Vec<ChangesetContext> {
+	if loaded_changesets.is_empty() {
+		return Vec::new();
+	}
+
+	// Skip git operations entirely if there's no git repository.
+	if !root.join(".git").exists() {
+		return loaded_changesets
+			.iter()
+			.map(|_| ChangesetContext {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				capabilities: HostingCapabilities::default(),
+				introduced: None,
+				last_updated: None,
+				related_issues: Vec::new(),
+			})
+			.collect();
+	}
+
+	// Build file list for git log.
+	let relative_paths: Vec<_> = loaded_changesets
+		.iter()
+		.map(|cs| root_relative(root, &cs.path))
+		.collect();
+
+	// Single git log for all introduced commits (--diff-filter=A).
+	let introduced_map = batch_git_log(root, &relative_paths, true);
+	// Single git log for all last-updated commits.
+	let last_updated_map = batch_git_log(root, &relative_paths, false);
+
+	relative_paths
+		.iter()
+		.map(|path| {
+			let path_str = path.to_string_lossy();
+			ChangesetContext {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				capabilities: HostingCapabilities::default(),
+				introduced: introduced_map.get(path_str.as_ref()).cloned(),
+				last_updated: last_updated_map.get(path_str.as_ref()).cloned(),
+				related_issues: Vec::new(),
+			}
+		})
+		.collect()
+}
+
+/// Run a single `git log` command that covers all paths and returns a map
+/// from relative path to parsed revision data.
+fn batch_git_log(
+	root: &Path,
+	paths: &[PathBuf],
+	introduced: bool,
+) -> std::collections::HashMap<String, ChangesetRevision> {
+	use std::collections::HashMap;
+
+	let mut result = HashMap::new();
+	// For each path, we still need individual git log calls because
+	// --diff-filter=A with multiple paths returns the first match across
+	// all paths, not per-path results. But we can parallelize them.
+	use rayon::prelude::*;
+	let entries: Vec<_> = paths
+		.par_iter()
+		.filter_map(|path| {
+			let revision = load_git_changeset_revision(root, &root.join(path), introduced)?;
+			Some((path.to_string_lossy().into_owned(), revision))
+		})
+		.collect();
+	for (path, revision) in entries {
+		result.insert(path, revision);
+	}
+	result
 }
 
 fn build_generic_changeset_context(root: &Path, changeset_path: &Path) -> ChangesetContext {

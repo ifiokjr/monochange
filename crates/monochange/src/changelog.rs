@@ -562,16 +562,52 @@ fn render_jinja_template_strict(
 }
 
 fn render_jinja_template_with_behavior(
-	template: &str,
+	template_source: &str,
 	context: &minijinja::Value,
 	undefined_behavior: UndefinedBehavior,
 ) -> MonochangeResult<String> {
-	let mut env = Environment::new();
-	env.set_undefined_behavior(undefined_behavior);
-	let rendered = env
-		.render_str(template, context)
-		.map_err(|error| MonochangeError::Config(format!("template rendering failed: {error}")))?;
-	Ok(rendered)
+	use std::collections::HashMap;
+
+	thread_local! {
+		static LENIENT_CACHE: std::cell::RefCell<HashMap<String, Environment<'static>>> =
+			std::cell::RefCell::new(HashMap::new());
+		static STRICT_CACHE: std::cell::RefCell<HashMap<String, Environment<'static>>> =
+			std::cell::RefCell::new(HashMap::new());
+	}
+
+	let render_with_cache =
+		|cache: &std::cell::RefCell<HashMap<String, Environment<'static>>>| -> MonochangeResult<String> {
+			cache.borrow_mut().entry(template_source.to_owned()).or_insert_with(|| {
+				let mut env = Environment::new();
+				env.set_undefined_behavior(undefined_behavior);
+				env.add_template_owned("t", template_source.to_owned()).unwrap_or_else(|_| {});
+				env
+			});
+			let cache_ref = cache.borrow();
+			let env = cache_ref.get(template_source).unwrap_or_else(|| unreachable!("just inserted"));
+			match env.get_template("t") {
+				Ok(tmpl) => tmpl
+					.render(context)
+					.map_err(|error| MonochangeError::Config(format!("template rendering failed: {error}"))),
+				Err(_) => {
+					// Template failed to compile on insert; fall back to render_str.
+					env.render_str(template_source, context)
+						.map_err(|error| MonochangeError::Config(format!("template rendering failed: {error}")))
+				}
+			}
+		};
+
+	match undefined_behavior {
+		UndefinedBehavior::Lenient => LENIENT_CACHE.with(render_with_cache),
+		UndefinedBehavior::Strict => STRICT_CACHE.with(render_with_cache),
+		_ => {
+			let mut env = Environment::new();
+			env.set_undefined_behavior(undefined_behavior);
+			env.render_str(template_source, context).map_err(|error| {
+				MonochangeError::Config(format!("template rendering failed: {error}"))
+			})
+		}
+	}
 }
 
 pub(crate) fn render_message_template(template: &str, metadata: &BTreeMap<&str, String>) -> String {

@@ -1845,6 +1845,7 @@ dependencies = [
  "monochange_npm",
  "monochange_semver",
  "monochange_test_helpers",
+ "rayon",
  "regex",
  "rmcp",
  "rstest",

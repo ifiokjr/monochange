@@ -1141,10 +1141,13 @@ pub(crate) fn prepare_release_execution(
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
 	let changeset_paths = discover_changeset_paths(root)?;
-	let loaded_changesets = changeset_paths
-		.iter()
-		.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
-		.collect::<MonochangeResult<Vec<_>>>()?;
+	let loaded_changesets = {
+		use rayon::prelude::*;
+		changeset_paths
+			.par_iter()
+			.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
+			.collect::<MonochangeResult<Vec<_>>>()?
+	};
 	let change_signals = loaded_changesets
 		.iter()
 		.flat_map(|changeset| changeset.signals.clone())
