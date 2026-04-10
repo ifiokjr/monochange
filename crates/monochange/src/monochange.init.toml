@@ -524,6 +524,11 @@ comment_on_failure = true
 #   Command              — run an arbitrary shell command
 #
 # Common step fields:
+#   when            — optional condition controlling whether this step runs (e.g.
+#{% raw -%}
+#                     "{{ inputs.enabled }}", "{{ inputs.debug and not inputs.skip }}")
+#{% endraw -%}
+#                     If the expression resolves to false, the step is skipped.
 #   inputs          — optional map of step-local input overrides. Values can be
 #                     strings, booleans, or string arrays.
 {% raw -%}
@@ -689,13 +694,13 @@ default = "HEAD"
 name = "force"
 type = "boolean"
 help_text = "allow non-descendant retargets"
-default = "false"
+default = false
 
 [[cli.repair-release.inputs]]
 name = "sync_provider"
 type = "boolean"
 help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)"
-default = "true"
+default = true
 
 [[cli.repair-release.inputs]]
 name = "format"

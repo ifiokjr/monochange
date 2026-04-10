@@ -197,8 +197,12 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 	let step_type = step.kind_name();
 	writeln!(rendered, "type = {}", render_toml_string(step_type))
 		.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+	if let Some(when) = step.when() {
+		writeln!(rendered, "when = {}", render_toml_string(when))
+			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+	}
 	match step {
-		monochange_core::CliStepDefinition::RenderReleaseManifest { path, inputs } => {
+		monochange_core::CliStepDefinition::RenderReleaseManifest { path, inputs, .. } => {
 			if let Some(path) = path {
 				writeln!(
 					rendered,
@@ -216,6 +220,7 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 			id,
 			variables,
 			inputs,
+			..
 		} => {
 			writeln!(rendered, "command = {}", render_toml_string(command))
 				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
@@ -252,17 +257,17 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 			}
 			render_step_inputs_toml(rendered, inputs);
 		}
-		monochange_core::CliStepDefinition::Validate { inputs }
-		| monochange_core::CliStepDefinition::Discover { inputs }
-		| monochange_core::CliStepDefinition::CreateChangeFile { inputs }
-		| monochange_core::CliStepDefinition::PrepareRelease { inputs }
-		| monochange_core::CliStepDefinition::CommitRelease { inputs }
-		| monochange_core::CliStepDefinition::PublishRelease { inputs }
-		| monochange_core::CliStepDefinition::OpenReleaseRequest { inputs }
-		| monochange_core::CliStepDefinition::CommentReleasedIssues { inputs }
-		| monochange_core::CliStepDefinition::AffectedPackages { inputs }
-		| monochange_core::CliStepDefinition::DiagnoseChangesets { inputs }
-		| monochange_core::CliStepDefinition::RetargetRelease { inputs } => {
+		monochange_core::CliStepDefinition::Validate { inputs, .. }
+		| monochange_core::CliStepDefinition::Discover { inputs, .. }
+		| monochange_core::CliStepDefinition::CreateChangeFile { inputs, .. }
+		| monochange_core::CliStepDefinition::PrepareRelease { inputs, .. }
+		| monochange_core::CliStepDefinition::CommitRelease { inputs, .. }
+		| monochange_core::CliStepDefinition::PublishRelease { inputs, .. }
+		| monochange_core::CliStepDefinition::OpenReleaseRequest { inputs, .. }
+		| monochange_core::CliStepDefinition::CommentReleasedIssues { inputs, .. }
+		| monochange_core::CliStepDefinition::AffectedPackages { inputs, .. }
+		| monochange_core::CliStepDefinition::DiagnoseChangesets { inputs, .. }
+		| monochange_core::CliStepDefinition::RetargetRelease { inputs, .. } => {
 			render_step_inputs_toml(rendered, inputs);
 		}
 	}
@@ -822,7 +827,7 @@ fn materialize_lockfile_command_updates(
 	for command in lockfile_commands {
 		run_lockfile_command(root, temp_root, command)?;
 	}
-	collect_workspace_file_updates(root, temp_root)
+	collect_workspace_file_updates(root, temp_root, base_updates, lockfile_commands)
 }
 
 fn remap_workspace_path(root: &Path, temp_root: &Path, path: &Path) -> MonochangeResult<PathBuf> {
@@ -892,10 +897,45 @@ fn run_lockfile_command(
 fn collect_workspace_file_updates(
 	root: &Path,
 	temp_root: &Path,
+	base_updates: &[FileUpdate],
+	lockfile_commands: &[LockfileCommandExecution],
 ) -> MonochangeResult<Vec<FileUpdate>> {
+	// Instead of walking the entire workspace tree, only scan directories
+	// that could have been modified: directories containing explicitly
+	// updated files and lockfile command working directories.
+	let normalized_root = monochange_core::normalize_path(root);
+	let mut dirs_to_scan = BTreeSet::new();
+	for update in base_updates {
+		if let Some(parent) = update.path.parent() {
+			let normalized = monochange_core::normalize_path(parent);
+			if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+				dirs_to_scan.insert(relative.to_path_buf());
+			}
+		}
+	}
+	for command in lockfile_commands {
+		let normalized = monochange_core::normalize_path(&command.cwd);
+		if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+			dirs_to_scan.insert(relative.to_path_buf());
+		} else {
+			dirs_to_scan.insert(command.cwd.clone());
+		}
+	}
+	// Always scan the changeset directory (files are deleted during release).
+	dirs_to_scan.insert(PathBuf::from(".changeset"));
+
 	let mut relative_paths = BTreeSet::new();
-	collect_workspace_files(root, root, &mut relative_paths)?;
-	collect_workspace_files(temp_root, temp_root, &mut relative_paths)?;
+	for dir in &dirs_to_scan {
+		let original_dir = root.join(dir);
+		let temp_dir = temp_root.join(dir);
+		if original_dir.is_dir() {
+			collect_workspace_files(root, &original_dir, &mut relative_paths)?;
+		}
+		if temp_dir.is_dir() {
+			collect_workspace_files(temp_root, &temp_dir, &mut relative_paths)?;
+		}
+	}
+
 	let mut updates = Vec::new();
 	for relative in relative_paths {
 		let before = read_optional_file(&root.join(&relative))?;
@@ -1275,8 +1315,14 @@ mod workspace_ops_tests {
 		)
 		.unwrap_or_else(|error| panic!("write generated file: {error}"));
 
-		let updates = collect_workspace_file_updates(fixture.path(), temp_root.path())
-			.unwrap_or_else(|error| panic!("collect updates: {error}"));
+		let lockfile_cmd = LockfileCommandExecution {
+			command: String::new(),
+			cwd: fixture.path().to_path_buf(),
+			shell: monochange_core::ShellConfig::None,
+		};
+		let updates =
+			collect_workspace_file_updates(fixture.path(), temp_root.path(), &[], &[lockfile_cmd])
+				.unwrap_or_else(|error| panic!("collect updates: {error}"));
 		assert!(updates
 			.iter()
 			.any(|update| update.path.ends_with("generated.txt")));

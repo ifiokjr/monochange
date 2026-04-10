@@ -22,16 +22,42 @@ Compared with a shell-only `Command` step that runs `mc validate`, the built-in 
 
 `Validate` does not accept any built-in step inputs.
 
+## Step-level `when` condition
+
+All CLI steps support an optional `when = "..."` condition.
+
+If the expression resolves to false at runtime, monochange skips the step and continues with the next step.
+
+```toml
+when = "{{ inputs.enabled }}"
+```
+
 ## Prerequisites
 
 None. `Validate` is standalone.
 
 ## Side effects and outputs
 
-- validates workspace config and changesets
+**Structural checks** (always run):
+
+- validates workspace config syntax and required fields
+- validates package and group declarations, membership rules, and namespace collisions
+- validates CLI command definitions, step types, and input schemas
+- validates changeset files reference declared packages and groups
 - validates Cargo workspace version-group constraints
-- returns a normal success/failure result for the command
-- does not prepare release state for later steps
+
+**Content checks** (verify files on disk):
+
+- versioned file paths that are not globs must resolve to an existing file
+- ecosystem-typed versioned files (Cargo.toml, package.json, deno.json, pubspec.yaml) must contain a readable version field
+- regex versioned file patterns must match at least once in the target file
+- glob patterns that match zero files produce a non-fatal warning printed to stderr
+
+**Security checks:**
+
+- `[source].api_url` and `[source].host` must use `https://`; insecure `http://` schemes are rejected to prevent cleartext token transmission
+
+`Validate` returns a normal success/failure result for the command and does not prepare release state for later steps.
 
 That last point matters: `Validate` is a gate, not a state-producing step.
 

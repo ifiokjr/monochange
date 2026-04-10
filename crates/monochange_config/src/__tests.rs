@@ -262,6 +262,51 @@ type = "RetargetRelease"
 }
 
 #[test]
+fn load_workspace_configuration_rejects_empty_when_conditions() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[cli.announce]
+
+[[cli.announce.steps]]
+type = "Command"
+when = ""
+command = "echo should not run"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected empty-when error"));
+	assert!(error.to_string().contains("has an empty `when` condition"));
+}
+
+#[test]
+fn load_workspace_configuration_supports_boolean_input_default_values() {
+	let root = fixture_path("config/accepts-boolean-input-defaults");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let command = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "pr-check")
+		.unwrap_or_else(|| panic!("expected pr-check command"));
+	let dry_run = command
+		.inputs
+		.iter()
+		.find(|input| input.name == "dry_run")
+		.unwrap_or_else(|| panic!("missing dry_run input"));
+	let sync = command
+		.inputs
+		.iter()
+		.find(|input| input.name == "sync")
+		.unwrap_or_else(|| panic!("missing sync input"));
+	assert_eq!(dry_run.default.as_deref(), Some("true"));
+	assert_eq!(sync.default.as_deref(), Some("false"));
+}
+
+#[test]
 fn load_workspace_configuration_parses_package_group_and_cli_command_declarations() {
 	let root = fixture_path("config/package-group-and-cli");
 	let configuration = load_workspace_configuration(&root)

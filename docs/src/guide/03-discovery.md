@@ -32,7 +32,8 @@ Key behaviors:
 - dependency names are normalized into one graph
 - package ids and manifest paths in CLI output are rendered relative to the repository root for deterministic automation
 - version-group assignments are attached after discovery
-- unmatched group members and version mismatches produce warnings
+- unmatched group members (declared in config but not found during discovery) produce warnings
+- unresolvable group members (invalid package IDs in `group.packages`) produce errors during configuration loading
 - discovery currently scans all supported ecosystems regardless of `[ecosystems.*]` toggles in `monochange.toml`
 
 <!-- {/discoveryKeyBehaviors} -->

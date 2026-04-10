@@ -56,9 +56,9 @@ use monochange_semver::strongest_assessment_for_package;
 use semver::Version;
 
 #[derive(Debug, Clone)]
-pub struct NormalizedGraph {
-	package_ids: BTreeSet<String>,
-	reverse_edges: BTreeMap<String, BTreeSet<String>>,
+pub struct NormalizedGraph<'a> {
+	package_ids: BTreeSet<&'a str>,
+	reverse_edges: BTreeMap<&'a str, BTreeSet<&'a str>>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,17 +82,17 @@ impl Default for DecisionState {
 	}
 }
 
-impl NormalizedGraph {
+impl<'a> NormalizedGraph<'a> {
 	#[must_use]
-	pub fn new(packages: &[PackageRecord], dependency_edges: &[DependencyEdge]) -> Self {
-		let mut reverse_edges = BTreeMap::<String, BTreeSet<String>>::new();
-		let package_ids = packages.iter().map(|package| package.id.clone()).collect();
+	pub fn new(packages: &'a [PackageRecord], dependency_edges: &'a [DependencyEdge]) -> Self {
+		let mut reverse_edges = BTreeMap::<&'a str, BTreeSet<&'a str>>::new();
+		let package_ids = packages.iter().map(|package| package.id.as_str()).collect();
 
 		for edge in dependency_edges {
 			reverse_edges
-				.entry(edge.to_package_id.clone())
+				.entry(&edge.to_package_id)
 				.or_default()
-				.insert(edge.from_package_id.clone());
+				.insert(&edge.from_package_id);
 		}
 
 		Self {
@@ -102,21 +102,21 @@ impl NormalizedGraph {
 	}
 
 	#[must_use]
-	pub fn direct_dependents(&self, package_id: &str) -> BTreeSet<String> {
+	pub fn direct_dependents(&self, package_id: &str) -> Vec<&'a str> {
 		self.reverse_edges
 			.get(package_id)
-			.cloned()
+			.map(|set| set.iter().copied().collect())
 			.unwrap_or_default()
 	}
 
 	#[must_use]
-	pub fn transitive_dependents(&self, package_id: &str) -> BTreeSet<String> {
+	pub fn transitive_dependents(&self, package_id: &str) -> BTreeSet<&'a str> {
 		let mut discovered = BTreeSet::new();
-		let mut queue = VecDeque::from([package_id.to_string()]);
+		let mut queue: VecDeque<&str> = VecDeque::from([package_id]);
 
 		while let Some(current) = queue.pop_front() {
-			for dependent in self.direct_dependents(&current) {
-				if discovered.insert(dependent.clone()) {
+			for dependent in self.direct_dependents(current) {
+				if discovered.insert(dependent) {
 					queue.push_back(dependent);
 				}
 			}
@@ -145,11 +145,11 @@ pub fn build_release_plan(
 	let graph = NormalizedGraph::new(packages, dependency_edges);
 	let package_by_id = packages
 		.iter()
-		.map(|package| (package.id.clone(), package))
+		.map(|package| (package.id.as_str(), package))
 		.collect::<BTreeMap<_, _>>();
 	let group_by_id = version_groups
 		.iter()
-		.map(|group| (group.group_id.clone(), group))
+		.map(|group| (group.group_id.as_str(), group))
 		.collect::<BTreeMap<_, _>>();
 	let (explicit_package_versions, explicit_group_versions, warnings) = resolve_explicit_versions(
 		&package_by_id,
@@ -161,15 +161,15 @@ pub fn build_release_plan(
 		.iter()
 		.map(|package| {
 			(
-				package.id.clone(),
+				package.id.as_str(),
 				DecisionState {
 					trigger_type: "none".to_string(),
 					..DecisionState::default()
 				},
 			)
 		})
-		.collect::<BTreeMap<_, _>>();
-	let mut queue = VecDeque::new();
+		.collect::<BTreeMap<&str, _>>();
+	let mut queue: VecDeque<&str> = VecDeque::new();
 
 	for change_signal in change_signals {
 		let assessment =
@@ -193,7 +193,7 @@ pub fn build_release_plan(
 	}
 
 	while let Some(source_package_id) = queue.pop_front() {
-		let source_state = if let Some(state) = states.get(&source_package_id) {
+		let source_state = if let Some(state) = states.get(source_package_id) {
 			state.clone()
 		} else {
 			continue;
@@ -203,17 +203,17 @@ pub fn build_release_plan(
 		}
 
 		let source_assessment =
-			strongest_assessment_for_package(compatibility_evidence, &source_package_id);
+			strongest_assessment_for_package(compatibility_evidence, source_package_id);
 		let propagated_severity =
 			propagated_release_severity(default_parent_bump, source_assessment.as_ref());
 
 		if propagated_severity.is_release() {
-			for dependent_id in graph.direct_dependents(&source_package_id) {
+			for dependent_id in graph.direct_dependents(source_package_id) {
 				let reason = format!("depends on `{source_package_id}`");
 				apply_decision(
 					&mut states,
 					&mut queue,
-					&dependent_id,
+					dependent_id,
 					propagated_severity,
 					"transitive-dependency",
 					&reason,
@@ -223,7 +223,7 @@ pub fn build_release_plan(
 		}
 
 		if let Some(group_id) = package_by_id
-			.get(&source_package_id)
+			.get(source_package_id)
 			.and_then(|package| package.version_group_id.as_deref())
 		{
 			let Some(group) = group_by_id.get(group_id) else {
@@ -232,7 +232,7 @@ pub fn build_release_plan(
 			let group_max = group
 				.members
 				.iter()
-				.filter_map(|member| states.get(member))
+				.filter_map(|member| states.get(member.as_str()))
 				.map(|state| state.severity)
 				.max()
 				.unwrap_or(BumpSeverity::None);
@@ -262,7 +262,7 @@ pub fn build_release_plan(
 	let decisions = packages
 		.iter()
 		.map(|package| {
-			let state = states.get(&package.id).cloned().unwrap_or_default();
+			let state = states.get(package.id.as_str()).cloned().unwrap_or_default();
 			let planned_version = package.version_group_id.as_deref().and_then(|group_id| {
 				planned_groups
 					.iter()
@@ -314,8 +314,8 @@ type ExplicitVersionResolution = (
 );
 
 fn resolve_explicit_versions(
-	package_by_id: &BTreeMap<String, &PackageRecord>,
-	group_by_id: &BTreeMap<String, &VersionGroup>,
+	package_by_id: &BTreeMap<&str, &PackageRecord>,
+	group_by_id: &BTreeMap<&str, &VersionGroup>,
 	change_signals: &[ChangeSignal],
 	strict_version_conflicts: bool,
 ) -> MonochangeResult<ExplicitVersionResolution> {
@@ -333,7 +333,7 @@ fn resolve_explicit_versions(
 			version,
 		};
 		if let Some(group_id) = package_by_id
-			.get(&signal.package_id)
+			.get(signal.package_id.as_str())
 			.and_then(|package| package.version_group_id.as_ref())
 		{
 			group_inputs
@@ -351,7 +351,7 @@ fn resolve_explicit_versions(
 	let package_versions = package_inputs
 		.into_iter()
 		.map(|(package_id, inputs)| {
-			let package = package_by_id.get(&package_id).unwrap_or_else(|| {
+			let package = package_by_id.get(package_id.as_str()).unwrap_or_else(|| {
 				panic!("package `{package_id}` missing while resolving explicit versions")
 			});
 			let owner = format!("package `{package_id}`");
@@ -369,13 +369,13 @@ fn resolve_explicit_versions(
 	let group_versions = group_inputs
 		.into_iter()
 		.map(|(group_id, inputs)| {
-			let group = group_by_id.get(&group_id).unwrap_or_else(|| {
+			let group = group_by_id.get(group_id.as_str()).unwrap_or_else(|| {
 				panic!("group `{group_id}` missing while resolving explicit versions")
 			});
 			let current_version = group
 				.members
 				.iter()
-				.filter_map(|member| package_by_id.get(member))
+				.filter_map(|member| package_by_id.get(member.as_str()))
 				.filter_map(|package| package.current_version.as_ref())
 				.max();
 			let owner = format!(
@@ -450,10 +450,10 @@ struct ExplicitVersionInput {
 	version: Version,
 }
 
-fn apply_decision(
-	states: &mut BTreeMap<String, DecisionState>,
-	queue: &mut VecDeque<String>,
-	package_id: &str,
+fn apply_decision<'a>(
+	states: &mut BTreeMap<&'a str, DecisionState>,
+	queue: &mut VecDeque<&'a str>,
+	package_id: &'a str,
 	new_severity: BumpSeverity,
 	trigger_type: &str,
 	reason: &str,
@@ -465,7 +465,7 @@ fn apply_decision(
 
 	if new_severity > state.severity {
 		state.severity = new_severity;
-		queue.push_back(package_id.to_string());
+		queue.push_back(package_id);
 	}
 	if trigger_priority(trigger_type) > trigger_priority(&state.trigger_type) {
 		state.trigger_type = trigger_type.to_string();
@@ -487,14 +487,14 @@ fn trigger_priority(trigger_type: &str) -> u8 {
 
 fn planned_group(
 	group: &VersionGroup,
-	package_by_id: &BTreeMap<String, &PackageRecord>,
-	states: &BTreeMap<String, DecisionState>,
+	package_by_id: &BTreeMap<&str, &PackageRecord>,
+	states: &BTreeMap<&str, DecisionState>,
 	explicit_group_versions: &BTreeMap<String, Version>,
 ) -> Option<PlannedVersionGroup> {
 	let recommended_bump = group
 		.members
 		.iter()
-		.filter_map(|member| states.get(member))
+		.filter_map(|member| states.get(member.as_str()))
 		.map(|state| state.severity)
 		.max()
 		.unwrap_or(BumpSeverity::None);
@@ -505,7 +505,7 @@ fn planned_group(
 	let base_version = group
 		.members
 		.iter()
-		.filter_map(|member| package_by_id.get(member))
+		.filter_map(|member| package_by_id.get(member.as_str()))
 		.filter_map(|package| package.current_version.clone())
 		.max();
 	let planned_version = explicit_group_versions
