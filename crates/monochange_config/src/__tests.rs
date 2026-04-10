@@ -2612,3 +2612,57 @@ fn validate_api_url_host_accepts_https_scheme() {
 	)
 	.unwrap_or_else(|error| panic!("expected Ok for https://: {error}"));
 }
+
+#[test]
+fn changeset_files_with_crlf_line_endings_parse_correctly() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	// Write a minimal monochange.toml.
+	std::fs::write(
+		root.join("monochange.toml"),
+		"[defaults]\npackage_type = \"cargo\"\n\n[package.core]\npath = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write toml: {error}"));
+
+	// Create the package manifest.
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir: {error}"));
+	std::fs::write(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo: {error}"));
+
+	// Write a changeset file with CRLF line endings.
+	let crlf_changeset = "---\r\ncore: patch\r\n---\r\n\r\nFix a bug with CRLF endings.\r\n";
+	std::fs::create_dir_all(root.join(".changeset"))
+		.unwrap_or_else(|error| panic!("mkdir changeset: {error}"));
+	std::fs::write(root.join(".changeset/crlf-test.md"), crlf_changeset)
+		.unwrap_or_else(|error| panic!("write changeset: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("config: {error}"));
+
+	let packages = vec![monochange_core::PackageRecord::new(
+		monochange_core::Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		monochange_core::PublishState::Public,
+	)];
+
+	let changeset = crate::load_changeset_file(
+		&root.join(".changeset/crlf-test.md"),
+		&configuration,
+		&packages,
+	)
+	.unwrap_or_else(|error| panic!("expected CRLF changeset to parse, got: {error}"));
+
+	assert!(!changeset.targets.is_empty());
+	let summary = changeset
+		.summary
+		.unwrap_or_else(|| panic!("expected summary"));
+	assert!(summary.contains("CRLF endings"));
+}
