@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
-assertion_line: 12
 info:
   program: monochange
   args:
@@ -17,6 +16,7 @@ Usage: monochange <COMMAND>
 
 Commands:
   init            Generate monochange.toml with detected packages, groups, and default CLI commands
+  populate        Add any missing built-in CLI commands to monochange.toml so you can customize them
   assist          Print assistant setup guidance, install steps, and MCP configuration
   release-record  Inspect the monochange release record associated with a tag or commit
   mcp             Start the monochange MCP (Model Context Protocol) server over stdin/stdout

@@ -150,6 +150,7 @@ use git_support::git_head_commit;
 use git_support::git_stage_paths;
 use release_record::render_release_record_discovery;
 use workspace_ops::init_workspace;
+use workspace_ops::populate_workspace;
 
 pub use changeset_policy::affected_packages;
 pub use changeset_policy::evaluate_changeset_policy;
@@ -235,6 +236,8 @@ pub(crate) use git_support::run_git_status;
 pub(crate) use workspace_ops::build_lockfile_command_executions;
 #[cfg(test)]
 pub(crate) use workspace_ops::change_type_default_bump;
+#[cfg(test)]
+pub(crate) use workspace_ops::render_cli_commands_toml;
 #[cfg(test)]
 pub(crate) use workspace_ops::render_interactive_changeset_markdown;
 
@@ -542,6 +545,22 @@ where
 		Some(("init", init_matches)) => {
 			let path = init_workspace(root, init_matches.get_flag("force"))?;
 			Ok(format!("wrote {}", path.display()))
+		}
+		Some(("populate", _)) => {
+			let result = populate_workspace(root)?;
+			if result.added_commands.is_empty() {
+				Ok(format!(
+					"{} already defines all default CLI commands",
+					result.path.display()
+				))
+			} else {
+				Ok(format!(
+					"updated {} and added {} default CLI commands: {}",
+					result.path.display(),
+					result.added_commands.len(),
+					result.added_commands.join(", ")
+				))
+			}
 		}
 		Some(("assist", assist_matches)) => {
 			let assistant = match assist_matches

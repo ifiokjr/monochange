@@ -14,7 +14,13 @@ mc init
 
 `mc init` detects packages, writes an annotated `monochange.toml`, and gives you a better starting point than hand-authoring a first config from scratch.
 
-The generated file becomes the source of truth for commands like `mc validate`, `mc discover`, `mc change`, and `mc release`.
+The generated file becomes the source of truth for commands like `mc validate`, `mc discover`, `mc change`, and `mc release`. If you later want editable copies of the built-in CLI commands, run:
+
+```bash
+mc populate
+```
+
+That appends any missing default command definitions to `monochange.toml` without overwriting commands you already defined.
 
 ## 2. Validate the generated workspace
 
