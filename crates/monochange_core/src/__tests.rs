@@ -1534,6 +1534,23 @@ fn json_helper_functions_cover_error_paths() {
 	assert!(crate::skip_json_object("{\"a\" 1}", 0).is_err());
 	assert!(crate::parse_json_string_span("abc", 0).is_err());
 	assert!(crate::parse_json_string_span("\"abc", 0).is_err());
+	// Truncated escape: backslash at end of input.
+	let error = crate::parse_json_string_span("\"abc\\", 0)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for truncated escape"));
+	assert!(
+		error
+			.to_string()
+			.contains("unterminated escape sequence"),
+		"expected truncated-escape error, got: {error}"
+	);
+	// Escaped quote should not close the string.
+	assert!(crate::parse_json_string_span("\"abc\\\"", 0).is_err());
+	// Double backslash followed by closing quote should work.
+	let (span, next) = crate::parse_json_string_span("\"abc\\\\\"", 0)
+		.unwrap_or_else(|error| panic!("double-backslash: {error}"));
+	assert_eq!(span, crate::JsonSpan { start: 1, end: 6 });
+	assert_eq!(next, 7);
 }
 
 #[test]

@@ -707,6 +707,12 @@ fn parse_json_string_span(contents: &str, start: usize) -> MonochangeResult<(Jso
 	let mut cursor = start + 1;
 	while let Some(&byte) = bytes.get(cursor) {
 		if byte == b'\\' {
+			// Escape sequence: verify there is a character after the backslash.
+			if cursor + 1 >= bytes.len() {
+				return Err(MonochangeError::Config(
+					"unterminated escape sequence in JSON string".to_string(),
+				));
+			}
 			cursor += 2;
 			continue;
 		}
