@@ -107,16 +107,14 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 
+use monochange_core::BotSettings;
+use monochange_core::ChangeRequestSettings;
+use monochange_core::ChangesetBotSettings;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
 use monochange_core::ExtraChangelogSection;
-use monochange_core::GitHubBotSettings;
-use monochange_core::GitHubChangesetBotSettings;
 use monochange_core::GitHubConfiguration;
-use monochange_core::GitHubPullRequestSettings;
-use monochange_core::GitHubReleaseNotesSource;
-use monochange_core::GitHubReleaseSettings;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::GroupDefinition;
 use monochange_core::LockfileCommandDefinition;
@@ -126,6 +124,8 @@ use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::ReleaseNotesSettings;
+use monochange_core::ReleaseNotesSource;
+use monochange_core::ReleaseProviderSettings;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
@@ -409,11 +409,11 @@ struct RawSourceConfiguration {
 	#[serde(default)]
 	api_url: Option<String>,
 	#[serde(default)]
-	releases: RawGitHubReleaseSettings,
+	releases: RawReleaseProviderSettings,
 	#[serde(default)]
-	pull_requests: RawGitHubPullRequestSettings,
+	pull_requests: RawChangeRequestSettings,
 	#[serde(default)]
-	bot: RawGitHubBotSettings,
+	bot: RawBotSettings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -421,16 +421,16 @@ struct RawGitHubConfiguration {
 	owner: String,
 	repo: String,
 	#[serde(default)]
-	releases: RawGitHubReleaseSettings,
+	releases: RawReleaseProviderSettings,
 	#[serde(default)]
-	pull_requests: RawGitHubPullRequestSettings,
+	pull_requests: RawChangeRequestSettings,
 	#[serde(default)]
-	bot: RawGitHubBotSettings,
+	bot: RawBotSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawGitHubReleaseSettings {
+struct RawReleaseProviderSettings {
 	#[serde(default = "default_true")]
 	enabled: bool,
 	#[serde(default)]
@@ -440,24 +440,24 @@ struct RawGitHubReleaseSettings {
 	#[serde(default)]
 	generate_notes: bool,
 	#[serde(default)]
-	source: GitHubReleaseNotesSource,
+	source: ReleaseNotesSource,
 }
 
-impl Default for RawGitHubReleaseSettings {
+impl Default for RawReleaseProviderSettings {
 	fn default() -> Self {
 		Self {
 			enabled: default_true(),
 			draft: false,
 			prerelease: false,
 			generate_notes: false,
-			source: GitHubReleaseNotesSource::Monochange,
+			source: ReleaseNotesSource::Monochange,
 		}
 	}
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawGitHubPullRequestSettings {
+struct RawChangeRequestSettings {
 	#[serde(default = "default_true")]
 	enabled: bool,
 	#[serde(default = "default_pull_request_branch_prefix")]
@@ -472,7 +472,7 @@ struct RawGitHubPullRequestSettings {
 	auto_merge: bool,
 }
 
-impl Default for RawGitHubPullRequestSettings {
+impl Default for RawChangeRequestSettings {
 	fn default() -> Self {
 		Self {
 			enabled: default_true(),
@@ -487,7 +487,7 @@ impl Default for RawGitHubPullRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize)]
-struct RawGitHubChangesetBotSettings {
+struct RawChangesetBotSettings {
 	#[serde(default)]
 	enabled: bool,
 	#[serde(default = "default_true")]
@@ -502,7 +502,7 @@ struct RawGitHubChangesetBotSettings {
 	ignored_paths: Vec<String>,
 }
 
-impl Default for RawGitHubChangesetBotSettings {
+impl Default for RawChangesetBotSettings {
 	fn default() -> Self {
 		Self {
 			enabled: false,
@@ -516,9 +516,9 @@ impl Default for RawGitHubChangesetBotSettings {
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct RawGitHubBotSettings {
+struct RawBotSettings {
 	#[serde(default)]
-	changesets: RawGitHubChangesetBotSettings,
+	changesets: RawChangesetBotSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -1112,14 +1112,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		repo: source.repo,
 		host: source.host,
 		api_url: source.api_url,
-		releases: GitHubReleaseSettings {
+		releases: ReleaseProviderSettings {
 			enabled: source.releases.enabled,
 			draft: source.releases.draft,
 			prerelease: source.releases.prerelease,
 			generate_notes: source.releases.generate_notes,
 			source: source.releases.source,
 		},
-		pull_requests: GitHubPullRequestSettings {
+		pull_requests: ChangeRequestSettings {
 			enabled: source.pull_requests.enabled,
 			branch_prefix: source.pull_requests.branch_prefix,
 			base: source.pull_requests.base,
@@ -1127,8 +1127,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			labels: source.pull_requests.labels,
 			auto_merge: source.pull_requests.auto_merge,
 		},
-		bot: GitHubBotSettings {
-			changesets: GitHubChangesetBotSettings {
+		bot: BotSettings {
+			changesets: ChangesetBotSettings {
 				enabled: source.bot.changesets.enabled,
 				required: source.bot.changesets.required,
 				skip_labels: source.bot.changesets.skip_labels,
@@ -1150,14 +1150,14 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		github.map(|github| GitHubConfiguration {
 			owner: github.owner,
 			repo: github.repo,
-			releases: GitHubReleaseSettings {
+			releases: ReleaseProviderSettings {
 				enabled: github.releases.enabled,
 				draft: github.releases.draft,
 				prerelease: github.releases.prerelease,
 				generate_notes: github.releases.generate_notes,
 				source: github.releases.source,
 			},
-			pull_requests: GitHubPullRequestSettings {
+			pull_requests: ChangeRequestSettings {
 				enabled: github.pull_requests.enabled,
 				branch_prefix: github.pull_requests.branch_prefix,
 				base: github.pull_requests.base,
@@ -1165,8 +1165,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 				labels: github.pull_requests.labels,
 				auto_merge: github.pull_requests.auto_merge,
 			},
-			bot: GitHubBotSettings {
-				changesets: GitHubChangesetBotSettings {
+			bot: BotSettings {
+				changesets: ChangesetBotSettings {
 					enabled: github.bot.changesets.enabled,
 					required: github.bot.changesets.required,
 					skip_labels: github.bot.changesets.skip_labels,

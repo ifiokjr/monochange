@@ -11,7 +11,6 @@ use monochange_core::ChangeRequestSettings;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
 use monochange_core::CommitMessage;
-use monochange_core::GitHubReleaseNotesSource;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
@@ -27,6 +26,7 @@ use monochange_core::ReleaseManifestPlan;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
+use monochange_core::ReleaseNotesSource;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleaseProviderSettings;
 use monochange_core::RetargetOperation;
@@ -83,7 +83,7 @@ fn build_release_requests_can_defer_to_github_generated_notes() {
 		owner: "ifiokjr".to_string(),
 		repo: "monochange".to_string(),
 		releases: ReleaseProviderSettings {
-			source: GitHubReleaseNotesSource::GitHubGenerated,
+			source: ReleaseNotesSource::GitHubGenerated,
 			generate_notes: true,
 			..ReleaseProviderSettings::default()
 		},
@@ -152,7 +152,7 @@ fn validate_source_configuration_rejects_conflicting_release_note_modes() {
 		repo: "monochange".to_string(),
 		releases: ReleaseProviderSettings {
 			generate_notes: true,
-			source: GitHubReleaseNotesSource::Monochange,
+			source: ReleaseNotesSource::Monochange,
 			..ReleaseProviderSettings::default()
 		},
 		pull_requests: ChangeRequestSettings::default(),

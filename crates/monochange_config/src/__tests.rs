@@ -381,7 +381,7 @@ fn load_workspace_configuration_parses_github_release_settings() {
 	assert!(source.releases.generate_notes);
 	assert_eq!(
 		source.releases.source,
-		monochange_core::GitHubReleaseNotesSource::GitHubGenerated
+		monochange_core::ReleaseNotesSource::GitHubGenerated
 	);
 	assert!(source.pull_requests.enabled);
 	assert_eq!(source.pull_requests.branch_prefix, "automation/release");
@@ -2572,10 +2572,10 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 		crate::validate_github_configuration(Some(&monochange_core::GitHubConfiguration {
 			owner: "ifiokjr".to_string(),
 			repo: "monochange".to_string(),
-			releases: monochange_core::GitHubReleaseSettings::default(),
-			pull_requests: monochange_core::GitHubPullRequestSettings::default(),
-			bot: monochange_core::GitHubBotSettings {
-				changesets: monochange_core::GitHubChangesetBotSettings {
+			releases: monochange_core::ReleaseProviderSettings::default(),
+			pull_requests: monochange_core::ChangeRequestSettings::default(),
+			bot: monochange_core::BotSettings {
+				changesets: monochange_core::ChangesetBotSettings {
 					enabled: true,
 					required: true,
 					skip_labels: vec!["skip".to_string()],
