@@ -424,7 +424,15 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 	let rendered = crate::render_cli_commands_toml(&[monochange_core::CliCommandDefinition {
 		name: "custom".to_string(),
 		help_text: None,
-		inputs: Vec::new(),
+		inputs: vec![CliInputDefinition {
+			name: "mode".to_string(),
+			kind: CliInputKind::Choice,
+			help_text: Some("Select the command mode".to_string()),
+			required: true,
+			default: Some("safe".to_string()),
+			choices: vec!["safe".to_string(), "fast".to_string()],
+			short: Some('m'),
+		}],
 		steps: vec![
 			monochange_core::CliStepDefinition::RenderReleaseManifest {
 				when: Some("{{ inputs.enabled }}".to_string()),
@@ -452,10 +460,28 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				dry_run_command: None,
 				shell: monochange_core::ShellConfig::Default,
 				id: Some("default-shell".to_string()),
-				variables: Some(BTreeMap::from([(
-					"version_value".to_string(),
-					monochange_core::CommandVariable::Version,
-				)])),
+				variables: Some(BTreeMap::from([
+					(
+						"version_value".to_string(),
+						monochange_core::CommandVariable::Version,
+					),
+					(
+						"group_version_value".to_string(),
+						monochange_core::CommandVariable::GroupVersion,
+					),
+					(
+						"released_packages_value".to_string(),
+						monochange_core::CommandVariable::ReleasedPackages,
+					),
+					(
+						"changed_files_value".to_string(),
+						monochange_core::CommandVariable::ChangedFiles,
+					),
+					(
+						"changesets_value".to_string(),
+						monochange_core::CommandVariable::Changesets,
+					),
+				])),
 				inputs: BTreeMap::from([(
 					"changed_paths".to_string(),
 					monochange_core::CliStepInputValue::List(vec!["src/lib.rs".to_string()]),
@@ -470,10 +496,46 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				variables: None,
 				inputs: BTreeMap::new(),
 			},
+			monochange_core::CliStepDefinition::CommitRelease {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("json".to_string()),
+				)]),
+			},
+			monochange_core::CliStepDefinition::PublishRelease {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("text".to_string()),
+				)]),
+			},
+			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("json".to_string()),
+				)]),
+			},
+			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("text".to_string()),
+				)]),
+			},
 		],
 	}]);
 
 	assert!(rendered.contains("[cli.custom]"));
+	assert!(rendered.contains("[[cli.custom.inputs]]"));
+	assert!(rendered.contains("name = \"mode\""));
+	assert!(rendered.contains("type = \"choice\""));
+	assert!(rendered.contains("help_text = \"Select the command mode\""));
+	assert!(rendered.contains("required = true"));
+	assert!(rendered.contains("default = \"safe\""));
+	assert!(rendered.contains("choices = [\"safe\", \"fast\"]"));
+	assert!(rendered.contains("short = \"m\""));
 	assert!(rendered.contains("[[cli.custom.steps]]"));
 	assert!(rendered.contains("type = \"RenderReleaseManifest\""));
 	assert!(rendered.contains("when = \"{{ inputs.enabled }}\""));
@@ -482,9 +544,17 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 	assert!(rendered.contains("dry_run_command = \"echo dry-run\""));
 	assert!(rendered.contains("inputs = { enabled = true }"));
 	assert!(rendered.contains("shell = true"));
-	assert!(rendered.contains("variables = { version_value = \"version\" }"));
+	assert!(rendered.contains("group_version_value = \"group_version\""));
+	assert!(rendered.contains("released_packages_value = \"released_packages\""));
+	assert!(rendered.contains("changed_files_value = \"changed_files\""));
+	assert!(rendered.contains("changesets_value = \"changesets\""));
+	assert!(rendered.contains("version_value = \"version\""));
 	assert!(rendered.contains("inputs = { changed_paths = [\"src/lib.rs\"] }"));
 	assert!(rendered.contains("shell = \"bash\""));
+	assert!(rendered.contains("type = \"CommitRelease\""));
+	assert!(rendered.contains("type = \"PublishRelease\""));
+	assert!(rendered.contains("type = \"OpenReleaseRequest\""));
+	assert!(rendered.contains("type = \"CommentReleasedIssues\""));
 	assert!(!rendered.contains("name = \"custom\""));
 }
 

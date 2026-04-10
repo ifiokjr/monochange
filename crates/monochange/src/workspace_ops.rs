@@ -135,8 +135,7 @@ fn render_cli_command_toml(rendered: &mut String, command: &CliCommandDefinition
 	writeln!(rendered, "[cli.{}]", command.name)
 		.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 	if let Some(help_text) = &command.help_text {
-		writeln!(rendered, "help_text = {}", render_toml_string(help_text))
-			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+		write_toml_key_value(rendered, "help_text", render_toml_string(help_text));
 	}
 	for input in &command.inputs {
 		rendered.push('\n');
@@ -152,44 +151,38 @@ fn render_cli_command_toml(rendered: &mut String, command: &CliCommandDefinition
 	}
 }
 
-fn render_cli_input_toml(rendered: &mut String, input: &monochange_core::CliInputDefinition) {
-	writeln!(rendered, "name = {}", render_toml_string(&input.name))
+fn write_toml_key_value(rendered: &mut String, key: &str, value: String) {
+	writeln!(rendered, "{key} = {value}")
 		.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
-	writeln!(
+}
+
+fn render_cli_input_toml(rendered: &mut String, input: &monochange_core::CliInputDefinition) {
+	write_toml_key_value(rendered, "name", render_toml_string(&input.name));
+	write_toml_key_value(
 		rendered,
-		"type = {}",
+		"type",
 		render_toml_string(match input.kind {
 			monochange_core::CliInputKind::String => "string",
 			monochange_core::CliInputKind::StringList => "string_list",
 			monochange_core::CliInputKind::Path => "path",
 			monochange_core::CliInputKind::Choice => "choice",
 			monochange_core::CliInputKind::Boolean => "boolean",
-		})
-	)
-	.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
-	if let Some(help_text) = &input.help_text {
-		writeln!(rendered, "help_text = {}", render_toml_string(help_text))
-			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
-	}
+		}),
+	);
+	input.help_text.iter().for_each(|help_text| {
+		write_toml_key_value(rendered, "help_text", render_toml_string(help_text))
+	});
 	if input.required {
-		writeln!(rendered, "required = true")
-			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+		write_toml_key_value(rendered, "required", "true".to_string());
 	}
 	if let Some(default) = &input.default {
-		writeln!(rendered, "default = {}", render_toml_string(default))
-			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+		write_toml_key_value(rendered, "default", render_toml_string(default));
 	}
 	if !input.choices.is_empty() {
-		writeln!(rendered, "choices = {}", render_toml_array(&input.choices))
-			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+		write_toml_key_value(rendered, "choices", render_toml_array(&input.choices));
 	}
 	if let Some(short) = input.short {
-		writeln!(
-			rendered,
-			"short = {}",
-			render_toml_string(&short.to_string())
-		)
-		.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+		write_toml_key_value(rendered, "short", render_toml_string(&short.to_string()));
 	}
 }
 
@@ -203,14 +196,13 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 	}
 	match step {
 		monochange_core::CliStepDefinition::RenderReleaseManifest { path, inputs, .. } => {
-			if let Some(path) = path {
-				writeln!(
+			path.iter().for_each(|path| {
+				write_toml_key_value(
 					rendered,
-					"path = {}",
-					render_toml_string(&path.display().to_string())
-				)
-				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
-			}
+					"path",
+					render_toml_string(&path.display().to_string()),
+				);
+			});
 			render_step_inputs_toml(rendered, inputs);
 		}
 		monochange_core::CliStepDefinition::Command {
@@ -243,10 +235,8 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 						.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 				}
 			}
-			if let Some(id) = id {
-				writeln!(rendered, "id = {}", render_toml_string(id))
-					.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
-			}
+			id.iter()
+				.for_each(|id| write_toml_key_value(rendered, "id", render_toml_string(id)));
 			if let Some(variables) = variables {
 				writeln!(
 					rendered,
