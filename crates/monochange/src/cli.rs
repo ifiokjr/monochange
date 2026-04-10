@@ -65,7 +65,10 @@ pub(crate) fn cli_commands_for_root(root: &Path) -> Vec<CliCommandDefinition> {
 /// Extract CLI commands from an already-loaded configuration result, avoiding
 /// a redundant config load when the caller has already parsed the config.
 pub(crate) fn cli_commands_from_config(
-	configuration: &Result<monochange_core::WorkspaceConfiguration, monochange_core::MonochangeError>,
+	configuration: &Result<
+		monochange_core::WorkspaceConfiguration,
+		monochange_core::MonochangeError,
+	>,
 ) -> Vec<CliCommandDefinition> {
 	match configuration {
 		Ok(configuration) => {

@@ -140,9 +140,9 @@ use serde_json::json;
 
 use assist::run_assist;
 use cli::build_command_with_cli;
-use cli::cli_commands_from_config;
 #[cfg(test)]
 use cli::cli_commands_for_root;
+use cli::cli_commands_from_config;
 use cli::current_dir_or_dot;
 use cli_runtime::execute_matches;
 use git_support::git_commit_paths;
