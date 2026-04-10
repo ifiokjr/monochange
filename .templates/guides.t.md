@@ -13,7 +13,8 @@
 - dependency names are normalized into one graph
 - package ids and manifest paths in CLI output are rendered relative to the repository root for deterministic automation
 - version-group assignments are attached after discovery
-- unmatched group members and version mismatches produce warnings
+- unmatched group members (declared in config but not found during discovery) produce warnings
+- unresolvable group members (invalid package IDs in `group.packages`) produce errors during configuration loading
 - discovery currently scans all supported ecosystems regardless of `[ecosystems.*]` toggles in `monochange.toml`
 
 <!-- {/discoveryKeyBehaviors} -->
@@ -283,11 +284,16 @@ type = "AffectedPackages"
 
 <!-- {@configurationGitHubSnippet} -->
 
+The `[source]` section configures provider integration for releases, pull requests, and changeset enforcement.
+
+For self-hosted instances, set `api_url` or `host` to your server's URL. These fields **must** use `https://`; insecure `http://` schemes are rejected because API tokens would be transmitted in cleartext.
+
 ```toml
 [source]
 provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
+# api_url = "https://github.company.com/api/v3"  # optional: for GitHub Enterprise
 
 [source.releases]
 enabled = true
@@ -414,7 +420,7 @@ version_format = "primary"
 - group changelog and group `versioned_files` can also be updated
 - grouped packages can use `empty_update_message` when their own changelog needs a version-only update with no direct notes
 - dependents of newly synced members still receive propagated parent bumps
-- unmatched members produce warnings during discovery
+- unmatched members (not found during discovery) produce warnings; unresolvable members (invalid IDs) produce errors
 - mismatched current versions produce warnings when `warn_on_group_mismatch = true`
 
 <!-- {/versionGroupsBehavior} -->
