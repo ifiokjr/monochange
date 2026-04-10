@@ -272,7 +272,7 @@ versioned_files = [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.p
 # Use "group-only" to show only direct group-targeted changesets.
 # Use an array to allow only specific group members to contribute notes.
 # include = ["monochange"]
-changelog = { path = "changelog.md", format = "monochange" }
+changelog = { path = "changelog.md", format = "monochange", include = ["monochange"] }
 
 # =============================================================================
 # [changesets.verify] — changeset verification settings
@@ -497,215 +497,26 @@ ignored_paths = [
 # Legacy $-prefixed interpolation: {{ version }}, $group_version, $released_packages,
 #   $changed_files, $changesets
 
-[cli.validate]
-help_text = "Validate monochange configuration and changesets"
-
-[[cli.validate.steps]]
-type = "Validate"
-
-[cli.discover]
-help_text = "Discover packages across supported ecosystems"
-
-[[cli.discover.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.discover.steps]]
-type = "Discover"
-
-[cli.change]
-help_text = "Create a change file for one or more packages"
-
-[[cli.change.inputs]]
-name = "interactive"
-type = "boolean"
-short = "i"
-
-[[cli.change.inputs]]
-name = "package"
-type = "string_list"
-
-[[cli.change.inputs]]
-name = "bump"
-type = "choice"
-choices = ["none", "patch", "minor", "major"]
-default = "patch"
-
-[[cli.change.inputs]]
-name = "version"
-type = "string"
-
-[[cli.change.inputs]]
-name = "reason"
-type = "string"
-
-[[cli.change.inputs]]
-name = "type"
-type = "string"
-
-[[cli.change.inputs]]
-name = "details"
-type = "string"
-
-[[cli.change.inputs]]
-name = "output"
-type = "path"
-
-[[cli.change.steps]]
-type = "CreateChangeFile"
-
 [cli.release]
 help_text = "Prepare a release from discovered change files"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+	{ name = "commit", type = "boolean", default = false },
+]
+steps = [
+	{ type = "PrepareRelease" },
+	{ type = "RenderReleaseManifest", path = ".monochange/release-manifest.json" },
+	{ type = "Command", command = "fix:all" },
+	{ type = "Command", command = "git add --all", when = "{{ inputs.commit }}" },
+	{ type = "CommitRelease", when = "{{ inputs.commit }}" },
+	{ type = "Command", command = "git push", when = "{{ inputs.commit }}" },
+	{ type = "PublishRelease", when = "{{ inputs.commit }}" },
+	{ type = "CommentReleasedIssues", when = "{{ inputs.commit }}" },
+]
 
-[[cli.release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release.steps]]
-type = "PrepareRelease"
-
-[cli.commit-release]
-help_text = "Prepare a release and create a local release commit"
-
-[[cli.commit-release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.commit-release.steps]]
-type = "PrepareRelease"
-
-[[cli.commit-release.steps]]
-type = "CommitRelease"
-
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
-
-[[cli.release-manifest.steps]]
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-
-[cli.publish-release]
-help_text = "Prepare a release and publish provider releases"
-
-[[cli.publish-release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.publish-release.steps]]
-type = "PrepareRelease"
-
-[[cli.publish-release.steps]]
-type = "PublishRelease"
-
-[[cli.publish-release.steps]]
-type = "CommentReleasedIssues"
-
-[cli.release-pr]
-help_text = "Prepare a release and open or update a provider release request"
-
-[[cli.release-pr.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release-pr.steps]]
-type = "PrepareRelease"
-
-[[cli.release-pr.steps]]
-type = "CommitRelease"
-
-[[cli.release-pr.steps]]
-type = "OpenReleaseRequest"
-
-[cli.affected]
-help_text = "Show packages affected by file changes and their changeset coverage"
-
-[[cli.affected.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.affected.inputs]]
-name = "changed_paths"
-type = "string_list"
-
-[[cli.affected.inputs]]
-name = "since"
-type = "string"
-
-[[cli.affected.inputs]]
-name = "verify"
-type = "boolean"
-
-[[cli.affected.inputs]]
-name = "label"
-type = "string_list"
-
-[[cli.affected.steps]]
-type = "AffectedPackages"
-# inputs = { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
-
-[cli.diagnostics]
-help_text = "Show changeset diagnostics and context"
-
-[[cli.diagnostics.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.diagnostics.inputs]]
-name = "changeset"
-type = "string_list"
-
-[[cli.diagnostics.steps]]
-type = "DiagnoseChangesets"
-
-[cli.repair-release]
-help_text = "Repair a recent release by moving its release tags to a later commit"
-
-[[cli.repair-release.inputs]]
-name = "from"
-type = "string"
-help_text = "tag or commit-ish used to locate the release record"
-required = true
-
-[[cli.repair-release.inputs]]
-name = "target"
-type = "string"
-help_text = "commit-ish the release set should move to"
-default = "HEAD"
-
-[[cli.repair-release.inputs]]
-name = "force"
-type = "boolean"
-help_text = "allow non-descendant retargets"
-default = "false"
-
-[[cli.repair-release.inputs]]
-name = "sync_provider"
-type = "boolean"
-help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)"
-default = "true"
-
-[[cli.repair-release.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.repair-release.steps]]
-type = "RetargetRelease"
+[cli.publish]
+help_text = "Publish all packages after a release"
+steps = [
+	{ type = "Command", command = "pnpm -r publish --access public --no-git-checks" },
+	{ type = "Command", command = "cargo workspaces publish --from-git --allow-dirty --yes" },
+]
