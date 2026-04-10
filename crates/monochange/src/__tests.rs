@@ -7519,3 +7519,21 @@ fn apply_versioned_file_definition_reports_missing_ecosystem_type() {
 	.unwrap_or_else(|| panic!("expected missing ecosystem type error"));
 	insta::assert_snapshot!(error.to_string());
 }
+
+#[test]
+fn template_rendering_does_not_interpret_variable_content_as_template_syntax() {
+	let mut metadata = BTreeMap::new();
+	metadata.insert("summary", "fix: handle {{ curly_braces }} in output".to_string());
+	metadata.insert("version", "1.0.0".to_string());
+	metadata.insert("package", "core".to_string());
+
+	let result = crate::changelog::render_message_template(
+		"- {{ summary }} ({{ package }}@{{ version }})",
+		&metadata,
+	);
+
+	assert_eq!(
+		result,
+		"- fix: handle {{ curly_braces }} in output (core@1.0.0)"
+	);
+}
