@@ -2792,3 +2792,53 @@ fn changeset_files_with_crlf_line_endings_parse_correctly() {
 		.unwrap_or_else(|| panic!("expected summary"));
 	assert!(summary.contains("CRLF endings"));
 }
+
+#[test]
+fn changeset_files_with_bare_cr_line_endings_parse_correctly() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	std::fs::write(
+		root.join("monochange.toml"),
+		"[defaults]\npackage_type = \"cargo\"\n\n[package.core]\npath = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write toml: {error}"));
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir: {error}"));
+	std::fs::write(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo: {error}"));
+
+	// Bare carriage return (old Mac style) line endings.
+	let bare_cr = "---\rcore: patch\r---\r\rFix with bare CR.\r";
+	std::fs::create_dir_all(root.join(".changeset"))
+		.unwrap_or_else(|error| panic!("mkdir: {error}"));
+	std::fs::write(root.join(".changeset/bare-cr.md"), bare_cr)
+		.unwrap_or_else(|error| panic!("write: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("config: {error}"));
+	let packages = vec![monochange_core::PackageRecord::new(
+		monochange_core::Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		monochange_core::PublishState::Public,
+	)];
+
+	let changeset = crate::load_changeset_file(
+		&root.join(".changeset/bare-cr.md"),
+		&configuration,
+		&packages,
+	)
+	.unwrap_or_else(|error| panic!("expected bare CR changeset to parse, got: {error}"));
+
+	assert!(!changeset.targets.is_empty());
+	let summary = changeset
+		.summary
+		.unwrap_or_else(|| panic!("expected summary"));
+	assert!(summary.contains("bare CR"));
+}
