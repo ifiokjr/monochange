@@ -277,8 +277,14 @@ fn batch_load_changeset_contexts(
 		.collect()
 }
 
-/// Run a single `git log` command that covers all paths and returns a map
-/// from relative path to parsed revision data.
+/// Run a single `git log` command covering the entire `.changeset/` directory
+/// and return a map from relative path to the relevant revision.
+///
+/// For `introduced=true`: finds the commit that first added each file.
+/// For `introduced=false`: finds the most recent commit that touched each file.
+///
+/// This replaces N individual `git log` subprocess calls with a single call
+/// that walks the history once.
 fn batch_git_log(
 	root: &Path,
 	paths: &[PathBuf],
@@ -286,21 +292,110 @@ fn batch_git_log(
 ) -> std::collections::HashMap<String, ChangesetRevision> {
 	use std::collections::HashMap;
 
-	let mut result = HashMap::new();
-	// For each path, we still need individual git log calls because
-	// --diff-filter=A with multiple paths returns the first match across
-	// all paths, not per-path results. But we can parallelize them.
-	use rayon::prelude::*;
-	let entries: Vec<_> = paths
-		.par_iter()
-		.filter_map(|path| {
-			let revision = load_git_changeset_revision(root, &root.join(path), introduced)?;
-			Some((path.to_string_lossy().into_owned(), revision))
-		})
-		.collect();
-	for (path, revision) in entries {
-		result.insert(path, revision);
+	if paths.is_empty() {
+		return HashMap::new();
 	}
+
+	// Use NUL-delimited output to safely handle any filenames.
+	// Format: <commit-fields>\x1f\n<filename>\n\x00 per entry.
+	let mut command = ProcessCommand::new("git");
+	command
+		.current_dir(root)
+		.arg("log")
+		.arg("--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%cI")
+		.arg("--name-only");
+	if introduced {
+		command.arg("--diff-filter=A");
+	}
+	command.arg("--").arg(".changeset/");
+
+	let output = match command.output() {
+		Ok(output) if output.status.success() => output,
+		_ => return HashMap::new(),
+	};
+	let stdout = match String::from_utf8(output.stdout) {
+		Ok(s) => s,
+		Err(_) => return HashMap::new(),
+	};
+
+	let wanted_paths: std::collections::HashSet<String> = paths
+		.iter()
+		.map(|p| p.to_string_lossy().into_owned())
+		.collect();
+
+	// Parse the git log output. Format is blocks separated by blank lines:
+	// <sha>\x1f<name>\x1f<email>\x1f<author_date>\x1f<commit_date>
+	// <filename1>
+	// <filename2>
+	//
+	// (blank line between commits)
+	let mut result: HashMap<String, ChangesetRevision> = HashMap::new();
+
+	let mut current_fields: Option<Vec<&str>> = None;
+	for line in stdout.lines() {
+		let trimmed = line.trim();
+		if trimmed.is_empty() {
+			current_fields = None;
+			continue;
+		}
+		if trimmed.contains('\u{1f}') {
+			// This is a commit header line.
+			current_fields = Some(trimmed.split('\u{1f}').collect());
+			continue;
+		}
+		// This is a filename line.
+		let Some(ref fields) = current_fields else {
+			continue;
+		};
+		if fields.len() != 5 {
+			continue;
+		}
+		let file_path = trimmed;
+		if !wanted_paths.contains(file_path) {
+			continue;
+		}
+		// For "introduced": we want the LAST (oldest) match per file since
+		// git log outputs newest first. For "last_updated": we want the
+		// FIRST (newest) match.
+		let dominated = if introduced {
+			// Keep overwriting — last write wins = oldest commit.
+			false
+		} else {
+			// Only take the first match = newest commit.
+			result.contains_key(file_path)
+		};
+		if dominated {
+			continue;
+		}
+		let [sha, author_name, author_email, authored_at, committed_at] = fields.as_slice() else {
+			continue;
+		};
+		let revision = ChangesetRevision {
+			actor: Some(HostedActorRef {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				id: None,
+				login: None,
+				display_name: Some((*author_name).to_string()),
+				url: None,
+				source: HostedActorSourceKind::CommitAuthor,
+			}),
+			commit: Some(HostedCommitRef {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				sha: (*sha).to_string(),
+				short_sha: short_commit_sha(sha),
+				url: None,
+				author_name: Some((*author_name).to_string()),
+				author_email: Some((*author_email).to_string()),
+				authored_at: Some((*authored_at).to_string()),
+				committed_at: Some((*committed_at).to_string()),
+			}),
+			review_request: None,
+		};
+		result.insert(file_path.to_string(), revision);
+	}
+
 	result
 }
 
