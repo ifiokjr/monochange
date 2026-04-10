@@ -7523,7 +7523,10 @@ fn apply_versioned_file_definition_reports_missing_ecosystem_type() {
 #[test]
 fn template_rendering_does_not_interpret_variable_content_as_template_syntax() {
 	let mut metadata = BTreeMap::new();
-	metadata.insert("summary", "fix: handle {{ curly_braces }} in output".to_string());
+	metadata.insert(
+		"summary",
+		"fix: handle {{ curly_braces }} in output".to_string(),
+	);
 	metadata.insert("version", "1.0.0".to_string());
 	metadata.insert("package", "core".to_string());
 
