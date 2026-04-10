@@ -115,6 +115,9 @@ jobs:
   benchmark:
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -128,10 +131,15 @@ jobs:
         run: cargo bench -p monochange --bench cli_commands -- --output-format bencher | tee target/benchmark-results.txt
         shell: devenv shell -- bash -e {0}
 
-      - name: upload benchmark results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: compare benchmarks and comment on PR
+        uses: benchmark-action/github-action-benchmark@v1
         with:
-          name: benchmark-results
-          path: target/benchmark-results.txt
-          retention-days: 30
+          tool: cargo
+          output-file-path: target/benchmark-results.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          alert-threshold: "150%"
+          fail-on-alert: false
+          comment-always: ${{ github.event_name == 'pull_request' }}
+          save-data-file: ${{ github.ref == 'refs/heads/main' }}
+          auto-push: ${{ github.ref == 'refs/heads/main' }}

@@ -50,6 +50,7 @@ typed-builder = { workspace = true, default-features = true }
 [dev-dependencies]
 criterion = { workspace = true, default-features = true }
 etest = { workspace = true, default-features = true }
+monochange_config = { workspace = true }
 httpmock = { workspace = true, default-features = true }
 insta = { workspace = true, default-features = true }
 insta-cmd = { workspace = true, default-features = true }
