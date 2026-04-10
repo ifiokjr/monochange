@@ -29,6 +29,16 @@ It is the best fit for:
 - `verify` — whether to enforce non-zero failure on uncovered packages
 - `label` — skip labels supplied from CI
 
+## Step-level `when` condition
+
+All CLI steps support an optional `when = "..."` condition.
+
+If the expression resolves to false at runtime, monochange skips the step and continues with the next step.
+
+```toml
+when = "{{ inputs.enabled }}"
+```
+
 ## Prerequisites
 
 None. `AffectedPackages` is standalone.

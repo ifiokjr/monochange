@@ -231,6 +231,17 @@ pub(crate) fn execute_cli_command_with_options(
 	for step in &cli_command.steps {
 		let step_inputs = resolve_step_inputs(&context, step)?;
 		context.last_step_inputs = step_inputs.clone();
+
+		if !should_execute_cli_step(step, &context, &step_inputs)? {
+			if let Some(condition) = step.when() {
+				context.command_logs.push(format!(
+					"skipped step `{}` because when condition `{condition}` is false",
+					step.kind_name()
+				));
+			}
+			continue;
+		}
+
 		match step {
 			CliStepDefinition::Validate { .. } => {
 				validate_workspace(root)?;
@@ -678,6 +689,103 @@ pub(crate) fn execute_cli_command_with_options(
 			if dry_run { " (dry-run)" } else { "" }
 		)
 	}))
+}
+
+pub(crate) fn should_execute_cli_step(
+	step: &CliStepDefinition,
+	context: &CliContext,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<bool> {
+	let Some(condition) = step.when() else {
+		return Ok(true);
+	};
+	evaluate_cli_step_condition(condition, context, step_inputs)
+}
+
+fn evaluate_cli_step_condition(
+	condition: &str,
+	context: &CliContext,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<bool> {
+	let trimmed = condition.trim();
+	if trimmed.is_empty() {
+		return Ok(false);
+	}
+	let template_context = build_cli_template_context(context, step_inputs, None);
+	let template_context_json = serde_json::Value::Object(template_context.clone());
+	if let Some(path) = parse_direct_template_reference(trimmed) {
+		let Some(value) = lookup_template_value(&template_context_json, path) else {
+			return Err(MonochangeError::Config(format!(
+				"failed to evaluate `when` condition `{condition}`: unknown template path `{path}`"
+			)));
+		};
+		return parse_template_as_boolean(value, condition);
+	}
+	let normalized = normalize_when_expression(trimmed);
+	let jinja_context =
+		minijinja::Value::from_serialize(serde_json::Value::Object(template_context));
+	let rendered = render_jinja_template(&normalized, &jinja_context)?;
+	parse_string_as_boolean(&rendered, condition)
+}
+
+fn parse_template_as_boolean(value: &serde_json::Value, condition: &str) -> MonochangeResult<bool> {
+	match value {
+		serde_json::Value::Bool(value) => Ok(*value),
+		serde_json::Value::Number(value) => parse_string_as_boolean(&value.to_string(), condition),
+		serde_json::Value::String(value) => parse_string_as_boolean(value, condition),
+		serde_json::Value::Null => Ok(false),
+		serde_json::Value::Array(values) => {
+			if values.len() == 1 {
+				parse_template_as_boolean(&values[0], condition)
+			} else {
+				Err(MonochangeError::Config(format!(
+					"`when` condition `{condition}` is not a scalar boolean value"
+				)))
+			}
+		}
+		serde_json::Value::Object(_) => Err(MonochangeError::Config(format!(
+			"`when` condition `{condition}` is not a scalar boolean value"
+		))),
+	}
+}
+
+pub(crate) fn normalize_when_expression(condition: &str) -> String {
+	let expression = condition.replace("&&", " and ").replace("||", " or ");
+	let mut normalized = String::with_capacity(expression.len());
+	let mut chars = expression.chars().peekable();
+	while let Some(ch) = chars.next() {
+		if ch == '!' {
+			if let Some('=') = chars.peek() {
+				normalized.push('!');
+				continue;
+			}
+			let previous_was_expression_boundary = normalized.chars().last().is_none_or(|prev| {
+				prev.is_whitespace() || prev == '(' || prev == ',' || prev == '>' || prev == '<'
+			});
+			if previous_was_expression_boundary {
+				normalized.push_str("not ");
+			} else {
+				normalized.push('!');
+			}
+			continue;
+		}
+		normalized.push(ch);
+	}
+	normalized
+}
+
+fn parse_string_as_boolean(value: &str, condition: &str) -> MonochangeResult<bool> {
+	let value = value.trim().to_ascii_lowercase();
+	if let Ok(number) = value.parse::<i64>() {
+		return Ok(number != 0);
+	}
+	match value.as_str() {
+		"true" => Ok(true),
+		"false" | "0" | "" => Ok(false),
+		other => Err(MonochangeError::Config(format!(
+			"`when` condition `{condition}` must be a boolean, got `{other}`"
+		))),
+	}
 }
 
 fn run_cli_command_command(
@@ -1413,5 +1521,88 @@ pub(crate) fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 		other => Err(MonochangeError::Config(format!(
 			"unsupported bump `{other}`"
 		))),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::{collections::BTreeMap, path::PathBuf};
+
+	fn cli_context() -> CliContext {
+		CliContext {
+			root: PathBuf::from("."),
+			dry_run: false,
+			show_diff: false,
+			inputs: BTreeMap::new(),
+			last_step_inputs: BTreeMap::new(),
+			prepared_release: None,
+			prepared_file_diffs: Vec::new(),
+			release_manifest_path: None,
+			release_requests: Vec::new(),
+			release_results: Vec::new(),
+			release_request: None,
+			release_request_result: None,
+			release_commit_report: None,
+			issue_comment_plans: Vec::new(),
+			issue_comment_results: Vec::new(),
+			changeset_policy_evaluation: None,
+			changeset_diagnostics: None,
+			retarget_report: None,
+			step_outputs: BTreeMap::new(),
+			command_logs: Vec::new(),
+		}
+	}
+
+	#[test]
+	fn evaluate_cli_step_condition_returns_false_for_blank_conditions() {
+		assert!(
+			!evaluate_cli_step_condition("   ", &cli_context(), &BTreeMap::new()).unwrap_or_else(
+				|error| panic!("blank conditions should be treated as false: {error}")
+			)
+		);
+	}
+
+	#[test]
+	fn parse_template_as_boolean_supports_number_null_and_single_item_arrays() {
+		assert!(
+			parse_template_as_boolean(&serde_json::json!(2), "{{ count }}")
+				.unwrap_or_else(|error| panic!("non-zero numbers should be truthy: {error}"))
+		);
+		assert!(
+			!parse_template_as_boolean(&serde_json::Value::Null, "{{ release }}")
+				.unwrap_or_else(|error| panic!("null values should be falsey: {error}"))
+		);
+		assert!(
+			!parse_template_as_boolean(&serde_json::json!([""]), "{{ items }}").unwrap_or_else(
+				|error| panic!("single-item arrays should recurse into the item value: {error}")
+			)
+		);
+	}
+
+	#[test]
+	fn parse_template_as_boolean_rejects_objects() {
+		let error =
+			parse_template_as_boolean(&serde_json::json!({ "nested": true }), "{{ inputs }}")
+				.unwrap_err();
+		assert!(error.to_string().contains("is not a scalar boolean value"));
+	}
+
+	#[test]
+	fn normalize_when_expression_preserves_inequality_and_mid_token_bangs() {
+		assert_eq!(
+			normalize_when_expression("{{ flag != other }}"),
+			"{{ flag != other }}"
+		);
+		assert_eq!(normalize_when_expression("{{ foo!bar }}"), "{{ foo!bar }}");
+	}
+
+	#[test]
+	fn parse_string_as_boolean_rejects_invalid_values() {
+		let error = parse_string_as_boolean("maybe", "{{ inputs.run }}").unwrap_err();
+		assert_eq!(
+			error.to_string(),
+			"config error: `when` condition `{{ inputs.run }}` must be a boolean, got `maybe`"
+		);
 	}
 }

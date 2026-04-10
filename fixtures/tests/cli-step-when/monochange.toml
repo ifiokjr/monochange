@@ -1,0 +1,44 @@
+[cli.when-command]
+help_text = "Conditionally run a command"
+
+[[cli.when-command.inputs]]
+name = "run"
+type = "boolean"
+default = "false"
+
+[[cli.when-command.inputs]]
+name = "extra"
+type = "boolean"
+default = "false"
+
+[[cli.when-command.steps]]
+type = "Command"
+when = "{{ inputs.run && inputs.extra }}"
+command = "printf '%s' hello > when-command-output.txt"
+shell = true
+
+[cli.not-condition]
+help_text = "Negation condition on command"
+
+[[cli.not-condition.inputs]]
+name = "skip"
+type = "boolean"
+default = "true"
+
+[[cli.not-condition.steps]]
+type = "Command"
+when = "{{ ! inputs.skip }}"
+command = "printf '%s' okay > not-output.txt"
+shell = true
+
+[cli.when-validate]
+help_text = "Conditionally run Validate"
+
+[[cli.when-validate.inputs]]
+name = "skip"
+type = "boolean"
+default = "true"
+
+[[cli.when-validate.steps]]
+type = "Validate"
+when = "{{ ! inputs.skip }}"

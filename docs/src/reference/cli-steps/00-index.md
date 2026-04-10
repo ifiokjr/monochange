@@ -75,6 +75,14 @@ In practice, most workflows fit one of four patterns:
 
 ## Shared concepts
 
+### Step-local `when`
+
+Every step can declare a `when = "..."` expression.
+
+It uses minijinja-style expression evaluation with template context and supports logical combinations like `and`, `or`, and `not` (for example: `"{{ inputs.publish && !inputs.dry_run }}"`).
+
+If the expression resolves to false, monochange skips that step and continues with the next step. Falsy values include `false`, `0`, and the empty string.
+
 ### Step-local `inputs`
 
 Every step can define an `inputs = { ... }` override inside the step table.

@@ -22,6 +22,16 @@ Compared with a shell-only `Command` step that runs `mc validate`, the built-in 
 
 `Validate` does not accept any built-in step inputs.
 
+## Step-level `when` condition
+
+All CLI steps support an optional `when = "..."` condition.
+
+If the expression resolves to false at runtime, monochange skips the step and continues with the next step.
+
+```toml
+when = "{{ inputs.enabled }}"
+```
+
 ## Prerequisites
 
 None. `Validate` is standalone.

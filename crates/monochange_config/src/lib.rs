@@ -2693,6 +2693,15 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 
 		let mut seen_step_ids: BTreeSet<String> = BTreeSet::new();
 		for step in &cli_command.steps {
+			if let Some(condition) = step.when() {
+				if condition.trim().is_empty() {
+					return Err(MonochangeError::Config(format!(
+						"CLI command `{}` step `{}` has an empty `when` condition",
+						cli_command.name,
+						step.kind_name()
+					)));
+				}
+			}
 			for input_name in step.inputs().keys() {
 				if input_name.trim().is_empty() {
 					return Err(MonochangeError::Config(format!(
@@ -2825,7 +2834,7 @@ fn validate_cli_runtime_requirements(
 		}
 		for step in &cli_command.steps {
 			validate_step_input_overrides(cli_command, step)?;
-			if let CliStepDefinition::AffectedPackages { inputs } = step {
+			if let CliStepDefinition::AffectedPackages { inputs, .. } = step {
 				if !changesets.verify.enabled {
 					return Err(MonochangeError::Config(format!(
 						"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",

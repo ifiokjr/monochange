@@ -25,6 +25,7 @@ Use `Command` for what is truly custom.
 ## Core fields
 
 - `command` — the command to run in normal mode
+- `when` — optional boolean condition controlling whether the step runs
 - `dry_run_command` — optional replacement command used only when the command runs with `--dry-run`
 - `shell` — whether to run through a shell (`true`, `false`, or a custom shell binary name)
 - `id` — optional identifier that exposes `steps.<id>.stdout` and `steps.<id>.stderr` to later steps

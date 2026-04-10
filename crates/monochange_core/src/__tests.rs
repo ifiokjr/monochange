@@ -325,6 +325,7 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 	assert_eq!(
 		validate_cli_command.steps,
 		vec![CliStepDefinition::Validate {
+			when: None,
 			inputs: BTreeMap::new(),
 		}]
 	);
@@ -336,36 +337,42 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 	let cases: Vec<(CliStepDefinition, &str)> = vec![
 		(
 			CliStepDefinition::Validate {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"Validate",
 		),
 		(
 			CliStepDefinition::Discover {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"Discover",
 		),
 		(
 			CliStepDefinition::CreateChangeFile {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"CreateChangeFile",
 		),
 		(
 			CliStepDefinition::PrepareRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"PrepareRelease",
 		),
 		(
 			CliStepDefinition::CommitRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"CommitRelease",
 		),
 		(
 			CliStepDefinition::RenderReleaseManifest {
+				when: None,
 				path: None,
 				inputs: BTreeMap::new(),
 			},
@@ -373,42 +380,49 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::PublishRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"PublishRelease",
 		),
 		(
 			CliStepDefinition::OpenReleaseRequest {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"OpenReleaseRequest",
 		),
 		(
 			CliStepDefinition::CommentReleasedIssues {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"CommentReleasedIssues",
 		),
 		(
 			CliStepDefinition::AffectedPackages {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"AffectedPackages",
 		),
 		(
 			CliStepDefinition::DiagnoseChangesets {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"DiagnoseChangesets",
 		),
 		(
 			CliStepDefinition::RetargetRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"RetargetRelease",
 		),
 		(
 			CliStepDefinition::Command {
+				when: None,
 				command: "echo".into(),
 				dry_run_command: None,
 				shell: ShellConfig::None,
@@ -427,6 +441,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 #[test]
 fn valid_input_names_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
+		when: None,
 		command: "echo hi".into(),
 		dry_run_command: None,
 		shell: ShellConfig::None,
@@ -440,6 +455,7 @@ fn valid_input_names_returns_none_for_command_steps() {
 #[test]
 fn valid_input_names_returns_empty_for_validate() {
 	let step = CliStepDefinition::Validate {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.valid_input_names(), Some([].as_slice()));
@@ -448,6 +464,7 @@ fn valid_input_names_returns_empty_for_validate() {
 #[test]
 fn valid_input_names_returns_empty_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.valid_input_names(), Some([].as_slice()));
@@ -456,6 +473,7 @@ fn valid_input_names_returns_empty_for_commit_release() {
 #[test]
 fn valid_input_names_returns_expected_names_for_affected_packages() {
 	let step = CliStepDefinition::AffectedPackages {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	let names = step.valid_input_names().unwrap();
@@ -469,6 +487,7 @@ fn valid_input_names_returns_expected_names_for_affected_packages() {
 #[test]
 fn valid_input_names_returns_expected_names_for_retarget_release() {
 	let step = CliStepDefinition::RetargetRelease {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	let names = step.valid_input_names().unwrap();
@@ -480,6 +499,7 @@ fn valid_input_names_returns_expected_names_for_retarget_release() {
 #[test]
 fn valid_input_names_returns_expected_names_for_create_change_file() {
 	let step = CliStepDefinition::CreateChangeFile {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	let names = step.valid_input_names().unwrap();
@@ -524,6 +544,7 @@ fn default_change_command_supports_none_bump_and_omits_legacy_evidence_input() {
 fn expected_input_kind_returns_correct_types_for_affected_packages() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::AffectedPackages {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -552,6 +573,7 @@ fn expected_input_kind_returns_correct_types_for_affected_packages() {
 #[test]
 fn expected_input_kind_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
+		when: None,
 		command: "echo".into(),
 		dry_run_command: None,
 		shell: ShellConfig::None,
@@ -565,6 +587,7 @@ fn expected_input_kind_returns_none_for_command_steps() {
 #[test]
 fn expected_input_kind_returns_none_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.expected_input_kind("format"), None);
@@ -574,6 +597,7 @@ fn expected_input_kind_returns_none_for_commit_release() {
 fn expected_input_kind_returns_correct_types_for_create_change_file() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::CreateChangeFile {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -596,6 +620,7 @@ fn expected_input_kind_returns_correct_types_for_create_change_file() {
 fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::DiagnoseChangesets {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -613,6 +638,7 @@ fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
 fn expected_input_kind_returns_correct_types_for_retarget_release() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::RetargetRelease {
+		when: None,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.expected_input_kind("from"), Some(CliInputKind::String));
@@ -687,12 +713,14 @@ fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
 	assert_eq!(
 		publish_release,
 		CliStepDefinition::PublishRelease {
+			when: None,
 			inputs: BTreeMap::new(),
 		}
 	);
 	assert_eq!(
 		open_release_request,
 		CliStepDefinition::OpenReleaseRequest {
+			when: None,
 			inputs: BTreeMap::new(),
 		}
 	);

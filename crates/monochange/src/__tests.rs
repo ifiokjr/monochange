@@ -30,6 +30,7 @@ use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
 use crate::build_lockfile_command_executions;
+use crate::cli_runtime::{normalize_when_expression, should_execute_cli_step};
 use crate::discover_workspace;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
@@ -1487,6 +1488,7 @@ fn command_step_without_dry_run_override_reports_skipped_command() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			when: None,
 			command: "echo hello".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -1517,6 +1519,7 @@ fn command_step_rejects_unparseable_commands() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			when: None,
 			command: "\"unterminated".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -1550,6 +1553,7 @@ fn command_step_rejects_empty_commands() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			when: None,
 			command: String::new(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -1581,6 +1585,7 @@ fn command_step_reports_process_spawn_failures() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			when: None,
 			command: "definitely-not-a-real-command-12345".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -1614,6 +1619,7 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			when: None,
 			command: "sh -c 'exit 7'".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -1648,6 +1654,7 @@ fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			when: None,
 			command: "sh -c 'echo boom 1>&2; exit 1'".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -2370,6 +2377,164 @@ fn parse_direct_template_reference_returns_none_when_not_a_bare_ref() {
 	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("prefix-{{ foo }}"), None);
 	assert_eq!(parse_direct_template_reference("hello world"), None);
+}
+
+#[test]
+fn normalize_when_expression_supports_logical_operators() {
+	assert_eq!(
+		normalize_when_expression("{{ flag_a && !flag_b || flag_c }}"),
+		"{{ flag_a  and  not flag_b  or  flag_c }}"
+	);
+}
+
+fn cli_context_for_when_evaluation_tests() -> CliContext {
+	CliContext {
+		root: PathBuf::from("."),
+		dry_run: false,
+		show_diff: false,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
+		release_manifest_path: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	}
+}
+
+#[test]
+fn should_execute_cli_step_runs_when_condition_is_true() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([
+		("run".to_string(), vec!["true".to_string()]),
+		("extra".to_string(), vec!["true".to_string()]),
+	]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.run && inputs.extra }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(should_execute_cli_step(&step, &context, &step_inputs)
+		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+}
+
+#[test]
+fn should_execute_cli_step_skips_when_condition_is_false() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([("run".to_string(), vec!["false".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.run }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!should_execute_cli_step(&step, &context, &step_inputs)
+		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+}
+
+#[test]
+fn should_execute_cli_step_skips_for_zero_value() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([("run".to_string(), vec!["0".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.run }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!should_execute_cli_step(&step, &context, &step_inputs)
+		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+}
+
+#[test]
+fn should_execute_cli_step_trims_and_treats_1_as_true() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([("run".to_string(), vec![" 1 ".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.run }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(should_execute_cli_step(&step, &context, &step_inputs)
+		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+}
+
+#[test]
+fn should_execute_cli_step_skips_with_not_operator() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([("skip".to_string(), vec!["true".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ ! inputs.skip }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!should_execute_cli_step(&step, &context, &step_inputs)
+		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+}
+
+#[test]
+fn should_execute_cli_step_rejects_unknown_template_reference() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::from([("run".to_string(), vec!["true".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.missing }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	let error = should_execute_cli_step(&step, &context, &step_inputs).unwrap_err();
+	assert!(error
+		.to_string()
+		.contains("failed to evaluate `when` condition `{{ inputs.missing }}`"));
+}
+
+#[test]
+fn should_execute_cli_step_rejects_non_scalar_condition_value() {
+	let context = cli_context_for_when_evaluation_tests();
+	let step_inputs =
+		BTreeMap::from([("list".to_string(), vec!["a".to_string(), "b".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		when: Some("{{ inputs.list }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	let error = should_execute_cli_step(&step, &context, &step_inputs).unwrap_err();
+	assert!(error.to_string().contains("is not a scalar boolean value"));
 }
 
 #[test]
@@ -3149,6 +3314,7 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::RetargetRelease {
+			when: None,
 			inputs: BTreeMap::new(),
 		}],
 	};
@@ -3176,6 +3342,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"release-manifest",
 			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				when: None,
 				path: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3184,6 +3351,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"publish-release",
 			monochange_core::CliStepDefinition::PublishRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"`PublishRelease` requires a previous `PrepareRelease` step",
@@ -3191,6 +3359,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"release-pr",
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"`OpenReleaseRequest` requires a previous `PrepareRelease` step",
@@ -3198,6 +3367,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"release-comments",
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"`CommentReleasedIssues` requires a previous `PrepareRelease` step",
@@ -3244,9 +3414,11 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -3276,6 +3448,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 		(
 			"publish-release",
 			monochange_core::CliStepDefinition::PublishRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"`PublishRelease` requires `[source]` configuration",
@@ -3283,6 +3456,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 		(
 			"release-pr",
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			"`OpenReleaseRequest` requires `[source]` configuration",
@@ -3296,6 +3470,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 			inputs: Vec::new(),
 			steps: vec![
 				monochange_core::CliStepDefinition::PrepareRelease {
+					when: None,
 					inputs: BTreeMap::new(),
 				},
 				step,
@@ -3319,6 +3494,7 @@ fn execute_cli_command_change_step_requires_reason_input() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::CreateChangeFile {
+			when: None,
 			inputs: BTreeMap::new(),
 		}],
 	};
@@ -3362,9 +3538,11 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				when: None,
 				path: Some(PathBuf::from("target/release-manifest.json")),
 				inputs: BTreeMap::new(),
 			},
@@ -3389,9 +3567,11 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::PublishRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -3413,9 +3593,11 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -3437,9 +3619,11 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				when: None,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -4295,6 +4479,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::CommitRelease {
+			when: None,
 			inputs: BTreeMap::new(),
 		}],
 	};
