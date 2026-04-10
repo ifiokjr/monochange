@@ -1,3 +1,53 @@
 # `monochange_gitea`
 
-Gitea release payload rendering and publishing for monochange.
+<br />
+
+<!-- {=crateReadmeBadgeRow} -->
+
+[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![Coverage][coverage-image]][coverage-link] [![License][license-image]][license-link]
+
+<!-- {/crateReadmeBadgeRow} -->
+
+<br />
+
+<!-- {=monochangeGiteaCrateDocs} -->
+
+`monochange_gitea` turns `monochange` release manifests into Gitea automation requests.
+
+Reach for this crate when you want to preview or publish Gitea releases and release pull requests using the same structured release data that powers changelog files and release manifests.
+
+## Why use it?
+
+- derive Gitea release payloads and release-PR bodies from `monochange`'s structured release manifest
+- keep Gitea automation aligned with changelog rendering and release targets
+- reuse one publishing path for dry-run previews and real repository updates
+
+## Best for
+
+- building Gitea release automation on top of `mc release`
+- previewing would-be Gitea releases and release PRs in CI before publishing
+- self-hosted Gitea instances that need the same release workflow as GitHub or GitLab
+
+## Public entry points
+
+- `build_release_requests(manifest, source)` builds release payloads from prepared release state
+- `build_change_request(manifest, source)` builds a pull-request payload for the release
+- `validate_source_configuration(source)` validates Gitea-specific source config
+- `source_capabilities()` returns provider feature flags
+
+<!-- {/monochangeGiteaCrateDocs} -->
+
+<!-- {=crateReadmeFooterLinks} -->
+
+[crate-image]: https://img.shields.io/crates/v/monochange_gitea.svg
+[crate-link]: https://crates.io/crates/monochange_gitea
+[docs-image]: https://docs.rs/monochange_gitea/badge.svg
+[docs-link]: https://docs.rs/monochange_gitea
+[ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
+[ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
+[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
+[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
+[license-image]: https://img.shields.io/crates/l/monochange_gitea.svg
+[license-link]: https://unlicense.org
+
+<!-- {/crateReadmeFooterLinks} -->

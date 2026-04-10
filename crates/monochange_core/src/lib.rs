@@ -713,7 +713,26 @@ fn parse_json_string_span(contents: &str, start: usize) -> MonochangeResult<(Jso
 					"unterminated escape sequence in JSON string".to_string(),
 				));
 			}
-			cursor += 2;
+			let escape_char = bytes[cursor + 1];
+			if escape_char == b'u' {
+				// Unicode escape \uXXXX requires exactly 4 hex digits.
+				if cursor + 5 >= bytes.len() {
+					return Err(MonochangeError::Config(
+						"incomplete unicode escape sequence in JSON string".to_string(),
+					));
+				}
+				for offset in 2..6 {
+					if !bytes[cursor + offset].is_ascii_hexdigit() {
+						return Err(MonochangeError::Config(format!(
+							"invalid unicode escape sequence in JSON string: expected hex digit at position {}",
+							cursor + offset
+						)));
+					}
+				}
+				cursor += 6;
+			} else {
+				cursor += 2;
+			}
 			continue;
 		}
 		if byte == b'"' {
