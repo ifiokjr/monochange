@@ -2565,3 +2565,23 @@ fn validate_versioned_files_content_warns_on_empty_glob() {
 	assert_eq!(warnings.len(), 1);
 	assert!(warnings.first().unwrap().contains("matches no files"));
 }
+
+#[test]
+fn validate_api_url_host_rejects_insecure_http_scheme() {
+	let error = crate::validate_api_url_host(
+		"http://attacker.com/api/v3",
+		monochange_core::SourceProvider::GitHub,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected error for http://"));
+	assert!(error.to_string().contains("insecure scheme"));
+}
+
+#[test]
+fn validate_api_url_host_accepts_https_scheme() {
+	crate::validate_api_url_host(
+		"https://api.github.com",
+		monochange_core::SourceProvider::GitHub,
+	)
+	.unwrap_or_else(|error| panic!("expected Ok for https://: {error}"));
+}
