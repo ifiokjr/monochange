@@ -1739,6 +1739,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		npm: EcosystemSettings::default(),
 		deno: EcosystemSettings::default(),
 		dart: EcosystemSettings::default(),
+		python: EcosystemSettings::default(),
 	}
 }
 

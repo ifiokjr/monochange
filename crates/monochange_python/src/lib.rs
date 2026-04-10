@@ -207,10 +207,7 @@ fn update_project_dependencies(
 	else {
 		return;
 	};
-	let Some(deps) = project
-		.get_mut("dependencies")
-		.and_then(Item::as_array_mut)
-	else {
+	let Some(deps) = project.get_mut("dependencies").and_then(Item::as_array_mut) else {
 		return;
 	};
 	for item in deps.iter_mut() {
@@ -382,9 +379,7 @@ fn expand_workspace_members(
 		for matched_path in matches {
 			let manifest_path = if matched_path.is_dir() {
 				matched_path.join(PYPROJECT_FILE)
-			} else if matched_path
-				.file_name()
-				.and_then(|name| name.to_str())
+			} else if matched_path.file_name().and_then(|name| name.to_str())
 				== Some(PYPROJECT_FILE)
 			{
 				matched_path
@@ -432,10 +427,7 @@ fn parse_python_package(
 		let version = if dynamic { None } else { version };
 		let deps = parse_pep621_dependencies(project);
 		(name, version, deps)
-	} else if let Some(poetry) = parsed
-		.get("tool")
-		.and_then(|tool| tool.get("poetry"))
-	{
+	} else if let Some(poetry) = parsed.get("tool").and_then(|tool| tool.get("poetry")) {
 		let name = poetry.get("name").and_then(Value::as_str);
 		let version = poetry
 			.get("version")
@@ -570,11 +562,7 @@ fn extract_version_constraint(spec: &str, name: &str) -> Option<String> {
 	} else {
 		rest
 	};
-	let constraint = after_extras
-		.split(';')
-		.next()
-		.unwrap_or("")
-		.trim();
+	let constraint = after_extras.split(';').next().unwrap_or("").trim();
 	if constraint.is_empty() {
 		None
 	} else {
@@ -625,7 +613,8 @@ fn should_descend(entry: &DirEntry) -> bool {
 			| ".ruff_cache"
 			| ".pytest_cache"
 			| "node_modules"
-			| "target" | ".devenv"
+			| "target"
+			| ".devenv"
 			| "book" | ".tox"
 			| "dist" | "build"
 			| ".eggs" | "*.egg-info"
