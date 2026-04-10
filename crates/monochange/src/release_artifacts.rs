@@ -539,13 +539,34 @@ pub(crate) fn apply_file_updates(updates: &[FileUpdate]) -> MonochangeResult<()>
 				MonochangeError::Io(format!("failed to create {}: {error}", parent.display()))
 			})?;
 		}
-		fs::write(&update.path, &update.content).map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to write {}: {error}",
-				update.path.display()
-			))
-		})?;
+		atomic_write(&update.path, &update.content)?;
 	}
+	Ok(())
+}
+
+/// Write file content atomically: write to a temporary file in the same
+/// directory, then rename into place. On Unix the rename is atomic within the
+/// same filesystem, so the file is either fully written or untouched.
+fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
+	let parent = path.parent().unwrap_or(path);
+	let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to create temp file in {}: {error}",
+			parent.display()
+		))
+	})?;
+	std::io::Write::write_all(&mut temp, content).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write temp file for {}: {error}",
+			path.display()
+		))
+	})?;
+	temp.persist(path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to rename temp file to {}: {error}",
+			path.display()
+		))
+	})?;
 	Ok(())
 }
 
