@@ -3425,10 +3425,7 @@ fn validate_single_versioned_file_content(
 ) -> MonochangeResult<()> {
 	if path_uses_glob(&definition.path) {
 		// Glob path: warn if zero files match.
-		let pattern = root
-			.join(&definition.path)
-			.to_string_lossy()
-			.to_string();
+		let pattern = root.join(&definition.path).to_string_lossy().to_string();
 		let matches = glob::glob(&pattern)
 			.map_err(|error| {
 				MonochangeError::Config(format!(
@@ -3460,10 +3457,7 @@ fn validate_single_versioned_file_content(
 	if let Some(regex_pattern) = &definition.regex {
 		// Regex versioned file: verify pattern matches file content.
 		let contents = fs::read_to_string(&full_path).map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to read `{}`: {error}",
-				definition.path
-			))
+			MonochangeError::Io(format!("failed to read `{}`: {error}", definition.path))
 		})?;
 		let compiled = Regex::new(regex_pattern).map_err(|error| {
 			MonochangeError::Config(format!(
@@ -3542,12 +3536,11 @@ fn validate_ecosystem_version_readable(
 			}
 		}
 		EcosystemType::Npm | EcosystemType::Deno => {
-			let json: serde_json::Value =
-				serde_json::from_str(&contents).map_err(|error| {
-					MonochangeError::Config(format!(
+			let json: serde_json::Value = serde_json::from_str(&contents).map_err(|error| {
+				MonochangeError::Config(format!(
 						"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid JSON: {error}"
 					))
-				})?;
+			})?;
 
 			let field_name = match fields {
 				Some(f) if !f.is_empty() => f.first().map(String::as_str).unwrap_or("version"),

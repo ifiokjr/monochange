@@ -2533,11 +2533,7 @@ fn validate_versioned_files_content_rejects_missing_file() {
 	let error = crate::validate_versioned_files_content(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected error for missing versioned file"));
-	assert!(
-		error
-			.to_string()
-			.contains("does-not-exist.toml")
-	);
+	assert!(error.to_string().contains("does-not-exist.toml"));
 	assert!(error.to_string().contains("does not exist"));
 }
 
@@ -2556,11 +2552,9 @@ fn validate_versioned_files_content_rejects_unparseable_version() {
 	let error = crate::validate_versioned_files_content(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected error for missing version field"));
-	assert!(
-		error
-			.to_string()
-			.contains("does not contain a readable version field")
-	);
+	assert!(error
+		.to_string()
+		.contains("does not contain a readable version field"));
 }
 
 #[test]

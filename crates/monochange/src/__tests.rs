@@ -122,7 +122,6 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("release-record"));
 }
 
-
 #[test]
 fn repair_release_help_describes_retargeting_workflow() {
 	let output = run_with_args(
