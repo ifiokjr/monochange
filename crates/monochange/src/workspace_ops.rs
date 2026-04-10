@@ -1261,6 +1261,7 @@ pub(crate) fn prepare_release_execution(
 #[cfg(test)]
 mod workspace_ops_tests {
 	use super::*;
+	use monochange_core::ShellConfig;
 	#[cfg(unix)]
 	use std::os::unix::fs::PermissionsExt;
 
@@ -1503,5 +1504,109 @@ mod workspace_ops_tests {
 		.err()
 		.unwrap_or_else(|| panic!("expected copy file error"));
 		assert!(copy_file_error.to_string().contains("failed to copy"));
+	}
+
+	#[test]
+	fn snapshot_directory_files_captures_file_contents() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("pkg")).unwrap();
+		fs::write(root.join("pkg/lock.json"), b"lockfile-content").unwrap();
+		fs::write(root.join("pkg/other.txt"), b"other").unwrap();
+
+		let mut snapshots = BTreeMap::new();
+		snapshot_directory_files(root, &root.join("pkg"), &mut snapshots)
+			.unwrap_or_else(|error| panic!("snapshot: {error}"));
+
+		assert_eq!(snapshots.len(), 2);
+		assert_eq!(
+			snapshots.get(Path::new("pkg/lock.json")).map(Vec::as_slice),
+			Some(b"lockfile-content".as_slice())
+		);
+	}
+
+	#[test]
+	fn snapshot_directory_files_skips_subdirectories() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("pkg/subdir")).unwrap();
+		fs::write(root.join("pkg/top.txt"), b"top").unwrap();
+		fs::write(root.join("pkg/subdir/nested.txt"), b"nested").unwrap();
+
+		let mut snapshots = BTreeMap::new();
+		snapshot_directory_files(root, &root.join("pkg"), &mut snapshots)
+			.unwrap_or_else(|error| panic!("snapshot: {error}"));
+
+		// Only top-level files, not nested.
+		assert_eq!(snapshots.len(), 1);
+		assert!(snapshots.contains_key(Path::new("pkg/top.txt")));
+	}
+
+	#[test]
+	fn materialize_lockfile_updates_captures_in_place_changes() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+
+		fs::create_dir_all(root.join("tools/bin")).unwrap();
+		let script_path = root.join("tools/bin/update-lock");
+		fs::write(
+			&script_path,
+			"#!/bin/sh\necho 'updated-lockfile' > \"$PWD/lock.txt\"\n",
+		)
+		.unwrap();
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755)).unwrap();
+		}
+
+		fs::write(root.join("lock.txt"), b"original").unwrap();
+		fs::write(root.join("manifest.json"), b"old-version").unwrap();
+
+		let base_updates = vec![FileUpdate {
+			path: root.join("manifest.json"),
+			content: b"new-version".to_vec(),
+		}];
+		let lockfile_commands = vec![LockfileCommandExecution {
+			command: script_path.display().to_string(),
+			cwd: root.to_path_buf(),
+			shell: ShellConfig::None,
+		}];
+
+		let updates = materialize_lockfile_command_updates(root, &base_updates, &lockfile_commands)
+			.unwrap_or_else(|error| panic!("materialize: {error}"));
+
+		assert!(
+			updates.iter().any(|u| u.path.ends_with("manifest.json")),
+			"expected manifest update"
+		);
+		assert!(
+			updates.iter().any(|u| u.path.ends_with("lock.txt")),
+			"expected lockfile update"
+		);
+		let lock_content = fs::read_to_string(root.join("lock.txt")).unwrap();
+		assert!(
+			lock_content.contains("updated-lockfile"),
+			"lockfile should be updated in-place"
+		);
+	}
+
+	#[test]
+	fn run_lockfile_command_in_place_reports_failures() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+
+		let error = run_lockfile_command_in_place(
+			root,
+			&LockfileCommandExecution {
+				command: "false".to_string(),
+				cwd: root.to_path_buf(),
+				shell: ShellConfig::Default,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected error from failing command"));
+
+		assert!(error.to_string().contains("failed"));
 	}
 }
