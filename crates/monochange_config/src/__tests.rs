@@ -2820,16 +2820,16 @@ fn changeset_files_with_bare_cr_line_endings_parse_correctly() {
 
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("config: {error}"));
-	let packages = vec![monochange_core::PackageRecord::new(
-		monochange_core::Ecosystem::Cargo,
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
 		"core",
 		root.join("crates/core/Cargo.toml"),
 		root.to_path_buf(),
 		Some(Version::new(1, 0, 0)),
-		monochange_core::PublishState::Public,
+		PublishState::Public,
 	)];
 
-	let changeset = crate::load_changeset_file(
+	let changeset = load_changeset_file(
 		&root.join(".changeset/bare-cr.md"),
 		&configuration,
 		&packages,

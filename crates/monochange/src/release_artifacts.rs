@@ -550,7 +550,7 @@ pub(crate) fn apply_file_updates(updates: &[FileUpdate]) -> MonochangeResult<()>
 fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 	let parent = path.parent().unwrap_or(path);
 	// Capture original permissions before overwriting (if the file exists).
-	let original_permissions = std::fs::metadata(path).ok().map(|meta| meta.permissions());
+	let original_permissions = fs::metadata(path).ok().map(|meta| meta.permissions());
 	let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to create temp file in {}: {error}",
@@ -571,7 +571,7 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 	})?;
 	// Restore original permissions after rename.
 	if let Some(permissions) = original_permissions {
-		std::fs::set_permissions(path, permissions).map_err(|error| {
+		fs::set_permissions(path, permissions).map_err(|error| {
 			MonochangeError::Io(format!(
 				"failed to restore permissions on {}: {error}",
 				path.display()

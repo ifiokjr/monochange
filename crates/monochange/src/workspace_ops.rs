@@ -170,7 +170,7 @@ fn render_cli_input_toml(rendered: &mut String, input: &monochange_core::CliInpu
 		}),
 	);
 	input.help_text.iter().for_each(|help_text| {
-		write_toml_key_value(rendered, "help_text", render_toml_string(help_text))
+		write_toml_key_value(rendered, "help_text", render_toml_string(help_text));
 	});
 	if input.required {
 		write_toml_key_value(rendered, "required", "true".to_string());
