@@ -216,12 +216,130 @@ fn bench_prepare_release_dry_run(c: &mut Criterion) {
 	group.finish();
 }
 
+/// Generate a workspace with a real git history.
+///
+/// Creates `num_packages` packages, then builds git history by:
+/// 1. Initial commit with all packages
+/// 2. `num_history_commits` filler commits (modifying source files)
+/// 3. Changesets added at evenly spaced intervals throughout the history
+///
+/// This tests whether `git log --follow --diff-filter=A` scales with
+/// the depth of git history.
+fn generate_fixture_with_git_history(
+	root: &Path,
+	num_packages: usize,
+	num_changesets: usize,
+	num_history_commits: usize,
+) {
+	use std::process::Command;
+
+	// Create workspace structure first (no git yet).
+	generate_fixture(root, num_packages, num_changesets);
+	// Remove changesets — we'll add them interleaved with history.
+	let changeset_dir = root.join(".changeset");
+	if changeset_dir.exists() {
+		fs::remove_dir_all(&changeset_dir).unwrap();
+	}
+	fs::create_dir_all(&changeset_dir).unwrap();
+
+	// Init git repo.
+	let git = |args: &[&str]| {
+		let output = Command::new("git")
+			.args(args)
+			.current_dir(root)
+			.env("GIT_AUTHOR_NAME", "bench")
+			.env("GIT_AUTHOR_EMAIL", "bench@test")
+			.env("GIT_COMMITTER_NAME", "bench")
+			.env("GIT_COMMITTER_EMAIL", "bench@test")
+			.output()
+			.unwrap_or_else(|e| panic!("git {}: {e}", args.join(" ")));
+		assert!(
+			output.status.success(),
+			"git {} failed: {}",
+			args.join(" "),
+			String::from_utf8_lossy(&output.stderr)
+		);
+	};
+
+	git(&["init", "-b", "main"]);
+	git(&["add", "."]);
+	git(&["commit", "-m", "initial"]);
+
+	// Calculate where to insert changesets in the history.
+	let changeset_interval = if num_changesets > 0 {
+		num_history_commits.max(1) / num_changesets.max(1)
+	} else {
+		usize::MAX
+	};
+	let mut changesets_added = 0;
+
+	for commit_idx in 0..num_history_commits {
+		// Add a filler commit (modify a source file).
+		let pkg_idx = commit_idx % num_packages;
+		let src_file = root.join(format!("crates/pkg-{pkg_idx}/src.rs"));
+		fs::write(&src_file, format!("// commit {commit_idx}\n")).unwrap();
+		git(&["add", "."]);
+		git(&["commit", "-m", &format!("commit {commit_idx}")]);
+
+		// Interleave changeset additions at regular intervals.
+		if changesets_added < num_changesets
+			&& (changeset_interval == 0 || commit_idx % changeset_interval.max(1) == 0)
+		{
+			let target_pkg = changesets_added % num_packages;
+			let cs_path = changeset_dir.join(format!("change-{changesets_added:04}.md"));
+			fs::write(
+				&cs_path,
+				format!("---\npkg-{target_pkg}: patch\n---\n\nFix issue #{changesets_added}.\n"),
+			)
+			.unwrap();
+			git(&["add", "."]);
+			git(&["commit", "-m", &format!("changeset {changesets_added}")]);
+			changesets_added += 1;
+		}
+	}
+
+	// Add any remaining changesets.
+	while changesets_added < num_changesets {
+		let target_pkg = changesets_added % num_packages;
+		let cs_path = changeset_dir.join(format!("change-{changesets_added:04}.md"));
+		fs::write(
+			&cs_path,
+			format!("---\npkg-{target_pkg}: patch\n---\n\nFix issue #{changesets_added}.\n"),
+		)
+		.unwrap();
+		git(&["add", "."]);
+		git(&["commit", "-m", &format!("changeset {changesets_added}")]);
+		changesets_added += 1;
+	}
+}
+
+fn bench_prepare_release_with_git_history(c: &mut Criterion) {
+	let mut group = c.benchmark_group("prepare_release_git_history");
+	group.sample_size(10);
+
+	// Test with 10 packages, 20 changesets, varying history depth.
+	for &history_commits in &[10, 100, 500] {
+		let label = format!("10pkg_20cs_{history_commits}commits");
+		group.bench_with_input(
+			BenchmarkId::new("prepare_release", &label),
+			&history_commits,
+			|b, &history_commits| {
+				let tempdir = tempfile::tempdir().unwrap();
+				generate_fixture_with_git_history(tempdir.path(), 10, 20, history_commits);
+				b.iter(|| monochange::prepare_release(tempdir.path(), true).unwrap());
+			},
+		);
+	}
+	group.finish();
+}
+
 criterion_group!(
 	benches,
 	bench_config_load,
 	bench_discover,
 	bench_validate,
 	bench_changeset_loading,
-	bench_prepare_release_dry_run
+	bench_prepare_release_dry_run,
+	bench_prepare_release_with_git_history,
 );
 criterion_main!(benches);
