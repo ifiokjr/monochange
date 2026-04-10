@@ -617,12 +617,19 @@ fn discover_python_packages_warns_on_empty_workspace_patterns() {
 // -- parse error paths --
 
 #[test]
-fn discover_python_packages_reports_parse_errors_for_invalid_toml() {
+fn discover_python_packages_warns_on_invalid_toml_in_standalone_scan() {
 	let root = fixture_path("python/invalid-toml");
-	let error = discover_python_packages(&root)
-		.err()
-		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(error.to_string().contains("failed to parse"));
+	let discovery =
+		discover_python_packages(&root).unwrap_or_else(|error| panic!("unexpected error: {error}"));
+	assert!(discovery.packages.is_empty());
+	assert!(
+		discovery
+			.warnings
+			.iter()
+			.any(|w| w.contains("failed to parse")),
+		"expected warning about parse failure: {:?}",
+		discovery.warnings
+	);
 }
 
 // -- Poetry complex dependency parsing --
@@ -821,20 +828,8 @@ fn expand_workspace_members_handles_glob_matching_pyproject_files() {
 	assert_eq!(discovery.packages.first().unwrap().name, "core");
 }
 
-// -- parse_python_package with invalid TOML --
-
-#[test]
-fn parse_python_package_reports_error_for_invalid_toml() {
-	let root = fixture_path("python/invalid-toml");
-	let error = discover_python_packages(&root)
-		.err()
-		.unwrap_or_else(|| panic!("expected parse error"));
-	let message = error.to_string();
-	assert!(
-		message.contains("failed to parse"),
-		"expected parse error message, got: {message}"
-	);
-}
+// parse_python_package invalid TOML is tested by
+// discover_python_packages_warns_on_invalid_toml_in_standalone_scan above
 
 // -- update_versioned_file with both version and deps --
 

@@ -288,7 +288,14 @@ pub fn discover_python_packages(root: &Path) -> MonochangeResult<AdapterDiscover
 	// Phase 1: uv workspace discovery
 	let root_manifest = root.join(PYPROJECT_FILE);
 	if root_manifest.exists() {
-		if let Some(workspace_members) = parse_uv_workspace_members(&root_manifest)? {
+		let workspace_members = match parse_uv_workspace_members(&root_manifest) {
+			Ok(members) => members,
+			Err(error) => {
+				warnings.push(format!("skipped {}: {error}", root_manifest.display()));
+				None
+			}
+		};
+		if let Some(workspace_members) = workspace_members {
 			// Exclude the workspace root manifest from standalone discovery
 			included_manifests.insert(normalize_path(&root_manifest));
 			let member_manifests =
@@ -302,7 +309,9 @@ pub fn discover_python_packages(root: &Path) -> MonochangeResult<AdapterDiscover
 		}
 	}
 
-	// Phase 2: scan for standalone pyproject.toml files not already discovered
+	// Phase 2: scan for standalone pyproject.toml files not already discovered.
+	// Parse errors are treated as warnings since the walker picks up all
+	// pyproject.toml files including test fixtures and generated files.
 	for manifest_path in find_all_pyproject_files(root) {
 		let normalized = normalize_path(&manifest_path);
 		if included_manifests.contains(&normalized) {
@@ -312,8 +321,12 @@ pub fn discover_python_packages(root: &Path) -> MonochangeResult<AdapterDiscover
 			.parent()
 			.unwrap_or_else(|| Path::new("."))
 			.to_path_buf();
-		if let Some(package) = parse_python_package(&manifest_path, &manifest_dir)? {
-			packages.push(package);
+		match parse_python_package(&manifest_path, &manifest_dir) {
+			Ok(Some(package)) => packages.push(package),
+			Ok(None) => {}
+			Err(error) => {
+				warnings.push(format!("skipped {}: {error}", manifest_path.display()));
+			}
 		}
 	}
 
