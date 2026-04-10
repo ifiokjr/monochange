@@ -194,7 +194,7 @@ Dependency targets in `versioned_files` must reference declared package ids. Gro
 
 <!-- {=configurationRegexVersionedFilesSnippet} -->
 
-Regex entries let you version-stamp any plain-text file — README badges, download links, install scripts — without needing an ecosystem-specific parser. The regex must contain a named `version` capture group; MonoChange replaces the captured substring with the new version while preserving the surrounding text.
+Regex entries let you version-stamp any plain-text file — README badges, download links, install scripts — without needing an ecosystem-specific parser. The regex must contain a named `version` capture group; monochange replaces the captured substring with the new version while preserving the surrounding text.
 
 ```toml
 [package.core]
