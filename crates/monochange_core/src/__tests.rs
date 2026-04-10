@@ -1598,6 +1598,14 @@ fn json_helper_functions_cover_error_paths() {
 		error.to_string().contains("invalid unicode escape"),
 		"got: {error}"
 	);
+	// Truncated unicode escape: string ends before 4 hex digits.
+	let error = crate::parse_json_string_span("\"\\u00", 0)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for truncated unicode escape"));
+	assert!(
+		error.to_string().contains("incomplete unicode escape"),
+		"got: {error}"
+	);
 }
 
 #[test]
