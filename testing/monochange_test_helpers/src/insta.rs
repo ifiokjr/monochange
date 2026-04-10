@@ -6,6 +6,7 @@ pub fn snapshot_settings() -> insta::Settings {
 	settings.add_filter(r"/tmp/[^/\s]+", "[ROOT]");
 	settings.add_filter(r"/home/runner/work/_temp/[^/\s]+", "[ROOT]");
 	settings.add_filter(r"\b[A-Z]:\\[^\s]+?\\Temp\\[^\\\s]+", "[ROOT]");
+	settings.add_filter(r"near position \d+", "near position [POS]");
 	settings.add_filter(r"SourceOffset\(\d+\)", "SourceOffset([OFFSET])");
 	settings.add_filter(r"length: \d+", "length: [LEN]");
 	settings.add_filter(r"@ bytes \d+\.\.\d+", "@ bytes [OFFSET]..[END]");

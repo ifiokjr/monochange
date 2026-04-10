@@ -2,4 +2,4 @@
 source: crates/monochange/src/__tests.rs
 expression: error.to_string()
 ---
-config error: invalid glob pattern `[invalid`: Pattern syntax error near position 60: invalid range pattern
+config error: invalid glob pattern `[invalid`: Pattern syntax error near position [POS]: invalid range pattern
