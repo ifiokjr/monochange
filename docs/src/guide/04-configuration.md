@@ -259,6 +259,8 @@ lockfile_commands = [
 
 CLI commands are user-defined top-level commands. monochange starts from its built-in default command set, then applies each `[cli.<command>]` entry as a full command override when the name matches or as an additional command when it does not. Each resulting command becomes invocable as `mc <command>`, and legacy `[[workflows]]` tables are no longer supported.
 
+If you want editable copies of the built-in commands in your config file, run `mc populate`. It appends only the missing default command definitions to `monochange.toml` and leaves existing `[cli.<command>]` entries unchanged.
+
 <!-- {=configurationWorkflowsSnippet} -->
 
 ```toml

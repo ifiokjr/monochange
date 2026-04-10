@@ -436,7 +436,7 @@ Generate a starter config from the packages monochange detects:
 mc init
 ```
 
-`mc init` writes an annotated `monochange.toml`, so most first-time users can start with the generated file instead of hand-authoring config.
+`mc init` writes an annotated `monochange.toml`, so most first-time users can start with the generated file instead of hand-authoring config. If you later want editable copies of the built-in CLI commands, run `mc populate` to append any missing default command definitions to `monochange.toml`.
 
 Validate the workspace:
 

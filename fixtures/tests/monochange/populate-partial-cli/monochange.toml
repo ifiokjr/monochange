@@ -1,0 +1,12 @@
+[defaults]
+parent_bump = "patch"
+
+[cli.release]
+help_text = "Custom release pipeline"
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[[cli.release.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"

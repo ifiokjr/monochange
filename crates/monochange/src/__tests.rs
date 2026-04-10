@@ -263,6 +263,302 @@ fn init_requires_force_to_overwrite_existing_configuration() {
 }
 
 #[test]
+fn populate_adds_all_missing_default_cli_commands_to_an_existing_configuration() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/populate-no-cli", tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.unwrap_or_else(|error| panic!("populate output: {error}"));
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(output.contains("added 7 default CLI commands"));
+	for table in [
+		"[cli.validate]",
+		"[cli.discover]",
+		"[cli.change]",
+		"[cli.release]",
+		"[cli.affected]",
+		"[cli.diagnostics]",
+		"[cli.repair-release]",
+	] {
+		assert!(config.contains(table), "missing populated table `{table}`");
+	}
+}
+
+#[test]
+fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/populate-partial-cli", tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.unwrap_or_else(|error| panic!("populate output: {error}"));
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(output.contains("added 6 default CLI commands"));
+	assert!(config.contains("help_text = \"Custom release pipeline\""));
+	assert_eq!(config.matches("[cli.release]").count(), 1);
+	for table in [
+		"[cli.validate]",
+		"[cli.discover]",
+		"[cli.change]",
+		"[cli.affected]",
+		"[cli.diagnostics]",
+		"[cli.repair-release]",
+	] {
+		assert!(config.contains(table), "missing populated table `{table}`");
+	}
+}
+
+#[test]
+fn populate_reports_when_all_default_cli_commands_are_already_present() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/populate-all-defaults", tempdir.path());
+	let before = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config before: {error}"));
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.unwrap_or_else(|error| panic!("populate output: {error}"));
+	let after = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config after: {error}"));
+
+	assert!(output.contains("already defines all default CLI commands"));
+	assert_eq!(after, before);
+}
+
+#[test]
+fn populate_requires_an_existing_monochange_configuration_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/populate-missing-config", tempdir.path());
+
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected populate failure"));
+	assert!(error.to_string().contains("monochange.toml does not exist"));
+}
+
+#[cfg(unix)]
+#[test]
+fn populate_reports_write_failures_when_configuration_is_read_only() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/populate-no-cli", tempdir.path());
+	let path = tempdir.path().join("monochange.toml");
+	let mut permissions = fs::metadata(&path)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o444);
+	fs::set_permissions(&path, permissions).unwrap_or_else(|error| panic!("chmod: {error}"));
+
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected populate failure"));
+	assert!(error.to_string().contains("failed to write"));
+}
+
+#[test]
+fn populate_rejects_invalid_monochange_toml() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/populate-invalid-config", tempdir.path());
+
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected populate failure"));
+	assert!(error.to_string().contains("failed to parse"));
+}
+
+#[test]
+fn populate_rejects_non_file_configuration_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture(
+		"monochange/populate-config-path-is-directory",
+		tempdir.path(),
+	);
+
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected populate failure"));
+	assert!(error.to_string().contains("failed to read"));
+}
+
+#[test]
+fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/populate-empty-config", tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("populate")],
+	)
+	.unwrap_or_else(|error| panic!("populate output: {error}"));
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(output.contains("added 7 default CLI commands"));
+	assert!(config.starts_with("[cli.validate]"));
+}
+
+#[test]
+fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
+	let rendered = crate::render_cli_commands_toml(&[monochange_core::CliCommandDefinition {
+		name: "custom".to_string(),
+		help_text: None,
+		inputs: vec![CliInputDefinition {
+			name: "mode".to_string(),
+			kind: CliInputKind::Choice,
+			help_text: Some("Select the command mode".to_string()),
+			required: true,
+			default: Some("safe".to_string()),
+			choices: vec!["safe".to_string(), "fast".to_string()],
+			short: Some('m'),
+		}],
+		steps: vec![
+			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				when: Some("{{ inputs.enabled }}".to_string()),
+				path: Some(PathBuf::from("target/release-manifest.json")),
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("json".to_string()),
+				)]),
+			},
+			monochange_core::CliStepDefinition::Command {
+				when: None,
+				command: "echo hello".to_string(),
+				dry_run_command: Some("echo dry-run".to_string()),
+				shell: monochange_core::ShellConfig::None,
+				id: Some("none-shell".to_string()),
+				variables: None,
+				inputs: BTreeMap::from([(
+					"enabled".to_string(),
+					monochange_core::CliStepInputValue::Boolean(true),
+				)]),
+			},
+			monochange_core::CliStepDefinition::Command {
+				when: None,
+				command: "echo through-shell".to_string(),
+				dry_run_command: None,
+				shell: monochange_core::ShellConfig::Default,
+				id: Some("default-shell".to_string()),
+				variables: Some(BTreeMap::from([
+					(
+						"version_value".to_string(),
+						monochange_core::CommandVariable::Version,
+					),
+					(
+						"group_version_value".to_string(),
+						monochange_core::CommandVariable::GroupVersion,
+					),
+					(
+						"released_packages_value".to_string(),
+						monochange_core::CommandVariable::ReleasedPackages,
+					),
+					(
+						"changed_files_value".to_string(),
+						monochange_core::CommandVariable::ChangedFiles,
+					),
+					(
+						"changesets_value".to_string(),
+						monochange_core::CommandVariable::Changesets,
+					),
+				])),
+				inputs: BTreeMap::from([(
+					"changed_paths".to_string(),
+					monochange_core::CliStepInputValue::List(vec!["src/lib.rs".to_string()]),
+				)]),
+			},
+			monochange_core::CliStepDefinition::Command {
+				when: None,
+				command: "echo custom-shell".to_string(),
+				dry_run_command: None,
+				shell: monochange_core::ShellConfig::Custom("bash".to_string()),
+				id: Some("custom-shell".to_string()),
+				variables: None,
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::CommitRelease {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("json".to_string()),
+				)]),
+			},
+			monochange_core::CliStepDefinition::PublishRelease {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("text".to_string()),
+				)]),
+			},
+			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("json".to_string()),
+				)]),
+			},
+			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				when: None,
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					monochange_core::CliStepInputValue::String("text".to_string()),
+				)]),
+			},
+		],
+	}]);
+
+	assert!(rendered.contains("[cli.custom]"));
+	assert!(rendered.contains("[[cli.custom.inputs]]"));
+	assert!(rendered.contains("name = \"mode\""));
+	assert!(rendered.contains("type = \"choice\""));
+	assert!(rendered.contains("help_text = \"Select the command mode\""));
+	assert!(rendered.contains("required = true"));
+	assert!(rendered.contains("default = \"safe\""));
+	assert!(rendered.contains("choices = [\"safe\", \"fast\"]"));
+	assert!(rendered.contains("short = \"m\""));
+	assert!(rendered.contains("[[cli.custom.steps]]"));
+	assert!(rendered.contains("type = \"RenderReleaseManifest\""));
+	assert!(rendered.contains("when = \"{{ inputs.enabled }}\""));
+	assert!(rendered.contains("path = \"target/release-manifest.json\""));
+	assert!(rendered.contains("inputs = { format = \"json\" }"));
+	assert!(rendered.contains("dry_run_command = \"echo dry-run\""));
+	assert!(rendered.contains("inputs = { enabled = true }"));
+	assert!(rendered.contains("shell = true"));
+	assert!(rendered.contains("group_version_value = \"group_version\""));
+	assert!(rendered.contains("released_packages_value = \"released_packages\""));
+	assert!(rendered.contains("changed_files_value = \"changed_files\""));
+	assert!(rendered.contains("changesets_value = \"changesets\""));
+	assert!(rendered.contains("version_value = \"version\""));
+	assert!(rendered.contains("inputs = { changed_paths = [\"src/lib.rs\"] }"));
+	assert!(rendered.contains("shell = \"bash\""));
+	assert!(rendered.contains("type = \"CommitRelease\""));
+	assert!(rendered.contains("type = \"PublishRelease\""));
+	assert!(rendered.contains("type = \"OpenReleaseRequest\""));
+	assert!(rendered.contains("type = \"CommentReleasedIssues\""));
+	assert!(!rendered.contains("name = \"custom\""));
+}
+
+#[test]
 fn validate_command_validates_workspace_configuration_and_changesets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/validate-workspace", tempdir.path());

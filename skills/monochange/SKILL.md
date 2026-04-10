@@ -42,6 +42,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 | Command               | Purpose                                                     |
 | --------------------- | ----------------------------------------------------------- |
 | `mc init`             | Generate a starter `monochange.toml` from detected packages |
+| `mc populate`         | Append missing built-in CLI command definitions to config   |
 | `mc validate`         | Validate config and changeset targets                       |
 | `mc discover`         | Discover packages across ecosystems                         |
 | `mc change`           | Create a `.changeset/*.md` file                             |

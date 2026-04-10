@@ -1,0 +1,13 @@
+[cli.validate]
+
+[cli.discover]
+
+[cli.change]
+
+[cli.release]
+
+[cli.affected]
+
+[cli.diagnostics]
+
+[cli.repair-release]

@@ -103,6 +103,10 @@ pub(crate) fn build_command_with_cli(
 						.action(ArgAction::SetTrue),
 				),
 		)
+		.subcommand(
+			Command::new("populate")
+				.about("Add any missing built-in CLI commands to monochange.toml so you can customize them"),
+		)
 		.subcommand(build_assist_subcommand())
 		.subcommand(build_release_record_subcommand())
 		.subcommand(
