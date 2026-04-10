@@ -402,11 +402,16 @@ Use `[source]` plus `[source.releases]` when you want command steps such as `Pub
 
 <!-- {=configurationGitHubSnippet} -->
 
+The `[source]` section configures provider integration for releases, pull requests, and changeset enforcement.
+
+For self-hosted instances, set `api_url` or `host` to your server's URL. These fields **must** use `https://`; insecure `http://` schemes are rejected because API tokens would be transmitted in cleartext.
+
 ```toml
 [source]
 provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
+# api_url = "https://github.company.com/api/v3"  # optional: for GitHub Enterprise
 
 [source.releases]
 enabled = true
@@ -577,5 +582,8 @@ mc validate
 - package and group declarations
 - manifest presence for each package type
 - group membership rules
-- `versioned_files` references
+- `versioned_files` structural rules (type/regex conflicts, capture groups)
+- `versioned_files` content checks: file existence, version field readability, regex pattern matching
 - `.changeset/*.md` targets and overlap rules
+- Cargo workspace version-group constraints
+- `[source]` url scheme security (`https://` required)
