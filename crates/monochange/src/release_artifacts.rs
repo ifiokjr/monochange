@@ -157,11 +157,9 @@ pub(crate) fn compare_url_for_provider(
 }
 
 pub(crate) fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
-	let output = std::process::Command::new("git")
-		.current_dir(root)
-		.args(["tag", "--list", "--sort=-v:refname"])
-		.output()
-		.ok()?;
+	let output =
+		monochange_core::git::git_command_output(root, &["tag", "--list", "--sort=-v:refname"])
+			.ok()?;
 	if !output.status.success() {
 		return None;
 	}

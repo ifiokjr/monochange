@@ -7387,8 +7387,23 @@ fn init_git_repo(root: &Path) {
 	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);
 }
 
+fn sanitized_git_command() -> std::process::Command {
+	let mut command = std::process::Command::new("git");
+	for variable in [
+		"GIT_DIR",
+		"GIT_WORK_TREE",
+		"GIT_COMMON_DIR",
+		"GIT_INDEX_FILE",
+		"GIT_OBJECT_DIRECTORY",
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	] {
+		command.env_remove(variable);
+	}
+	command
+}
+
 fn git_in_dir(root: &Path, args: &[&str]) {
-	let status = std::process::Command::new("git")
+	let status = sanitized_git_command()
 		.current_dir(root)
 		.args(args)
 		.status()
@@ -7397,7 +7412,7 @@ fn git_in_dir(root: &Path, args: &[&str]) {
 }
 
 fn git_output_in_git_dir(git_dir: &Path, args: &[&str]) -> String {
-	let output = std::process::Command::new("git")
+	let output = sanitized_git_command()
 		.arg("--git-dir")
 		.arg(git_dir)
 		.args(args)
@@ -7411,7 +7426,7 @@ fn git_output_in_git_dir(git_dir: &Path, args: &[&str]) -> String {
 }
 
 fn git_in_temp_repo(root: &Path, args: &[&str]) {
-	let status = std::process::Command::new("git")
+	let status = sanitized_git_command()
 		.current_dir(root)
 		.args(args)
 		.status()
@@ -7420,7 +7435,7 @@ fn git_in_temp_repo(root: &Path, args: &[&str]) {
 }
 
 fn git_output_in_temp_repo(root: &Path, args: &[&str]) -> String {
-	let output = std::process::Command::new("git")
+	let output = sanitized_git_command()
 		.current_dir(root)
 		.args(args)
 		.output()

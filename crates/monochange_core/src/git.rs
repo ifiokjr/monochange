@@ -8,20 +8,33 @@ use crate::MonochangeError;
 use crate::MonochangeResult;
 
 #[must_use]
-pub fn git_checkout_branch_command(root: &Path, branch: &str) -> Command {
+pub fn git_command(root: &Path) -> Command {
 	let mut command = Command::new("git");
+	command.current_dir(root);
+	for variable in [
+		"GIT_DIR",
+		"GIT_WORK_TREE",
+		"GIT_COMMON_DIR",
+		"GIT_INDEX_FILE",
+		"GIT_OBJECT_DIRECTORY",
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	] {
+		command.env_remove(variable);
+	}
 	command
-		.current_dir(root)
-		.arg("checkout")
-		.arg("-B")
-		.arg(branch);
+}
+
+#[must_use]
+pub fn git_checkout_branch_command(root: &Path, branch: &str) -> Command {
+	let mut command = git_command(root);
+	command.arg("checkout").arg("-B").arg(branch);
 	command
 }
 
 #[must_use]
 pub fn git_stage_paths_command(root: &Path, tracked_paths: &[PathBuf]) -> Command {
-	let mut command = Command::new("git");
-	command.current_dir(root).arg("add").arg("-A").arg("--");
+	let mut command = git_command(root);
+	command.arg("add").arg("-A").arg("--");
 	for path in tracked_paths {
 		command.arg(path);
 	}
@@ -30,12 +43,8 @@ pub fn git_stage_paths_command(root: &Path, tracked_paths: &[PathBuf]) -> Comman
 
 #[must_use]
 pub fn git_commit_paths_command(root: &Path, message: &CommitMessage) -> Command {
-	let mut command = Command::new("git");
-	command
-		.current_dir(root)
-		.arg("commit")
-		.arg("--message")
-		.arg(&message.subject);
+	let mut command = git_command(root);
+	command.arg("commit").arg("--message").arg(&message.subject);
 	if let Some(body) = &message.body {
 		command.arg("--message").arg(body);
 	}
@@ -44,9 +53,8 @@ pub fn git_commit_paths_command(root: &Path, message: &CommitMessage) -> Command
 
 #[must_use]
 pub fn git_push_branch_command(root: &Path, branch: &str) -> Command {
-	let mut command = Command::new("git");
+	let mut command = git_command(root);
 	command
-		.current_dir(root)
 		.arg("push")
 		.arg("--force-with-lease")
 		.arg("origin")
@@ -55,7 +63,7 @@ pub fn git_push_branch_command(root: &Path, branch: &str) -> Command {
 }
 
 pub fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
-	Command::new("git").current_dir(root).args(args).output()
+	git_command(root).args(args).output()
 }
 
 #[must_use]
