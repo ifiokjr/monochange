@@ -511,3 +511,117 @@ fn build_release_plan_rejects_explicit_versions_not_greater_than_current() {
 		.to_string()
 		.contains("must be greater than current version"));
 }
+
+#[test]
+fn build_release_plan_returns_error_for_unknown_package_in_changeset() {
+	let packages = vec![package("cargo:core", Version::new(1, 0, 0))];
+	let error = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[],
+		&[],
+		&[ChangeSignal {
+			package_id: "cargo:nonexistent".to_string(),
+			requested_bump: Some(BumpSeverity::Patch),
+			explicit_version: Some(Version::new(2, 0, 0)),
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: None,
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/ghost.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected error for unknown package"));
+	assert!(error.to_string().contains("cargo:nonexistent"));
+	assert!(error.to_string().contains("not found"));
+}
+
+#[test]
+fn build_release_plan_returns_error_for_unknown_group_in_changeset() {
+	let mut core = package("cargo:core", Version::new(1, 0, 0));
+	core.version_group_id = Some("sdk".to_string());
+	let version_group = VersionGroup {
+		group_id: "sdk".to_string(),
+		display_name: "sdk".to_string(),
+		members: vec![core.id.clone()],
+		mismatch_detected: false,
+	};
+	// Create a changeset that targets the group member, which maps to a group,
+	// but use a version_group_id that doesn't match any defined group.
+	let mut misrouted = package("cargo:orphan", Version::new(1, 0, 0));
+	misrouted.version_group_id = Some("nonexistent-group".to_string());
+	let error = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&[core, misrouted.clone()],
+		&[],
+		&[version_group],
+		&[ChangeSignal {
+			package_id: misrouted.id.clone(),
+			requested_bump: Some(BumpSeverity::Patch),
+			explicit_version: Some(Version::new(2, 0, 0)),
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: None,
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/orphan.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected error for unknown group"));
+	assert!(error.to_string().contains("nonexistent-group"));
+	assert!(error.to_string().contains("not found"));
+}
+
+#[test]
+fn build_release_plan_warns_on_missing_group_member_during_traversal() {
+	// Group has a member "ghost" that doesn't exist in packages.
+	// The BFS should warn but not crash, and the present member
+	// should still be synchronized.
+	let mut core = package("cargo:core", Version::new(1, 0, 0));
+	core.version_group_id = Some("sdk".to_string());
+	let version_group = VersionGroup {
+		group_id: "sdk".to_string(),
+		display_name: "sdk".to_string(),
+		members: vec![core.id.clone(), "ghost".to_string()],
+		mismatch_detected: false,
+	};
+
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/mixed").as_path(),
+		&[core.clone()],
+		&[],
+		&[version_group],
+		&[ChangeSignal {
+			package_id: core.id.clone(),
+			requested_bump: Some(BumpSeverity::Minor),
+			explicit_version: None,
+			change_origin: "direct-change".to_string(),
+			evidence_refs: Vec::new(),
+			notes: Some("feature".to_string()),
+			details: None,
+			change_type: None,
+			source_path: PathBuf::from(".changeset/feature.md"),
+		}],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	// core should still get its bump despite the ghost member.
+	let core_decision = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == core.id)
+		.unwrap_or_else(|| panic!("expected core decision"));
+	assert_eq!(core_decision.recommended_bump, BumpSeverity::Minor);
+}

@@ -232,8 +232,17 @@ pub fn build_release_plan(
 			let group_max = group
 				.members
 				.iter()
-				.filter_map(|member| states.get(member.as_str()))
-				.map(|state| state.severity)
+				.map(|member| {
+					states
+						.get(member.as_str())
+						.map(|state| state.severity)
+						.unwrap_or_else(|| {
+							eprintln!(
+								"warning: version group `{group_id}` member `{member}` was not found in discovered packages"
+							);
+							BumpSeverity::None
+						})
+				})
 				.max()
 				.unwrap_or(BumpSeverity::None);
 
@@ -351,9 +360,11 @@ fn resolve_explicit_versions(
 	let package_versions = package_inputs
 		.into_iter()
 		.map(|(package_id, inputs)| {
-			let package = package_by_id.get(package_id.as_str()).unwrap_or_else(|| {
-				panic!("package `{package_id}` missing while resolving explicit versions")
-			});
+			let package = package_by_id.get(package_id.as_str()).ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"changeset references package `{package_id}` which was not found in the workspace"
+				))
+			})?;
 			let owner = format!("package `{package_id}`");
 			resolve_explicit_version_choice(
 				&owner,
@@ -369,9 +380,11 @@ fn resolve_explicit_versions(
 	let group_versions = group_inputs
 		.into_iter()
 		.map(|(group_id, inputs)| {
-			let group = group_by_id.get(group_id.as_str()).unwrap_or_else(|| {
-				panic!("group `{group_id}` missing while resolving explicit versions")
-			});
+			let group = group_by_id.get(group_id.as_str()).ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"changeset references group `{group_id}` which was not found in the workspace configuration"
+				))
+			})?;
 			let current_version = group
 				.members
 				.iter()
@@ -407,7 +420,9 @@ fn resolve_explicit_version_choice(
 		.iter()
 		.map(|input| input.version.clone())
 		.max()
-		.unwrap_or_else(|| panic!("explicit version inputs cannot be empty"));
+		.ok_or_else(|| {
+			MonochangeError::Config(format!("no explicit version inputs found for {owner}"))
+		})?;
 	let distinct_versions = inputs
 		.iter()
 		.map(|input| input.version.clone())
