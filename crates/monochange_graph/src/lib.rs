@@ -241,13 +241,15 @@ pub fn build_release_plan(
 				.map(|member| {
 					states
 						.get(member.as_str())
-						.map(|state| state.severity)
-						.unwrap_or_else(|| {
-							eprintln!(
-								"warning: version group `{group_id}` member `{member}` was not found in discovered packages"
-							);
-							BumpSeverity::None
-						})
+						.map_or_else(
+							|| {
+								eprintln!(
+									"warning: version group `{group_id}` member `{member}` was not found in discovered packages"
+								);
+								BumpSeverity::None
+							},
+							|state| state.severity,
+						)
 				})
 				.max()
 				.unwrap_or(BumpSeverity::None);
