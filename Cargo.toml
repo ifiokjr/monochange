@@ -47,6 +47,7 @@ rust-version = "1.86.0"
 [workspace.dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4", default-features = false, features = ["derive"] }
+criterion = { version = "0.5", default-features = false }
 doc-comment = { version = "^0.3", default-features = false }
 etest = { version = "^0.3", default-features = false }
 glob = { version = "^0.3", default-features = false }

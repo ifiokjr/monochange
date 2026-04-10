@@ -111,3 +111,27 @@ jobs:
           flags: rust
           name: monochange-rust-workspace
           verbose: true
+
+  benchmark:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run benchmarks
+        run: cargo bench -p monochange --bench cli_commands -- --output-format bencher | tee target/benchmark-results.txt
+        shell: devenv shell -- bash -e {0}
+
+      - name: upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: target/benchmark-results.txt
+          retention-days: 30
