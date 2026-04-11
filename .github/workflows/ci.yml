@@ -133,7 +133,7 @@ jobs:
           cargo bench -p monochange --bench cli_commands -- \
             --output-format bencher \
             "config_load" "discover" "validate" "changeset_loading" "prepare_release_dry_run" \
-            2>&1 | tee target/benchmark-results.txt
+            | tee target/benchmark-results.txt
         shell: devenv shell -- bash -e {0}
 
       - name: compare benchmarks and comment on PR
