@@ -153,6 +153,12 @@ pub(crate) fn build_command_with_cli(
 							.long("force")
 							.help("Overwrite an existing monochange.toml file")
 							.action(ArgAction::SetTrue),
+					)
+					.arg(
+						Arg::new("provider")
+							.long("provider")
+							.help("Source-control provider for release automation workflows")
+							.value_parser(["github", "gitlab", "gitea"]),
 					),
 			)
 			.subcommand(Command::new("populate").about(

@@ -387,6 +387,33 @@ enabled = true
 # Optional fields:
 #   host    — custom host URL for self-hosted instances
 #   api_url — custom API URL (e.g. for GitHub Enterprise)
+{% if provider %}
+
+[source]
+provider = "{{ provider }}"
+owner = "{{ owner }}"
+repo = "{{ repo }}"
+
+# [source.releases] — provider release settings
+#
+# Controls whether and how releases are created on the provider when the
+# PublishRelease CLI step runs.
+[source.releases]
+enabled = true
+source = "monochange"
+
+# [source.pull_requests] — release pull request settings
+#
+# Controls the OpenReleaseRequest CLI step which creates or updates a release
+# PR with version bumps, changelog updates, and changeset cleanup.
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+{% else %}
 #
 # [source]
 # provider = "github"
@@ -423,7 +450,7 @@ enabled = true
 #   branch_prefix — branch name prefix for release PRs (default: "monochange/release")
 #   base          — target branch for the release PR (default: "main")
 #   title         — PR title template (default: "chore(release): prepare release")
-#   labels        — labels applied to the release PR (default: ["release", "automated"])
+#   labels        — labels applied to the release PR (default: ["release", "automated"]
 #   auto_merge    — enable auto-merge on the PR when supported (default: false)
 #
 # [source.pull_requests]
@@ -436,21 +463,7 @@ enabled = true
 
 # [source.bot.changesets] — legacy changeset bot settings (source-provider-aware)
 #
-# This is the legacy location for changeset policy settings that are aware of
-# the source provider's changed-file detection. These settings feed the
-# AffectedPackages step when it needs to know which paths matter.
-#
 # For skip_labels, prefer [changesets.verify].skip_labels instead.
-#
-# Fields:
-#   enabled          — enable the legacy changeset bot (default: false)
-#   required         — treat missing changesets as errors (default: true)
-#   skip_labels      — PR labels that skip enforcement (default: [])
-#   comment_on_failure — render a failure comment for CI (default: true)
-#   changed_paths    — glob patterns for paths that require changeset coverage;
-#                      only files matching at least one pattern trigger verification
-#   ignored_paths    — glob patterns for paths to exclude from verification even
-#                      when they match changed_paths
 #
 # [source.bot.changesets]
 # enabled = false
@@ -459,6 +472,7 @@ enabled = true
 # comment_on_failure = true
 # changed_paths = []
 # ignored_paths = []
+{% endif %}
 
 # =============================================================================
 # [changesets.verify] — changeset verification settings
@@ -645,3 +659,16 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
 steps = [{ name = "retarget release", type = "RetargetRelease" }]
+{% if provider %}
+
+[cli.commit-release]
+help_text = "Prepare a release, commit it, and open or update a release PR"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [
+	{ type = "PrepareRelease" },
+	{ type = "CommitRelease" },
+	{ type = "OpenReleaseRequest" },
+]
+{% endif %}
