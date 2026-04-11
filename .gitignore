@@ -17,3 +17,5 @@ node_modules/
 *.snap.new
 .ant-colony/
 .pi/
+.claude/
+CLAUDE.md
