@@ -318,7 +318,7 @@ fn bench_prepare_release_with_git_history(c: &mut Criterion) {
 	group.sample_size(10);
 
 	// Test with 10 packages, 20 changesets, varying history depth.
-	for &history_commits in &[10, 100, 500] {
+	for &history_commits in &[10, 100, 200] {
 		let label = format!("10pkg_20cs_{history_commits}commits");
 		group.bench_with_input(
 			BenchmarkId::new("prepare_release", &label),
