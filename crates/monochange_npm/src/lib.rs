@@ -583,6 +583,7 @@ impl EcosystemAdapter for NpmAdapter {
 	}
 }
 
+#[tracing::instrument(skip_all)]
 pub fn discover_npm_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let mut included_manifests = HashSet::new();
 	let mut packages = Vec::new();
@@ -624,6 +625,7 @@ pub fn discover_npm_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> 
 
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
+	tracing::debug!(packages = packages.len(), "discovered npm packages");
 
 	Ok(AdapterDiscovery { packages, warnings })
 }

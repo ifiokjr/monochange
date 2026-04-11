@@ -227,6 +227,7 @@ pub(crate) fn build_prepared_changesets(
 
 /// Load git context for all changesets in two batched git-log calls instead
 /// of 2*N individual subprocess spawns.
+#[tracing::instrument(skip_all, fields(count = loaded_changesets.len()))]
 fn batch_load_changeset_contexts(
 	root: &Path,
 	loaded_changesets: &[monochange_config::LoadedChangesetFile],
@@ -285,6 +286,7 @@ fn batch_load_changeset_contexts(
 ///
 /// This replaces N individual `git log` subprocess calls with a single call
 /// that walks the history once.
+#[tracing::instrument(skip_all, fields(count = paths.len(), introduced))]
 fn batch_git_log(
 	root: &Path,
 	paths: &[PathBuf],
@@ -405,6 +407,7 @@ pub(crate) fn short_commit_sha(sha: &str) -> String {
 	sha.chars().take(7).collect()
 }
 
+#[tracing::instrument(skip_all)]
 pub(crate) fn build_release_plan_from_signals(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	discovery: &DiscoveryReport,

@@ -73,6 +73,7 @@ pub(crate) fn resolve_git_commit_ref(root: &Path, from: &str) -> MonochangeResul
 }
 
 #[rustfmt::skip]
+#[tracing::instrument(skip_all, fields(commit))]
 pub(crate) fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResult<Vec<String>> {
 	let output = run_git_capture(
 		root,
@@ -94,6 +95,7 @@ pub(crate) fn read_git_commit_message(root: &Path, commit: &str) -> MonochangeRe
 	)
 }
 
+#[tracing::instrument(skip_all, fields(args = ?args))]
 pub(crate) fn run_git_capture(
 	root: &Path,
 	args: &[&str],
@@ -103,6 +105,7 @@ pub(crate) fn run_git_capture(
 		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
 	if !output.status.success() {
 		let stderr = git_stderr_trimmed(&output);
+		tracing::warn!(args = ?args, %stderr, "git command failed");
 		let detail = [error_message, stderr.as_str()]
 			.into_iter()
 			.filter(|part| !part.is_empty())

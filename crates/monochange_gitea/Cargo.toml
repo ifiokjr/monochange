@@ -17,6 +17,7 @@ monochange_core = { workspace = true }
 reqwest = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
 urlencoding = { workspace = true, default-features = true }
 
 [dev-dependencies]

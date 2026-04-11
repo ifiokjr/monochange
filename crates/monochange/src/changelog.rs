@@ -13,6 +13,7 @@ pub(crate) struct ChangelogBuildContext<'a> {
 	pub release_targets: &'a [ReleaseTarget],
 }
 
+#[tracing::instrument(skip_all)]
 pub(crate) fn build_changelog_updates(
 	context: ChangelogBuildContext<'_>,
 ) -> MonochangeResult<Vec<ChangelogUpdate>> {

@@ -20,6 +20,7 @@ serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 serde_yaml_ng = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
 walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]

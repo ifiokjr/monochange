@@ -19,6 +19,7 @@ serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 tokio = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
 urlencoding = { workspace = true, default-features = true }
 
 [dev-dependencies]

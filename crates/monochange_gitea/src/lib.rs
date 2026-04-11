@@ -197,6 +197,7 @@ pub fn build_release_pull_request_request(
 	}
 }
 
+#[tracing::instrument(skip_all)]
 pub fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],

@@ -38,6 +38,7 @@ pub(crate) fn render_release_record_discovery(
 	}
 }
 
+#[tracing::instrument(skip_all, fields(from))]
 pub fn discover_release_record(
 	root: &Path,
 	from: &str,
@@ -47,6 +48,11 @@ pub fn discover_release_record(
 		.into_iter()
 		.enumerate()
 	{
+		tracing::trace!(
+			commit = &commit[..7],
+			distance,
+			"scanning for release record"
+		);
 		let message = read_git_commit_message(root, &commit)?;
 		match parse_release_record_block(&message) {
 			Ok(record) => {
