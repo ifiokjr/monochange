@@ -326,10 +326,12 @@ version_format = "primary"
 #                     entries may be typed manifest updates or plain-text regex
 #                     replacements with a named `version` capture, e.g.
 #                     [{ path = "src/lib.rs", regex = 'VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' }]
-#   lockfile_commands — commands that refresh ecosystem lockfiles after a
-#                       release updates manifest versions; when set, inferred
-#                       defaults are disabled and these commands fully own
-#                       lockfile refresh for that ecosystem
+#   lockfile_commands — optional escape-hatch commands that refresh ecosystem
+#                       lockfiles after a release updates manifest versions.
+#                       By default monochange rewrites supported lockfiles
+#                       directly from the release plan so `mc release` stays on
+#                       the fast path. When set, these commands fully own
+#                       lockfile refresh for that ecosystem.
 
 {% if has_cargo %}
 [ecosystems.cargo]

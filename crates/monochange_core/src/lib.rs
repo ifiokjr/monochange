@@ -406,14 +406,14 @@ impl DiscoveryPathFilter {
 }
 
 fn ignored_discovery_dir_name(path: &Path) -> bool {
-	path.file_name()
-		.and_then(|name| name.to_str())
-		.is_some_and(|name| {
+	path.components().any(|component| {
+		component.as_os_str().to_str().is_some_and(|name| {
 			matches!(
 				name,
-				".git" | "target" | "node_modules" | ".devenv" | "book"
+				".git" | "target" | "node_modules" | ".devenv" | ".claude" | "book"
 			)
 		})
+	})
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

@@ -508,7 +508,10 @@ inputs = [
 steps = [
 	{ type = "PrepareRelease" },
 	{ type = "RenderReleaseManifest", path = ".monochange/release-manifest.json", when = "{{ inputs.commit }}" },
-	{ type = "Command", command = "fix:all" },
+	# Keep local `mc release` runs fast. The generated files are stable enough to
+	# inspect immediately, so we only pay for clippy/docs/validation right before
+	# creating and publishing the release commit.
+	{ type = "Command", command = "fix:all", when = "{{ inputs.commit }}" },
 	{ type = "Command", command = "git add --all", when = "{{ inputs.commit }}" },
 	{ type = "CommitRelease", when = "{{ inputs.commit }}" },
 	{ type = "Command", command = "git push", when = "{{ inputs.commit }}" },

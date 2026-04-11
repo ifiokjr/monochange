@@ -173,10 +173,107 @@ pub(crate) fn build_versioned_file_updates(
 		}
 	}
 
+	apply_inferred_lockfile_updates(
+		root,
+		configuration,
+		packages,
+		plan,
+		shared_release_version.as_ref(),
+		&context,
+		&mut updates,
+	)?;
+
 	updates
 		.into_iter()
 		.map(|(path, document)| serialize_cached_document(&path, document))
 		.collect()
+}
+
+fn apply_inferred_lockfile_updates(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+	shared_release_version: Option<&String>,
+	context: &VersionedFileUpdateContext<'_>,
+	updates: &mut BTreeMap<PathBuf, CachedDocument>,
+) -> MonochangeResult<()> {
+	let released_versions = released_versions_by_record_id(plan);
+	let mut dep_names_by_lockfile =
+		BTreeMap::<PathBuf, (monochange_core::EcosystemType, BTreeSet<String>)>::new();
+
+	for package in packages
+		.iter()
+		.filter(|package| released_versions.contains_key(&package.id))
+	{
+		let Some(ecosystem_type) =
+			inferred_lockfile_ecosystem_type(configuration, package.ecosystem)
+		else {
+			continue;
+		};
+		for lockfile_path in inferred_lockfile_paths(package) {
+			let relative_lockfile = root_relative(root, &lockfile_path);
+			let (_, dep_names) = dep_names_by_lockfile
+				.entry(relative_lockfile)
+				.or_insert_with(|| (ecosystem_type, BTreeSet::new()));
+			dep_names.insert(package.name.clone());
+		}
+	}
+
+	for (lockfile_path, (ecosystem_type, dep_names)) in dep_names_by_lockfile {
+		let definition = VersionedFileDefinition {
+			path: lockfile_path.display().to_string(),
+			ecosystem_type: Some(ecosystem_type),
+			prefix: None,
+			fields: None,
+			name: None,
+			regex: None,
+		};
+		// Supported lockfiles can be rewritten directly from the release plan.
+		// That keeps normal `mc release` runs on the fast path instead of paying
+		// package-manager startup and dependency-resolution costs for every bump.
+		apply_versioned_file_definition(
+			root,
+			updates,
+			&definition,
+			"",
+			shared_release_version,
+			&dep_names.into_iter().collect::<Vec<_>>(),
+			context,
+		)?;
+	}
+
+	Ok(())
+}
+
+fn inferred_lockfile_ecosystem_type(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	ecosystem: Ecosystem,
+) -> Option<monochange_core::EcosystemType> {
+	match ecosystem {
+		Ecosystem::Cargo if configuration.cargo.lockfile_commands.is_empty() => {
+			Some(monochange_core::EcosystemType::Cargo)
+		}
+		Ecosystem::Npm if configuration.npm.lockfile_commands.is_empty() => {
+			Some(monochange_core::EcosystemType::Npm)
+		}
+		Ecosystem::Deno if configuration.deno.lockfile_commands.is_empty() => {
+			Some(monochange_core::EcosystemType::Deno)
+		}
+		Ecosystem::Dart | Ecosystem::Flutter if configuration.dart.lockfile_commands.is_empty() => {
+			Some(monochange_core::EcosystemType::Dart)
+		}
+		_ => None,
+	}
+}
+
+fn inferred_lockfile_paths(package: &PackageRecord) -> Vec<PathBuf> {
+	match package.ecosystem {
+		Ecosystem::Cargo => monochange_cargo::discover_lockfiles(package),
+		Ecosystem::Npm => monochange_npm::discover_lockfiles(package),
+		Ecosystem::Deno => monochange_deno::discover_lockfiles(package),
+		Ecosystem::Dart | Ecosystem::Flutter => monochange_dart::discover_lockfiles(package),
+	}
 }
 
 fn render_cached_document_bytes(

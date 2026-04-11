@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+use criterion::BatchSize;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
@@ -46,6 +47,42 @@ fn generate_fixture(root: &Path, num_packages: usize, num_changesets: usize) {
 		)
 		.unwrap();
 	}
+}
+
+fn write_synthetic_cargo_lock(root: &Path, num_packages: usize) {
+	use std::fmt::Write;
+
+	let mut cargo_lock = String::from("version = 3\n\n");
+	for i in 0..num_packages {
+		let _ = writeln!(
+			cargo_lock,
+			"[[package]]\nname = \"pkg-{i}\"\nversion = \"1.0.0\"\n"
+		);
+	}
+	fs::write(root.join("Cargo.lock"), cargo_lock).unwrap();
+}
+
+fn generate_fixture_with_cargo_lock(root: &Path, num_packages: usize, num_changesets: usize) {
+	generate_fixture(root, num_packages, num_changesets);
+	let config_path = root.join("monochange.toml");
+	let config = fs::read_to_string(&config_path).unwrap();
+	fs::write(
+		&config_path,
+		config.replacen(
+			"[defaults]\npackage_type = \"cargo\"\n\n",
+			"[defaults]\npackage_type = \"cargo\"\nchangelog = \"{{ path }}/changelog.md\"\n\n",
+			1,
+		),
+	)
+	.unwrap();
+	for i in 0..num_packages {
+		fs::write(
+			root.join(format!("crates/pkg-{i}/changelog.md")),
+			"## 1.0.0\n\n- Initial release\n",
+		)
+		.unwrap();
+	}
+	write_synthetic_cargo_lock(root, num_packages);
 }
 
 const SCALES: &[(usize, usize)] = &[(5, 10), (20, 50), (50, 200)];
@@ -264,6 +301,36 @@ fn generate_fixture_with_git_history(
 	}
 }
 
+fn bench_prepare_release_apply(c: &mut Criterion) {
+	let mut group = c.benchmark_group("prepare_release_apply");
+	group.sample_size(10);
+
+	for &(packages, changesets) in SCALES {
+		let label = format!("{packages}pkg_{changesets}cs");
+		group.bench_with_input(
+			BenchmarkId::new("prepare_release", &label),
+			&(packages, changesets),
+			|b, &(packages, changesets)| {
+				b.iter_batched(
+					|| {
+						let tempdir = tempfile::tempdir().unwrap();
+						generate_fixture_with_cargo_lock(tempdir.path(), packages, changesets);
+						tempdir
+					},
+					|tempdir| {
+						// Benchmark the real non-dry-run path without rendering diff
+						// previews. This is the critical fast path for `mc release`
+						// after we switched supported lockfiles to direct rewrites.
+						monochange::prepare_release(tempdir.path(), false).unwrap();
+					},
+					BatchSize::LargeInput,
+				);
+			},
+		);
+	}
+	group.finish();
+}
+
 fn bench_prepare_release_with_git_history(c: &mut Criterion) {
 	let mut group = c.benchmark_group("prepare_release_git_history");
 	group.sample_size(10);
@@ -291,6 +358,7 @@ criterion_group!(
 	bench_validate,
 	bench_changeset_loading,
 	bench_prepare_release_dry_run,
+	bench_prepare_release_apply,
 	bench_prepare_release_with_git_history,
 );
 criterion_main!(benches);

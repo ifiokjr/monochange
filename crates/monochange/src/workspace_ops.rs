@@ -492,14 +492,23 @@ pub(crate) fn build_lockfile_command_executions(
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<LockfileCommandExecution>> {
 	let released_versions = released_versions_by_record_id(plan);
+	let cargo_executions = if configuration.cargo.lockfile_commands.is_empty() {
+		infer_cargo_lockfile_command_executions(packages, &released_versions)
+	} else {
+		resolve_lockfile_command_executions(
+			root,
+			&configuration.cargo.lockfile_commands,
+			packages.iter().any(|package| {
+				package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)
+			}),
+		)?
+	};
 	#[rustfmt::skip]
-	let cargo_executions = resolve_lockfile_command_executions(root, &configuration.cargo.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)).collect(), monochange_cargo::default_lockfile_commands)?;
+	let npm_executions = resolve_lockfile_command_executions(root, &configuration.npm.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)))?;
 	#[rustfmt::skip]
-	let npm_executions = resolve_lockfile_command_executions(root, &configuration.npm.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)).collect(), monochange_npm::default_lockfile_commands)?;
+	let deno_executions = resolve_lockfile_command_executions(root, &configuration.deno.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)))?;
 	#[rustfmt::skip]
-	let deno_executions = resolve_lockfile_command_executions(root, &configuration.deno.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)).collect(), monochange_deno::default_lockfile_commands)?;
-	#[rustfmt::skip]
-	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().filter(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)).collect(), monochange_dart::default_lockfile_commands)?;
+	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().any(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)))?;
 	let mut executions = cargo_executions;
 	executions.extend(npm_executions);
 	executions.extend(deno_executions);
@@ -507,20 +516,51 @@ pub(crate) fn build_lockfile_command_executions(
 	Ok(dedup_lockfile_command_executions(executions))
 }
 
+fn infer_cargo_lockfile_command_executions(
+	packages: &[PackageRecord],
+	released_versions: &BTreeMap<String, String>,
+) -> Vec<LockfileCommandExecution> {
+	let released_packages = packages
+		.iter()
+		.filter(|package| {
+			package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)
+		})
+		.collect::<Vec<_>>();
+	if released_packages.is_empty() {
+		return Vec::new();
+	}
+	let cargo_packages = packages
+		.iter()
+		.filter(|package| package.ecosystem == Ecosystem::Cargo)
+		.collect::<Vec<_>>();
+	let mut executions = Vec::new();
+	for package in released_packages {
+		for lockfile in monochange_cargo::discover_lockfiles(package) {
+			let shared_packages = cargo_packages
+				.iter()
+				.copied()
+				.filter(|candidate| {
+					monochange_cargo::discover_lockfiles(candidate).contains(&lockfile)
+				})
+				.collect::<Vec<_>>();
+			// Fast in-process lockfile rewrites are correct for already-canonical
+			// Cargo.lock files, but fixture and user workspaces can still contain
+			// incomplete locks that need Cargo itself to repopulate missing entries.
+			if monochange_cargo::lockfile_requires_command_refresh(&lockfile, &shared_packages) {
+				executions.extend(monochange_cargo::default_lockfile_commands(package));
+			}
+		}
+	}
+	executions
+}
+
 fn resolve_lockfile_command_executions(
 	root: &Path,
 	configured_commands: &[LockfileCommandDefinition],
-	released_packages: Vec<&PackageRecord>,
-	infer_defaults: fn(&PackageRecord) -> Vec<LockfileCommandExecution>,
+	has_released_packages: bool,
 ) -> MonochangeResult<Vec<LockfileCommandExecution>> {
-	if released_packages.is_empty() {
+	if !has_released_packages || configured_commands.is_empty() {
 		return Ok(Vec::new());
-	}
-	if configured_commands.is_empty() {
-		return Ok(released_packages
-			.into_iter()
-			.flat_map(infer_defaults)
-			.collect());
 	}
 	configured_commands
 		.iter()
@@ -1200,13 +1240,28 @@ fn copy_workspace_tree(source: &Path, destination: &Path) -> MonochangeResult<()
 }
 
 pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
-	prepare_release_execution(root, dry_run).map(|execution| execution.prepared_release)
+	// The public API returns structured release state, not rendered diffs.
+	// Building unified diffs for large lockfiles can dominate wall time, so skip
+	// that work here unless a caller explicitly asks for the richer execution
+	// report via `prepare_release_execution`.
+	prepare_release_execution_with_file_diffs(root, dry_run, false)
+		.map(|execution| execution.prepared_release)
 }
 
+#[cfg(test)]
 #[tracing::instrument(skip_all, fields(dry_run))]
 pub(crate) fn prepare_release_execution(
 	root: &Path,
 	dry_run: bool,
+) -> MonochangeResult<PreparedReleaseExecution> {
+	prepare_release_execution_with_file_diffs(root, dry_run, true)
+}
+
+#[tracing::instrument(skip_all, fields(dry_run, build_file_diffs))]
+pub(crate) fn prepare_release_execution_with_file_diffs(
+	root: &Path,
+	dry_run: bool,
+	build_file_diffs: bool,
 ) -> MonochangeResult<PreparedReleaseExecution> {
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_release_workspace(root, &configuration)?;
@@ -1347,7 +1402,15 @@ pub(crate) fn prepare_release_execution(
 		.iter()
 		.map(|update| update.path.clone())
 		.collect::<Vec<_>>();
-	let file_diffs = build_file_diff_previews(root, &file_updates)?;
+	// Diff rendering is far more expensive than preparing the release itself on
+	// large workspaces because unified diffs need to read and compare every
+	// changed file, including giant lockfiles. Only pay that cost when a caller
+	// explicitly needs human-readable diff previews.
+	let file_diffs = if build_file_diffs {
+		build_file_diff_previews(root, &file_updates)?
+	} else {
+		Vec::new()
+	};
 
 	let version = shared_release_version(&plan);
 	let group_version = shared_group_version(&plan);
