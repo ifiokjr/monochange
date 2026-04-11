@@ -496,8 +496,7 @@ ignored_paths = [
 # Command variables: Version, GroupVersion, ReleasedPackages, ChangedFiles, Changesets
 # Command templates can also use {{ inputs.name }} for CLI inputs; bare input names
 # remain available for backward compatibility.
-# Legacy $-prefixed interpolation: {{ version }}, $group_version, $released_packages,
-#   $changed_files, $changesets
+# {{ version }}, {{ group_version }}, {{ released_packages }}, {{changed_files}}, {{ changesets }}
 
 [cli.release]
 help_text = "Prepare a release from discovered change files"
@@ -508,10 +507,11 @@ inputs = [
 steps = [
 	{ type = "PrepareRelease" },
 	{ type = "RenderReleaseManifest", path = ".monochange/release-manifest.json", when = "{{ inputs.commit }}" },
+	{ type = "Command", command = "dprint fmt {{ changed_files }}" },
 	# Keep local `mc release` runs fast. The generated files are stable enough to
 	# inspect immediately, so we only pay for clippy/docs/validation right before
 	# creating and publishing the release commit.
-	{ type = "Command", command = "fix:all", when = "{{ inputs.commit }}" },
+	{ type = "Command", command = "mdt update", when = "{{ inputs.commit }}" },
 	{ type = "Command", command = "git add --all", when = "{{ inputs.commit }}" },
 	{ type = "CommitRelease", when = "{{ inputs.commit }}" },
 	{ type = "Command", command = "git push", when = "{{ inputs.commit }}" },
