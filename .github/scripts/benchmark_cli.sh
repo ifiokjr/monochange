@@ -152,7 +152,7 @@ run_scenario() {
 
 	local fixture_dir
 	fixture_dir="$(mktemp -d -t monochange-bench.XXXXXX)"
-	trap 'rm -rf "$fixture_dir"' RETURN
+	trap "rm -rf '$fixture_dir'" RETURN
 
 	generate_fixture "$fixture_dir" "$packages" "$changesets" "$commits"
 
