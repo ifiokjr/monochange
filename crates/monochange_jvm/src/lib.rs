@@ -217,6 +217,7 @@ pub fn update_pom_version(contents: &str, new_version: &str) -> String {
 	.to_string()
 }
 
+#[tracing::instrument(skip_all)]
 pub fn discover_jvm_projects(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let mut packages = Vec::new();
 	let mut warnings = Vec::new();
@@ -275,6 +276,8 @@ pub fn discover_jvm_projects(root: &Path) -> MonochangeResult<AdapterDiscovery> 
 
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
+
+	tracing::debug!(packages = packages.len(), "discovered jvm projects");
 
 	Ok(AdapterDiscovery { packages, warnings })
 }
