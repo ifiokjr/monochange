@@ -11,6 +11,7 @@ members = [
 	"crates/monochange_github",
 	"crates/monochange_gitlab",
 	"crates/monochange_graph",
+	"crates/monochange_jvm",
 	"crates/monochange_npm",
 	"crates/monochange_semver",
 	"docs",
@@ -23,6 +24,7 @@ default-members = [
 	"crates/monochange_dart",
 	"crates/monochange_deno",
 	"crates/monochange_graph",
+	"crates/monochange_jvm",
 	"crates/monochange_github",
 	"crates/monochange_gitea",
 	"crates/monochange_gitlab",
@@ -95,6 +97,7 @@ monochange_gitea = { version = "0.0.0", path = "./crates/monochange_gitea" }
 monochange_github = { version = "0.0.0", path = "./crates/monochange_github" }
 monochange_gitlab = { version = "0.0.0", path = "./crates/monochange_gitlab" }
 monochange_graph = { version = "0.0.0", path = "./crates/monochange_graph" }
+monochange_jvm = { version = "0.0.0", path = "./crates/monochange_jvm" }
 monochange_npm = { version = "0.0.0", path = "./crates/monochange_npm" }
 monochange_semver = { version = "0.0.0", path = "./crates/monochange_semver" }
 

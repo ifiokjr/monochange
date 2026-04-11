@@ -85,7 +85,7 @@ If you want a slower, more guided walkthrough, continue with [Start here](./guid
 
 <!-- {=projectMilestoneCapabilities} -->
 
-- discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
+- discover Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, and JVM (Gradle/Maven) packages
 - normalize dependency edges across ecosystems
 - coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input

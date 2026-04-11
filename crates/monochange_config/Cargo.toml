@@ -24,6 +24,7 @@ monochange_deno = { workspace = true }
 monochange_gitea = { workspace = true }
 monochange_github = { workspace = true }
 monochange_gitlab = { workspace = true }
+monochange_jvm = { workspace = true }
 monochange_npm = { workspace = true }
 regex = { workspace = true, default-features = true }
 semver = { workspace = true, default-features = true }

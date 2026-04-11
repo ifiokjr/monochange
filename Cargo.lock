@@ -1851,6 +1851,7 @@ dependencies = [
  "monochange_github",
  "monochange_gitlab",
  "monochange_graph",
+ "monochange_jvm",
  "monochange_npm",
  "monochange_semver",
  "monochange_test_helpers",
@@ -1929,6 +1930,7 @@ dependencies = [
  "monochange_gitea",
  "monochange_github",
  "monochange_gitlab",
+ "monochange_jvm",
  "monochange_npm",
  "monochange_test_helpers",
  "regex",
@@ -2059,6 +2061,24 @@ dependencies = [
  "semver",
  "similar-asserts",
  "tracing",
+]
+
+[[package]]
+name = "monochange_jvm"
+version = "0.0.0"
+dependencies = [
+ "glob",
+ "insta",
+ "monochange_core",
+ "monochange_test_helpers",
+ "regex",
+ "rstest",
+ "semver",
+ "similar-asserts",
+ "tempfile",
+ "toml",
+ "toml_edit",
+ "walkdir",
 ]
 
 [[package]]

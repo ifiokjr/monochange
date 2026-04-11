@@ -187,6 +187,7 @@ pub enum Ecosystem {
 	Deno,
 	Dart,
 	Flutter,
+	Jvm,
 }
 
 impl Ecosystem {
@@ -198,6 +199,7 @@ impl Ecosystem {
 			Self::Deno => "deno",
 			Self::Dart => "dart",
 			Self::Flutter => "flutter",
+			Self::Jvm => "jvm",
 		}
 	}
 }
@@ -348,6 +350,7 @@ pub enum PackageType {
 	Deno,
 	Dart,
 	Flutter,
+	Jvm,
 }
 
 impl PackageType {
@@ -359,6 +362,7 @@ impl PackageType {
 			Self::Deno => "deno",
 			Self::Dart => "dart",
 			Self::Flutter => "flutter",
+			Self::Jvm => "jvm",
 		}
 	}
 }
@@ -378,13 +382,14 @@ pub enum EcosystemType {
 	Npm,
 	Deno,
 	Dart,
+	Jvm,
 }
 
 impl EcosystemType {
 	#[must_use]
 	pub fn default_prefix(self) -> &'static str {
 		match self {
-			Self::Cargo => "",
+			Self::Cargo | Self::Jvm => "",
 			Self::Npm | Self::Deno | Self::Dart => "^",
 		}
 	}
@@ -396,6 +401,7 @@ impl EcosystemType {
 			Self::Npm => &["dependencies", "devDependencies", "peerDependencies"],
 			Self::Deno => &["imports"],
 			Self::Dart => &["dependencies", "dev_dependencies"],
+			Self::Jvm => &["dependencies"],
 		}
 	}
 }
@@ -2484,6 +2490,7 @@ pub struct WorkspaceConfiguration {
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,
 	pub dart: EcosystemSettings,
+	pub jvm: EcosystemSettings,
 }
 
 impl WorkspaceConfiguration {
