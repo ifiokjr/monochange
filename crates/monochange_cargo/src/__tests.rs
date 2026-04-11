@@ -197,6 +197,10 @@ fn materialize_nested_worktree_gitdir(root: &Path) {
 		if placeholder.is_file() {
 			let gitdir = fs::read_to_string(&placeholder)
 				.unwrap_or_else(|error| panic!("read {}: {error}", placeholder.display()));
+			if let Some(parent) = git_path.parent() {
+				fs::create_dir_all(parent)
+					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+			}
 			fs::write(&git_path, gitdir)
 				.unwrap_or_else(|error| panic!("write {}: {error}", git_path.display()));
 		}
