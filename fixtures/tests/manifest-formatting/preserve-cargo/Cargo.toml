@@ -11,3 +11,6 @@ authors = ["monochange Maintainers"]
 workflow-core = { path = "./crates/core", version = "1.0.0", default-features = false }
 workflow-app = { path = "./crates/app", version = "1.0.0" }
 serde = { version = "1.0.219", features = ["derive"] }
+
+[workspace.metadata.bin.monochange]
+version = "1.0.0"

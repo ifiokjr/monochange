@@ -710,7 +710,9 @@ pub(crate) fn apply_versioned_file_definition(
 				if kind == monochange_npm::NpmVersionedFileKind::Manifest {
 					*contents = monochange_core::update_json_manifest_text(
 						contents,
-						None,
+						shared_release_version
+							.map(String::as_str)
+							.or(Some(owner_version)),
 						&fields,
 						&versioned_deps,
 					)
@@ -766,7 +768,9 @@ pub(crate) fn apply_versioned_file_definition(
 			) => {
 				*contents = monochange_core::update_json_manifest_text(
 					contents,
-					None,
+					shared_release_version
+						.map(String::as_str)
+						.or(Some(owner_version)),
 					&fields,
 					&versioned_deps,
 				)
@@ -787,14 +791,20 @@ pub(crate) fn apply_versioned_file_definition(
 				CachedDocument::Text(contents),
 				VersionedFileKind::Dart(monochange_dart::DartVersionedFileKind::Manifest),
 			) => {
-				*contents =
-					monochange_dart::update_manifest_text(contents, None, &fields, &versioned_deps)
-						.map_err(|error| {
-							MonochangeError::Config(format!(
-								"failed to parse {}: {error}",
-								resolved_path.display()
-							))
-						})?;
+				*contents = monochange_dart::update_manifest_text(
+					contents,
+					shared_release_version
+						.map(String::as_str)
+						.or(Some(owner_version)),
+					&fields,
+					&versioned_deps,
+				)
+				.map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to parse {}: {error}",
+						resolved_path.display()
+					))
+				})?;
 			}
 			(
 				CachedDocument::Yaml(mapping),

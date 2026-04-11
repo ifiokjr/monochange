@@ -86,11 +86,11 @@ The current grouped changelog is correct but not very informative.
 
 ### Why the output looks this way
 
-The current group changelog aggregates member notes into one list, but the default change templates do not include `$package`:
+The current group changelog aggregates member notes into one list, but the default change templates do not include `{{ package }}`:
 
 ```toml
 [release_notes]
-change_templates = ["#### $summary\n\n$details", "- $summary"]
+change_templates = ["#### {{ summary }}\n\n{{ details }}", "- {{ summary }}"]
 ```
 
 That means grouped changelog entries render the summary text only, even though the release-note model already knows the originating package.
@@ -140,15 +140,15 @@ Rendered output should still look good in GitHub, GitLab, generated release note
 
 Do not choose this.
 
-## Option B — Use workspace-wide templates to include `$package`
+## Option B — Use workspace-wide templates to include `{{ package }}`
 
 Example configuration:
 
 ```toml
 [release_notes]
 change_templates = [
-	"#### $package — $summary\n\n$details",
-	"- **$package**: $summary",
+	"#### {{ package }} — {{ summary }}\n\n{{ details }}",
+	"- **{{ package }}**: {{ summary }}",
 ]
 ```
 

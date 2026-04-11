@@ -556,21 +556,25 @@ pub fn update_json_manifest_text(
 		replacements.push((span, render_json_string(owner_version)?));
 	}
 	for field in fields {
-		let Some(section_span) = find_json_object_field_value_span(contents, root_start, field)?
-		else {
+		let Some(field_span) = find_json_path_value_span(contents, root_start, field)? else {
 			continue;
 		};
-		if !json_span_is_object(contents, section_span) {
+		if json_span_is_object(contents, field_span) {
+			for (dep_name, dep_version) in versioned_deps {
+				let Some(dep_span) =
+					find_json_object_field_value_span(contents, field_span.start, dep_name)?
+						.filter(|span| json_span_is_string(contents, *span))
+				else {
+					continue;
+				};
+				replacements.push((dep_span, render_json_string(dep_version)?));
+			}
 			continue;
 		}
-		for (dep_name, dep_version) in versioned_deps {
-			let Some(dep_span) =
-				find_json_object_field_value_span(contents, section_span.start, dep_name)?
-					.filter(|span| json_span_is_string(contents, *span))
-			else {
-				continue;
-			};
-			replacements.push((dep_span, render_json_string(dep_version)?));
+		if let Some(owner_version) = owner_version
+			&& json_span_is_string(contents, field_span)
+		{
+			replacements.push((field_span, render_json_string(owner_version)?));
 		}
 	}
 	apply_json_replacements(contents, replacements)
@@ -606,6 +610,31 @@ fn json_root_object_start(contents: &str) -> MonochangeResult<usize> {
 			"expected JSON object at document root".to_string(),
 		))
 	}
+}
+
+fn find_json_path_value_span(
+	contents: &str,
+	root_start: usize,
+	path: &str,
+) -> MonochangeResult<Option<JsonSpan>> {
+	let mut segments = path.split('.').filter(|segment| !segment.is_empty());
+	let Some(first) = segments.next() else {
+		return Ok(None);
+	};
+	let Some(mut span) = find_json_object_field_value_span(contents, root_start, first)? else {
+		return Ok(None);
+	};
+	for segment in segments {
+		if !json_span_is_object(contents, span) {
+			return Ok(None);
+		}
+		let Some(next_span) = find_json_object_field_value_span(contents, span.start, segment)?
+		else {
+			return Ok(None);
+		};
+		span = next_span;
+	}
+	Ok(Some(span))
 }
 
 fn find_json_object_field_value_span(

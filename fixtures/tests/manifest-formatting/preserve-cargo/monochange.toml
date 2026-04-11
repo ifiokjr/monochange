@@ -12,7 +12,10 @@ path = "crates/app"
 
 [group.main]
 packages = ["core", "app"]
-versioned_files = [{ path = "group.toml", type = "cargo" }]
+versioned_files = [
+  { path = "group.toml", type = "cargo" },
+  { path = "Cargo.toml", type = "cargo", fields = ["workspace.metadata.bin.monochange.version"] },
+]
 tag = true
 release = true
 version_format = "primary"

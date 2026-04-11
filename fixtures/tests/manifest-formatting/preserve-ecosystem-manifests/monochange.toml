@@ -5,6 +5,7 @@ changelog = false
 [package.web]
 path = "packages/web"
 type = "npm"
+versioned_files = [{ path = "packages/web/package.json", type = "npm", fields = ["metadata.bin.monochange.version"] }]
 
 [package.tool]
 path = "tools/deno"

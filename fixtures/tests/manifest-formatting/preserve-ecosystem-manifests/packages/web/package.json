@@ -2,5 +2,12 @@
     "name": "web",
     "version": "1.0.0",
     "dependencies": { "shared": "^1.0.0" },
+    "metadata": {
+        "bin": {
+            "monochange": {
+                "version": "1.0.0"
+            }
+        }
+    },
     "private": false
 }

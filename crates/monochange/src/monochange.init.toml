@@ -202,6 +202,10 @@ warn_on_group_mismatch = true
 #                             e.g. ["Cargo.toml"] or ["**/crates/*/Cargo.toml"]
 #                             explicit typed entries remain supported, e.g.
 #                             [{ path = "group.toml", type = "cargo" }]
+#                             typed manifest entries can update dependency
+#                             sections and arbitrary string fields inside TOML
+#                             or JSON manifests, e.g.
+#                             [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.metadata.bin.monochange.version"], prefix = "" }]
 #                             regex entries update plain-text files and must include a
 #                             named `version` capture group, e.g.
 #                             [{ path = "README.md", regex = 'v(?<version>\d+\.\d+\.\d+)' }]
@@ -323,7 +327,8 @@ version_format = "primary"
 #   exclude  — glob patterns to exclude from discovery
 #   dependency_version_prefix — default dependency prefix for typed versioned_files
 #   versioned_files — ecosystem-wide default versioned_files inherited by matching packages;
-#                     entries may be typed manifest updates or plain-text regex
+#                     entries may be typed manifest updates (including
+#                     arbitrary TOML/JSON field paths) or plain-text regex
 #                     replacements with a named `version` capture, e.g.
 #                     [{ path = "src/lib.rs", regex = 'VERSION: &str = "(?<version>\d+\.\d+\.\d+)"' }]
 #   lockfile_commands — optional escape-hatch commands that refresh ecosystem

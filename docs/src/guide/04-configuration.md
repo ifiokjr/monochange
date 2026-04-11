@@ -182,13 +182,19 @@ versioned_files = ["**/crates/*/Cargo.toml"]
 # explicit typed entries remain available
 versioned_files = [{ path = "group.toml", type = "cargo", name = "sdk-core" }]
 versioned_files = [{ path = "docs/version.txt", type = "cargo" }]
+versioned_files = [
+	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.metadata.bin.monochange.version"], prefix = "" },
+]
+versioned_files = [
+	{ path = "package.json", type = "npm", fields = ["metadata.bin.monochange.version"] },
+]
 
 # ecosystem-level defaults inherited by matching packages
 [ecosystems.npm]
 versioned_files = ["**/packages/*/package.json"]
 ```
 
-Dependency targets in `versioned_files` must reference declared package ids. Groups must use explicit typed entries because monochange cannot infer a group ecosystem from a bare string.
+Typed manifest entries can update dependency sections and arbitrary string fields inside TOML or JSON manifests. Dependency targets in `versioned_files` must reference declared package ids. Groups must use explicit typed entries because monochange cannot infer a group ecosystem from a bare string.
 
 ### Regex versioned files
 
@@ -382,10 +388,10 @@ CLI command interpolation variables:
 
 <!-- {=configurationWorkflowVariables} -->
 
-- default command substitution when `variables` is omitted: `{{ version }}`, `$group_version`, `$released_packages`, `$changed_files`, and `$changesets`
+- built-in command variables are available directly as `{{ version }}`, `{{ group_version }}`, `{{ released_packages }}`, `{{ changed_files }}`, and `{{ changesets }}`
 - command templates can read CLI inputs through `{{ inputs.name }}`; bare input names still work for backward compatibility
 - every step can override the inputs it receives with `inputs = { ... }`; direct references like `"{{ inputs.labels }}"` preserve list and boolean values when rebinding to built-in steps
-- custom command substitution when `variables` is present: map your own replacement strings to variable names such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
+- custom command variables become available when `variables` is present: map your own names to variables such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
 - `dry_run_command` on a `Command` step replaces `command` only when the CLI command is run with `--dry-run`
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 

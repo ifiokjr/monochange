@@ -33,7 +33,7 @@
 - [x] T035 Add integration tests for grouped and ungrouped GitHub release payloads.
 - [x] T036 Add release-note customization for `change_templates`, `extra_changelog_sections`, and optional change `type` / `details` fields.
 
-> Follow-up note: add git-derived release-note template variables next (`$commit_hash`, `$commit_author_name`, and related metadata).
+> Follow-up note: add git-derived release-note template variables next (`{{ commit_hash }}`, `{{ commit_author_name }}`, and related metadata).
 
 ## Phase 4 — Release PR automation
 

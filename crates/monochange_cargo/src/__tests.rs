@@ -440,6 +440,89 @@ fn lockfile_requires_command_refresh_for_incomplete_lockfiles() {
 }
 
 #[test]
+fn lockfile_requires_command_refresh_for_missing_invalid_and_empty_lockfiles() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let package = PackageRecord::new(
+		Ecosystem::Cargo,
+		"workflow-core",
+		root.join("crates/core/Cargo.toml"),
+		root.to_path_buf(),
+		None,
+		PublishState::Public,
+	);
+	let package_refs = [&package];
+	let lockfile_path = root.join("Cargo.lock");
+
+	assert!(lockfile_requires_command_refresh(
+		&lockfile_path,
+		&package_refs
+	));
+
+	fs::write(&lockfile_path, "not valid toml = [")
+		.unwrap_or_else(|error| panic!("write invalid lockfile: {error}"));
+	assert!(lockfile_requires_command_refresh(
+		&lockfile_path,
+		&package_refs
+	));
+
+	fs::write(&lockfile_path, "version = 4\n")
+		.unwrap_or_else(|error| panic!("write empty lockfile: {error}"));
+	assert!(lockfile_requires_command_refresh(
+		&lockfile_path,
+		&package_refs
+	));
+}
+
+#[test]
+fn update_versioned_file_updates_arbitrary_manifest_field_paths() {
+	let contents = r#"[workspace.package]
+version = "1.0.0"
+
+[workspace.metadata.bin.monochange]
+version = "1.0.0"
+"#;
+	let updated = update_versioned_file_text(
+		contents,
+		CargoVersionedFileKind::Manifest,
+		&["workspace.metadata.bin.monochange.version"],
+		Some("2.0.0"),
+		None,
+		&BTreeMap::new(),
+		&BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("update cargo manifest: {error}"));
+
+	let document = updated
+		.parse::<DocumentMut>()
+		.unwrap_or_else(|error| panic!("parse updated manifest: {error}"));
+	assert_eq!(
+		document
+			.get("workspace")
+			.and_then(Item::as_table_like)
+			.and_then(|workspace| workspace.get("metadata"))
+			.and_then(Item::as_table_like)
+			.and_then(|metadata| metadata.get("bin"))
+			.and_then(Item::as_table_like)
+			.and_then(|bin| bin.get("monochange"))
+			.and_then(Item::as_table_like)
+			.and_then(|monochange| monochange.get("version"))
+			.and_then(Item::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		document
+			.get("workspace")
+			.and_then(Item::as_table_like)
+			.and_then(|workspace| workspace.get("package"))
+			.and_then(Item::as_table_like)
+			.and_then(|package| package.get("version"))
+			.and_then(Item::as_str),
+		Some("1.0.0")
+	);
+}
+
+#[test]
 fn update_versioned_file_updates_manifest_and_workspace_dependencies() {
 	let manifest = r#"
 [package]
@@ -772,6 +855,42 @@ fn cargo_versioned_file_helpers_cover_non_table_and_insertion_paths() {
 			.and_then(|table| table.get("core"))
 			.and_then(Item::as_str),
 		Some("2.0.0")
+	);
+
+	let mut nested_document = r#"
+[workspace]
+version = "1.0.0"
+
+[workspace.metadata]
+value = true
+"#
+	.parse::<DocumentMut>()
+	.unwrap_or_else(|error| panic!("parse nested document: {error}"));
+	let workspace_table = nested_document
+		.get_mut("workspace")
+		.and_then(Item::as_table_like_mut)
+		.unwrap_or_else(|| panic!("expected workspace table"));
+	crate::set_table_value_by_path(workspace_table, &[], "2.0.0");
+	crate::set_table_value_by_path(workspace_table, &["missing", "version"], "2.0.0");
+	crate::set_table_value_by_path(workspace_table, &["version", "nested"], "2.0.0");
+	crate::set_table_value_by_path(workspace_table, &["metadata", "version"], "2.0.0");
+	assert_eq!(
+		nested_document
+			.get("workspace")
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("version"))
+			.and_then(Item::as_str),
+		Some("1.0.0")
+	);
+	assert_eq!(
+		nested_document
+			.get("workspace")
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("metadata"))
+			.and_then(Item::as_table_like)
+			.and_then(|table| table.get("value"))
+			.and_then(Item::as_bool),
+		Some(true)
 	);
 
 	let mut empty_item = Item::None;
