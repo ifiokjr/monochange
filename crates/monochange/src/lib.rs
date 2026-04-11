@@ -518,7 +518,14 @@ pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 }
 
 fn extract_log_level_from_args() -> Option<String> {
-	let mut args = std::env::args().peekable();
+	extract_log_level(std::env::args())
+}
+
+fn extract_log_level<I>(args: I) -> Option<String>
+where
+	I: IntoIterator<Item = String>,
+{
+	let mut args = args.into_iter();
 	while let Some(arg) = args.next() {
 		if arg == "--log-level" {
 			return args.next();

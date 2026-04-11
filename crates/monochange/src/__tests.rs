@@ -8266,3 +8266,91 @@ fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
 		"last_updated commit should match the most recent commit"
 	);
 }
+
+#[test]
+fn extract_log_level_returns_none_when_flag_absent() {
+	let args = ["mc", "discover", "--format", "json"];
+	assert_eq!(
+		crate::extract_log_level(args.iter().map(ToString::to_string)),
+		None
+	);
+}
+
+#[test]
+fn extract_log_level_returns_value_for_separate_flag() {
+	let args = ["mc", "--log-level", "debug", "discover"];
+	assert_eq!(
+		crate::extract_log_level(args.iter().map(ToString::to_string)),
+		Some("debug".to_string())
+	);
+}
+
+#[test]
+fn extract_log_level_returns_value_for_equals_syntax() {
+	let args = ["mc", "--log-level=monochange=trace", "release"];
+	assert_eq!(
+		crate::extract_log_level(args.iter().map(ToString::to_string)),
+		Some("monochange=trace".to_string())
+	);
+}
+
+#[test]
+fn extract_log_level_returns_none_when_flag_has_no_value() {
+	let args = ["mc", "--log-level"];
+	assert_eq!(
+		crate::extract_log_level(args.iter().map(ToString::to_string)),
+		None
+	);
+}
+
+#[test]
+fn init_tracing_with_none_does_not_install_subscriber() {
+	crate::tracing_setup::init_tracing(None);
+}
+
+#[test]
+fn init_tracing_with_valid_filter_does_not_panic() {
+	crate::tracing_setup::init_tracing(Some("monochange=debug"));
+}
+
+#[test]
+fn cli_accepts_log_level_flag_without_error() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("--log-level"),
+			OsString::from("debug"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("log-level with help: {error}"));
+
+	assert!(output.contains("Usage: mc <COMMAND>"));
+}
+
+#[test]
+fn cli_accepts_log_level_equals_syntax_without_error() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("--log-level=monochange=trace"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("log-level equals with help: {error}"));
+
+	assert!(output.contains("Usage: mc <COMMAND>"));
+}
+
+#[test]
+fn cli_help_does_not_show_log_level_flag() {
+	let output = run_with_args("mc", [OsString::from("mc"), OsString::from("--help")])
+		.unwrap_or_else(|error| panic!("help output: {error}"));
+
+	assert!(
+		!output.contains("--log-level"),
+		"hidden flag should not appear in help output"
+	);
+}
