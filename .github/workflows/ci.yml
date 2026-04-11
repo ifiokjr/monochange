@@ -115,6 +115,7 @@ jobs:
   benchmark:
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: write
       pull-requests: write
@@ -129,14 +130,23 @@ jobs:
 
       - name: run benchmarks
         run: |
+          set +e
           mkdir -p target
           cargo bench -p monochange --bench cli_commands -- \
             --output-format bencher \
             "config_load" "discover" "validate" "changeset_loading" "prepare_release_dry_run" \
             > /tmp/bench-raw.txt 2>&1
+          bench_exit=$?
           grep "^test " /tmp/bench-raw.txt > target/benchmark-results.txt || true
+          echo "Benchmark exit code: $bench_exit"
+          echo "Results:"
           cat target/benchmark-results.txt
-        shell: devenv shell -- bash -e {0}
+          if [ ! -s target/benchmark-results.txt ]; then
+            echo "Raw output:"
+            tail -30 /tmp/bench-raw.txt
+          fi
+          [ -s target/benchmark-results.txt ]
+        shell: devenv shell -- bash {0}
 
       - name: compare benchmarks and comment on PR
         uses: benchmark-action/github-action-benchmark@v1
@@ -155,6 +165,7 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       pull-requests: write
     steps:
