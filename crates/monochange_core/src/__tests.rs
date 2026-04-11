@@ -1,8 +1,12 @@
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 
 use semver::Version;
 use serde_json::json;
+use tempfile::TempDir;
+use tempfile::tempdir;
 
 use crate::BumpSeverity;
 use crate::ChangelogFormat;
@@ -194,6 +198,91 @@ fn is_pre_stable_returns_true_for_zero_major() {
 	assert!(BumpSeverity::is_pre_stable(&Version::new(0, 99, 99)));
 	assert!(!BumpSeverity::is_pre_stable(&Version::new(1, 0, 0)));
 	assert!(!BumpSeverity::is_pre_stable(&Version::new(2, 0, 0)));
+}
+
+#[test]
+fn discovery_path_filter_rejects_gitignored_paths() {
+	let fixture = setup_discovery_fixture("ignore-gitignored-nested-worktree");
+	let root = fixture.path();
+	let filter = crate::DiscoveryPathFilter::new(root);
+
+	assert!(!filter.should_descend(&root.join(".claude")));
+	assert!(!filter.allows(&root.join(".claude/worktrees/feature/Cargo.toml")));
+	assert!(filter.allows(&root.join("crates/root/Cargo.toml")));
+}
+
+#[test]
+fn discovery_path_filter_rejects_paths_under_nested_git_worktrees() {
+	let fixture = setup_discovery_fixture("ignore-automatic-nested-worktree");
+	let root = fixture.path();
+	let filter = crate::DiscoveryPathFilter::new(root);
+
+	assert!(!filter.should_descend(&root.join("sandbox/feature")));
+	assert!(!filter.allows(&root.join("sandbox/feature/crates/ignored/Cargo.toml")));
+	assert!(filter.allows(&root.join("crates/root/Cargo.toml")));
+}
+
+fn setup_discovery_fixture(name: &str) -> TempDir {
+	let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo")
+		.join(name);
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&source, tempdir.path());
+	materialize_nested_worktree_gitdir(tempdir.path());
+	tempdir
+}
+
+fn copy_directory(source: &Path, destination: &Path) {
+	fs::create_dir_all(destination)
+		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
+	for entry in fs::read_dir(source)
+		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
+	{
+		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
+		let source_path = entry.path();
+		let destination_path = destination.join(entry.file_name());
+		let metadata = fs::metadata(&source_path)
+			.unwrap_or_else(|error| panic!("metadata {}: {error}", source_path.display()));
+		if metadata.is_dir() {
+			copy_directory(&source_path, &destination_path);
+		} else if metadata.is_file() {
+			if let Some(parent) = destination_path.parent() {
+				fs::create_dir_all(parent)
+					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+			}
+			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
+				panic!(
+					"copy {} -> {}: {error}",
+					source_path.display(),
+					destination_path.display()
+				)
+			});
+		}
+	}
+}
+
+fn materialize_nested_worktree_gitdir(root: &Path) {
+	for (placeholder, git_path) in [
+		(
+			root.join("sandbox/feature/gitdir.txt"),
+			root.join("sandbox/feature/.git"),
+		),
+		(
+			root.join("feature.gitdir"),
+			root.join(".claude/worktrees/feature/.git"),
+		),
+	] {
+		if placeholder.is_file() {
+			let gitdir = fs::read_to_string(&placeholder)
+				.unwrap_or_else(|error| panic!("read {}: {error}", placeholder.display()));
+			if let Some(parent) = git_path.parent() {
+				fs::create_dir_all(parent)
+					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+			}
+			fs::write(&git_path, gitdir)
+				.unwrap_or_else(|error| panic!("write {}: {error}", git_path.display()));
+		}
+	}
 }
 
 #[test]

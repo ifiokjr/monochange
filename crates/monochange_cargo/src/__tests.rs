@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -113,6 +114,97 @@ fn cargo_workspace_members_mark_uses_workspace_version_metadata() {
 			.map(String::as_str),
 		None
 	);
+}
+
+#[test]
+fn discover_cargo_packages_ignores_gitignored_nested_worktrees() {
+	let fixture = setup_discovery_fixture("ignore-gitignored-nested-worktree");
+	let discovery = discover_cargo_packages(fixture.path())
+		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
+	let package_names = discovery
+		.packages
+		.iter()
+		.map(|package| package.name.as_str())
+		.collect::<Vec<_>>();
+
+	assert_eq!(package_names, vec!["root-package"]);
+}
+
+#[test]
+fn discover_cargo_packages_ignores_nested_worktrees_even_when_not_gitignored() {
+	let fixture = setup_discovery_fixture("ignore-automatic-nested-worktree");
+	let discovery = discover_cargo_packages(fixture.path())
+		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
+	let package_names = discovery
+		.packages
+		.iter()
+		.map(|package| package.name.as_str())
+		.collect::<Vec<_>>();
+
+	assert_eq!(package_names, vec!["root-package"]);
+}
+
+fn setup_discovery_fixture(name: &str) -> tempfile::TempDir {
+	let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo")
+		.join(name);
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&source, tempdir.path());
+	materialize_nested_worktree_gitdir(tempdir.path());
+	tempdir
+}
+
+fn copy_directory(source: &Path, destination: &Path) {
+	fs::create_dir_all(destination)
+		.unwrap_or_else(|error| panic!("create destination {}: {error}", destination.display()));
+	for entry in fs::read_dir(source)
+		.unwrap_or_else(|error| panic!("read dir {}: {error}", source.display()))
+	{
+		let entry = entry.unwrap_or_else(|error| panic!("dir entry: {error}"));
+		let source_path = entry.path();
+		let destination_path = destination.join(entry.file_name());
+		let metadata = fs::metadata(&source_path)
+			.unwrap_or_else(|error| panic!("metadata {}: {error}", source_path.display()));
+		if metadata.is_dir() {
+			copy_directory(&source_path, &destination_path);
+		} else if metadata.is_file() {
+			if let Some(parent) = destination_path.parent() {
+				fs::create_dir_all(parent)
+					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+			}
+			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
+				panic!(
+					"copy {} -> {}: {error}",
+					source_path.display(),
+					destination_path.display()
+				)
+			});
+		}
+	}
+}
+
+fn materialize_nested_worktree_gitdir(root: &Path) {
+	for (placeholder, git_path) in [
+		(
+			root.join("sandbox/feature/gitdir.txt"),
+			root.join("sandbox/feature/.git"),
+		),
+		(
+			root.join("feature.gitdir"),
+			root.join(".claude/worktrees/feature/.git"),
+		),
+	] {
+		if placeholder.is_file() {
+			let gitdir = fs::read_to_string(&placeholder)
+				.unwrap_or_else(|error| panic!("read {}: {error}", placeholder.display()));
+			if let Some(parent) = git_path.parent() {
+				fs::create_dir_all(parent)
+					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+			}
+			fs::write(&git_path, gitdir)
+				.unwrap_or_else(|error| panic!("write {}: {error}", git_path.display()));
+		}
+	}
 }
 
 #[test]
@@ -1069,7 +1161,7 @@ fn cargo_manifest_helpers_cover_workspace_and_error_paths() {
 	let root_manifest = versioned_root.join("Cargo.toml");
 	assert!(has_workspace_section(&root_manifest).unwrap());
 	let parsed = toml::from_str::<Value>(
-		&std::fs::read_to_string(&root_manifest)
+		&fs::read_to_string(&root_manifest)
 			.unwrap_or_else(|error| panic!("read workspace manifest: {error}")),
 	)
 	.unwrap_or_else(|error| panic!("parse workspace manifest: {error}"));
@@ -1104,14 +1196,14 @@ fn cargo_manifest_helpers_cover_workspace_and_error_paths() {
 	let invalid_package_root = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/cargo/invalid-package-name");
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	std::fs::create_dir_all(tempdir.path().join("crates/core"))
+	fs::create_dir_all(tempdir.path().join("crates/core"))
 		.unwrap_or_else(|error| panic!("create temp package dir: {error}"));
-	std::fs::copy(
+	fs::copy(
 		invalid_package_root.join("invalid-workspace.toml"),
 		tempdir.path().join("invalid-workspace.toml"),
 	)
 	.unwrap_or_else(|error| panic!("copy workspace manifest: {error}"));
-	std::fs::copy(
+	fs::copy(
 		invalid_package_root.join("crates/core/invalid-package.toml"),
 		tempdir.path().join("crates/core/Cargo.toml"),
 	)

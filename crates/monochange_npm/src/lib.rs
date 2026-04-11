@@ -42,6 +42,7 @@ use std::path::PathBuf;
 use glob::glob;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
+use monochange_core::DiscoveryPathFilter;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
 use monochange_core::LockfileCommandExecution;
@@ -876,6 +877,7 @@ fn expand_member_patterns(
 	patterns: &[String],
 	warnings: &mut Vec<String>,
 ) -> BTreeSet<PathBuf> {
+	let filter = DiscoveryPathFilter::new(root);
 	let mut manifests = BTreeSet::new();
 	for pattern in patterns {
 		let joined_pattern = root.join(pattern).to_string_lossy().to_string();
@@ -883,6 +885,7 @@ fn expand_member_patterns(
 			.into_iter()
 			.flat_map(|paths| paths.filter_map(Result::ok))
 			.map(|path| normalize_path(&path))
+			.filter(|path| filter.allows(path))
 			.collect::<Vec<_>>();
 		if matches.is_empty() {
 			warnings.push(format!(
@@ -897,7 +900,9 @@ fn expand_member_patterns(
 			} else {
 				matched_path
 			};
-			if manifest_path.file_name().and_then(|name| name.to_str()) == Some(PACKAGE_JSON_FILE) {
+			if manifest_path.file_name().and_then(|name| name.to_str()) == Some(PACKAGE_JSON_FILE)
+				&& filter.allows(&manifest_path)
+			{
 				manifests.insert(manifest_path);
 			}
 		}
@@ -906,9 +911,10 @@ fn expand_member_patterns(
 }
 
 fn find_pnpm_workspaces(root: &Path) -> Vec<PathBuf> {
+	let filter = DiscoveryPathFilter::new(root);
 	WalkDir::new(root)
 		.into_iter()
-		.filter_entry(should_descend)
+		.filter_entry(|entry| filter.should_descend(entry.path()))
 		.filter_map(Result::ok)
 		.filter(|entry| entry.file_name() == PNPM_WORKSPACE_FILE)
 		.map(DirEntry::into_path)
@@ -917,22 +923,15 @@ fn find_pnpm_workspaces(root: &Path) -> Vec<PathBuf> {
 }
 
 fn find_all_package_json(root: &Path) -> Vec<PathBuf> {
+	let filter = DiscoveryPathFilter::new(root);
 	WalkDir::new(root)
 		.into_iter()
-		.filter_entry(should_descend)
+		.filter_entry(|entry| filter.should_descend(entry.path()))
 		.filter_map(Result::ok)
 		.filter(|entry| entry.file_name() == PACKAGE_JSON_FILE)
 		.map(DirEntry::into_path)
 		.map(|path| normalize_path(&path))
 		.collect()
-}
-
-fn should_descend(entry: &DirEntry) -> bool {
-	let file_name = entry.file_name().to_string_lossy();
-	!matches!(
-		file_name.as_ref(),
-		".git" | "target" | "node_modules" | ".devenv" | "book"
-	)
 }
 
 #[cfg(test)]

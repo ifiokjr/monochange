@@ -41,6 +41,7 @@ use std::path::PathBuf;
 use glob::glob;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
+use monochange_core::DiscoveryPathFilter;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
 use monochange_core::LockfileCommandExecution;
@@ -254,12 +255,15 @@ fn expand_workspace_patterns(
 	patterns: &[String],
 	warnings: &mut Vec<String>,
 ) -> BTreeSet<PathBuf> {
+	let filter = DiscoveryPathFilter::new(root);
 	let mut manifests = BTreeSet::new();
 	for pattern in patterns {
 		let joined_pattern = root.join(pattern).to_string_lossy().to_string();
 		let matches = glob(&joined_pattern)
 			.into_iter()
 			.flat_map(|paths| paths.filter_map(Result::ok))
+			.map(|path| normalize_path(&path))
+			.filter(|path| filter.allows(path))
 			.collect::<Vec<_>>();
 		if matches.is_empty() {
 			warnings.push(format!(
@@ -277,6 +281,7 @@ fn expand_workspace_patterns(
 				};
 				if manifest_path.file_name().and_then(|name| name.to_str()) == Some(manifest_name)
 					&& manifest_path.exists()
+					&& filter.allows(&manifest_path)
 				{
 					manifests.insert(manifest_path);
 				}
@@ -361,22 +366,15 @@ fn parse_json_manifest(manifest_path: &Path) -> MonochangeResult<Value> {
 }
 
 fn find_all_manifests(root: &Path) -> Vec<PathBuf> {
+	let filter = DiscoveryPathFilter::new(root);
 	WalkDir::new(root)
 		.into_iter()
-		.filter_entry(should_descend)
+		.filter_entry(|entry| filter.should_descend(entry.path()))
 		.filter_map(Result::ok)
 		.filter(|entry| DENO_MANIFEST_FILES.contains(&entry.file_name().to_string_lossy().as_ref()))
 		.map(DirEntry::into_path)
 		.map(|path| normalize_path(&path))
 		.collect()
-}
-
-fn should_descend(entry: &DirEntry) -> bool {
-	let file_name = entry.file_name().to_string_lossy();
-	!matches!(
-		file_name.as_ref(),
-		".git" | "target" | "node_modules" | ".devenv" | "book"
-	)
 }
 
 #[cfg(test)]

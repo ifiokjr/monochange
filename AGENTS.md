@@ -22,6 +22,7 @@
 ## Git rules
 
 - Never use `--no-verify` with `git commit` or `git push`.
+- Never change `commit.gpgsign` in local, global, or workspace git config.
 - The only allowed exception is during `git rebase` workflows when a rebase continuation or amend step would otherwise block on hooks/editor behavior.
 
 ## Task-specific guidance

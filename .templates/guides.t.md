@@ -12,6 +12,7 @@
 - native workspace globs are expanded by each ecosystem adapter
 - dependency names are normalized into one graph
 - package ids and manifest paths in CLI output are rendered relative to the repository root for deterministic automation
+- gitignored paths and nested git worktrees are skipped during discovery
 - version-group assignments are attached after discovery
 - unmatched group members (declared in config but not found during discovery) produce warnings
 - unresolvable group members (invalid package IDs in `group.packages`) produce errors during configuration loading

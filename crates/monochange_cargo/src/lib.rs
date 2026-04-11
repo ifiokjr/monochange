@@ -46,6 +46,7 @@ use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::CompatibilityAssessment;
 use monochange_core::DependencyKind;
+use monochange_core::DiscoveryPathFilter;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
 use monochange_core::LockfileCommandExecution;
@@ -690,14 +691,15 @@ fn expand_manifest_patterns(
 	exclude_patterns: &[&str],
 	warnings: &mut Vec<String>,
 ) -> BTreeSet<PathBuf> {
+	let filter = DiscoveryPathFilter::new(root);
 	let excluded = exclude_patterns
 		.iter()
-		.flat_map(|pattern| glob_pattern_paths(root, pattern))
+		.flat_map(|pattern| glob_pattern_paths(root, pattern, &filter))
 		.collect::<HashSet<_>>();
 	let mut manifests = BTreeSet::new();
 
 	for pattern in member_patterns {
-		let matches = glob_pattern_paths(root, pattern);
+		let matches = glob_pattern_paths(root, pattern, &filter);
 		if matches.is_empty() {
 			warnings.push(format!(
 				"cargo workspace pattern `{pattern}` under {} matched no packages",
@@ -713,6 +715,7 @@ fn expand_manifest_patterns(
 			};
 
 			if manifest_path.file_name().and_then(|name| name.to_str()) != Some(CARGO_MANIFEST_FILE)
+				|| !filter.allows(&manifest_path)
 			{
 				continue;
 			}
@@ -726,12 +729,13 @@ fn expand_manifest_patterns(
 	manifests
 }
 
-fn glob_pattern_paths(root: &Path, pattern: &str) -> Vec<PathBuf> {
+fn glob_pattern_paths(root: &Path, pattern: &str, filter: &DiscoveryPathFilter) -> Vec<PathBuf> {
 	let joined_pattern = root.join(pattern).to_string_lossy().to_string();
 	glob(&joined_pattern)
 		.into_iter()
 		.flat_map(|paths| paths.filter_map(Result::ok))
 		.map(|path| normalize_path(&path))
+		.filter(|path| filter.allows(path))
 		.collect()
 }
 
@@ -887,9 +891,10 @@ fn has_workspace_section(manifest_path: &Path) -> MonochangeResult<bool> {
 }
 
 fn find_all_manifests(root: &Path) -> Vec<PathBuf> {
+	let filter = DiscoveryPathFilter::new(root);
 	WalkDir::new(root)
 		.into_iter()
-		.filter_entry(should_descend)
+		.filter_entry(|entry| filter.should_descend(entry.path()))
 		.filter_map(Result::ok)
 		.filter(|entry| entry.file_name() == CARGO_MANIFEST_FILE)
 		.map(DirEntry::into_path)
@@ -927,14 +932,6 @@ fn parse_severity(value: &str) -> BumpSeverity {
 		"patch" => BumpSeverity::Patch,
 		_ => BumpSeverity::None,
 	}
-}
-
-fn should_descend(entry: &DirEntry) -> bool {
-	let file_name = entry.file_name().to_string_lossy();
-	!matches!(
-		file_name.as_ref(),
-		".git" | "target" | "node_modules" | ".devenv" | "book"
-	)
 }
 
 #[cfg(test)]

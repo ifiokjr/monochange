@@ -52,6 +52,7 @@ doc-comment = { version = "^0.3", default-features = false }
 etest = { version = "^0.3", default-features = false }
 glob = { version = "^0.3", default-features = false }
 httpmock = { version = "^0.8.3", default-features = false }
+ignore = { version = "^0.4", default-features = false }
 inquire = { version = "^0.9", default-features = false }
 insta = { version = "^1", default-features = false, features = ["filters", "json"] }
 insta-cmd = { version = "^0.6", default-features = false }
