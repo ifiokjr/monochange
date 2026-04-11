@@ -321,9 +321,8 @@ fn batch_git_log(
 		Ok(output) if output.status.success() => output,
 		_ => return HashMap::new(),
 	};
-	let stdout = match String::from_utf8(output.stdout) {
-		Ok(s) => s,
-		Err(_) => return HashMap::new(),
+	let Ok(stdout) = String::from_utf8(output.stdout) else {
+		return HashMap::new();
 	};
 
 	let wanted_paths: std::collections::HashSet<String> = paths

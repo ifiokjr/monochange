@@ -587,7 +587,7 @@ fn render_jinja_template_with_behavior(
 			});
 			let cache_ref = cache.borrow();
 			let env = cache_ref.get(template_source).unwrap_or_else(|| unreachable!("just inserted"));
-			match env.get_template("t") {
+			let rendered = match env.get_template("t") {
 				Ok(tmpl) => tmpl
 					.render(context)
 					.map_err(|error| MonochangeError::Config(format!("template rendering failed: {error}"))),
@@ -596,7 +596,8 @@ fn render_jinja_template_with_behavior(
 					env.render_str(template_source, context)
 						.map_err(|error| MonochangeError::Config(format!("template rendering failed: {error}")))
 				}
-			}
+			};
+			rendered
 		};
 
 	match undefined_behavior {
