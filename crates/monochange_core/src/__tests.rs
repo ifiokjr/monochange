@@ -882,6 +882,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		npm: EcosystemSettings::default(),
 		deno: EcosystemSettings::default(),
 		dart: EcosystemSettings::default(),
+		ruby: EcosystemSettings::default(),
 	}
 }
 

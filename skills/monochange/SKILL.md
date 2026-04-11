@@ -110,7 +110,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 ### Lockfile commands
 
-Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, and Dart/Flutter. Explicit configuration overrides inference.
+Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, Dart/Flutter, and Ruby. Explicit configuration overrides inference.
 
 ### Release titles
 

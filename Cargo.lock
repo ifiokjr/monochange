@@ -1852,6 +1852,7 @@ dependencies = [
  "monochange_gitlab",
  "monochange_graph",
  "monochange_npm",
+ "monochange_ruby",
  "monochange_semver",
  "monochange_test_helpers",
  "rayon",
@@ -1930,6 +1931,7 @@ dependencies = [
  "monochange_github",
  "monochange_gitlab",
  "monochange_npm",
+ "monochange_ruby",
  "monochange_test_helpers",
  "regex",
  "rstest",
@@ -2075,6 +2077,23 @@ dependencies = [
  "serde_yaml_ng",
  "similar-asserts",
  "thiserror 2.0.18",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
+name = "monochange_ruby"
+version = "0.0.0"
+dependencies = [
+ "glob",
+ "insta",
+ "monochange_core",
+ "monochange_test_helpers",
+ "regex",
+ "rstest",
+ "semver",
+ "similar-asserts",
+ "tempfile",
  "tracing",
  "walkdir",
 ]

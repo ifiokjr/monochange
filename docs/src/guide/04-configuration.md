@@ -241,6 +241,7 @@ When you do not configure `lockfile_commands`, monochange infers sensible defaul
   - `pnpm-lock.yaml` → `pnpm install --lockfile-only`
   - `bun.lock` / `bun.lockb` → `bun install --lockfile-only`
 - Dart / Flutter: `dart pub get` or `flutter pub get`
+- Ruby: `bundle lock --update` (when `Gemfile.lock` exists)
 - Deno: no inferred default today
 
 If you configure `lockfile_commands` for an ecosystem, monochange stops inferring defaults for that ecosystem and those commands fully own lockfile refresh.
@@ -481,6 +482,10 @@ enabled = true
 [ecosystems.dart]
 enabled = true
 lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
+
+[ecosystems.ruby]
+enabled = true
+lockfile_commands = [{ command = "bundle lock --update" }]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->
