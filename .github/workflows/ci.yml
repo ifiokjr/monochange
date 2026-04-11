@@ -128,7 +128,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run benchmarks
-        run: cargo bench -p monochange --bench cli_commands -- --output-format bencher 2>&1 | tee target/benchmark-results.txt || true
+        run: |
+          mkdir -p target
+          cargo bench -p monochange --bench cli_commands -- \
+            --output-format bencher \
+            "config_load" "discover" "validate" "changeset_loading" "prepare_release_dry_run" \
+            2>&1 | tee target/benchmark-results.txt
         shell: devenv shell -- bash -e {0}
 
       - name: compare benchmarks and comment on PR
@@ -179,11 +184,12 @@ jobs:
           mkdir -p /tmp/bench-fixture/.changeset
           cd /tmp/bench-fixture
 
-          cat > Cargo.toml << 'TOML'
-          [workspace]
-          members = ["crates/pkg-0","crates/pkg-1","crates/pkg-2","crates/pkg-3","crates/pkg-4","crates/pkg-5","crates/pkg-6","crates/pkg-7","crates/pkg-8","crates/pkg-9","crates/pkg-10","crates/pkg-11","crates/pkg-12","crates/pkg-13","crates/pkg-14","crates/pkg-15","crates/pkg-16","crates/pkg-17","crates/pkg-18","crates/pkg-19"]
-          resolver = "2"
-          TOML
+          printf '[workspace]\nmembers = [' > Cargo.toml
+          for i in $(seq 0 19); do
+            [ $i -gt 0 ] && printf ',' >> Cargo.toml
+            printf '"crates/pkg-%d"' $i >> Cargo.toml
+          done
+          printf ']\nresolver = "2"\n' >> Cargo.toml
 
           printf '[defaults]\npackage_type = "cargo"\n\n' > monochange.toml
           for i in $(seq 0 19); do
@@ -234,16 +240,15 @@ jobs:
           done
 
           {
-            echo "results<<EOF"
+            echo "results<<ENDOFBENCH"
             echo "## Binary Benchmark: main vs PR"
             echo ""
             echo "Fixture: 20 packages, 50 changesets, 50 git commits"
             echo ""
             echo "| Command | main | PR | ratio |"
             echo "|---------|------|-----|-------|"
-            printf "$RESULTS"
-            echo ""
-            echo "EOF"
+            echo -e "$RESULTS"
+            echo "ENDOFBENCH"
           } >> "$GITHUB_OUTPUT"
         working-directory: /tmp/bench-fixture
         shell: bash -e {0}
