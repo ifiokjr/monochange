@@ -6,10 +6,12 @@ use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
-use test_support::{
-	copy_directory, current_test_name, fixture_path, monochange_command, setup_scenario_workspace,
-	snapshot_settings,
-};
+use test_support::copy_directory;
+use test_support::current_test_name;
+use test_support::fixture_path;
+use test_support::monochange_command;
+use test_support::setup_scenario_workspace;
+use test_support::snapshot_settings;
 
 #[rstest]
 #[case::detects_package_changes(

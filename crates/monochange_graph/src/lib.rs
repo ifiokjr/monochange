@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_graph`
@@ -240,17 +239,15 @@ pub fn build_release_plan(
 				.members
 				.iter()
 				.map(|member| {
-					states
-						.get(member.as_str())
-						.map_or_else(
-							|| {
-								eprintln!(
-									"warning: version group `{group_id}` member `{member}` was not found in discovered packages"
-								);
-								BumpSeverity::None
-							},
-							|state| state.severity,
-						)
+					states.get(member.as_str()).map_or_else(
+						|| {
+							eprintln!(
+								"warning: version group `{group_id}` member `{member}` was not found in discovered packages"
+							);
+							BumpSeverity::None
+						},
+						|state| state.severity,
+					)
 				})
 				.max()
 				.unwrap_or(BumpSeverity::None);
@@ -460,12 +457,12 @@ fn resolve_explicit_version_choice(
 		}
 		warnings.push(message);
 	}
-	if let Some(current_version) = current_version {
-		if chosen_version <= *current_version {
-			return Err(MonochangeError::Config(format!(
-				"explicit version `{chosen_version}` for {owner} must be greater than current version `{current_version}`"
-			)));
-		}
+	if let Some(current_version) = current_version
+		&& chosen_version <= *current_version
+	{
+		return Err(MonochangeError::Config(format!(
+			"explicit version `{chosen_version}` for {owner} must be greater than current version `{current_version}`"
+		)));
 	}
 	Ok(chosen_version)
 }

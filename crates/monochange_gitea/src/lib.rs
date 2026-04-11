@@ -1,16 +1,9 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 
-use monochange_core::git::git_checkout_branch_command;
-use monochange_core::git::git_commit_paths_command;
-use monochange_core::git::git_push_branch_command;
-use monochange_core::git::git_stage_paths_command;
-use monochange_core::git::run_command;
-use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -27,14 +20,20 @@ use monochange_core::SourceProvider;
 use monochange_core::SourceReleaseOperation;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
+use monochange_core::git::git_checkout_branch_command;
+use monochange_core::git::git_commit_paths_command;
+use monochange_core::git::git_push_branch_command;
+use monochange_core::git::git_stage_paths_command;
+use monochange_core::git::run_command;
+use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use reqwest::blocking::Client;
-use reqwest::header::HeaderMap;
-use reqwest::header::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::CONTENT_TYPE;
-use serde::de::DeserializeOwned;
+use reqwest::header::HeaderMap;
+use reqwest::header::HeaderValue;
 use serde::Deserialize;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
 #[must_use]
@@ -152,19 +151,21 @@ pub fn build_release_requests(
 		.release_targets
 		.iter()
 		.filter(|target| target.release)
-		.map(|target| SourceReleaseRequest {
-			provider: SourceProvider::Gitea,
-			repository: format!("{}/{}", source.owner, source.repo),
-			owner: source.owner.clone(),
-			repo: source.repo.clone(),
-			target_id: target.id.clone(),
-			target_kind: target.kind,
-			tag_name: target.tag_name.clone(),
-			name: target.rendered_title.clone(),
-			body: release_body(source, manifest, target),
-			draft: source.releases.draft,
-			prerelease: source.releases.prerelease,
-			generate_release_notes: source.releases.generate_notes,
+		.map(|target| {
+			SourceReleaseRequest {
+				provider: SourceProvider::Gitea,
+				repository: format!("{}/{}", source.owner, source.repo),
+				owner: source.owner.clone(),
+				repo: source.repo.clone(),
+				target_id: target.id.clone(),
+				target_kind: target.kind,
+				tag_name: target.tag_name.clone(),
+				name: target.rendered_title.clone(),
+				body: release_body(source, manifest, target),
+				draft: source.releases.draft,
+				prerelease: source.releases.prerelease,
+				generate_release_notes: source.releases.generate_notes,
+			}
 		})
 		.collect()
 }
@@ -543,14 +544,16 @@ fn release_body(
 ) -> Option<String> {
 	match source.releases.source {
 		ProviderReleaseNotesSource::GitHubGenerated => None,
-		ProviderReleaseNotesSource::Monochange => manifest
-			.changelogs
-			.iter()
-			.find(|changelog| {
-				changelog.owner_id == target.id && changelog.owner_kind == target.kind
-			})
-			.map(|changelog| changelog.rendered.clone())
-			.or_else(|| Some(minimal_release_body(manifest, target))),
+		ProviderReleaseNotesSource::Monochange => {
+			manifest
+				.changelogs
+				.iter()
+				.find(|changelog| {
+					changelog.owner_id == target.id && changelog.owner_kind == target.kind
+				})
+				.map(|changelog| changelog.rendered.clone())
+				.or_else(|| Some(minimal_release_body(manifest, target)))
+		}
 	}
 }
 

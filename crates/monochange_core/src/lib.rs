@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_core`
@@ -78,8 +77,7 @@ pub const DEFAULT_RELEASE_TITLE_NAMESPACED: &str = "{{ id }} {{ version }} ({{ d
 pub const DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY: &str =
 	"{% if tag_url %}[{{ version }}]({{ tag_url }}){% else %}{{ version }}{% endif %} ({{ date }})";
 /// Default changelog version title for namespaced versioning (markdown-linked when source configured).
-pub const DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED: &str =
-	"{% if tag_url %}{{ id }} [{{ version }}]({{ tag_url }}){% else %}{{ id }} {{ version }}{% endif %} ({{ date }})";
+pub const DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED: &str = "{% if tag_url %}{{ id }} [{{ version }}]({{ tag_url }}){% else %}{{ id }} {{ version }}{% endif %} ({{ date }})";
 
 #[derive(Debug, Error)]
 pub enum MonochangeError {
@@ -462,12 +460,11 @@ pub fn update_json_manifest_text(
 ) -> MonochangeResult<String> {
 	let root_start = json_root_object_start(contents)?;
 	let mut replacements = Vec::<(JsonSpan, String)>::new();
-	if let Some(owner_version) = owner_version {
-		if let Some(span) = find_json_object_field_value_span(contents, root_start, "version")?
+	if let Some(owner_version) = owner_version
+		&& let Some(span) = find_json_object_field_value_span(contents, root_start, "version")?
 			.filter(|span| json_span_is_string(contents, *span))
-		{
-			replacements.push((span, render_json_string(owner_version)?));
-		}
+	{
+		replacements.push((span, render_json_string(owner_version)?));
 	}
 	for field in fields {
 		let Some(section_span) = find_json_object_field_value_span(contents, root_start, field)?
@@ -595,9 +592,11 @@ fn skip_json_value(contents: &str, start: usize) -> MonochangeResult<usize> {
 		Some(b'{') => skip_json_object(contents, cursor),
 		Some(b'[') => skip_json_array(contents, cursor),
 		Some(_) => Ok(skip_json_primitive(contents, cursor)),
-		None => Err(MonochangeError::Config(
-			"unexpected end of JSON input".to_string(),
-		)),
+		None => {
+			Err(MonochangeError::Config(
+				"unexpected end of JSON input".to_string(),
+			))
+		}
 	}
 }
 
@@ -612,12 +611,12 @@ fn skip_json_object(contents: &str, object_start: usize) -> MonochangeResult<usi
 			Some(_) => {
 				return Err(MonochangeError::Config(
 					"expected JSON object key".to_string(),
-				))
+				));
 			}
 			None => {
 				return Err(MonochangeError::Config(
 					"unterminated JSON object".to_string(),
-				))
+				));
 			}
 		}
 		let (_, next) = parse_json_string_span(contents, cursor)?;
@@ -671,14 +670,14 @@ fn skip_json_array(contents: &str, array_start: usize) -> MonochangeResult<usize
 					None => {
 						return Err(MonochangeError::Config(
 							"unterminated JSON array".to_string(),
-						))
+						));
 					}
 				}
 			}
 			None => {
 				return Err(MonochangeError::Config(
 					"unterminated JSON array".to_string(),
-				))
+				));
 			}
 		}
 	}
@@ -1028,9 +1027,11 @@ where
 	D: serde::Deserializer<'de>,
 {
 	let value = Option::<CliInputDefault>::deserialize(deserializer)?;
-	Ok(value.map(|value| match value {
-		CliInputDefault::String(value) => value,
-		CliInputDefault::Boolean(value) => value.to_string(),
+	Ok(value.map(|value| {
+		match value {
+			CliInputDefault::String(value) => value,
+			CliInputDefault::Boolean(value) => value.to_string(),
+		}
 	}))
 }
 
@@ -1338,16 +1339,18 @@ impl CliStepDefinition {
 			| Self::PublishRelease { .. }
 			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
-			Self::CreateChangeFile { .. } => Some(&[
-				"interactive",
-				"package",
-				"bump",
-				"version",
-				"reason",
-				"type",
-				"details",
-				"output",
-			]),
+			Self::CreateChangeFile { .. } => {
+				Some(&[
+					"interactive",
+					"package",
+					"bump",
+					"version",
+					"reason",
+					"type",
+					"details",
+					"output",
+				])
+			}
 			Self::AffectedPackages { .. } => {
 				Some(&["format", "changed_paths", "since", "verify", "label"])
 			}
@@ -1371,35 +1374,45 @@ impl CliStepDefinition {
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
 			| Self::OpenReleaseRequest { .. }
-			| Self::CommentReleasedIssues { .. } => match name {
-				"format" => Some(CliInputKind::Choice),
-				_ => None,
-			},
-			Self::CreateChangeFile { .. } => match name {
-				"interactive" => Some(CliInputKind::Boolean),
-				"package" => Some(CliInputKind::StringList),
-				"bump" => Some(CliInputKind::Choice),
-				"version" | "reason" | "type" | "details" => Some(CliInputKind::String),
-				"output" => Some(CliInputKind::Path),
-				_ => None,
-			},
-			Self::AffectedPackages { .. } => match name {
-				"format" => Some(CliInputKind::Choice),
-				"changed_paths" | "label" => Some(CliInputKind::StringList),
-				"since" => Some(CliInputKind::String),
-				"verify" => Some(CliInputKind::Boolean),
-				_ => None,
-			},
-			Self::DiagnoseChangesets { .. } => match name {
-				"format" => Some(CliInputKind::Choice),
-				"changeset" => Some(CliInputKind::StringList),
-				_ => None,
-			},
-			Self::RetargetRelease { .. } => match name {
-				"from" | "target" => Some(CliInputKind::String),
-				"force" | "sync_provider" => Some(CliInputKind::Boolean),
-				_ => None,
-			},
+			| Self::CommentReleasedIssues { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					_ => None,
+				}
+			}
+			Self::CreateChangeFile { .. } => {
+				match name {
+					"interactive" => Some(CliInputKind::Boolean),
+					"package" => Some(CliInputKind::StringList),
+					"bump" => Some(CliInputKind::Choice),
+					"version" | "reason" | "type" | "details" => Some(CliInputKind::String),
+					"output" => Some(CliInputKind::Path),
+					_ => None,
+				}
+			}
+			Self::AffectedPackages { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"changed_paths" | "label" => Some(CliInputKind::StringList),
+					"since" => Some(CliInputKind::String),
+					"verify" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
+			Self::DiagnoseChangesets { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"changeset" => Some(CliInputKind::StringList),
+					_ => None,
+				}
+			}
+			Self::RetargetRelease { .. } => {
+				match name {
+					"from" | "target" => Some(CliInputKind::String),
+					"force" | "sync_provider" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
 		}
 	}
 }

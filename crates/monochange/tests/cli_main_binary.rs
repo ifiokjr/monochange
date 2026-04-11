@@ -1,5 +1,7 @@
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use std::process::Command;
+
+use insta_cmd::assert_cmd_snapshot;
+use insta_cmd::get_cargo_bin;
 
 fn monochange_cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("monochange"));

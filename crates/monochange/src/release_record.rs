@@ -1,8 +1,5 @@
 use std::path::Path;
 
-use monochange_core::parse_release_record_block;
-use monochange_core::release_record_release_tag_names;
-use monochange_core::release_record_tag_names;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::ReleaseRecordDiscovery;
@@ -14,7 +11,11 @@ use monochange_core::RetargetResult;
 use monochange_core::RetargetTagResult;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
+use monochange_core::parse_release_record_block;
+use monochange_core::release_record_release_tag_names;
+use monochange_core::release_record_tag_names;
 
+use crate::OutputFormat;
 use crate::git_support::first_parent_commits;
 use crate::git_support::git_is_ancestor;
 use crate::git_support::move_git_tag;
@@ -23,7 +24,6 @@ use crate::git_support::read_git_commit_message;
 use crate::git_support::resolve_git_commit_ref;
 use crate::git_support::resolve_git_tag_commit;
 use crate::github_provider;
-use crate::OutputFormat;
 
 pub(crate) fn render_release_record_discovery(
 	root: &Path,
@@ -32,8 +32,10 @@ pub(crate) fn render_release_record_discovery(
 ) -> MonochangeResult<String> {
 	let discovery = discover_release_record(root, from)?;
 	match format {
-		OutputFormat::Json => serde_json::to_string_pretty(&discovery)
-			.map_err(|error| MonochangeError::Discovery(error.to_string())),
+		OutputFormat::Json => {
+			serde_json::to_string_pretty(&discovery)
+				.map_err(|error| MonochangeError::Discovery(error.to_string()))
+		}
 		OutputFormat::Text => Ok(text_release_record_discovery(&discovery)),
 	}
 }
@@ -70,14 +72,14 @@ pub fn discover_release_record(
 					"release record in commit {} uses unsupported schemaVersion {}",
 					crate::short_commit_sha(&commit),
 					version
-				)))
+				)));
 			}
 			Err(error) => {
 				return Err(MonochangeError::Discovery(format!(
 					"found a malformed monochange release record in commit {}: {}",
 					crate::short_commit_sha(&commit),
 					error
-				)))
+				)));
 			}
 		}
 	}
@@ -132,27 +134,33 @@ pub fn plan_release_retarget(
 	});
 	let provider_updates = if sync_provider {
 		match provider {
-			Some(provider) => release_record_release_tag_names(&discovery.record)
-				.into_iter()
-				.map(|tag_name| RetargetProviderResult {
-					provider,
-					tag_name,
-					target_commit: target_commit.clone(),
-					operation: match provider {
-						SourceProvider::GitHub => RetargetProviderOperation::Planned,
-						SourceProvider::GitLab | SourceProvider::Gitea => {
-							RetargetProviderOperation::Unsupported
+			Some(provider) => {
+				release_record_release_tag_names(&discovery.record)
+					.into_iter()
+					.map(|tag_name| {
+						RetargetProviderResult {
+							provider,
+							tag_name,
+							target_commit: target_commit.clone(),
+							operation: match provider {
+								SourceProvider::GitHub => RetargetProviderOperation::Planned,
+								SourceProvider::GitLab | SourceProvider::Gitea => {
+									RetargetProviderOperation::Unsupported
+								}
+							},
+							url: None,
+							message: match provider {
+								SourceProvider::GitHub => None,
+								SourceProvider::GitLab | SourceProvider::Gitea => {
+									Some(format!(
+										"provider sync is not yet supported for {provider} release retargeting"
+									))
+								}
+							},
 						}
-					},
-					url: None,
-					message: match provider {
-						SourceProvider::GitHub => None,
-						SourceProvider::GitLab | SourceProvider::Gitea => Some(format!(
-							"provider sync is not yet supported for {provider} release retargeting"
-						)),
-					},
-				})
-				.collect(),
+					})
+					.collect()
+			}
 			None => Vec::new(),
 		}
 	} else {
@@ -290,16 +298,18 @@ pub(crate) fn sync_retargeted_provider_releases(
 			if dry_run {
 				Ok(tag_results
 					.iter()
-					.map(|update| RetargetProviderResult {
-						provider: source.provider,
-						tag_name: update.tag_name.clone(),
-						target_commit: update.to_commit.clone(),
-						operation: RetargetProviderOperation::Unsupported,
-						url: None,
-						message: Some(format!(
-							"provider sync is not yet supported for {} release retargeting",
-							source.provider
-						)),
+					.map(|update| {
+						RetargetProviderResult {
+							provider: source.provider,
+							tag_name: update.tag_name.clone(),
+							target_commit: update.to_commit.clone(),
+							operation: RetargetProviderOperation::Unsupported,
+							url: None,
+							message: Some(format!(
+								"provider sync is not yet supported for {} release retargeting",
+								source.provider
+							)),
+						}
 					})
 					.collect())
 			} else {

@@ -1,4 +1,5 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
 use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
@@ -256,9 +257,11 @@ type = "RetargetRelease"
 	let error = load_workspace_configuration(tempdir.path())
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid boolean default error"));
-	assert!(error
-		.to_string()
-		.contains("boolean default must be `true` or `false`"));
+	assert!(
+		error
+			.to_string()
+			.contains("boolean default must be `true` or `false`")
+	);
 }
 
 #[test]
@@ -464,65 +467,79 @@ fn load_workspace_configuration_rejects_missing_expected_manifests() {
 #[test]
 fn load_workspace_configuration_rejects_empty_github_owner_and_repo() {
 	let root_owner = fixture_path("config/rejects-empty-github-owner");
-	assert!(load_workspace_configuration(&root_owner)
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("[github].owner must not be empty"));
+	assert!(
+		load_workspace_configuration(&root_owner)
+			.err()
+			.unwrap_or_else(|| panic!("expected config error"))
+			.to_string()
+			.contains("[github].owner must not be empty")
+	);
 
 	let root_repo = fixture_path("config/rejects-empty-github-repo");
-	assert!(load_workspace_configuration(&root_repo)
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("[github].repo must not be empty"));
+	assert!(
+		load_workspace_configuration(&root_repo)
+			.err()
+			.unwrap_or_else(|| panic!("expected config error"))
+			.to_string()
+			.contains("[github].repo must not be empty")
+	);
 }
 
 #[test]
 fn load_workspace_configuration_rejects_invalid_pull_request_settings() {
 	let root = fixture_path("config/rejects-invalid-pr-settings");
-	assert!(load_workspace_configuration(&root)
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("[github.pull_requests].branch_prefix must not be empty"));
+	assert!(
+		load_workspace_configuration(&root)
+			.err()
+			.unwrap_or_else(|| panic!("expected config error"))
+			.to_string()
+			.contains("[github.pull_requests].branch_prefix must not be empty")
+	);
 }
 
 #[test]
 fn load_workspace_configuration_rejects_empty_pull_request_base_and_title() {
 	let root_base = fixture_path("config/rejects-empty-pr-base");
-	assert!(load_workspace_configuration(&root_base)
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("[github.pull_requests].base must not be empty"));
+	assert!(
+		load_workspace_configuration(&root_base)
+			.err()
+			.unwrap_or_else(|| panic!("expected config error"))
+			.to_string()
+			.contains("[github.pull_requests].base must not be empty")
+	);
 
 	let root_title = fixture_path("config/rejects-empty-pr-title");
-	assert!(load_workspace_configuration(&root_title)
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("[github.pull_requests].title must not be empty"));
+	assert!(
+		load_workspace_configuration(&root_title)
+			.err()
+			.unwrap_or_else(|| panic!("expected config error"))
+			.to_string()
+			.contains("[github.pull_requests].title must not be empty")
+	);
 }
 
 #[test]
 fn load_workspace_configuration_rejects_invalid_github_release_note_source_combinations() {
 	let root = fixture_path("config/rejects-invalid-release-source");
-	assert!(load_workspace_configuration(&root)
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("generate_notes cannot be true"));
+	assert!(
+		load_workspace_configuration(&root)
+			.err()
+			.unwrap_or_else(|| panic!("expected config error"))
+			.to_string()
+			.contains("generate_notes cannot be true")
+	);
 }
 
 #[test]
 fn load_workspace_configuration_rejects_empty_pull_request_labels() {
 	let root = fixture_path("config/rejects-empty-pr-labels");
-	assert!(load_workspace_configuration(&root)
-		.err()
-		.unwrap_or_else(|| panic!("expected config error"))
-		.to_string()
-		.contains("labels must not include empty values"));
+	assert!(
+		load_workspace_configuration(&root)
+			.err()
+			.unwrap_or_else(|| panic!("expected config error"))
+			.to_string()
+			.contains("labels must not include empty values")
+	);
 }
 
 #[test]
@@ -671,7 +688,9 @@ fn load_workspace_configuration_rejects_invalid_group_changelog_include_members(
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 	let rendered = error.render();
-	assert!(rendered.contains("group `sdk` changelog include entry `missing` must reference a package declared in that group"));
+	assert!(rendered.contains(
+		"group `sdk` changelog include entry `missing` must reference a package declared in that group"
+	));
 	assert!(rendered.contains("group changelog include member"));
 }
 
@@ -822,8 +841,10 @@ fn load_workspace_configuration_rejects_duplicate_primary_version_format() {
 	let rendered = error.render();
 
 	assert!(rendered.contains("primary release identity"));
-	assert!(rendered
-		.contains("choose a single package or group as the primary outward release identity"));
+	assert!(
+		rendered
+			.contains("choose a single package or group as the primary outward release identity")
+	);
 }
 
 #[test]
@@ -851,10 +872,12 @@ fn load_workspace_configuration_infers_package_versioned_file_types_from_string_
 		.unwrap_or_else(|| panic!("expected package"));
 
 	assert_eq!(package.versioned_files.len(), 2);
-	assert!(package
-		.versioned_files
-		.iter()
-		.all(|definition| definition.ecosystem_type == Some(EcosystemType::Cargo)));
+	assert!(
+		package
+			.versioned_files
+			.iter()
+			.all(|definition| definition.ecosystem_type == Some(EcosystemType::Cargo))
+	);
 }
 
 #[test]
@@ -1012,9 +1035,11 @@ fn load_workspace_configuration_rejects_empty_lockfile_commands() {
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 
-	assert!(error
-		.render()
-		.contains("lockfile_commands must provide a non-empty command"));
+	assert!(
+		error
+			.render()
+			.contains("lockfile_commands must provide a non-empty command")
+	);
 }
 
 #[test]
@@ -1024,9 +1049,11 @@ fn load_workspace_configuration_rejects_empty_lockfile_command_cwds() {
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 
-	assert!(error
-		.render()
-		.contains("lockfile_commands must provide a non-empty cwd when set"));
+	assert!(
+		error
+			.render()
+			.contains("lockfile_commands must provide a non-empty cwd when set")
+	);
 }
 
 #[test]
@@ -1036,9 +1063,11 @@ fn load_workspace_configuration_rejects_lockfile_command_cwds_outside_the_worksp
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 
-	assert!(error
-		.render()
-		.contains("lockfile_commands cwd `/tmp` must stay within the workspace root"));
+	assert!(
+		error
+			.render()
+			.contains("lockfile_commands cwd `/tmp` must stay within the workspace root")
+	);
 }
 
 #[test]
@@ -1048,9 +1077,11 @@ fn load_workspace_configuration_rejects_missing_lockfile_command_cwds() {
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 
-	assert!(error
-		.render()
-		.contains("lockfile_commands cwd `packages/missing` does not exist or is not a directory"));
+	assert!(
+		error.render().contains(
+			"lockfile_commands cwd `packages/missing` does not exist or is not a directory"
+		)
+	);
 }
 
 #[test]
@@ -1286,10 +1317,12 @@ fn load_change_signals_accept_group_scalar_type_shorthand_with_default_bump() {
 	assert_eq!(target.id, "sdk");
 	assert_eq!(target.bump, Some(BumpSeverity::Minor));
 	assert_eq!(target.change_type.as_deref(), Some("test"));
-	assert!(changeset
-		.signals
-		.iter()
-		.all(|signal| signal.requested_bump == Some(BumpSeverity::Minor)));
+	assert!(
+		changeset
+			.signals
+			.iter()
+			.all(|signal| signal.requested_bump == Some(BumpSeverity::Minor))
+	);
 }
 
 #[test]
@@ -1376,9 +1409,11 @@ fn load_change_signals_reject_object_type_when_target_has_no_configured_sections
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(error
-		.to_string()
-		.contains("no configured types are available for this target"));
+	assert!(
+		error
+			.to_string()
+			.contains("no configured types are available for this target")
+	);
 }
 
 #[test]
@@ -1432,9 +1467,11 @@ fn load_change_signals_reject_none_bump_without_type_or_version() {
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(error
-		.to_string()
-		.contains("must not use `bump = \"none\"` without also declaring `type` or `version`"));
+	assert!(
+		error
+			.to_string()
+			.contains("must not use `bump = \"none\"` without also declaring `type` or `version`")
+	);
 }
 
 #[test]
@@ -1454,9 +1491,11 @@ fn load_change_signals_reject_invalid_object_bumps() {
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(error
-		.to_string()
-		.contains("has invalid bump `nope`; expected `none`, `patch`, `minor`, or `major`"));
+	assert!(
+		error
+			.to_string()
+			.contains("has invalid bump `nope`; expected `none`, `patch`, `minor`, or `major`")
+	);
 }
 
 #[test]
@@ -1517,9 +1556,11 @@ fn parse_markdown_change_target_rejects_non_scalar_non_mapping_values() {
 	let error =
 		crate::parse_markdown_change_target(&value, Path::new("change.md"), "core", &configuration)
 			.expect_err("sequence values should fail");
-	assert!(error
-		.to_string()
-		.contains("must map to `none`, `patch`, `minor`, `major`, a configured change type"));
+	assert!(
+		error
+			.to_string()
+			.contains("must map to `none`, `patch`, `minor`, `major`, a configured change type")
+	);
 }
 
 #[test]
@@ -1532,9 +1573,11 @@ fn parse_markdown_change_target_rejects_empty_mapping() {
 	let error =
 		crate::parse_markdown_change_target(&value, Path::new("change.md"), "core", &configuration)
 			.expect_err("empty mapping should fail");
-	assert!(error
-		.to_string()
-		.contains("must declare `bump`, `version`, `type`, or a valid scalar shorthand"));
+	assert!(
+		error
+			.to_string()
+			.contains("must declare `bump`, `version`, `type`, or a valid scalar shorthand")
+	);
 }
 
 #[test]
@@ -1582,9 +1625,11 @@ fn load_change_signals_rejects_unterminated_markdown_frontmatter() {
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(error
-		.to_string()
-		.contains("unterminated markdown frontmatter"));
+	assert!(
+		error
+			.to_string()
+			.contains("unterminated markdown frontmatter")
+	);
 }
 
 #[test]
@@ -1660,9 +1705,11 @@ fn load_change_signals_expands_group_targets_into_member_packages() {
 		.unwrap_or_else(|error| panic!("change signals: {error}"));
 
 	assert_eq!(signals.len(), 2);
-	assert!(signals
-		.iter()
-		.all(|signal| signal.requested_bump == Some(BumpSeverity::Minor)));
+	assert!(
+		signals
+			.iter()
+			.all(|signal| signal.requested_bump == Some(BumpSeverity::Minor))
+	);
 }
 
 #[test]
@@ -1781,10 +1828,12 @@ fn load_changeset_file_preserves_group_targets_and_source_paths() {
 	assert_eq!(target.origin, "direct-change");
 	assert_eq!(target.explicit_version, None);
 	assert_eq!(changeset.signals.len(), 2);
-	assert!(changeset
-		.signals
-		.iter()
-		.all(|signal| signal.source_path == root.join("change.md")));
+	assert!(
+		changeset
+			.signals
+			.iter()
+			.all(|signal| signal.source_path == root.join("change.md"))
+	);
 }
 
 #[test]
@@ -1827,9 +1876,11 @@ fn load_workspace_configuration_rejects_publish_github_release_without_github_co
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected github CLI command config error"));
-	assert!(error
-		.to_string()
-		.contains("uses `PublishRelease` but `[source]` is not configured"));
+	assert!(
+		error
+			.to_string()
+			.contains("uses `PublishRelease` but `[source]` is not configured")
+	);
 }
 
 #[test]
@@ -1838,9 +1889,11 @@ fn load_workspace_configuration_rejects_open_release_pull_request_without_github
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected github CLI command config error"));
-	assert!(error
-		.to_string()
-		.contains("uses `OpenReleaseRequest` but `[source]` is not configured"));
+	assert!(
+		error
+			.to_string()
+			.contains("uses `OpenReleaseRequest` but `[source]` is not configured")
+	);
 }
 
 #[test]
@@ -1867,10 +1920,12 @@ fn load_workspace_configuration_accepts_comment_released_issues_for_github() {
 	let root = fixture_path("config/accepts-comment-github");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert!(configuration
-		.cli
-		.iter()
-		.any(|command| command.name == "comment"));
+	assert!(
+		configuration
+			.cli
+			.iter()
+			.any(|command| command.name == "comment")
+	);
 }
 
 #[test]
@@ -1879,9 +1934,11 @@ fn load_workspace_configuration_rejects_enforce_changeset_policy_without_github_
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected verification CLI command config error"));
-	assert!(error
-		.to_string()
-		.contains("uses `AffectedPackages` but `[changesets.verify].enabled` is false"));
+	assert!(
+		error
+			.to_string()
+			.contains("uses `AffectedPackages` but `[changesets.verify].enabled` is false")
+	);
 }
 
 #[test]
@@ -1890,9 +1947,11 @@ fn load_workspace_configuration_rejects_affected_packages_without_path_inputs() 
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected verification CLI command config error"));
-	assert!(error
-		.to_string()
-		.contains("declares neither a `changed_paths` nor a `since` input"));
+	assert!(
+		error
+			.to_string()
+			.contains("declares neither a `changed_paths` nor a `since` input")
+	);
 }
 
 #[test]
@@ -1900,10 +1959,12 @@ fn load_workspace_configuration_accepts_affected_packages_step_input_overrides()
 	let root = fixture_path("config/affected-step-overrides");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert!(configuration
-		.cli
-		.iter()
-		.any(|command| command.name == "pr-check"));
+	assert!(
+		configuration
+			.cli
+			.iter()
+			.any(|command| command.name == "pr-check")
+	);
 }
 
 #[test]
@@ -1911,22 +1972,26 @@ fn load_workspace_configuration_accepts_affected_packages_with_since_in_step_ove
 	let root = fixture_path("config/affected-step-since");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert!(configuration
-		.cli
-		.iter()
-		.any(|command| command.name == "pr-check"));
+	assert!(
+		configuration
+			.cli
+			.iter()
+			.any(|command| command.name == "pr-check")
+	);
 }
 
 #[test]
-fn load_workspace_configuration_rejects_affected_packages_when_step_override_provides_no_path_source(
-) {
+fn load_workspace_configuration_rejects_affected_packages_when_step_override_provides_no_path_source()
+ {
 	let root = fixture_path("config/rejects-affected-no-source");
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
-	assert!(error
-		.to_string()
-		.contains("declares neither a `changed_paths` nor a `since` input"));
+	assert!(
+		error
+			.to_string()
+			.contains("declares neither a `changed_paths` nor a `since` input")
+	);
 }
 
 #[test]
@@ -2149,9 +2214,11 @@ fn load_workspace_configuration_rejects_unknown_change_template_variables() {
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
-	assert!(error
-		.render()
-		.contains("unsupported variables: commit_hash"));
+	assert!(
+		error
+			.render()
+			.contains("unsupported variables: commit_hash")
+	);
 }
 
 #[test]
@@ -2181,9 +2248,11 @@ fn load_workspace_configuration_rejects_legacy_workflows_namespace() {
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 
-	assert!(error
-		.to_string()
-		.contains("legacy `[[workflows]]` configuration is no longer supported"));
+	assert!(
+		error
+			.to_string()
+			.contains("legacy `[[workflows]]` configuration is no longer supported")
+	);
 }
 
 #[test]
@@ -2208,9 +2277,11 @@ fn load_workspace_configuration_rejects_both_source_and_legacy_github_config() {
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
-	assert!(error
-		.to_string()
-		.contains("configure either `[source]` or legacy `[github]`"));
+	assert!(
+		error
+			.to_string()
+			.contains("configure either `[source]` or legacy `[github]`")
+	);
 }
 
 #[test]
@@ -2513,9 +2584,11 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 		}))
 		.err()
 		.unwrap_or_else(|| panic!("expected source validation error"));
-	assert!(source_error
-		.to_string()
-		.contains("[source].owner must not be empty"));
+	assert!(
+		source_error
+			.to_string()
+			.contains("[source].owner must not be empty")
+	);
 
 	let changeset_error = crate::validate_changesets_configuration(
 		&monochange_core::ChangesetSettings {
@@ -2528,9 +2601,11 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected changeset validation error"));
-	assert!(changeset_error
-		.to_string()
-		.contains("[changesets.verify].skip_labels must not include empty values"));
+	assert!(
+		changeset_error
+			.to_string()
+			.contains("[changesets.verify].skip_labels must not include empty values")
+	);
 }
 
 #[test]
@@ -2548,9 +2623,11 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected duplicate path error"));
-	assert!(duplicate_path_error
-		.to_string()
-		.contains("package path `crates/core` is already used by `core`"));
+	assert!(
+		duplicate_path_error
+			.to_string()
+			.contains("package path `crates/core` is already used by `core`")
+	);
 
 	let mut primary_core = package_definition("core", "crates/core");
 	primary_core.version_format = monochange_core::VersionFormat::Primary;
@@ -2564,9 +2641,11 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected duplicate primary error"));
-	assert!(duplicate_primary_error
-		.to_string()
-		.contains("`version_format = \"primary\"` is already used by `core`"));
+	assert!(
+		duplicate_primary_error
+			.to_string()
+			.contains("`version_format = \"primary\"` is already used by `core`")
+	);
 
 	let github_error =
 		crate::validate_github_configuration(Some(&monochange_core::GitHubConfiguration {
@@ -2587,9 +2666,11 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 		}))
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid github glob error"));
-	assert!(github_error
-		.to_string()
-		.contains("[github.bot.changesets].changed_paths contains invalid glob pattern"));
+	assert!(
+		github_error
+			.to_string()
+			.contains("[github.bot.changesets].changed_paths contains invalid glob pattern")
+	);
 
 	let package_pattern_error = crate::validate_changesets_configuration(
 		&monochange_core::ChangesetSettings::default(),
@@ -2600,9 +2681,11 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid package path pattern error"));
-	assert!(package_pattern_error
-		.to_string()
-		.contains("[package.core].ignored_paths must not include empty values"));
+	assert!(
+		package_pattern_error
+			.to_string()
+			.contains("[package.core].ignored_paths must not include empty values")
+	);
 }
 
 #[test]
@@ -2705,9 +2788,11 @@ fn validate_versioned_files_content_rejects_unparseable_version() {
 	let error = crate::validate_versioned_files_content(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected error for missing version field"));
-	assert!(error
-		.to_string()
-		.contains("does not contain a readable version field"));
+	assert!(
+		error
+			.to_string()
+			.contains("does not contain a readable version field")
+	);
 }
 
 #[test]

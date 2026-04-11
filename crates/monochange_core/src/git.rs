@@ -82,11 +82,7 @@ pub fn git_stderr_trimmed(output: &Output) -> String {
 pub fn git_error_detail(output: &Output) -> String {
 	let stdout = git_stdout_trimmed(output);
 	let stderr = git_stderr_trimmed(output);
-	if stderr.is_empty() {
-		stdout
-	} else {
-		stderr
-	}
+	if stderr.is_empty() { stdout } else { stderr }
 }
 
 #[must_use]

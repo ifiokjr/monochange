@@ -2,14 +2,14 @@ use std::path::Path;
 use std::process::Command;
 
 use insta_cmd::get_cargo_bin;
-use serde_json::{Map, Value};
-
 #[allow(unused_imports)]
 pub use monochange_test_helpers::copy_directory;
 #[allow(unused_imports)]
 pub use monochange_test_helpers::current_test_name;
 #[allow(unused_imports)]
 pub use monochange_test_helpers::snapshot_settings;
+use serde_json::Map;
+use serde_json::Value;
 
 #[allow(dead_code)]
 pub fn fixture_path(relative: &str) -> std::path::PathBuf {

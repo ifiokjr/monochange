@@ -1,7 +1,10 @@
-use std::{fs, path::Path, process::Output};
+use std::fs;
+use std::path::Path;
+use std::process::Output;
 
 mod test_support;
-use test_support::{monochange_command, setup_scenario_workspace};
+use test_support::monochange_command;
+use test_support::setup_scenario_workspace;
 
 #[test]
 fn cli_step_when_supports_logical_and_for_command_steps() {

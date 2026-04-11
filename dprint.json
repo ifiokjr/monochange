@@ -5,7 +5,7 @@
 	"exec": {
 		"commands": [
 			{
-				"command": "rustup run stable rustfmt --edition 2021",
+				"command": "rustup run nightly rustfmt --edition 2024",
 				"exts": ["rs"]
 			},
 			{

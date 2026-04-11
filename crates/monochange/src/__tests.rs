@@ -25,12 +25,14 @@ use monochange_test_helpers::snapshot_settings;
 use semver::Version;
 use tempfile::tempdir;
 
+use crate::CliContext;
 use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
 use crate::build_command_for_root;
 use crate::build_lockfile_command_executions;
-use crate::cli_runtime::{normalize_when_expression, should_execute_cli_step};
+use crate::cli_runtime::normalize_when_expression;
+use crate::cli_runtime::should_execute_cli_step;
 use crate::discover_workspace;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
@@ -41,7 +43,6 @@ use crate::release_artifacts::set_force_build_file_diff_previews_error;
 use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
-use crate::CliContext;
 
 fn fixture_path(relative: &str) -> PathBuf {
 	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
@@ -135,7 +136,9 @@ fn repair_release_help_describes_retargeting_workflow() {
 	)
 	.unwrap_or_else(|error| panic!("repair-release help: {error}"));
 
-	assert!(output.contains("Repair a recent release by moving its release tags to a later commit"));
+	assert!(
+		output.contains("Repair a recent release by moving its release tags to a later commit")
+	);
 	assert!(output.contains("mc repair-release --from v1.2.3 --dry-run"));
 	assert!(output.contains("--sync-provider=false"));
 }
@@ -580,9 +583,11 @@ fn validate_command_reports_invalid_changeset_targets() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected validation failure"));
-	assert!(error
-		.to_string()
-		.contains("unknown package or group `missing`"));
+	assert!(
+		error
+			.to_string()
+			.contains("unknown package or group `missing`")
+	);
 }
 
 #[test]
@@ -592,22 +597,30 @@ fn discover_workspace_aggregates_packages_from_multiple_ecosystems() {
 		discover_workspace(&fixture_root).unwrap_or_else(|error| panic!("discovery: {error}"));
 
 	assert_eq!(discovery.packages.len(), 4);
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.ecosystem == Ecosystem::Cargo));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.ecosystem == Ecosystem::Npm));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.ecosystem == Ecosystem::Deno));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.ecosystem == Ecosystem::Dart));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.ecosystem == Ecosystem::Cargo)
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.ecosystem == Ecosystem::Npm)
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.ecosystem == Ecosystem::Deno)
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.ecosystem == Ecosystem::Dart)
+	);
 	assert_eq!(discovery.dependencies.len(), 3);
 	assert_eq!(discovery.version_groups.len(), 1);
 	let version_group = discovery
@@ -637,18 +650,24 @@ fn workspace_discover_json_output_contains_contract_fields() {
 	assert_eq!(parsed["packages"].as_array().map(Vec::len), Some(4));
 	assert_eq!(parsed["versionGroups"].as_array().map(Vec::len), Some(1));
 	assert_eq!(parsed["dependencies"].as_array().map(Vec::len), Some(3));
-	assert!(parsed["packages"]
-		.as_array()
-		.unwrap_or_else(|| panic!("packages array"))
-		.iter()
-		.all(|package| package.get("manifestPath").is_some()));
-	assert!(parsed["packages"]
-		.as_array()
-		.unwrap_or_else(|| panic!("packages array"))
-		.iter()
-		.all(|package| package["id"]
-			.as_str()
-			.is_some_and(|id| !id.contains(fixture_root.to_string_lossy().as_ref()))));
+	assert!(
+		parsed["packages"]
+			.as_array()
+			.unwrap_or_else(|| panic!("packages array"))
+			.iter()
+			.all(|package| package.get("manifestPath").is_some())
+	);
+	assert!(
+		parsed["packages"]
+			.as_array()
+			.unwrap_or_else(|| panic!("packages array"))
+			.iter()
+			.all(|package| {
+				package["id"]
+					.as_str()
+					.is_some_and(|id| !id.contains(fixture_root.to_string_lossy().as_ref()))
+			})
+	);
 }
 
 #[test]
@@ -913,9 +932,11 @@ fn changes_add_requires_package_or_interactive_mode() {
 		],
 	)
 	.expect_err("change without package should fail");
-	assert!(error
-		.to_string()
-		.contains("requires at least one `--package` value or `--interactive` mode"));
+	assert!(
+		error
+			.to_string()
+			.contains("requires at least one `--package` value or `--interactive` mode")
+	);
 }
 
 #[test]
@@ -1013,9 +1034,11 @@ fn add_change_file_rejects_none_without_type_or_version() {
 			.build(),
 	)
 	.expect_err("none bump without type/version should fail");
-	assert!(error
-		.to_string()
-		.contains("must not use a `none` bump without also declaring `type` or `version`"));
+	assert!(
+		error
+			.to_string()
+			.contains("must not use a `none` bump without also declaring `type` or `version`")
+	);
 }
 
 #[test]
@@ -1033,9 +1056,11 @@ fn add_change_file_rejects_unknown_change_type() {
 			.build(),
 	)
 	.expect_err("unknown type should fail");
-	assert!(error
-		.to_string()
-		.contains("uses unknown change type `docs`"));
+	assert!(
+		error
+			.to_string()
+			.contains("uses unknown change type `docs`")
+	);
 }
 
 #[test]
@@ -1137,9 +1162,11 @@ fn changes_add_rejects_legacy_evidence_input() {
 	)
 	.expect_err("legacy evidence input should be rejected");
 
-	assert!(error
-		.to_string()
-		.contains("unexpected argument '--evidence'"));
+	assert!(
+		error
+			.to_string()
+			.contains("unexpected argument '--evidence'")
+	);
 }
 
 #[test]
@@ -1159,9 +1186,11 @@ fn changes_add_rejects_unknown_package_references() {
 	.err()
 	.unwrap_or_else(|| panic!("expected failure"));
 
-	assert!(error
-		.to_string()
-		.contains("did not match any discovered package"));
+	assert!(
+		error
+			.to_string()
+			.contains("did not match any discovered package")
+	);
 }
 
 #[test]
@@ -1181,9 +1210,11 @@ fn release_dry_run_rejects_legacy_origin_and_evidence_metadata() {
 	)
 	.expect_err("legacy metadata should be rejected");
 
-	assert!(error
-		.to_string()
-		.contains("target `origin` uses unsupported field(s): core"));
+	assert!(
+		error
+			.to_string()
+			.contains("target `origin` uses unsupported field(s): core")
+	);
 }
 
 #[test]
@@ -1393,14 +1424,16 @@ fn build_lockfile_command_executions_skips_default_deno_commands() {
 	)
 	.unwrap_or_else(|error| panic!("plan: {error}"));
 
-	assert!(build_lockfile_command_executions(
-		tempdir.path(),
-		&configuration,
-		&discovery.packages,
-		&plan,
-	)
-	.unwrap_or_else(|error| panic!("lockfile commands: {error}"))
-	.is_empty());
+	assert!(
+		build_lockfile_command_executions(
+			tempdir.path(),
+			&configuration,
+			&discovery.packages,
+			&plan,
+		)
+		.unwrap_or_else(|error| panic!("lockfile commands: {error}"))
+		.is_empty()
+	);
 }
 
 #[test]
@@ -1725,9 +1758,11 @@ fn command_unknown_commands_suggest_available_cli() {
 	.err()
 	.unwrap_or_else(|| panic!("expected command suggestion"));
 
-	assert!(error
-		.to_string()
-		.contains("unrecognized subcommand 'ship-it'"));
+	assert!(
+		error
+			.to_string()
+			.contains("unrecognized subcommand 'ship-it'")
+	);
 }
 
 #[test]
@@ -1844,9 +1879,11 @@ fn command_step_rejects_unparseable_commands() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected parse failure"));
-	assert!(error
-		.to_string()
-		.contains("failed to parse command `\"unterminated`"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to parse command `\"unterminated`")
+	);
 }
 
 #[test]
@@ -1910,9 +1947,11 @@ fn command_step_reports_process_spawn_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected process spawn failure"));
-	assert!(error
-		.to_string()
-		.contains("failed to run command `definitely-not-a-real-command-12345`"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to run command `definitely-not-a-real-command-12345`")
+	);
 }
 
 #[test]
@@ -2628,9 +2667,11 @@ fn step_override_forwards_multi_value_list_reference_as_list() {
 	.unwrap_or_else(|error| panic!("pr-check output: {error}"));
 	let json: serde_json::Value = serde_json::from_str(&output)
 		.unwrap_or_else(|error| panic!("json: {error}; output={output}"));
-	assert!(json["matchedPaths"]
-		.as_array()
-		.is_some_and(|p| p.iter().any(|v| v == "crates/core/src/lib.rs")));
+	assert!(
+		json["matchedPaths"]
+			.as_array()
+			.is_some_and(|p| p.iter().any(|v| v == "crates/core/src/lib.rs"))
+	);
 }
 
 #[test]
@@ -2735,8 +2776,10 @@ fn should_execute_cli_step_runs_when_condition_is_true() {
 		variables: None,
 		inputs: BTreeMap::new(),
 	};
-	assert!(should_execute_cli_step(&step, &context, &step_inputs)
-		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+	assert!(
+		should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
 }
 
 #[test]
@@ -2752,8 +2795,10 @@ fn should_execute_cli_step_skips_when_condition_is_false() {
 		variables: None,
 		inputs: BTreeMap::new(),
 	};
-	assert!(!should_execute_cli_step(&step, &context, &step_inputs)
-		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+	assert!(
+		!should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
 }
 
 #[test]
@@ -2769,8 +2814,10 @@ fn should_execute_cli_step_skips_for_zero_value() {
 		variables: None,
 		inputs: BTreeMap::new(),
 	};
-	assert!(!should_execute_cli_step(&step, &context, &step_inputs)
-		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+	assert!(
+		!should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
 }
 
 #[test]
@@ -2786,8 +2833,10 @@ fn should_execute_cli_step_trims_and_treats_1_as_true() {
 		variables: None,
 		inputs: BTreeMap::new(),
 	};
-	assert!(should_execute_cli_step(&step, &context, &step_inputs)
-		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+	assert!(
+		should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
 }
 
 #[test]
@@ -2803,8 +2852,10 @@ fn should_execute_cli_step_skips_with_not_operator() {
 		variables: None,
 		inputs: BTreeMap::new(),
 	};
-	assert!(!should_execute_cli_step(&step, &context, &step_inputs)
-		.unwrap_or_else(|error| { panic!("when condition: {error}") }));
+	assert!(
+		!should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
 }
 
 #[test]
@@ -2821,9 +2872,11 @@ fn should_execute_cli_step_rejects_unknown_template_reference() {
 		inputs: BTreeMap::new(),
 	};
 	let error = should_execute_cli_step(&step, &context, &step_inputs).unwrap_err();
-	assert!(error
-		.to_string()
-		.contains("failed to evaluate `when` condition `{{ inputs.missing }}`"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to evaluate `when` condition `{{ inputs.missing }}`")
+	);
 }
 
 #[test]
@@ -2846,8 +2899,9 @@ fn should_execute_cli_step_rejects_non_scalar_condition_value() {
 
 #[test]
 fn lookup_template_value_traverses_nested_objects() {
-	use super::lookup_template_value;
 	use serde_json::json;
+
+	use super::lookup_template_value;
 	let v = json!({"inputs": {"message": "hello"}});
 	assert_eq!(
 		lookup_template_value(&v, "inputs.message"),
@@ -2857,24 +2911,27 @@ fn lookup_template_value_traverses_nested_objects() {
 
 #[test]
 fn lookup_template_value_traverses_array_by_index() {
-	use super::lookup_template_value;
 	use serde_json::json;
+
+	use super::lookup_template_value;
 	let v = json!({"items": ["a", "b", "c"]});
 	assert_eq!(lookup_template_value(&v, "items.1"), Some(&json!("b")));
 }
 
 #[test]
 fn lookup_template_value_returns_none_for_missing_key() {
-	use super::lookup_template_value;
 	use serde_json::json;
+
+	use super::lookup_template_value;
 	let v = json!({"inputs": {}});
 	assert_eq!(lookup_template_value(&v, "inputs.missing"), None);
 }
 
 #[test]
 fn lookup_template_value_returns_none_for_primitive_descent() {
-	use super::lookup_template_value;
 	use serde_json::json;
+
+	use super::lookup_template_value;
 	let v = json!({"foo": "string_value"});
 	assert_eq!(lookup_template_value(&v, "foo.nested"), None);
 }
@@ -2890,8 +2947,9 @@ fn template_value_to_input_values_null_returns_empty() {
 
 #[test]
 fn template_value_to_input_values_number_returns_string() {
-	use super::template_value_to_input_values;
 	use serde_json::json;
+
+	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&json!(42)),
 		vec!["42".to_string()]
@@ -2904,8 +2962,9 @@ fn template_value_to_input_values_number_returns_string() {
 
 #[test]
 fn template_value_to_input_values_array_flattens_elements() {
-	use super::template_value_to_input_values;
 	use serde_json::json;
+
+	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&json!(["a", "b", "c"])),
 		vec!["a", "b", "c"]
@@ -2918,8 +2977,9 @@ fn template_value_to_input_values_array_flattens_elements() {
 
 #[test]
 fn template_value_to_input_values_object_returns_json_serialization() {
-	use super::template_value_to_input_values;
 	use serde_json::json;
+
+	use super::template_value_to_input_values;
 	let obj = json!({"k": "v"});
 	let result = template_value_to_input_values(&obj);
 	assert_eq!(result.len(), 1);
@@ -2962,10 +3022,12 @@ fn build_release_commit_message_uses_default_title_without_source() {
 
 	let commit_message = crate::build_release_commit_message(None, &manifest);
 	assert_eq!(commit_message.subject, "chore(release): prepare release");
-	assert!(commit_message
-		.body
-		.as_deref()
-		.is_some_and(|body| body.contains("## monochange Release Record")));
+	assert!(
+		commit_message
+			.body
+			.as_deref()
+			.is_some_and(|body| body.contains("## monochange Release Record"))
+	);
 }
 
 #[test]
@@ -3353,9 +3415,11 @@ fn repair_release_command_rejects_non_descendant_targets_without_force() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected non-descendant error"));
-	assert!(error
-		.to_string()
-		.contains("is not a descendant of release-record commit"));
+	assert!(
+		error
+			.to_string()
+			.contains("is not a descendant of release-record commit")
+	);
 }
 
 #[test]
@@ -3634,9 +3698,11 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing from input error"));
-	assert!(error
-		.to_string()
-		.contains("`RetargetRelease` requires a `from` input"));
+	assert!(
+		error
+			.to_string()
+			.contains("`RetargetRelease` requires a `from` input")
+	);
 }
 
 #[test]
@@ -3814,9 +3880,11 @@ fn execute_cli_command_change_step_requires_reason_input() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing reason error"));
-	assert!(error
-		.to_string()
-		.contains("command `change` requires a `--reason` value"));
+	assert!(
+		error
+			.to_string()
+			.contains("command `change` requires a `--reason` value")
+	);
 }
 
 #[test]
@@ -3979,9 +4047,11 @@ fn parse_boolean_step_input_rejects_invalid_values() {
 	let error = crate::parse_boolean_step_input(&inputs, "force")
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid boolean error"));
-	assert!(error
-		.to_string()
-		.contains("invalid boolean value `maybe` for `force`"));
+	assert!(
+		error
+			.to_string()
+			.contains("invalid boolean value `maybe` for `force`")
+	);
 }
 
 #[test]
@@ -4192,9 +4262,11 @@ fn plan_release_retarget_rejects_non_descendant_without_force() {
 		crate::plan_release_retarget(root, &discovery, &branch_commit, false, false, true, None)
 			.err()
 			.unwrap_or_else(|| panic!("expected non-descendant error"));
-	assert!(error
-		.to_string()
-		.contains("is not a descendant of release-record commit"));
+	assert!(
+		error
+			.to_string()
+			.contains("is not a descendant of release-record commit")
+	);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -4284,9 +4356,11 @@ fn retarget_release_reports_missing_tags() {
 	let error = crate::retarget_release(root, &discovery, "HEAD", false, false, true, None)
 		.err()
 		.unwrap_or_else(|| panic!("expected missing tag error"));
-	assert!(error
-		.to_string()
-		.contains("release tag v1.2.3 could not be found"));
+	assert!(
+		error
+			.to_string()
+			.contains("release tag v1.2.3 could not be found")
+	);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -4378,11 +4452,13 @@ fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
 		provider_update.operation,
 		monochange_core::RetargetProviderOperation::Unsupported
 	);
-	assert!(provider_update
-		.message
-		.as_deref()
-		.unwrap_or("")
-		.contains("gitlab"));
+	assert!(
+		provider_update
+			.message
+			.as_deref()
+			.unwrap_or("")
+			.contains("gitlab")
+	);
 
 	let result = crate::execute_release_retarget(root, Some(&source), &plan)
 		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
@@ -4454,9 +4530,11 @@ fn plan_release_retarget_rejects_provider_kind_mismatches() {
 		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
 			.err()
 			.unwrap_or_else(|| panic!("expected provider mismatch error"));
-	assert!(error
-		.to_string()
-		.contains("does not match configured source provider"));
+	assert!(
+		error
+			.to_string()
+			.contains("does not match configured source provider")
+	);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -4490,9 +4568,11 @@ fn plan_release_retarget_rejects_repository_mismatches() {
 		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
 			.err()
 			.unwrap_or_else(|| panic!("expected repository mismatch error"));
-	assert!(error
-		.to_string()
-		.contains("does not match configured source repository"));
+	assert!(
+		error
+			.to_string()
+			.contains("does not match configured source repository")
+	);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -4555,7 +4635,9 @@ fn execute_release_retarget_delegates_github_provider_sync() {
 			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
 		then.status(200)
 			.header("content-type", "application/json")
-			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}");
+			.body(
+				"{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}",
+			);
 	});
 	let update_release = server.mock(|when, then| {
 		when.method(PATCH)
@@ -4675,9 +4757,11 @@ fn git_is_ancestor_reports_missing_worktree_directory_errors() {
 	let error = crate::git_support::git_is_ancestor(&missing, "abc", "def")
 		.err()
 		.unwrap_or_else(|| panic!("expected git spawn error"));
-	assert!(error
-		.to_string()
-		.contains("failed to compare commit ancestry"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to compare commit ancestry")
+	);
 }
 
 #[test]
@@ -4771,9 +4855,11 @@ fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
 	let error = crate::execute_release_retarget(tempdir.path(), Some(&source), &plan)
 		.err()
 		.unwrap_or_else(|| panic!("expected unsupported provider error"));
-	assert!(error
-		.to_string()
-		.contains("provider sync is not yet supported for gitlab release retargeting"));
+	assert!(
+		error
+			.to_string()
+			.contains("provider sync is not yet supported for gitlab release retargeting")
+	);
 }
 
 #[test]
@@ -4800,9 +4886,11 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing PrepareRelease error"));
-	assert!(error
-		.to_string()
-		.contains("`CommitRelease` requires a previous `PrepareRelease` step"));
+	assert!(
+		error
+			.to_string()
+			.contains("`CommitRelease` requires a previous `PrepareRelease` step")
+	);
 }
 
 #[test]
@@ -4811,9 +4899,11 @@ fn git_stage_paths_reports_git_failures() {
 	let error = crate::git_stage_paths(tempdir.path(), &[PathBuf::from("release.txt")])
 		.err()
 		.unwrap_or_else(|| panic!("expected git stage failure"));
-	assert!(error
-		.to_string()
-		.contains("failed to stage release commit files"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to stage release commit files")
+	);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -5115,9 +5205,11 @@ fn serialize_cached_document_formats_json_yaml_text_and_bytes() {
 		crate::CachedDocument::Json(serde_json::json!({"name": "web"})),
 	)
 	.unwrap_or_else(|error| panic!("serialize json: {error}"));
-	assert!(String::from_utf8(json.content)
-		.unwrap_or_else(|error| panic!("json utf8: {error}"))
-		.ends_with('\n'));
+	assert!(
+		String::from_utf8(json.content)
+			.unwrap_or_else(|error| panic!("json utf8: {error}"))
+			.ends_with('\n')
+	);
 
 	let mut yaml_mapping = serde_yaml_ng::Mapping::new();
 	yaml_mapping.insert(
@@ -5129,9 +5221,11 @@ fn serialize_cached_document_formats_json_yaml_text_and_bytes() {
 		crate::CachedDocument::Yaml(yaml_mapping),
 	)
 	.unwrap_or_else(|error| panic!("serialize yaml: {error}"));
-	assert!(String::from_utf8(yaml.content)
-		.unwrap_or_else(|error| panic!("yaml utf8: {error}"))
-		.contains("lockfileVersion"));
+	assert!(
+		String::from_utf8(yaml.content)
+			.unwrap_or_else(|error| panic!("yaml utf8: {error}"))
+			.contains("lockfileVersion")
+	);
 
 	let text = crate::serialize_cached_document(
 		Path::new("bun.lock"),
@@ -5243,18 +5337,20 @@ fn build_manifest_updates_preserve_npm_deno_and_dart_formatting() {
 		workspace_root: tempdir.path().to_path_buf(),
 		decisions: packages
 			.iter()
-			.map(|package| monochange_core::ReleaseDecision {
-				package_id: package.id.clone(),
-				trigger_type: "changeset".to_string(),
-				recommended_bump: BumpSeverity::Minor,
-				planned_version: Some(
-					Version::parse("1.1.0")
-						.unwrap_or_else(|error| panic!("planned version: {error}")),
-				),
-				group_id: None,
-				reasons: vec!["release".to_string()],
-				upstream_sources: Vec::new(),
-				warnings: Vec::new(),
+			.map(|package| {
+				monochange_core::ReleaseDecision {
+					package_id: package.id.clone(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Minor,
+					planned_version: Some(
+						Version::parse("1.1.0")
+							.unwrap_or_else(|error| panic!("planned version: {error}")),
+					),
+					group_id: None,
+					reasons: vec!["release".to_string()],
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				}
 			})
 			.collect(),
 		groups: Vec::new(),
@@ -5274,7 +5370,10 @@ fn build_manifest_updates_preserve_npm_deno_and_dart_formatting() {
 		String::from_utf8_lossy(&npm_updates[0].content),
 		"{\n    \"name\": \"web\",\n    \"version\": \"1.1.0\",\n    \"private\": false\n}\n"
 	);
-	assert_eq!(String::from_utf8_lossy(&deno_updates[0].content), "{\n  \"name\": \"tool\",\n  \"version\": \"1.1.0\",\n  \"imports\": {\n    \"core\": \"^1.0.0\"\n  }\n}\n");
+	assert_eq!(
+		String::from_utf8_lossy(&deno_updates[0].content),
+		"{\n  \"name\": \"tool\",\n  \"version\": \"1.1.0\",\n  \"imports\": {\n    \"core\": \"^1.0.0\"\n  }\n}\n"
+	);
 	assert_eq!(
 		String::from_utf8_lossy(&dart_updates[0].content),
 		"name: mobile\nversion: '1.1.0' # keep quote\n"
@@ -5343,17 +5442,20 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 			dart_missing.id.clone(),
 		]
 		.into_iter()
-		.map(|package_id| monochange_core::ReleaseDecision {
-			package_id,
-			trigger_type: "changeset".to_string(),
-			recommended_bump: BumpSeverity::Minor,
-			planned_version: Some(
-				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
-			),
-			group_id: None,
-			reasons: vec!["release".to_string()],
-			upstream_sources: Vec::new(),
-			warnings: Vec::new(),
+		.map(|package_id| {
+			monochange_core::ReleaseDecision {
+				package_id,
+				trigger_type: "changeset".to_string(),
+				recommended_bump: BumpSeverity::Minor,
+				planned_version: Some(
+					Version::parse("1.1.0")
+						.unwrap_or_else(|error| panic!("planned version: {error}")),
+				),
+				group_id: None,
+				reasons: vec!["release".to_string()],
+				upstream_sources: Vec::new(),
+				warnings: Vec::new(),
+			}
 		})
 		.collect(),
 		groups: Vec::new(),
@@ -5468,17 +5570,20 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 			cargo_workspace_parse.id.clone(),
 		]
 		.into_iter()
-		.map(|package_id| monochange_core::ReleaseDecision {
-			package_id,
-			trigger_type: "changeset".to_string(),
-			recommended_bump: BumpSeverity::Minor,
-			planned_version: Some(
-				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
-			),
-			group_id: None,
-			reasons: vec!["release".to_string()],
-			upstream_sources: Vec::new(),
-			warnings: Vec::new(),
+		.map(|package_id| {
+			monochange_core::ReleaseDecision {
+				package_id,
+				trigger_type: "changeset".to_string(),
+				recommended_bump: BumpSeverity::Minor,
+				planned_version: Some(
+					Version::parse("1.1.0")
+						.unwrap_or_else(|error| panic!("planned version: {error}")),
+				),
+				group_id: None,
+				reasons: vec!["release".to_string()],
+				upstream_sources: Vec::new(),
+				warnings: Vec::new(),
+			}
 		})
 		.collect(),
 		groups: Vec::new(),
@@ -6150,9 +6255,11 @@ fn apply_versioned_file_definition_reports_invalid_regex_patterns() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid regex error"));
-	assert!(error
-		.to_string()
-		.contains("invalid versioned_files regex `(`"));
+	assert!(
+		error
+			.to_string()
+			.contains("invalid versioned_files regex `(`")
+	);
 }
 
 #[test]
@@ -6588,21 +6695,25 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 	let planned_group = sample_planned_group();
 	let group = sample_group_definition(GroupChangelogInclude::GroupOnly);
 
-	assert!(crate::filter_group_release_note_change(
-		&sample_release_note_change(None),
-		Some(&group),
-		&planned_group,
-		&BTreeMap::new(),
-	)
-	.is_none());
+	assert!(
+		crate::filter_group_release_note_change(
+			&sample_release_note_change(None),
+			Some(&group),
+			&planned_group,
+			&BTreeMap::new(),
+		)
+		.is_none()
+	);
 
-	assert!(crate::filter_group_release_note_change(
-		&sample_release_note_change(Some(".changeset/missing.md")),
-		Some(&group),
-		&planned_group,
-		&BTreeMap::new(),
-	)
-	.is_none());
+	assert!(
+		crate::filter_group_release_note_change(
+			&sample_release_note_change(Some(".changeset/missing.md")),
+			Some(&group),
+			&planned_group,
+			&BTreeMap::new(),
+		)
+		.is_none()
+	);
 
 	let group_changeset = BTreeMap::from([(
 		PathBuf::from(".changeset/group.md"),
@@ -6635,13 +6746,15 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 			change_type: None,
 		}],
 	)]);
-	assert!(crate::filter_group_release_note_change(
-		&sample_release_note_change(Some(".changeset/outside.md")),
-		Some(&group),
-		&planned_group,
-		&outside_group_changeset,
-	)
-	.is_none());
+	assert!(
+		crate::filter_group_release_note_change(
+			&sample_release_note_change(Some(".changeset/outside.md")),
+			Some(&group),
+			&planned_group,
+			&outside_group_changeset,
+		)
+		.is_none()
+	);
 }
 
 #[test]
@@ -6661,13 +6774,15 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 			change_type: None,
 		}],
 	)]);
-	assert!(crate::filter_group_release_note_change(
-		&change,
-		Some(&selected_core),
-		&planned_group,
-		&member_changeset,
-	)
-	.is_some());
+	assert!(
+		crate::filter_group_release_note_change(
+			&change,
+			Some(&selected_core),
+			&planned_group,
+			&member_changeset,
+		)
+		.is_some()
+	);
 
 	let blocked_changeset = BTreeMap::from([(
 		PathBuf::from(".changeset/member.md"),
@@ -6690,13 +6805,15 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 			},
 		],
 	)]);
-	assert!(crate::filter_group_release_note_change(
-		&change,
-		Some(&selected_core),
-		&planned_group,
-		&blocked_changeset,
-	)
-	.is_none());
+	assert!(
+		crate::filter_group_release_note_change(
+			&change,
+			Some(&selected_core),
+			&planned_group,
+			&blocked_changeset,
+		)
+		.is_none()
+	);
 
 	let message = crate::render_group_filtered_update_message("sdk");
 	assert!(message.contains("No group-facing notes were recorded for this release."));
@@ -7305,8 +7422,10 @@ fn render_tag_name_and_provider_urls_follow_provider_conventions() {
 		"core/v1.2.3"
 	);
 	assert!(crate::tag_url_for_provider(&github, "v1.2.3").contains("/releases/tag/v1.2.3"));
-	assert!(crate::compare_url_for_provider(&github, "v1.2.2", "v1.2.3")
-		.contains("compare/v1.2.2...v1.2.3"));
+	assert!(
+		crate::compare_url_for_provider(&github, "v1.2.2", "v1.2.3")
+			.contains("compare/v1.2.2...v1.2.3")
+	);
 
 	let gitlab = monochange_core::SourceConfiguration {
 		provider: monochange_core::SourceProvider::GitLab,
@@ -7437,9 +7556,11 @@ fn build_file_diff_previews_handles_missing_files_and_color_modes() {
 			.unwrap_or_else(|error| panic!("plain previews: {error}"))
 	});
 	assert_eq!(plain_previews.len(), 2);
-	assert!(plain_previews
-		.iter()
-		.all(|preview| preview.display_diff == preview.diff));
+	assert!(
+		plain_previews
+			.iter()
+			.all(|preview| preview.display_diff == preview.diff)
+	);
 	let rendered_plain_diffs = plain_previews
 		.iter()
 		.map(|preview| preview.diff.clone())
@@ -7479,9 +7600,11 @@ fn build_file_diff_previews_reports_directory_read_errors() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected directory read failure"));
-	assert!(error
-		.to_string()
-		.contains(&format!("failed to read {}", directory_path.display())));
+	assert!(
+		error
+			.to_string()
+			.contains(&format!("failed to read {}", directory_path.display()))
+	);
 }
 
 #[test]
@@ -7493,10 +7616,12 @@ fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
 	});
 	assert!(!prepared.prepared_release.changed_files.is_empty());
 	assert!(!prepared.file_diffs.is_empty());
-	assert!(prepared
-		.file_diffs
-		.iter()
-		.all(|file_diff| file_diff.display_diff == file_diff.diff));
+	assert!(
+		prepared
+			.file_diffs
+			.iter()
+			.all(|file_diff| file_diff.display_diff == file_diff.diff)
+	);
 }
 
 #[test]
@@ -7507,9 +7632,11 @@ fn prepare_release_execution_propagates_file_diff_preview_errors() {
 		.err()
 		.unwrap_or_else(|| panic!("expected forced file diff preview error"));
 	set_force_build_file_diff_previews_error(false);
-	assert!(error
-		.to_string()
-		.contains("forced build_file_diff_previews test error"));
+	assert!(
+		error
+			.to_string()
+			.contains("forced build_file_diff_previews test error")
+	);
 }
 
 #[test]
@@ -7519,9 +7646,10 @@ fn default_change_path_sluggifies_first_package_reference() {
 		&["cargo:crates/core/Cargo.toml".to_string()],
 	);
 	assert!(path.starts_with("/workspace/.changeset"));
-	assert!(path
-		.to_string_lossy()
-		.ends_with("-cargo-crates-core-cargo-toml.md"));
+	assert!(
+		path.to_string_lossy()
+			.ends_with("-cargo-crates-core-cargo-toml.md")
+	);
 }
 
 #[test]

@@ -1,6 +1,6 @@
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt;
 use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::EnvFilter;
 
 /// Initialize the tracing subscriber for CLI diagnostics.
 ///
@@ -11,10 +11,12 @@ use tracing_subscriber::EnvFilter;
 pub(crate) fn init_tracing(log_level: Option<&str>) {
 	let filter = match EnvFilter::try_from_default_env() {
 		Ok(env_filter) => env_filter,
-		Err(_) => match log_level {
-			Some(level) => EnvFilter::new(level),
-			None => return,
-		},
+		Err(_) => {
+			match log_level {
+				Some(level) => EnvFilter::new(level),
+				None => return,
+			}
+		}
 	};
 
 	let subscriber = fmt::Subscriber::builder()

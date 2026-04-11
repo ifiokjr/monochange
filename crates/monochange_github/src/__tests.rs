@@ -160,9 +160,11 @@ fn validate_source_configuration_rejects_conflicting_release_note_modes() {
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("[source.releases].generate_notes cannot be true"));
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].generate_notes cannot be true")
+	);
 }
 
 #[test]
@@ -466,7 +468,9 @@ fn sync_retargeted_releases_updates_existing_release_target_commitish() {
 			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
 		then.status(200)
 			.header("content-type", "application/json")
-			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}");
+			.body(
+				"{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}",
+			);
 	});
 	let update_release = server.mock(|when, then| {
 		when.method(PATCH)
@@ -524,7 +528,9 @@ fn sync_retargeted_releases_reports_already_aligned_release() {
 			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
 		then.status(200)
 			.header("content-type", "application/json")
-			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"def5678\"}");
+			.body(
+				"{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"def5678\"}",
+			);
 	});
 	let source = SourceConfiguration {
 		provider: SourceProvider::GitHub,
@@ -601,9 +607,11 @@ fn sync_retargeted_releases_errors_when_release_lookup_is_missing() {
 		.unwrap_or_else(|| panic!("expected release lookup error"));
 
 	release_lookup.assert();
-	assert!(error
-		.to_string()
-		.contains("GitHub release for tag `v1.2.3` could not be found"));
+	assert!(
+		error
+			.to_string()
+			.contains("GitHub release for tag `v1.2.3` could not be found")
+	);
 }
 
 #[test]
@@ -614,7 +622,9 @@ fn sync_retargeted_releases_public_api_uses_source_configuration_and_env() {
 			.path("/repos/ifiokjr/monochange/releases/tags/v1.2.3");
 		then.status(200)
 			.header("content-type", "application/json")
-			.body("{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}");
+			.body(
+				"{\"id\":42,\"html_url\":\"https://example.com/releases/42\",\"target_commitish\":\"abc1234\"}",
+			);
 	});
 	let update_release = server.mock(|when, then| {
 		when.method(PATCH)
@@ -753,8 +763,8 @@ fn publish_release_pull_request_updates_existing_pull_request_via_octocrab() {
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-			"[{\"number\":9,\"html_url\":\"https://example.com/pr/9\",\"node_id\":\"PR_node\"}]",
-		);
+				"[{\"number\":9,\"html_url\":\"https://example.com/pr/9\",\"node_id\":\"PR_node\"}]",
+			);
 	});
 	let update_pull_request = server.mock(|when, then| {
 		when.method(PATCH).path("/repos/ifiokjr/monochange/pulls/9");
@@ -794,9 +804,11 @@ fn build_github_client_rejects_invalid_base_urls() {
 	let error = build_github_client("token", Some("not a url"))
 		.err()
 		.unwrap_or_else(|| panic!("expected client error"));
-	assert!(error
-		.to_string()
-		.contains("failed to configure GitHub base URL"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to configure GitHub base URL")
+	);
 }
 
 #[test]
@@ -839,8 +851,8 @@ fn publish_release_pull_request_reports_auto_merge_payload_errors() {
 		then.status(201)
 			.header("content-type", "application/json")
 			.body(
-			"{\"number\":13,\"html_url\":\"https://example.com/pr/13\",\"node_id\":\"PR_node\"}",
-		);
+				"{\"number\":13,\"html_url\":\"https://example.com/pr/13\",\"node_id\":\"PR_node\"}",
+			);
 	});
 	let add_labels = server.mock(|when, then| {
 		when.method(POST)
@@ -872,9 +884,11 @@ fn publish_release_pull_request_reports_auto_merge_payload_errors() {
 	create_pull_request.assert();
 	add_labels.assert();
 	enable_auto_merge.assert();
-	assert!(error
-		.to_string()
-		.contains("auto merge returned no pull request payload"));
+	assert!(
+		error
+			.to_string()
+			.contains("auto merge returned no pull request payload")
+	);
 }
 
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
@@ -942,9 +956,11 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
-	assert!(io_error
-		.to_string()
-		.contains("failed to commit release pull request changes"));
+	assert!(
+		io_error
+			.to_string()
+			.contains("failed to commit release pull request changes")
+	);
 
 	let repo = tempdir.path().join("repo-error");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
@@ -970,9 +986,11 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
-	assert!(error
-		.to_string()
-		.contains("failed to commit release pull request changes"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to commit release pull request changes")
+	);
 }
 
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
@@ -1256,9 +1274,11 @@ fn comment_released_issues_skips_existing_markers_and_posts_missing_comments() {
 
 	let plans = plan_released_issue_comments(&github, &manifest);
 	assert_eq!(plans.len(), 2);
-	assert!(plans
-		.iter()
-		.all(|plan| plan.body.contains("Released in v1.2.0.")));
+	assert!(
+		plans
+			.iter()
+			.all(|plan| plan.body.contains("Released in v1.2.0."))
+	);
 
 	let outcomes = temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
 		let outcome = github_runtime()

@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::Path;
 
-use criterion::criterion_group;
-use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
+use criterion::criterion_group;
+use criterion::criterion_main;
 
 /// Generate a workspace fixture with N cargo packages and M changesets.
 fn generate_fixture(root: &Path, num_packages: usize, num_changesets: usize) {

@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use monochange_config::validate_workspace;
 use monochange_core::CliCommandDefinition;
 use monochange_core::ReleaseManifest;
+use rmcp::ErrorData as McpError;
+use rmcp::ServerHandler;
+use rmcp::ServiceExt;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::*;
@@ -11,9 +14,6 @@ use rmcp::schemars;
 use rmcp::tool;
 use rmcp::tool_handler;
 use rmcp::tool_router;
-use rmcp::ErrorData as McpError;
-use rmcp::ServerHandler;
-use rmcp::ServiceExt;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -154,19 +154,23 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 		match validate_workspace(&root) {
-			Ok(()) => Ok(json_result(json!({
-				"ok": true,
-				"action": "validate",
-				"root": root,
-				"summary": "workspace validation passed"
-			}))),
-			Err(error) => Ok(json_error_result(json!({
-				"ok": false,
-				"action": "validate",
-				"root": root,
-				"summary": error.render(),
-				"error": error.render()
-			}))),
+			Ok(()) => {
+				Ok(json_result(json!({
+					"ok": true,
+					"action": "validate",
+					"root": root,
+					"summary": "workspace validation passed"
+				})))
+			}
+			Err(error) => {
+				Ok(json_error_result(json!({
+					"ok": false,
+					"action": "validate",
+					"root": root,
+					"summary": error.render(),
+					"error": error.render()
+				})))
+			}
 		}
 	}
 
@@ -180,23 +184,27 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 		match crate::discover_workspace(&root) {
-			Ok(report) => Ok(json_result(json!({
-				"ok": true,
-				"action": "discover",
-				"summary": format!(
-					"Discovered {} package(s) and {} dependency edge(s).",
-					report.packages.len(),
-					report.dependencies.len()
-				),
-				"report": report,
-			}))),
-			Err(error) => Ok(json_error_result(json!({
-				"ok": false,
-				"action": "discover",
-				"root": root,
-				"summary": error.render(),
-				"error": error.render()
-			}))),
+			Ok(report) => {
+				Ok(json_result(json!({
+					"ok": true,
+					"action": "discover",
+					"summary": format!(
+						"Discovered {} package(s) and {} dependency edge(s).",
+						report.packages.len(),
+						report.dependencies.len()
+					),
+					"report": report,
+				})))
+			}
+			Err(error) => {
+				Ok(json_error_result(json!({
+					"ok": false,
+					"action": "discover",
+					"root": root,
+					"summary": error.render(),
+					"error": error.render()
+				})))
+			}
 		}
 	}
 
@@ -223,20 +231,24 @@ impl MonochangeMcpServer {
 				.output(output)
 				.build(),
 		) {
-			Ok(path) => Ok(json_result(json!({
-				"ok": true,
-				"action": "change",
-				"root": root,
-				"path": path,
-				"summary": format!("Wrote change file {}", path.display())
-			}))),
-			Err(error) => Ok(json_error_result(json!({
-				"ok": false,
-				"action": "change",
-				"root": root,
-				"summary": error.render(),
-				"error": error.render()
-			}))),
+			Ok(path) => {
+				Ok(json_result(json!({
+					"ok": true,
+					"action": "change",
+					"root": root,
+					"path": path,
+					"summary": format!("Wrote change file {}", path.display())
+				})))
+			}
+			Err(error) => {
+				Ok(json_error_result(json!({
+					"ok": false,
+					"action": "change",
+					"root": root,
+					"summary": error.render(),
+					"error": error.render()
+				})))
+			}
 		}
 	}
 
@@ -250,22 +262,26 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 		match crate::prepare_release(&root, true) {
-			Ok(prepared_release) => Ok(json_result(json!({
-				"ok": true,
-				"action": "release_preview",
-				"summary": format!(
-					"Prepared dry-run release preview with {} release target(s).",
-					prepared_release.release_targets.len()
-				),
-				"release": prepared_release_value(&prepared_release)
-			}))),
-			Err(error) => Ok(json_error_result(json!({
-				"ok": false,
-				"action": "release_preview",
-				"root": root,
-				"summary": error.render(),
-				"error": error.render()
-			}))),
+			Ok(prepared_release) => {
+				Ok(json_result(json!({
+					"ok": true,
+					"action": "release_preview",
+					"summary": format!(
+						"Prepared dry-run release preview with {} release target(s).",
+						prepared_release.release_targets.len()
+					),
+					"release": prepared_release_value(&prepared_release)
+				})))
+			}
+			Err(error) => {
+				Ok(json_error_result(json!({
+					"ok": false,
+					"action": "release_preview",
+					"root": root,
+					"summary": error.render(),
+					"error": error.render()
+				})))
+			}
 		}
 	}
 
@@ -291,13 +307,15 @@ impl MonochangeMcpServer {
 					"manifest": manifest,
 				})))
 			}
-			Err(error) => Ok(json_error_result(json!({
-				"ok": false,
-				"action": "release_manifest",
-				"root": root,
-				"summary": error.render(),
-				"error": error.render()
-			}))),
+			Err(error) => {
+				Ok(json_error_result(json!({
+					"ok": false,
+					"action": "release_manifest",
+					"root": root,
+					"summary": error.render(),
+					"error": error.render()
+				})))
+			}
 		}
 	}
 
@@ -311,19 +329,23 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 		match crate::affected_packages(&root, &params.changed_paths, &params.labels) {
-			Ok(evaluation) => Ok(json_result(json!({
-				"ok": evaluation.status != monochange_core::ChangesetPolicyStatus::Failed,
-				"action": "affected_packages",
-				"summary": evaluation.summary,
-				"evaluation": evaluation,
-			}))),
-			Err(error) => Ok(json_error_result(json!({
-				"ok": false,
-				"action": "affected_packages",
-				"root": root,
-				"summary": error.render(),
-				"error": error.render()
-			}))),
+			Ok(evaluation) => {
+				Ok(json_result(json!({
+					"ok": evaluation.status != monochange_core::ChangesetPolicyStatus::Failed,
+					"action": "affected_packages",
+					"summary": evaluation.summary,
+					"evaluation": evaluation,
+				})))
+			}
+			Err(error) => {
+				Ok(json_error_result(json!({
+					"ok": false,
+					"action": "affected_packages",
+					"root": root,
+					"summary": error.render(),
+					"error": error.render()
+				})))
+			}
 		}
 	}
 }
@@ -353,18 +375,18 @@ mod __tests {
 	use monochange_test_helpers::copy_directory;
 	use monochange_test_helpers::current_test_name;
 	use monochange_test_helpers::snapshot_settings;
-	use rmcp::handler::server::wrapper::Parameters;
 	use rmcp::ServerHandler;
+	use rmcp::handler::server::wrapper::Parameters;
 	use tempfile::tempdir;
 
-	use super::json_error_result;
-	use super::json_result;
-	use super::resolve_root;
 	use super::AffectedParam;
 	use super::ChangeParam;
 	use super::McpChangeBump;
 	use super::MonochangeMcpServer;
 	use super::PathParam;
+	use super::json_error_result;
+	use super::json_result;
+	use super::resolve_root;
 
 	fn setup_fixture(relative: &str) -> tempfile::TempDir {
 		monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
@@ -402,8 +424,11 @@ mod __tests {
 	#[test]
 	fn get_info_exposes_tool_instructions_and_capabilities() {
 		let info = MonochangeMcpServer::new().get_info();
-		assert!(info.instructions.as_ref().is_some_and(|text| text
-			.contains("monochange manages versions and releases across Cargo, npm, Deno, and Dart/Flutter workspaces")));
+		assert!(info.instructions.as_ref().is_some_and(|text| {
+			text.contains(
+				"monochange manages versions and releases across Cargo, npm, Deno, and Dart/Flutter workspaces",
+			)
+		}));
 		assert!(info.capabilities.tools.is_some());
 	}
 

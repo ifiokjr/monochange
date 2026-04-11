@@ -204,23 +204,27 @@ pub(crate) fn build_prepared_changesets(
 	loaded_changesets
 		.iter()
 		.enumerate()
-		.map(|(index, changeset)| PreparedChangeset {
-			path: root_relative(root, &changeset.path),
-			summary: changeset.summary.clone(),
-			details: changeset.details.clone(),
-			targets: changeset
-				.targets
-				.iter()
-				.map(|target| PreparedChangesetTarget {
-					id: target.id.clone(),
-					kind: target.kind,
-					bump: target.bump,
-					origin: target.origin.clone(),
-					evidence_refs: target.evidence_refs.clone(),
-					change_type: target.change_type.clone(),
-				})
-				.collect(),
-			context: git_contexts.get(index).cloned(),
+		.map(|(index, changeset)| {
+			PreparedChangeset {
+				path: root_relative(root, &changeset.path),
+				summary: changeset.summary.clone(),
+				details: changeset.details.clone(),
+				targets: changeset
+					.targets
+					.iter()
+					.map(|target| {
+						PreparedChangesetTarget {
+							id: target.id.clone(),
+							kind: target.kind,
+							bump: target.bump,
+							origin: target.origin.clone(),
+							evidence_refs: target.evidence_refs.clone(),
+							change_type: target.change_type.clone(),
+						}
+					})
+					.collect(),
+				context: git_contexts.get(index).cloned(),
+			}
 		})
 		.collect()
 }
@@ -240,13 +244,15 @@ fn batch_load_changeset_contexts(
 	if !root.join(".git").exists() {
 		return loaded_changesets
 			.iter()
-			.map(|_| ChangesetContext {
-				provider: HostingProviderKind::GenericGit,
-				host: None,
-				capabilities: HostingCapabilities::default(),
-				introduced: None,
-				last_updated: None,
-				related_issues: Vec::new(),
+			.map(|_| {
+				ChangesetContext {
+					provider: HostingProviderKind::GenericGit,
+					host: None,
+					capabilities: HostingCapabilities::default(),
+					introduced: None,
+					last_updated: None,
+					related_issues: Vec::new(),
+				}
 			})
 			.collect();
 	}

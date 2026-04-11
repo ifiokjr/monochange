@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_cargo`
@@ -42,7 +41,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
-use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
@@ -57,14 +55,15 @@ use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::normalize_path;
 use monochange_semver::CompatibilityProvider;
 use semver::Version;
 use toml::Value;
-use toml_edit::value;
 use toml_edit::DocumentMut;
 use toml_edit::Item;
 use toml_edit::TableLike;
 use toml_edit::Value as EditValue;
+use toml_edit::value;
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
@@ -135,13 +134,15 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommandExecution> {
 	discover_lockfiles(package)
 		.into_iter()
-		.map(|lockfile| LockfileCommandExecution {
-			command: "cargo generate-lockfile".to_string(),
-			cwd: lockfile
-				.parent()
-				.unwrap_or(&package.workspace_root)
-				.to_path_buf(),
-			shell: ShellConfig::None,
+		.map(|lockfile| {
+			LockfileCommandExecution {
+				command: "cargo generate-lockfile".to_string(),
+				cwd: lockfile
+					.parent()
+					.unwrap_or(&package.workspace_root)
+					.to_path_buf(),
+				shell: ShellConfig::None,
+			}
 		})
 		.collect()
 }
@@ -175,9 +176,11 @@ pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> Monochan
 		if group_ids.len() > 1 || group_ids.contains(&None) {
 			let details = packages
 				.iter()
-				.map(|package| match &package.version_group_id {
-					Some(group_id) => format!("`{}` in group `{}`", package.name, group_id),
-					None => format!("`{}` not in any group", package.name),
+				.map(|package| {
+					match &package.version_group_id {
+						Some(group_id) => format!("`{}` in group `{}`", package.name, group_id),
+						None => format!("`{}` not in any group", package.name),
+					}
 				})
 				.collect::<Vec<_>>();
 			return Err(MonochangeError::Config(format!(
@@ -775,15 +778,17 @@ fn parse_dependency_table(
 		.map(|table| {
 			table
 				.iter()
-				.map(|(name, value)| PackageDependency {
-					name: name.clone(),
-					kind,
-					version_constraint: dependency_constraint(value),
-					optional: value
-						.as_table()
-						.and_then(|table| table.get("optional"))
-						.and_then(Value::as_bool)
-						.unwrap_or(false),
+				.map(|(name, value)| {
+					PackageDependency {
+						name: name.clone(),
+						kind,
+						version_constraint: dependency_constraint(value),
+						optional: value
+							.as_table()
+							.and_then(|table| table.get("optional"))
+							.and_then(Value::as_bool)
+							.unwrap_or(false),
+					}
 				})
 				.collect::<Vec<_>>()
 		})

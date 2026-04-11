@@ -3,22 +3,24 @@ use std::path::Path;
 
 use insta::assert_json_snapshot;
 use insta::assert_snapshot;
-use monochange_core::render_release_record_block;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleaseRecord;
 use monochange_core::ReleaseRecordProvider;
 use monochange_core::ReleaseRecordTarget;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
+use monochange_core::render_release_record_block;
 use monochange_test_helpers::git;
 use monochange_test_helpers::git_output_trimmed;
 use serde_json::Value;
 use tempfile::TempDir;
 
 mod test_support;
-use test_support::{
-	current_test_name, fixture_path, monochange_command, setup_fixture, snapshot_settings,
-};
+use test_support::current_test_name;
+use test_support::fixture_path;
+use test_support::monochange_command;
+use test_support::setup_fixture;
+use test_support::snapshot_settings;
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_record_command_reports_record_from_tag_as_json() {

@@ -10,12 +10,12 @@ use monochange_core::ProviderReleaseSettings;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
-use monochange_github::publish_release_pull_request;
-use monochange_github::publish_release_requests;
 use monochange_github::GitHubPullRequestOperation;
 use monochange_github::GitHubPullRequestRequest;
 use monochange_github::GitHubReleaseOperation;
 use monochange_github::GitHubReleaseRequest;
+use monochange_github::publish_release_pull_request;
+use monochange_github::publish_release_requests;
 use tempfile::tempdir;
 
 #[test]
@@ -76,8 +76,8 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 		then.status(201)
 			.header("content-type", "application/json")
 			.body(
-			"{\"number\":12,\"html_url\":\"https://example.com/pr/12\",\"node_id\":\"PR_node\"}",
-		);
+				"{\"number\":12,\"html_url\":\"https://example.com/pr/12\",\"node_id\":\"PR_node\"}",
+			);
 	});
 	let add_labels = server.mock(|when, then| {
 		when.method(POST)

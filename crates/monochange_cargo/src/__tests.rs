@@ -2,19 +2,21 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
-use monochange_core::materialize_dependency_edges;
 use monochange_core::ChangeSignal;
 use monochange_core::CompatibilityAssessment;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::materialize_dependency_edges;
 use monochange_semver::CompatibilityProvider;
 use tempfile::tempdir;
 use toml::Value;
 use toml_edit::DocumentMut;
 use toml_edit::Item;
 
+use crate::CargoVersionedFileKind;
+use crate::RustSemverProvider;
 use crate::adapter;
 use crate::default_lockfile_commands;
 use crate::dependency_constraint;
@@ -28,8 +30,6 @@ use crate::supported_versioned_file_kind;
 use crate::update_versioned_file_text;
 use crate::validate_workspace_version_groups;
 use crate::workspace_package_version;
-use crate::CargoVersionedFileKind;
-use crate::RustSemverProvider;
 
 #[test]
 fn discovers_cargo_workspace_members() {
@@ -38,19 +38,25 @@ fn discovers_cargo_workspace_members() {
 		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
 
 	assert_eq!(discovery.packages.len(), 2);
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "cargo-core"));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "cargo-app"));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "cargo-core")
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "cargo-app")
+	);
 	let dependency_edges = materialize_dependency_edges(&discovery.packages);
 	assert_eq!(dependency_edges.len(), 1);
-	assert!(dependency_edges
-		.iter()
-		.any(|edge| edge.to_package_id.contains("crates/core/Cargo.toml")));
+	assert!(
+		dependency_edges
+			.iter()
+			.any(|edge| edge.to_package_id.contains("crates/core/Cargo.toml"))
+	);
 }
 
 #[test]
@@ -962,10 +968,9 @@ fn discover_cargo_packages_reports_workspace_warnings_and_private_packages() {
 		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
 
 	assert_eq!(discovery.packages.len(), 3);
-	assert!(discovery
-		.warnings
-		.iter()
-		.any(|warning| warning.contains("missing/*") && warning.contains("matched no packages")));
+	assert!(discovery.warnings.iter().any(|warning| {
+		warning.contains("missing/*") && warning.contains("matched no packages")
+	}));
 	let excluded_package = discovery
 		.packages
 		.iter()
@@ -1090,9 +1095,11 @@ fn cargo_manifest_helpers_cover_workspace_and_error_paths() {
 	let invalid_workspace_error = has_workspace_section(&invalid_workspace)
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid workspace error"));
-	assert!(invalid_workspace_error
-		.to_string()
-		.contains("failed to parse"));
+	assert!(
+		invalid_workspace_error
+			.to_string()
+			.contains("failed to parse")
+	);
 
 	let invalid_package_root = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/cargo/invalid-package-name");
