@@ -48,8 +48,27 @@ use typed_builder::TypedBuilder;
 use crate::interactive;
 use crate::*;
 
+pub(crate) struct InitWorkspaceResult {
+	pub config_path: PathBuf,
+	pub workflow_paths: Vec<PathBuf>,
+}
+
+impl InitWorkspaceResult {
+	pub fn summary(&self) -> String {
+		let mut lines = vec![format!("wrote {}", self.config_path.display())];
+		for path in &self.workflow_paths {
+			lines.push(format!("wrote {}", path.display()));
+		}
+		lines.join("\n")
+	}
+}
+
 #[must_use = "the initialization result must be checked"]
-pub(crate) fn init_workspace(root: &Path, force: bool) -> MonochangeResult<PathBuf> {
+pub(crate) fn init_workspace(
+	root: &Path,
+	force: bool,
+	provider: Option<&str>,
+) -> MonochangeResult<InitWorkspaceResult> {
 	let path = monochange_config::config_path(root);
 	if path.exists() && !force {
 		return Err(MonochangeError::Config(format!(
@@ -58,11 +77,104 @@ pub(crate) fn init_workspace(root: &Path, force: bool) -> MonochangeResult<PathB
 		)));
 	}
 
-	let content = render_annotated_init_config(root)?;
-	fs::write(&path, content).map_err(|error| {
+	let remote = provider.and_then(|_| detect_remote_owner_repo(root));
+	let content = render_annotated_init_config(root, provider, remote.as_ref())?;
+	fs::write(&path, &content).map_err(|error| {
 		MonochangeError::Io(format!("failed to write {}: {error}", path.display()))
 	})?;
-	Ok(path)
+
+	let workflow_paths = if provider == Some("github") {
+		write_github_workflows(root)?
+	} else {
+		Vec::new()
+	};
+
+	Ok(InitWorkspaceResult {
+		config_path: path,
+		workflow_paths,
+	})
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct RemoteInfo {
+	pub owner: String,
+	pub repo: String,
+}
+
+/// Parse the git remote URL to extract owner and repo.
+///
+/// Supports SSH (`git@host:owner/repo.git`) and HTTPS
+/// (`https://host/owner/repo.git`) formats.
+pub(crate) fn detect_remote_owner_repo(root: &Path) -> Option<RemoteInfo> {
+	let output = ProcessCommand::new("git")
+		.current_dir(root)
+		.args(["remote", "get-url", "origin"])
+		.output()
+		.ok()?;
+	if !output.status.success() {
+		return None;
+	}
+	let url = String::from_utf8(output.stdout).ok()?.trim().to_string();
+	parse_remote_url(&url)
+}
+
+pub(crate) fn parse_remote_url(url: &str) -> Option<RemoteInfo> {
+	// Extract the "owner/repo" portion from various URL formats.
+	let owner_repo = if let Some(rest) = url.strip_prefix("git@") {
+		// git@github.com:owner/repo.git
+		rest.split_once(':').map(|(_, path)| path.to_string())
+	} else if url.starts_with("https://") || url.starts_with("http://") {
+		// https://github.com/owner/repo.git
+		url.split_once("//")
+			.and_then(|(_, rest)| rest.split_once('/'))
+			.map(|(_, path)| path.to_string())
+	} else if url.starts_with("ssh://") {
+		// ssh://git@github.com/owner/repo.git
+		url.strip_prefix("ssh://")
+			.and_then(|rest| rest.split_once('/'))
+			.map(|(_, path)| path.to_string())
+	} else {
+		None
+	}?;
+
+	let owner_repo = owner_repo.strip_suffix(".git").unwrap_or(&owner_repo);
+	let (owner, repo) = owner_repo.split_once('/')?;
+
+	if owner.is_empty() || repo.is_empty() || repo.contains('/') {
+		return None;
+	}
+
+	Some(RemoteInfo {
+		owner: owner.to_string(),
+		repo: repo.to_string(),
+	})
+}
+
+const CHANGESET_POLICY_WORKFLOW: &str = include_str!("templates/changeset-policy.yml");
+const RELEASE_WORKFLOW: &str = include_str!("templates/release.yml");
+
+fn write_github_workflows(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
+	let workflows_dir = root.join(".github/workflows");
+	fs::create_dir_all(&workflows_dir).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to create {}: {error}",
+			workflows_dir.display()
+		))
+	})?;
+
+	let mut paths = Vec::new();
+	for (name, content) in [
+		("changeset-policy.yml", CHANGESET_POLICY_WORKFLOW),
+		("release.yml", RELEASE_WORKFLOW),
+	] {
+		let path = workflows_dir.join(name);
+		fs::write(&path, content).map_err(|error| {
+			MonochangeError::Io(format!("failed to write {}: {error}", path.display()))
+		})?;
+		paths.push(path);
+	}
+
+	Ok(paths)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -358,7 +470,11 @@ const INIT_TEMPLATE: &str = include_str!("monochange.init.toml");
 
 /// Render a fully annotated `monochange.toml` from the init template with
 /// discovered packages injected as context.
-fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
+fn render_annotated_init_config(
+	root: &Path,
+	provider: Option<&str>,
+	remote: Option<&RemoteInfo>,
+) -> MonochangeResult<String> {
 	let packages = discover_packages(root)?;
 	let mut template_packages = Vec::new();
 	let mut package_ids = Vec::<String>::new();
@@ -416,6 +532,9 @@ fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
 		"has_npm": has_npm,
 		"has_deno": has_deno,
 		"has_dart": has_dart,
+		"provider": provider.unwrap_or(""),
+		"owner": remote.map_or("your-org", |r| r.owner.as_str()),
+		"repo": remote.map_or("your-repo", |r| r.repo.as_str()),
 	});
 
 	let jinja_context = minijinja::Value::from_serialize(&context);

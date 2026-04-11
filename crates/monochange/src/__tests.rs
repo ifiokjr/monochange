@@ -9143,3 +9143,219 @@ fn cli_help_does_not_show_log_level_flag() {
 		"hidden flag should not appear in help output"
 	);
 }
+
+#[test]
+fn parse_remote_url_extracts_owner_repo_from_ssh_url() {
+	let result = crate::workspace_ops::parse_remote_url("git@github.com:ifiokjr/monochange.git");
+	let info = result.unwrap_or_else(|| panic!("expected RemoteInfo"));
+	assert_eq!(info.owner, "ifiokjr");
+	assert_eq!(info.repo, "monochange");
+}
+
+#[test]
+fn parse_remote_url_extracts_owner_repo_from_https_url() {
+	let result =
+		crate::workspace_ops::parse_remote_url("https://github.com/ifiokjr/monochange.git");
+	let info = result.unwrap_or_else(|| panic!("expected RemoteInfo"));
+	assert_eq!(info.owner, "ifiokjr");
+	assert_eq!(info.repo, "monochange");
+}
+
+#[test]
+fn parse_remote_url_handles_https_without_git_suffix() {
+	let result = crate::workspace_ops::parse_remote_url("https://gitlab.com/mygroup/myproject");
+	let info = result.unwrap_or_else(|| panic!("expected RemoteInfo"));
+	assert_eq!(info.owner, "mygroup");
+	assert_eq!(info.repo, "myproject");
+}
+
+#[test]
+fn parse_remote_url_handles_ssh_protocol_url() {
+	let result = crate::workspace_ops::parse_remote_url("ssh://git@github.com/owner/repo.git");
+	let info = result.unwrap_or_else(|| panic!("expected RemoteInfo"));
+	assert_eq!(info.owner, "owner");
+	assert_eq!(info.repo, "repo");
+}
+
+#[test]
+fn parse_remote_url_returns_none_for_invalid_url() {
+	assert!(crate::workspace_ops::parse_remote_url("not-a-url").is_none());
+	assert!(crate::workspace_ops::parse_remote_url("").is_none());
+}
+
+#[test]
+fn init_with_provider_writes_source_section_and_commit_release_command() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("init"),
+			OsString::from("--provider"),
+			OsString::from("github"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(output.contains("wrote"), "expected wrote message");
+	assert!(
+		config.contains("[source]"),
+		"expected [source] section in config"
+	);
+	assert!(
+		config.contains("provider = \"github\""),
+		"expected github provider"
+	);
+	assert!(
+		config.contains("[source.releases]"),
+		"expected [source.releases]"
+	);
+	assert!(
+		config.contains("[source.pull_requests]"),
+		"expected [source.pull_requests]"
+	);
+	assert!(
+		config.contains("[cli.commit-release]"),
+		"expected [cli.commit-release] command"
+	);
+	assert!(
+		config.contains("type = \"PrepareRelease\""),
+		"expected PrepareRelease step"
+	);
+	assert!(
+		config.contains("type = \"CommitRelease\""),
+		"expected CommitRelease step"
+	);
+	assert!(
+		config.contains("type = \"OpenReleaseRequest\""),
+		"expected OpenReleaseRequest step"
+	);
+}
+
+#[test]
+fn init_with_github_provider_creates_workflow_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("init"),
+			OsString::from("--provider"),
+			OsString::from("github"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+
+	assert!(
+		output.contains("changeset-policy.yml"),
+		"expected changeset-policy.yml in output"
+	);
+	assert!(
+		output.contains("release.yml"),
+		"expected release.yml in output"
+	);
+
+	let policy = fs::read_to_string(
+		tempdir
+			.path()
+			.join(".github/workflows/changeset-policy.yml"),
+	)
+	.unwrap_or_else(|error| panic!("changeset-policy.yml: {error}"));
+	assert!(
+		policy.contains("mc \"${args[@]}\""),
+		"expected mc command in changeset policy"
+	);
+	assert!(
+		policy.contains("cargo binstall monochange"),
+		"expected cargo binstall install step"
+	);
+
+	let release = fs::read_to_string(tempdir.path().join(".github/workflows/release.yml"))
+		.unwrap_or_else(|error| panic!("release.yml: {error}"));
+	assert!(
+		release.contains("mc commit-release"),
+		"expected mc commit-release command"
+	);
+	assert!(
+		release.contains("github-actions[bot]"),
+		"expected bot git config"
+	);
+}
+
+#[test]
+fn init_without_provider_does_not_create_workflow_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("init")],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+
+	assert!(
+		!tempdir.path().join(".github/workflows").exists(),
+		"expected no .github/workflows directory without --provider"
+	);
+}
+
+#[test]
+fn init_without_provider_comments_out_source_section() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("init")],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(
+		!config.contains("\n[source]\n"),
+		"expected no active [source] section without --provider"
+	);
+	assert!(
+		config.contains("# [source]"),
+		"expected commented-out [source] section"
+	);
+	assert!(
+		!config.contains("[cli.commit-release]"),
+		"expected no commit-release command without --provider"
+	);
+}
+
+#[test]
+fn init_with_gitlab_provider_writes_source_but_no_workflows() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("init"),
+			OsString::from("--provider"),
+			OsString::from("gitlab"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(config.contains("provider = \"gitlab\""));
+	assert!(config.contains("[cli.commit-release]"));
+	assert!(
+		!output.contains("changeset-policy.yml"),
+		"gitlab should not generate GitHub workflows"
+	);
+	assert!(!tempdir.path().join(".github/workflows").exists());
+}

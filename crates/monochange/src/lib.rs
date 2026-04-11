@@ -610,11 +610,15 @@ where
 
 	match matches.subcommand() {
 		Some(("init", init_matches)) => {
+			let provider = init_matches
+				.get_one::<String>("provider")
+				.map(String::as_str);
+			let result = init_workspace(root, init_matches.get_flag("force"), provider)?;
 			if quiet {
-				return Ok(String::new());
+				Ok(String::new())
+			} else {
+				Ok(result.summary())
 			}
-			let path = init_workspace(root, init_matches.get_flag("force"))?;
-			Ok(format!("wrote {}", path.display()))
 		}
 		Some(("populate", _)) => {
 			if quiet {
