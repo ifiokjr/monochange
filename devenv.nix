@@ -100,15 +100,15 @@ in
         set -e
         cargo run --quiet --package monochange --bin monochange -- "$@"
       '';
-      description = "The `monochange` executable";
+      description = "The dev build of the `monochange` executable";
       binary = "bash";
     };
     "mc" = {
       exec = ''
         set -e
-        cargo run --quiet --package monochange --bin mc -- "$@"
+        cargo bin mc "$@"
       '';
-      description = "Alias for the `monochange` executable";
+      description = "The release build of the `monochange` executable";
       binary = "bash";
     };
     "install:all" = {
@@ -127,9 +127,19 @@ in
       description = "Install cargo binaries locally.";
       binary = "bash";
     };
+    "update:mc" = {
+      exec = ''
+        set -e
+        rm -rf $DEVENV_ROOT/.bin/rust-*/monochange  $DEVENV_ROOT/.bin/.shims/mc
+        mc --help
+      '';
+      description = "Alias for the `monochange` executable";
+      binary = "bash";
+    };
     "update:deps" = {
       exec = ''
         set -e
+        update:mc
         cargo update
         devenv update
       '';

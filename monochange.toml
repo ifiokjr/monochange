@@ -266,7 +266,9 @@ extra_changelog_sections = [
 tag = true
 release = true
 version_format = "primary"
-versioned_files = [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] }]
+versioned_files = [
+	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version", "workspace.metadata.bin.monochange.version"] },
+]
 # Optional: filter member-targeted notes in the group changelog.
 # Omit `include` (or set it to "all") to keep current behavior.
 # Use "group-only" to show only direct group-targeted changesets.
