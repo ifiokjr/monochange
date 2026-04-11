@@ -4,6 +4,7 @@ pub mod insta;
 pub mod rmcp;
 
 pub use fs::copy_directory;
+pub use fs::copy_directory_skip_git;
 pub use fs::current_test_name;
 pub use git::git;
 pub use git::git_output;
