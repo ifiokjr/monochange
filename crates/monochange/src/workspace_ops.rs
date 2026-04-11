@@ -27,6 +27,7 @@ use monochange_core::SourceProvider;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
 use monochange_github as github_provider;
+use monochange_jvm::discover_jvm_projects;
 use monochange_npm::discover_npm_packages;
 use serde_json::json;
 use typed_builder::TypedBuilder;
@@ -374,6 +375,7 @@ fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
 			PackageType::Deno => "deno",
 			PackageType::Dart => "dart",
 			PackageType::Flutter => "flutter",
+			PackageType::Jvm => "jvm",
 		};
 		let mut entry = BTreeMap::new();
 		entry.insert("id", json!(id));
@@ -391,6 +393,7 @@ fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
 	let has_dart = packages
 		.iter()
 		.any(|p| p.ecosystem == Ecosystem::Dart || p.ecosystem == Ecosystem::Flutter);
+	let has_jvm = packages.iter().any(|p| p.ecosystem == Ecosystem::Jvm);
 
 	let package_ids_toml = package_ids
 		.iter()
@@ -406,6 +409,7 @@ fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
 		"has_npm": has_npm,
 		"has_deno": has_deno,
 		"has_dart": has_dart,
+		"has_jvm": has_jvm,
 	});
 
 	let jinja_context = minijinja::Value::from_serialize(&context);
@@ -437,6 +441,7 @@ fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
 		discover_npm_packages(root)?,
 		discover_deno_packages(root)?,
 		discover_dart_packages(root)?,
+		discover_jvm_projects(root)?,
 	] {
 		packages.extend(discovery.packages);
 	}
@@ -477,6 +482,7 @@ fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 		Ecosystem::Deno => PackageType::Deno,
 		Ecosystem::Dart => PackageType::Dart,
 		Ecosystem::Flutter => PackageType::Flutter,
+		Ecosystem::Jvm => PackageType::Jvm,
 	}
 }
 
@@ -495,10 +501,13 @@ pub(crate) fn build_lockfile_command_executions(
 	let deno_executions = resolve_lockfile_command_executions(root, &configuration.deno.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)).collect(), monochange_deno::default_lockfile_commands)?;
 	#[rustfmt::skip]
 	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().filter(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)).collect(), monochange_dart::default_lockfile_commands)?;
+	#[rustfmt::skip]
+	let jvm_executions = resolve_lockfile_command_executions(root, &configuration.jvm.lockfile_commands, packages.iter().filter(|package| package.ecosystem == Ecosystem::Jvm && released_versions.contains_key(&package.id)).collect(), monochange_jvm::default_lockfile_commands)?;
 	let mut executions = cargo_executions;
 	executions.extend(npm_executions);
 	executions.extend(deno_executions);
 	executions.extend(dart_executions);
+	executions.extend(jvm_executions);
 	Ok(dedup_lockfile_command_executions(executions))
 }
 
@@ -578,6 +587,7 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 		discover_npm_packages(root)?,
 		discover_deno_packages(root)?,
 		discover_dart_packages(root)?,
+		discover_jvm_projects(root)?,
 	] {
 		warnings.extend(discovery.warnings);
 		packages.extend(discovery.packages);
@@ -1186,7 +1196,15 @@ pub(crate) fn prepare_release_execution(
 	let npm_updates = build_npm_manifest_updates(&discovery.packages, &plan)?;
 	let deno_updates = build_deno_manifest_updates(&discovery.packages, &plan)?;
 	let dart_updates = build_dart_manifest_updates(&discovery.packages, &plan)?;
-	let manifest_updates = [cargo_updates, npm_updates, deno_updates, dart_updates].concat();
+	let jvm_updates = build_jvm_manifest_updates(&discovery.packages, &plan)?;
+	let manifest_updates = [
+		cargo_updates,
+		npm_updates,
+		deno_updates,
+		dart_updates,
+		jvm_updates,
+	]
+	.concat();
 	let versioned_file_updates =
 		build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)?;
 	let release_targets =

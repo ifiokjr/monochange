@@ -337,6 +337,8 @@ struct RawEcosystems {
 	deno: RawEcosystemSettings,
 	#[serde(default)]
 	dart: RawEcosystemSettings,
+	#[serde(default)]
+	jvm: RawEcosystemSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -827,6 +829,7 @@ fn package_type_to_ecosystem_type(package_type: PackageType) -> EcosystemType {
 		PackageType::Npm => EcosystemType::Npm,
 		PackageType::Deno => EcosystemType::Deno,
 		PackageType::Dart | PackageType::Flutter => EcosystemType::Dart,
+		PackageType::Jvm => EcosystemType::Jvm,
 	}
 }
 
@@ -942,6 +945,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		normalize_ecosystem_settings(&contents, "deno", EcosystemType::Deno, ecosystems.deno)?;
 	let dart_ecosystem =
 		normalize_ecosystem_settings(&contents, "dart", EcosystemType::Dart, ecosystems.dart)?;
+	let jvm_ecosystem =
+		normalize_ecosystem_settings(&contents, "jvm", EcosystemType::Jvm, ecosystems.jvm)?;
 	let defaults_changelog_policy = defaults
 		.changelog
 		.as_ref()
@@ -998,6 +1003,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 					EcosystemType::Npm => npm_ecosystem.versioned_files.clone(),
 					EcosystemType::Deno => deno_ecosystem.versioned_files.clone(),
 					EcosystemType::Dart => dart_ecosystem.versioned_files.clone(),
+					EcosystemType::Jvm => jvm_ecosystem.versioned_files.clone(),
 				}
 			};
 			let mut versioned_files = inherited_versioned_files;
@@ -1207,6 +1213,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		("npm", &npm_ecosystem),
 		("deno", &deno_ecosystem),
 		("dart", &dart_ecosystem),
+		("jvm", &jvm_ecosystem),
 	] {
 		let declared_packages = packages
 			.iter()
@@ -1252,6 +1259,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		npm: npm_ecosystem,
 		deno: deno_ecosystem,
 		dart: dart_ecosystem,
+		jvm: jvm_ecosystem,
 	})
 }
 
@@ -2073,6 +2081,7 @@ fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -
 		EcosystemType::Npm => monochange_npm::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Deno => monochange_deno::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Dart => monochange_dart::supported_versioned_file_kind(path).is_some(),
+		EcosystemType::Jvm => monochange_jvm::supported_versioned_file_kind(path).is_some(),
 	}
 }
 
@@ -2223,6 +2232,7 @@ fn validate_versioned_files(
 							EcosystemType::Npm => "npm",
 							EcosystemType::Deno => "deno",
 							EcosystemType::Dart => "dart",
+							EcosystemType::Jvm => "jvm",
 						}
 					),
 					vec![config_section_label(
@@ -2286,6 +2296,7 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 		PackageType::Npm => "package.json",
 		PackageType::Deno => "deno.json",
 		PackageType::Dart | PackageType::Flutter => "pubspec.yaml",
+		PackageType::Jvm => "build.gradle.kts",
 	}
 }
 
@@ -3406,6 +3417,7 @@ fn ecosystem_matches_package_type(ecosystem: Ecosystem, package_type: PackageTyp
 			| (Ecosystem::Deno, PackageType::Deno)
 			| (Ecosystem::Dart, PackageType::Dart)
 			| (Ecosystem::Flutter, PackageType::Flutter)
+			| (Ecosystem::Jvm, PackageType::Jvm)
 	)
 }
 
@@ -3460,6 +3472,7 @@ pub fn validate_versioned_files_content(root: &Path) -> MonochangeResult<Vec<Str
 		("npm", &configuration.npm),
 		("deno", &configuration.deno),
 		("dart", &configuration.dart),
+		("jvm", &configuration.jvm),
 	];
 	for &(eco_name, settings) in ecosystem_entries {
 		if !settings.versioned_files.is_empty() {
@@ -3630,6 +3643,13 @@ fn validate_ecosystem_version_readable(
 			if yaml.get("version").and_then(|v| v.as_str()).is_none() {
 				return Err(MonochangeError::Config(format!(
 					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `version` string field"
+				)));
+			}
+		}
+		EcosystemType::Jvm => {
+			if contents.trim().is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"{owner_kind} `{owner_id}` versioned file `{display_path}` is empty"
 				)));
 			}
 		}

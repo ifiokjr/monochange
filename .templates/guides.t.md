@@ -4,6 +4,7 @@
 - npm workspaces, pnpm workspaces, Bun workspaces, and standalone `package.json` packages
 - Deno workspaces and standalone `deno.json` / `deno.jsonc` packages
 - Dart and Flutter workspaces plus standalone `pubspec.yaml` packages
+- Gradle multi-project builds and Maven multi-module projects
 
 <!-- {/discoverySupportedSources} -->
 
@@ -357,6 +358,10 @@ enabled = true
 [ecosystems.dart]
 enabled = true
 lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
+
+[ecosystems.jvm]
+enabled = true
+lockfile_commands = [{ command = "./gradlew dependencies --write-locks" }]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

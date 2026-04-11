@@ -31,6 +31,7 @@ monochange_gitea = { workspace = true }
 monochange_github = { workspace = true }
 monochange_gitlab = { workspace = true }
 monochange_graph = { workspace = true }
+monochange_jvm = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }
 rayon = { workspace = true, default-features = true }

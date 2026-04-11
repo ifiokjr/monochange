@@ -532,6 +532,34 @@ pub(crate) fn build_dart_manifest_updates(
 	Ok(updates)
 }
 
+pub(crate) fn build_jvm_manifest_updates(
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let released_versions = released_versions_by_record_id(plan);
+	let mut updates = Vec::new();
+	for package in packages
+		.iter()
+		.filter(|package| package.ecosystem == Ecosystem::Jvm)
+	{
+		let Some(version) = released_versions.get(&package.id) else {
+			continue;
+		};
+		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read {}: {error}",
+				package.manifest_path.display()
+			))
+		})?;
+		let rendered = monochange_jvm::update_gradle_build_version(&contents, version);
+		updates.push(FileUpdate {
+			path: package.manifest_path.clone(),
+			content: rendered.into_bytes(),
+		});
+	}
+	Ok(updates)
+}
+
 pub(crate) fn apply_file_updates(updates: &[FileUpdate]) -> MonochangeResult<()> {
 	for update in updates {
 		if let Some(parent) = update.path.parent() {

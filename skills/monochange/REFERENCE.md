@@ -10,6 +10,7 @@ Use it when a repository needs one release-planning model across:
 - npm / pnpm / Bun
 - Deno
 - Dart / Flutter
+- JVM (Gradle / Maven)
 
 It discovers packages, normalizes dependency relationships, applies package and group rules from `monochange.toml`, reads explicit `.changeset/*.md` files, and turns those inputs into deterministic release plans.
 
@@ -209,6 +210,7 @@ Lockfile refresh is command-driven. monochange infers defaults when not configur
 - Cargo: `cargo generate-lockfile`
 - npm-family: detects owned lockfiles and runs the matching command (`npm install --package-lock-only`, `pnpm install --lockfile-only`, `bun install --lockfile-only`)
 - Dart / Flutter: `dart pub get` or `flutter pub get`
+- JVM (Gradle): `./gradlew dependencies --write-locks` (Maven has no lockfile)
 - Deno: no inferred default
 
 Explicit configuration overrides inference:
