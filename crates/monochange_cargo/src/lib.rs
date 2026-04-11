@@ -548,6 +548,69 @@ pub fn discover_cargo_packages(root: &Path) -> MonochangeResult<AdapterDiscovery
 	Ok(AdapterDiscovery { packages, warnings })
 }
 
+/// Load one explicitly configured Cargo package without walking the whole repo.
+///
+/// Performance note:
+/// full-repository `WalkDir` scans are fine for `mc discover`, but they become a
+/// large fixed cost for release planning in repositories that vendor many test
+/// fixtures. Release planning already knows the configured package paths, so this
+/// helper lets higher-level code parse just the manifests it needs instead of
+/// rediscovering every Cargo fixture on disk.
+pub fn load_configured_cargo_package(
+	root: &Path,
+	package_path: &Path,
+) -> MonochangeResult<Option<PackageRecord>> {
+	let manifest_path =
+		if package_path.file_name().and_then(|name| name.to_str()) == Some(CARGO_MANIFEST_FILE) {
+			package_path.to_path_buf()
+		} else {
+			package_path.join(CARGO_MANIFEST_FILE)
+		};
+	let workspace_manifest = find_nearest_workspace_manifest(root, &manifest_path);
+	let workspace_root = workspace_manifest
+		.as_ref()
+		.and_then(|path| path.parent())
+		.unwrap_or_else(|| manifest_path.parent().unwrap_or(root));
+	let workspace_version = match workspace_manifest.as_ref() {
+		Some(path) => workspace_package_version_from_manifest(path)?,
+		None => None,
+	};
+	parse_package_manifest(&manifest_path, workspace_root, workspace_version.as_ref())
+}
+
+fn find_nearest_workspace_manifest(root: &Path, manifest_path: &Path) -> Option<PathBuf> {
+	let mut current = manifest_path.parent();
+	while let Some(directory) = current {
+		let candidate = directory.join(CARGO_MANIFEST_FILE);
+		if candidate.exists() && has_workspace_section(&candidate).unwrap_or(false) {
+			return Some(candidate);
+		}
+		if directory == root {
+			break;
+		}
+		current = directory.parent();
+	}
+	None
+}
+
+fn workspace_package_version_from_manifest(
+	workspace_manifest: &Path,
+) -> MonochangeResult<Option<Version>> {
+	let contents = fs::read_to_string(workspace_manifest).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to read {}: {error}",
+			workspace_manifest.display()
+		))
+	})?;
+	let parsed = toml::from_str::<Value>(&contents).map_err(|error| {
+		MonochangeError::Discovery(format!(
+			"failed to parse {}: {error}",
+			workspace_manifest.display()
+		))
+	})?;
+	Ok(workspace_package_version(&parsed))
+}
+
 fn find_workspace_manifests(root: &Path) -> Vec<PathBuf> {
 	let mut manifests = find_all_manifests(root)
 		.into_iter()

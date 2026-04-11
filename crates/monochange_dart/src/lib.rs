@@ -413,6 +413,20 @@ pub fn discover_dart_packages(root: &Path) -> MonochangeResult<AdapterDiscovery>
 	Ok(AdapterDiscovery { packages, warnings })
 }
 
+/// Load one explicitly configured Dart/Flutter package without walking the repo.
+pub fn load_configured_dart_package(
+	root: &Path,
+	package_path: &Path,
+) -> MonochangeResult<Option<PackageRecord>> {
+	let manifest_path =
+		if package_path.file_name().and_then(|name| name.to_str()) == Some(PUBSPEC_FILE) {
+			package_path.to_path_buf()
+		} else {
+			package_path.join(PUBSPEC_FILE)
+		};
+	parse_manifest(&manifest_path, manifest_path.parent().unwrap_or(root))
+}
+
 fn find_workspace_manifests(root: &Path) -> Vec<PathBuf> {
 	let mut manifests = find_all_manifests(root)
 		.into_iter()

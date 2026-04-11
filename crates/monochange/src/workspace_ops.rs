@@ -7,9 +7,11 @@ use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
 use monochange_cargo::discover_cargo_packages;
+use monochange_cargo::load_configured_cargo_package;
 use monochange_config::apply_version_groups;
+use monochange_config::build_changeset_load_context;
 use monochange_config::load_change_signals;
-use monochange_config::load_changeset_file;
+use monochange_config::load_changeset_contents_with_context;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
 use monochange_core::CliCommandDefinition;
@@ -25,9 +27,12 @@ use monochange_core::ReleasePlan;
 use monochange_core::SourceProvider;
 use monochange_core::default_cli_commands;
 use monochange_dart::discover_dart_packages;
+use monochange_dart::load_configured_dart_package;
 use monochange_deno::discover_deno_packages;
+use monochange_deno::load_configured_deno_package;
 use monochange_github as github_provider;
 use monochange_npm::discover_npm_packages;
+use monochange_npm::load_configured_npm_package;
 use serde_json::json;
 use typed_builder::TypedBuilder;
 
@@ -606,6 +611,61 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	})
 }
 
+/// Discover just the packages that release planning actually needs.
+///
+/// Performance note:
+/// the generic discovery command intentionally walks the full repository so
+/// `mc discover` can surface every supported package it finds. That behavior is
+/// expensive in monochange's own repo because fixtures contain many extra
+/// manifests across multiple ecosystems. Release planning already has explicit
+/// package definitions, so re-running whole-repo discovery turned `mc release
+/// --dry-run` into mostly filesystem scanning.
+///
+/// This helper keeps the broad `discover_workspace()` behavior for discovery-
+/// oriented commands while giving release planning a path that parses only the
+/// configured package manifests. The comment is intentionally explicit so future
+/// refactors do not “simplify” the code back to a full repo walk.
+fn discover_release_workspace(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+) -> MonochangeResult<DiscoveryReport> {
+	if configuration.packages.is_empty() {
+		return discover_workspace(root);
+	}
+
+	let mut packages = Vec::new();
+	for package_definition in &configuration.packages {
+		let path = root.join(&package_definition.path);
+		let package = match package_definition.package_type {
+			PackageType::Cargo => load_configured_cargo_package(root, &path)?,
+			PackageType::Npm => load_configured_npm_package(root, &path)?,
+			PackageType::Deno => load_configured_deno_package(root, &path)?,
+			PackageType::Dart | PackageType::Flutter => load_configured_dart_package(root, &path)?,
+		}
+		.ok_or_else(|| {
+			MonochangeError::Discovery(format!(
+				"configured package `{}` at {} could not be discovered",
+				package_definition.id,
+				package_definition.path.display()
+			))
+		})?;
+		packages.push(package);
+	}
+
+	normalize_package_ids(root, &mut packages);
+	packages.sort_by(|left, right| left.id.cmp(&right.id));
+	packages.dedup_by(|left, right| left.id == right.id);
+	let (version_groups, warnings) = apply_version_groups(&mut packages, configuration)?;
+	let dependencies = materialize_dependency_edges(&packages);
+	Ok(DiscoveryReport {
+		workspace_root: root.to_path_buf(),
+		packages,
+		dependencies,
+		version_groups,
+		warnings,
+	})
+}
+
 #[derive(Clone, Copy, Debug, TypedBuilder)]
 pub struct AddChangeFileRequest<'a> {
 	pub package_refs: &'a [String],
@@ -1149,14 +1209,42 @@ pub(crate) fn prepare_release_execution(
 	dry_run: bool,
 ) -> MonochangeResult<PreparedReleaseExecution> {
 	let configuration = load_workspace_configuration(root)?;
-	let discovery = discover_workspace(root)?;
+	let discovery = discover_release_workspace(root, &configuration)?;
 	let changeset_paths = discover_changeset_paths(root)?;
 	tracing::debug!(count = changeset_paths.len(), "discovered changesets");
+
+	// Build the shared changeset lookup context once.
+	//
+	// This command is extremely sensitive to repeated per-file setup work because
+	// it often parses every pending `.changeset/*.md` file in the repo. Reusing a
+	// single context keeps package/group lookup costs flat instead of multiplying
+	// them by the number of changesets.
+	let changeset_context = build_changeset_load_context(&configuration, &discovery.packages);
+	// Split changeset loading into two phases:
+	// 1. read every tiny file in a simple sequential pass
+	// 2. parse the already-loaded text in parallel
+	//
+	// Real-world profiling showed that letting worker threads both open and parse
+	// dozens of tiny files inflated wall time because the workload became mostly
+	// filesystem contention. Reading eagerly keeps I/O predictable, while the
+	// second phase still benefits from parallel parsing once the bytes are in
+	// memory.
+	let changeset_sources = changeset_paths
+		.iter()
+		.map(|path| {
+			let contents = fs::read_to_string(path).map_err(|error| {
+				MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
+			})?;
+			Ok((path.clone(), contents))
+		})
+		.collect::<MonochangeResult<Vec<_>>>()?;
 	let loaded_changesets = {
 		use rayon::prelude::*;
-		changeset_paths
+		changeset_sources
 			.par_iter()
-			.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
+			.map(|(path, contents)| {
+				load_changeset_contents_with_context(path, contents, &changeset_context)
+			})
 			.collect::<MonochangeResult<Vec<_>>>()?
 	};
 	let change_signals = loaded_changesets
@@ -1169,7 +1257,11 @@ pub(crate) fn prepare_release_execution(
 		.as_ref()
 		.filter(|source| source.provider == SourceProvider::GitHub)
 	{
-		github_provider::enrich_changeset_context(source, &mut changesets);
+		if dry_run {
+			github_provider::annotate_changeset_context(source, &mut changesets);
+		} else {
+			github_provider::enrich_changeset_context(source, &mut changesets);
+		}
 	}
 	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals)?;
 	let released_packages = released_package_names(&discovery.packages, &plan);

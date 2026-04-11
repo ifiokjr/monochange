@@ -77,6 +77,8 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::ops::Range;
 use std::path::Path;
@@ -1271,12 +1273,147 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	})
 }
 
+#[derive(Debug)]
+struct ChangeTypeLookup {
+	valid_types: Vec<String>,
+	default_bumps: HashMap<String, BumpSeverity>,
+}
+
+#[derive(Debug)]
+pub struct ChangesetLoadContext<'a> {
+	package_ids: HashSet<&'a str>,
+	groups_by_id: HashMap<&'a str, &'a GroupDefinition>,
+	package_reference_matches: HashMap<String, Vec<&'a str>>,
+	package_versions: HashMap<&'a str, &'a Version>,
+	change_types_by_target: HashMap<&'a str, ChangeTypeLookup>,
+}
+
+/// Build reusable lookup tables for loading many `.changeset/*.md` files.
+///
+/// Performance note:
+/// release planning often parses dozens or hundreds of changesets in one run.
+/// The older path rebuilt package/group lookup maps for every file and resolved
+/// package references by rescanning the full discovered package list each time.
+/// On the monochange repo that repeated work dominated `mc release --dry-run`
+/// once the obvious git/network costs were removed.
+///
+/// This context shifts that cost to a single up-front pass so each changeset can
+/// reuse the same reference indexes, version lookups, and configured change-type
+/// metadata. Keeping the optimization centralized here also makes it harder for a
+/// future call site to accidentally fall back to the slow per-file rebuild.
+#[must_use]
+pub fn build_changeset_load_context<'a>(
+	configuration: &'a WorkspaceConfiguration,
+	packages: &'a [PackageRecord],
+) -> ChangesetLoadContext<'a> {
+	let package_ids = configuration
+		.packages
+		.iter()
+		.map(|package| package.id.as_str())
+		.collect::<HashSet<_>>();
+	let groups_by_id = configuration
+		.groups
+		.iter()
+		.map(|group| (group.id.as_str(), group))
+		.collect::<HashMap<_, _>>();
+	let package_versions = packages
+		.iter()
+		.filter_map(|package| {
+			package
+				.current_version
+				.as_ref()
+				.map(|version| (package.id.as_str(), version))
+		})
+		.collect::<HashMap<_, _>>();
+	let mut package_reference_matches = HashMap::<String, Vec<&'a str>>::new();
+	for package in packages {
+		for reference in changeset_package_references(configuration.root_path.as_path(), package) {
+			package_reference_matches
+				.entry(reference)
+				.or_default()
+				.push(package.id.as_str());
+		}
+	}
+	let mut change_types_by_target = HashMap::new();
+	for package in &configuration.packages {
+		change_types_by_target.insert(
+			package.id.as_str(),
+			build_change_type_lookup(&package.extra_changelog_sections),
+		);
+	}
+	for group in &configuration.groups {
+		change_types_by_target.insert(
+			group.id.as_str(),
+			build_change_type_lookup(&group.extra_changelog_sections),
+		);
+	}
+	ChangesetLoadContext {
+		package_ids,
+		groups_by_id,
+		package_reference_matches,
+		package_versions,
+		change_types_by_target,
+	}
+}
+
+fn build_change_type_lookup(sections: &[ExtraChangelogSection]) -> ChangeTypeLookup {
+	let mut valid_types = sections
+		.iter()
+		.flat_map(|section| section.types.iter())
+		.map(|value| value.trim())
+		.filter(|value| !value.is_empty())
+		.map(ToString::to_string)
+		.collect::<Vec<_>>();
+	valid_types.sort();
+	valid_types.dedup();
+	let default_bumps = sections
+		.iter()
+		.flat_map(|section| {
+			section.types.iter().map(|change_type| {
+				(
+					change_type.trim().to_string(),
+					section.default_bump.unwrap_or(BumpSeverity::None),
+				)
+			})
+		})
+		.filter(|(change_type, _)| !change_type.is_empty())
+		.collect::<HashMap<_, _>>();
+	ChangeTypeLookup {
+		valid_types,
+		default_bumps,
+	}
+}
+
+fn changeset_package_references(root: &Path, package: &PackageRecord) -> Vec<String> {
+	let mut references = vec![package.name.clone(), package.id.clone()];
+	if let Some(config_id) = package.metadata.get("config_id") {
+		references.push(config_id.clone());
+	}
+	if let Some(manifest_path) = relative_to_root(root, &package.manifest_path)
+		.and_then(|path| path.to_str().map(ToString::to_string))
+	{
+		references.push(manifest_path);
+	}
+	if let Some(directory_path) = package
+		.manifest_path
+		.parent()
+		.and_then(|path| relative_to_root(root, path))
+		.and_then(|path| path.to_str().map(ToString::to_string))
+	{
+		references.push(directory_path);
+	}
+	references.sort();
+	references.dedup();
+	references
+}
+
 pub fn load_change_signals(
 	changes_path: &Path,
 	configuration: &WorkspaceConfiguration,
 	packages: &[PackageRecord],
 ) -> MonochangeResult<Vec<ChangeSignal>> {
-	Ok(load_changeset_file(changes_path, configuration, packages)?.signals)
+	let context = build_changeset_load_context(configuration, packages);
+	Ok(load_changeset_file_with_context(changes_path, &context)?.signals)
 }
 
 pub fn load_changeset_file(
@@ -1284,16 +1421,55 @@ pub fn load_changeset_file(
 	configuration: &WorkspaceConfiguration,
 	packages: &[PackageRecord],
 ) -> MonochangeResult<LoadedChangesetFile> {
+	let context = build_changeset_load_context(configuration, packages);
+	load_changeset_file_with_context(changes_path, &context)
+}
+
+/// Load a changeset file with precomputed package/group indexes.
+///
+/// Performance note:
+/// this is the hot path for `mc release --dry-run` on repositories that keep a
+/// large `.changeset/` queue. The slow version repeated all of the following for
+/// every file:
+///
+/// - rebuild the package-id set
+/// - rebuild the group lookup map
+/// - rescan discovered packages for every package reference
+/// - rescan package/group changelog metadata for every `type = ...` lookup
+///
+/// Those tiny costs multiplied by every pending changeset. Keeping the fast path
+/// in a dedicated function with an explicit `ChangesetLoadContext` makes the
+/// intended usage obvious and gives future maintainers one place to extend the
+/// shared indexes instead of accidentally reintroducing per-file recomputation.
+pub fn load_changeset_file_with_context(
+	changes_path: &Path,
+	context: &ChangesetLoadContext<'_>,
+) -> MonochangeResult<LoadedChangesetFile> {
 	let contents = fs::read_to_string(changes_path).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to read {}: {error}",
 			changes_path.display()
 		))
 	})?;
+	load_changeset_contents_with_context(changes_path, &contents, context)
+}
+
+/// Parse already-loaded changeset text with the shared lookup context.
+///
+/// Performance note:
+/// release planning can batch-read many tiny files much faster than it can let
+/// worker threads fight over opening them one by one. This helper keeps the
+/// actual parse/validation logic separate from file I/O so callers can choose a
+/// better read strategy without duplicating the parser itself.
+pub fn load_changeset_contents_with_context(
+	changes_path: &Path,
+	contents: &str,
+	context: &ChangesetLoadContext<'_>,
+) -> MonochangeResult<LoadedChangesetFile> {
 	let raw = if changes_path.extension().and_then(|value| value.to_str()) == Some("md") {
-		parse_markdown_change_file(&contents, changes_path, configuration)?
+		parse_markdown_change_file_with_context(contents, changes_path, context)?
 	} else {
-		toml::from_str::<RawChangeFile>(&contents).map_err(|error| {
+		toml::from_str::<RawChangeFile>(contents).map_err(|error| {
 			MonochangeError::Config(format!(
 				"failed to parse {}: {error}",
 				changes_path.display()
@@ -1301,29 +1477,19 @@ pub fn load_changeset_file(
 		})?
 	};
 
-	let package_ids = configuration
-		.packages
-		.iter()
-		.map(|package| package.id.as_str())
-		.collect::<BTreeSet<_>>();
-	let groups_by_id = configuration
-		.groups
-		.iter()
-		.map(|group| (group.id.as_str(), group))
-		.collect::<BTreeMap<_, _>>();
-	let referenced_packages: BTreeSet<String> = raw
+	let referenced_packages: HashSet<String> = raw
 		.changes
 		.iter()
-		.filter(|change| package_ids.contains(change.package.as_str()))
+		.filter(|change| context.package_ids.contains(change.package.as_str()))
 		.map(|change| change.package.clone())
 		.collect();
 
 	for change in &raw.changes {
-		if !package_ids.contains(change.package.as_str())
-			&& !groups_by_id.contains_key(change.package.as_str())
+		if !context.package_ids.contains(change.package.as_str())
+			&& !context.groups_by_id.contains_key(change.package.as_str())
 		{
 			return Err(changeset_diagnostic(
-				&contents,
+				contents,
 				changes_path,
 				format!(
 					"changeset `{}` references unknown package or group `{}`",
@@ -1331,7 +1497,7 @@ pub fn load_changeset_file(
 					change.package,
 				),
 				vec![changeset_key_label(
-					&contents,
+					contents,
 					&change.package,
 					"unknown package or group",
 				)],
@@ -1345,19 +1511,18 @@ pub fn load_changeset_file(
 		.changes
 		.first()
 		.and_then(|change| change.details.clone());
-	let mut seen_package_ids = BTreeSet::new();
+	let mut seen_package_ids = HashSet::new();
 	let mut signals = Vec::new();
 	let mut targets = Vec::new();
 	for change in raw.changes {
-		if let Some(group) = groups_by_id.get(change.package.as_str()) {
+		if let Some(group) = context.groups_by_id.get(change.package.as_str()) {
 			let explicit_version = change.version.clone();
 			let inferred_bump = match change.bump {
 				Some(bump) => Some(bump),
 				None => {
-					infer_group_bump_from_explicit_version(
+					infer_group_bump_from_explicit_version_with_context(
 						group,
-						&configuration.root_path,
-						packages,
+						context,
 						explicit_version.as_ref(),
 					)?
 				}
@@ -1375,18 +1540,17 @@ pub fn load_changeset_file(
 				if referenced_packages.contains(member_id.as_str()) {
 					continue;
 				}
-				let package_id =
-					resolve_package_reference(member_id, &configuration.root_path, packages)?;
+				let package_id = resolve_package_reference_with_context(member_id, context)?;
 				if !seen_package_ids.insert(package_id.clone()) {
 					return Err(changeset_diagnostic(
-						&contents,
+						contents,
 						changes_path,
 						format!(
 							"duplicate change entry for `{package_id}` in {}",
 							changes_path.display()
 						),
 						vec![changeset_key_label(
-							&contents,
+							contents,
 							member_id,
 							"duplicate package target",
 						)],
@@ -1406,13 +1570,12 @@ pub fn load_changeset_file(
 				});
 			}
 		} else {
-			let package_id =
-				resolve_package_reference(&change.package, &configuration.root_path, packages)?;
+			let package_id = resolve_package_reference_with_context(&change.package, context)?;
 			let explicit_version = change.version;
 			let inferred_bump = change.bump.or_else(|| {
-				infer_package_bump_from_explicit_version(
+				infer_package_bump_from_explicit_version_with_context(
 					&package_id,
-					packages,
+					context,
 					explicit_version.as_ref(),
 				)
 			});
@@ -1427,14 +1590,14 @@ pub fn load_changeset_file(
 			});
 			if !seen_package_ids.insert(package_id.clone()) {
 				return Err(changeset_diagnostic(
-					&contents,
+					contents,
 					changes_path,
 					format!(
 						"duplicate change entry for `{package_id}` in {}",
 						changes_path.display()
 					),
 					vec![changeset_key_label(
-						&contents,
+						contents,
 						&change.package,
 						"duplicate package target",
 					)],
@@ -1464,6 +1627,275 @@ pub fn load_changeset_file(
 	})
 }
 
+fn infer_package_bump_from_explicit_version_with_context(
+	package_id: &str,
+	context: &ChangesetLoadContext<'_>,
+	explicit_version: Option<&Version>,
+) -> Option<BumpSeverity> {
+	let explicit_version = explicit_version?;
+	context
+		.package_versions
+		.get(package_id)
+		.map(|current_version| infer_bump_from_versions(current_version, explicit_version))
+}
+
+fn infer_group_bump_from_explicit_version_with_context(
+	group: &GroupDefinition,
+	context: &ChangesetLoadContext<'_>,
+	explicit_version: Option<&Version>,
+) -> MonochangeResult<Option<BumpSeverity>> {
+	let Some(explicit_version) = explicit_version else {
+		return Ok(None);
+	};
+	let mut max_version: Option<&Version> = None;
+	for member_id in &group.packages {
+		let package_id = resolve_package_reference_with_context(member_id, context)?;
+		if let Some(current_version) = context.package_versions.get(package_id.as_str()) {
+			max_version = Some(match max_version {
+				Some(current_max) if *current_version > current_max => current_version,
+				Some(current_max) => current_max,
+				None => current_version,
+			});
+		}
+	}
+	Ok(max_version
+		.map(|current_version| infer_bump_from_versions(current_version, explicit_version)))
+}
+
+fn resolve_package_reference_with_context(
+	reference: &str,
+	context: &ChangesetLoadContext<'_>,
+) -> MonochangeResult<String> {
+	match context
+		.package_reference_matches
+		.get(reference)
+		.map(Vec::as_slice)
+		.unwrap_or_default()
+	{
+		[] => {
+			Err(MonochangeError::Config(format!(
+				"change package reference `{reference}` did not match any discovered package"
+			)))
+		}
+		[package_id] => Ok((*package_id).to_string()),
+		package_ids => {
+			Err(MonochangeError::Config(format!(
+				"change package reference `{reference}` matched multiple packages: {}",
+				package_ids.join(", ")
+			)))
+		}
+	}
+}
+
+fn configured_change_type_default_bump_with_context(
+	context: &ChangesetLoadContext<'_>,
+	target: &str,
+	change_type: &str,
+) -> Option<BumpSeverity> {
+	context
+		.change_types_by_target
+		.get(target)
+		.and_then(|lookup| lookup.default_bumps.get(change_type))
+		.copied()
+}
+
+fn configured_change_types_with_context(
+	context: &ChangesetLoadContext<'_>,
+	target: &str,
+) -> Vec<String> {
+	context
+		.change_types_by_target
+		.get(target)
+		.map(|lookup| lookup.valid_types.clone())
+		.unwrap_or_default()
+}
+
+fn parse_markdown_change_file_with_context(
+	contents: &str,
+	changes_path: &Path,
+	context: &ChangesetLoadContext<'_>,
+) -> MonochangeResult<RawChangeFile> {
+	let contents = &contents.replace("\r\n", "\n").replace('\r', "\n");
+	let Some(without_opening) = contents.strip_prefix("---") else {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: missing markdown frontmatter",
+			changes_path.display()
+		)));
+	};
+	let Some((frontmatter, body_with_separator)) = without_opening.split_once("\n---\n") else {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: unterminated markdown frontmatter",
+			changes_path.display()
+		)));
+	};
+	let body = body_with_separator.trim();
+	let mapping = serde_yaml_ng::from_str::<Mapping>(frontmatter).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {} frontmatter: {error}",
+			changes_path.display()
+		))
+	})?;
+	let (reason, details) = markdown_change_text(body);
+	let mut changes = Vec::new();
+
+	for (key, value) in &mapping {
+		let Some(package) = key.as_str() else {
+			continue;
+		};
+		let (requested_bump, explicit_version, change_type) =
+			parse_markdown_change_target_with_context(value, changes_path, package, context)?;
+		changes.push(RawChangeEntry {
+			package: package.to_string(),
+			bump: requested_bump,
+			version: explicit_version,
+			reason: reason.clone(),
+			details: details.clone(),
+			change_type,
+		});
+	}
+
+	Ok(RawChangeFile { changes })
+}
+
+fn parse_markdown_change_target_with_context(
+	value: &serde_yaml_ng::Value,
+	changes_path: &Path,
+	package: &str,
+	context: &ChangesetLoadContext<'_>,
+) -> MonochangeResult<(Option<BumpSeverity>, Option<Version>, Option<String>)> {
+	if let Some(token) = value
+		.as_str()
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
+	{
+		if let Some(bump) = parse_bump_severity(token) {
+			return Ok((Some(bump), None, None));
+		}
+		if let Some(default_bump) =
+			configured_change_type_default_bump_with_context(context, package, token)
+		{
+			return Ok((Some(default_bump), None, Some(token.to_string())));
+		}
+		if context.package_ids.contains(package) || context.groups_by_id.contains_key(package) {
+			let valid_types = configured_change_types_with_context(context, package);
+			let valid_types_help = if valid_types.is_empty() {
+				String::new()
+			} else {
+				format!(
+					" or one of the configured types: {}",
+					valid_types.join(", ")
+				)
+			};
+			return Err(MonochangeError::Config(format!(
+				"failed to parse {}: target `{package}` has invalid scalar value `{token}`; expected one of `none`, `patch`, `minor`, `major`{valid_types_help}`",
+				changes_path.display()
+			)));
+		}
+		return Ok((None, None, Some(token.to_string())));
+	}
+
+	let Some(mapping) = value.as_mapping() else {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, and/or `type`",
+			changes_path.display()
+		)));
+	};
+
+	let allowed_keys = ["bump", "version", "type"];
+	let unknown_keys = mapping
+		.keys()
+		.filter_map(serde_yaml_ng::Value::as_str)
+		.filter(|key| !allowed_keys.contains(key))
+		.collect::<Vec<_>>();
+	if !unknown_keys.is_empty() {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: target `{package}` uses unsupported field(s): {}",
+			changes_path.display(),
+			unknown_keys.join(", ")
+		)));
+	}
+
+	let requested_bump = mapping
+		.get(serde_yaml_ng::Value::String("bump".to_string()))
+		.and_then(serde_yaml_ng::Value::as_str)
+		.map(|value| {
+			parse_bump_severity(value).ok_or_else(|| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: target `{package}` has invalid bump `{value}`; expected `none`, `patch`, `minor`, or `major`",
+					changes_path.display()
+				))
+			})
+		})
+		.transpose()?;
+	let explicit_version = mapping
+		.get(serde_yaml_ng::Value::String("version".to_string()))
+		.and_then(serde_yaml_ng::Value::as_str)
+		.map(|value| {
+			Version::parse(value).map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: target `{package}` has invalid version `{value}`: {error}",
+					changes_path.display()
+				))
+			})
+		})
+		.transpose()?;
+	let change_type = mapping
+		.get(serde_yaml_ng::Value::String("type".to_string()))
+		.and_then(serde_yaml_ng::Value::as_str)
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
+		.map(ToString::to_string);
+	if let Some(change_type) = change_type.as_deref() {
+		validate_configured_change_type_with_context(context, changes_path, package, change_type)?;
+	}
+	let requested_bump = requested_bump.or_else(|| {
+		change_type.as_deref().and_then(|change_type| {
+			configured_change_type_default_bump_with_context(context, package, change_type)
+		})
+	});
+	if requested_bump.is_none() && explicit_version.is_none() && change_type.is_none() {
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: target `{package}` must declare `bump`, `version`, `type`, or a valid scalar shorthand",
+			changes_path.display()
+		)));
+	}
+	if requested_bump == Some(BumpSeverity::None)
+		&& explicit_version.is_none()
+		&& change_type.is_none()
+	{
+		return Err(MonochangeError::Config(format!(
+			"failed to parse {}: target `{package}` must not use `bump = \"none\"` without also declaring `type` or `version`",
+			changes_path.display()
+		)));
+	}
+	Ok((requested_bump, explicit_version, change_type))
+}
+
+fn validate_configured_change_type_with_context(
+	context: &ChangesetLoadContext<'_>,
+	changes_path: &Path,
+	target: &str,
+	change_type: &str,
+) -> MonochangeResult<()> {
+	if !context.package_ids.contains(target) && !context.groups_by_id.contains_key(target) {
+		return Ok(());
+	}
+	let valid_types = configured_change_types_with_context(context, target);
+	if valid_types.iter().any(|candidate| candidate == change_type) {
+		return Ok(());
+	}
+	let valid_types_help = if valid_types.is_empty() {
+		"no configured types are available for this target".to_string()
+	} else {
+		format!("valid types: {}", valid_types.join(", "))
+	};
+	Err(MonochangeError::Config(format!(
+		"failed to parse {}: target `{target}` has invalid type `{change_type}`; {valid_types_help}",
+		changes_path.display()
+	)))
+}
+
+#[cfg(test)]
 fn infer_package_bump_from_explicit_version(
 	package_id: &str,
 	packages: &[PackageRecord],
@@ -1477,6 +1909,7 @@ fn infer_package_bump_from_explicit_version(
 		.map(|current_version| infer_bump_from_versions(current_version, explicit_version))
 }
 
+#[cfg(test)]
 fn infer_group_bump_from_explicit_version(
 	group: &GroupDefinition,
 	workspace_root: &Path,

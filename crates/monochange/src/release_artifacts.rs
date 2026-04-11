@@ -21,6 +21,15 @@ pub(crate) fn build_release_targets(
 	let source = configuration.source.as_ref();
 	let defaults_release_title = configuration.defaults.release_title.as_deref();
 	let defaults_changelog_title = configuration.defaults.changelog_version_title.as_deref();
+	// Cache the sorted tag list once for the whole command.
+	//
+	// Performance note:
+	// the previous implementation ran `git tag --list --sort=-v:refname` once per
+	// release target. On a repository with multiple release identities that turned
+	// a tiny formatting helper into repeated subprocess latency. The target builder
+	// only needs a stable view of tags for the current command, so sharing one
+	// loaded list avoids re-running the same git command over and over.
+	let sorted_tags = load_sorted_tags(&configuration.root_path);
 
 	let mut release_targets = configuration
 		.groups
@@ -33,7 +42,7 @@ pub(crate) fn build_release_targets(
 					pg.planned_version.as_ref().map(|version| {
 						let vs = version.to_string();
 						let tag = render_tag_name(&group.id, &vs, group.version_format);
-						let prev = find_previous_tag(&configuration.root_path, &tag);
+						let prev = find_previous_tag_in(&tag, &sorted_tags);
 						let ctx = TitleRenderContext::new(
 							&group.id,
 							&vs,
@@ -89,7 +98,7 @@ pub(crate) fn build_release_targets(
 		};
 		let vs = version.to_string();
 		let tag = render_tag_name(&identity.owner_id, &vs, identity.version_format);
-		let prev = find_previous_tag(&configuration.root_path, &tag);
+		let prev = find_previous_tag_in(&tag, &sorted_tags);
 		let pkg_def = configuration.package_by_id(&config_id);
 		let ctx = TitleRenderContext::new(
 			&identity.owner_id,
@@ -155,25 +164,39 @@ pub(crate) fn compare_url_for_provider(
 	}
 }
 
-pub(crate) fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
-	let output =
-		monochange_core::git::git_command_output(root, &["tag", "--list", "--sort=-v:refname"])
-			.ok()?;
-	if !output.status.success() {
-		return None;
-	}
-	let tags_text = String::from_utf8_lossy(&output.stdout);
-	let all_tags: Vec<&str> = tags_text.lines().map(str::trim).collect();
+fn load_sorted_tags(root: &Path) -> Vec<String> {
+	let output = match monochange_core::git::git_command_output(
+		root,
+		&["tag", "--list", "--sort=-v:refname"],
+	) {
+		Ok(output) if output.status.success() => output,
+		_ => return Vec::new(),
+	};
+	String::from_utf8_lossy(&output.stdout)
+		.lines()
+		.map(str::trim)
+		.filter(|tag| !tag.is_empty())
+		.map(ToString::to_string)
+		.collect()
+}
+
+fn find_previous_tag_in(current_tag: &str, sorted_tags: &[String]) -> Option<String> {
 	let (prefix, current_version) = parse_tag_prefix_and_version(current_tag)?;
-	all_tags
-		.into_iter()
-		.filter(|tag| *tag != current_tag)
+	sorted_tags
+		.iter()
+		.filter(|tag| tag.as_str() != current_tag)
 		.filter_map(|tag| {
-			let (p, v) = parse_tag_prefix_and_version(tag)?;
-			(p == prefix && v < current_version).then(|| (tag.to_string(), v))
+			let (candidate_prefix, candidate_version) = parse_tag_prefix_and_version(tag)?;
+			(candidate_prefix == prefix && candidate_version < current_version)
+				.then(|| (tag.clone(), candidate_version))
 		})
-		.max_by(|a, b| a.1.cmp(&b.1))
+		.max_by(|left, right| left.1.cmp(&right.1))
 		.map(|(tag, _)| tag)
+}
+
+#[cfg(test)]
+pub(crate) fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
+	find_previous_tag_in(current_tag, &load_sorted_tags(root))
 }
 
 pub(crate) fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
