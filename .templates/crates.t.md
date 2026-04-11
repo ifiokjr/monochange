@@ -69,6 +69,24 @@
 
 <!-- {/monochangeGithubBadgeLinks} -->
 
+<!-- {@monochangeGiteaBadgeLinks} -->
+
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitea-orange?logo=rust
+[crate-link]: https://crates.io/crates/monochange_gitea
+[docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitea-1f425f?logo=docs.rs
+[docs-link]: https://docs.rs/monochange_gitea/
+
+<!-- {/monochangeGiteaBadgeLinks} -->
+
+<!-- {@monochangeGitlabBadgeLinks} -->
+
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitlab-orange?logo=rust
+[crate-link]: https://crates.io/crates/monochange_gitlab
+[docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitlab-1f425f?logo=docs.rs
+[docs-link]: https://docs.rs/monochange_gitlab/
+
+<!-- {/monochangeGitlabBadgeLinks} -->
+
 <!-- {@monochangeNpmBadgeLinks} -->
 
 [crate-image]: https://img.shields.io/badge/crates.io-monochange__npm-orange?logo=rust
@@ -429,6 +447,60 @@ assert_eq!(requests[0].repository, "ifiokjr/monochange");
 ```
 
 <!-- {/monochangeGithubCrateDocs} -->
+
+<!-- {@monochangeGiteaCrateDocs} -->
+
+`monochange_gitea` turns `monochange` release manifests into Gitea automation requests.
+
+Reach for this crate when you want to preview or publish Gitea releases and release pull requests using the same structured release data that powers changelog files and release manifests.
+
+## Why use it?
+
+- derive Gitea release payloads and release-PR bodies from `monochange`'s structured release manifest
+- keep Gitea automation aligned with changelog rendering and release targets
+- reuse one publishing path for dry-run previews and real repository updates
+
+## Best for
+
+- building Gitea release automation on top of `mc release`
+- previewing would-be Gitea releases and release PRs in CI before publishing
+- self-hosted Gitea instances that need the same release workflow as GitHub or GitLab
+
+## Public entry points
+
+- `build_release_requests(manifest, source)` builds release payloads from prepared release state
+- `build_change_request(manifest, source)` builds a pull-request payload for the release
+- `validate_source_configuration(source)` validates Gitea-specific source config
+- `source_capabilities()` returns provider feature flags
+
+<!-- {/monochangeGiteaCrateDocs} -->
+
+<!-- {@monochangeGitlabCrateDocs} -->
+
+`monochange_gitlab` turns `monochange` release manifests into GitLab automation requests.
+
+Reach for this crate when you want to preview or publish GitLab releases and merge requests using the same structured release data that powers changelog files and release manifests.
+
+## Why use it?
+
+- derive GitLab release payloads and merge-request bodies from `monochange`'s structured release manifest
+- keep GitLab automation aligned with changelog rendering and release targets
+- reuse one publishing path for dry-run previews and real repository updates
+
+## Best for
+
+- building GitLab release automation on top of `mc release`
+- previewing would-be GitLab releases and merge requests in CI before publishing
+- self-hosted GitLab instances that need the same release workflow as GitHub
+
+## Public entry points
+
+- `build_release_requests(manifest, source)` builds release payloads from prepared release state
+- `build_change_request(manifest, source)` builds a merge-request payload for the release
+- `validate_source_configuration(source)` validates GitLab-specific source config
+- `source_capabilities()` returns provider feature flags
+
+<!-- {/monochangeGitlabCrateDocs} -->
 
 <!-- {@monochangeNpmCrateDocs} -->
 

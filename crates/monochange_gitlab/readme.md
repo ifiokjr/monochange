@@ -37,17 +37,22 @@ Reach for this crate when you want to preview or publish GitLab releases and mer
 
 <!-- {/monochangeGitlabCrateDocs} -->
 
-<!-- {=crateReadmeFooterLinks} -->
+<!-- {=monochangeGitlabBadgeLinks} -->
 
-[crate-image]: https://img.shields.io/crates/v/monochange_gitlab.svg
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitlab-orange?logo=rust
 [crate-link]: https://crates.io/crates/monochange_gitlab
-[docs-image]: https://docs.rs/monochange_gitlab/badge.svg
-[docs-link]: https://docs.rs/monochange_gitlab
+[docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitlab-1f425f?logo=docs.rs
+[docs-link]: https://docs.rs/monochange_gitlab/
+
+<!-- {/monochangeGitlabBadgeLinks} -->
+
+<!-- {=repoStatusBadgeLinks} -->
+
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
 [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
 [coverage-link]: https://codecov.io/gh/ifiokjr/monochange
-[license-image]: https://img.shields.io/crates/l/monochange_gitlab.svg
-[license-link]: https://unlicense.org
+[license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
+[license-link]: https://opensource.org/license/unlicense
 
-<!-- {/crateReadmeFooterLinks} -->
+<!-- {/repoStatusBadgeLinks} -->
