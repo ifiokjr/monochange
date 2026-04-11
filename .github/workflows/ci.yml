@@ -141,13 +141,19 @@ jobs:
           cat target/benchmark-results.txt
         shell: devenv shell -- bash -e {0}
 
-      - name: upload benchmark results
+      - name: compare benchmarks and comment on PR
+        uses: benchmark-action/github-action-benchmark@v1
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: criterion-benchmark-results
-          path: target/benchmark-results.txt
-          retention-days: 90
+          tool: cargo
+          output-file-path: target/benchmark-results.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          alert-threshold: "150%"
+          fail-on-alert: false
+          comment-always: ${{ github.event_name == 'pull_request' }}
+          save-data-file: ${{ github.ref == 'refs/heads/main' }}
+          auto-push: ${{ github.ref == 'refs/heads/main' }}
 
   benchmark-binary:
     if: github.event_name == 'pull_request'
