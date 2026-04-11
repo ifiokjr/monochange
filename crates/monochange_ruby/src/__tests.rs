@@ -407,3 +407,37 @@ fn discover_ruby_gems_skips_vendor_and_bundle_directories() {
 	);
 	assert_eq!(discovery.packages.first().unwrap().name, "root");
 }
+
+#[test]
+fn discover_ruby_gems_finds_version_in_deeply_nested_path() {
+	let root = fixture_path("ruby/nested-version");
+	let discovery = discover_ruby_gems(&root).unwrap_or_else(|error| panic!("discover: {error}"));
+
+	assert_eq!(discovery.packages.len(), 1);
+	let pkg = discovery.packages.first().unwrap();
+	assert_eq!(pkg.name, "nested_version");
+	assert_eq!(
+		pkg.current_version,
+		Some(Version::new(3, 0, 0)),
+		"should find version.rb via recursive search"
+	);
+}
+
+#[test]
+fn parse_gemspec_dependencies_with_single_quotes() {
+	let contents = "Gem::Specification.new do |s|\n  s.add_dependency 'rack', '~> 2.0'\n  s.add_development_dependency 'minitest', '~> 5.0'\nend";
+	let deps = parse_gemspec_dependencies(contents);
+	let runtime: Vec<&str> = deps
+		.iter()
+		.filter(|d| d.kind == DependencyKind::Runtime)
+		.map(|d| d.name.as_str())
+		.collect();
+	assert!(runtime.contains(&"rack"));
+
+	let dev: Vec<&str> = deps
+		.iter()
+		.filter(|d| d.kind == DependencyKind::Development)
+		.map(|d| d.name.as_str())
+		.collect();
+	assert!(dev.contains(&"minitest"));
+}
