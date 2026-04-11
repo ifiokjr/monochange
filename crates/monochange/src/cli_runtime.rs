@@ -196,6 +196,7 @@ pub(crate) fn execute_cli_command(
 	execute_cli_command_with_options(root, configuration, cli_command, dry_run, false, inputs)
 }
 
+#[tracing::instrument(skip_all, fields(command = cli_command.name))]
 pub(crate) fn execute_cli_command_with_options(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -234,6 +235,7 @@ pub(crate) fn execute_cli_command_with_options(
 
 		if !should_execute_cli_step(step, &context, &step_inputs)? {
 			if let Some(condition) = step.when() {
+				tracing::debug!(step = step.kind_name(), condition = %condition, "skipped CLI step");
 				context.command_logs.push(format!(
 					"skipped step `{}` because when condition `{condition}` is false",
 					step.kind_name()
@@ -242,6 +244,7 @@ pub(crate) fn execute_cli_command_with_options(
 			continue;
 		}
 
+		tracing::debug!(step = step.kind_name(), "executing CLI step");
 		match step {
 			CliStepDefinition::Validate { .. } => {
 				validate_workspace(root)?;

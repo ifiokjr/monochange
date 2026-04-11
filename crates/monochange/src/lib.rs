@@ -252,6 +252,7 @@ mod interactive;
 mod mcp;
 mod release_artifacts;
 mod release_record;
+mod tracing_setup;
 mod versioned_files;
 mod workspace_ops;
 
@@ -505,12 +506,28 @@ struct CommandStepOutput {
 const CHANGESET_DIR: &str = ".changeset";
 
 pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
+	let log_level = extract_log_level_from_args();
+	tracing_setup::init_tracing(log_level.as_deref());
+
 	let args = std::env::args_os();
 	let output = run_with_args(bin_name, args)?;
 	if !output.is_empty() {
 		println!("{output}");
 	}
 	Ok(())
+}
+
+fn extract_log_level_from_args() -> Option<String> {
+	let mut args = std::env::args().peekable();
+	while let Some(arg) = args.next() {
+		if arg == "--log-level" {
+			return args.next();
+		}
+		if let Some(value) = arg.strip_prefix("--log-level=") {
+			return Some(value.to_string());
+		}
+	}
+	None
 }
 
 pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
@@ -521,6 +538,7 @@ where
 	run_with_args_in_dir(bin_name, args, &root)
 }
 
+#[tracing::instrument(skip_all, fields(bin_name))]
 fn run_with_args_in_dir<I>(bin_name: &'static str, args: I, root: &Path) -> MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,

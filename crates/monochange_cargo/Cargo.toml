@@ -21,6 +21,7 @@ serde = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 toml = { workspace = true, default-features = true }
 toml_edit = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
 walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]

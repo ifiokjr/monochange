@@ -582,6 +582,7 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 }
 
 #[rustfmt::skip]
+#[tracing::instrument(skip_all)]
 pub(crate) fn build_file_diff_previews(root: &Path, updates: &[FileUpdate]) -> MonochangeResult<Vec<PreparedFileDiff>> { let colorize_diffs = diff_output_colors_enabled();
 	#[cfg(test)]
 	if FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(Cell::get) {

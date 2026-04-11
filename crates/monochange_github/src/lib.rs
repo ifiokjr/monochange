@@ -417,6 +417,7 @@ pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag
 	)
 }
 
+#[tracing::instrument(skip_all)]
 pub fn enrich_changeset_context(
 	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
@@ -447,6 +448,7 @@ pub fn enrich_changeset_context(
 	}
 
 	let Ok(token) = env::var("GITHUB_TOKEN").or_else(|_| env::var("GH_TOKEN")) else {
+		tracing::debug!("skipping GitHub enrichment: no GITHUB_TOKEN or GH_TOKEN found");
 		return;
 	};
 	let Ok(runtime) = github_runtime() else {
@@ -751,6 +753,7 @@ pub fn plan_released_issue_comments(
 	plans_by_issue.into_values().collect()
 }
 
+#[tracing::instrument(skip_all)]
 pub fn comment_released_issues(
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
@@ -831,6 +834,7 @@ fn release_issue_comment_body(release_tags: &[String], marker: &str) -> String {
 	}
 }
 
+#[tracing::instrument(skip_all)]
 pub fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[GitHubReleaseRequest],
@@ -843,6 +847,7 @@ pub fn publish_release_requests(
 	})
 }
 
+#[tracing::instrument(skip_all)]
 pub fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
@@ -862,6 +867,7 @@ pub fn publish_release_pull_request(
 	})
 }
 
+#[tracing::instrument(skip_all)]
 pub fn sync_retargeted_releases(
 	source: &SourceConfiguration,
 	tag_updates: &[RetargetTagResult],
@@ -891,6 +897,7 @@ async fn publish_release_request_with_client(
 	client: &Octocrab,
 	request: &GitHubReleaseRequest,
 ) -> MonochangeResult<GitHubReleaseOutcome> {
+	tracing::info!(tag = %request.tag_name, repository = %request.repository, "publishing GitHub release");
 	let payload = GitHubReleasePayload {
 		tag_name: &request.tag_name,
 		name: &request.name,

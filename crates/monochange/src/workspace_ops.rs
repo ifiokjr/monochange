@@ -567,6 +567,7 @@ pub(crate) fn validate_cargo_workspace_version_groups(root: &Path) -> Monochange
 	monochange_cargo::validate_workspace_version_groups(&packages)
 }
 
+#[tracing::instrument(skip_all)]
 pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	let configuration = load_workspace_configuration(root)?;
 	let mut warnings = Vec::new();
@@ -590,6 +591,11 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 		apply_version_groups(&mut packages, &configuration)?;
 	warnings.extend(version_group_warnings);
 	let dependencies = materialize_dependency_edges(&packages);
+	tracing::info!(
+		packages = packages.len(),
+		warnings = warnings.len(),
+		"workspace discovery complete"
+	);
 
 	Ok(DiscoveryReport {
 		workspace_root: root.to_path_buf(),
@@ -796,6 +802,7 @@ pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<Releas
 	build_release_plan_from_signals(&configuration, &discovery, &change_signals)
 }
 
+#[tracing::instrument(skip_all)]
 fn materialize_lockfile_command_updates(
 	root: &Path,
 	base_updates: &[FileUpdate],
@@ -1134,6 +1141,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	prepare_release_execution(root, dry_run).map(|execution| execution.prepared_release)
 }
 
+#[tracing::instrument(skip_all, fields(dry_run))]
 pub(crate) fn prepare_release_execution(
 	root: &Path,
 	dry_run: bool,
@@ -1141,6 +1149,7 @@ pub(crate) fn prepare_release_execution(
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
 	let changeset_paths = discover_changeset_paths(root)?;
+	tracing::debug!(count = changeset_paths.len(), "discovered changesets");
 	let loaded_changesets = {
 		use rayon::prelude::*;
 		changeset_paths
@@ -1162,6 +1171,10 @@ pub(crate) fn prepare_release_execution(
 	}
 	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals)?;
 	let released_packages = released_package_names(&discovery.packages, &plan);
+	tracing::debug!(
+		count = released_packages.len(),
+		"identified released packages"
+	);
 	if released_packages.is_empty() {
 		return Err(MonochangeError::Config(
 			"no releaseable packages were found in discovered changesets".to_string(),
@@ -1202,6 +1215,11 @@ pub(crate) fn prepare_release_execution(
 	.concat();
 	let lockfile_commands =
 		build_lockfile_command_executions(root, &configuration, &discovery.packages, &plan)?;
+	tracing::debug!(
+		manifest_updates = manifest_updates.len(),
+		lockfile_commands = lockfile_commands.len(),
+		"built manifest and lockfile updates"
+	);
 	let file_updates = if lockfile_commands.is_empty() || dry_run {
 		// During dry-run, skip the expensive workspace copy and lockfile
 		// command execution. The base updates already contain all version
@@ -1252,6 +1270,12 @@ pub(crate) fn prepare_release_execution(
 			deleted_changesets.push(root_relative(root, path));
 		}
 	}
+
+	tracing::info!(
+		changed_files = changed_files.len(),
+		dry_run,
+		"release preparation complete"
+	);
 
 	Ok(PreparedReleaseExecution {
 		prepared_release: PreparedRelease {

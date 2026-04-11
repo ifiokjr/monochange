@@ -157,6 +157,7 @@ impl EcosystemAdapter for DenoAdapter {
 	}
 }
 
+#[tracing::instrument(skip_all)]
 pub fn discover_deno_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let workspace_manifests = find_workspace_manifests(root);
 	let mut included_manifests = HashSet::new();
@@ -187,6 +188,7 @@ pub fn discover_deno_packages(root: &Path) -> MonochangeResult<AdapterDiscovery>
 
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
+	tracing::debug!(packages = packages.len(), "discovered deno packages");
 
 	Ok(AdapterDiscovery { packages, warnings })
 }

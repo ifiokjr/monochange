@@ -895,6 +895,7 @@ fn normalize_ecosystem_settings(
 	})
 }
 
+#[tracing::instrument(skip_all)]
 pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceConfiguration> {
 	let path = config_path(root);
 	let contents = if path.exists() {

@@ -62,8 +62,10 @@ pub fn git_push_branch_command(root: &Path, branch: &str) -> Command {
 	command
 }
 
+#[tracing::instrument(skip_all, fields(args = ?args))]
 pub fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
-	git_command(root).args(args).output()
+	let mut command = git_command(root);
+	command.args(args).output()
 }
 
 #[must_use]
@@ -93,6 +95,7 @@ pub fn git_reports_nothing_to_commit(output: &Output) -> bool {
 		|| git_stderr_trimmed(output).contains("nothing to commit")
 }
 
+#[tracing::instrument(skip_all, fields(action))]
 pub fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 	let output = command
 		.output()

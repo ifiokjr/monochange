@@ -93,6 +93,14 @@ pub(crate) fn build_command_with_cli(
 		.about("Manage versions and releases for your multiplatform, multilanguage monorepo")
 		.subcommand_required(true)
 		.arg_required_else_help(true)
+		.arg(
+			Arg::new("log-level")
+				.long("log-level")
+				.global(true)
+				.help("Set tracing filter (e.g. debug, monochange=trace)")
+				.value_name("FILTER")
+				.hide(true),
+		)
 		.subcommand(
 			Command::new("init")
 				.about("Generate monochange.toml with detected packages, groups, and default CLI commands")
