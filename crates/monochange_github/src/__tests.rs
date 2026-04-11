@@ -364,8 +364,7 @@ fn publish_release_requests_creates_release_via_octocrab() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let outcome = publish_release_requests_with_client(&client, &[request]).await;
-			outcome
+			publish_release_requests_with_client(&client, &[request]).await
 		})
 		.unwrap_or_else(|error| panic!("publish release: {error}"));
 
@@ -405,8 +404,7 @@ fn publish_release_requests_updates_existing_release_via_octocrab() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let outcome = publish_release_requests_with_client(&client, &[request]).await;
-			outcome
+			publish_release_requests_with_client(&client, &[request]).await
 		})
 		.unwrap_or_else(|error| panic!("publish release: {error}"));
 
@@ -599,9 +597,7 @@ fn sync_retargeted_releases_errors_when_release_lookup_is_missing() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let result =
-				sync_retargeted_releases_with_client(&client, &source, &updates, false).await;
-			result
+			sync_retargeted_releases_with_client(&client, &source, &updates, false).await
 		})
 		.err()
 		.unwrap_or_else(|| panic!("expected release lookup error"));
@@ -692,8 +688,7 @@ fn publish_release_pull_request_creates_pull_request_via_octocrab() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let outcome = publish_release_pull_request_with_client(&client, &request).await;
-			outcome
+			publish_release_pull_request_with_client(&client, &request).await
 		})
 		.unwrap_or_else(|error| panic!("publish pull request: {error}"));
 
@@ -742,8 +737,7 @@ fn publish_release_pull_request_can_enable_auto_merge() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let outcome = publish_release_pull_request_with_client(&client, &request).await;
-			outcome
+			publish_release_pull_request_with_client(&client, &request).await
 		})
 		.unwrap_or_else(|error| panic!("publish pull request: {error}"));
 
@@ -787,8 +781,7 @@ fn publish_release_pull_request_updates_existing_pull_request_via_octocrab() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let outcome = publish_release_pull_request_with_client(&client, &request).await;
-			outcome
+			publish_release_pull_request_with_client(&client, &request).await
 		})
 		.unwrap_or_else(|error| panic!("publish pull request: {error}"));
 
@@ -827,8 +820,7 @@ fn publish_release_requests_reports_github_api_errors() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let outcome = publish_release_requests_with_client(&client, &[request]).await;
-			outcome
+			publish_release_requests_with_client(&client, &[request]).await
 		})
 		.err()
 		.unwrap_or_else(|| panic!("expected GitHub API error"));
@@ -874,8 +866,7 @@ fn publish_release_pull_request_reports_auto_merge_payload_errors() {
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
 			let client = build_test_client(&server);
-			let outcome = publish_release_pull_request_with_client(&client, &request).await;
-			outcome
+			publish_release_pull_request_with_client(&client, &request).await
 		})
 		.err()
 		.unwrap_or_else(|| panic!("expected auto merge error"));
@@ -1281,16 +1272,13 @@ fn comment_released_issues_skips_existing_markers_and_posts_missing_comments() {
 	);
 
 	let outcomes = temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
-		let outcome = github_runtime()
+		github_runtime()
 			.unwrap_or_else(|error| panic!("runtime: {error}"))
 			.block_on(async {
 				let client = build_test_client(&server);
-				let comment_outcome =
-					comment_released_issues_with_client(&client, &github, &plans).await;
-				comment_outcome
+				comment_released_issues_with_client(&client, &github, &plans).await
 			})
-			.unwrap_or_else(|error| panic!("comment released issues: {error}"));
-		outcome
+			.unwrap_or_else(|error| panic!("comment released issues: {error}"))
 	});
 
 	list_issue_seven_comments.assert();

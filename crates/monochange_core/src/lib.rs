@@ -495,7 +495,7 @@ fn apply_json_replacements(
 	contents: &str,
 	mut replacements: Vec<(JsonSpan, String)>,
 ) -> MonochangeResult<String> {
-	replacements.sort_by(|left, right| right.0.start.cmp(&left.0.start));
+	replacements.sort_by_key(|right| std::cmp::Reverse(right.0.start));
 	let mut updated = contents.to_string();
 	for (span, replacement) in replacements {
 		if span.start > span.end || span.end > updated.len() {
