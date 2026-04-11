@@ -1569,6 +1569,45 @@ fn update_json_manifest_text_updates_arbitrary_nested_fields() {
 }
 
 #[test]
+fn update_json_manifest_text_updates_nested_object_fields_and_ignores_invalid_paths() {
+	let contents = r#"{
+  "version": "1.0.0",
+  "workspace": {
+    "metadata": {
+      "bin": {
+        "monochange": {
+          "version": "1.0.0"
+        },
+        "dependencies": {
+          "core": "^1.0.0"
+        }
+      }
+    }
+  }
+}
+"#;
+	let updated = crate::update_json_manifest_text(
+		contents,
+		Some("2.0.0"),
+		&[
+			"",
+			"workspace.version.major",
+			"workspace.metadata.bin.dependencies",
+			"workspace.metadata.bin.monochange.version",
+			"workspace.metadata.bin.monochange.version.major",
+			"workspace.metadata.bin.missing.version",
+		],
+		&BTreeMap::from([("core".to_string(), "^2.0.0".to_string())]),
+	)
+	.unwrap_or_else(|error| panic!("update nested json manifest: {error}"));
+
+	assert!(updated.contains("\"version\": \"2.0.0\""));
+	assert!(updated.contains("\"core\": \"^2.0.0\""));
+	assert!(!updated.contains("\"major\""));
+	assert!(!updated.contains("\"missing\""));
+}
+
+#[test]
 fn update_json_manifest_text_preserves_existing_formatting() {
 	let contents = r#"{
   // keep comment
