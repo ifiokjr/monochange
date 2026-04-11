@@ -4,7 +4,8 @@
 
 ## Workspace essentials
 
-- Tooling: use `cargo` in the `devenv` shell; repository task commands are exposed as `devenv` scripts.
+- Tooling: use `cargo` in the `devenv` shell; repository task commands are exposed as `devenv` scripts. Use `direnv allow` to auto-populate `PATH` with devenv scripts, or prefix commands with `devenv shell` (e.g. `devenv shell fix:all`).
+- Fix all warnings: `fix:all`
 - Build: `build:all`
 - Quality/typecheck: `lint:all`
 - Validation: `mc validate`

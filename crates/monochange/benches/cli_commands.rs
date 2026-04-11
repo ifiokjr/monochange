@@ -8,16 +8,17 @@ use criterion::Criterion;
 
 /// Generate a workspace fixture with N cargo packages and M changesets.
 fn generate_fixture(root: &Path, num_packages: usize, num_changesets: usize) {
+	use std::fmt::Write;
 	let mut workspace_members = String::from("[workspace]\nmembers = [\n");
 	for i in 0..num_packages {
-		workspace_members.push_str(&format!("  \"crates/pkg-{i}\",\n"));
+		let _ = writeln!(workspace_members, "  \"crates/pkg-{i}\",");
 	}
 	workspace_members.push_str("]\nresolver = \"2\"\n");
 	fs::write(root.join("Cargo.toml"), &workspace_members).unwrap();
 
 	let mut config = String::from("[defaults]\npackage_type = \"cargo\"\n\n");
 	for i in 0..num_packages {
-		config.push_str(&format!("[package.pkg-{i}]\npath = \"crates/pkg-{i}\"\n\n"));
+		let _ = write!(config, "[package.pkg-{i}]\npath = \"crates/pkg-{i}\"\n\n");
 	}
 	config.push_str("[ecosystems.cargo]\nenabled = true\n\n");
 	config.push_str("[cli.validate]\n[[cli.validate.steps]]\ntype = \"Validate\"\n\n");
@@ -122,11 +123,11 @@ fn bench_changeset_loading(c: &mut Criterion) {
 					monochange_config::load_workspace_configuration(tempdir.path()).unwrap();
 				let discovery = monochange::discover_workspace(tempdir.path()).unwrap();
 				let changeset_dir = tempdir.path().join(".changeset");
-				let changeset_paths: Vec<_> = std::fs::read_dir(&changeset_dir)
+				let changeset_paths: Vec<_> = fs::read_dir(&changeset_dir)
 					.unwrap()
 					.filter_map(Result::ok)
 					.map(|e| e.path())
-					.filter(|p| p.extension().map_or(false, |ext| ext == "md"))
+					.filter(|p| p.extension().is_some_and(|ext| ext == "md"))
 					.collect();
 				b.iter(|| {
 					changeset_paths
@@ -140,56 +141,6 @@ fn bench_changeset_loading(c: &mut Criterion) {
 							.unwrap()
 						})
 						.collect::<Vec<_>>()
-				});
-			},
-		);
-	}
-	group.finish();
-}
-
-fn bench_release_planning(c: &mut Criterion) {
-	let mut group = c.benchmark_group("release_planning");
-	group.sample_size(10);
-
-	for &(packages, changesets) in SCALES {
-		let label = format!("{packages}pkg_{changesets}cs");
-		group.bench_with_input(
-			BenchmarkId::new("plan_release", &label),
-			&(packages, changesets),
-			|b, &(packages, changesets)| {
-				let tempdir = tempfile::tempdir().unwrap();
-				generate_fixture(tempdir.path(), packages, changesets);
-				let changes_dir = tempdir.path().join(".changeset");
-				let changeset_paths: Vec<_> = std::fs::read_dir(&changes_dir)
-					.unwrap()
-					.filter_map(Result::ok)
-					.map(|e| e.path())
-					.filter(|p| p.extension().map_or(false, |ext| ext == "md"))
-					.collect();
-				// Load once outside the benchmark loop.
-				let configuration =
-					monochange_config::load_workspace_configuration(tempdir.path()).unwrap();
-				let discovery = monochange::discover_workspace(tempdir.path()).unwrap();
-				let change_signals: Vec<_> = changeset_paths
-					.iter()
-					.flat_map(|path| {
-						monochange_config::load_changeset_file(
-							path,
-							&configuration,
-							&discovery.packages,
-						)
-						.unwrap()
-						.signals
-					})
-					.collect();
-				b.iter(|| {
-					monochange::plan_release(tempdir.path(), &changeset_paths.first().unwrap())
-						.unwrap_or_else(|_| {
-							// plan_release takes a single file; for benchmarking the
-							// graph/planning separately we'd need a different API.
-							// Fall back to plan from first changeset.
-							panic!("plan_release benchmark failed")
-						})
 				});
 			},
 		);
