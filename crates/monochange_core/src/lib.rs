@@ -62,6 +62,8 @@ use std::path::PathBuf;
 
 pub mod git;
 
+use ignore::gitignore::Gitignore;
+use ignore::gitignore::GitignoreBuilder;
 use semver::Version;
 use serde::Deserialize;
 use serde::Serialize;
@@ -325,6 +327,93 @@ pub fn relative_to_root(root: &Path, path: &Path) -> Option<PathBuf> {
 		.strip_prefix(&normalized_root)
 		.ok()
 		.map(Path::to_path_buf)
+}
+
+#[derive(Clone, Debug)]
+pub struct DiscoveryPathFilter {
+	root: PathBuf,
+	gitignore: Gitignore,
+}
+
+impl DiscoveryPathFilter {
+	#[must_use]
+	pub fn new(root: &Path) -> Self {
+		let root = normalize_path(root);
+		let mut builder = GitignoreBuilder::new(&root);
+		for path in [root.join(".gitignore"), root.join(".git/info/exclude")] {
+			if path.is_file() {
+				let _ = builder.add(path);
+			}
+		}
+		let gitignore = builder.build().unwrap_or_else(|_| Gitignore::empty());
+
+		Self { root, gitignore }
+	}
+
+	#[must_use]
+	pub fn allows(&self, path: &Path) -> bool {
+		!self.is_ignored(path, path.is_dir())
+	}
+
+	#[must_use]
+	pub fn should_descend(&self, path: &Path) -> bool {
+		!self.is_ignored(path, true)
+	}
+
+	fn is_ignored(&self, path: &Path, is_dir: bool) -> bool {
+		if ignored_discovery_dir_name(path) || self.has_nested_git_worktree_ancestor(path, is_dir) {
+			return true;
+		}
+
+		self.matches_gitignore(path, is_dir)
+	}
+
+	fn matches_gitignore(&self, path: &Path, is_dir: bool) -> bool {
+		let normalized_path = normalize_path(path);
+		normalized_path
+			.strip_prefix(&self.root)
+			.ok()
+			.is_some_and(|relative| {
+				self.gitignore
+					.matched_path_or_any_parents(relative, is_dir)
+					.is_ignore()
+			})
+	}
+
+	fn has_nested_git_worktree_ancestor(&self, path: &Path, is_dir: bool) -> bool {
+		let normalized_path = normalize_path(path);
+		let mut current = if is_dir {
+			normalized_path.clone()
+		} else {
+			normalized_path
+				.parent()
+				.unwrap_or(&normalized_path)
+				.to_path_buf()
+		};
+
+		while current.starts_with(&self.root) && current != self.root {
+			if current.join(".git").exists() {
+				return true;
+			}
+			let Some(parent) = current.parent() else {
+				break;
+			};
+			current = parent.to_path_buf();
+		}
+
+		false
+	}
+}
+
+fn ignored_discovery_dir_name(path: &Path) -> bool {
+	path.file_name()
+		.and_then(|name| name.to_str())
+		.is_some_and(|name| {
+			matches!(
+				name,
+				".git" | "target" | "node_modules" | ".devenv" | "book"
+			)
+		})
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

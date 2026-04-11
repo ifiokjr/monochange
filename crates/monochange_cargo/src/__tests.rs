@@ -116,6 +116,36 @@ fn cargo_workspace_members_mark_uses_workspace_version_metadata() {
 }
 
 #[test]
+fn discover_cargo_packages_ignores_gitignored_nested_worktrees() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/ignore-gitignored-nested-worktree");
+	let discovery = discover_cargo_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
+	let package_names = discovery
+		.packages
+		.iter()
+		.map(|package| package.name.as_str())
+		.collect::<Vec<_>>();
+
+	assert_eq!(package_names, vec!["root-package"]);
+}
+
+#[test]
+fn discover_cargo_packages_ignores_nested_worktrees_even_when_not_gitignored() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/ignore-automatic-nested-worktree");
+	let discovery = discover_cargo_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("cargo discovery: {error}"));
+	let package_names = discovery
+		.packages
+		.iter()
+		.map(|package| package.name.as_str())
+		.collect::<Vec<_>>();
+
+	assert_eq!(package_names, vec!["root-package"]);
+}
+
+#[test]
 fn validate_workspace_version_groups_rejects_mismatched_workspace_version_groups() {
 	let workspace_root = PathBuf::from("/tmp/workspace");
 	let mut core = PackageRecord::new(

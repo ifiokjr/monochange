@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::path::PathBuf;
 
 use semver::Version;
@@ -194,6 +195,28 @@ fn is_pre_stable_returns_true_for_zero_major() {
 	assert!(BumpSeverity::is_pre_stable(&Version::new(0, 99, 99)));
 	assert!(!BumpSeverity::is_pre_stable(&Version::new(1, 0, 0)));
 	assert!(!BumpSeverity::is_pre_stable(&Version::new(2, 0, 0)));
+}
+
+#[test]
+fn discovery_path_filter_rejects_gitignored_paths() {
+	let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/ignore-gitignored-nested-worktree");
+	let filter = crate::DiscoveryPathFilter::new(&root);
+
+	assert!(!filter.should_descend(&root.join(".claude")));
+	assert!(!filter.allows(&root.join(".claude/worktrees/feature/Cargo.toml")));
+	assert!(filter.allows(&root.join("crates/root/Cargo.toml")));
+}
+
+#[test]
+fn discovery_path_filter_rejects_paths_under_nested_git_worktrees() {
+	let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/ignore-automatic-nested-worktree");
+	let filter = crate::DiscoveryPathFilter::new(&root);
+
+	assert!(!filter.should_descend(&root.join("sandbox/feature")));
+	assert!(!filter.allows(&root.join("sandbox/feature/crates/ignored/Cargo.toml")));
+	assert!(filter.allows(&root.join("crates/root/Cargo.toml")));
 }
 
 #[test]
