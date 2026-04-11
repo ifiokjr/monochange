@@ -274,7 +274,7 @@ pub fn update_pnpm_lock_text(
 			&mut replacements,
 		);
 	}
-	replacements.sort_by(|left, right| right.0.0.cmp(&left.0.0));
+	replacements.sort_by_key(|right| std::cmp::Reverse(right.0.0));
 	let mut updated = contents.to_string();
 	for ((start, end), replacement) in replacements {
 		updated.replace_range(start..end, &replacement);

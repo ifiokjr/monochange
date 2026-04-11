@@ -635,9 +635,10 @@ pub(crate) fn apply_versioned_file_definition(
 						})?;
 				}
 			}
-			(CachedDocument::Json(value), VersionedFileKind::Npm(kind))
-				if kind == monochange_npm::NpmVersionedFileKind::PackageLock =>
-			{
+			(
+				CachedDocument::Json(value),
+				VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::PackageLock),
+			) => {
 				monochange_npm::update_package_lock(value, &package_paths_by_name, &raw_versions);
 			}
 			(
@@ -679,14 +680,16 @@ pub(crate) fn apply_versioned_file_definition(
 					))
 				})?;
 			}
-			(CachedDocument::Json(value), VersionedFileKind::Deno(kind))
-				if kind == monochange_deno::DenoVersionedFileKind::Lock =>
-			{
+			(
+				CachedDocument::Json(value),
+				VersionedFileKind::Deno(monochange_deno::DenoVersionedFileKind::Lock),
+			) => {
 				monochange_deno::update_lockfile(value, &raw_versions);
 			}
-			(CachedDocument::Text(contents), VersionedFileKind::Dart(kind))
-				if kind == monochange_dart::DartVersionedFileKind::Manifest =>
-			{
+			(
+				CachedDocument::Text(contents),
+				VersionedFileKind::Dart(monochange_dart::DartVersionedFileKind::Manifest),
+			) => {
 				*contents =
 					monochange_dart::update_manifest_text(contents, None, &fields, &versioned_deps)
 						.map_err(|error| {
@@ -696,9 +699,10 @@ pub(crate) fn apply_versioned_file_definition(
 							))
 						})?;
 			}
-			(CachedDocument::Yaml(mapping), VersionedFileKind::Dart(kind))
-				if kind == monochange_dart::DartVersionedFileKind::Lock =>
-			{
+			(
+				CachedDocument::Yaml(mapping),
+				VersionedFileKind::Dart(monochange_dart::DartVersionedFileKind::Lock),
+			) => {
 				monochange_dart::update_pubspec_lock(mapping, &raw_versions);
 			}
 			_ => {}
