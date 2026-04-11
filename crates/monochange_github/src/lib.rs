@@ -416,8 +416,7 @@ pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag
 	)
 }
 
-#[tracing::instrument(skip_all)]
-pub fn enrich_changeset_context(
+fn apply_github_changeset_annotations(
 	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
 ) {
@@ -445,6 +444,30 @@ pub fn enrich_changeset_context(
 			}
 		}
 	}
+}
+
+/// Apply GitHub URLs and provider metadata without making remote API calls.
+///
+/// Performance note:
+/// `mc release --dry-run` should stay local and fast. The old path always went
+/// on to look up PRs and related issues for every changeset commit whenever a
+/// GitHub token was present, which turned a local preview into tens of seconds
+/// of serialized network traffic. The dry-run release path now uses this helper
+/// so the changelog context still gets stable GitHub commit links while the
+/// expensive hosted lookups remain reserved for commands that truly need them.
+pub fn annotate_changeset_context(
+	source: &SourceConfiguration,
+	changesets: &mut [PreparedChangeset],
+) {
+	apply_github_changeset_annotations(source, changesets);
+}
+
+#[tracing::instrument(skip_all)]
+pub fn enrich_changeset_context(
+	source: &SourceConfiguration,
+	changesets: &mut [PreparedChangeset],
+) {
+	apply_github_changeset_annotations(source, changesets);
 
 	let Ok(token) = env::var("GITHUB_TOKEN").or_else(|_| env::var("GH_TOKEN")) else {
 		tracing::debug!("skipping GitHub enrichment: no GITHUB_TOKEN or GH_TOKEN found");

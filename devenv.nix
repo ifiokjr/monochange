@@ -20,6 +20,7 @@ in
       extra.mdt
       extra.pnpm-standalone
       gitleaks
+      hyperfine
       mdbook
       nixfmt
       rustup

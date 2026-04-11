@@ -628,6 +628,30 @@ pub fn discover_npm_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> 
 	Ok(AdapterDiscovery { packages, warnings })
 }
 
+/// Load one explicitly configured npm package without recursively scanning the repo.
+///
+/// Performance note:
+/// release planning only needs the configured package manifests. Walking the
+/// entire repository is wasted work in workspaces that contain fixture package
+/// trees, so higher-level code uses this helper to parse only the known package.
+pub fn load_configured_npm_package(
+	root: &Path,
+	package_path: &Path,
+) -> MonochangeResult<Option<PackageRecord>> {
+	let manifest_path =
+		if package_path.file_name().and_then(|name| name.to_str()) == Some(PACKAGE_JSON_FILE) {
+			package_path.to_path_buf()
+		} else {
+			package_path.join(PACKAGE_JSON_FILE)
+		};
+	let workspace_root = manifest_path.parent().unwrap_or(root);
+	parse_package_json(
+		&manifest_path,
+		workspace_root,
+		detect_npm_manager(workspace_root),
+	)
+}
+
 fn discover_package_json_workspace(
 	workspace_manifest: &Path,
 ) -> MonochangeResult<(Vec<PackageRecord>, Vec<String>)> {

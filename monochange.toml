@@ -505,7 +505,7 @@ inputs = [
 ]
 steps = [
 	{ type = "PrepareRelease" },
-	{ type = "RenderReleaseManifest", path = ".monochange/release-manifest.json" },
+	{ type = "RenderReleaseManifest", path = ".monochange/release-manifest.json", when = "{{ inputs.commit }}" },
 	{ type = "Command", command = "fix:all" },
 	{ type = "Command", command = "git add --all", when = "{{ inputs.commit }}" },
 	{ type = "CommitRelease", when = "{{ inputs.commit }}" },

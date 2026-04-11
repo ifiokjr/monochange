@@ -192,6 +192,23 @@ pub fn discover_deno_packages(root: &Path) -> MonochangeResult<AdapterDiscovery>
 	Ok(AdapterDiscovery { packages, warnings })
 }
 
+/// Load one explicitly configured Deno package without scanning unrelated manifests.
+pub fn load_configured_deno_package(
+	root: &Path,
+	package_path: &Path,
+) -> MonochangeResult<Option<PackageRecord>> {
+	let manifest_path = if package_path.is_file() {
+		package_path.to_path_buf()
+	} else {
+		DENO_MANIFEST_FILES
+			.into_iter()
+			.map(|name| package_path.join(name))
+			.find(|candidate| candidate.exists())
+			.unwrap_or_else(|| package_path.join(DENO_MANIFEST_FILES[0]))
+	};
+	parse_manifest(&manifest_path, manifest_path.parent().unwrap_or(root))
+}
+
 fn find_workspace_manifests(root: &Path) -> Vec<PathBuf> {
 	let mut manifests = find_all_manifests(root)
 		.into_iter()
