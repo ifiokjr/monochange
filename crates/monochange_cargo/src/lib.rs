@@ -501,7 +501,11 @@ fn update_manifest_field(
 			};
 			update_dependency_version_by_name(workspace_deps, dep_name, dep_version);
 		}
-		_ => {}
+		_ => {
+			if let Some(version) = shared_release_version.or(owner_version) {
+				set_table_value_by_path(document.as_table_mut(), &segments, version);
+			}
+		}
 	}
 }
 
@@ -598,6 +602,23 @@ fn set_table_value(table: &mut dyn TableLike, key: &str, version: &str) {
 	} else {
 		table.insert(key, value(version));
 	}
+}
+
+fn set_table_value_by_path(table: &mut dyn TableLike, path: &[&str], version: &str) {
+	let Some((head, tail)) = path.split_first() else {
+		return;
+	};
+	if tail.is_empty() {
+		set_table_value(table, head, version);
+		return;
+	}
+	let Some(item) = table.get_mut(head) else {
+		return;
+	};
+	let Some(next_table) = item.as_table_like_mut() else {
+		return;
+	};
+	set_table_value_by_path(next_table, tail, version);
 }
 
 fn set_item_string(item: &mut Item, version: &str) {

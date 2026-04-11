@@ -440,6 +440,54 @@ fn lockfile_requires_command_refresh_for_incomplete_lockfiles() {
 }
 
 #[test]
+fn update_versioned_file_updates_arbitrary_manifest_field_paths() {
+	let contents = r#"[workspace.package]
+version = "1.0.0"
+
+[workspace.metadata.bin.monochange]
+version = "1.0.0"
+"#;
+	let updated = update_versioned_file_text(
+		contents,
+		CargoVersionedFileKind::Manifest,
+		&["workspace.metadata.bin.monochange.version"],
+		Some("2.0.0"),
+		None,
+		&BTreeMap::new(),
+		&BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("update cargo manifest: {error}"));
+
+	let document = updated
+		.parse::<DocumentMut>()
+		.unwrap_or_else(|error| panic!("parse updated manifest: {error}"));
+	assert_eq!(
+		document
+			.get("workspace")
+			.and_then(Item::as_table_like)
+			.and_then(|workspace| workspace.get("metadata"))
+			.and_then(Item::as_table_like)
+			.and_then(|metadata| metadata.get("bin"))
+			.and_then(Item::as_table_like)
+			.and_then(|bin| bin.get("monochange"))
+			.and_then(Item::as_table_like)
+			.and_then(|monochange| monochange.get("version"))
+			.and_then(Item::as_str),
+		Some("2.0.0")
+	);
+	assert_eq!(
+		document
+			.get("workspace")
+			.and_then(Item::as_table_like)
+			.and_then(|workspace| workspace.get("package"))
+			.and_then(Item::as_table_like)
+			.and_then(|package| package.get("version"))
+			.and_then(Item::as_str),
+		Some("1.0.0")
+	);
+}
+
+#[test]
 fn update_versioned_file_updates_manifest_and_workspace_dependencies() {
 	let manifest = r#"
 [package]

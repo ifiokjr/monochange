@@ -207,7 +207,7 @@ fn discovery_path_filter_rejects_gitignored_paths() {
 	let filter = crate::DiscoveryPathFilter::new(root);
 
 	assert!(!filter.should_descend(&root.join(".claude")));
-	assert!(!filter.allows(&root.join(".claude/worktrees/feature/Cargo.toml")));
+	assert!(!filter.allows(&root.join(".claude/worktrees/feature")));
 	assert!(filter.allows(&root.join("crates/root/Cargo.toml")));
 }
 
@@ -1538,6 +1538,34 @@ fn retarget_plan_and_result_serialize_with_camel_case_keys() {
 			.unwrap_or_else(|| panic!("expected providerResults[0].operation")),
 		"planned"
 	);
+}
+
+#[test]
+fn update_json_manifest_text_updates_arbitrary_nested_fields() {
+	let contents = r#"{
+  "name": "tool",
+  "version": "1.0.0",
+  "workspace": {
+    "metadata": {
+      "bin": {
+        "monochange": {
+          "version": "1.0.0"
+        }
+      }
+    }
+  }
+}
+"#;
+	let updated = crate::update_json_manifest_text(
+		contents,
+		Some("2.0.0"),
+		&["workspace.metadata.bin.monochange.version"],
+		&BTreeMap::new(),
+	)
+	.unwrap_or_else(|error| panic!("update json manifest: {error}"));
+
+	assert!(updated.contains("\"version\": \"2.0.0\""));
+	assert!(updated.contains("\"monochange\": {\n          \"version\": \"2.0.0\""));
 }
 
 #[test]
