@@ -32,6 +32,14 @@ pub fn copy_directory(source: &Path, destination: &Path) {
 	copy_directory_filtered(source, destination, &|_| false);
 }
 
+/// Copy a directory tree, skipping `.git` directories. Useful for creating
+/// workspace copies in test fixtures without copying git metadata.
+pub fn copy_directory_skip_git(source: &Path, destination: &Path) {
+	copy_directory_filtered(source, destination, &|path| {
+		path.file_name().is_some_and(|name| name == ".git")
+	});
+}
+
 pub fn setup_fixture_from(manifest_dir: &str, relative: &str) -> TempDir {
 	let tempdir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_directory(&fixture_path_from(manifest_dir, relative), tempdir.path());

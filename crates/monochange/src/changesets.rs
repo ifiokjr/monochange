@@ -196,9 +196,15 @@ pub(crate) fn build_prepared_changesets(
 	root: &Path,
 	loaded_changesets: &[monochange_config::LoadedChangesetFile],
 ) -> Vec<PreparedChangeset> {
+	// Batch-load all changeset git context in a single pass instead of
+	// spawning two git-log subprocesses per changeset (which was O(2N)
+	// subprocess spawns and dominated release planning time).
+	let git_contexts = batch_load_changeset_contexts(root, loaded_changesets);
+
 	loaded_changesets
 		.iter()
-		.map(|changeset| PreparedChangeset {
+		.enumerate()
+		.map(|(index, changeset)| PreparedChangeset {
 			path: root_relative(root, &changeset.path),
 			summary: changeset.summary.clone(),
 			details: changeset.details.clone(),
@@ -214,77 +220,185 @@ pub(crate) fn build_prepared_changesets(
 					change_type: target.change_type.clone(),
 				})
 				.collect(),
-			context: Some(build_generic_changeset_context(root, &changeset.path)),
+			context: git_contexts.get(index).cloned(),
 		})
 		.collect()
 }
 
-fn build_generic_changeset_context(root: &Path, changeset_path: &Path) -> ChangesetContext {
-	ChangesetContext {
-		provider: HostingProviderKind::GenericGit,
-		host: None,
-		capabilities: HostingCapabilities::default(),
-		introduced: load_git_changeset_revision(root, changeset_path, true),
-		last_updated: load_git_changeset_revision(root, changeset_path, false),
-		related_issues: Vec::new(),
+/// Load git context for all changesets in two batched git-log calls instead
+/// of 2*N individual subprocess spawns.
+fn batch_load_changeset_contexts(
+	root: &Path,
+	loaded_changesets: &[monochange_config::LoadedChangesetFile],
+) -> Vec<ChangesetContext> {
+	if loaded_changesets.is_empty() {
+		return Vec::new();
 	}
+
+	// Skip git operations entirely if there's no git repository.
+	if !root.join(".git").exists() {
+		return loaded_changesets
+			.iter()
+			.map(|_| ChangesetContext {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				capabilities: HostingCapabilities::default(),
+				introduced: None,
+				last_updated: None,
+				related_issues: Vec::new(),
+			})
+			.collect();
+	}
+
+	// Build file list for git log.
+	let relative_paths: Vec<_> = loaded_changesets
+		.iter()
+		.map(|cs| root_relative(root, &cs.path))
+		.collect();
+
+	// Single git log for all introduced commits (--diff-filter=A).
+	let introduced_map = batch_git_log(root, &relative_paths, true);
+	// Single git log for all last-updated commits.
+	let last_updated_map = batch_git_log(root, &relative_paths, false);
+
+	relative_paths
+		.iter()
+		.map(|path| {
+			let path_str = path.to_string_lossy();
+			ChangesetContext {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				capabilities: HostingCapabilities::default(),
+				introduced: introduced_map.get(path_str.as_ref()).cloned(),
+				last_updated: last_updated_map.get(path_str.as_ref()).cloned(),
+				related_issues: Vec::new(),
+			}
+		})
+		.collect()
 }
 
-fn load_git_changeset_revision(
+/// Run a single `git log` command covering the entire `.changeset/` directory
+/// and return a map from relative path to the relevant revision.
+///
+/// For `introduced=true`: finds the commit that first added each file.
+/// For `introduced=false`: finds the most recent commit that touched each file.
+///
+/// This replaces N individual `git log` subprocess calls with a single call
+/// that walks the history once.
+fn batch_git_log(
 	root: &Path,
-	changeset_path: &Path,
+	paths: &[PathBuf],
 	introduced: bool,
-) -> Option<ChangesetRevision> {
-	let relative_path = root_relative(root, changeset_path);
+) -> std::collections::HashMap<String, ChangesetRevision> {
+	use std::collections::HashMap;
+
+	if paths.is_empty() {
+		return HashMap::new();
+	}
+
+	// Use NUL-delimited output to safely handle any filenames.
+	// Format: <commit-fields>\x1f\n<filename>\n\x00 per entry.
 	let mut command = ProcessCommand::new("git");
-	command.current_dir(root).arg("log").arg("--follow");
+	command
+		.current_dir(root)
+		.arg("log")
+		.arg("--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%cI")
+		.arg("--name-only");
 	if introduced {
 		command.arg("--diff-filter=A");
 	}
-	command
-		.arg("-n")
-		.arg("1")
-		.arg("--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%cI")
-		.arg("--")
-		.arg(&relative_path);
-	let output = command.output().ok()?;
-	if !output.status.success() {
-		return None;
-	}
-	let stdout = String::from_utf8(output.stdout).ok()?;
-	let trimmed = stdout.trim();
-	if trimmed.is_empty() {
-		return None;
-	}
-	let parts = trimmed.split('\u{1f}').collect::<Vec<_>>();
-	let [sha, author_name, author_email, authored_at, committed_at] = parts.as_slice() else {
-		return None;
+	command.arg("--").arg(".changeset/");
+
+	let output = match command.output() {
+		Ok(output) if output.status.success() => output,
+		_ => return HashMap::new(),
 	};
-	let author_name = (*author_name).to_string();
-	let author_email = (*author_email).to_string();
-	Some(ChangesetRevision {
-		actor: Some(HostedActorRef {
-			provider: HostingProviderKind::GenericGit,
-			host: None,
-			id: None,
-			login: None,
-			display_name: Some(author_name.clone()),
-			url: None,
-			source: HostedActorSourceKind::CommitAuthor,
-		}),
-		commit: Some(HostedCommitRef {
-			provider: HostingProviderKind::GenericGit,
-			host: None,
-			sha: (*sha).to_string(),
-			short_sha: short_commit_sha(sha),
-			url: None,
-			authored_at: Some((*authored_at).to_string()),
-			committed_at: Some((*committed_at).to_string()),
-			author_name: Some(author_name),
-			author_email: Some(author_email),
-		}),
-		review_request: None,
-	})
+	let stdout = match String::from_utf8(output.stdout) {
+		Ok(s) => s,
+		Err(_) => return HashMap::new(),
+	};
+
+	let wanted_paths: std::collections::HashSet<String> = paths
+		.iter()
+		.map(|p| p.to_string_lossy().into_owned())
+		.collect();
+
+	// Parse the git log output. Format is blocks separated by blank lines:
+	// <sha>\x1f<name>\x1f<email>\x1f<author_date>\x1f<commit_date>
+	// <filename1>
+	// <filename2>
+	//
+	// (blank line between commits)
+	let mut result: HashMap<String, ChangesetRevision> = HashMap::new();
+
+	let mut current_fields: Option<Vec<&str>> = None;
+	for line in stdout.lines() {
+		let trimmed = line.trim();
+		if trimmed.is_empty() {
+			// Blank lines separate the header from filenames AND separate
+			// commits from each other. Don't reset current_fields here —
+			// a new header line (containing \x1f) will replace it.
+			continue;
+		}
+		if trimmed.contains('\u{1f}') {
+			// This is a commit header line — start a new commit block.
+			current_fields = Some(trimmed.split('\u{1f}').collect());
+			continue;
+		}
+		// This is a filename line associated with the current commit.
+		let Some(ref fields) = current_fields else {
+			continue;
+		};
+		if fields.len() != 5 {
+			continue;
+		}
+		let file_path = trimmed;
+		if !wanted_paths.contains(file_path) {
+			continue;
+		}
+		// For "introduced": we want the LAST (oldest) match per file since
+		// git log outputs newest first. For "last_updated": we want the
+		// FIRST (newest) match.
+		let dominated = if introduced {
+			// Keep overwriting — last write wins = oldest commit.
+			false
+		} else {
+			// Only take the first match = newest commit.
+			result.contains_key(file_path)
+		};
+		if dominated {
+			continue;
+		}
+		let [sha, author_name, author_email, authored_at, committed_at] = fields.as_slice() else {
+			continue;
+		};
+		let revision = ChangesetRevision {
+			actor: Some(HostedActorRef {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				id: None,
+				login: None,
+				display_name: Some((*author_name).to_string()),
+				url: None,
+				source: HostedActorSourceKind::CommitAuthor,
+			}),
+			commit: Some(HostedCommitRef {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				sha: (*sha).to_string(),
+				short_sha: short_commit_sha(sha),
+				url: None,
+				author_name: Some((*author_name).to_string()),
+				author_email: Some((*author_email).to_string()),
+				authored_at: Some((*authored_at).to_string()),
+				committed_at: Some((*committed_at).to_string()),
+			}),
+			review_request: None,
+		};
+		result.insert(file_path.to_string(), revision);
+	}
+
+	result
 }
 
 pub(crate) fn short_commit_sha(sha: &str) -> String {

@@ -33,6 +33,7 @@ monochange_gitlab = { workspace = true }
 monochange_graph = { workspace = true }
 monochange_npm = { workspace = true }
 monochange_semver = { workspace = true }
+rayon = { workspace = true, default-features = true }
 regex = { workspace = true, default-features = true }
 rmcp = { workspace = true, features = ["server", "transport-io", "macros"], default-features = true }
 semver = { workspace = true, default-features = true }
@@ -48,14 +49,20 @@ toml = { workspace = true, default-features = true }
 typed-builder = { workspace = true, default-features = true }
 
 [dev-dependencies]
+criterion = { workspace = true, default-features = true }
 etest = { workspace = true, default-features = true }
 httpmock = { workspace = true, default-features = true }
 insta = { workspace = true, default-features = true }
 insta-cmd = { workspace = true, default-features = true }
+monochange_config = { workspace = true }
 monochange_test_helpers = { version = "0.0.0", path = "../../testing/monochange_test_helpers" }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 temp-env = { workspace = true, default-features = true }
+
+[[bench]]
+name = "cli_commands"
+harness = false
 
 [lints]
 workspace = true

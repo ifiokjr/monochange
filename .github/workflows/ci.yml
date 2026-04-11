@@ -111,3 +111,163 @@ jobs:
           flags: rust
           name: monochange-rust-workspace
           verbose: true
+
+  benchmark:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run benchmarks
+        run: |
+          set +e
+          mkdir -p target
+          cargo bench -p monochange --bench cli_commands -- \
+            --output-format bencher \
+            "config_load" "discover" "validate" "changeset_loading" "prepare_release_dry_run" \
+            > /tmp/bench-raw.txt 2>&1
+          bench_exit=$?
+          grep "^test " /tmp/bench-raw.txt > target/benchmark-results.txt || true
+          echo "Benchmark exit code: $bench_exit"
+          echo "Results:"
+          cat target/benchmark-results.txt
+          if [ ! -s target/benchmark-results.txt ]; then
+            echo "Raw output:"
+            tail -30 /tmp/bench-raw.txt
+          fi
+          [ -s target/benchmark-results.txt ]
+        shell: devenv shell -- bash {0}
+
+      - name: compare benchmarks and comment on PR
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: cargo
+          output-file-path: target/benchmark-results.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          alert-threshold: "150%"
+          fail-on-alert: false
+          comment-always: ${{ github.event_name == 'pull_request' }}
+          save-data-file: ${{ github.ref == 'refs/heads/main' }}
+          auto-push: ${{ github.ref == 'refs/heads/main' }}
+
+  benchmark-binary:
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pull-requests: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build PR binary
+        run: cargo build --release --bin mc && cp target/release/mc /tmp/mc-pr
+        shell: devenv shell -- bash -e {0}
+
+      - name: build main binary
+        run: |
+          git stash --include-untracked
+          git checkout origin/main
+          cargo build --release --bin mc && cp target/release/mc /tmp/mc-main
+          git checkout -
+          git stash pop || true
+        shell: devenv shell -- bash -e {0}
+
+      - name: generate benchmark fixture
+        run: |
+          mkdir -p /tmp/bench-fixture/.changeset
+          cd /tmp/bench-fixture
+
+          printf '[workspace]\nmembers = [' > Cargo.toml
+          for i in $(seq 0 19); do
+            [ $i -gt 0 ] && printf ',' >> Cargo.toml
+            printf '"crates/pkg-%d"' $i >> Cargo.toml
+          done
+          printf ']\nresolver = "2"\n' >> Cargo.toml
+
+          printf '[defaults]\npackage_type = "cargo"\n\n' > monochange.toml
+          for i in $(seq 0 19); do
+            printf '[package.pkg-%d]\npath = "crates/pkg-%d"\n\n' $i $i >> monochange.toml
+            mkdir -p crates/pkg-$i
+            printf '[package]\nname = "pkg-%d"\nversion = "1.0.0"\nedition = "2021"\n' $i > crates/pkg-$i/Cargo.toml
+          done
+          printf '[ecosystems.cargo]\nenabled = true\n' >> monochange.toml
+
+          git init -b main
+          git config user.name "bench" && git config user.email "bench@test"
+          git add . && git commit -m "initial"
+          for i in $(seq 0 49); do
+            pkg=$((i % 20))
+            printf -- '---\npkg-%d: patch\n---\n\nFix issue #%d.\n' $pkg $i > .changeset/change-$(printf "%04d" $i).md
+            printf '// commit %d\n' $i > crates/pkg-$pkg/src.rs
+            git add . && git commit -m "change $i"
+          done
+        shell: bash -e {0}
+
+      - name: time CLI commands
+        id: bench
+        run: |
+          PR_BIN="/tmp/mc-pr"
+          MAIN_BIN="/tmp/mc-main"
+          RESULTS=""
+
+          time_cmd() {
+            local bin="$1"; shift
+            local best=999999
+            for run in 1 2 3; do
+              ms=$( { TIMEFORMAT='%3R'; time "$bin" "$@" > /dev/null 2>&1; } 2>&1 )
+              ms_int=$(echo "$ms * 1000 / 1" | bc)
+              [ "$ms_int" -lt "$best" ] && best=$ms_int
+            done
+            echo "$best"
+          }
+
+          for cmd_args in "validate" "discover --format json" "release --dry-run"; do
+            pr_ms=$(time_cmd "$PR_BIN" $cmd_args)
+            main_ms=$(time_cmd "$MAIN_BIN" $cmd_args)
+            if [ "$main_ms" -gt 0 ]; then
+              pct=$(( (pr_ms * 100) / main_ms ))
+            else
+              pct=0
+            fi
+            RESULTS="${RESULTS}| \`mc ${cmd_args}\` | ${main_ms}ms | ${pr_ms}ms | ${pct}% |\n"
+          done
+
+          {
+            echo "results<<ENDOFBENCH"
+            echo "## Binary Benchmark: main vs PR"
+            echo ""
+            echo "Fixture: 20 packages, 50 changesets, 50 git commits"
+            echo ""
+            echo "| Command | main | PR | ratio |"
+            echo "|---------|------|-----|-------|"
+            echo -e "$RESULTS"
+            echo "ENDOFBENCH"
+          } >> "$GITHUB_OUTPUT"
+        working-directory: /tmp/bench-fixture
+        shell: bash -e {0}
+
+      - name: comment benchmark results on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: binary-benchmark
+          message: ${{ steps.bench.outputs.results }}
