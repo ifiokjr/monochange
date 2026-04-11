@@ -133,7 +133,7 @@ jobs:
           mkdir -p target
           cargo bench -p monochange --bench cli_commands -- \
             --output-format bencher \
-            "config_load" "discover" "validate" "changeset_loading" "prepare_release_dry_run" \
+            "config_load|discover|validate|changeset_loading|prepare_release_dry_run" \
             2>&1 | tee /tmp/bench-output.txt | grep "^test " > target/benchmark-results.txt || true
           echo "--- raw output (last 10 lines) ---"
           tail -10 /tmp/bench-output.txt
