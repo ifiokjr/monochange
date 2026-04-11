@@ -225,7 +225,9 @@ use workspace_ops::init_workspace;
 pub use workspace_ops::plan_release;
 use workspace_ops::populate_workspace;
 pub use workspace_ops::prepare_release;
+#[cfg(test)]
 pub(crate) use workspace_ops::prepare_release_execution;
+pub(crate) use workspace_ops::prepare_release_execution_with_file_diffs;
 pub(crate) use workspace_ops::render_change_target_markdown;
 #[cfg(test)]
 pub(crate) use workspace_ops::render_cli_commands_toml;

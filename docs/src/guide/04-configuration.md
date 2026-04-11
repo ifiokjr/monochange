@@ -231,19 +231,16 @@ Key rules:
 
 ## Lockfile commands
 
-Lockfile refresh is command-driven. monochange runs lockfile commands only when at least one package in that ecosystem receives a planned version change, whether directly or through a group release.
+By default monochange rewrites supported lockfiles directly from the release plan. That keeps normal `mc release` runs close to `--dry-run` speed instead of launching package managers just to rewrite workspace version strings.
 
-When you do not configure `lockfile_commands`, monochange infers sensible defaults:
+Built-in direct lockfile updates cover:
 
-- Cargo: `cargo generate-lockfile`
-- npm-family: detects owned lockfiles and runs the matching command for each workspace root
-  - `package-lock.json` → `npm install --package-lock-only`
-  - `pnpm-lock.yaml` → `pnpm install --lockfile-only`
-  - `bun.lock` / `bun.lockb` → `bun install --lockfile-only`
-- Dart / Flutter: `dart pub get` or `flutter pub get`
-- Deno: no inferred default today
+- Cargo: `Cargo.lock`
+- npm-family: `package-lock.json`, `pnpm-lock.yaml`, `bun.lock`, and `bun.lockb`
+- Deno: `deno.lock`
+- Dart / Flutter: `pubspec.lock`
 
-If you configure `lockfile_commands` for an ecosystem, monochange stops inferring defaults for that ecosystem and those commands fully own lockfile refresh.
+If you configure `lockfile_commands` for an ecosystem, monochange stops using the built-in direct updater for that ecosystem and those commands fully own lockfile refresh. Use that escape hatch only when your workspace needs package-manager-side regeneration beyond version rewrites.
 
 ```toml
 [ecosystems.npm]
@@ -393,6 +390,8 @@ CLI command interpolation variables:
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting
 
 <!-- {/configurationWorkflowVariables} -->
+
+Performance tip: keep the default `mc release` path focused on built-in steps such as `PrepareRelease`. Arbitrary `Command` steps shell out to external tools, so expensive follow-up work like formatting, validation, publishing, or pushes should usually be gated behind an explicit input such as `when = "{{ inputs.commit }}"` if you want local release preparation to stay sub-second.
 
 `RetargetRelease` is intentionally different from `PrepareRelease`-driven steps. It operates from git history plus source/provider information, discovers the durable `ReleaseRecord`, and then exposes structured `retarget.*` outputs for later command steps.
 

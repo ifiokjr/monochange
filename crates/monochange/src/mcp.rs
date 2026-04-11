@@ -68,6 +68,7 @@ impl From<McpChangeBump> for ChangeBump {
 
 #[derive(Debug, Clone)]
 pub struct MonochangeMcpServer {
+	#[allow(dead_code)]
 	tool_router: ToolRouter<Self>,
 }
 

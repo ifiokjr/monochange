@@ -233,7 +233,7 @@ pub(crate) fn execute_cli_command_with_options(
 	};
 	let mut output = None;
 
-	for step in &cli_command.steps {
+	for (step_index, step) in cli_command.steps.iter().enumerate() {
 		let step_inputs = resolve_step_inputs(&context, step)?;
 		context.last_step_inputs = step_inputs.clone();
 
@@ -361,7 +361,10 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 			}
 			CliStepDefinition::PrepareRelease { .. } => {
-				let prepared_execution = prepare_release_execution(root, dry_run)?;
+				let build_file_diffs = context.show_diff
+					|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
+				let prepared_execution =
+					prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?;
 				context.prepared_file_diffs = prepared_execution.file_diffs;
 				context.prepared_release = Some(prepared_execution.prepared_release);
 				output = None;
@@ -715,6 +718,46 @@ pub(crate) fn should_execute_cli_step(
 		return Ok(true);
 	};
 	evaluate_cli_step_condition(condition, context, step_inputs)
+}
+
+fn steps_reference_release_file_diffs(steps: &[CliStepDefinition]) -> bool {
+	steps.iter().any(step_references_release_file_diffs)
+}
+
+fn step_references_release_file_diffs(step: &CliStepDefinition) -> bool {
+	let mentions_file_diffs = |value: &str| value.contains("file_diffs");
+	let inputs_mention_file_diffs = step.inputs().values().any(|value| {
+		match value {
+			CliStepInputValue::String(value) => mentions_file_diffs(value),
+			CliStepInputValue::Boolean(_) => false,
+			CliStepInputValue::List(values) => {
+				values.iter().any(|value| mentions_file_diffs(value))
+			}
+		}
+	});
+	if step.when().is_some_and(mentions_file_diffs) || inputs_mention_file_diffs {
+		return true;
+	}
+	match step {
+		CliStepDefinition::RenderReleaseManifest { path, .. } => {
+			path.as_ref()
+				.and_then(|path| path.to_str())
+				.is_some_and(mentions_file_diffs)
+		}
+		CliStepDefinition::Command {
+			command,
+			dry_run_command,
+			variables,
+			..
+		} => {
+			mentions_file_diffs(command)
+				|| dry_run_command.as_deref().is_some_and(mentions_file_diffs)
+				|| variables.as_ref().is_some_and(|variables| {
+					variables.keys().any(|value| mentions_file_diffs(value))
+				})
+		}
+		_ => false,
+	}
 }
 
 fn evaluate_cli_step_condition(

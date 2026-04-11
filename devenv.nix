@@ -272,9 +272,11 @@ in
     "lint:clippy" = {
       exec = ''
         set -e
-        cargo clippy --workspace --all-features --all-targets
+        # Treat all compiler and clippy warnings as errors so warning-only
+        # regressions never make it into CI or a pushed branch.
+        cargo clippy --workspace --all-features --all-targets -- -D warnings
       '';
-      description = "Check that all rust lints are passing.";
+      description = "Check that all rust lints are passing with warnings denied.";
       binary = "bash";
     };
     "docs:check" = {

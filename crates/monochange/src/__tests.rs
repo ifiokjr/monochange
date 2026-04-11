@@ -1357,7 +1357,7 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 }
 
 #[test]
-fn command_release_runs_inferred_cargo_lockfile_commands() {
+fn command_release_updates_inferred_cargo_lockfiles_without_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_cargo_lock_release_fixture(tempdir.path());
 
@@ -1375,7 +1375,7 @@ fn command_release_runs_inferred_cargo_lockfile_commands() {
 }
 
 #[test]
-fn command_release_runs_inferred_npm_lockfile_commands() {
+fn command_release_updates_inferred_npm_lockfiles_without_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_npm_lock_release_fixture(tempdir.path());
 
@@ -1393,7 +1393,7 @@ fn command_release_runs_inferred_npm_lockfile_commands() {
 }
 
 #[test]
-fn command_release_runs_inferred_bun_lockfile_commands() {
+fn command_release_updates_inferred_bun_lockfiles_without_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_bun_lockb_release_fixture(tempdir.path());
 
@@ -1411,9 +1411,25 @@ fn command_release_runs_inferred_bun_lockfile_commands() {
 }
 
 #[test]
-fn build_lockfile_command_executions_skips_default_deno_commands() {
+fn command_release_updates_inferred_deno_lockfiles_without_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_deno_lock_release_fixture(tempdir.path());
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("command output: {error}"));
+	let deno_lock = fs::read_to_string(tempdir.path().join("packages/app/deno.lock"))
+		.unwrap_or_else(|error| panic!("deno lock: {error}"));
+
+	assert!(deno_lock.contains("npm:app@1.1.0"));
+}
+
+#[test]
+fn build_lockfile_command_executions_only_returns_configured_commands() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_cargo_lock_release_fixture(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let discovery =
@@ -2413,6 +2429,10 @@ fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changel
 		copy_fixture("monochange/release-base", root);
 	}
 	let _ = command_step;
+}
+
+fn seed_release_file_diff_command_fixture(root: &Path) {
+	copy_fixture("monochange/release-with-file-diff-command", root);
 }
 
 fn seed_cargo_lock_release_fixture(root: &Path) {
@@ -7621,6 +7641,48 @@ fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
 			.file_diffs
 			.iter()
 			.all(|file_diff| file_diff.display_diff == file_diff.diff)
+	);
+}
+
+#[test]
+fn prepare_release_skips_file_diff_previews_when_callers_do_not_need_them() {
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	set_force_build_file_diff_previews_error(true);
+	let prepared = crate::prepare_release(tempdir.path(), true)
+		.unwrap_or_else(|error| panic!("prepare release without diffs: {error}"));
+	set_force_build_file_diff_previews_error(false);
+	assert!(!prepared.changed_files.is_empty());
+}
+
+#[test]
+fn command_release_without_diff_skips_file_diff_previews() {
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	set_force_build_file_diff_previews_error(true);
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.unwrap_or_else(|error| panic!("release without diff: {error}"));
+	set_force_build_file_diff_previews_error(false);
+	assert!(output.contains("command `release` completed"));
+}
+
+#[test]
+fn command_release_command_steps_can_still_request_file_diffs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_file_diff_command_fixture(tempdir.path());
+	set_force_build_file_diff_previews_error(true);
+	let error = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("release")],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected release command to require file diffs"));
+	set_force_build_file_diff_previews_error(false);
+	assert!(
+		error
+			.to_string()
+			.contains("forced build_file_diff_previews test error")
 	);
 }
 

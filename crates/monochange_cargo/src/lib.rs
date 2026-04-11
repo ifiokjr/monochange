@@ -148,6 +148,39 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 		.collect()
 }
 
+pub fn lockfile_requires_command_refresh(lockfile: &Path, packages: &[&PackageRecord]) -> bool {
+	let Ok(contents) = fs::read_to_string(lockfile) else {
+		return true;
+	};
+	let Ok(document) = toml::from_str::<Value>(&contents) else {
+		return true;
+	};
+	let locked_package_names = document
+		.get("package")
+		.and_then(Value::as_array)
+		.into_iter()
+		.flatten()
+		.filter_map(|package| package.get("name").and_then(Value::as_str))
+		.collect::<HashSet<_>>();
+	if locked_package_names.is_empty() {
+		return true;
+	}
+	let workspace_package_names = packages
+		.iter()
+		.map(|package| package.name.as_str())
+		.collect::<HashSet<_>>();
+	packages.iter().any(|package| {
+		package
+			.declared_dependencies
+			.iter()
+			.filter(|dependency| !dependency.optional)
+			.any(|dependency| {
+				!workspace_package_names.contains(dependency.name.as_str())
+					&& !locked_package_names.contains(dependency.name.as_str())
+			})
+	})
+}
+
 pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> MonochangeResult<()> {
 	let mut workspace_versioned = BTreeMap::<PathBuf, Vec<&PackageRecord>>::new();
 	for package in packages {
@@ -247,6 +280,9 @@ pub fn update_versioned_file_text(
 	versioned_deps: &BTreeMap<String, String>,
 	raw_versions: &BTreeMap<String, String>,
 ) -> Result<String, toml_edit::TomlError> {
+	if kind == CargoVersionedFileKind::Lock {
+		return Ok(update_lockfile_text(contents, raw_versions));
+	}
 	let mut document = contents.parse::<DocumentMut>()?;
 	update_versioned_file(
 		&mut document,
@@ -258,6 +294,90 @@ pub fn update_versioned_file_text(
 		raw_versions,
 	);
 	Ok(document.to_string())
+}
+
+fn update_lockfile_text(contents: &str, raw_versions: &BTreeMap<String, String>) -> String {
+	let mut lines = contents
+		.split_inclusive('\n')
+		.map(ToString::to_string)
+		.collect::<Vec<_>>();
+	let mut line_index = 0;
+	while let Some(current_line) = lines.get(line_index) {
+		if current_line.trim() != "[[package]]" {
+			line_index += 1;
+			continue;
+		}
+		let section_start = line_index + 1;
+		let section_end = lines
+			.iter()
+			.skip(section_start)
+			.position(|line| line.trim() == "[[package]]")
+			.map_or(lines.len(), |offset| section_start + offset);
+		let package_name = lines
+			.iter()
+			.skip(section_start)
+			.take(section_end.saturating_sub(section_start))
+			.find_map(|line| {
+				parse_toml_basic_string_assignment(line, "name").map(|(_, _, value)| value)
+			});
+		let Some(package_name) = package_name else {
+			line_index = section_end;
+			continue;
+		};
+		let Some(version) = raw_versions.get(&package_name) else {
+			line_index = section_end;
+			continue;
+		};
+		for section_line in lines
+			.iter_mut()
+			.skip(section_start)
+			.take(section_end.saturating_sub(section_start))
+		{
+			let Some((value_start, value_end, _)) =
+				parse_toml_basic_string_assignment(section_line, "version")
+			else {
+				continue;
+			};
+			section_line.replace_range(value_start..value_end, version);
+			break;
+		}
+		line_index = section_end;
+	}
+	lines.concat()
+}
+
+fn parse_toml_basic_string_assignment(line: &str, key: &str) -> Option<(usize, usize, String)> {
+	let trimmed_line = line.trim_end_matches(['\n', '\r']);
+	let content_start = trimmed_line
+		.char_indices()
+		.find_map(|(index, ch)| (!ch.is_whitespace()).then_some(index))
+		.unwrap_or(trimmed_line.len());
+	let key_start = content_start;
+	let key_end = key_start + key.len();
+	let remainder = trimmed_line.get(key_start..)?;
+	let remainder = remainder.strip_prefix(key)?;
+	let equals_start = remainder
+		.char_indices()
+		.find_map(|(index, ch)| (!ch.is_whitespace()).then_some(index))?;
+	if remainder.get(equals_start..=equals_start)? != "=" {
+		return None;
+	}
+	let value_start_in_remainder = remainder[equals_start + 1..]
+		.char_indices()
+		.find_map(|(index, ch)| (!ch.is_whitespace()).then_some(equals_start + 1 + index))?;
+	if remainder.get(value_start_in_remainder..=value_start_in_remainder)? != "\"" {
+		return None;
+	}
+	let value_start = key_end + value_start_in_remainder + 1;
+	let value_end = trimmed_line
+		.get(value_start..)?
+		.find('"')
+		.map(|offset| value_start + offset)?;
+	Some((
+		value_start,
+		value_end,
+		trimmed_line[value_start..value_end].to_string(),
+	))
 }
 
 fn update_manifest_owner_version(document: &mut DocumentMut, owner_version: Option<&str>) {
