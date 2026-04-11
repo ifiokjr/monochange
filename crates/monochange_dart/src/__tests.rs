@@ -8,6 +8,7 @@ use monochange_core::PublishState;
 use semver::Version;
 use serde_yaml_ng::Value;
 
+use crate::DartVersionedFileKind;
 use crate::adapter;
 use crate::default_lockfile_commands;
 use crate::discover_dart_packages;
@@ -24,7 +25,6 @@ use crate::yaml_array_strings;
 use crate::yaml_bool;
 use crate::yaml_mapping;
 use crate::yaml_string;
-use crate::DartVersionedFileKind;
 
 #[test]
 fn discovers_dart_workspace_packages() {
@@ -33,14 +33,18 @@ fn discovers_dart_workspace_packages() {
 		.unwrap_or_else(|error| panic!("dart discovery: {error}"));
 
 	assert_eq!(discovery.packages.len(), 2);
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "dart_shared"));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "dart_app"));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "dart_shared")
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "dart_app")
+	);
 }
 
 #[test]
@@ -50,10 +54,12 @@ fn marks_flutter_packages_with_flutter_ecosystem() {
 	let discovery = discover_dart_packages(&fixture_root)
 		.unwrap_or_else(|error| panic!("flutter discovery: {error}"));
 
-	assert!(discovery
-		.packages
-		.iter()
-		.all(|package| package.ecosystem.as_str() == "flutter"));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.all(|package| package.ecosystem.as_str() == "flutter")
+	);
 }
 
 #[test]
@@ -339,10 +345,9 @@ fn workspace_and_manifest_helpers_cover_yaml_and_error_paths() {
 	let discovery = discover_workspace_packages(&workspace_manifest)
 		.unwrap_or_else(|error| panic!("workspace discovery: {error}"));
 	assert_eq!(discovery.0.len(), 2);
-	assert!(discovery
-		.1
-		.iter()
-		.any(|warning| warning.contains("missing/*") && warning.contains("matched no packages")));
+	assert!(discovery.1.iter().any(|warning| {
+		warning.contains("missing/*") && warning.contains("matched no packages")
+	}));
 
 	let nameless_manifest: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
 		r"
@@ -360,16 +365,20 @@ dependencies:
 	let invalid_workspace_error = has_workspace_section(&invalid_workspace)
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid workspace error"));
-	assert!(invalid_workspace_error
-		.to_string()
-		.contains("failed to parse"));
+	assert!(
+		invalid_workspace_error
+			.to_string()
+			.contains("failed to parse")
+	);
 
 	let invalid_package = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/dart/invalid-package/invalid-package.yaml");
 	let invalid_package_error = parse_manifest(&invalid_package, Path::new("."))
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid package error"));
-	assert!(invalid_package_error
-		.to_string()
-		.contains("failed to parse"));
+	assert!(
+		invalid_package_error
+			.to_string()
+			.contains("failed to parse")
+	);
 }

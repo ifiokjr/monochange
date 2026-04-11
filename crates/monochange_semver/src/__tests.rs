@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::CompatibilityAssessment;
@@ -5,15 +7,14 @@ use monochange_core::Ecosystem;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use semver::Version;
-use std::path::PathBuf;
 
+use crate::CompatibilityProvider;
 use crate::collect_assessments;
 use crate::direct_release_severity;
 use crate::merge_severities;
 use crate::propagated_release_severity;
 use crate::strongest_assessment;
 use crate::strongest_assessment_for_package;
-use crate::CompatibilityProvider;
 
 fn make_assessment(package_id: &str, severity: BumpSeverity) -> CompatibilityAssessment {
 	CompatibilityAssessment {

@@ -2,15 +2,16 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
-use monochange_core::materialize_dependency_edges;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::materialize_dependency_edges;
 use semver::Version;
 use serde_json::json;
 use serde_yaml_ng::Value as YamlValue;
 
+use crate::NpmVersionedFileKind;
 use crate::adapter;
 use crate::default_lockfile_commands;
 use crate::detect_npm_manager;
@@ -29,7 +30,6 @@ use crate::update_package_lock;
 use crate::update_pnpm_lock;
 use crate::update_pnpm_lock_text;
 use crate::workspace_patterns_from_package_json;
-use crate::NpmVersionedFileKind;
 
 #[test]
 fn discovers_npm_workspace_packages() {
@@ -38,14 +38,18 @@ fn discovers_npm_workspace_packages() {
 		.unwrap_or_else(|error| panic!("npm discovery: {error}"));
 
 	assert_eq!(discovery.packages.len(), 2);
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "npm-web"));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "npm-shared"));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "npm-web")
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "npm-shared")
+	);
 	let dependency_edges = materialize_dependency_edges(&discovery.packages);
 	assert_eq!(dependency_edges.len(), 1);
 }
@@ -58,10 +62,12 @@ fn discovers_pnpm_workspace_globs() {
 		.unwrap_or_else(|error| panic!("pnpm discovery: {error}"));
 
 	assert_eq!(discovery.packages.len(), 2);
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "pnpm-web"));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "pnpm-web")
+	);
 }
 
 #[test]
@@ -542,14 +548,15 @@ fn discovers_object_style_package_json_workspaces_and_warnings() {
 	let discovery = discover_npm_packages(&fixture_root)
 		.unwrap_or_else(|error| panic!("npm discovery: {error}"));
 	assert_eq!(discovery.packages.len(), 3);
-	assert!(discovery
-		.warnings
-		.iter()
-		.any(|warning| warning.contains("missing/*") && warning.contains("matched no packages")));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "root-workspace"));
+	assert!(discovery.warnings.iter().any(|warning| {
+		warning.contains("missing/*") && warning.contains("matched no packages")
+	}));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "root-workspace")
+	);
 	let private_package = discovery
 		.packages
 		.iter()
@@ -648,9 +655,11 @@ fn explicit_file_workspace_patterns_discover_package_manifests() {
 	);
 	assert_eq!(warnings, Vec::<String>::new());
 	assert_eq!(manifests.len(), 1);
-	assert!(manifests
-		.iter()
-		.any(|path| path.ends_with("packages/web/package.json")));
+	assert!(
+		manifests
+			.iter()
+			.any(|path| path.ends_with("packages/web/package.json"))
+	);
 
 	let discovery = discover_npm_packages(&fixture_root)
 		.unwrap_or_else(|error| panic!("npm discovery: {error}"));

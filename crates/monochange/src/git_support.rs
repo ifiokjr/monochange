@@ -2,15 +2,15 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
+use monochange_core::CommitMessage;
+use monochange_core::MonochangeError;
+use monochange_core::MonochangeResult;
 use monochange_core::git::git_command_output;
 use monochange_core::git::git_commit_paths_command;
 use monochange_core::git::git_error_detail;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::git_stderr_trimmed;
 use monochange_core::git::git_stdout_trimmed;
-use monochange_core::CommitMessage;
-use monochange_core::MonochangeError;
-use monochange_core::MonochangeResult;
 
 pub(crate) fn resolve_git_tag_commit(root: &Path, tag_name: &str) -> MonochangeResult<String> {
 	run_git_capture(

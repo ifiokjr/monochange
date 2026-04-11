@@ -1,5 +1,6 @@
-use super::*;
 use typed_builder::TypedBuilder;
+
+use super::*;
 
 #[derive(Clone, Copy, Debug, TypedBuilder)]
 pub(crate) struct ChangelogBuildContext<'a> {
@@ -778,9 +779,11 @@ pub(crate) fn group_changelog_include_allows(
 	match include {
 		GroupChangelogInclude::All => true,
 		GroupChangelogInclude::GroupOnly => false,
-		GroupChangelogInclude::Selected(selected) => in_group_targets
-			.iter()
-			.all(|package_id| selected.contains(package_id)),
+		GroupChangelogInclude::Selected(selected) => {
+			in_group_targets
+				.iter()
+				.all(|package_id| selected.contains(package_id))
+		}
 	}
 }
 
@@ -916,9 +919,11 @@ fn render_release_note_sections(
 		.collect::<BTreeSet<_>>();
 	let resolved_extra_sections = extra_sections
 		.iter()
-		.map(|section| ResolvedSectionDefinition {
-			title: section.name.clone(),
-			types: section.types.clone(),
+		.map(|section| {
+			ResolvedSectionDefinition {
+				title: section.name.clone(),
+				types: section.types.clone(),
+			}
 		})
 		.collect::<Vec<_>>();
 	let mut builtin_entries = BTreeMap::<BuiltinReleaseSection, Vec<String>>::new();
@@ -1033,10 +1038,11 @@ fn format_group_labeled_entry(change: &ReleaseNoteChange, rendered: &str) -> Str
 	if change.package_labels.is_empty() {
 		return rendered.to_string();
 	}
-	if change.package_labels.len() == 1 && !rendered.contains('\n') {
-		if let Some(entry) = rendered.strip_prefix("- ") {
-			return format!("- **{}**: {}", change.package_labels[0], entry);
-		}
+	if change.package_labels.len() == 1
+		&& !rendered.contains('\n')
+		&& let Some(entry) = rendered.strip_prefix("- ")
+	{
+		return format!("- **{}**: {}", change.package_labels[0], entry);
 	}
 	let labels = change
 		.package_labels

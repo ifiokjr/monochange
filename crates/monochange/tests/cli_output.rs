@@ -4,9 +4,10 @@ use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
 
 mod test_support;
-use test_support::{
-	current_test_name, monochange_command, setup_scenario_workspace, snapshot_settings,
-};
+use test_support::current_test_name;
+use test_support::monochange_command;
+use test_support::setup_scenario_workspace;
+use test_support::snapshot_settings;
 
 fn release_cli_command() -> std::process::Command {
 	monochange_command(Some("2026-04-06"))
@@ -19,9 +20,11 @@ fn validate_cli_succeeds_for_valid_workspace() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("monochange/validate-workspace");
-	assert_cmd_snapshot!(monochange_command(None)
-		.current_dir(tempdir.path())
-		.arg("validate"));
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("validate")
+	);
 }
 
 #[test]
@@ -40,11 +43,13 @@ fn discover_cli_json_reports_relative_paths_and_stable_ids() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/discover-mixed");
-	assert_cmd_snapshot!(monochange_command(None)
-		.current_dir(tempdir.path())
-		.arg("discover")
-		.arg("--format")
-		.arg("json"));
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("discover")
+			.arg("--format")
+			.arg("json")
+	);
 }
 
 #[test]
@@ -56,17 +61,19 @@ fn change_cli_writes_requested_file_contents() {
 	let tempdir = setup_scenario_workspace("cli-output/ungrouped-basic");
 	let output_path = tempdir.path().join("feature.md");
 
-	assert_cmd_snapshot!(monochange_command(None)
-		.current_dir(tempdir.path())
-		.arg("change")
-		.arg("--package")
-		.arg("core")
-		.arg("--bump")
-		.arg("minor")
-		.arg("--reason")
-		.arg("document cli snapshots")
-		.arg("--output")
-		.arg(&output_path));
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("change")
+			.arg("--package")
+			.arg("core")
+			.arg("--bump")
+			.arg("minor")
+			.arg("--reason")
+			.arg("document cli snapshots")
+			.arg("--output")
+			.arg(&output_path)
+	);
 
 	let change_file =
 		fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("change file: {error}"));
@@ -82,19 +89,21 @@ fn change_cli_writes_explicit_versions_when_requested() {
 	let tempdir = setup_scenario_workspace("cli-output/ungrouped-basic");
 	let output_path = tempdir.path().join("versioned.md");
 
-	assert_cmd_snapshot!(monochange_command(None)
-		.current_dir(tempdir.path())
-		.arg("change")
-		.arg("--package")
-		.arg("core")
-		.arg("--bump")
-		.arg("major")
-		.arg("--version")
-		.arg("2.0.0")
-		.arg("--reason")
-		.arg("promote to stable")
-		.arg("--output")
-		.arg(&output_path));
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("change")
+			.arg("--package")
+			.arg("core")
+			.arg("--bump")
+			.arg("major")
+			.arg("--version")
+			.arg("2.0.0")
+			.arg("--reason")
+			.arg("promote to stable")
+			.arg("--output")
+			.arg(&output_path)
+	);
 
 	let change_file =
 		fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("change file: {error}"));
@@ -108,12 +117,14 @@ fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/ungrouped-basic");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("text"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("text")
+	);
 }
 
 #[test]
@@ -123,12 +134,14 @@ fn release_dry_run_cli_uses_explicit_group_versions_from_member_changes() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/group-explicit-version");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("text"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("text")
+	);
 }
 
 #[test]
@@ -138,12 +151,14 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--format")
-		.arg("json"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("json")
+	);
 }
 
 #[test]
@@ -153,13 +168,15 @@ fn release_dry_run_cli_text_renders_diff_preview() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--diff")
-		.arg("--format")
-		.arg("text"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+			.arg("--diff")
+			.arg("--format")
+			.arg("text")
+	);
 }
 
 #[test]
@@ -169,13 +186,15 @@ fn release_dry_run_cli_json_renders_diff_preview() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release")
-		.arg("--dry-run")
-		.arg("--diff")
-		.arg("--format")
-		.arg("json"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+			.arg("--diff")
+			.arg("--format")
+			.arg("json")
+	);
 }
 
 #[test]
@@ -185,13 +204,15 @@ fn verify_cli_json_reports_failure_comment() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/changeset-policy-no-changeset");
-	assert_cmd_snapshot!(monochange_command(None)
-		.current_dir(tempdir.path())
-		.arg("affected")
-		.arg("--format")
-		.arg("json")
-		.arg("--changed-paths")
-		.arg("crates/core/src/lib.rs"));
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("affected")
+			.arg("--format")
+			.arg("json")
+			.arg("--changed-paths")
+			.arg("crates/core/src/lib.rs")
+	);
 }
 
 #[test]
@@ -201,10 +222,12 @@ fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/release-pr-workflow");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release-pr")
-		.arg("--dry-run"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release-pr")
+			.arg("--dry-run")
+	);
 }
 
 #[test]
@@ -214,10 +237,12 @@ fn release_manifest_workflow_writes_manifest_json() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/release-manifest-workflow");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release-manifest")
-		.arg("--dry-run"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release-manifest")
+			.arg("--dry-run")
+	);
 
 	let manifest_path = tempdir.path().join(".monochange/release-manifest.json");
 	let manifest = fs::read_to_string(&manifest_path)
@@ -232,9 +257,11 @@ fn release_cli_reports_missing_changesets_cleanly() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/ungrouped-no-changeset");
-	assert_cmd_snapshot!(release_cli_command()
-		.current_dir(tempdir.path())
-		.arg("release"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release")
+	);
 }
 
 #[test]
@@ -279,7 +306,9 @@ fn validate_cli_rejects_packages_in_multiple_groups() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/multiple-groups-validation");
-	assert_cmd_snapshot!(monochange_command(None)
-		.current_dir(tempdir.path())
-		.arg("validate"));
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("validate")
+	);
 }

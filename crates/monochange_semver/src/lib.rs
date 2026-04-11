@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_semver`

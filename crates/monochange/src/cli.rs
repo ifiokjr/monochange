@@ -6,10 +6,10 @@ use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
 use monochange_config::load_workspace_configuration;
-use monochange_core::default_cli_commands;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
+use monochange_core::default_cli_commands;
 
 pub fn build_command(bin_name: &'static str) -> Command {
 	let root = current_dir_or_dot();
@@ -45,15 +45,14 @@ pub(crate) fn apply_runtime_change_type_choices(
 	if choices.is_empty() {
 		return;
 	}
-	if let Some(change_command) = cli.iter_mut().find(|command| command.name == "change") {
-		if let Some(change_type_input) = change_command
+	if let Some(change_command) = cli.iter_mut().find(|command| command.name == "change")
+		&& let Some(change_type_input) = change_command
 			.inputs
 			.iter_mut()
 			.find(|input| input.name == "type" && input.choices.is_empty())
-		{
-			change_type_input.kind = CliInputKind::Choice;
-			change_type_input.choices = choices;
-		}
+	{
+		change_type_input.kind = CliInputKind::Choice;
+		change_type_input.choices = choices;
 	}
 }
 
@@ -89,38 +88,39 @@ pub(crate) fn build_command_with_cli(
 	bin_name: &'static str,
 	cli: &[CliCommandDefinition],
 ) -> Command {
-	let mut command = Command::new(bin_name)
-		.about("Manage versions and releases for your multiplatform, multilanguage monorepo")
-		.subcommand_required(true)
-		.arg_required_else_help(true)
-		.arg(
-			Arg::new("log-level")
-				.long("log-level")
-				.global(true)
-				.help("Set tracing filter (e.g. debug, monochange=trace)")
-				.value_name("FILTER")
-				.hide(true),
-		)
-		.subcommand(
-			Command::new("init")
-				.about("Generate monochange.toml with detected packages, groups, and default CLI commands")
-				.arg(
-					Arg::new("force")
-						.long("force")
-						.help("Overwrite an existing monochange.toml file")
-						.action(ArgAction::SetTrue),
-				),
-		)
-		.subcommand(
-			Command::new("populate")
-				.about("Add any missing built-in CLI commands to monochange.toml so you can customize them"),
-		)
-		.subcommand(build_assist_subcommand())
-		.subcommand(build_release_record_subcommand())
-		.subcommand(
-			Command::new("mcp")
-				.about("Start the monochange MCP (Model Context Protocol) server over stdin/stdout"),
-		);
+	let mut command =
+		Command::new(bin_name)
+			.about("Manage versions and releases for your multiplatform, multilanguage monorepo")
+			.subcommand_required(true)
+			.arg_required_else_help(true)
+			.arg(
+				Arg::new("log-level")
+					.long("log-level")
+					.global(true)
+					.help("Set tracing filter (e.g. debug, monochange=trace)")
+					.value_name("FILTER")
+					.hide(true),
+			)
+			.subcommand(
+				Command::new("init")
+					.about(
+						"Generate monochange.toml with detected packages, groups, and default CLI commands",
+					)
+					.arg(
+						Arg::new("force")
+							.long("force")
+							.help("Overwrite an existing monochange.toml file")
+							.action(ArgAction::SetTrue),
+					),
+			)
+			.subcommand(Command::new("populate").about(
+				"Add any missing built-in CLI commands to monochange.toml so you can customize them",
+			))
+			.subcommand(build_assist_subcommand())
+			.subcommand(build_release_record_subcommand())
+			.subcommand(Command::new("mcp").about(
+				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
+			));
 
 	for cli_command in cli {
 		command = command.subcommand(build_cli_command_subcommand(cli_command));
@@ -222,8 +222,9 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 
 pub(crate) fn cli_command_after_help(cli_command: &CliCommandDefinition) -> Option<&'static str> {
 	match cli_command.name.as_str() {
-		"change" => Some(
-			r#"Examples:
+		"change" => {
+			Some(
+				r#"Examples:
   mc change --package sdk-core --bump patch --reason "fix panic"
   mc change --package sdk-core --bump minor --reason "add API" --output .changeset/sdk-core.md
   mc change --package sdk --bump minor --reason "coordinated release"
@@ -233,9 +234,11 @@ Rules:
   - Use a group id only when the change is intentionally owned by the whole group.
   - Dependents and grouped members are propagated automatically during planning.
   - Legacy manifest paths may still resolve during migration, but declared ids are the stable interface."#,
-		),
-		"release" => Some(
-			r"Examples:
+			)
+		}
+		"release" => {
+			Some(
+				r"Examples:
   mc release --dry-run --format text
   mc release --dry-run --format json
   mc release --dry-run --diff
@@ -245,9 +248,11 @@ Planning reminders:
   - Direct package changes propagate to dependents using defaults.parent_bump.
   - Group synchronization happens before final output is rendered.
   - Explicit versions on grouped members propagate to the whole group.",
-		),
-		"commit-release" => Some(
-			r"Examples:
+			)
+		}
+		"commit-release" => {
+			Some(
+				r"Examples:
   mc commit-release --dry-run --format json
   mc commit-release --dry-run --diff
   mc commit-release
@@ -256,9 +261,11 @@ Commit notes:
   - Reuses the standard monochange release commit subject/body contract.
   - Embeds a durable release record block in the commit body.
   - Can run before OpenReleaseRequest in the same workflow.",
-		),
-		"affected" => Some(
-			r"Examples:
+			)
+		}
+		"affected" => {
+			Some(
+				r"Examples:
   mc affected --changed-paths crates/core/src/lib.rs --format json
   mc affected --since origin/main --verify
 
@@ -266,9 +273,11 @@ Verification reminders:
   - Prefer package ids in .changeset files.
   - Group-owned changesets cover all members of that group.
   - Ignored paths and skip labels are controlled from [changesets.verify].",
-		),
-		"diagnostics" => Some(
-			r"Examples:
+			)
+		}
+		"diagnostics" => {
+			Some(
+				r"Examples:
   mc diagnostics --format json
   mc diagnostics --changeset .changeset/feature.md
 
@@ -277,9 +286,11 @@ Diagnostics include:
   - commit SHA that introduced and last updated each changeset
   - linked review request (when detected)
   - related issue references",
-		),
-		"repair-release" => Some(
-			r"Examples:
+			)
+		}
+		"repair-release" => {
+			Some(
+				r"Examples:
   mc repair-release --from v1.2.3 --dry-run
   mc repair-release --from v1.2.3 --target HEAD --format json
 
@@ -288,7 +299,8 @@ Repair notes:
   - Moves the full release tag set together.
   - Defaults to descendant-only retargets unless --force is set.
   - Hosted release sync runs by default and can be disabled with --sync-provider=false.",
-		),
+			)
+		}
 		_ => None,
 	}
 }
@@ -333,10 +345,10 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 		arg = arg.short(short);
 	}
 
-	if let Some(default) = &input.default {
-		if !matches!(input.kind, CliInputKind::Boolean) || default == "true" {
-			arg = arg.default_value(leak_string(default.clone()));
-		}
+	if let Some(default) = &input.default
+		&& (!matches!(input.kind, CliInputKind::Boolean) || default == "true")
+	{
+		arg = arg.default_value(leak_string(default.clone()));
 	}
 
 	arg

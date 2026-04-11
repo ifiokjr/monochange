@@ -85,8 +85,10 @@ pub(crate) fn run_assist(
 ) -> MonochangeResult<String> {
 	let payload = assistant_setup_payload(assistant);
 	match format {
-		AssistOutputFormat::Json => serde_json::to_string_pretty(&payload)
-			.map_err(|error| MonochangeError::Config(error.to_string())),
+		AssistOutputFormat::Json => {
+			serde_json::to_string_pretty(&payload)
+				.map_err(|error| MonochangeError::Config(error.to_string()))
+		}
 		AssistOutputFormat::Text => {
 			let mcp_config = serde_json::to_string_pretty(&payload["mcp_config"])
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;

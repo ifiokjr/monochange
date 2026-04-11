@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use inquire::validator::Validation;
 use inquire::MultiSelect;
 use inquire::Select;
 use inquire::Text;
+use inquire::validator::Validation;
 use monochange_core::BumpSeverity;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -252,9 +252,11 @@ fn prompt_version_for_target(target: &SelectableTarget) -> MonochangeResult<Opti
 			}
 			match semver::Version::parse(input) {
 				Ok(_) => Ok(Validation::Valid),
-				Err(error) => Ok(Validation::Invalid(
-					format!("invalid semver: {error}").into(),
-				)),
+				Err(error) => {
+					Ok(Validation::Invalid(
+						format!("invalid semver: {error}").into(),
+					))
+				}
 			}
 		})
 		.prompt()
@@ -344,7 +346,11 @@ mod __tests {
 	use monochange_core::VersionFormat;
 	use monochange_core::WorkspaceConfiguration;
 	use monochange_core::WorkspaceDefaults;
+	use monochange_test_helpers::current_test_name;
 
+	use super::InteractiveOptions;
+	use super::SelectableTarget;
+	use super::TargetKind;
 	use super::build_selectable_targets;
 	use super::bump_options;
 	use super::change_type_options;
@@ -352,11 +358,6 @@ mod __tests {
 	use super::parse_selected_bump;
 	use super::prompt_change_type_for_target;
 	use super::run_interactive_change;
-	use super::InteractiveOptions;
-	use super::SelectableTarget;
-	use super::TargetKind;
-
-	use monochange_test_helpers::current_test_name;
 
 	fn fixture_path(relative: &str) -> std::path::PathBuf {
 		monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
@@ -436,9 +437,11 @@ mod __tests {
 		let error = run_interactive_change(&empty_configuration(), &InteractiveOptions::default())
 			.err()
 			.unwrap_or_else(|| panic!("expected interactive error"));
-		assert!(error
-			.to_string()
-			.contains("no packages or groups found in workspace configuration"));
+		assert!(
+			error
+				.to_string()
+				.contains("no packages or groups found in workspace configuration")
+		);
 	}
 
 	#[test]

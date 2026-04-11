@@ -86,9 +86,11 @@ fn validate_source_configuration_rejects_missing_host_and_unsupported_features()
 	let error = validate_source_configuration(&sample_source(None, None))
 		.err()
 		.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("[source].host must be set for `provider = \"gitea\"`"));
+	assert!(
+		error
+			.to_string()
+			.contains("[source].host must be set for `provider = \"gitea\"`")
+	);
 
 	let error = validate_source_configuration(&SourceConfiguration {
 		pull_requests: ProviderMergeRequestSettings {
@@ -99,9 +101,11 @@ fn validate_source_configuration_rejects_missing_host_and_unsupported_features()
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("[source.pull_requests].auto_merge is not supported"));
+	assert!(
+		error
+			.to_string()
+			.contains("[source.pull_requests].auto_merge is not supported")
+	);
 
 	let error = validate_source_configuration(&SourceConfiguration {
 		releases: ProviderReleaseSettings {
@@ -112,9 +116,11 @@ fn validate_source_configuration_rejects_missing_host_and_unsupported_features()
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("provider-generated release notes are not supported"));
+	assert!(
+		error
+			.to_string()
+			.contains("provider-generated release notes are not supported")
+	);
 }
 
 #[test]
@@ -137,9 +143,11 @@ fn gitea_api_base_requires_host_unless_api_url_is_set() {
 	let error = gitea_api_base(&sample_source(None, None))
 		.err()
 		.unwrap_or_else(|| panic!("expected missing host error"));
-	assert!(error
-		.to_string()
-		.contains("[source].host must be set for `provider = \"gitea\"`"));
+	assert!(
+		error
+			.to_string()
+			.contains("[source].host must be set for `provider = \"gitea\"`")
+	);
 }
 
 #[test]
@@ -155,9 +163,11 @@ fn gitea_token_requires_environment_variable() {
 		let error = gitea_token()
 			.err()
 			.unwrap_or_else(|| panic!("expected missing token error"));
-		assert!(error
-			.to_string()
-			.contains("set `GITEA_TOKEN` before running Gitea automation"));
+		assert!(
+			error
+				.to_string()
+				.contains("set `GITEA_TOKEN` before running Gitea automation")
+		);
 	});
 }
 
@@ -179,9 +189,11 @@ fn auth_headers_reject_invalid_gitea_tokens() {
 	let error = auth_headers("bad\nvalue")
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid header error"));
-	assert!(error
-		.to_string()
-		.contains("invalid Gitea token header value"));
+	assert!(
+		error
+			.to_string()
+			.contains("invalid Gitea token header value")
+	);
 }
 
 #[test]
@@ -462,12 +474,14 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 	create.assert();
 	labels.assert();
 	assert_eq!(outcome.operation, SourceChangeRequestOperation::Created);
-	assert!(!git_output(
-		&repo,
-		&["rev-parse", "--verify", "monochange/release/release"]
-	)
-	.trim()
-	.is_empty());
+	assert!(
+		!git_output(
+			&repo,
+			&["rev-parse", "--verify", "monochange/release/release"]
+		)
+		.trim()
+		.is_empty()
+	);
 	let commit_body = git_output(&repo, &["log", "-1", "--pretty=%B"]);
 	assert!(commit_body.contains("release body"));
 }
@@ -485,9 +499,11 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
-	assert!(io_error
-		.to_string()
-		.contains("failed to commit release pull request changes"));
+	assert!(
+		io_error
+			.to_string()
+			.contains("failed to commit release pull request changes")
+	);
 
 	let repo = tempdir.path().join("repo-error");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
@@ -513,9 +529,11 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
-	assert!(error
-		.to_string()
-		.contains("failed to commit release pull request changes"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to commit release pull request changes")
+	);
 }
 
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]

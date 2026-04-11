@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_github`
@@ -96,12 +95,6 @@ use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 
-use monochange_core::git::git_checkout_branch_command;
-use monochange_core::git::git_commit_paths_command;
-use monochange_core::git::git_push_branch_command;
-use monochange_core::git::git_stage_paths_command;
-use monochange_core::git::run_command;
-use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use monochange_core::CommitMessage;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
@@ -131,10 +124,16 @@ use monochange_core::SourceProvider;
 use monochange_core::SourceReleaseOperation;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
+use monochange_core::git::git_checkout_branch_command;
+use monochange_core::git::git_commit_paths_command;
+use monochange_core::git::git_push_branch_command;
+use monochange_core::git::git_stage_paths_command;
+use monochange_core::git::run_command;
+use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use octocrab::Octocrab;
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::json;
 use tokio::runtime::Builder as RuntimeBuilder;
 use urlencoding::encode;
@@ -472,19 +471,21 @@ pub fn build_release_requests(
 		.release_targets
 		.iter()
 		.filter(|target| target.release)
-		.map(|target| GitHubReleaseRequest {
-			provider: SourceProvider::GitHub,
-			repository: format!("{}/{}", source.owner, source.repo),
-			owner: source.owner.clone(),
-			repo: source.repo.clone(),
-			target_id: target.id.clone(),
-			target_kind: target.kind,
-			tag_name: target.tag_name.clone(),
-			name: target.rendered_title.clone(),
-			body: release_body(source, manifest, target),
-			draft: source.releases.draft,
-			prerelease: source.releases.prerelease,
-			generate_release_notes: source.releases.generate_notes,
+		.map(|target| {
+			GitHubReleaseRequest {
+				provider: SourceProvider::GitHub,
+				repository: format!("{}/{}", source.owner, source.repo),
+				owner: source.owner.clone(),
+				repo: source.repo.clone(),
+				target_id: target.id.clone(),
+				target_kind: target.kind,
+				tag_name: target.tag_name.clone(),
+				name: target.rendered_title.clone(),
+				body: release_body(source, manifest, target),
+				draft: source.releases.draft,
+				prerelease: source.releases.prerelease,
+				generate_release_notes: source.releases.generate_notes,
+			}
 		})
 		.collect()
 }
@@ -604,14 +605,16 @@ async fn lookup_commit_review_request_with_client(
 	let Some(pull_request) = pull_requests.into_iter().next() else {
 		return Ok(None);
 	};
-	let author = pull_request.user.map(|user| HostedActorRef {
-		provider: HostingProviderKind::GitHub,
-		host: github_host(),
-		id: Some(user.id.to_string()),
-		login: Some(user.login.clone()),
-		display_name: Some(user.login),
-		url: user.html_url,
-		source: HostedActorSourceKind::ReviewRequestAuthor,
+	let author = pull_request.user.map(|user| {
+		HostedActorRef {
+			provider: HostingProviderKind::GitHub,
+			host: github_host(),
+			id: Some(user.id.to_string()),
+			login: Some(user.login.clone()),
+			display_name: Some(user.login),
+			url: user.html_url,
+			source: HostedActorSourceKind::ReviewRequestAuthor,
+		}
 	});
 	let review_request = HostedReviewRequestRef {
 		provider: HostingProviderKind::GitHub,
@@ -679,13 +682,15 @@ async fn load_pull_request_issues_with_client(
 	for issue_number in body.map(extract_issue_numbers).unwrap_or_default() {
 		issues_by_id
 			.entry(format!("#{issue_number}"))
-			.or_insert_with(|| HostedIssueRef {
-				provider: HostingProviderKind::GitHub,
-				host: github_host(),
-				id: format!("#{issue_number}"),
-				title: None,
-				url: Some(github_issue_url(source, issue_number)),
-				relationship: HostedIssueRelationshipKind::ReferencedByReviewRequest,
+			.or_insert_with(|| {
+				HostedIssueRef {
+					provider: HostingProviderKind::GitHub,
+					host: github_host(),
+					id: format!("#{issue_number}"),
+					title: None,
+					url: Some(github_issue_url(source, issue_number)),
+					relationship: HostedIssueRelationshipKind::ReferencedByReviewRequest,
+				}
 			});
 	}
 	Ok(issues_by_id.into_values().collect())
@@ -741,14 +746,14 @@ pub fn plan_released_issue_comments(
 		.flat_map(|context| context.related_issues.iter())
 		.filter(|issue| issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest)
 	{
-		plans_by_issue
-			.entry(issue.id.clone())
-			.or_insert_with(|| GitHubIssueCommentPlan {
+		plans_by_issue.entry(issue.id.clone()).or_insert_with(|| {
+			GitHubIssueCommentPlan {
 				repository: format!("{}/{}", source.owner, source.repo),
 				issue_id: issue.id.clone(),
 				issue_url: issue.url.clone(),
 				body: body.clone(),
-			});
+			}
+		});
 	}
 	plans_by_issue.into_values().collect()
 }
@@ -765,8 +770,8 @@ pub fn comment_released_issues(
 	let runtime = github_runtime()?;
 	runtime.block_on(async {
 		let client = github_client_from_env(source)?;
-		let outcome = comment_released_issues_with_client(&client, source, &plans).await;
-		outcome
+
+		comment_released_issues_with_client(&client, source, &plans).await
 	})
 }
 
@@ -842,8 +847,8 @@ pub fn publish_release_requests(
 	let runtime = github_runtime()?;
 	runtime.block_on(async {
 		let client = github_client_from_env(source)?;
-		let outcome = publish_release_requests_with_client(&client, requests).await;
-		outcome
+
+		publish_release_requests_with_client(&client, requests).await
 	})
 }
 
@@ -862,8 +867,8 @@ pub fn publish_release_pull_request(
 	let runtime = github_runtime()?;
 	runtime.block_on(async {
 		let client = github_client_from_env(source)?;
-		let outcome = publish_release_pull_request_with_client(&client, request).await;
-		outcome
+
+		publish_release_pull_request_with_client(&client, request).await
 	})
 }
 
@@ -908,27 +913,31 @@ async fn publish_release_request_with_client(
 	};
 	let existing = lookup_existing_release_with_client(client, request).await?;
 	let (operation, response) = match existing {
-		Some(existing) => (
-			GitHubReleaseOperation::Updated,
-			patch_json::<_, GitHubReleaseResponse>(
-				client,
-				&format!(
-					"/repos/{}/{}/releases/{}",
-					request.owner, request.repo, existing.id
-				),
-				&payload,
+		Some(existing) => {
+			(
+				GitHubReleaseOperation::Updated,
+				patch_json::<_, GitHubReleaseResponse>(
+					client,
+					&format!(
+						"/repos/{}/{}/releases/{}",
+						request.owner, request.repo, existing.id
+					),
+					&payload,
+				)
+				.await?,
 			)
-			.await?,
-		),
-		None => (
-			GitHubReleaseOperation::Created,
-			post_json::<_, GitHubReleaseResponse>(
-				client,
-				&format!("/repos/{}/{}/releases", request.owner, request.repo),
-				&payload,
+		}
+		None => {
+			(
+				GitHubReleaseOperation::Created,
+				post_json::<_, GitHubReleaseResponse>(
+					client,
+					&format!("/repos/{}/{}/releases", request.owner, request.repo),
+					&payload,
+				)
+				.await?,
 			)
-			.await?,
-		),
+		}
 	};
 	Ok(GitHubReleaseOutcome {
 		provider: SourceProvider::GitHub,
@@ -945,37 +954,41 @@ async fn publish_release_pull_request_with_client(
 ) -> MonochangeResult<GitHubPullRequestOutcome> {
 	let existing = lookup_existing_pull_request_with_client(client, request).await?;
 	let (operation, pull_request) = match existing {
-		Some(existing) => (
-			GitHubPullRequestOperation::Updated,
-			patch_json::<_, GitHubPullRequestResponse>(
-				client,
-				&format!(
-					"/repos/{}/{}/pulls/{}",
-					request.owner, request.repo, existing.number
-				),
-				&GitHubPullRequestUpdatePayload {
-					title: &request.title,
-					body: &request.body,
-					base: &request.base_branch,
-				},
+		Some(existing) => {
+			(
+				GitHubPullRequestOperation::Updated,
+				patch_json::<_, GitHubPullRequestResponse>(
+					client,
+					&format!(
+						"/repos/{}/{}/pulls/{}",
+						request.owner, request.repo, existing.number
+					),
+					&GitHubPullRequestUpdatePayload {
+						title: &request.title,
+						body: &request.body,
+						base: &request.base_branch,
+					},
+				)
+				.await?,
 			)
-			.await?,
-		),
-		None => (
-			GitHubPullRequestOperation::Created,
-			post_json::<_, GitHubPullRequestResponse>(
-				client,
-				&format!("/repos/{}/{}/pulls", request.owner, request.repo),
-				&GitHubPullRequestPayload {
-					title: &request.title,
-					head: &request.head_branch,
-					base: &request.base_branch,
-					body: &request.body,
-					draft: false,
-				},
+		}
+		None => {
+			(
+				GitHubPullRequestOperation::Created,
+				post_json::<_, GitHubPullRequestResponse>(
+					client,
+					&format!("/repos/{}/{}/pulls", request.owner, request.repo),
+					&GitHubPullRequestPayload {
+						title: &request.title,
+						head: &request.head_branch,
+						base: &request.base_branch,
+						body: &request.body,
+						draft: false,
+					},
+				)
+				.await?,
 			)
-			.await?,
-		),
+		}
 	};
 	if !request.labels.is_empty() {
 		let _: serde_json::Value = post_json(
@@ -1175,9 +1188,11 @@ where
 		Err(octocrab::Error::GitHub { source, .. }) if source.status_code.as_u16() == 404 => {
 			Ok(None)
 		}
-		Err(error) => Err(MonochangeError::Config(format!(
-			"GitHub API GET `{path}` failed: {error}"
-		))),
+		Err(error) => {
+			Err(MonochangeError::Config(format!(
+				"GitHub API GET `{path}` failed: {error}"
+			)))
+		}
 	}
 }
 
@@ -1187,9 +1202,11 @@ where
 {
 	match client.get::<T, _, _>(path, None::<&()>).await {
 		Ok(value) => Ok(value),
-		Err(error) => Err(MonochangeError::Config(format!(
-			"GitHub API GET `{path}` failed: {error}"
-		))),
+		Err(error) => {
+			Err(MonochangeError::Config(format!(
+				"GitHub API GET `{path}` failed: {error}"
+			)))
+		}
 	}
 }
 
@@ -1256,14 +1273,16 @@ fn release_body(
 ) -> Option<String> {
 	match github.releases.source {
 		ProviderReleaseNotesSource::GitHubGenerated => None,
-		ProviderReleaseNotesSource::Monochange => manifest
-			.changelogs
-			.iter()
-			.find(|changelog| {
-				changelog.owner_id == target.id && changelog.owner_kind == target.kind
-			})
-			.map(|changelog| changelog.rendered.clone())
-			.or_else(|| Some(minimal_release_body(manifest, target))),
+		ProviderReleaseNotesSource::Monochange => {
+			manifest
+				.changelogs
+				.iter()
+				.find(|changelog| {
+					changelog.owner_id == target.id && changelog.owner_kind == target.kind
+				})
+				.map(|changelog| changelog.rendered.clone())
+				.or_else(|| Some(minimal_release_body(manifest, target)))
+		}
 	}
 }
 

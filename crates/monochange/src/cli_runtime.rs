@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 
-use clap::parser::ValueSource;
 use clap::ArgMatches;
+use clap::parser::ValueSource;
 use monochange_config::load_workspace_configuration;
 use monochange_core::ChangesetPolicyStatus;
 use monochange_core::CliCommandDefinition;
@@ -55,10 +55,12 @@ pub(crate) fn collect_cli_command_inputs(
 	for input in &cli_command.inputs {
 		let value_source = matches.value_source(input.name.as_str());
 		let values = match input.kind {
-			CliInputKind::StringList => matches
-				.get_many::<String>(input.name.as_str())
-				.map(|values| values.cloned().collect::<Vec<_>>())
-				.unwrap_or_default(),
+			CliInputKind::StringList => {
+				matches
+					.get_many::<String>(input.name.as_str())
+					.map(|values| values.cloned().collect::<Vec<_>>())
+					.unwrap_or_default()
+			}
 			CliInputKind::Boolean => {
 				if input.default.as_deref() == Some("true") {
 					matches
@@ -178,10 +180,12 @@ pub(crate) fn template_value_to_input_values(value: &serde_json::Value) -> Vec<S
 		serde_json::Value::Bool(value) => vec![value.to_string()],
 		serde_json::Value::Number(value) => vec![value.to_string()],
 		serde_json::Value::String(value) => vec![value.clone()],
-		serde_json::Value::Array(values) => values
-			.iter()
-			.flat_map(template_value_to_input_values)
-			.collect(),
+		serde_json::Value::Array(values) => {
+			values
+				.iter()
+				.flat_map(template_value_to_input_values)
+				.collect()
+		}
 		serde_json::Value::Object(_) => vec![value.to_string()],
 	}
 }
@@ -606,15 +610,17 @@ pub(crate) fn execute_cli_command_with_options(
 				id,
 				variables,
 				..
-			} => run_cli_command_command(
-				&mut context,
-				command,
-				dry_run_command.as_deref(),
-				shell,
-				id.as_deref(),
-				variables.as_ref(),
-				&step_inputs,
-			)?,
+			} => {
+				run_cli_command_command(
+					&mut context,
+					command,
+					dry_run_command.as_deref(),
+					shell,
+					id.as_deref(),
+					variables.as_ref(),
+					&step_inputs,
+				)?;
+			}
 		}
 	}
 
@@ -643,11 +649,13 @@ pub(crate) fn execute_cli_command_with_options(
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
-			OutputFormat::Json => serde_json::to_string_pretty(evaluation).map_err(|error| {
-				MonochangeError::Config(format!(
-					"failed to render changeset policy evaluation as json: {error}"
-				))
-			})?,
+			OutputFormat::Json => {
+				serde_json::to_string_pretty(evaluation).map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to render changeset policy evaluation as json: {error}"
+					))
+				})?
+			}
 			OutputFormat::Text => render_cli_command_result(cli_command, &context),
 		};
 		if evaluation.enforce && evaluation.status == ChangesetPolicyStatus::Failed {
@@ -663,11 +671,13 @@ pub(crate) fn execute_cli_command_with_options(
 			.and_then(|values| values.first())
 			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 		let rendered = match format {
-			OutputFormat::Json => serde_json::to_string_pretty(report).map_err(|error| {
-				MonochangeError::Config(format!(
-					"failed to render changeset diagnostics as json: {error}"
-				))
-			})?,
+			OutputFormat::Json => {
+				serde_json::to_string_pretty(report).map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to render changeset diagnostics as json: {error}"
+					))
+				})?
+			}
 			OutputFormat::Text => render_changeset_diagnostics(report),
 		};
 		return Ok(rendered);
@@ -675,8 +685,10 @@ pub(crate) fn execute_cli_command_with_options(
 	if let Some(report) = &context.retarget_report {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
-			OutputFormat::Json => serde_json::to_string_pretty(report)
-				.unwrap_or_else(|error| panic!("retarget report serialization bug: {error}")),
+			OutputFormat::Json => {
+				serde_json::to_string_pretty(report)
+					.unwrap_or_else(|error| panic!("retarget report serialization bug: {error}"))
+			}
 			OutputFormat::Text => render_retarget_release_report(report),
 		};
 		return Ok(rendered);
@@ -746,9 +758,11 @@ fn parse_template_as_boolean(value: &serde_json::Value, condition: &str) -> Mono
 				)))
 			}
 		}
-		serde_json::Value::Object(_) => Err(MonochangeError::Config(format!(
-			"`when` condition `{condition}` is not a scalar boolean value"
-		))),
+		serde_json::Value::Object(_) => {
+			Err(MonochangeError::Config(format!(
+				"`when` condition `{condition}` is not a scalar boolean value"
+			)))
+		}
 	}
 }
 
@@ -785,9 +799,11 @@ fn parse_string_as_boolean(value: &str, condition: &str) -> MonochangeResult<boo
 	match value.as_str() {
 		"true" => Ok(true),
 		"false" | "0" | "" => Ok(false),
-		other => Err(MonochangeError::Config(format!(
-			"`when` condition `{condition}` must be a boolean, got `{other}`"
-		))),
+		other => {
+			Err(MonochangeError::Config(format!(
+				"`when` condition `{condition}` must be a boolean, got `{other}`"
+			)))
+		}
 	}
 }
 
@@ -1183,12 +1199,16 @@ pub(crate) fn parse_boolean_step_input(
 	inputs
 		.get(name)
 		.and_then(|values| values.first())
-		.map(|value| match value.as_str() {
-			"true" => Ok(true),
-			"false" => Ok(false),
-			other => Err(MonochangeError::Config(format!(
-				"invalid boolean value `{other}` for `{name}`"
-			))),
+		.map(|value| {
+			match value.as_str() {
+				"true" => Ok(true),
+				"false" => Ok(false),
+				other => {
+					Err(MonochangeError::Config(format!(
+						"invalid boolean value `{other}` for `{name}`"
+					)))
+				}
+			}
 		})
 		.transpose()
 }
@@ -1348,35 +1368,41 @@ fn cli_command_variable_value(context: &CliContext, variable: CommandVariable) -
 	match variable {
 		CommandVariable::Version => version.to_string(),
 		CommandVariable::GroupVersion => group_version.to_string(),
-		CommandVariable::ReleasedPackages => context
-			.prepared_release
-			.as_ref()
-			.map(|prepared| prepared.released_packages.join(","))
-			.unwrap_or_default(),
-		CommandVariable::ChangedFiles => context
-			.prepared_release
-			.as_ref()
-			.map(|prepared| {
-				prepared
-					.changed_files
-					.iter()
-					.map(|path| path.display().to_string())
-					.collect::<Vec<_>>()
-					.join(" ")
-			})
-			.unwrap_or_default(),
-		CommandVariable::Changesets => context
-			.prepared_release
-			.as_ref()
-			.map(|prepared| {
-				prepared
-					.changeset_paths
-					.iter()
-					.map(|path| path.display().to_string())
-					.collect::<Vec<_>>()
-					.join(" ")
-			})
-			.unwrap_or_default(),
+		CommandVariable::ReleasedPackages => {
+			context
+				.prepared_release
+				.as_ref()
+				.map(|prepared| prepared.released_packages.join(","))
+				.unwrap_or_default()
+		}
+		CommandVariable::ChangedFiles => {
+			context
+				.prepared_release
+				.as_ref()
+				.map(|prepared| {
+					prepared
+						.changed_files
+						.iter()
+						.map(|path| path.display().to_string())
+						.collect::<Vec<_>>()
+						.join(" ")
+				})
+				.unwrap_or_default()
+		}
+		CommandVariable::Changesets => {
+			context
+				.prepared_release
+				.as_ref()
+				.map(|prepared| {
+					prepared
+						.changeset_paths
+						.iter()
+						.map(|path| path.display().to_string())
+						.collect::<Vec<_>>()
+						.join(" ")
+				})
+				.unwrap_or_default()
+		}
 	}
 }
 
@@ -1509,9 +1535,11 @@ pub(crate) fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat>
 	match value {
 		"text" => Ok(OutputFormat::Text),
 		"json" => Ok(OutputFormat::Json),
-		other => Err(MonochangeError::Config(format!(
-			"unsupported output format `{other}`"
-		))),
+		other => {
+			Err(MonochangeError::Config(format!(
+				"unsupported output format `{other}`"
+			)))
+		}
 	}
 }
 
@@ -1521,16 +1549,20 @@ pub(crate) fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 		"patch" => Ok(ChangeBump::Patch),
 		"minor" => Ok(ChangeBump::Minor),
 		"major" => Ok(ChangeBump::Major),
-		other => Err(MonochangeError::Config(format!(
-			"unsupported bump `{other}`"
-		))),
+		other => {
+			Err(MonochangeError::Config(format!(
+				"unsupported bump `{other}`"
+			)))
+		}
 	}
 }
 
 #[cfg(test)]
 mod tests {
+	use std::collections::BTreeMap;
+	use std::path::PathBuf;
+
 	use super::*;
-	use std::{collections::BTreeMap, path::PathBuf};
 
 	fn cli_context() -> CliContext {
 		CliContext {

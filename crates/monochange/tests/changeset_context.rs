@@ -6,7 +6,8 @@ use monochange_test_helpers::git_output;
 use serde_json::Value;
 
 mod test_support;
-use test_support::{monochange_command, setup_scenario_workspace};
+use test_support::monochange_command;
+use test_support::setup_scenario_workspace;
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn release_manifest_records_git_changeset_context_and_renders_context_templates() {

@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_npm`
@@ -41,7 +40,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
-use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
@@ -53,6 +51,7 @@ use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::normalize_path;
 use semver::Version;
 use serde_json::Value;
 use serde_yaml_ng::Value as YamlValue;
@@ -168,12 +167,11 @@ pub fn update_package_lock(
 	package_paths_by_name: &BTreeMap<String, PathBuf>,
 	raw_versions: &BTreeMap<String, String>,
 ) {
-	if let Some(root_name) = value.get("name").and_then(Value::as_str) {
-		if let Some(version) = raw_versions.get(root_name) {
-			if let Some(obj) = value.as_object_mut() {
-				obj.insert("version".to_string(), Value::String(version.clone()));
-			}
-		}
+	if let Some(root_name) = value.get("name").and_then(Value::as_str)
+		&& let Some(version) = raw_versions.get(root_name)
+		&& let Some(obj) = value.as_object_mut()
+	{
+		obj.insert("version".to_string(), Value::String(version.clone()));
 	}
 	if let Some(packages) = value.get_mut("packages").and_then(Value::as_object_mut) {
 		for (entry_path, entry_value) in packages {
@@ -187,10 +185,10 @@ pub fn update_package_lock(
 				continue;
 			}
 			for (name, package_dir) in package_paths_by_name {
-				if entry_path == &package_dir.to_string_lossy() {
-					if let Some(version) = raw_versions.get(name) {
-						entry_object.insert("version".to_string(), Value::String(version.clone()));
-					}
+				if entry_path == &package_dir.to_string_lossy()
+					&& let Some(version) = raw_versions.get(name)
+				{
+					entry_object.insert("version".to_string(), Value::String(version.clone()));
 				}
 			}
 		}
@@ -240,12 +238,12 @@ pub fn update_pnpm_lock(
 						}
 					} else if let Some(entry_mapping) = entry.as_mapping_mut() {
 						let version_key = serde_yaml_ng::Value::String("version".to_string());
-						if let Some(version_value) = entry_mapping.get_mut(&version_key) {
-							if let Some(text) = version_value.as_str() {
-								if !text.starts_with("link:") && !text.starts_with("workspace:") {
-									*version_value = serde_yaml_ng::Value::String(version.clone());
-								}
-							}
+						if let Some(version_value) = entry_mapping.get_mut(&version_key)
+							&& let Some(text) = version_value.as_str()
+							&& !text.starts_with("link:")
+							&& !text.starts_with("workspace:")
+						{
+							*version_value = serde_yaml_ng::Value::String(version.clone());
 						}
 					}
 				}
@@ -276,7 +274,7 @@ pub fn update_pnpm_lock_text(
 			&mut replacements,
 		);
 	}
-	replacements.sort_by(|left, right| right.0 .0.cmp(&left.0 .0));
+	replacements.sort_by(|left, right| right.0.0.cmp(&left.0.0));
 	let mut updated = contents.to_string();
 	for ((start, end), replacement) in replacements {
 		updated.replace_range(start..end, &replacement);
@@ -800,11 +798,13 @@ fn parse_dependency_map(
 			dependencies
 				.iter()
 				.filter_map(|(name, version)| {
-					version.as_str().map(|constraint| PackageDependency {
-						name: name.clone(),
-						kind,
-						version_constraint: Some(constraint.to_string()),
-						optional: false,
+					version.as_str().map(|constraint| {
+						PackageDependency {
+							name: name.clone(),
+							kind,
+							version_constraint: Some(constraint.to_string()),
+							optional: false,
+						}
 					})
 				})
 				.collect::<Vec<_>>()

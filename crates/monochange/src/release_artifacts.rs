@@ -1,7 +1,6 @@
-use std::io::IsTerminal;
-
 #[cfg(test)]
 use std::cell::Cell;
+use std::io::IsTerminal;
 
 use similar::TextDiff;
 
@@ -413,9 +412,11 @@ pub(crate) fn build_cargo_manifest_updates(
 
 	Ok(updated_documents
 		.into_iter()
-		.map(|(path, document)| FileUpdate {
-			path,
-			content: document.into_bytes(),
+		.map(|(path, document)| {
+			FileUpdate {
+				path,
+				content: document.into_bytes(),
+			}
 		})
 		.collect())
 }
@@ -742,8 +743,10 @@ pub(crate) fn render_discovery_report(
 	format: OutputFormat,
 ) -> MonochangeResult<String> {
 	match format {
-		OutputFormat::Json => serde_json::to_string_pretty(&json_discovery_report(report))
-			.map_err(|error| MonochangeError::Discovery(error.to_string())),
+		OutputFormat::Json => {
+			serde_json::to_string_pretty(&json_discovery_report(report))
+				.map_err(|error| MonochangeError::Discovery(error.to_string()))
+		}
 		OutputFormat::Text => Ok(text_discovery_report(report)),
 	}
 }
@@ -761,17 +764,19 @@ pub(crate) fn build_release_manifest(
 		release_targets: prepared_release
 			.release_targets
 			.iter()
-			.map(|target| ReleaseManifestTarget {
-				id: target.id.clone(),
-				kind: target.kind,
-				version: target.version.clone(),
-				tag: target.tag,
-				release: target.release,
-				version_format: target.version_format,
-				tag_name: target.tag_name.clone(),
-				members: target.members.clone(),
-				rendered_title: target.rendered_title.clone(),
-				rendered_changelog_title: target.rendered_changelog_title.clone(),
+			.map(|target| {
+				ReleaseManifestTarget {
+					id: target.id.clone(),
+					kind: target.kind,
+					version: target.version.clone(),
+					tag: target.tag,
+					release: target.release,
+					version_format: target.version_format,
+					tag_name: target.tag_name.clone(),
+					members: target.members.clone(),
+					rendered_title: target.rendered_title.clone(),
+					rendered_changelog_title: target.rendered_changelog_title.clone(),
+				}
 			})
 			.collect(),
 		released_packages: prepared_release.released_packages.clone(),
@@ -779,13 +784,15 @@ pub(crate) fn build_release_manifest(
 		changelogs: prepared_release
 			.changelogs
 			.iter()
-			.map(|changelog| ReleaseManifestChangelog {
-				owner_id: changelog.owner_id.clone(),
-				owner_kind: changelog.owner_kind,
-				path: changelog.path.clone(),
-				format: changelog.format,
-				notes: changelog.notes.clone(),
-				rendered: changelog.rendered.clone(),
+			.map(|changelog| {
+				ReleaseManifestChangelog {
+					owner_id: changelog.owner_id.clone(),
+					owner_kind: changelog.owner_kind,
+					path: changelog.path.clone(),
+					format: changelog.format,
+					notes: changelog.notes.clone(),
+					rendered: changelog.rendered.clone(),
+				}
 			})
 			.collect(),
 		changesets: prepared_release.changesets.clone(),
@@ -796,24 +803,28 @@ pub(crate) fn build_release_manifest(
 				.plan
 				.decisions
 				.iter()
-				.map(|decision| ReleaseManifestPlanDecision {
-					package: decision.package_id.clone(),
-					bump: decision.recommended_bump,
-					trigger: decision.trigger_type.clone(),
-					planned_version: decision.planned_version.as_ref().map(ToString::to_string),
-					reasons: decision.reasons.clone(),
-					upstream_sources: decision.upstream_sources.clone(),
+				.map(|decision| {
+					ReleaseManifestPlanDecision {
+						package: decision.package_id.clone(),
+						bump: decision.recommended_bump,
+						trigger: decision.trigger_type.clone(),
+						planned_version: decision.planned_version.as_ref().map(ToString::to_string),
+						reasons: decision.reasons.clone(),
+						upstream_sources: decision.upstream_sources.clone(),
+					}
 				})
 				.collect(),
 			groups: prepared_release
 				.plan
 				.groups
 				.iter()
-				.map(|group| ReleaseManifestPlanGroup {
-					id: group.group_id.clone(),
-					planned_version: group.planned_version.as_ref().map(ToString::to_string),
-					members: group.members.clone(),
-					bump: group.recommended_bump,
+				.map(|group| {
+					ReleaseManifestPlanGroup {
+						id: group.group_id.clone(),
+						planned_version: group.planned_version.as_ref().map(ToString::to_string),
+						members: group.members.clone(),
+						bump: group.recommended_bump,
+					}
 				})
 				.collect(),
 			warnings: prepared_release.plan.warnings.clone(),
@@ -822,13 +833,15 @@ pub(crate) fn build_release_manifest(
 				.plan
 				.compatibility_evidence
 				.iter()
-				.map(|assessment| ReleaseManifestCompatibilityEvidence {
-					package: assessment.package_id.clone(),
-					provider: assessment.provider_id.clone(),
-					severity: assessment.severity,
-					summary: assessment.summary.clone(),
-					confidence: assessment.confidence.clone(),
-					evidence_location: assessment.evidence_location.clone(),
+				.map(|assessment| {
+					ReleaseManifestCompatibilityEvidence {
+						package: assessment.package_id.clone(),
+						provider: assessment.provider_id.clone(),
+						severity: assessment.severity,
+						summary: assessment.summary.clone(),
+						confidence: assessment.confidence.clone(),
+						evidence_location: assessment.evidence_location.clone(),
+					}
 				})
 				.collect(),
 		},
@@ -851,15 +864,17 @@ pub(crate) fn build_release_record(
 		release_targets: manifest
 			.release_targets
 			.iter()
-			.map(|target| ReleaseRecordTarget {
-				id: target.id.clone(),
-				kind: target.kind,
-				version: target.version.clone(),
-				version_format: target.version_format,
-				tag: target.tag,
-				release: target.release,
-				tag_name: target.tag_name.clone(),
-				members: target.members.clone(),
+			.map(|target| {
+				ReleaseRecordTarget {
+					id: target.id.clone(),
+					kind: target.kind,
+					version: target.version.clone(),
+					version_format: target.version_format,
+					tag: target.tag,
+					release: target.release,
+					tag_name: target.tag_name.clone(),
+					members: target.members.clone(),
+				}
 			})
 			.collect(),
 		released_packages: manifest.released_packages.clone(),
@@ -870,11 +885,13 @@ pub(crate) fn build_release_record(
 			.map(|changelog| changelog.path.clone())
 			.collect(),
 		deleted_changesets: manifest.deleted_changesets.clone(),
-		provider: source.map(|source| ReleaseRecordProvider {
-			kind: source.provider,
-			owner: source.owner.clone(),
-			repo: source.repo.clone(),
-			host: source.host.clone(),
+		provider: source.map(|source| {
+			ReleaseRecordProvider {
+				kind: source.provider,
+				owner: source.owner.clone(),
+				repo: source.repo.clone(),
+				host: source.host.clone(),
+			}
 		}),
 	}
 }

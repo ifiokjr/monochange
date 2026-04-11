@@ -4,7 +4,8 @@ use std::path::Path;
 use serde_json::Value;
 
 mod test_support;
-use test_support::{monochange_command, setup_scenario_workspace};
+use test_support::monochange_command;
+use test_support::setup_scenario_workspace;
 
 fn cli() -> std::process::Command {
 	monochange_command(Some("2026-04-06"))
@@ -230,6 +231,8 @@ fn release_rejects_legacy_reserved_metadata_blocks() {
 		.output()
 		.unwrap_or_else(|error| panic!("release output: {error}"));
 	assert!(!output.status.success());
-	assert!(String::from_utf8_lossy(&output.stderr)
-		.contains("target `origin` uses unsupported field(s): core"));
+	assert!(
+		String::from_utf8_lossy(&output.stderr)
+			.contains("target `origin` uses unsupported field(s): core")
+	);
 }

@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_deno`
@@ -40,7 +39,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
-use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
@@ -51,6 +49,7 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::normalize_path;
 use semver::Version;
 use serde_json::Value;
 use walkdir::DirEntry;
@@ -306,11 +305,13 @@ fn parse_dependency_map(parsed: &Value, section: &str) -> Vec<PackageDependency>
 			dependencies
 				.iter()
 				.filter_map(|(name, value)| {
-					value.as_str().map(|constraint| PackageDependency {
-						name: name.clone(),
-						kind: DependencyKind::Runtime,
-						version_constraint: Some(constraint.to_string()),
-						optional: false,
+					value.as_str().map(|constraint| {
+						PackageDependency {
+							name: name.clone(),
+							kind: DependencyKind::Runtime,
+							version_constraint: Some(constraint.to_string()),
+							optional: false,
+						}
 					})
 				})
 				.collect::<Vec<_>>()

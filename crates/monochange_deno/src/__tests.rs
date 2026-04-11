@@ -2,21 +2,21 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
-use monochange_core::materialize_dependency_edges;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemAdapter;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::materialize_dependency_edges;
 use semver::Version;
 use serde_json::json;
 
+use crate::DenoVersionedFileKind;
 use crate::adapter;
 use crate::default_lockfile_commands;
 use crate::discover_deno_packages;
 use crate::discover_lockfiles;
 use crate::supported_versioned_file_kind;
 use crate::update_lockfile;
-use crate::DenoVersionedFileKind;
 
 #[test]
 fn discovers_deno_workspace_packages() {
@@ -25,14 +25,18 @@ fn discovers_deno_workspace_packages() {
 		.unwrap_or_else(|error| panic!("deno discovery: {error}"));
 
 	assert_eq!(discovery.packages.len(), 2);
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "deno-tool"));
-	assert!(discovery
-		.packages
-		.iter()
-		.any(|package| package.name == "deno-shared"));
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "deno-tool")
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "deno-shared")
+	);
 	let dependency_edges = materialize_dependency_edges(&discovery.packages);
 	assert_eq!(dependency_edges.len(), 1);
 }

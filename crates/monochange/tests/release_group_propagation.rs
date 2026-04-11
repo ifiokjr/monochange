@@ -2,7 +2,9 @@ use insta::assert_json_snapshot;
 use serde_json::Value;
 
 mod test_support;
-use test_support::{run_json_command, setup_scenario_workspace, snapshot_settings};
+use test_support::run_json_command;
+use test_support::setup_scenario_workspace;
+use test_support::snapshot_settings;
 
 #[test]
 fn grouped_member_changes_patch_dependents_outside_the_group() {

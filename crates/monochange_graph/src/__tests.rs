@@ -12,8 +12,8 @@ use monochange_core::PublishState;
 use monochange_core::VersionGroup;
 use semver::Version;
 
-use crate::build_release_plan;
 use crate::NormalizedGraph;
+use crate::build_release_plan;
 
 fn package(id: &str, version: Version) -> PackageRecord {
 	let manifest_path = PathBuf::from(id.replace(':', "/")).join("manifest");
@@ -380,10 +380,11 @@ fn build_release_plan_propagates_explicit_member_versions_to_group_version() {
 		.first()
 		.unwrap_or_else(|| panic!("expected one group"));
 	assert_eq!(group.planned_version, Some(Version::new(2, 0, 0)));
-	assert!(plan
-		.decisions
-		.iter()
-		.all(|decision| decision.planned_version == Some(Version::new(2, 0, 0))));
+	assert!(
+		plan.decisions
+			.iter()
+			.all(|decision| decision.planned_version == Some(Version::new(2, 0, 0)))
+	);
 }
 
 #[test]
@@ -507,9 +508,11 @@ fn build_release_plan_rejects_explicit_versions_not_greater_than_current() {
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid explicit version error"));
 
-	assert!(error
-		.to_string()
-		.contains("must be greater than current version"));
+	assert!(
+		error
+			.to_string()
+			.contains("must be greater than current version")
+	);
 }
 
 #[test]

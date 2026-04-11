@@ -11,7 +11,6 @@ use monochange_config::apply_version_groups;
 use monochange_config::load_change_signals;
 use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
-use monochange_core::default_cli_commands;
 use monochange_core::BumpSeverity;
 use monochange_core::CliCommandDefinition;
 use monochange_core::DiscoveryReport;
@@ -24,6 +23,7 @@ use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::ReleasePlan;
 use monochange_core::SourceProvider;
+use monochange_core::default_cli_commands;
 use monochange_dart::discover_dart_packages;
 use monochange_deno::discover_deno_packages;
 use monochange_github as github_provider;
@@ -1063,10 +1063,12 @@ fn read_optional_file(path: &Path) -> MonochangeResult<Option<Vec<u8>>> {
 		{
 			Ok(None)
 		}
-		Err(error) => Err(MonochangeError::Io(format!(
-			"failed to read {}: {error}",
-			path.display()
-		))),
+		Err(error) => {
+			Err(MonochangeError::Io(format!(
+				"failed to read {}: {error}",
+				path.display()
+			)))
+		}
 	}
 }
 
@@ -1238,13 +1240,15 @@ pub(crate) fn prepare_release_execution(
 	changed_files.dedup();
 	let changelogs = changelog_updates
 		.iter()
-		.map(|update| PreparedChangelog {
-			owner_id: update.owner_id.clone(),
-			owner_kind: update.owner_kind,
-			path: root_relative(root, &update.file.path),
-			format: update.format,
-			notes: update.notes.clone(),
-			rendered: update.rendered.clone(),
+		.map(|update| {
+			PreparedChangelog {
+				owner_id: update.owner_id.clone(),
+				owner_kind: update.owner_kind,
+				path: root_relative(root, &update.file.path),
+				format: update.format,
+				notes: update.notes.clone(),
+				rendered: update.rendered.clone(),
+			}
 		})
 		.collect::<Vec<_>>();
 	let updated_changelogs = changelogs
@@ -1298,10 +1302,12 @@ pub(crate) fn prepare_release_execution(
 
 #[cfg(test)]
 mod workspace_ops_tests {
-	use super::*;
-	use monochange_core::ShellConfig;
 	#[cfg(unix)]
 	use std::os::unix::fs::PermissionsExt;
+
+	use monochange_core::ShellConfig;
+
+	use super::*;
 
 	fn setup_workspace_ops_fixture() -> tempfile::TempDir {
 		monochange_test_helpers::fs::setup_fixture_from(
@@ -1373,9 +1379,11 @@ mod workspace_ops_tests {
 		)
 		.err()
 		.unwrap_or_else(|| panic!("expected empty command error"));
-		assert!(empty_error
-			.to_string()
-			.contains("lockfile command must not be empty"));
+		assert!(
+			empty_error
+				.to_string()
+				.contains("lockfile command must not be empty")
+		);
 
 		let spawn_error = run_lockfile_command(
 			fixture.path(),
@@ -1388,9 +1396,11 @@ mod workspace_ops_tests {
 		)
 		.err()
 		.unwrap_or_else(|| panic!("expected spawn error"));
-		assert!(spawn_error
-			.to_string()
-			.contains("failed to run lockfile command"));
+		assert!(
+			spawn_error
+				.to_string()
+				.contains("failed to run lockfile command")
+		);
 
 		let no_stderr_error = run_lockfile_command(
 			fixture.path(),
@@ -1461,9 +1471,11 @@ mod workspace_ops_tests {
 		let updates =
 			collect_workspace_file_updates(fixture.path(), temp_root.path(), &[], &[lockfile_cmd])
 				.unwrap_or_else(|error| panic!("collect updates: {error}"));
-		assert!(updates
-			.iter()
-			.any(|update| update.path.ends_with("generated.txt")));
+		assert!(
+			updates
+				.iter()
+				.any(|update| update.path.ends_with("generated.txt"))
+		);
 
 		let mut paths = BTreeSet::new();
 		collect_workspace_files(fixture.path(), fixture.path(), &mut paths)
@@ -1475,9 +1487,11 @@ mod workspace_ops_tests {
 	#[test]
 	fn file_helpers_report_missing_and_invalid_paths() {
 		let fixture = setup_workspace_ops_fixture();
-		assert!(read_optional_file(&fixture.path().join("missing.txt"))
-			.unwrap_or_else(|error| panic!("missing file lookup: {error}"))
-			.is_none());
+		assert!(
+			read_optional_file(&fixture.path().join("missing.txt"))
+				.unwrap_or_else(|error| panic!("missing file lookup: {error}"))
+				.is_none()
+		);
 		let read_error = read_optional_file(fixture.path())
 			.err()
 			.unwrap_or_else(|| panic!("expected directory read error"));
@@ -1497,9 +1511,11 @@ mod workspace_ops_tests {
 		)
 		.err()
 		.unwrap_or_else(|| panic!("expected strip-prefix error"));
-		assert!(strip_prefix_error
-			.to_string()
-			.contains("was outside workspace root"));
+		assert!(
+			strip_prefix_error
+				.to_string()
+				.contains("was outside workspace root")
+		);
 
 		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let destination_file = temp_root.path().join("not-a-directory");

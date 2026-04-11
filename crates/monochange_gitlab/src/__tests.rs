@@ -93,9 +93,11 @@ fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("[source.pull_requests].auto_merge is not supported"));
+	assert!(
+		error
+			.to_string()
+			.contains("[source.pull_requests].auto_merge is not supported")
+	);
 
 	let error = validate_source_configuration(&SourceConfiguration {
 		releases: ProviderReleaseSettings {
@@ -106,9 +108,11 @@ fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("[source.releases].draft is not supported"));
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].draft is not supported")
+	);
 
 	let error = validate_source_configuration(&SourceConfiguration {
 		releases: ProviderReleaseSettings {
@@ -119,9 +123,11 @@ fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("[source.releases].prerelease is not supported"));
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].prerelease is not supported")
+	);
 
 	let error = validate_source_configuration(&SourceConfiguration {
 		releases: ProviderReleaseSettings {
@@ -132,9 +138,11 @@ fn validate_source_configuration_rejects_unsupported_gitlab_features() {
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
-	assert!(error
-		.to_string()
-		.contains("provider-generated release notes are not supported"));
+	assert!(
+		error
+			.to_string()
+			.contains("provider-generated release notes are not supported")
+	);
 }
 
 #[test]
@@ -194,9 +202,11 @@ fn gitlab_token_supports_primary_and_fallback_environment_variables() {
 			let error = gitlab_token()
 				.err()
 				.unwrap_or_else(|| panic!("expected missing token error"));
-			assert!(error
-				.to_string()
-				.contains("set `GITLAB_TOKEN` (or `GL_TOKEN`) before running GitLab automation"));
+			assert!(
+				error.to_string().contains(
+					"set `GITLAB_TOKEN` (or `GL_TOKEN`) before running GitLab automation"
+				)
+			);
 		},
 	);
 }
@@ -222,9 +232,11 @@ fn auth_headers_reject_invalid_gitlab_tokens() {
 	let error = auth_headers("bad\nvalue")
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid header error"));
-	assert!(error
-		.to_string()
-		.contains("invalid GitLab token header value"));
+	assert!(
+		error
+			.to_string()
+			.contains("invalid GitLab token header value")
+	);
 }
 
 #[test]
@@ -500,12 +512,14 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 	list.assert();
 	create.assert();
 	assert_eq!(outcome.operation, SourceChangeRequestOperation::Created);
-	assert!(!git_output(
-		&repo,
-		&["rev-parse", "--verify", "monochange/release/release"]
-	)
-	.trim()
-	.is_empty());
+	assert!(
+		!git_output(
+			&repo,
+			&["rev-parse", "--verify", "monochange/release/release"]
+		)
+		.trim()
+		.is_empty()
+	);
 	let commit_body = git_output(&repo, &["log", "-1", "--pretty=%B"]);
 	assert!(commit_body.contains("release body"));
 }
@@ -523,9 +537,11 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
-	assert!(io_error
-		.to_string()
-		.contains("failed to commit release merge request changes"));
+	assert!(
+		io_error
+			.to_string()
+			.contains("failed to commit release merge request changes")
+	);
 
 	let repo = tempdir.path().join("repo-error");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
@@ -551,9 +567,11 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
-	assert!(error
-		.to_string()
-		.contains("failed to commit release merge request changes"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to commit release merge request changes")
+	);
 }
 
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]

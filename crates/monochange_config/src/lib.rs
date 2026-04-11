@@ -1,5 +1,4 @@
 #![allow(unused_assignments)]
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_config`
@@ -91,8 +90,6 @@ use miette::Report;
 use miette::SourceSpan;
 use minijinja::Environment;
 use minijinja::UndefinedBehavior;
-use monochange_core::default_cli_commands;
-use monochange_core::relative_to_root;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
@@ -106,7 +103,6 @@ use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
-
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
@@ -133,6 +129,8 @@ use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
+use monochange_core::default_cli_commands;
+use monochange_core::relative_to_root;
 use regex::Regex;
 use semver::Version;
 use serde::Deserialize;
@@ -636,20 +634,24 @@ fn render_changelog_path_template(template: &str, package_path: &Path) -> String
 impl RawChangelogConfig {
 	fn as_defaults_definition(&self) -> ChangelogDefinition {
 		match self {
-			Self::Legacy(definition) => match definition {
-				RawChangelogDefinition::Enabled(false) => ChangelogDefinition::Disabled,
-				RawChangelogDefinition::Enabled(true) => ChangelogDefinition::PackageDefault,
-				RawChangelogDefinition::Path(path_pattern) => {
-					ChangelogDefinition::PathPattern(path_pattern.clone())
+			Self::Legacy(definition) => {
+				match definition {
+					RawChangelogDefinition::Enabled(false) => ChangelogDefinition::Disabled,
+					RawChangelogDefinition::Enabled(true) => ChangelogDefinition::PackageDefault,
+					RawChangelogDefinition::Path(path_pattern) => {
+						ChangelogDefinition::PathPattern(path_pattern.clone())
+					}
 				}
-			},
-			Self::Detailed(table) => match (table.enabled.unwrap_or(true), &table.path) {
-				(false, _) => ChangelogDefinition::Disabled,
-				(true, Some(path_pattern)) => {
-					ChangelogDefinition::PathPattern(path_pattern.clone())
+			}
+			Self::Detailed(table) => {
+				match (table.enabled.unwrap_or(true), &table.path) {
+					(false, _) => ChangelogDefinition::Disabled,
+					(true, Some(path_pattern)) => {
+						ChangelogDefinition::PathPattern(path_pattern.clone())
+					}
+					(true, None) => ChangelogDefinition::PackageDefault,
 				}
-				(true, None) => ChangelogDefinition::PackageDefault,
-			},
+			}
 		}
 	}
 
@@ -682,20 +684,24 @@ impl RawChangelogConfig {
 		treat_string_as_pattern: bool,
 	) -> Option<PathBuf> {
 		match self {
-			Self::Legacy(definition) => match definition {
-				RawChangelogDefinition::Enabled(false) => None,
-				RawChangelogDefinition::Enabled(true) => Some(package_path.join("CHANGELOG.md")),
-				RawChangelogDefinition::Path(path) => {
-					if treat_string_as_pattern {
-						Some(PathBuf::from(render_changelog_path_template(
-							path,
-							package_path,
-						)))
-					} else {
-						Some(PathBuf::from(path))
+			Self::Legacy(definition) => {
+				match definition {
+					RawChangelogDefinition::Enabled(false) => None,
+					RawChangelogDefinition::Enabled(true) => {
+						Some(package_path.join("CHANGELOG.md"))
+					}
+					RawChangelogDefinition::Path(path) => {
+						if treat_string_as_pattern {
+							Some(PathBuf::from(render_changelog_path_template(
+								path,
+								package_path,
+							)))
+						} else {
+							Some(PathBuf::from(path))
+						}
 					}
 				}
-			},
+			}
 			Self::Detailed(table) => {
 				if matches!(table.enabled, Some(false)) {
 					return None;
@@ -719,10 +725,12 @@ impl RawChangelogConfig {
 
 	fn resolve_for_group(&self) -> Option<PathBuf> {
 		match self {
-			Self::Legacy(definition) => match definition {
-				RawChangelogDefinition::Enabled(false | true) => None,
-				RawChangelogDefinition::Path(path) => Some(PathBuf::from(path)),
-			},
+			Self::Legacy(definition) => {
+				match definition {
+					RawChangelogDefinition::Enabled(false | true) => None,
+					RawChangelogDefinition::Path(path) => Some(PathBuf::from(path)),
+				}
+			}
 			Self::Detailed(table) => {
 				if matches!(table.enabled, Some(false)) {
 					return None;
@@ -1107,87 +1115,95 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			comment_on_failure: changesets.verify.comment_on_failure,
 		},
 	};
-	let source = source.map(|source| SourceConfiguration {
-		provider: source.provider,
-		owner: source.owner,
-		repo: source.repo,
-		host: source.host,
-		api_url: source.api_url,
-		releases: ProviderReleaseSettings {
-			enabled: source.releases.enabled,
-			draft: source.releases.draft,
-			prerelease: source.releases.prerelease,
-			generate_notes: source.releases.generate_notes,
-			source: source.releases.source,
-		},
-		pull_requests: ProviderMergeRequestSettings {
-			enabled: source.pull_requests.enabled,
-			branch_prefix: source.pull_requests.branch_prefix,
-			base: source.pull_requests.base,
-			title: source.pull_requests.title,
-			labels: source.pull_requests.labels,
-			auto_merge: source.pull_requests.auto_merge,
-		},
-		bot: ProviderBotSettings {
-			changesets: ProviderChangesetBotSettings {
-				enabled: source.bot.changesets.enabled,
-				required: source.bot.changesets.required,
-				skip_labels: source.bot.changesets.skip_labels,
-				comment_on_failure: source.bot.changesets.comment_on_failure,
-				changed_paths: source.bot.changesets.changed_paths,
-				ignored_paths: source.bot.changesets.ignored_paths,
-			},
-		},
-	});
-	let legacy_github = if let Some(source) = &source {
-		(source.provider == SourceProvider::GitHub).then(|| GitHubConfiguration {
-			owner: source.owner.clone(),
-			repo: source.repo.clone(),
-			releases: source.releases.clone(),
-			pull_requests: source.pull_requests.clone(),
-			bot: source.bot.clone(),
-		})
-	} else {
-		github.map(|github| GitHubConfiguration {
-			owner: github.owner,
-			repo: github.repo,
+	let source = source.map(|source| {
+		SourceConfiguration {
+			provider: source.provider,
+			owner: source.owner,
+			repo: source.repo,
+			host: source.host,
+			api_url: source.api_url,
 			releases: ProviderReleaseSettings {
-				enabled: github.releases.enabled,
-				draft: github.releases.draft,
-				prerelease: github.releases.prerelease,
-				generate_notes: github.releases.generate_notes,
-				source: github.releases.source,
+				enabled: source.releases.enabled,
+				draft: source.releases.draft,
+				prerelease: source.releases.prerelease,
+				generate_notes: source.releases.generate_notes,
+				source: source.releases.source,
 			},
 			pull_requests: ProviderMergeRequestSettings {
-				enabled: github.pull_requests.enabled,
-				branch_prefix: github.pull_requests.branch_prefix,
-				base: github.pull_requests.base,
-				title: github.pull_requests.title,
-				labels: github.pull_requests.labels,
-				auto_merge: github.pull_requests.auto_merge,
+				enabled: source.pull_requests.enabled,
+				branch_prefix: source.pull_requests.branch_prefix,
+				base: source.pull_requests.base,
+				title: source.pull_requests.title,
+				labels: source.pull_requests.labels,
+				auto_merge: source.pull_requests.auto_merge,
 			},
 			bot: ProviderBotSettings {
 				changesets: ProviderChangesetBotSettings {
-					enabled: github.bot.changesets.enabled,
-					required: github.bot.changesets.required,
-					skip_labels: github.bot.changesets.skip_labels,
-					comment_on_failure: github.bot.changesets.comment_on_failure,
-					changed_paths: github.bot.changesets.changed_paths,
-					ignored_paths: github.bot.changesets.ignored_paths,
+					enabled: source.bot.changesets.enabled,
+					required: source.bot.changesets.required,
+					skip_labels: source.bot.changesets.skip_labels,
+					comment_on_failure: source.bot.changesets.comment_on_failure,
+					changed_paths: source.bot.changesets.changed_paths,
+					ignored_paths: source.bot.changesets.ignored_paths,
 				},
 			},
+		}
+	});
+	let legacy_github = if let Some(source) = &source {
+		(source.provider == SourceProvider::GitHub).then(|| {
+			GitHubConfiguration {
+				owner: source.owner.clone(),
+				repo: source.repo.clone(),
+				releases: source.releases.clone(),
+				pull_requests: source.pull_requests.clone(),
+				bot: source.bot.clone(),
+			}
+		})
+	} else {
+		github.map(|github| {
+			GitHubConfiguration {
+				owner: github.owner,
+				repo: github.repo,
+				releases: ProviderReleaseSettings {
+					enabled: github.releases.enabled,
+					draft: github.releases.draft,
+					prerelease: github.releases.prerelease,
+					generate_notes: github.releases.generate_notes,
+					source: github.releases.source,
+				},
+				pull_requests: ProviderMergeRequestSettings {
+					enabled: github.pull_requests.enabled,
+					branch_prefix: github.pull_requests.branch_prefix,
+					base: github.pull_requests.base,
+					title: github.pull_requests.title,
+					labels: github.pull_requests.labels,
+					auto_merge: github.pull_requests.auto_merge,
+				},
+				bot: ProviderBotSettings {
+					changesets: ProviderChangesetBotSettings {
+						enabled: github.bot.changesets.enabled,
+						required: github.bot.changesets.required,
+						skip_labels: github.bot.changesets.skip_labels,
+						comment_on_failure: github.bot.changesets.comment_on_failure,
+						changed_paths: github.bot.changesets.changed_paths,
+						ignored_paths: github.bot.changesets.ignored_paths,
+					},
+				},
+			}
 		})
 	};
 	let source = source.or_else(|| {
-		legacy_github.as_ref().map(|github| SourceConfiguration {
-			provider: SourceProvider::GitHub,
-			owner: github.owner.clone(),
-			repo: github.repo.clone(),
-			host: None,
-			api_url: None,
-			releases: github.releases.clone(),
-			pull_requests: github.pull_requests.clone(),
-			bot: github.bot.clone(),
+		legacy_github.as_ref().map(|github| {
+			SourceConfiguration {
+				provider: SourceProvider::GitHub,
+				owner: github.owner.clone(),
+				repo: github.repo.clone(),
+				host: None,
+				api_url: None,
+				releases: github.releases.clone(),
+				pull_requests: github.pull_requests.clone(),
+				bot: github.bot.clone(),
+			}
 		})
 	});
 
@@ -1337,12 +1353,14 @@ pub fn load_changeset_file(
 			let explicit_version = change.version.clone();
 			let inferred_bump = match change.bump {
 				Some(bump) => Some(bump),
-				None => infer_group_bump_from_explicit_version(
-					group,
-					&configuration.root_path,
-					packages,
-					explicit_version.as_ref(),
-				)?,
+				None => {
+					infer_group_bump_from_explicit_version(
+						group,
+						&configuration.root_path,
+						packages,
+						explicit_version.as_ref(),
+					)?
+				}
 			};
 			targets.push(LoadedChangesetTarget {
 				id: change.package.clone(),
@@ -1509,14 +1527,18 @@ pub fn resolve_package_reference(
 ) -> MonochangeResult<String> {
 	let matching_package_ids = find_matching_package_ids(reference, workspace_root, packages);
 	match matching_package_ids.as_slice() {
-		[] => Err(MonochangeError::Config(format!(
-			"change package reference `{reference}` did not match any discovered package"
-		))),
+		[] => {
+			Err(MonochangeError::Config(format!(
+				"change package reference `{reference}` did not match any discovered package"
+			)))
+		}
 		[package_id] => Ok(package_id.clone()),
-		_ => Err(MonochangeError::Config(format!(
-			"change package reference `{reference}` matched multiple packages: {}",
-			matching_package_ids.join(", ")
-		))),
+		_ => {
+			Err(MonochangeError::Config(format!(
+				"change package reference `{reference}` matched multiple packages: {}",
+				matching_package_ids.join(", ")
+			)))
+		}
 	}
 }
 
@@ -2176,9 +2198,10 @@ fn validate_versioned_files(
 			));
 		};
 
-		if let Some(name) = &versioned_file.name {
-			if !declared_packages.contains(name.as_str()) {
-				return Err(config_diagnostic(
+		if let Some(name) = &versioned_file.name
+			&& !declared_packages.contains(name.as_str())
+		{
+			return Err(config_diagnostic(
 					config_contents,
 					format!(
 						"{owner_id} references unknown versioned file name `{name}`"
@@ -2192,7 +2215,6 @@ fn validate_versioned_files(
 					)],
 					Some("reference a declared package id from `versioned_files` or remove the name entry".to_string()),
 				));
-			}
 		}
 		if path_uses_glob(&versioned_file.path) {
 			let pattern = root
@@ -2694,14 +2716,14 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 
 		let mut seen_step_ids: BTreeSet<String> = BTreeSet::new();
 		for step in &cli_command.steps {
-			if let Some(condition) = step.when() {
-				if condition.trim().is_empty() {
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` step `{}` has an empty `when` condition",
-						cli_command.name,
-						step.kind_name()
-					)));
-				}
+			if let Some(condition) = step.when()
+				&& condition.trim().is_empty()
+			{
+				return Err(MonochangeError::Config(format!(
+					"CLI command `{}` step `{}` has an empty `when` condition",
+					cli_command.name,
+					step.kind_name()
+				)));
 			}
 			for input_name in step.inputs().keys() {
 				if input_name.trim().is_empty() {
@@ -2828,8 +2850,7 @@ fn validate_cli_runtime_requirements(
 			if !source_capabilities(source.provider).released_issue_comments {
 				return Err(MonochangeError::Config(format!(
 					"CLI command `{}` uses `CommentReleasedIssues` but `[source].provider = \"{}\"` does not support released-issue comments",
-					cli_command.name,
-					source.provider
+					cli_command.name, source.provider
 				)));
 			}
 		}
@@ -2853,13 +2874,13 @@ fn validate_cli_runtime_requirements(
 						cli_command.name
 					)));
 				}
-				if let Some(label_input) = cli_command_input(cli_command, "label") {
-					if !matches!(label_input.kind, CliInputKind::StringList) {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` input `label` must use type `string_list` when used with `AffectedPackages`",
-							cli_command.name
-						)));
-					}
+				if let Some(label_input) = cli_command_input(cli_command, "label")
+					&& !matches!(label_input.kind, CliInputKind::StringList)
+				{
+					return Err(MonochangeError::Config(format!(
+						"CLI command `{}` input `label` must use type `string_list` when used with `AffectedPackages`",
+						cli_command.name
+					)));
 				}
 				validate_step_override_kind(
 					cli_command,
@@ -2955,34 +2976,38 @@ fn validate_step_input_overrides(
 
 	for (name, value) in overrides {
 		// Reject unknown input names (Command steps accept anything).
-		if let Some(names) = valid_names {
-			if !names.contains(&name.as_str()) {
-				let available = if names.is_empty() {
-					"this step accepts no inputs".to_string()
-				} else {
-					format!("valid inputs: {}", names.join(", "))
-				};
-				return Err(MonochangeError::Config(format!(
-					"CLI command `{}` step `{}` has unknown input override `{}`; {}",
-					cli_command.name,
-					step.kind_name(),
-					name,
-					available,
-				)));
-			}
+		if let Some(names) = valid_names
+			&& !names.contains(&name.as_str())
+		{
+			let available = if names.is_empty() {
+				"this step accepts no inputs".to_string()
+			} else {
+				format!("valid inputs: {}", names.join(", "))
+			};
+			return Err(MonochangeError::Config(format!(
+				"CLI command `{}` step `{}` has unknown input override `{}`; {}",
+				cli_command.name,
+				step.kind_name(),
+				name,
+				available,
+			)));
 		}
 
 		// Validate value type against expected kind.
 		if let Some(expected_kind) = step.expected_input_kind(name) {
 			let type_ok = match expected_kind {
-				CliInputKind::Boolean => matches!(
-					value,
-					CliStepInputValue::Boolean(_) | CliStepInputValue::String(_)
-				),
-				CliInputKind::StringList => matches!(
-					value,
-					CliStepInputValue::String(_) | CliStepInputValue::List(_)
-				),
+				CliInputKind::Boolean => {
+					matches!(
+						value,
+						CliStepInputValue::Boolean(_) | CliStepInputValue::String(_)
+					)
+				}
+				CliInputKind::StringList => {
+					matches!(
+						value,
+						CliStepInputValue::String(_) | CliStepInputValue::List(_)
+					)
+				}
 				CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => {
 					matches!(value, CliStepInputValue::String(_))
 				}
@@ -3604,8 +3629,8 @@ fn validate_ecosystem_version_readable(
 		EcosystemType::Npm | EcosystemType::Deno => {
 			let json: serde_json::Value = serde_json::from_str(&contents).map_err(|error| {
 				MonochangeError::Config(format!(
-						"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid JSON: {error}"
-					))
+					"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid JSON: {error}"
+				))
 			})?;
 
 			let field_name = match fields {

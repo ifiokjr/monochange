@@ -4,9 +4,6 @@ use std::path::PathBuf;
 use semver::Version;
 use serde_json::json;
 
-use crate::default_cli_commands;
-use crate::materialize_dependency_edges;
-use crate::render_release_notes;
 use crate::BumpSeverity;
 use crate::ChangelogFormat;
 use crate::ChangelogTarget;
@@ -14,9 +11,6 @@ use crate::ChangesetPolicyStatus;
 use crate::ChangesetVerificationSettings;
 use crate::CliStepDefinition;
 use crate::DependencyKind;
-
-use crate::git::git_checkout_branch_command;
-use crate::git::git_push_branch_command;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
 use crate::GroupChangelogInclude;
@@ -26,6 +20,11 @@ use crate::PackageDependency;
 use crate::PackageRecord;
 use crate::PackageType;
 use crate::PublishState;
+use crate::RELEASE_RECORD_END_MARKER;
+use crate::RELEASE_RECORD_HEADING;
+use crate::RELEASE_RECORD_KIND;
+use crate::RELEASE_RECORD_SCHEMA_VERSION;
+use crate::RELEASE_RECORD_START_MARKER;
 use crate::ReleaseNotesDocument;
 use crate::ReleaseNotesSection;
 use crate::ReleaseNotesSettings;
@@ -47,11 +46,11 @@ use crate::VersionFormat;
 use crate::VersionedFileDefinition;
 use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
-use crate::RELEASE_RECORD_END_MARKER;
-use crate::RELEASE_RECORD_HEADING;
-use crate::RELEASE_RECORD_KIND;
-use crate::RELEASE_RECORD_SCHEMA_VERSION;
-use crate::RELEASE_RECORD_START_MARKER;
+use crate::default_cli_commands;
+use crate::git::git_checkout_branch_command;
+use crate::git::git_push_branch_command;
+use crate::materialize_dependency_edges;
+use crate::render_release_notes;
 
 #[test]
 fn git_checkout_branch_command_builds_expected_arguments() {
@@ -107,9 +106,11 @@ fn versioned_file_definition_uses_regex_returns_false_when_unset() {
 
 #[test]
 fn workspace_defaults_default_has_no_extra_changelog_sections() {
-	assert!(WorkspaceDefaults::default()
-		.extra_changelog_sections
-		.is_empty());
+	assert!(
+		WorkspaceDefaults::default()
+			.extra_changelog_sections
+			.is_empty()
+	);
 }
 
 #[test]
@@ -1535,9 +1536,11 @@ fn json_helper_functions_cover_error_paths() {
 	let locate_error = crate::find_json_object_field_value_span("[]", 0, "name")
 		.err()
 		.unwrap_or_else(|| panic!("expected locate error"));
-	assert!(locate_error
-		.to_string()
-		.contains("expected JSON object when locating field"));
+	assert!(
+		locate_error
+			.to_string()
+			.contains("expected JSON object when locating field")
+	);
 
 	for (contents, key) in [
 		("{1:2}", "a"),

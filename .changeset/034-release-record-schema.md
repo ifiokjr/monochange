@@ -15,9 +15,9 @@ use monochange_core::ReleaseManifest;
 After, downstream tooling can also work with durable commit-history records:
 
 ```rust
+use monochange_core::ReleaseRecord;
 use monochange_core::parse_release_record_block;
 use monochange_core::render_release_record_block;
-use monochange_core::ReleaseRecord;
 ```
 
 This release-record contract includes:

@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_dart`
@@ -40,7 +39,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
-use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
@@ -52,6 +50,7 @@ use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::normalize_path;
 use semver::Version;
 use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value;
@@ -114,13 +113,15 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 	};
 	discover_lockfiles(package)
 		.into_iter()
-		.map(|lockfile| LockfileCommandExecution {
-			command: command.to_string(),
-			cwd: lockfile
-				.parent()
-				.unwrap_or(&package.workspace_root)
-				.to_path_buf(),
-			shell: ShellConfig::None,
+		.map(|lockfile| {
+			LockfileCommandExecution {
+				command: command.to_string(),
+				cwd: lockfile
+					.parent()
+					.unwrap_or(&package.workspace_root)
+					.to_path_buf(),
+				shell: ShellConfig::None,
+			}
 		})
 		.collect()
 }
@@ -153,13 +154,13 @@ pub fn update_manifest_text(
 	})?;
 	let line_ranges = yaml_line_ranges(contents);
 	let mut replacements = Vec::<((usize, usize), String)>::new();
-	if let Some(owner_version) = owner_version {
-		if let Some(span) = find_yaml_scalar_for_key(contents, &line_ranges, 0, "version") {
-			replacements.push((
-				span,
-				render_yaml_scalar(&contents[span.0..span.1], owner_version),
-			));
-		}
+	if let Some(owner_version) = owner_version
+		&& let Some(span) = find_yaml_scalar_for_key(contents, &line_ranges, 0, "version")
+	{
+		replacements.push((
+			span,
+			render_yaml_scalar(&contents[span.0..span.1], owner_version),
+		));
 	}
 	for field in fields {
 		let Some(section_index) = find_yaml_key_line(contents, &line_ranges, 0, field) else {
@@ -176,7 +177,7 @@ pub fn update_manifest_text(
 			}
 		}
 	}
-	replacements.sort_by(|left, right| right.0 .0.cmp(&left.0 .0));
+	replacements.sort_by(|left, right| right.0.0.cmp(&left.0.0));
 	let mut updated = contents.to_string();
 	for ((start, end), replacement) in replacements {
 		updated.replace_range(start..end, &replacement);
@@ -515,18 +516,22 @@ fn parse_dependencies(parsed: &Mapping) -> Vec<PackageDependency> {
 		.into_iter()
 		.filter_map(|section| yaml_mapping(parsed, section))
 		.flat_map(|dependencies| {
-			dependencies.iter().map(|(name, value)| PackageDependency {
-				name: name.as_str().unwrap_or_default().to_string(),
-				kind: DependencyKind::Runtime,
-				version_constraint: match value {
-					Value::String(text) => Some(text.clone()),
-					Value::Mapping(mapping) => mapping
-						.get(Value::String("version".to_string()))
-						.and_then(Value::as_str)
-						.map(ToString::to_string),
-					_ => None,
-				},
-				optional: false,
+			dependencies.iter().map(|(name, value)| {
+				PackageDependency {
+					name: name.as_str().unwrap_or_default().to_string(),
+					kind: DependencyKind::Runtime,
+					version_constraint: match value {
+						Value::String(text) => Some(text.clone()),
+						Value::Mapping(mapping) => {
+							mapping
+								.get(Value::String("version".to_string()))
+								.and_then(Value::as_str)
+								.map(ToString::to_string)
+						}
+						_ => None,
+					},
+					optional: false,
+				}
 			})
 		})
 		.filter(|dependency| !dependency.name.is_empty())

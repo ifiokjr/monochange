@@ -3,7 +3,9 @@ use std::fs;
 use insta::assert_snapshot;
 
 mod test_support;
-use test_support::{monochange_command, setup_scenario_workspace, snapshot_settings};
+use test_support::monochange_command;
+use test_support::setup_scenario_workspace;
+use test_support::snapshot_settings;
 
 #[test]
 fn release_preserves_cargo_manifest_formatting_while_updating_versions() {

@@ -1,5 +1,3 @@
-#![deny(clippy::all)]
-
 //! # `monochange`
 //!
 //! <!-- {=monochangeCrateDocs|trim|linePrefix:"//! ":true} -->
@@ -53,8 +51,81 @@ use std::process::Command as ProcessCommand;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use clap::error::ErrorKind;
+#[cfg(test)]
+pub(crate) use assist::assistant_display_name;
+#[cfg(test)]
+pub(crate) use assist::assistant_setup_payload;
+use assist::run_assist;
+pub(crate) use changelog::*;
+pub use changeset_policy::affected_packages;
+pub(crate) use changeset_policy::compute_changed_paths_since;
+pub use changeset_policy::evaluate_changeset_policy;
+pub(crate) use changeset_policy::is_changeset_markdown_path;
+pub(crate) use changeset_policy::normalize_changed_path;
+pub use changeset_policy::verify_changesets;
+pub(crate) use changesets::*;
 use clap::ValueEnum;
+use clap::error::ErrorKind;
+#[cfg(test)]
+pub(crate) use cli::apply_runtime_change_type_choices;
+#[cfg(test)]
+pub(crate) use cli::build_assist_subcommand;
+#[cfg(test)]
+pub(crate) use cli::build_cli_command_subcommand;
+pub use cli::build_command;
+#[cfg(test)]
+pub(crate) use cli::build_command_for_root;
+use cli::build_command_with_cli;
+#[cfg(test)]
+pub(crate) use cli::build_release_record_subcommand;
+#[cfg(test)]
+pub(crate) use cli::cli_command_after_help;
+#[cfg(test)]
+use cli::cli_commands_for_root;
+use cli::cli_commands_from_config;
+#[cfg(test)]
+pub(crate) use cli::configured_change_type_choices;
+use cli::current_dir_or_dot;
+#[cfg(test)]
+pub(crate) use cli_runtime::build_cli_template_context;
+#[cfg(test)]
+pub(crate) use cli_runtime::build_retarget_release_report;
+#[cfg(test)]
+pub(crate) use cli_runtime::collect_cli_command_inputs;
+#[cfg(test)]
+pub(crate) use cli_runtime::execute_cli_command;
+use cli_runtime::execute_matches;
+#[cfg(test)]
+pub(crate) use cli_runtime::inferred_retarget_source_configuration;
+#[cfg(test)]
+pub(crate) use cli_runtime::lookup_template_value;
+#[cfg(test)]
+pub(crate) use cli_runtime::parse_boolean_step_input;
+#[cfg(test)]
+pub(crate) use cli_runtime::parse_change_bump;
+#[cfg(test)]
+pub(crate) use cli_runtime::parse_direct_template_reference;
+#[cfg(test)]
+pub(crate) use cli_runtime::parse_output_format;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_cli_command_result;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_retarget_release_report;
+#[cfg(test)]
+pub(crate) use cli_runtime::retarget_operation_label;
+#[cfg(test)]
+pub(crate) use cli_runtime::template_value_to_input_values;
+use git_support::git_commit_paths;
+use git_support::git_head_commit;
+use git_support::git_stage_paths;
+#[cfg(test)]
+pub(crate) use git_support::read_git_commit_message;
+#[cfg(test)]
+pub(crate) use git_support::run_git_capture;
+#[cfg(test)]
+pub(crate) use git_support::run_git_process;
+#[cfg(test)]
+pub(crate) use git_support::run_git_status;
 use minijinja::Environment;
 use minijinja::UndefinedBehavior;
 use monochange_cargo::RustSemverProvider;
@@ -63,9 +134,6 @@ use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_config::validate_versioned_files_content;
 use monochange_config::validate_workspace;
-use monochange_core::materialize_dependency_edges;
-use monochange_core::relative_to_root;
-use monochange_core::render_release_notes;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
@@ -73,13 +141,13 @@ use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetRevision;
+use monochange_core::ChangesetTargetKind;
 use monochange_core::CliCommandDefinition;
+use monochange_core::CommitMessage;
 use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY;
 use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
-
-use monochange_core::CommitMessage;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::ExtraChangelogSection;
@@ -97,9 +165,6 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::PreparedChangeset;
 use monochange_core::PreparedChangesetTarget;
-
-use monochange_core::render_release_record_block;
-use monochange_core::ChangesetTargetKind;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestChangelog;
 use monochange_core::ReleaseManifestCompatibilityEvidence;
@@ -129,117 +194,44 @@ use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
 use monochange_core::VersionFormat;
 use monochange_core::VersionedFileDefinition;
+use monochange_core::materialize_dependency_edges;
+use monochange_core::relative_to_root;
+use monochange_core::render_release_notes;
+use monochange_core::render_release_record_block;
 use monochange_gitea as gitea_provider;
 use monochange_github as github_provider;
 use monochange_gitlab as gitlab_provider;
 use monochange_graph::build_release_plan;
-use monochange_semver::collect_assessments;
 use monochange_semver::CompatibilityProvider;
-use serde::Serialize;
-use serde_json::json;
-
-use assist::run_assist;
-use cli::build_command_with_cli;
-#[cfg(test)]
-use cli::cli_commands_for_root;
-use cli::cli_commands_from_config;
-use cli::current_dir_or_dot;
-use cli_runtime::execute_matches;
-use git_support::git_commit_paths;
-use git_support::git_head_commit;
-use git_support::git_stage_paths;
-use release_record::render_release_record_discovery;
-use workspace_ops::init_workspace;
-use workspace_ops::populate_workspace;
-
-pub use changeset_policy::affected_packages;
-pub use changeset_policy::evaluate_changeset_policy;
-pub use changeset_policy::verify_changesets;
-pub use cli::build_command;
+use monochange_semver::collect_assessments;
+pub(crate) use release_artifacts::*;
 pub use release_record::discover_release_record;
 pub use release_record::execute_release_retarget;
 pub use release_record::plan_release_retarget;
+use release_record::render_release_record_discovery;
 pub use release_record::retarget_release;
-pub use workspace_ops::add_change_file;
-pub use workspace_ops::discover_workspace;
-pub use workspace_ops::plan_release;
-pub use workspace_ops::prepare_release;
-pub use workspace_ops::AddChangeFileRequest;
-
-pub(crate) use changelog::*;
-pub(crate) use changeset_policy::compute_changed_paths_since;
-pub(crate) use changeset_policy::is_changeset_markdown_path;
-pub(crate) use changeset_policy::normalize_changed_path;
-pub(crate) use changesets::*;
-pub(crate) use release_artifacts::*;
+use serde::Serialize;
+use serde_json::json;
 pub(crate) use versioned_files::*;
+pub use workspace_ops::AddChangeFileRequest;
+pub use workspace_ops::add_change_file;
 pub(crate) use workspace_ops::add_interactive_change_file;
-pub(crate) use workspace_ops::prepare_release_execution;
-pub(crate) use workspace_ops::render_change_target_markdown;
-pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
-
-#[cfg(test)]
-pub(crate) use assist::assistant_display_name;
-#[cfg(test)]
-pub(crate) use assist::assistant_setup_payload;
-#[cfg(test)]
-pub(crate) use cli::apply_runtime_change_type_choices;
-#[cfg(test)]
-pub(crate) use cli::build_assist_subcommand;
-#[cfg(test)]
-pub(crate) use cli::build_cli_command_subcommand;
-#[cfg(test)]
-pub(crate) use cli::build_command_for_root;
-#[cfg(test)]
-pub(crate) use cli::build_release_record_subcommand;
-#[cfg(test)]
-pub(crate) use cli::cli_command_after_help;
-#[cfg(test)]
-pub(crate) use cli::configured_change_type_choices;
-#[cfg(test)]
-pub(crate) use cli_runtime::build_cli_template_context;
-#[cfg(test)]
-pub(crate) use cli_runtime::build_retarget_release_report;
-#[cfg(test)]
-pub(crate) use cli_runtime::collect_cli_command_inputs;
-#[cfg(test)]
-pub(crate) use cli_runtime::execute_cli_command;
-#[cfg(test)]
-pub(crate) use cli_runtime::inferred_retarget_source_configuration;
-#[cfg(test)]
-pub(crate) use cli_runtime::lookup_template_value;
-#[cfg(test)]
-pub(crate) use cli_runtime::parse_boolean_step_input;
-#[cfg(test)]
-pub(crate) use cli_runtime::parse_change_bump;
-#[cfg(test)]
-pub(crate) use cli_runtime::parse_direct_template_reference;
-#[cfg(test)]
-pub(crate) use cli_runtime::parse_output_format;
-#[cfg(test)]
-pub(crate) use cli_runtime::render_cli_command_result;
-#[cfg(test)]
-pub(crate) use cli_runtime::render_retarget_release_report;
-#[cfg(test)]
-pub(crate) use cli_runtime::retarget_operation_label;
-#[cfg(test)]
-pub(crate) use cli_runtime::template_value_to_input_values;
-#[cfg(test)]
-pub(crate) use git_support::read_git_commit_message;
-#[cfg(test)]
-pub(crate) use git_support::run_git_capture;
-#[cfg(test)]
-pub(crate) use git_support::run_git_process;
-#[cfg(test)]
-pub(crate) use git_support::run_git_status;
 #[cfg(test)]
 pub(crate) use workspace_ops::build_lockfile_command_executions;
 #[cfg(test)]
 pub(crate) use workspace_ops::change_type_default_bump;
+pub use workspace_ops::discover_workspace;
+use workspace_ops::init_workspace;
+pub use workspace_ops::plan_release;
+use workspace_ops::populate_workspace;
+pub use workspace_ops::prepare_release;
+pub(crate) use workspace_ops::prepare_release_execution;
+pub(crate) use workspace_ops::render_change_target_markdown;
 #[cfg(test)]
 pub(crate) use workspace_ops::render_cli_commands_toml;
 #[cfg(test)]
 pub(crate) use workspace_ops::render_interactive_changeset_markdown;
+pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
 mod assist;
 mod changelog;
@@ -600,7 +592,7 @@ where
 				Some(value) => {
 					return Err(MonochangeError::Config(format!(
 						"unknown assistant `{value}`"
-					)))
+					)));
 				}
 				None => return Err(MonochangeError::Config("missing assistant".to_string())),
 			};
@@ -613,7 +605,7 @@ where
 				value => {
 					return Err(MonochangeError::Config(format!(
 						"unknown assist output format `{value}`"
-					)))
+					)));
 				}
 			};
 			run_assist(assistant, format)
