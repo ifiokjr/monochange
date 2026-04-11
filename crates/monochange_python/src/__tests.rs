@@ -882,3 +882,38 @@ fn normalize_python_package_name_handles_leading_and_trailing_separators() {
 	assert_eq!(normalize_python_package_name("trailing-"), "trailing-");
 	assert_eq!(normalize_python_package_name("a"), "a");
 }
+
+#[test]
+fn discover_python_packages_skips_project_without_name() {
+	let root = fixture_path("python/project-no-name");
+	let discovery =
+		discover_python_packages(&root).unwrap_or_else(|error| panic!("discover: {error}"));
+	assert!(
+		discovery.packages.is_empty(),
+		"should skip packages without a name"
+	);
+}
+
+#[test]
+fn update_versioned_file_text_handles_version_and_deps_with_env_markers() {
+	let input = r#"[project]
+name = "cli"
+version = "1.0.0"
+dependencies = [
+    "numpy>=1.20.0; python_version < '3.9'",
+    "my-core>=1.0.0",
+]
+"#;
+	let deps = BTreeMap::from([("my-core".to_string(), ">=2.0.0".to_string())]);
+	let result = update_versioned_file_text(
+		input,
+		PythonVersionedFileKind::Manifest,
+		Some("2.0.0"),
+		&deps,
+	)
+	.unwrap_or_else(|error| panic!("update: {error}"));
+	assert!(result.contains(r#"version = "2.0.0""#));
+	assert!(result.contains("my-core>=2.0.0"));
+	// Environment markers should be stripped from the constraint
+	assert!(result.contains("numpy"));
+}
