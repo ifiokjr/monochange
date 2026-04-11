@@ -2094,6 +2094,7 @@ dependencies = [
  "semver",
  "similar-asserts",
  "tempfile",
+ "tracing",
  "walkdir",
 ]
 

@@ -17,6 +17,7 @@ glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
 regex = { workspace = true, default-features = true }
 semver = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
 walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
