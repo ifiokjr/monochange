@@ -280,6 +280,7 @@ fn normalize_python_package_name(name: &str) -> String {
 	result
 }
 
+#[tracing::instrument(skip_all)]
 pub fn discover_python_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let mut packages = Vec::new();
 	let mut warnings = Vec::new();
@@ -332,6 +333,8 @@ pub fn discover_python_packages(root: &Path) -> MonochangeResult<AdapterDiscover
 
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
+
+	tracing::debug!(packages = packages.len(), "discovered python packages");
 
 	Ok(AdapterDiscovery { packages, warnings })
 }

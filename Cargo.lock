@@ -2404,6 +2404,7 @@ dependencies = [
  "tempfile",
  "toml",
  "toml_edit",
+ "tracing",
  "walkdir",
 ]
 
