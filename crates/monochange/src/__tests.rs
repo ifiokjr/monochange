@@ -8123,3 +8123,146 @@ fn atomic_write_preserves_file_permissions() {
 		mode & 0o777
 	);
 }
+
+#[test]
+fn template_cache_reuses_compiled_templates_across_calls() {
+	// Call render_message_template twice with the same template to exercise
+	// both cache-miss (first call) and cache-hit (second call) paths.
+	let mut metadata = BTreeMap::new();
+	metadata.insert("name", "alpha".to_string());
+
+	let first = crate::changelog::render_message_template("Hello {{ name }}", &metadata);
+	assert_eq!(first, "Hello alpha");
+
+	metadata.insert("name", "beta".to_string());
+	let second = crate::changelog::render_message_template("Hello {{ name }}", &metadata);
+	assert_eq!(second, "Hello beta");
+
+	// Different template string exercises a second cache entry.
+	let third = crate::changelog::render_message_template("Goodbye {{ name }}", &metadata);
+	assert_eq!(third, "Goodbye beta");
+}
+
+#[test]
+fn batch_changeset_contexts_returns_empty_without_git_repo() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	// No .git directory — should return contexts with None fields.
+	fs::create_dir_all(root.join("crates/pkg")).unwrap();
+	fs::write(
+		root.join("crates/pkg/Cargo.toml"),
+		"[package]\nname = \"pkg\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap();
+	fs::write(
+		root.join("Cargo.toml"),
+		"[workspace]\nmembers = [\"crates/pkg\"]\nresolver = \"2\"\n",
+	)
+	.unwrap();
+	fs::write(
+		root.join("monochange.toml"),
+		"[defaults]\npackage_type = \"cargo\"\n\n[package.pkg]\npath = \"crates/pkg\"\n\n[ecosystems.cargo]\nenabled = true\n",
+	)
+	.unwrap();
+	fs::create_dir_all(root.join(".changeset")).unwrap();
+	fs::write(
+		root.join(".changeset/test.md"),
+		"---\npkg: patch\n---\n\nTest.\n",
+	)
+	.unwrap();
+
+	let result = crate::prepare_release(root, true).unwrap();
+	// With no .git, changeset context fields should all be None.
+	for changeset in &result.changesets {
+		if let Some(ctx) = &changeset.context {
+			assert!(
+				ctx.introduced.is_none(),
+				"expected no introduced commit without git"
+			);
+			assert!(
+				ctx.last_updated.is_none(),
+				"expected no last_updated commit without git"
+			);
+		}
+	}
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	fs::create_dir_all(root.join("crates/pkg")).unwrap();
+	fs::write(
+		root.join("crates/pkg/Cargo.toml"),
+		"[package]\nname = \"pkg\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap();
+	fs::write(
+		root.join("Cargo.toml"),
+		"[workspace]\nmembers = [\"crates/pkg\"]\nresolver = \"2\"\n",
+	)
+	.unwrap();
+	fs::write(
+		root.join("monochange.toml"),
+		"[defaults]\npackage_type = \"cargo\"\n\n[package.pkg]\npath = \"crates/pkg\"\n\n[ecosystems.cargo]\nenabled = true\n",
+	)
+	.unwrap();
+
+	init_git_repo(root);
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+
+	// Add changeset in a separate commit.
+	fs::create_dir_all(root.join(".changeset")).unwrap();
+	fs::write(
+		root.join(".changeset/feat.md"),
+		"---\npkg: minor\n---\n\nNew feature.\n",
+	)
+	.unwrap();
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "add changeset"]);
+	let intro_sha = git_output_in_temp_repo(root, &["rev-parse", "--short=7", "HEAD"]);
+
+	// Update changeset.
+	fs::write(
+		root.join(".changeset/feat.md"),
+		"---\npkg: minor\n---\n\nUpdated feature.\n",
+	)
+	.unwrap();
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "update changeset"]);
+	let update_sha = git_output_in_temp_repo(root, &["rev-parse", "--short=7", "HEAD"]);
+
+	let result = crate::prepare_release(root, true).unwrap();
+	let changeset = result
+		.changesets
+		.iter()
+		.find(|cs| cs.path.to_string_lossy().contains("feat.md"))
+		.unwrap_or_else(|| panic!("expected feat changeset"));
+	let ctx = changeset
+		.context
+		.as_ref()
+		.unwrap_or_else(|| panic!("expected context"));
+
+	let intro_commit = ctx
+		.introduced
+		.as_ref()
+		.unwrap_or_else(|| panic!("expected introduced"));
+	assert_eq!(
+		intro_commit.commit.as_ref().unwrap().short_sha,
+		intro_sha.trim(),
+		"introduced commit should match the commit that added the file"
+	);
+
+	let updated_commit = ctx
+		.last_updated
+		.as_ref()
+		.unwrap_or_else(|| panic!("expected last_updated"));
+	assert_eq!(
+		updated_commit.commit.as_ref().unwrap().short_sha,
+		update_sha.trim(),
+		"last_updated commit should match the most recent commit"
+	);
+}

@@ -1083,6 +1083,7 @@ fn strip_workspace_prefix<'a>(path: &'a Path, root: &Path) -> MonochangeResult<&
 
 #[cfg(test)]
 #[rustfmt::skip]
+#[cfg(test)]
 fn ensure_parent_directory(path: &Path) -> MonochangeResult<()> {
 	if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|error| MonochangeError::Io(format!("failed to create {}: {error}", parent.display())))?; }
 	Ok(())
@@ -1102,6 +1103,7 @@ fn copy_workspace_file(source: &Path, destination: &Path) -> MonochangeResult<()
 
 #[cfg(test)]
 #[rustfmt::skip]
+#[cfg(test)]
 fn collect_workspace_files(root: &Path, current: &Path, relative_paths: &mut BTreeSet<PathBuf>) -> MonochangeResult<()> {
 	for entry in fs::read_dir(current).map_err(|error| MonochangeError::Io(format!("failed to read {}: {error}", current.display())))? {
 		let entry = entry.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
@@ -1116,6 +1118,7 @@ fn collect_workspace_files(root: &Path, current: &Path, relative_paths: &mut BTr
 
 #[cfg(test)]
 #[rustfmt::skip]
+#[cfg(test)]
 fn copy_workspace_tree(source: &Path, destination: &Path) -> MonochangeResult<()> {
 	fs::create_dir_all(destination).map_err(|error| MonochangeError::Io(format!("failed to create {}: {error}", destination.display())))?;
 	for entry in fs::read_dir(source).map_err(|error| MonochangeError::Io(format!("failed to read {}: {error}", source.display())))? {
