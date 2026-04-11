@@ -134,7 +134,8 @@ jobs:
           cargo bench -p monochange --bench cli_commands -- \
             --output-format bencher \
             "config_load" "discover" "validate" "changeset_loading" "prepare_release_dry_run" \
-            2>&1 | grep "^test " > target/benchmark-results.txt
+            > /tmp/bench-stdout.txt 2>&1
+          grep "^test " /tmp/bench-stdout.txt > target/benchmark-results.txt || true
           cat target/benchmark-results.txt
         shell: devenv shell -- bash -e {0}
 
