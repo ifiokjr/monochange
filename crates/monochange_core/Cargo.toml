@@ -25,6 +25,7 @@ insta = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
