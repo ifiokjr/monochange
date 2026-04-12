@@ -109,6 +109,22 @@ json.dump(summary, sys.stdout, indent=2, sort_keys=True)
 PY
 }
 
+write_unavailable_summary() {
+	local output_path="$1"
+	cat >"$output_path" <<'EOF'
+{
+  "available": false,
+  "stepTotalMs": null,
+  "phases": []
+}
+EOF
+}
+
+supports_json_progress() {
+	local bin="$1"
+	"$bin" --help 2>&1 | grep -q -- '--progress-format'
+}
+
 run_phase_capture() {
 	local bin="$1"
 	local fixture_dir="$2"
@@ -169,11 +185,17 @@ command_summaries = {
 }
 
 def phase_map(summary):
+    if not summary.get("available", True):
+        return {}
     return {phase["label"]: int(phase["durationMs"]) for phase in summary.get("phases", [])}
 
 def status_label(main_ms, pr_ms, budget_ms):
+    if pr_ms is None:
+        return "unavailable"
     if budget_ms is not None and pr_ms > budget_ms:
         return "over budget"
+    if main_ms is None:
+        return "budget only" if budget_ms is not None else "pr only"
     if pr_ms > main_ms:
         return "regressed"
     if pr_ms < main_ms:
@@ -181,8 +203,13 @@ def status_label(main_ms, pr_ms, budget_ms):
     return "flat"
 
 def delta(pr_ms, main_ms):
+    if pr_ms is None or main_ms is None:
+        return "n/a"
     value = pr_ms - main_ms
     return f"{value:+d}"
+
+def format_ms(value):
+    return "n/a" if value is None else str(int(value))
 
 sections = ["#### Phase timings", ""]
 violations = 0
@@ -195,12 +222,14 @@ for command_label in ("mc release --dry-run", "mc release"):
     pr_summary = summaries["pr"]
     main_phases = phase_map(main_summary)
     pr_phases = phase_map(pr_summary)
+    main_step_total = main_summary.get("stepTotalMs")
+    pr_step_total = pr_summary.get("stepTotalMs")
     rows = [
         (
             "prepare release total",
             budget.get("stepTotalMs"),
-            int(main_summary.get("stepTotalMs", 0) or 0),
-            int(pr_summary.get("stepTotalMs", 0) or 0),
+            None if main_step_total is None else int(main_step_total),
+            None if pr_step_total is None else int(pr_step_total),
         )
     ]
     labels = sorted(
@@ -212,15 +241,20 @@ for command_label in ("mc release --dry-run", "mc release"):
 
     sections.append(f"##### `{command_label}`")
     sections.append("")
+    if not main_summary.get("available", True):
+        sections.append(
+            "_`main` does not support `--progress-format json`; phase timings are shown for the PR binary against the configured budgets only._"
+        )
+        sections.append("")
     sections.append("| Phase | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status |")
     sections.append("|:---|---:|---:|---:|---:|:---|")
     for label, budget_ms, main_ms, pr_ms in rows:
         status = status_label(main_ms, pr_ms, budget_ms)
-        if budget_ms is not None and pr_ms > budget_ms:
+        if budget_ms is not None and pr_ms is not None and pr_ms > budget_ms:
             violations += 1
-        budget_text = "n/a" if budget_ms is None else str(int(budget_ms))
+        budget_text = format_ms(budget_ms)
         sections.append(
-            f"| `{label}` | {budget_text} | {main_ms} | {pr_ms} | {delta(pr_ms, main_ms)} | {status} |"
+            f"| `{label}` | {budget_text} | {format_ms(main_ms)} | {format_ms(pr_ms)} | {delta(pr_ms, main_ms)} | {status} |"
         )
     sections.append("")
 
@@ -246,22 +280,32 @@ collect_phase_markdown() {
 	local dry_pr_summary
 	local release_main_summary
 	local release_pr_summary
-	dry_main_events="$(mktemp -t monochange-bench-dry-main.XXXXXX.jsonl)"
-	dry_pr_events="$(mktemp -t monochange-bench-dry-pr.XXXXXX.jsonl)"
-	release_main_events="$(mktemp -t monochange-bench-release-main.XXXXXX.jsonl)"
-	release_pr_events="$(mktemp -t monochange-bench-release-pr.XXXXXX.jsonl)"
 	dry_main_summary="$(mktemp -t monochange-bench-dry-main-summary.XXXXXX.json)"
 	dry_pr_summary="$(mktemp -t monochange-bench-dry-pr-summary.XXXXXX.json)"
 	release_main_summary="$(mktemp -t monochange-bench-release-main-summary.XXXXXX.json)"
 	release_pr_summary="$(mktemp -t monochange-bench-release-pr-summary.XXXXXX.json)"
-	run_phase_capture "$main_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[0]}" "$dry_main_events"
-	run_phase_capture "$pr_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[0]}" "$dry_pr_events"
-	run_phase_capture "$main_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[1]}" "$release_main_events"
-	run_phase_capture "$pr_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[1]}" "$release_pr_events"
-	summarize_progress_events "$dry_main_events" "$dry_main_summary"
-	summarize_progress_events "$dry_pr_events" "$dry_pr_summary"
-	summarize_progress_events "$release_main_events" "$release_main_summary"
-	summarize_progress_events "$release_pr_events" "$release_pr_summary"
+	if supports_json_progress "$main_bin"; then
+		dry_main_events="$(mktemp -t monochange-bench-dry-main.XXXXXX.jsonl)"
+		release_main_events="$(mktemp -t monochange-bench-release-main.XXXXXX.jsonl)"
+		run_phase_capture "$main_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[0]}" "$dry_main_events"
+		run_phase_capture "$main_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[1]}" "$release_main_events"
+		summarize_progress_events "$dry_main_events" "$dry_main_summary"
+		summarize_progress_events "$release_main_events" "$release_main_summary"
+	else
+		write_unavailable_summary "$dry_main_summary"
+		write_unavailable_summary "$release_main_summary"
+	fi
+	if supports_json_progress "$pr_bin"; then
+		dry_pr_events="$(mktemp -t monochange-bench-dry-pr.XXXXXX.jsonl)"
+		release_pr_events="$(mktemp -t monochange-bench-release-pr.XXXXXX.jsonl)"
+		run_phase_capture "$pr_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[0]}" "$dry_pr_events"
+		run_phase_capture "$pr_bin" "$fixture_dir" "${PHASE_COMMAND_ARGS[1]}" "$release_pr_events"
+		summarize_progress_events "$dry_pr_events" "$dry_pr_summary"
+		summarize_progress_events "$release_pr_events" "$release_pr_summary"
+	else
+		write_unavailable_summary "$dry_pr_summary"
+		write_unavailable_summary "$release_pr_summary"
+	fi
 	render_phase_markdown \
 		"$scenario_id" \
 		"$phase_markdown_path" \
