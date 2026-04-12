@@ -29,10 +29,15 @@ fn generate_fixture(root: &Path, num_packages: usize, num_changesets: usize) {
 
 	for i in 0..num_packages {
 		let pkg_dir = root.join(format!("crates/pkg-{i}"));
-		fs::create_dir_all(&pkg_dir).unwrap();
+		fs::create_dir_all(pkg_dir.join("src")).unwrap();
 		fs::write(
 			pkg_dir.join("Cargo.toml"),
 			format!("[package]\nname = \"pkg-{i}\"\nversion = \"1.0.0\"\nedition = \"2021\"\n"),
+		)
+		.unwrap();
+		fs::write(
+			pkg_dir.join("src/lib.rs"),
+			format!("pub const PACKAGE_ID: &str = \"pkg-{i}\";\n"),
 		)
 		.unwrap();
 	}
