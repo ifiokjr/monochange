@@ -505,18 +505,18 @@ inputs = [
 	{ name = "commit", type = "boolean", default = false },
 ]
 steps = [
-	{ type = "PrepareRelease" },
-	{ type = "RenderReleaseManifest", path = ".monochange/release-manifest.json", when = "{{ inputs.commit }}" },
-	{ type = "Command", command = "dprint fmt {{ changed_files }}" },
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "RenderReleaseManifest", name = "write release manifest", path = ".monochange/release-manifest.json", when = "{{ inputs.commit }}" },
+	{ type = "Command", name = "format changed files", command = "dprint fmt {{ changed_files }}" },
 	# Keep local `mc release` runs fast. The generated files are stable enough to
 	# inspect immediately, so we only pay for clippy/docs/validation right before
 	# creating and publishing the release commit.
-	{ type = "Command", command = "mdt update", when = "{{ inputs.commit }}" },
-	{ type = "Command", command = "git add --all", when = "{{ inputs.commit }}" },
-	{ type = "CommitRelease", when = "{{ inputs.commit }}" },
-	{ type = "Command", command = "git push", when = "{{ inputs.commit }}" },
-	{ type = "PublishRelease", when = "{{ inputs.commit }}" },
-	{ type = "CommentReleasedIssues", when = "{{ inputs.commit }}" },
+	{ type = "Command", name = "refresh shared markdown", command = "mdt update", when = "{{ inputs.commit }}" },
+	{ type = "Command", name = "stage release changes", command = "git add --all", when = "{{ inputs.commit }}" },
+	{ type = "CommitRelease", name = "create release commit", when = "{{ inputs.commit }}" },
+	{ type = "Command", name = "push release commit", command = "git push", when = "{{ inputs.commit }}" },
+	{ type = "PublishRelease", name = "publish hosted releases", when = "{{ inputs.commit }}" },
+	{ type = "CommentReleasedIssues", name = "comment on released issues", when = "{{ inputs.commit }}" },
 ]
 
 [cli.publish]

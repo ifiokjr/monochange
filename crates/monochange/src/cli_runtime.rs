@@ -1,6 +1,16 @@
 use std::collections::BTreeMap;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Read;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::process::ExitStatus;
+use std::process::Stdio;
+use std::sync::mpsc;
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::Instant;
 
 use clap::ArgMatches;
 use clap::parser::ValueSource;
@@ -14,10 +24,16 @@ use monochange_core::CommandVariable;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::ShellConfig;
+use monochange_core::SourceChangeRequest;
+use monochange_core::SourceChangeRequestOutcome;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
+use monochange_core::SourceReleaseOutcome;
+use monochange_core::SourceReleaseRequest;
 
 use crate::cli::command_supports_release_diff_preview;
+use crate::cli_progress::CliProgressReporter;
+use crate::cli_progress::CommandStream;
 use crate::*;
 
 pub(crate) fn execute_matches(
@@ -150,6 +166,12 @@ pub(crate) fn parse_direct_template_reference(template: &str) -> Option<&str> {
 	let trimmed = template.trim();
 	let inner = trimmed.strip_prefix("{{")?.strip_suffix("}}")?.trim();
 	if inner.is_empty()
+		|| !matches!(
+			inner.chars().next(),
+			Some(first) if first.is_ascii_alphabetic() || first == '_'
+		) || inner
+		.split('.')
+		.any(|segment| matches!(segment, "true" | "false" | "null" | "none"))
 		|| !inner
 			.chars()
 			.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '.')
@@ -188,6 +210,146 @@ pub(crate) fn template_value_to_input_values(value: &serde_json::Value) -> Vec<S
 		}
 		serde_json::Value::Object(_) => vec![value.to_string()],
 	}
+}
+
+pub(crate) fn write_release_manifest_file(
+	root: &Path,
+	path: &Path,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<PathBuf> {
+	let resolved_path = resolve_config_path(root, path);
+	let rendered = render_release_manifest_json(manifest)?;
+	let update = FileUpdate {
+		path: resolved_path.clone(),
+		content: rendered.into_bytes(),
+	};
+	apply_file_updates(&[update])?;
+	Ok(root_relative(root, &resolved_path))
+}
+
+fn resolve_release_manifest_path(
+	root: &Path,
+	path: Option<&Path>,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<Option<PathBuf>> {
+	path.map(|path| write_release_manifest_file(root, path, manifest))
+		.transpose()
+}
+
+pub(crate) fn build_release_results(
+	dry_run: bool,
+	requests: &[SourceReleaseRequest],
+	publish: impl FnOnce() -> MonochangeResult<Vec<SourceReleaseOutcome>>,
+) -> MonochangeResult<Vec<String>> {
+	if dry_run {
+		Ok(requests
+			.iter()
+			.map(|request| {
+				format!(
+					"dry-run {} {} ({}) via {}",
+					request.repository, request.tag_name, request.name, request.provider
+				)
+			})
+			.collect())
+	} else {
+		Ok(publish()?
+			.into_iter()
+			.map(|result| {
+				format!(
+					"{} {} ({}) via {}",
+					result.repository,
+					result.tag_name,
+					format_source_operation(&result.operation),
+					result.provider
+				)
+			})
+			.collect())
+	}
+}
+
+fn build_release_results_for_source(
+	dry_run: bool,
+	source: &SourceConfiguration,
+	requests: &[SourceReleaseRequest],
+) -> MonochangeResult<Vec<String>> {
+	#[rustfmt::skip]
+	let result = build_release_results(dry_run, requests, || publish_source_release_requests(source, requests));
+	result
+}
+
+pub(crate) fn build_release_request_result(
+	dry_run: bool,
+	request: &SourceChangeRequest,
+	publish: impl FnOnce() -> MonochangeResult<SourceChangeRequestOutcome>,
+) -> MonochangeResult<String> {
+	if dry_run {
+		Ok(format!(
+			"dry-run {} {} -> {} via {}",
+			request.repository, request.head_branch, request.base_branch, request.provider
+		))
+	} else {
+		let result = publish()?;
+		Ok(format!(
+			"{} #{} ({}) via {}",
+			result.repository,
+			result.number,
+			format_change_request_operation(&result.operation),
+			result.provider
+		))
+	}
+}
+
+fn build_release_request_result_for_source(
+	dry_run: bool,
+	source: &SourceConfiguration,
+	root: &Path,
+	request: &SourceChangeRequest,
+	tracked_paths: &[PathBuf],
+) -> MonochangeResult<String> {
+	#[rustfmt::skip]
+	let result = build_release_request_result(dry_run, request, || publish_source_change_request(source, root, request, tracked_paths));
+	result
+}
+
+pub(crate) fn build_issue_comment_results(
+	dry_run: bool,
+	plans: &[github_provider::GitHubIssueCommentPlan],
+	publish: impl FnOnce() -> MonochangeResult<Vec<github_provider::GitHubIssueCommentOutcome>>,
+) -> MonochangeResult<Vec<String>> {
+	if dry_run {
+		Ok(plans
+			.iter()
+			.map(|plan| format!("dry-run {} {}", plan.repository, plan.issue_id))
+			.collect())
+	} else {
+		Ok(publish()?
+			.into_iter()
+			.map(|result| {
+				format!(
+					"{} {} ({})",
+					result.repository,
+					result.issue_id,
+					match result.operation {
+						monochange_github::GitHubIssueCommentOperation::Created => "created",
+						monochange_github::GitHubIssueCommentOperation::SkippedExisting => {
+							"skipped_existing"
+						}
+					}
+				)
+			})
+			.collect())
+	}
+}
+
+fn build_issue_comment_results_for_source(
+	dry_run: bool,
+	source: &SourceConfiguration,
+	manifest: &ReleaseManifest,
+	plans: &[github_provider::GitHubIssueCommentPlan],
+) -> MonochangeResult<Vec<String>> {
+	#[rustfmt::skip]
+	let result = build_issue_comment_results(dry_run, plans, || github_provider::comment_released_issues(source, manifest));
+	result
 }
 
 pub(crate) fn execute_cli_command(
@@ -232,400 +394,391 @@ pub(crate) fn execute_cli_command_with_options(
 		command_logs: Vec::new(),
 	};
 	let mut output = None;
+	let command_started_at = Instant::now();
+	let mut progress = CliProgressReporter::new(cli_command, dry_run);
+	progress.command_started();
 
 	for (step_index, step) in cli_command.steps.iter().enumerate() {
+		let step_started_at = Instant::now();
 		let step_inputs = resolve_step_inputs(&context, step)?;
 		context.last_step_inputs = step_inputs.clone();
 
 		if !should_execute_cli_step(step, &context, &step_inputs)? {
+			progress.step_skipped(step_index, step, step.when());
 			if let Some(condition) = step.when() {
 				tracing::debug!(step = step.kind_name(), condition = %condition, "skipped CLI step");
 				context.command_logs.push(format!(
 					"skipped step `{}` because when condition `{condition}` is false",
-					step.kind_name()
+					step.display_name()
 				));
 			}
 			continue;
 		}
 
+		progress.step_started(step_index, step);
 		tracing::debug!(step = step.kind_name(), "executing CLI step");
-		match step {
-			CliStepDefinition::Validate { .. } => {
-				validate_workspace(root)?;
-				validate_cargo_workspace_version_groups(root)?;
-				let warnings = validate_versioned_files_content(root)?;
-				for warning in &warnings {
-					eprintln!("warning: {warning}");
+		let mut step_phase_timings = Vec::new();
+		let step_result: MonochangeResult<()> = (|| {
+			match step {
+				CliStepDefinition::Validate { .. } => {
+					validate_workspace(root)?;
+					validate_cargo_workspace_version_groups(root)?;
+					let warnings = validate_versioned_files_content(root)?;
+					for warning in &warnings {
+						eprintln!("warning: {warning}");
+					}
+					output = Some(format!(
+						"workspace validation passed for {}",
+						root_relative(root, root).display()
+					));
+					Ok(())
 				}
-				output = Some(format!(
-					"workspace validation passed for {}",
-					root_relative(root, root).display()
-				));
-			}
-			CliStepDefinition::Discover { .. } => {
-				let format = step_inputs
-					.get("format")
-					.and_then(|values| values.first())
-					.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
-				output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
-			}
-			CliStepDefinition::CreateChangeFile { .. } => {
-				let is_interactive = step_inputs
-					.get("interactive")
-					.and_then(|values| values.first())
-					.is_some_and(|value| value == "true");
+				CliStepDefinition::Discover { .. } => {
+					let format = step_inputs
+						.get("format")
+						.and_then(|values| values.first())
+						.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+					output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
+					Ok(())
+				}
+				CliStepDefinition::CreateChangeFile { .. } => {
+					let is_interactive = step_inputs
+						.get("interactive")
+						.and_then(|values| values.first())
+						.is_some_and(|value| value == "true");
 
-				if is_interactive {
-					let configuration = load_workspace_configuration(root)?;
-					let options = interactive::InteractiveOptions {
-						reason: step_inputs
+					if is_interactive {
+						let configuration = load_workspace_configuration(root)?;
+						let options = interactive::InteractiveOptions {
+							reason: step_inputs
+								.get("reason")
+								.and_then(|values| values.first())
+								.cloned(),
+							details: step_inputs
+								.get("details")
+								.and_then(|values| values.first())
+								.cloned(),
+						};
+						let result = interactive::run_interactive_change(&configuration, &options)?;
+						let output_path = step_inputs
+							.get("output")
+							.and_then(|values| values.first())
+							.map(PathBuf::from);
+						let path =
+							add_interactive_change_file(root, &result, output_path.as_deref())?;
+						output = Some(format!(
+							"wrote change file {}",
+							root_relative(root, &path).display()
+						));
+					} else {
+						let package_refs = step_inputs.get("package").cloned().unwrap_or_default();
+						if package_refs.is_empty() {
+							Err(MonochangeError::Config(
+							"command `change` requires at least one `--package` value or `--interactive` mode".to_string(),
+						))?;
+						}
+						let bump = if let Some(value) =
+							step_inputs.get("bump").and_then(|values| values.first())
+						{
+							parse_change_bump(value)?
+						} else if step_inputs
+							.get("type")
+							.and_then(|values| values.first())
+							.is_some()
+						{
+							ChangeBump::None
+						} else {
+							ChangeBump::Patch
+						};
+						let version = step_inputs
+							.get("version")
+							.and_then(|values| values.first())
+							.cloned();
+						let reason = step_inputs
 							.get("reason")
 							.and_then(|values| values.first())
-							.cloned(),
-						details: step_inputs
+							.cloned()
+							.ok_or_else(|| {
+								MonochangeError::Config(
+									"command `change` requires a `--reason` value".to_string(),
+								)
+							})?;
+						let change_type = step_inputs
+							.get("type")
+							.and_then(|values| values.first())
+							.cloned();
+						let details = step_inputs
 							.get("details")
 							.and_then(|values| values.first())
-							.cloned(),
-					};
-					let result = interactive::run_interactive_change(&configuration, &options)?;
-					let output_path = step_inputs
-						.get("output")
-						.and_then(|values| values.first())
-						.map(PathBuf::from);
-					let path = add_interactive_change_file(root, &result, output_path.as_deref())?;
-					output = Some(format!(
-						"wrote change file {}",
-						root_relative(root, &path).display()
-					));
-				} else {
-					let package_refs = step_inputs.get("package").cloned().unwrap_or_default();
-					if package_refs.is_empty() {
-						return Err(MonochangeError::Config(
-							"command `change` requires at least one `--package` value or `--interactive` mode".to_string(),
+							.cloned();
+						let output_path = step_inputs
+							.get("output")
+							.and_then(|values| values.first())
+							.map(PathBuf::from);
+						let path = add_change_file(
+							root,
+							AddChangeFileRequest::builder()
+								.package_refs(&package_refs)
+								.bump(bump.into())
+								.reason(&reason)
+								.version(version.as_deref())
+								.change_type(change_type.as_deref())
+								.details(details.as_deref())
+								.output(output_path.as_deref())
+								.build(),
+						)?;
+						output = Some(format!(
+							"wrote change file {}",
+							root_relative(root, &path).display()
 						));
 					}
-					let bump = if let Some(value) =
-						step_inputs.get("bump").and_then(|values| values.first())
-					{
-						parse_change_bump(value)?
-					} else if step_inputs
-						.get("type")
-						.and_then(|values| values.first())
-						.is_some()
-					{
-						ChangeBump::None
+					Ok(())
+				}
+				CliStepDefinition::PrepareRelease { .. } => {
+					let build_file_diffs = context.show_diff
+						|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
+					let prepared_execution =
+						prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?;
+					step_phase_timings = prepared_execution.phase_timings.clone();
+					context.prepared_file_diffs = prepared_execution.file_diffs;
+					context.prepared_release = Some(prepared_execution.prepared_release);
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::RenderReleaseManifest { path, .. } => {
+					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+						MonochangeError::Config(
+							"`RenderReleaseManifest` requires a previous `PrepareRelease` step"
+								.to_string(),
+						)
+					})?;
+					let manifest = build_release_manifest(
+						cli_command,
+						prepared_release,
+						&context.command_logs,
+					);
+					context.release_manifest_path =
+						resolve_release_manifest_path(root, path.as_deref(), &manifest)?;
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::PublishRelease { .. } => {
+					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+						MonochangeError::Config(
+							"`PublishRelease` requires a previous `PrepareRelease` step"
+								.to_string(),
+						)
+					})?;
+					let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
+						MonochangeError::Config(
+							"`PublishRelease` requires `[source]` configuration".to_string(),
+						)
+					})?;
+					let manifest = build_release_manifest(
+						cli_command,
+						prepared_release,
+						&context.command_logs,
+					);
+					context.release_requests = build_source_release_requests(&source, &manifest);
+					#[rustfmt::skip]
+						let results = build_release_results_for_source(context.dry_run, &source, &context.release_requests)?;
+					context.release_results = results;
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::CommitRelease { .. } => {
+					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+						MonochangeError::Config(
+							"`CommitRelease` requires a previous `PrepareRelease` step".to_string(),
+						)
+					})?;
+					let manifest = build_release_manifest(
+						cli_command,
+						prepared_release,
+						&context.command_logs,
+					);
+					#[rustfmt::skip]
+				let release_commit_report = commit_release(root, &context, configuration.source.as_ref(), &manifest)?;
+					context.release_commit_report = Some(release_commit_report);
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::OpenReleaseRequest { .. } => {
+					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+						MonochangeError::Config(
+							"`OpenReleaseRequest` requires a previous `PrepareRelease` step"
+								.to_string(),
+						)
+					})?;
+					let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
+						MonochangeError::Config(
+							"`OpenReleaseRequest` requires `[source]` configuration".to_string(),
+						)
+					})?;
+					let manifest = build_release_manifest(
+						cli_command,
+						prepared_release,
+						&context.command_logs,
+					);
+					let request = build_source_change_request(&source, &manifest);
+					let tracked_paths = tracked_release_pull_request_paths(&context, &manifest);
+					let dry_run = context.dry_run;
+					#[rustfmt::skip]
+						let result = build_release_request_result_for_source(dry_run, &source, root, &request, &tracked_paths)?;
+					context.release_request_result = Some(result);
+					context.release_request = Some(request);
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::CommentReleasedIssues { .. } => {
+					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
+						MonochangeError::Config(
+							"`CommentReleasedIssues` requires a previous `PrepareRelease` step"
+								.to_string(),
+						)
+					})?;
+					let source = load_workspace_configuration(root)?
+						.source
+						.filter(|source| source.provider == SourceProvider::GitHub)
+						.ok_or_else(|| {
+							MonochangeError::Config(
+							"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
+								.to_string(),
+						)
+						})?;
+					let manifest = build_release_manifest(
+						cli_command,
+						prepared_release,
+						&context.command_logs,
+					);
+					context.issue_comment_plans =
+						github_provider::plan_released_issue_comments(&source, &manifest);
+					let dry_run = context.dry_run;
+					let plans = &context.issue_comment_plans;
+					let results =
+						build_issue_comment_results_for_source(dry_run, &source, &manifest, plans)?;
+					context.issue_comment_results = results;
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::AffectedPackages { .. } => {
+					let since = step_inputs
+						.get("since")
+						.and_then(|values| values.first().cloned());
+					let explicit_paths = step_inputs
+						.get("changed_paths")
+						.cloned()
+						.unwrap_or_default();
+					let changed_paths = if let Some(rev) = &since {
+						if !explicit_paths.is_empty() {
+							eprintln!(
+								"warning: --since takes priority; --changed-paths was ignored"
+							);
+						}
+						compute_changed_paths_since(root, rev)?
 					} else {
-						ChangeBump::Patch
+						explicit_paths
 					};
-					let version = step_inputs
-						.get("version")
-						.and_then(|values| values.first())
-						.cloned();
-					let reason = step_inputs
-						.get("reason")
+					let labels = step_inputs.get("label").cloned().unwrap_or_default();
+					let enforce = step_inputs
+						.get("verify")
+						.is_some_and(|values| values.iter().any(|v| v == "true"));
+					let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
+					evaluation.enforce = enforce;
+					context.changeset_policy_evaluation = Some(evaluation);
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::DiagnoseChangesets { .. } => {
+					let requested = step_inputs.get("changeset").cloned().unwrap_or_default();
+					let report = diagnose_changesets(root, &requested)?;
+					context.changeset_diagnostics = Some(report);
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::RetargetRelease { .. } => {
+					let from = step_inputs
+						.get("from")
 						.and_then(|values| values.first())
 						.cloned()
 						.ok_or_else(|| {
 							MonochangeError::Config(
-								"command `change` requires a `--reason` value".to_string(),
+								"`RetargetRelease` requires a `from` input".to_string(),
 							)
 						})?;
-					let change_type = step_inputs
-						.get("type")
+					let target = step_inputs
+						.get("target")
 						.and_then(|values| values.first())
-						.cloned();
-					let details = step_inputs
-						.get("details")
-						.and_then(|values| values.first())
-						.cloned();
-					let output_path = step_inputs
-						.get("output")
-						.and_then(|values| values.first())
-						.map(PathBuf::from);
-					let path = add_change_file(
+						.cloned()
+						.unwrap_or_else(|| "HEAD".to_string());
+					let force = parse_boolean_step_input(&step_inputs, "force")?.unwrap_or(false);
+					let sync_provider =
+						parse_boolean_step_input(&step_inputs, "sync_provider")?.unwrap_or(true);
+					let discovery = discover_release_record(root, &from)?;
+					let source = inferred_retarget_source_configuration(
+						configuration.source.as_ref(),
+						&discovery,
+						sync_provider,
+					);
+					let plan = plan_release_retarget(
 						root,
-						AddChangeFileRequest::builder()
-							.package_refs(&package_refs)
-							.bump(bump.into())
-							.reason(&reason)
-							.version(version.as_deref())
-							.change_type(change_type.as_deref())
-							.details(details.as_deref())
-							.output(output_path.as_deref())
-							.build(),
+						&discovery,
+						&target,
+						force,
+						sync_provider,
+						context.dry_run,
+						source.as_ref(),
 					)?;
-					output = Some(format!(
-						"wrote change file {}",
-						root_relative(root, &path).display()
+					let result = execute_release_retarget(root, source.as_ref(), &plan)?;
+					context.retarget_report = Some(build_retarget_release_report(
+						&from,
+						&target,
+						&discovery,
+						plan.is_descendant,
+						&result,
 					));
+					output = None;
+					Ok(())
 				}
-			}
-			CliStepDefinition::PrepareRelease { .. } => {
-				let build_file_diffs = context.show_diff
-					|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
-				let prepared_execution =
-					prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?;
-				context.prepared_file_diffs = prepared_execution.file_diffs;
-				context.prepared_release = Some(prepared_execution.prepared_release);
-				output = None;
-			}
-			CliStepDefinition::RenderReleaseManifest { path, .. } => {
-				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-					MonochangeError::Config(
-						"`RenderReleaseManifest` requires a previous `PrepareRelease` step"
-							.to_string(),
-					)
-				})?;
-				let manifest =
-					build_release_manifest(cli_command, prepared_release, &context.command_logs);
-				if let Some(path) = path {
-					let resolved_path = resolve_config_path(root, path);
-					let rendered = render_release_manifest_json(&manifest)?;
-					apply_file_updates(&[FileUpdate {
-						path: resolved_path.clone(),
-						content: rendered.into_bytes(),
-					}])?;
-					context.release_manifest_path = Some(root_relative(root, &resolved_path));
-				}
-				output = None;
-			}
-			CliStepDefinition::PublishRelease { .. } => {
-				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-					MonochangeError::Config(
-						"`PublishRelease` requires a previous `PrepareRelease` step".to_string(),
-					)
-				})?;
-				let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
-					MonochangeError::Config(
-						"`PublishRelease` requires `[source]` configuration".to_string(),
-					)
-				})?;
-				let manifest =
-					build_release_manifest(cli_command, prepared_release, &context.command_logs);
-				context.release_requests = build_source_release_requests(&source, &manifest);
-				if context.dry_run {
-					context.release_results = context
-						.release_requests
-						.iter()
-						.map(|request| {
-							format!(
-								"dry-run {} {} ({}) via {}",
-								request.repository,
-								request.tag_name,
-								request.name,
-								request.provider
-							)
-						})
-						.collect();
-				} else {
-					context.release_results =
-						publish_source_release_requests(&source, &context.release_requests)?
-							.into_iter()
-							.map(|result| {
-								format!(
-									"{} {} ({}) via {}",
-									result.repository,
-									result.tag_name,
-									format_source_operation(&result.operation),
-									result.provider
-								)
-							})
-							.collect();
-				}
-				output = None;
-			}
-			CliStepDefinition::CommitRelease { .. } => {
-				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-					MonochangeError::Config(
-						"`CommitRelease` requires a previous `PrepareRelease` step".to_string(),
-					)
-				})?;
-				let manifest =
-					build_release_manifest(cli_command, prepared_release, &context.command_logs);
-				#[rustfmt::skip]
-				let release_commit_report = commit_release(root, &context, configuration.source.as_ref(), &manifest)?;
-				context.release_commit_report = Some(release_commit_report);
-				output = None;
-			}
-			CliStepDefinition::OpenReleaseRequest { .. } => {
-				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-					MonochangeError::Config(
-						"`OpenReleaseRequest` requires a previous `PrepareRelease` step"
-							.to_string(),
-					)
-				})?;
-				let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
-					MonochangeError::Config(
-						"`OpenReleaseRequest` requires `[source]` configuration".to_string(),
-					)
-				})?;
-				let manifest =
-					build_release_manifest(cli_command, prepared_release, &context.command_logs);
-				let request = build_source_change_request(&source, &manifest);
-				if context.dry_run {
-					context.release_request_result = Some(format!(
-						"dry-run {} {} -> {} via {}",
-						request.repository,
-						request.head_branch,
-						request.base_branch,
-						request.provider
-					));
-				} else {
-					let tracked_paths = tracked_release_pull_request_paths(&context, &manifest);
-					let result =
-						publish_source_change_request(&source, root, &request, &tracked_paths)?;
-					context.release_request_result = Some(format!(
-						"{} #{} ({}) via {}",
-						result.repository,
-						result.number,
-						format_change_request_operation(&result.operation),
-						result.provider
-					));
-				}
-				context.release_request = Some(request);
-				output = None;
-			}
-			CliStepDefinition::CommentReleasedIssues { .. } => {
-				let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-					MonochangeError::Config(
-						"`CommentReleasedIssues` requires a previous `PrepareRelease` step"
-							.to_string(),
-					)
-				})?;
-				let source = load_workspace_configuration(root)?
-					.source
-					.filter(|source| source.provider == SourceProvider::GitHub)
-					.ok_or_else(|| {
-						MonochangeError::Config(
-							"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
-								.to_string(),
-						)
-					})?;
-				let manifest =
-					build_release_manifest(cli_command, prepared_release, &context.command_logs);
-				context.issue_comment_plans =
-					github_provider::plan_released_issue_comments(&source, &manifest);
-				if context.dry_run {
-					context.issue_comment_results = context
-						.issue_comment_plans
-						.iter()
-						.map(|plan| format!("dry-run {} {}", plan.repository, plan.issue_id))
-						.collect();
-				} else {
-					context.issue_comment_results =
-						github_provider::comment_released_issues(&source, &manifest)?
-							.into_iter()
-							.map(|result| {
-								format!(
-									"{} {} ({})",
-									result.repository,
-									result.issue_id,
-									match result.operation {
-										monochange_github::GitHubIssueCommentOperation::Created => "created",
-										monochange_github::GitHubIssueCommentOperation::SkippedExisting => {
-											"skipped_existing"
-										}
-									}
-								)
-							})
-							.collect();
-				}
-				output = None;
-			}
-			CliStepDefinition::AffectedPackages { .. } => {
-				let since = step_inputs
-					.get("since")
-					.and_then(|values| values.first().cloned());
-				let explicit_paths = step_inputs
-					.get("changed_paths")
-					.cloned()
-					.unwrap_or_default();
-				let changed_paths = if let Some(rev) = &since {
-					if !explicit_paths.is_empty() {
-						eprintln!("warning: --since takes priority; --changed-paths was ignored");
-					}
-					compute_changed_paths_since(root, rev)?
-				} else {
-					explicit_paths
-				};
-				let labels = step_inputs.get("label").cloned().unwrap_or_default();
-				let enforce = step_inputs
-					.get("verify")
-					.is_some_and(|values| values.iter().any(|v| v == "true"));
-				let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
-				evaluation.enforce = enforce;
-				context.changeset_policy_evaluation = Some(evaluation);
-				output = None;
-			}
-			CliStepDefinition::DiagnoseChangesets { .. } => {
-				let requested = step_inputs.get("changeset").cloned().unwrap_or_default();
-				let report = diagnose_changesets(root, &requested)?;
-				context.changeset_diagnostics = Some(report);
-				output = None;
-			}
-			CliStepDefinition::RetargetRelease { .. } => {
-				let from = step_inputs
-					.get("from")
-					.and_then(|values| values.first())
-					.cloned()
-					.ok_or_else(|| {
-						MonochangeError::Config(
-							"`RetargetRelease` requires a `from` input".to_string(),
-						)
-					})?;
-				let target = step_inputs
-					.get("target")
-					.and_then(|values| values.first())
-					.cloned()
-					.unwrap_or_else(|| "HEAD".to_string());
-				let force = parse_boolean_step_input(&step_inputs, "force")?.unwrap_or(false);
-				let sync_provider =
-					parse_boolean_step_input(&step_inputs, "sync_provider")?.unwrap_or(true);
-				let discovery = discover_release_record(root, &from)?;
-				let source = inferred_retarget_source_configuration(
-					configuration.source.as_ref(),
-					&discovery,
-					sync_provider,
-				);
-				let plan = plan_release_retarget(
-					root,
-					&discovery,
-					&target,
-					force,
-					sync_provider,
-					context.dry_run,
-					source.as_ref(),
-				)?;
-				let result = execute_release_retarget(root, source.as_ref(), &plan)?;
-				context.retarget_report = Some(build_retarget_release_report(
-					&from,
-					&target,
-					&discovery,
-					plan.is_descendant,
-					&result,
-				));
-				output = None;
-			}
-			CliStepDefinition::Command {
-				command,
-				dry_run_command,
-				shell,
-				id,
-				variables,
-				..
-			} => {
-				run_cli_command_command(
-					&mut context,
+				CliStepDefinition::Command {
 					command,
-					dry_run_command.as_deref(),
+					dry_run_command,
 					shell,
-					id.as_deref(),
-					variables.as_ref(),
-					&step_inputs,
-				)?;
+					id,
+					variables,
+					..
+				} => {
+					run_cli_command_command(
+						&mut context,
+						step,
+						&mut progress,
+						CommandStepOptions {
+							command,
+							dry_run_command: dry_run_command.as_deref(),
+							shell,
+							step_id: id.as_deref(),
+							variables: variables.as_ref(),
+							step_inputs: &step_inputs,
+						},
+					)?;
+					Ok(())
+				}
 			}
+		})();
+		if let Err(error) = step_result {
+			let progress_error = progress_error_detail(&error).to_string();
+			progress.step_failed(step_index, step, step_started_at.elapsed(), &progress_error);
+			return Err(error);
 		}
+		progress.step_finished(
+			step_index,
+			step,
+			step_started_at.elapsed(),
+			&step_phase_timings,
+		);
 	}
+
+	progress.command_finished(command_started_at.elapsed());
 
 	if let Some(prepared_release) = &context.prepared_release {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
@@ -850,37 +1003,50 @@ fn parse_string_as_boolean(value: &str, condition: &str) -> MonochangeResult<boo
 	}
 }
 
+#[derive(Clone, Copy)]
+struct CommandStepOptions<'a> {
+	command: &'a str,
+	dry_run_command: Option<&'a str>,
+	shell: &'a ShellConfig,
+	step_id: Option<&'a str>,
+	variables: Option<&'a BTreeMap<String, CommandVariable>>,
+	step_inputs: &'a BTreeMap<String, Vec<String>>,
+}
+
 fn run_cli_command_command(
 	context: &mut CliContext,
-	command: &str,
-	dry_run_command: Option<&str>,
-	shell: &ShellConfig,
-	step_id: Option<&str>,
-	variables: Option<&BTreeMap<String, CommandVariable>>,
-	step_inputs: &BTreeMap<String, Vec<String>>,
+	step: &CliStepDefinition,
+	progress: &mut CliProgressReporter,
+	options: CommandStepOptions<'_>,
 ) -> MonochangeResult<()> {
 	let command_to_run = if context.dry_run {
-		if let Some(command) = dry_run_command {
+		if let Some(command) = options.dry_run_command {
 			command
 		} else {
-			let skipped = interpolate_cli_command_command(context, command, variables, step_inputs);
+			let skipped = interpolate_cli_command_command(
+				context,
+				options.command,
+				options.variables,
+				options.step_inputs,
+			);
 			context
 				.command_logs
 				.push(format!("skipped command `{skipped}` (dry-run)"));
 			return Ok(());
 		}
 	} else {
-		command
+		options.command
 	};
-	let interpolated =
-		interpolate_cli_command_command(context, command_to_run, variables, step_inputs);
-
-	let output = if let Some(shell_binary) = shell.shell_binary() {
-		ProcessCommand::new(shell_binary)
-			.arg("-c")
-			.arg(&interpolated)
-			.current_dir(&context.root)
-			.output()
+	let interpolated = interpolate_cli_command_command(
+		context,
+		command_to_run,
+		options.variables,
+		options.step_inputs,
+	);
+	let mut process_command = if let Some(shell_binary) = options.shell.shell_binary() {
+		let mut process_command = ProcessCommand::new(shell_binary);
+		process_command.arg("-c").arg(&interpolated);
+		process_command
 	} else {
 		let parts = shlex::split(&interpolated).ok_or_else(|| {
 			MonochangeError::Config(format!("failed to parse command `{interpolated}`"))
@@ -890,14 +1056,24 @@ fn run_cli_command_command(
 				"command must not be empty".to_string(),
 			));
 		};
-		ProcessCommand::new(program)
-			.args(args)
-			.current_dir(&context.root)
-			.output()
+		let mut process_command = ProcessCommand::new(program);
+		process_command.args(args);
+		process_command
 	};
-	let output = output.map_err(|error| {
-		MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
-	})?;
+	process_command.current_dir(&context.root);
+
+	let output = if progress.is_enabled() {
+		run_process_with_streaming(&mut process_command, progress, step, &interpolated)?
+	} else {
+		let output = process_command.output().map_err(|error| {
+			MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
+		})?;
+		PreparedProcessOutput {
+			status: output.status,
+			stdout: output.stdout,
+			stderr: output.stderr,
+		}
+	};
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 		let details = if stderr.is_empty() {
@@ -905,15 +1081,16 @@ fn run_cli_command_command(
 		} else {
 			stderr
 		};
+		let rendered_command = render_command_for_error(&interpolated);
 		return Err(MonochangeError::Discovery(format!(
-			"command `{interpolated}` failed: {details}"
+			"command `{rendered_command}` failed: {details}"
 		)));
 	}
 
 	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
 	let stderr_text = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
-	if let Some(id) = step_id {
+	if let Some(id) = options.step_id {
 		context.step_outputs.insert(
 			id.to_string(),
 			CommandStepOutput {
@@ -929,6 +1106,142 @@ fn run_cli_command_command(
 		context.command_logs.push(stdout);
 	}
 	Ok(())
+}
+
+struct PreparedProcessOutput {
+	status: ExitStatus,
+	stdout: Vec<u8>,
+	stderr: Vec<u8>,
+}
+
+enum StreamEvent {
+	Chunk(CommandStream, Vec<u8>),
+	Closed(CommandStream),
+}
+
+fn run_process_with_streaming(
+	process_command: &mut ProcessCommand,
+	progress: &mut CliProgressReporter,
+	step: &CliStepDefinition,
+	interpolated: &str,
+) -> MonochangeResult<PreparedProcessOutput> {
+	process_command
+		.stdin(Stdio::null())
+		.stdout(Stdio::piped())
+		.stderr(Stdio::piped());
+	let mut child = map_process_spawn_result(process_command.spawn(), interpolated)?;
+	let stdout = take_process_stream(child.stdout.take(), "stdout", interpolated)?;
+	let stderr = take_process_stream(child.stderr.take(), "stderr", interpolated)?;
+	let (sender, receiver) = mpsc::channel();
+	let stdout_handle = spawn_stream_reader(stdout, CommandStream::Stdout, sender.clone());
+	let stderr_handle = spawn_stream_reader(stderr, CommandStream::Stderr, sender);
+	let (stdout_buffer, stderr_buffer) = drain_stream_events(receiver, progress, step);
+	let status = map_process_wait_result(child.wait(), interpolated)?;
+	let _ = stdout_handle.join();
+	let _ = stderr_handle.join();
+	Ok(PreparedProcessOutput {
+		status,
+		stdout: stdout_buffer,
+		stderr: stderr_buffer,
+	})
+}
+
+fn map_process_spawn_result(
+	result: std::io::Result<std::process::Child>,
+	interpolated: &str,
+) -> MonochangeResult<std::process::Child> {
+	result.map_err(|error| {
+		MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
+	})
+}
+
+fn take_process_stream<T>(
+	stream: Option<T>,
+	stream_name: &str,
+	interpolated: &str,
+) -> MonochangeResult<T> {
+	stream.ok_or_else(|| {
+		MonochangeError::Io(format!(
+			"failed to capture {stream_name} for command `{interpolated}`"
+		))
+	})
+}
+
+fn drain_stream_events(
+	receiver: mpsc::Receiver<StreamEvent>,
+	progress: &mut CliProgressReporter,
+	step: &CliStepDefinition,
+) -> (Vec<u8>, Vec<u8>) {
+	let mut stdout_buffer = Vec::new();
+	let mut stderr_buffer = Vec::new();
+	let mut stdout_closed = false;
+	let mut stderr_closed = false;
+	while !stdout_closed || !stderr_closed {
+		match receiver.recv() {
+			Ok(StreamEvent::Chunk(stream, chunk)) => {
+				match stream {
+					CommandStream::Stdout => stdout_buffer.extend_from_slice(&chunk),
+					CommandStream::Stderr => stderr_buffer.extend_from_slice(&chunk),
+				}
+				progress.log_command_output(step, stream, String::from_utf8_lossy(&chunk).as_ref());
+			}
+			Ok(StreamEvent::Closed(stream)) => {
+				match stream {
+					CommandStream::Stdout => stdout_closed = true,
+					CommandStream::Stderr => stderr_closed = true,
+				}
+			}
+			Err(_) => break,
+		}
+	}
+	(stdout_buffer, stderr_buffer)
+}
+
+fn map_process_wait_result(
+	result: std::io::Result<ExitStatus>,
+	interpolated: &str,
+) -> MonochangeResult<ExitStatus> {
+	result.map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to wait for command `{interpolated}`: {error}"
+		))
+	})
+}
+
+fn spawn_stream_reader(
+	reader: impl Read + Send + 'static,
+	stream: CommandStream,
+	sender: mpsc::Sender<StreamEvent>,
+) -> JoinHandle<()> {
+	thread::spawn(move || {
+		let mut reader = BufReader::new(reader);
+		loop {
+			let mut buffer = Vec::new();
+			match reader.read_until(b'\n', &mut buffer) {
+				Ok(0) | Err(_) => break,
+				Ok(_) => {
+					let _ = sender.send(StreamEvent::Chunk(stream, buffer));
+				}
+			}
+		}
+		let _ = sender.send(StreamEvent::Closed(stream));
+	})
+}
+
+fn progress_error_detail(error: &MonochangeError) -> &str {
+	match error {
+		MonochangeError::Io(message)
+		| MonochangeError::Config(message)
+		| MonochangeError::Discovery(message)
+		| MonochangeError::Diagnostic(message) => message,
+	}
+}
+
+fn render_command_for_error(command: &str) -> String {
+	command
+		.replace('\r', "\\r")
+		.replace('\n', "\\n")
+		.replace('\t', "\\t")
 }
 
 fn cli_inputs_template_value(
@@ -1603,7 +1916,12 @@ pub(crate) fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 #[cfg(test)]
 mod tests {
 	use std::collections::BTreeMap;
+	use std::io;
 	use std::path::PathBuf;
+	use std::sync::mpsc;
+
+	use monochange_core::CliCommandDefinition;
+	use tempfile::tempdir;
 
 	use super::*;
 
@@ -1681,6 +1999,132 @@ mod tests {
 		assert_eq!(
 			error.to_string(),
 			"config error: `when` condition `{{ inputs.run }}` must be a boolean, got `maybe`"
+		);
+	}
+
+	#[test]
+	fn map_process_spawn_result_reports_io_failures() {
+		let error =
+			map_process_spawn_result(Err(io::Error::other("boom")), "echo hello").unwrap_err();
+		assert_eq!(
+			error.to_string(),
+			"io error: failed to run command `echo hello`: boom"
+		);
+	}
+
+	#[test]
+	fn take_process_stream_reports_missing_pipes() {
+		let error = take_process_stream::<Vec<u8>>(None, "stdout", "echo hello").unwrap_err();
+		assert_eq!(
+			error.to_string(),
+			"io error: failed to capture stdout for command `echo hello`"
+		);
+	}
+
+	#[test]
+	fn drain_stream_events_collects_stdout_stderr_and_handles_closed_channels() {
+		let cli_command = CliCommandDefinition {
+			name: "release".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: Vec::new(),
+		};
+		let mut progress = CliProgressReporter::new(&cli_command, false);
+		let step = CliStepDefinition::Command {
+			name: Some("stream output".to_string()),
+			when: None,
+			command: "echo hello".to_string(),
+			dry_run_command: None,
+			shell: ShellConfig::Default,
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		};
+		let (sender, receiver) = mpsc::channel();
+		sender
+			.send(StreamEvent::Chunk(
+				CommandStream::Stdout,
+				b"hello\n".to_vec(),
+			))
+			.unwrap_or_else(|error| panic!("send stdout: {error}"));
+		sender
+			.send(StreamEvent::Chunk(
+				CommandStream::Stderr,
+				b"warn\n".to_vec(),
+			))
+			.unwrap_or_else(|error| panic!("send stderr: {error}"));
+		sender
+			.send(StreamEvent::Closed(CommandStream::Stdout))
+			.unwrap_or_else(|error| panic!("close stdout: {error}"));
+		sender
+			.send(StreamEvent::Closed(CommandStream::Stderr))
+			.unwrap_or_else(|error| panic!("close stderr: {error}"));
+		drop(sender);
+		let (stdout, stderr) = drain_stream_events(receiver, &mut progress, &step);
+		assert_eq!(stdout, b"hello\n");
+		assert_eq!(stderr, b"warn\n");
+
+		let (sender, receiver) = mpsc::channel();
+		drop(sender);
+		let (stdout, stderr) = drain_stream_events(receiver, &mut progress, &step);
+		assert!(stdout.is_empty());
+		assert!(stderr.is_empty());
+	}
+
+	#[test]
+	fn map_process_wait_result_reports_io_failures() {
+		let error = map_process_wait_result(Err(io::Error::other("wait failed")), "echo hello")
+			.unwrap_err();
+		assert_eq!(
+			error.to_string(),
+			"io error: failed to wait for command `echo hello`: wait failed"
+		);
+	}
+
+	#[test]
+	fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let cli_command = CliCommandDefinition {
+			name: "fail".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: vec![CliStepDefinition::Command {
+				name: Some("fail loud".to_string()),
+				when: None,
+				command: "printf 'boom\\n' >&2; exit 3".to_string(),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::new(),
+			}],
+		};
+
+		let configuration = monochange_core::WorkspaceConfiguration {
+			root_path: tempdir.path().to_path_buf(),
+			defaults: monochange_core::WorkspaceDefaults::default(),
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		};
+		let error = execute_cli_command(
+			tempdir.path(),
+			&configuration,
+			&cli_command,
+			false,
+			BTreeMap::new(),
+		)
+		.unwrap_err();
+		assert_eq!(
+			error.to_string(),
+			"discovery error: command `printf 'boom\\n' >&2; exit 3` failed: boom"
 		);
 	}
 }

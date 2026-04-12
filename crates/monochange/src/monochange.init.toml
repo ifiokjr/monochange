@@ -335,8 +335,10 @@ version_format = "primary"
 #                       lockfiles after a release updates manifest versions.
 #                       By default monochange rewrites supported lockfiles
 #                       directly from the release plan so `mc release` stays on
-#                       the fast path. When set, these commands fully own
-#                       lockfile refresh for that ecosystem.
+#                       the fast path. Cargo is not re-run automatically anymore,
+#                       so incomplete Cargo.lock files should be refreshed with
+#                       explicit commands here or manually afterwards. When set,
+#                       these commands fully own lockfile refresh for that ecosystem.
 
 {% if has_cargo %}
 [ecosystems.cargo]
@@ -531,6 +533,9 @@ comment_on_failure = true
 #   Command              — run an arbitrary shell command
 #
 # Common step fields:
+#   name            — optional human-readable label shown in progress output and
+#                     diagnostics. Useful for long workflows with several steps
+#                     of the same kind.
 #   when            — optional condition controlling whether this step runs (e.g.
 #{% raw -%}
 #                     "{{ inputs.enabled }}", "{{ inputs.debug and not inputs.skip }}")

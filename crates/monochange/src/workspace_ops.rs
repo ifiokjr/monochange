@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::time::Instant;
 
 use monochange_cargo::discover_cargo_packages;
 use monochange_cargo::load_configured_cargo_package;
@@ -24,13 +25,16 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::ReleasePlan;
+use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::default_cli_commands;
 use monochange_dart::discover_dart_packages;
 use monochange_dart::load_configured_dart_package;
 use monochange_deno::discover_deno_packages;
 use monochange_deno::load_configured_deno_package;
+use monochange_gitea as gitea_provider;
 use monochange_github as github_provider;
+use monochange_gitlab as gitlab_provider;
 use monochange_npm::discover_npm_packages;
 use monochange_npm::load_configured_npm_package;
 use serde_json::json;
@@ -492,17 +496,9 @@ pub(crate) fn build_lockfile_command_executions(
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<LockfileCommandExecution>> {
 	let released_versions = released_versions_by_record_id(plan);
-	let cargo_executions = if configuration.cargo.lockfile_commands.is_empty() {
-		infer_cargo_lockfile_command_executions(packages, &released_versions)
-	} else {
-		resolve_lockfile_command_executions(
-			root,
-			&configuration.cargo.lockfile_commands,
-			packages.iter().any(|package| {
-				package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)
-			}),
-		)?
-	};
+	warn_about_incomplete_cargo_lockfiles(root, configuration, packages, &released_versions);
+	#[rustfmt::skip]
+	let cargo_executions = resolve_lockfile_command_executions(root, &configuration.cargo.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)))?;
 	#[rustfmt::skip]
 	let npm_executions = resolve_lockfile_command_executions(root, &configuration.npm.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)))?;
 	#[rustfmt::skip]
@@ -516,10 +512,15 @@ pub(crate) fn build_lockfile_command_executions(
 	Ok(dedup_lockfile_command_executions(executions))
 }
 
-fn infer_cargo_lockfile_command_executions(
+fn warn_about_incomplete_cargo_lockfiles(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	released_versions: &BTreeMap<String, String>,
-) -> Vec<LockfileCommandExecution> {
+) {
+	if !configuration.cargo.lockfile_commands.is_empty() {
+		return;
+	}
 	let released_packages = packages
 		.iter()
 		.filter(|package| {
@@ -527,13 +528,13 @@ fn infer_cargo_lockfile_command_executions(
 		})
 		.collect::<Vec<_>>();
 	if released_packages.is_empty() {
-		return Vec::new();
+		return;
 	}
 	let cargo_packages = packages
 		.iter()
 		.filter(|package| package.ecosystem == Ecosystem::Cargo)
 		.collect::<Vec<_>>();
-	let mut executions = Vec::new();
+	let mut warned_lockfiles = BTreeSet::new();
 	for package in released_packages {
 		for lockfile in monochange_cargo::discover_lockfiles(package) {
 			let shared_packages = cargo_packages
@@ -543,15 +544,18 @@ fn infer_cargo_lockfile_command_executions(
 					monochange_cargo::discover_lockfiles(candidate).contains(&lockfile)
 				})
 				.collect::<Vec<_>>();
-			// Fast in-process lockfile rewrites are correct for already-canonical
-			// Cargo.lock files, but fixture and user workspaces can still contain
-			// incomplete locks that need Cargo itself to repopulate missing entries.
-			if monochange_cargo::lockfile_requires_command_refresh(&lockfile, &shared_packages) {
-				executions.extend(monochange_cargo::default_lockfile_commands(package));
+			if !monochange_cargo::lockfile_requires_command_refresh(&lockfile, &shared_packages) {
+				continue;
+			}
+			let relative_lockfile = root_relative(root, &lockfile);
+			if warned_lockfiles.insert(relative_lockfile.clone()) {
+				eprintln!(
+					"warning: `{}` still looks incomplete after monochange rewrote it directly; run `cargo generate-lockfile`, `cargo check`, or configure `[ecosystems.cargo].lockfile_commands` if you want cargo to refresh it automatically",
+					relative_lockfile.display()
+				);
 			}
 		}
 	}
-	executions
 }
 
 fn resolve_lockfile_command_executions(
@@ -1263,9 +1267,19 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 	dry_run: bool,
 	build_file_diffs: bool,
 ) -> MonochangeResult<PreparedReleaseExecution> {
-	let configuration = load_workspace_configuration(root)?;
-	let discovery = discover_release_workspace(root, &configuration)?;
-	let changeset_paths = discover_changeset_paths(root)?;
+	let mut phase_timings = Vec::new();
+	let configuration =
+		measure_prepare_phase(&mut phase_timings, "load workspace configuration", || {
+			load_workspace_configuration(root)
+		})?;
+	let discovery =
+		measure_prepare_phase(&mut phase_timings, "discover release workspace", || {
+			discover_release_workspace(root, &configuration)
+		})?;
+	let changeset_paths =
+		measure_prepare_phase(&mut phase_timings, "discover changeset paths", || {
+			discover_changeset_paths(root)
+		})?;
 	tracing::debug!(count = changeset_paths.len(), "discovered changesets");
 
 	// Build the shared changeset lookup context once.
@@ -1284,41 +1298,42 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 	// filesystem contention. Reading eagerly keeps I/O predictable, while the
 	// second phase still benefits from parallel parsing once the bytes are in
 	// memory.
-	let changeset_sources = changeset_paths
-		.iter()
-		.map(|path| {
-			let contents = fs::read_to_string(path).map_err(|error| {
-				MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
-			})?;
-			Ok((path.clone(), contents))
-		})
-		.collect::<MonochangeResult<Vec<_>>>()?;
-	let loaded_changesets = {
-		use rayon::prelude::*;
-		changeset_sources
-			.par_iter()
-			.map(|(path, contents)| {
-				load_changeset_contents_with_context(path, contents, &changeset_context)
-			})
-			.collect::<MonochangeResult<Vec<_>>>()?
-	};
+	let changeset_sources =
+		measure_prepare_phase(&mut phase_timings, "read changeset files", || {
+			changeset_paths
+				.iter()
+				.map(|path| Ok((path.clone(), read_changeset_source(path)?)))
+				.collect::<MonochangeResult<Vec<_>>>()
+		})?;
+	let loaded_changesets =
+		measure_prepare_phase(&mut phase_timings, "parse changeset files", || {
+			use rayon::prelude::*;
+			changeset_sources
+				.par_iter()
+				.map(|(path, contents)| {
+					load_changeset_contents_with_context(path, contents, &changeset_context)
+				})
+				.collect::<MonochangeResult<Vec<_>>>()
+		})?;
 	let change_signals = loaded_changesets
 		.iter()
 		.flat_map(|changeset| changeset.signals.clone())
 		.collect::<Vec<_>>();
-	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
-	if let Some(source) = configuration
-		.source
-		.as_ref()
-		.filter(|source| source.provider == SourceProvider::GitHub)
-	{
-		if dry_run {
-			github_provider::annotate_changeset_context(source, &mut changesets);
-		} else {
-			github_provider::enrich_changeset_context(source, &mut changesets);
-		}
+	let mut changesets =
+		measure_prepare_phase(&mut phase_timings, "build prepared changesets", || {
+			Ok(build_prepared_changesets(root, &loaded_changesets))
+		})?;
+	if let Some(source) = configuration.source.as_ref() {
+		apply_source_changeset_context_with_timing(
+			&mut phase_timings,
+			source,
+			dry_run,
+			&mut changesets,
+		);
 	}
-	let plan = build_release_plan_from_signals(&configuration, &discovery, &change_signals)?;
+	let plan = measure_prepare_phase(&mut phase_timings, "build release plan", || {
+		build_release_plan_from_signals(&configuration, &discovery, &change_signals)
+	})?;
 	let released_packages = released_package_names(&discovery.packages, &plan);
 	tracing::debug!(
 		count = released_packages.len(),
@@ -1330,28 +1345,46 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		));
 	}
 
-	let changelog_targets = resolve_changelog_targets(&configuration, &discovery.packages)?;
-	let cargo_updates = build_cargo_manifest_updates(&discovery.packages, &plan)?;
-	let npm_updates = build_npm_manifest_updates(&discovery.packages, &plan)?;
-	let deno_updates = build_deno_manifest_updates(&discovery.packages, &plan)?;
-	let dart_updates = build_dart_manifest_updates(&discovery.packages, &plan)?;
-	let manifest_updates = [cargo_updates, npm_updates, deno_updates, dart_updates].concat();
+	let changelog_targets =
+		measure_prepare_phase(&mut phase_timings, "resolve changelog targets", || {
+			resolve_changelog_targets(&configuration, &discovery.packages)
+		})?;
+	let manifest_updates =
+		measure_prepare_phase(&mut phase_timings, "build manifest updates", || {
+			let cargo_updates = build_cargo_manifest_updates(&discovery.packages, &plan)?;
+			let npm_updates = build_npm_manifest_updates(&discovery.packages, &plan)?;
+			let deno_updates = build_deno_manifest_updates(&discovery.packages, &plan)?;
+			let dart_updates = build_dart_manifest_updates(&discovery.packages, &plan)?;
+			Ok([cargo_updates, npm_updates, deno_updates, dart_updates].concat())
+		})?;
 	let versioned_file_updates =
-		build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)?;
+		measure_prepare_phase(&mut phase_timings, "build versioned file updates", || {
+			build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)
+		})?;
 	let release_targets =
-		build_release_targets(&configuration, &discovery.packages, &plan, &changeset_paths);
-	let changelog_updates = build_changelog_updates(
-		ChangelogBuildContext::builder()
-			.root(root)
-			.configuration(&configuration)
-			.packages(&discovery.packages)
-			.plan(&plan)
-			.change_signals(&change_signals)
-			.changesets(&changesets)
-			.changelog_targets(&changelog_targets)
-			.release_targets(&release_targets)
-			.build(),
-	)?;
+		measure_prepare_phase(&mut phase_timings, "build release targets", || {
+			Ok(build_release_targets(
+				&configuration,
+				&discovery.packages,
+				&plan,
+				&changeset_paths,
+			))
+		})?;
+	let changelog_updates =
+		measure_prepare_phase(&mut phase_timings, "build changelog updates", || {
+			build_changelog_updates(
+				ChangelogBuildContext::builder()
+					.root(root)
+					.configuration(&configuration)
+					.packages(&discovery.packages)
+					.plan(&plan)
+					.change_signals(&change_signals)
+					.changesets(&changesets)
+					.changelog_targets(&changelog_targets)
+					.release_targets(&release_targets)
+					.build(),
+			)
+		})?;
 	let changelog_file_updates = changelog_updates
 		.iter()
 		.map(|update| update.file.clone())
@@ -1363,7 +1396,9 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 	]
 	.concat();
 	let lockfile_commands =
-		build_lockfile_command_executions(root, &configuration, &discovery.packages, &plan)?;
+		measure_prepare_phase(&mut phase_timings, "build lockfile refresh plan", || {
+			build_lockfile_command_executions(root, &configuration, &discovery.packages, &plan)
+		})?;
 	tracing::debug!(
 		manifest_updates = manifest_updates.len(),
 		lockfile_commands = lockfile_commands.len(),
@@ -1377,7 +1412,9 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		// directory (which can take minutes for large repos).
 		base_updates.clone()
 	} else {
-		materialize_lockfile_command_updates(root, &base_updates, &lockfile_commands)?
+		#[rustfmt::skip]
+		let materialized_updates = materialize_lockfile_command_updates_with_timing(&mut phase_timings, root, &base_updates, &lockfile_commands)?;
+		materialized_updates
 	};
 	let mut changed_files = file_updates
 		.iter()
@@ -1407,7 +1444,9 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 	// changed file, including giant lockfiles. Only pay that cost when a caller
 	// explicitly needs human-readable diff previews.
 	let file_diffs = if build_file_diffs {
-		build_file_diff_previews(root, &file_updates)?
+		measure_prepare_phase(&mut phase_timings, "build file diff previews", || {
+			build_file_diff_previews(root, &file_updates)
+		})?
 	} else {
 		Vec::new()
 	};
@@ -1416,18 +1455,19 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 	let group_version = shared_group_version(&plan);
 	let mut deleted_changesets = Vec::new();
 	if !dry_run {
-		// When lockfile commands ran, materialize_lockfile_command_updates
-		// already applied base_updates in-place. Only apply when we
-		// skipped that path (no lockfile commands).
-		if lockfile_commands.is_empty() {
-			apply_file_updates(&file_updates)?;
-		}
-		for path in &changeset_paths {
-			fs::remove_file(path).map_err(|error| {
-				MonochangeError::Io(format!("failed to delete {}: {error}", path.display()))
-			})?;
-			deleted_changesets.push(root_relative(root, path));
-		}
+		measure_prepare_phase(&mut phase_timings, "apply release changes", || {
+			// When lockfile commands ran, materialize_lockfile_command_updates
+			// already applied base_updates in-place. Only apply when we
+			// skipped that path (no lockfile commands).
+			if lockfile_commands.is_empty() {
+				apply_file_updates(&file_updates)?;
+			}
+			for path in &changeset_paths {
+				delete_changeset_file(path)?;
+				deleted_changesets.push(root_relative(root, path));
+			}
+			Ok(())
+		})?;
 	}
 
 	tracing::info!(
@@ -1452,7 +1492,108 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 			dry_run,
 		},
 		file_diffs,
+		phase_timings,
 	})
+}
+
+fn measure_prepare_phase<T>(
+	phase_timings: &mut Vec<StepPhaseTiming>,
+	label: impl Into<String>,
+	action: impl FnOnce() -> MonochangeResult<T>,
+) -> MonochangeResult<T> {
+	let label = label.into();
+	let started_at = Instant::now();
+	let result = action();
+	record_prepare_phase_timing(phase_timings, label, started_at);
+	result
+}
+
+fn record_prepare_phase_timing(
+	phase_timings: &mut Vec<StepPhaseTiming>,
+	label: impl Into<String>,
+	started_at: Instant,
+) {
+	phase_timings.push(StepPhaseTiming {
+		label: label.into(),
+		duration: started_at.elapsed(),
+	});
+}
+
+fn read_changeset_source(path: &Path) -> MonochangeResult<String> {
+	fs::read_to_string(path)
+		.map_err(|error| MonochangeError::Io(format!("failed to read {}: {error}", path.display())))
+}
+
+fn delete_changeset_file(path: &Path) -> MonochangeResult<()> {
+	fs::remove_file(path).map_err(|error| {
+		MonochangeError::Io(format!("failed to delete {}: {error}", path.display()))
+	})
+}
+
+fn changeset_context_phase_label(source: &SourceConfiguration, dry_run: bool) -> String {
+	if dry_run {
+		format!("annotate changeset context via {}", source.provider)
+	} else {
+		format!("enrich changeset context via {}", source.provider)
+	}
+}
+
+fn apply_source_changeset_context_with_timing(
+	phase_timings: &mut Vec<StepPhaseTiming>,
+	source: &SourceConfiguration,
+	dry_run: bool,
+	changesets: &mut [PreparedChangeset],
+) {
+	let label = changeset_context_phase_label(source, dry_run);
+	let started_at = Instant::now();
+	apply_source_changeset_context(source, dry_run, changesets);
+	record_prepare_phase_timing(phase_timings, label, started_at);
+}
+
+fn apply_source_changeset_context(
+	source: &SourceConfiguration,
+	dry_run: bool,
+	changesets: &mut [PreparedChangeset],
+) {
+	match source.provider {
+		SourceProvider::GitHub => {
+			if dry_run {
+				github_provider::annotate_changeset_context(source, changesets);
+			} else {
+				github_provider::enrich_changeset_context(source, changesets);
+			}
+		}
+		SourceProvider::GitLab => {
+			if dry_run {
+				gitlab_provider::annotate_changeset_context(source, changesets);
+			} else {
+				gitlab_provider::enrich_changeset_context(source, changesets);
+			}
+		}
+		SourceProvider::Gitea => {
+			if dry_run {
+				gitea_provider::annotate_changeset_context(source, changesets);
+			} else {
+				gitea_provider::enrich_changeset_context(source, changesets);
+			}
+		}
+	}
+}
+
+fn materialize_lockfile_command_updates_with_timing(
+	phase_timings: &mut Vec<StepPhaseTiming>,
+	root: &Path,
+	base_updates: &[FileUpdate],
+	lockfile_commands: &[LockfileCommandExecution],
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let started_at = Instant::now();
+	let result = materialize_lockfile_command_updates(root, base_updates, lockfile_commands);
+	record_prepare_phase_timing(
+		phase_timings,
+		"materialize lockfile command updates",
+		started_at,
+	);
+	result
 }
 
 #[cfg(test)]
@@ -1460,7 +1601,21 @@ mod workspace_ops_tests {
 	#[cfg(unix)]
 	use std::os::unix::fs::PermissionsExt;
 
+	use monochange_core::ChangesetContext;
+	use monochange_core::ChangesetRevision;
+	use monochange_core::HostedActorRef;
+	use monochange_core::HostedActorSourceKind;
+	use monochange_core::HostedCommitRef;
+	use monochange_core::HostingCapabilities;
+	use monochange_core::HostingProviderKind;
+	use monochange_core::PreparedChangeset;
+	use monochange_core::ProviderBotSettings;
+	use monochange_core::ProviderMergeRequestSettings;
+	use monochange_core::ProviderReleaseSettings;
 	use monochange_core::ShellConfig;
+	use monochange_core::SourceConfiguration;
+	use monochange_core::SourceProvider;
+	use monochange_core::WorkspaceConfiguration;
 
 	use super::*;
 
@@ -1482,6 +1637,89 @@ mod workspace_ops_tests {
 
 	#[cfg(not(unix))]
 	fn make_executable(_path: &Path) {}
+
+	fn sample_changeset_with_context() -> PreparedChangeset {
+		PreparedChangeset {
+			path: PathBuf::from(".changeset/feature.md"),
+			summary: Some("feature".to_string()),
+			details: None,
+			targets: Vec::new(),
+			context: Some(ChangesetContext {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				capabilities: HostingCapabilities::default(),
+				introduced: Some(ChangesetRevision {
+					actor: Some(HostedActorRef {
+						provider: HostingProviderKind::GenericGit,
+						host: None,
+						id: None,
+						login: Some("ifiokjr".to_string()),
+						display_name: Some("Ifiok Jr.".to_string()),
+						url: None,
+						source: HostedActorSourceKind::CommitAuthor,
+					}),
+					commit: Some(HostedCommitRef {
+						provider: HostingProviderKind::GenericGit,
+						host: None,
+						sha: "abc1234567890".to_string(),
+						short_sha: "abc1234".to_string(),
+						url: None,
+						authored_at: None,
+						committed_at: None,
+						author_name: Some("Ifiok Jr.".to_string()),
+						author_email: Some("ifiok@example.com".to_string()),
+					}),
+					review_request: None,
+				}),
+				last_updated: None,
+				related_issues: Vec::new(),
+			}),
+		}
+	}
+
+	fn sample_source(provider: SourceProvider) -> SourceConfiguration {
+		SourceConfiguration {
+			provider,
+			host: match provider {
+				SourceProvider::Gitea => Some("https://codeberg.org".to_string()),
+				SourceProvider::GitHub => None,
+				SourceProvider::GitLab => None,
+			},
+			api_url: None,
+			owner: match provider {
+				SourceProvider::GitLab => "group".to_string(),
+				_ => "org".to_string(),
+			},
+			repo: "monochange".to_string(),
+			releases: ProviderReleaseSettings::default(),
+			pull_requests: ProviderMergeRequestSettings::default(),
+			bot: ProviderBotSettings::default(),
+		}
+	}
+
+	fn workspace_configuration_with_lockfile_commands() -> WorkspaceConfiguration {
+		WorkspaceConfiguration {
+			root_path: PathBuf::from("."),
+			defaults: monochange_core::WorkspaceDefaults::default(),
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings {
+				lockfile_commands: vec![LockfileCommandDefinition {
+					command: "cargo metadata".to_string(),
+					cwd: None,
+					shell: ShellConfig::None,
+				}],
+				..monochange_core::EcosystemSettings::default()
+			},
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		}
+	}
 
 	#[test]
 	fn remap_workspace_path_rejects_paths_outside_the_workspace() {
@@ -1817,5 +2055,167 @@ mod workspace_ops_tests {
 		.unwrap_or_else(|| panic!("expected error from failing command"));
 
 		assert!(error.to_string().contains("failed"));
+	}
+
+	#[test]
+	fn read_and_delete_changeset_helpers_report_missing_paths() {
+		let error = read_changeset_source(Path::new("missing/changeset.md"))
+			.err()
+			.unwrap_or_else(|| panic!("expected read error"));
+		assert!(
+			error
+				.to_string()
+				.contains("failed to read missing/changeset.md")
+		);
+
+		let error = delete_changeset_file(Path::new("missing/changeset.md"))
+			.err()
+			.unwrap_or_else(|| panic!("expected delete error"));
+		assert!(
+			error
+				.to_string()
+				.contains("failed to delete missing/changeset.md")
+		);
+	}
+
+	#[test]
+	fn changeset_context_phase_label_covers_annotate_and_enrich_modes() {
+		let gitlab = sample_source(SourceProvider::GitLab);
+		let github = sample_source(SourceProvider::GitHub);
+		assert_eq!(github.host, None);
+		assert_eq!(
+			changeset_context_phase_label(&gitlab, true),
+			"annotate changeset context via gitlab"
+		);
+		assert_eq!(
+			changeset_context_phase_label(&gitlab, false),
+			"enrich changeset context via gitlab"
+		);
+	}
+
+	#[test]
+	fn warn_about_incomplete_cargo_lockfiles_returns_early_when_commands_are_configured() {
+		let configuration = workspace_configuration_with_lockfile_commands();
+		warn_about_incomplete_cargo_lockfiles(
+			Path::new("."),
+			&configuration,
+			&[],
+			&BTreeMap::new(),
+		);
+	}
+
+	#[test]
+	fn apply_source_changeset_context_dispatches_non_dry_gitlab_and_gitea_enrichment() {
+		let mut gitlab_changesets = vec![sample_changeset_with_context()];
+		apply_source_changeset_context(
+			&sample_source(SourceProvider::GitLab),
+			false,
+			&mut gitlab_changesets,
+		);
+		let gitlab_context = gitlab_changesets
+			.first()
+			.and_then(|changeset| changeset.context.as_ref())
+			.unwrap_or_else(|| panic!("expected GitLab context"));
+		assert_eq!(gitlab_context.provider, HostingProviderKind::GitLab);
+		assert_eq!(gitlab_context.host.as_deref(), Some("gitlab.com"));
+		assert_eq!(
+			gitlab_context
+				.introduced
+				.as_ref()
+				.and_then(|revision| revision.commit.as_ref())
+				.and_then(|commit| commit.url.as_deref()),
+			Some("https://gitlab.com/group/monochange/-/commit/abc1234567890")
+		);
+
+		let mut gitea_changesets = vec![sample_changeset_with_context()];
+		apply_source_changeset_context(
+			&sample_source(SourceProvider::Gitea),
+			false,
+			&mut gitea_changesets,
+		);
+		let gitea_context = gitea_changesets
+			.first()
+			.and_then(|changeset| changeset.context.as_ref())
+			.unwrap_or_else(|| panic!("expected Gitea context"));
+		assert_eq!(gitea_context.provider, HostingProviderKind::Gitea);
+		assert_eq!(gitea_context.host.as_deref(), Some("codeberg.org"));
+		assert_eq!(
+			gitea_context
+				.introduced
+				.as_ref()
+				.and_then(|revision| revision.commit.as_ref())
+				.and_then(|commit| commit.url.as_deref()),
+			Some("https://codeberg.org/org/monochange/commit/abc1234567890")
+		);
+	}
+
+	#[test]
+	fn prepare_release_execution_materializes_configured_lockfile_commands() {
+		let fixture = monochange_test_helpers::fs::setup_fixture_from(
+			env!("CARGO_MANIFEST_DIR"),
+			"monochange/cargo-lock-release",
+		);
+		make_executable(&fixture.path().join("tools/bin/cargo"));
+		let config_path = fixture.path().join("monochange.toml");
+		let mut config = fs::read_to_string(&config_path)
+			.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
+		config.push_str(
+			r#"
+
+[[ecosystems.cargo.lockfile_commands]]
+command = "tools/bin/cargo"
+cwd = "."
+"#,
+		);
+		fs::write(&config_path, config)
+			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+		let prepared = prepare_release_execution_with_file_diffs(fixture.path(), false, false)
+			.unwrap_or_else(|error| panic!("prepare release: {error}"));
+
+		assert!(
+			prepared
+				.phase_timings
+				.iter()
+				.any(|phase| phase.label == "materialize lockfile command updates")
+		);
+		assert_eq!(
+			fs::read_to_string(fixture.path().join("Cargo.lock"))
+				.unwrap_or_else(|error| panic!("read Cargo.lock: {error}"))
+				.trim(),
+			"[[package]]\nname = \"workflow-core\"\nversion = \"1.1.0\""
+		);
+	}
+
+	#[test]
+	fn prepare_release_execution_tracks_gitlab_context_phase_timing() {
+		let fixture = monochange_test_helpers::fs::setup_fixture_from(
+			env!("CARGO_MANIFEST_DIR"),
+			"monochange/release-base",
+		);
+		let config_path = fixture.path().join("monochange.toml");
+		let mut config = fs::read_to_string(&config_path)
+			.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
+		config.push_str(
+			r#"
+
+[source]
+provider = "gitlab"
+owner = "group"
+repo = "monochange"
+"#,
+		);
+		fs::write(&config_path, config)
+			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+		let prepared = prepare_release_execution_with_file_diffs(fixture.path(), true, false)
+			.unwrap_or_else(|error| panic!("prepare release: {error}"));
+
+		assert!(
+			prepared
+				.phase_timings
+				.iter()
+				.any(|phase| phase.label == "annotate changeset context via gitlab")
+		);
 	}
 }

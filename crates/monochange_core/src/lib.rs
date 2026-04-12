@@ -1256,12 +1256,16 @@ pub enum CliStepDefinition {
 	/// release.
 	Validate {
 		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Discover packages across supported ecosystems and render the result.
 	Discover {
+		#[serde(default)]
+		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
@@ -1271,6 +1275,8 @@ pub enum CliStepDefinition {
 	/// prompts.
 	CreateChangeFile {
 		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -1278,6 +1284,8 @@ pub enum CliStepDefinition {
 	/// Prepare a release and expose structured `release.*` context to later
 	/// steps.
 	PrepareRelease {
+		#[serde(default)]
+		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
@@ -1288,6 +1296,8 @@ pub enum CliStepDefinition {
 	/// Requires a previous `PrepareRelease` step.
 	CommitRelease {
 		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -1297,6 +1307,8 @@ pub enum CliStepDefinition {
 	///
 	/// Requires a previous `PrepareRelease` step.
 	RenderReleaseManifest {
+		#[serde(default)]
+		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
@@ -1311,6 +1323,8 @@ pub enum CliStepDefinition {
 	/// configuration.
 	PublishRelease {
 		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -1322,6 +1336,8 @@ pub enum CliStepDefinition {
 	/// configuration.
 	OpenReleaseRequest {
 		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -1331,6 +1347,8 @@ pub enum CliStepDefinition {
 	/// Requires a previous `PrepareRelease` step and currently expects
 	/// `[source].provider = "github"`.
 	CommentReleasedIssues {
+		#[serde(default)]
+		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
@@ -1342,12 +1360,16 @@ pub enum CliStepDefinition {
 	/// Standalone CI-oriented step.
 	AffectedPackages {
 		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Inspect parsed changeset data, provenance, and linked metadata.
 	DiagnoseChangesets {
+		#[serde(default)]
+		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
@@ -1359,6 +1381,8 @@ pub enum CliStepDefinition {
 	/// `retarget.*` state to later commands.
 	RetargetRelease {
 		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -1367,6 +1391,8 @@ pub enum CliStepDefinition {
 	///
 	/// Use this to bridge built-in `monochange` state into external tooling.
 	Command {
+		#[serde(default)]
+		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
 		command: String,
@@ -1401,6 +1427,30 @@ impl CliStepDefinition {
 			| Self::RetargetRelease { inputs, .. }
 			| Self::Command { inputs, .. } => inputs,
 		}
+	}
+
+	#[must_use]
+	pub fn name(&self) -> Option<&str> {
+		match self {
+			Self::Validate { name, .. }
+			| Self::Discover { name, .. }
+			| Self::CreateChangeFile { name, .. }
+			| Self::PrepareRelease { name, .. }
+			| Self::CommitRelease { name, .. }
+			| Self::RenderReleaseManifest { name, .. }
+			| Self::PublishRelease { name, .. }
+			| Self::OpenReleaseRequest { name, .. }
+			| Self::CommentReleasedIssues { name, .. }
+			| Self::AffectedPackages { name, .. }
+			| Self::DiagnoseChangesets { name, .. }
+			| Self::RetargetRelease { name, .. }
+			| Self::Command { name, .. } => name.as_deref(),
+		}
+	}
+
+	#[must_use]
+	pub fn display_name(&self) -> &str {
+		self.name().unwrap_or(self.kind_name())
 	}
 
 	#[must_use]
@@ -1678,9 +1728,15 @@ pub struct ReleaseManifestChangelog {
 #[serde(rename_all = "snake_case")]
 pub enum HostingProviderKind {
 	#[default]
+	#[serde(rename = "generic_git")]
 	GenericGit,
+	#[serde(rename = "github", alias = "git_hub")]
 	GitHub,
+	#[serde(rename = "gitlab", alias = "git_lab")]
 	GitLab,
+	#[serde(rename = "gitea")]
+	Gitea,
+	#[serde(rename = "bitbucket")]
 	Bitbucket,
 }
 
@@ -1691,6 +1747,7 @@ impl HostingProviderKind {
 			Self::GenericGit => "generic_git",
 			Self::GitHub => "github",
 			Self::GitLab => "gitlab",
+			Self::Gitea => "gitea",
 			Self::Bitbucket => "bitbucket",
 		}
 	}
@@ -2672,6 +2729,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			help_text: Some("Validate monochange configuration and changesets".to_string()),
 			inputs: Vec::new(),
 			steps: vec![CliStepDefinition::Validate {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2689,6 +2747,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				short: None,
 			}],
 			steps: vec![CliStepDefinition::Discover {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2782,6 +2841,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::CreateChangeFile {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2799,6 +2859,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				short: None,
 			}],
 			steps: vec![CliStepDefinition::PrepareRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2864,6 +2925,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::AffectedPackages {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2897,6 +2959,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::DiagnoseChangesets {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2956,6 +3019,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::RetargetRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			}],

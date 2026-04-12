@@ -48,6 +48,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
@@ -240,6 +241,7 @@ mod changelog;
 mod changeset_policy;
 mod changesets;
 mod cli;
+mod cli_progress;
 mod cli_runtime;
 mod git_support;
 mod interactive;
@@ -340,9 +342,16 @@ struct PreparedFileDiff {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct StepPhaseTiming {
+	label: String,
+	duration: Duration,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 struct PreparedReleaseExecution {
 	prepared_release: PreparedRelease,
 	file_diffs: Vec<PreparedFileDiff>,
+	phase_timings: Vec<StepPhaseTiming>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

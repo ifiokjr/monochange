@@ -75,6 +75,12 @@ In practice, most workflows fit one of four patterns:
 
 ## Shared concepts
 
+### Step-local `name`
+
+Every step can declare a `name = "..."` label.
+
+Use that when you want human-friendly progress output such as `plan release`, `publish tags`, or `announce release` instead of the raw step kind.
+
 ### Step-local `when`
 
 Every step can declare a `when = "..."` expression.

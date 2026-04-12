@@ -5,8 +5,11 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use monochange_core::CommitMessage;
+use monochange_core::HostingCapabilities;
+use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PreparedChangeset;
 use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ReleaseManifest;
 use monochange_core::ReleaseManifestTarget;
@@ -45,6 +48,81 @@ pub const fn source_capabilities() -> SourceCapabilities {
 		released_issue_comments: false,
 		requires_host: false,
 	}
+}
+
+#[must_use]
+pub const fn gitlab_hosting_capabilities() -> HostingCapabilities {
+	HostingCapabilities {
+		commit_web_urls: true,
+		actor_profiles: false,
+		review_request_lookup: false,
+		related_issues: false,
+		issue_comments: false,
+	}
+}
+
+#[must_use]
+pub fn gitlab_host_name(source: &SourceConfiguration) -> Option<String> {
+	let host = gitlab_host(source)
+		.trim_start_matches("https://")
+		.trim_start_matches("http://")
+		.split('/')
+		.next()
+		.unwrap_or_default()
+		.trim();
+	if host.is_empty() {
+		None
+	} else {
+		Some(host.to_string())
+	}
+}
+
+#[must_use]
+pub fn gitlab_commit_url(source: &SourceConfiguration, sha: &str) -> String {
+	format!(
+		"{}/{}/{}/-/commit/{sha}",
+		gitlab_host(source).trim_end_matches('/'),
+		source.owner,
+		source.repo
+	)
+}
+
+pub fn annotate_changeset_context(
+	source: &SourceConfiguration,
+	changesets: &mut [PreparedChangeset],
+) {
+	let host = gitlab_host_name(source);
+	let capabilities = gitlab_hosting_capabilities();
+	for changeset in changesets {
+		let Some(context) = changeset.context.as_mut() else {
+			continue;
+		};
+		context.provider = HostingProviderKind::GitLab;
+		context.host.clone_from(&host);
+		context.capabilities = capabilities.clone();
+		for revision in [&mut context.introduced, &mut context.last_updated] {
+			let Some(revision) = revision.as_mut() else {
+				continue;
+			};
+			if let Some(commit) = revision.commit.as_mut() {
+				commit.provider = HostingProviderKind::GitLab;
+				commit.host.clone_from(&host);
+				commit.url = Some(gitlab_commit_url(source, &commit.sha));
+			}
+			if let Some(actor) = revision.actor.as_mut() {
+				actor.provider = HostingProviderKind::GitLab;
+				actor.host.clone_from(&host);
+			}
+		}
+	}
+}
+
+#[tracing::instrument(skip_all)]
+pub fn enrich_changeset_context(
+	source: &SourceConfiguration,
+	changesets: &mut [PreparedChangeset],
+) {
+	annotate_changeset_context(source, changesets);
 }
 
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {

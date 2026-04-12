@@ -92,6 +92,7 @@
 //! <!-- {/monochangeGithubCrateDocs} -->
 
 use std::env;
+use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -273,52 +274,6 @@ struct GraphqlPullRequestMutation {
 struct GraphqlPullRequestNode {
 	#[serde(rename = "number")]
 	_number: u64,
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubUserResponse {
-	id: u64,
-	login: String,
-	html_url: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubCommitPullRequestResponse {
-	number: u64,
-	title: String,
-	html_url: Option<String>,
-	body: Option<String>,
-	user: Option<GitHubUserResponse>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GraphqlPullRequestIssuesResponse {
-	repository: Option<GraphqlPullRequestIssuesRepository>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GraphqlPullRequestIssuesRepository {
-	pull_request: Option<GraphqlPullRequestIssuesNode>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GraphqlPullRequestIssuesNode {
-	closing_issues_references: GraphqlIssueConnection,
-}
-
-#[derive(Debug, Deserialize)]
-struct GraphqlIssueConnection {
-	nodes: Vec<GraphqlIssueNode>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GraphqlIssueNode {
-	number: u64,
-	title: String,
-	url: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -570,8 +525,15 @@ async fn enrich_changeset_context_with_client(
 			}
 		}
 	}
-	let mut review_requests_by_sha =
-		std::collections::BTreeMap::<String, Option<GitHubRelatedReviewRequest>>::new();
+	let review_request_lookup_shas = collect_review_request_lookup_shas(changesets);
+	let review_requests_by_sha =
+		load_review_requests_for_commits_with_client(client, source, &review_request_lookup_shas)
+			.await
+			.unwrap_or_else(|error| {
+				#[rustfmt::skip]
+				tracing::warn!(commits = review_request_lookup_shas.len(), %error, "failed to batch load GitHub review requests; continuing with commit annotations only");
+				std::collections::BTreeMap::new()
+			});
 	for changeset in changesets.iter_mut() {
 		let Some(context) = changeset.context.as_mut() else {
 			continue;
@@ -584,20 +546,10 @@ async fn enrich_changeset_context_with_client(
 			let Some(commit) = revision.commit.as_ref() else {
 				continue;
 			};
-			let commit_sha = commit.sha.clone();
-			let related_review_request = if let Some(cached) =
-				review_requests_by_sha.get(&commit_sha)
+			if let Some(related_review_request) = review_requests_by_sha
+				.get(&commit.sha)
+				.and_then(Clone::clone)
 			{
-				cached.clone()
-			} else {
-				let loaded = lookup_commit_review_request_with_client(client, source, &commit_sha)
-					.await
-					.ok()
-					.flatten();
-				review_requests_by_sha.insert(commit_sha.clone(), loaded.clone());
-				loaded
-			};
-			if let Some(related_review_request) = related_review_request {
 				for issue in related_review_request.issues {
 					issues_by_id.entry(issue.id.clone()).or_insert(issue);
 				}
@@ -615,94 +567,180 @@ async fn enrich_changeset_context_with_client(
 	}
 }
 
-async fn lookup_commit_review_request_with_client(
+fn collect_review_request_lookup_shas(changesets: &[PreparedChangeset]) -> Vec<String> {
+	let mut shas = changesets
+		.iter()
+		.filter_map(|changeset| changeset.context.as_ref())
+		.flat_map(|context| [&context.introduced, &context.last_updated])
+		.filter_map(|revision| revision.as_ref())
+		.filter_map(|revision| revision.commit.as_ref())
+		.map(|commit| commit.sha.clone())
+		.collect::<Vec<_>>();
+	shas.sort();
+	shas.dedup();
+	shas
+}
+
+async fn load_review_requests_for_commits_with_client(
 	client: &Octocrab,
 	source: &SourceConfiguration,
-	sha: &str,
-) -> MonochangeResult<Option<GitHubRelatedReviewRequest>> {
-	let path = format!(
-		"/repos/{}/{}/commits/{}/pulls",
-		source.owner, source.repo, sha
-	);
-	let pull_requests = get_json::<Vec<GitHubCommitPullRequestResponse>>(client, &path).await?;
-	let Some(pull_request) = pull_requests.into_iter().next() else {
-		return Ok(None);
-	};
-	let author = pull_request.user.map(|user| {
-		HostedActorRef {
-			provider: HostingProviderKind::GitHub,
-			host: github_host(),
-			id: Some(user.id.to_string()),
-			login: Some(user.login.clone()),
-			display_name: Some(user.login),
-			url: user.html_url,
-			source: HostedActorSourceKind::ReviewRequestAuthor,
-		}
-	});
+	shas: &[String],
+) -> MonochangeResult<std::collections::BTreeMap<String, Option<GitHubRelatedReviewRequest>>> {
+	if shas.is_empty() {
+		return Ok(std::collections::BTreeMap::new());
+	}
+	#[rustfmt::skip]
+	tracing::info!(commits = shas.len(), requests = 1, "loading GitHub review requests");
+	let review_requests_by_sha =
+		load_review_request_batch_with_client(client, source, shas).await?;
+	let review_requests_found = review_requests_by_sha
+		.values()
+		.filter(|review_request| review_request.is_some())
+		.count();
+	#[rustfmt::skip]
+	tracing::debug!(commits = shas.len(), review_requests = review_requests_found, "resolved GitHub review requests");
+	Ok(review_requests_by_sha)
+}
+
+async fn load_review_request_batch_with_client(
+	client: &Octocrab,
+	source: &SourceConfiguration,
+	shas: &[String],
+) -> MonochangeResult<std::collections::BTreeMap<String, Option<GitHubRelatedReviewRequest>>> {
+	let query = build_review_request_batch_query(&source.owner, &source.repo, shas);
+	let response = client
+		.graphql::<serde_json::Value>(&json!({ "query": query }))
+		.await
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to batch load GitHub review requests for {} commit(s): {error}",
+				shas.len()
+			))
+		})?;
+	let repository = response
+		.get("repository")
+		.or_else(|| response.get("data").and_then(|data| data.get("repository")))
+		.and_then(serde_json::Value::as_object)
+		.ok_or_else(|| {
+			MonochangeError::Config(
+				"GitHub review-request lookup returned no repository payload".to_string(),
+			)
+		})?;
+	let mut review_requests_by_sha =
+		std::collections::BTreeMap::<String, Option<GitHubRelatedReviewRequest>>::new();
+	for (index, sha) in shas.iter().enumerate() {
+		let alias = format!("commit_{index}");
+		let review_request = repository
+			.get(&alias)
+			.and_then(|commit| {
+				commit
+					.get("associatedPullRequests")
+					.and_then(|pull_requests| pull_requests.get("nodes"))
+					.and_then(serde_json::Value::as_array)
+					.and_then(|pull_requests| pull_requests.first())
+			})
+			.and_then(|pull_request| parse_review_request_from_graphql(source, pull_request));
+		review_requests_by_sha.insert(sha.clone(), review_request);
+	}
+	Ok(review_requests_by_sha)
+}
+
+fn build_review_request_batch_query(owner: &str, repo: &str, shas: &[String]) -> String {
+	let mut query = format!("query {{ repository(owner: \"{owner}\", name: \"{repo}\") {{");
+	for (index, sha) in shas.iter().enumerate() {
+		let alias = format!("commit_{index}");
+		let _ = write!(
+			query,
+			" {alias}: object(expression: \"{sha}\") {{ ... on Commit {{ associatedPullRequests(first: 1) {{ nodes {{ number title url body author {{ login url }} closingIssuesReferences(first: 50) {{ nodes {{ number title url }} }} }} }} }} }}"
+		);
+	}
+	query.push_str(" } }");
+	query
+}
+
+fn parse_review_request_from_graphql(
+	source: &SourceConfiguration,
+	pull_request: &serde_json::Value,
+) -> Option<GitHubRelatedReviewRequest> {
+	let number = pull_request.get("number")?.as_u64()?;
+	let title = pull_request
+		.get("title")
+		.and_then(serde_json::Value::as_str)?
+		.to_string();
+	let body = pull_request
+		.get("body")
+		.and_then(serde_json::Value::as_str)
+		.map(str::to_string);
+	let author = pull_request
+		.get("author")
+		.and_then(serde_json::Value::as_object)
+		.map(|author| {
+			HostedActorRef {
+				provider: HostingProviderKind::GitHub,
+				host: github_host(),
+				id: None,
+				login: author
+					.get("login")
+					.and_then(serde_json::Value::as_str)
+					.map(str::to_string),
+				display_name: author
+					.get("login")
+					.and_then(serde_json::Value::as_str)
+					.map(str::to_string),
+				url: author
+					.get("url")
+					.and_then(serde_json::Value::as_str)
+					.map(str::to_string),
+				source: HostedActorSourceKind::ReviewRequestAuthor,
+			}
+		});
 	let review_request = HostedReviewRequestRef {
 		provider: HostingProviderKind::GitHub,
 		host: github_host(),
 		kind: HostedReviewRequestKind::PullRequest,
-		id: format!("#{}", pull_request.number),
-		title: Some(pull_request.title),
+		id: format!("#{number}"),
+		title: Some(title),
 		url: pull_request
-			.html_url
-			.or_else(|| Some(github_pull_request_url(source, pull_request.number))),
+			.get("url")
+			.and_then(serde_json::Value::as_str)
+			.map(str::to_string)
+			.or_else(|| Some(github_pull_request_url(source, number))),
 		author,
 	};
-	let issues = load_pull_request_issues_with_client(
-		client,
-		source,
-		pull_request.number,
-		pull_request.body.as_deref(),
-	)
-	.await
-	.unwrap_or_default();
-	Ok(Some(GitHubRelatedReviewRequest {
-		review_request,
-		issues,
-	}))
-}
-
-async fn load_pull_request_issues_with_client(
-	client: &Octocrab,
-	source: &SourceConfiguration,
-	number: u64,
-	body: Option<&str>,
-) -> MonochangeResult<Vec<HostedIssueRef>> {
-	let response = client
-		.graphql::<GraphqlPullRequestIssuesResponse>(&json!({
-			"query": "query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { closingIssuesReferences(first: 50) { nodes { number title url } } } } }",
-			"owner": source.owner,
-			"repo": source.repo,
-			"number": number,
-		}))
-		.await
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"failed to load GitHub closing issues for pull request #{number}: {error}"
-			))
-		})?;
 	let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
-	for issue in response
-		.repository
-		.and_then(|repository| repository.pull_request)
+	for issue in pull_request
+		.get("closingIssuesReferences")
+		.and_then(|issues| issues.get("nodes"))
+		.and_then(serde_json::Value::as_array)
 		.into_iter()
-		.flat_map(|pull_request| pull_request.closing_issues_references.nodes)
+		.flatten()
 	{
+		let Some(number) = issue.get("number").and_then(serde_json::Value::as_u64) else {
+			continue;
+		};
 		issues_by_id.insert(
-			format!("#{}", issue.number),
+			format!("#{number}"),
 			HostedIssueRef {
 				provider: HostingProviderKind::GitHub,
 				host: github_host(),
-				id: format!("#{}", issue.number),
-				title: Some(issue.title),
-				url: Some(issue.url),
+				id: format!("#{number}"),
+				title: issue
+					.get("title")
+					.and_then(serde_json::Value::as_str)
+					.map(str::to_string),
+				url: issue
+					.get("url")
+					.and_then(serde_json::Value::as_str)
+					.map(str::to_string),
 				relationship: HostedIssueRelationshipKind::ClosedByReviewRequest,
 			},
 		);
 	}
-	for issue_number in body.map(extract_issue_numbers).unwrap_or_default() {
+	for issue_number in body
+		.as_deref()
+		.map(extract_issue_numbers)
+		.unwrap_or_default()
+	{
 		issues_by_id
 			.entry(format!("#{issue_number}"))
 			.or_insert_with(|| {
@@ -716,7 +754,10 @@ async fn load_pull_request_issues_with_client(
 				}
 			});
 	}
-	Ok(issues_by_id.into_values().collect())
+	Some(GitHubRelatedReviewRequest {
+		review_request,
+		issues: issues_by_id.into_values().collect(),
+	})
 }
 
 fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
