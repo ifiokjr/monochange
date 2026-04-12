@@ -203,6 +203,8 @@ path = "crates/monochange_gitea"
 [package."@monochange/skill"]
 path = "npm/skill"
 type = "npm"
+tag = true
+release = true
 
 # =============================================================================
 # [group.*] — version groups that share a single release identity
