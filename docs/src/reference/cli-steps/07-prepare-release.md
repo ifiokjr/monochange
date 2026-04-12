@@ -24,7 +24,7 @@ If your command eventually needs release metadata, start with `PrepareRelease` r
 
 ## Inputs
 
-- `format` — `text` or `json`
+- `format` — `markdown`, `text`, or `json`
 
 ## Step-level `when` condition
 

@@ -26,6 +26,7 @@ use semver::Version;
 use tempfile::tempdir;
 
 use crate::CliContext;
+use crate::PreparedFileDiff;
 use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
@@ -115,7 +116,7 @@ fn cli_help_returns_success_output() {
 	let output = run_with_args("mc", [OsString::from("mc"), OsString::from("--help")])
 		.unwrap_or_else(|error| panic!("help output: {error}"));
 
-	assert!(output.contains("Usage: mc <COMMAND>"));
+	assert!(output.contains("Usage: mc"));
 	assert!(output.contains("assist"));
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
@@ -1261,8 +1262,8 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 
-	assert!(output.contains("command `release` completed (dry-run)"));
-	assert!(output.contains("version: 1.1.0"));
+	assert!(output.contains("# `release` (dry-run)"));
+	assert!(output.contains("1.1.0"));
 	assert!(output.contains("workflow-app"));
 	assert!(output.contains("workflow-core"));
 	assert_eq!(
@@ -1348,8 +1349,9 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 	let release_version = fs::read_to_string(tempdir.path().join("release-version.txt"))
 		.unwrap_or_else(|error| panic!("release version output: {error}"));
 
-	assert!(output.contains("command `release` completed"));
-	assert!(output.contains("group sdk -> v1.1.0"));
+	assert!(output.contains("# `release`"));
+	assert!(output.contains("group `sdk`"));
+	assert!(output.contains("v1.1.0"));
 	assert!(workspace_manifest.contains("version = \"1.1.0\""));
 	assert!(core_changelog.contains("## 1.1.0"));
 	assert!(core_changelog.contains("- add release command"));
@@ -2780,6 +2782,7 @@ fn cli_context_for_when_evaluation_tests() -> CliContext {
 	CliContext {
 		root: PathBuf::from("."),
 		dry_run: false,
+		quiet: false,
 		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
@@ -3287,8 +3290,8 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 	let commit_body = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%B"]);
 	let status = git_output_in_temp_repo(root, &["status", "--short"]);
 
-	assert!(output.contains("release commit:"));
-	assert!(output.contains("status: completed"));
+	assert!(output.contains("## Release commit"));
+	assert!(output.contains("- **Status:** completed"));
 	assert_eq!(commit_subject, "chore(release): prepare release");
 	assert!(commit_body.contains("## monochange Release Record"));
 	assert!(commit_body.contains("\"command\": \"commit-release\""));
@@ -3475,6 +3478,7 @@ fn template_context_exposes_release_commit_namespace() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		quiet: false,
 		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
@@ -3516,6 +3520,7 @@ fn template_context_exposes_retarget_namespace() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		quiet: false,
 		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
@@ -3558,6 +3563,7 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		quiet: false,
 		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
@@ -3658,6 +3664,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		quiet: false,
 		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
@@ -3693,6 +3700,7 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		quiet: false,
 		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
@@ -3720,6 +3728,51 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 	assert!(rendered.contains("release request:"));
 	assert!(rendered.contains("issue comments:"));
 	assert!(rendered.contains("changed files:"));
+}
+
+#[test]
+fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release() {
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+	};
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		quiet: false,
+		show_diff: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: Some(sample_prepared_release_for_cli_render()),
+		prepared_file_diffs: vec![PreparedFileDiff {
+			path: PathBuf::from("Cargo.toml"),
+			diff: "@@ -1 +1 @@".to_string(),
+			display_diff: "diff --git a/Cargo.toml b/Cargo.toml\n@@ -1 +1 @@".to_string(),
+		}],
+		release_manifest_path: Some(PathBuf::from("target/release-manifest.json")),
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: vec!["skipped command `cargo publish` (dry-run)".to_string()],
+	};
+	let rendered = crate::render_cli_command_markdown_result(&cli_command, &context);
+	assert!(rendered.contains("# `release` (dry-run)"));
+	assert!(rendered.contains("## Summary"));
+	assert!(rendered.contains("## Release targets"));
+	assert!(rendered.contains("## File diffs"));
+	assert!(rendered.contains("```diff"));
+	assert!(rendered.contains("## Commands"));
+	assert!(rendered.contains("skipped command `cargo publish` (dry-run)"));
 }
 
 #[test]
@@ -4198,7 +4251,7 @@ fn execute_matches_rejects_unknown_cli_command_names() {
 	let matches = clap::Command::new("dummy")
 		.try_get_matches_from(["dummy"])
 		.unwrap_or_else(|error| panic!("matches: {error}"));
-	let error = crate::execute_matches(tempdir.path(), &configuration, "missing", &matches)
+	let error = crate::execute_matches(tempdir.path(), &configuration, "missing", &matches, false)
 		.err()
 		.unwrap_or_else(|| panic!("expected unknown command error"));
 	assert!(error.to_string().contains("unknown command `missing`"));
@@ -7182,6 +7235,31 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 }
 
 #[test]
+fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defaults() {
+	let mut cli = monochange_core::default_cli_commands();
+	let release = cli
+		.iter_mut()
+		.find(|command| command.name == "release")
+		.unwrap_or_else(|| panic!("expected release command"));
+	release.inputs[0].default = Some("text".to_string());
+	release.inputs[0].choices = vec!["text".to_string(), "json".to_string()];
+
+	crate::apply_runtime_prepare_release_markdown_defaults(&mut cli);
+
+	let release = cli
+		.iter()
+		.find(|command| command.name == "release")
+		.unwrap_or_else(|| panic!("expected release command after runtime defaults"));
+	let format = release
+		.inputs
+		.iter()
+		.find(|input| input.name == "format")
+		.unwrap_or_else(|| panic!("expected release format input"));
+	assert_eq!(format.default.as_deref(), Some("markdown"));
+	assert_eq!(format.choices.first().map(String::as_str), Some("markdown"));
+}
+
+#[test]
 fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 	let configuration = monochange_core::WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
@@ -7825,7 +7903,7 @@ fn command_release_without_diff_skips_file_diff_previews() {
 	)
 	.unwrap_or_else(|error| panic!("release without diff: {error}"));
 	set_force_build_file_diff_previews_error(false);
-	assert!(output.contains("command `release` completed"));
+	assert!(output.contains("# `release`"));
 }
 
 #[test]
@@ -7916,7 +7994,11 @@ fn format_publish_state_and_source_operation_labels_are_stable() {
 }
 
 #[test]
-fn parse_output_format_accepts_text_and_json_and_rejects_invalid_values() {
+fn parse_output_format_accepts_markdown_text_and_json_and_rejects_invalid_values() {
+	assert_eq!(
+		crate::parse_output_format("markdown").unwrap(),
+		crate::OutputFormat::Markdown
+	);
 	assert_eq!(
 		crate::parse_output_format("text").unwrap(),
 		crate::OutputFormat::Text
@@ -8122,6 +8204,7 @@ fn tracked_release_pull_request_paths_include_manifest_path_and_deduplicate() {
 	let context = CliContext {
 		root: PathBuf::from("."),
 		dry_run: true,
+		quiet: false,
 		show_diff: false,
 		inputs: BTreeMap::new(),
 		last_step_inputs: BTreeMap::new(),
@@ -8619,6 +8702,24 @@ fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
 }
 
 #[test]
+fn extract_quiet_from_args_detects_short_and_long_flags() {
+	assert!(crate::extract_quiet_from_args([
+		OsString::from("mc"),
+		OsString::from("--quiet"),
+		OsString::from("release"),
+	]));
+	assert!(crate::extract_quiet_from_args([
+		OsString::from("mc"),
+		OsString::from("-q"),
+		OsString::from("discover"),
+	]));
+	assert!(!crate::extract_quiet_from_args([
+		OsString::from("mc"),
+		OsString::from("release"),
+	]));
+}
+
+#[test]
 fn extract_log_level_returns_none_when_flag_absent() {
 	let args = ["mc", "discover", "--format", "json"];
 	assert_eq!(
@@ -8677,7 +8778,7 @@ fn cli_accepts_log_level_flag_without_error() {
 	)
 	.unwrap_or_else(|error| panic!("log-level with help: {error}"));
 
-	assert!(output.contains("Usage: mc <COMMAND>"));
+	assert!(output.contains("Usage: mc"));
 }
 
 #[test]
@@ -8692,7 +8793,7 @@ fn cli_accepts_log_level_equals_syntax_without_error() {
 	)
 	.unwrap_or_else(|error| panic!("log-level equals with help: {error}"));
 
-	assert!(output.contains("Usage: mc <COMMAND>"));
+	assert!(output.contains("Usage: mc"));
 }
 
 #[test]

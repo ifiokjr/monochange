@@ -36,7 +36,9 @@ pub(crate) fn render_release_record_discovery(
 			serde_json::to_string_pretty(&discovery)
 				.map_err(|error| MonochangeError::Discovery(error.to_string()))
 		}
-		OutputFormat::Text => Ok(text_release_record_discovery(&discovery)),
+		OutputFormat::Markdown | OutputFormat::Text => {
+			Ok(text_release_record_discovery(&discovery))
+		}
 	}
 }
 

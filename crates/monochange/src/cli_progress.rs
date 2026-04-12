@@ -46,9 +46,10 @@ struct SpinnerState {
 }
 
 impl CliProgressReporter {
-	pub(crate) fn new(cli_command: &CliCommandDefinition, dry_run: bool) -> Self {
+	pub(crate) fn new(cli_command: &CliCommandDefinition, dry_run: bool, quiet: bool) -> Self {
 		let color_enabled = env::var("TERM").is_ok_and(|term| term != "dumb");
-		let enabled = io::stderr().is_terminal() && env::var_os("MONOCHANGE_NO_PROGRESS").is_none();
+		let enabled =
+			!quiet && io::stderr().is_terminal() && env::var_os("MONOCHANGE_NO_PROGRESS").is_none();
 		let color = enabled && env::var_os("NO_COLOR").is_none() && color_enabled;
 		let animate = enabled && color;
 		Self {

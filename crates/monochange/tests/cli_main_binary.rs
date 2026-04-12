@@ -18,3 +18,21 @@ fn monochange_binary_prints_help() {
 fn monochange_binary_renders_cli_errors() {
 	assert_cmd_snapshot!(monochange_cli().arg("not-a-command"));
 }
+
+#[test]
+fn monochange_binary_quiet_suppresses_cli_errors() {
+	let output = monochange_cli()
+		.arg("--quiet")
+		.arg("not-a-command")
+		.output()
+		.unwrap_or_else(|error| panic!("quiet cli error output: {error}"));
+	assert!(!output.status.success());
+	assert!(
+		output.stdout.is_empty(),
+		"quiet mode should suppress stdout"
+	);
+	assert!(
+		output.stderr.is_empty(),
+		"quiet mode should suppress stderr"
+	);
+}

@@ -111,6 +111,21 @@ fn change_cli_writes_explicit_versions_when_requested() {
 }
 
 #[test]
+fn release_dry_run_cli_defaults_to_markdown_output() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/ungrouped-basic");
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("release")
+			.arg("--dry-run")
+	);
+}
+
+#[test]
 fn release_dry_run_cli_patches_parent_packages_when_dependencies_change() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -297,6 +312,39 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 	assert!(!tempdir.path().join("crates/app/changelog.md").exists());
 	assert!(workspace_manifest.contains("version = \"1.1.0\""));
 	assert!(group_versioned_file.contains("version = \"1.1.0\""));
+}
+
+#[test]
+fn release_quiet_suppresses_output_and_skips_workspace_mutation() {
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	let before_root_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
+		.unwrap_or_else(|error| panic!("group changelog before quiet release: {error}"));
+	let before_workspace_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("workspace manifest before quiet release: {error}"));
+
+	let output = release_cli_command()
+		.current_dir(tempdir.path())
+		.arg("--quiet")
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("quiet release output: {error}"));
+	assert!(output.status.success(), "quiet release failed unexpectedly");
+	assert!(
+		output.stdout.is_empty(),
+		"quiet release should suppress stdout"
+	);
+	assert!(
+		output.stderr.is_empty(),
+		"quiet release should suppress stderr"
+	);
+
+	let after_root_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
+		.unwrap_or_else(|error| panic!("group changelog after quiet release: {error}"));
+	let after_workspace_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("workspace manifest after quiet release: {error}"));
+
+	assert_eq!(before_root_changelog, after_root_changelog);
+	assert_eq!(before_workspace_manifest, after_workspace_manifest);
 }
 
 #[test]

@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 31
+assertion_line: 36
 info:
   program: mc
   args:
@@ -8,6 +8,7 @@ info:
     - "--help"
   env:
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: true
 exit_code: 0
@@ -19,6 +20,7 @@ Usage: mc change [OPTIONS]
 Options:
       --dry-run            Run the command in dry-run mode when supported
   -i, --interactive        Select packages, bumps, and options interactively
+  -q, --quiet              Suppress stdout/stderr output and run in dry-run mode when supported
       --package <PACKAGE>  Package or group to include in the change
       --bump <BUMP>        Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
       --version <VERSION>  Pin an explicit version for this release

@@ -608,7 +608,7 @@ steps = [{ type = "CreateChangeFile" }]
 [cli.release]
 help_text = "Prepare a release from discovered change files"
 inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
 ]
 steps = [{ type = "PrepareRelease" }]
 

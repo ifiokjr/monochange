@@ -70,6 +70,8 @@ use clap::error::ErrorKind;
 #[cfg(test)]
 pub(crate) use cli::apply_runtime_change_type_choices;
 #[cfg(test)]
+pub(crate) use cli::apply_runtime_prepare_release_markdown_defaults;
+#[cfg(test)]
 pub(crate) use cli::build_assist_subcommand;
 #[cfg(test)]
 pub(crate) use cli::build_cli_command_subcommand;
@@ -108,6 +110,8 @@ pub(crate) use cli_runtime::parse_change_bump;
 pub(crate) use cli_runtime::parse_direct_template_reference;
 #[cfg(test)]
 pub(crate) use cli_runtime::parse_output_format;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_cli_command_markdown_result;
 #[cfg(test)]
 pub(crate) use cli_runtime::render_cli_command_result;
 #[cfg(test)]
@@ -255,6 +259,7 @@ mod workspace_ops;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum OutputFormat {
 	Text,
+	Markdown,
 	Json,
 }
 
@@ -480,6 +485,7 @@ struct CommitReleaseReport {
 struct CliContext {
 	root: PathBuf,
 	dry_run: bool,
+	quiet: bool,
 	show_diff: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 	last_step_inputs: BTreeMap<String, Vec<String>>,
@@ -512,9 +518,10 @@ pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
 
+	let quiet = extract_quiet_from_args(std::env::args_os());
 	let args = std::env::args_os();
 	let output = run_with_args(bin_name, args)?;
-	if !output.is_empty() {
+	if !quiet && !output.is_empty() {
 		println!("{output}");
 	}
 	Ok(())
@@ -522,6 +529,17 @@ pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 
 fn extract_log_level_from_args() -> Option<String> {
 	extract_log_level(std::env::args())
+}
+
+fn quiet_from_os_arg(arg: &OsString) -> bool {
+	matches!(arg.to_str(), Some("--quiet" | "-q"))
+}
+
+fn extract_quiet_from_args<I>(args: I) -> bool
+where
+	I: IntoIterator<Item = OsString>,
+{
+	args.into_iter().any(|arg| quiet_from_os_arg(&arg))
 }
 
 fn extract_log_level<I>(args: I) -> Option<String>
@@ -556,6 +574,7 @@ where
 	let args = args.into_iter().collect::<Vec<_>>();
 	let configuration = load_workspace_configuration(root);
 	let cli = cli_commands_from_config(&configuration);
+	let quiet = extract_quiet_from_args(args.iter().cloned());
 	let matches = match build_command_with_cli(bin_name, &cli).try_get_matches_from(args) {
 		Ok(matches) => matches,
 		Err(error)
@@ -571,10 +590,16 @@ where
 
 	match matches.subcommand() {
 		Some(("init", init_matches)) => {
+			if quiet {
+				return Ok(String::new());
+			}
 			let path = init_workspace(root, init_matches.get_flag("force"))?;
 			Ok(format!("wrote {}", path.display()))
 		}
 		Some(("populate", _)) => {
+			if quiet {
+				return Ok(String::new());
+			}
 			let result = populate_workspace(root)?;
 			if result.added_commands.is_empty() {
 				Ok(format!(
@@ -622,6 +647,9 @@ where
 			run_assist(assistant, format)
 		}
 		Some(("mcp", _)) => {
+			if quiet {
+				return Ok(String::new());
+			}
 			let runtime = tokio::runtime::Runtime::new()
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;
 			runtime.block_on(mcp::run_server());
@@ -644,7 +672,13 @@ where
 		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;
-			execute_matches(root, &configuration, cli_command_name, cli_command_matches)
+			execute_matches(
+				root,
+				&configuration,
+				cli_command_name,
+				cli_command_matches,
+				quiet,
+			)
 		}
 		None => Err(MonochangeError::Config("unknown command".to_string())),
 	}

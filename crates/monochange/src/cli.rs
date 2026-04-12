@@ -73,9 +73,35 @@ pub(crate) fn cli_commands_from_config(
 		Ok(configuration) => {
 			let mut cli = configuration.cli.clone();
 			apply_runtime_change_type_choices(&mut cli, configuration);
+			apply_runtime_prepare_release_markdown_defaults(&mut cli);
 			cli
 		}
 		Err(_) => default_cli_commands(),
+	}
+}
+
+pub(crate) fn apply_runtime_prepare_release_markdown_defaults(cli: &mut [CliCommandDefinition]) {
+	for cli_command in cli {
+		if !command_supports_release_diff_preview(cli_command) {
+			continue;
+		}
+		let Some(format_input) = cli_command
+			.inputs
+			.iter_mut()
+			.find(|input| input.name == "format")
+		else {
+			continue;
+		};
+		if !format_input
+			.choices
+			.iter()
+			.any(|choice| choice == "markdown")
+		{
+			format_input.choices.insert(0, "markdown".to_string());
+		}
+		if format_input.default.as_deref() == Some("text") {
+			format_input.default = Some("markdown".to_string());
+		}
 	}
 }
 
@@ -100,6 +126,14 @@ pub(crate) fn build_command_with_cli(
 					.help("Set tracing filter (e.g. debug, monochange=trace)")
 					.value_name("FILTER")
 					.hide(true),
+			)
+			.arg(
+				Arg::new("quiet")
+					.long("quiet")
+					.short('q')
+					.global(true)
+					.help("Suppress stdout/stderr output and run in dry-run mode when supported")
+					.action(ArgAction::SetTrue),
 			)
 			.subcommand(
 				Command::new("init")
