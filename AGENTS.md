@@ -14,7 +14,7 @@
 
 - The project name is always written in **all lowercase**: `monochange`.
 - Never use `MonoChange`, `Monochange`, or `MONOCHANGE` in prose, docs, comments, or string literals.
-- Issue titles must use Title Case and must not use conventional-commit prefixes such as `feat:` or `fix:`.
+- Issue titles must use sentence case, must not end with a full stop, and must not use conventional-commit prefixes such as `feat:` or `fix:`.
 - Pull request titles must use conventional-commit style prefixes.
 - Commit titles must use conventional-commit style prefixes.
 - **Rust code exception**: standard Rust naming conventions apply.
