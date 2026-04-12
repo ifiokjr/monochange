@@ -4,11 +4,31 @@ use std::path::Path;
 mod test_support;
 use test_support::setup_fixture;
 
+const EXIT_STATUS_MARKER: &str = "__MC_EXIT_STATUS__=";
+
 #[cfg(unix)]
-fn run_tty_command_result(
-	workspace: &Path,
-	command_name: &str,
-) -> (std::process::ExitStatus, String) {
+fn normalize_tty_transcript(text: &str) -> String {
+	let mut normalized = String::with_capacity(text.len());
+	let mut chars = text.chars().peekable();
+	while let Some(ch) = chars.next() {
+		if ch == '\u{1b}' && chars.peek() == Some(&'[') {
+			let _ = chars.next();
+			for escape_ch in chars.by_ref() {
+				if ('@'..='~').contains(&escape_ch) {
+					break;
+				}
+			}
+			continue;
+		}
+		if ch != '\r' {
+			normalized.push(ch);
+		}
+	}
+	normalized
+}
+
+#[cfg(unix)]
+fn run_tty_command_result(workspace: &Path, command_name: &str) -> (i32, String) {
 	const SCRIPT: &str = r"
 import os
 import pty
@@ -51,13 +71,17 @@ while True:
     ready, _, _ = select.select([master], [], [], 0.01)
     if master not in ready:
         break
-    data = os.read(master, 4096)
+    try:
+        data = os.read(master, 4096)
+    except OSError:
+        break
     if not data:
         break
     transcript.extend(data)
 os.close(master)
 sys.stdout.buffer.write(transcript)
-sys.exit(proc.returncode)
+sys.stderr.write(f'__MC_EXIT_STATUS__={proc.returncode}\n')
+sys.exit(0)
 ";
 
 	let output = std::process::Command::new("python3")
@@ -68,15 +92,28 @@ sys.exit(proc.returncode)
 		.env("MC_COMMAND", command_name)
 		.output()
 		.unwrap_or_else(|error| panic!("tty python harness: {error}"));
+	assert!(
+		output.status.success(),
+		"tty python harness failed:\n{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stderr =
+		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("tty stderr utf8: {error}"));
+	let status_code = stderr
+		.lines()
+		.find_map(|line| line.strip_prefix(EXIT_STATUS_MARKER))
+		.unwrap_or_else(|| panic!("missing tty exit status marker:\n{stderr}"))
+		.parse::<i32>()
+		.unwrap_or_else(|error| panic!("parse tty exit status: {error}\n{stderr}"));
 	let transcript =
 		String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("tty output utf8: {error}"));
-	(output.status, transcript)
+	(status_code, normalize_tty_transcript(&transcript))
 }
 
 #[cfg(unix)]
 fn run_tty_command(workspace: &Path, command_name: &str) -> String {
 	let (status, transcript) = run_tty_command_result(workspace, command_name);
-	assert!(status.success(), "{}", transcript);
+	assert_eq!(status, 0, "{transcript}");
 	transcript
 }
 
@@ -140,10 +177,7 @@ steps = [
 
 	let (status, transcript) = run_tty_command_result(tempdir.path(), "progress-failure");
 
-	assert!(
-		!status.success(),
-		"expected failure transcript:\n{transcript}"
-	);
+	assert_ne!(status, 0, "expected failure transcript:\n{transcript}");
 	assert!(transcript.contains("○ [1/3] skip validate (Validate) — skipped ({{ false }})"));
 	assert!(transcript.contains("stderr only [stderr] warn line"));
 	assert!(transcript.contains("✖ [3/3] fail loud (Command)"));

@@ -13,11 +13,13 @@ COMMAND_LABELS=(
 	"mc validate"
 	"mc discover --format json"
 	"mc release --dry-run"
+	"mc release"
 )
 COMMAND_ARGS=(
 	"validate"
 	"discover --format json"
 	"release --dry-run"
+	"release"
 )
 
 render_comment() {
@@ -166,6 +168,7 @@ run_scenario() {
 	(
 		cd "$fixture_dir"
 		hyperfine \
+			--prepare "git reset --hard HEAD >/dev/null && git clean -fd >/dev/null" \
 			--style basic \
 			--warmup "$WARMUP_RUNS" \
 			--runs "$BENCHMARK_RUNS" \
