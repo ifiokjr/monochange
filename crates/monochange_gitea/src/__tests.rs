@@ -269,7 +269,7 @@ fn gitea_context_annotation_updates_hosts_commits_and_authors() {
 
 #[test]
 fn gitea_context_annotation_handles_empty_hosts_and_missing_context_entries() {
-	let source = sample_source(None, Some("".to_string()));
+	let source = sample_source(None, Some(String::new()));
 	assert_eq!(gitea_host_name(&source), None);
 	let mut changesets = vec![
 		PreparedChangeset {

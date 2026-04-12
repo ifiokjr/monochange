@@ -321,7 +321,7 @@ fn gitlab_context_annotation_updates_hosts_commits_and_authors() {
 #[test]
 fn gitlab_context_annotation_handles_empty_hosts_and_missing_context_entries() {
 	let source = SourceConfiguration {
-		host: Some("".to_string()),
+		host: Some(String::new()),
 		..sample_source(None)
 	};
 	assert_eq!(gitlab_host_name(&source), None);
