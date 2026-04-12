@@ -312,12 +312,15 @@ fn hosted_source_adapter_default_retarget_planning_marks_unsupported_providers()
 	};
 
 	let plan = adapter.plan_retargeted_releases(&test_retarget_tags());
+	let plan_entry = plan
+		.first()
+		.expect("default retarget planning should emit one entry");
 
 	assert_eq!(plan.len(), 1);
-	assert_eq!(plan[0].provider, SourceProvider::GitLab);
-	assert_eq!(plan[0].operation, RetargetProviderOperation::Unsupported);
+	assert_eq!(plan_entry.provider, SourceProvider::GitLab);
+	assert_eq!(plan_entry.operation, RetargetProviderOperation::Unsupported);
 	assert_eq!(
-		plan[0].message.as_deref(),
+		plan_entry.message.as_deref(),
 		Some("provider sync is not yet supported for gitlab release retargeting")
 	);
 }
@@ -340,10 +343,10 @@ fn hosted_source_adapter_default_retarget_sync_uses_dry_run_plans_and_blocks_rea
 		adapter.sync_retargeted_releases(&source, &tags, true),
 		"default retarget sync should reuse dry-run planning",
 	);
-	assert_eq!(
-		dry_run_plan[0].operation,
-		RetargetProviderOperation::Planned
-	);
+	let dry_run_entry = dry_run_plan
+		.first()
+		.expect("default retarget sync should emit one dry-run entry");
+	assert_eq!(dry_run_entry.operation, RetargetProviderOperation::Planned);
 
 	let error = must_err(
 		adapter.sync_retargeted_releases(&source, &tags, false),
