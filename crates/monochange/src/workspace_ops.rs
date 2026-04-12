@@ -1682,8 +1682,7 @@ mod workspace_ops_tests {
 			provider,
 			host: match provider {
 				SourceProvider::Gitea => Some("https://codeberg.org".to_string()),
-				SourceProvider::GitHub => None,
-				SourceProvider::GitLab => None,
+				SourceProvider::GitHub | SourceProvider::GitLab => None,
 			},
 			api_url: None,
 			owner: match provider {

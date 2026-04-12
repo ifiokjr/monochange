@@ -539,7 +539,7 @@ pub(crate) fn execute_cli_command_with_options(
 						|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
 					let prepared_execution =
 						prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?;
-					step_phase_timings = prepared_execution.phase_timings.clone();
+					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					context.prepared_file_diffs = prepared_execution.file_diffs;
 					context.prepared_release = Some(prepared_execution.prepared_release);
 					output = None;
@@ -1135,7 +1135,7 @@ fn run_process_with_streaming(
 	let (sender, receiver) = mpsc::channel();
 	let stdout_handle = spawn_stream_reader(stdout, CommandStream::Stdout, sender.clone());
 	let stderr_handle = spawn_stream_reader(stderr, CommandStream::Stderr, sender);
-	let (stdout_buffer, stderr_buffer) = drain_stream_events(receiver, progress, step);
+	let (stdout_buffer, stderr_buffer) = drain_stream_events(&receiver, progress, step);
 	let status = map_process_wait_result(child.wait(), interpolated)?;
 	let _ = stdout_handle.join();
 	let _ = stderr_handle.join();
@@ -1168,7 +1168,7 @@ fn take_process_stream<T>(
 }
 
 fn drain_stream_events(
-	receiver: mpsc::Receiver<StreamEvent>,
+	receiver: &mpsc::Receiver<StreamEvent>,
 	progress: &mut CliProgressReporter,
 	step: &CliStepDefinition,
 ) -> (Vec<u8>, Vec<u8>) {
@@ -2060,13 +2060,13 @@ mod tests {
 			.send(StreamEvent::Closed(CommandStream::Stderr))
 			.unwrap_or_else(|error| panic!("close stderr: {error}"));
 		drop(sender);
-		let (stdout, stderr) = drain_stream_events(receiver, &mut progress, &step);
+		let (stdout, stderr) = drain_stream_events(&receiver, &mut progress, &step);
 		assert_eq!(stdout, b"hello\n");
 		assert_eq!(stderr, b"warn\n");
 
 		let (sender, receiver) = mpsc::channel();
 		drop(sender);
-		let (stdout, stderr) = drain_stream_events(receiver, &mut progress, &step);
+		let (stdout, stderr) = drain_stream_events(&receiver, &mut progress, &step);
 		assert!(stdout.is_empty());
 		assert!(stderr.is_empty());
 	}
