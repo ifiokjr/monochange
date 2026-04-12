@@ -22,9 +22,7 @@ where
 }
 
 fn git(root: &Path, args: &[&str]) {
-	let output = Command::new("git")
-		.current_dir(root)
-		.args(args)
+	let output = git_command(root, args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 	assert!(
@@ -36,9 +34,7 @@ fn git(root: &Path, args: &[&str]) {
 }
 
 fn git_output(root: &Path, args: &[&str]) -> String {
-	let output = Command::new("git")
-		.current_dir(root)
-		.args(args)
+	let output = git_command(root, args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 	assert!(
@@ -53,12 +49,31 @@ fn git_output(root: &Path, args: &[&str]) -> String {
 		.to_string()
 }
 
+fn git_command(root: &Path, args: &[&str]) -> Command {
+	let mut command = Command::new("git");
+	command.current_dir(root).args(args);
+	for variable in [
+		"GIT_DIR",
+		"GIT_WORK_TREE",
+		"GIT_COMMON_DIR",
+		"GIT_INDEX_FILE",
+		"GIT_OBJECT_DIRECTORY",
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	] {
+		command.env_remove(variable);
+	}
+	command
+}
+
 fn init_git_repo(root: &Path) {
 	git(root, &["init", "-b", "main"]);
 	git(root, &["config", "user.name", "monochange tests"]);
 	git(root, &["config", "user.email", "monochange@example.com"]);
 	git(root, &["add", "."]);
-	git(root, &["commit", "-m", "initial"]);
+	git(
+		root,
+		&["-c", "commit.gpgsign=false", "commit", "-m", "initial"],
+	);
 }
 
 fn command_args(args: &[&str]) -> Vec<OsString> {
