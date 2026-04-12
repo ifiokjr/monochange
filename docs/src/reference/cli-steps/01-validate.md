@@ -59,6 +59,8 @@ None. `Validate` is standalone.
 
 `Validate` returns a normal success/failure result for the command and does not prepare release state for later steps.
 
+When validation fails, monochange renders the offending file path and line/column first, then shows a focused source snippet plus a fix hint when one is available. That makes malformed changesets and config entries much faster to correct from CI logs or local terminal output.
+
 That last point matters: `Validate` is a gate, not a state-producing step.
 
 ## When to place it in a workflow

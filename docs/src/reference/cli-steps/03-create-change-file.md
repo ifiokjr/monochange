@@ -51,6 +51,7 @@ None. `CreateChangeFile` is standalone.
 - reports the written path
 - does not prepare release state for later steps
 - automatically hides the progress spinner during interactive prompting so the selector UI stays readable
+- automatically wraps package/group ids in quotes when the authored frontmatter key contains YAML-sensitive characters such as `@` or `/`
 
 ## Example
 

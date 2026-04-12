@@ -1,12 +1,13 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 264
+assertion_line: 357
 info:
   program: mc
   args:
     - validate
   env:
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: false
 exit_code: 1
@@ -14,8 +15,17 @@ exit_code: 1
 
 ----- stderr -----
 error: package `core` belongs to multiple groups: `cli` and `sdk`
---> monochange.toml
-labels:
-- first group membership @ bytes [OFFSET]..[END]
-- conflicting group membership @ bytes [OFFSET]..[END]
-help: move the package into exactly one [group.<id>] declaration
+  --> monochange.toml:11:13
+
+   |
+11 | packages = ["core"]
+   |             ^^^^^^ first group membership
+
+  ::: monochange.toml:8:13
+  |
+8 | packages = ["core"]
+  |             ^^^^^^ conflicting group membership
+
+  = help: move the package into exactly one [group.<id>] declaration
+  = note: the first snippet marks the primary failure location
+  = note: additional snippets show related locations referenced by this error

@@ -828,8 +828,11 @@ fn load_workspace_configuration_rejects_multi_group_membership() {
 
 	assert!(rendered.contains("error: package `core` belongs to multiple groups"));
 	assert!(rendered.contains("--> monochange.toml"));
-	assert!(rendered.contains("labels:"));
-	assert!(rendered.contains("move the package into exactly one [group.<id>] declaration"));
+	assert!(rendered.contains("::: monochange.toml"));
+	assert!(
+		rendered.contains("= help: move the package into exactly one [group.<id>] declaration")
+	);
+	assert!(rendered.contains("= note: the first snippet marks the primary failure location"));
 }
 
 #[test]
@@ -2269,6 +2272,53 @@ fn load_change_signals_rejects_unknown_package_references_with_diagnostic_help()
 	assert!(rendered.contains("error: changeset `"));
 	assert!(rendered.contains("unknown package or group `missing-package`"));
 	assert!(rendered.contains("help: declare the package or group id in monochange.toml"));
+}
+
+#[test]
+fn load_change_signals_reports_pretty_frontmatter_parse_errors_with_fix_hint() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[package.\"@monochange/skill\"]\npath = \"crates/core\"\ntype = \"cargo\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	std::fs::create_dir_all(tempdir.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir crate: {error}"));
+	std::fs::write(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2024\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo manifest: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let change_path = tempdir.path().join("change.md");
+	std::fs::write(
+		&change_path,
+		"---\n@monochange/skill: patch\n---\n\n# broken\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+
+	let error = load_change_signals(&change_path, &configuration, &[])
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+	let rendered = error.render();
+
+	assert!(
+		rendered.contains("error: failed to parse"),
+		"rendered: {rendered}"
+	);
+	assert!(
+		rendered.contains(&format!("--> {}:2:1", change_path.display())),
+		"rendered: {rendered}"
+	);
+	assert!(
+		rendered.contains("2 | @monochange/skill: patch"),
+		"rendered: {rendered}"
+	);
+	assert!(
+		rendered.contains("wrap package or group ids that contain characters like `@`, `/`, `:`, or spaces in double quotes"),
+		"rendered: {rendered}"
+	);
 }
 
 #[test]

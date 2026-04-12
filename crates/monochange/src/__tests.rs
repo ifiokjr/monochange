@@ -1108,6 +1108,22 @@ fn render_change_target_markdown_uses_group_defaults() {
 }
 
 #[test]
+fn render_change_target_markdown_quotes_special_character_ids() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+	let lines = render_change_target_markdown(
+		&configuration,
+		"@monochange/skill",
+		BumpSeverity::Patch,
+		None,
+		None,
+	)
+	.unwrap_or_else(|error| panic!("render target: {error}"));
+	assert_eq!(lines, vec!["\"@monochange/skill\": patch".to_string()]);
+}
+
+#[test]
 fn change_type_default_bump_resolves_package_group_and_unknown_targets() {
 	let root = fixture_path("changeset-target-metadata/render-workspace");
 	let configuration =
@@ -1147,6 +1163,41 @@ fn add_interactive_change_file_writes_target_owned_metadata() {
 	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
 	assert!(content.contains("sdk: test"));
 	assert!(content.contains("# broaden integration coverage"));
+}
+
+#[test]
+fn add_interactive_change_file_quotes_special_character_targets() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir crate: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[package.\"@monochange/skill\"]\npath = \"crates/core\"\ntype = \"cargo\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2024\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo manifest: {error}"));
+	let output_path = tempdir.path().join(".changeset/interactive-special.md");
+	let result = InteractiveChangeResult {
+		targets: vec![InteractiveTarget {
+			id: "@monochange/skill".to_string(),
+			bump: BumpSeverity::Patch,
+			version: None,
+			change_type: None,
+		}],
+		reason: "ship special package id support".to_string(),
+		details: None,
+	};
+
+	add_interactive_change_file(tempdir.path(), &result, Some(&output_path))
+		.unwrap_or_else(|error| panic!("interactive change file: {error}"));
+	let content = fs::read_to_string(&output_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert!(content.contains("\"@monochange/skill\": patch"));
+	monochange_config::validate_workspace(tempdir.path())
+		.unwrap_or_else(|error| panic!("validate workspace: {error}"));
 }
 
 #[test]

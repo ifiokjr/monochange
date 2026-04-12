@@ -1729,12 +1729,7 @@ fn parse_markdown_change_file_with_context(
 		)));
 	};
 	let body = body_with_separator.trim();
-	let mapping = serde_yaml_ng::from_str::<Mapping>(frontmatter).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to parse {} frontmatter: {error}",
-			changes_path.display()
-		))
-	})?;
+	let mapping = parse_changeset_frontmatter(contents, frontmatter, changes_path)?;
 	let (reason, details) = markdown_change_text(body);
 	let mut changes = Vec::new();
 
@@ -1996,12 +1991,7 @@ fn parse_markdown_change_file(
 		)));
 	};
 	let body = body_with_separator.trim();
-	let mapping = serde_yaml_ng::from_str::<Mapping>(frontmatter).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to parse {} frontmatter: {error}",
-			changes_path.display()
-		))
-	})?;
+	let mapping = parse_changeset_frontmatter(contents, frontmatter, changes_path)?;
 	let (reason, details) = markdown_change_text(body);
 	let mut changes = Vec::new();
 
@@ -2022,6 +2012,39 @@ fn parse_markdown_change_file(
 	}
 
 	Ok(RawChangeFile { changes })
+}
+
+fn parse_changeset_frontmatter(
+	contents: &str,
+	frontmatter: &str,
+	changes_path: &Path,
+) -> MonochangeResult<Mapping> {
+	serde_yaml_ng::from_str::<Mapping>(frontmatter).map_err(|error| {
+		let message = format!(
+			"failed to parse {} frontmatter: {error}",
+			changes_path.display()
+		);
+		let location = error.location().map(|location| {
+			frontmatter_span_for_line_column(contents, location.line(), location.column())
+		});
+		let labels = location
+			.map(|span| {
+				vec![LabeledSpan::new_with_span(
+					Some("frontmatter parse error".to_string()),
+					range_to_span(span),
+				)]
+			})
+			.unwrap_or_default();
+		changeset_diagnostic(
+			contents,
+			changes_path,
+			message,
+			labels,
+			Some(
+				"wrap package or group ids that contain characters like `@`, `/`, `:`, or spaces in double quotes, for example `\"@scope/pkg\": patch`".to_string(),
+			),
+		)
+	})
 }
 
 fn markdown_heading_level(line: &str) -> Option<usize> {
@@ -3498,6 +3521,7 @@ fn config_diagnostic(
 	let _ = report;
 	MonochangeError::Diagnostic(render_source_diagnostic(
 		CONFIG_FILE,
+		config_contents,
 		&message,
 		&labels,
 		help.as_deref(),
@@ -3566,23 +3590,155 @@ fn config_primary_label(config_contents: &str, owner_id: &str) -> LabeledSpan {
 
 fn render_source_diagnostic(
 	source_name: &str,
+	source_contents: &str,
 	message: &str,
 	labels: &[LabeledSpan],
 	help: Option<&str>,
 ) -> String {
-	let mut lines = vec![format!("error: {message}"), format!("--> {source_name}")];
-	if !labels.is_empty() {
-		lines.push("labels:".to_string());
-		for label in labels {
-			let label_text = label.label().unwrap_or("source");
-			let end = label.offset().saturating_add(label.len());
-			lines.push(format!("- {label_text} @ bytes {}..{end}", label.offset()));
-		}
+	let sorted_labels = sort_labels_by_location(labels);
+	let primary = sorted_labels.first().map_or(0, LabeledSpan::offset);
+	let (line_number, column_number) = line_and_column_for_offset(source_contents, primary);
+	let mut lines = vec![
+		format!("error: {message}"),
+		format!("  --> {source_name}:{line_number}:{column_number}"),
+	];
+
+	let snippets = render_source_snippets(source_name, source_contents, &sorted_labels);
+	if !snippets.is_empty() {
+		lines.push(String::new());
+		lines.extend(snippets);
 	}
 	if let Some(help) = help {
-		lines.push(format!("help: {help}"));
+		lines.push(String::new());
+		lines.push(format!("  = help: {help}"));
+	}
+	for note in render_diagnostic_notes(&sorted_labels) {
+		lines.push(format!("  = note: {note}"));
 	}
 	lines.join("\n")
+}
+
+fn sort_labels_by_location(labels: &[LabeledSpan]) -> Vec<LabeledSpan> {
+	let Some((first, rest)) = labels.split_first() else {
+		return Vec::new();
+	};
+	let mut sorted = vec![first.clone()];
+	let mut remaining = rest.to_vec();
+	remaining.sort_by(|left, right| {
+		(left.offset(), left.len(), left.label().unwrap_or("")).cmp(&(
+			right.offset(),
+			right.len(),
+			right.label().unwrap_or(""),
+		))
+	});
+	sorted.extend(remaining);
+	sorted
+}
+
+fn render_source_snippets(
+	source_name: &str,
+	source_contents: &str,
+	labels: &[LabeledSpan],
+) -> Vec<String> {
+	let mut snippets = Vec::new();
+	for (index, label) in labels.iter().enumerate() {
+		if index > 0 {
+			snippets.push(String::new());
+		}
+		snippets.extend(render_source_snippet(
+			source_name,
+			source_contents,
+			label,
+			index == 0,
+		));
+	}
+	snippets
+}
+
+fn render_source_snippet(
+	source_name: &str,
+	source_contents: &str,
+	label: &LabeledSpan,
+	is_primary: bool,
+) -> Vec<String> {
+	let line_index = line_index_for_offset(source_contents, label.offset());
+	let line = source_contents.lines().nth(line_index).unwrap_or_default();
+	let (_, column_number) = line_and_column_for_offset(source_contents, label.offset());
+	let line_number = line_index + 1;
+	let gutter_width = line_number.to_string().len();
+	let caret_width = label.len().max(1);
+	let caret_padding = column_number.saturating_sub(1);
+	let label_text = label.label().unwrap_or("here");
+	let mut lines = Vec::new();
+	if !is_primary {
+		lines.push(format!("  ::: {source_name}:{line_number}:{column_number}"));
+	}
+	lines.push(format!(
+		"{space:>width$} |",
+		space = "",
+		width = gutter_width
+	));
+	lines.push(format!("{line_number:>gutter_width$} | {line}"));
+	lines.push(format!(
+		"{space:>width$} | {padding}{carets} {label_text}",
+		space = "",
+		width = gutter_width,
+		padding = " ".repeat(caret_padding),
+		carets = "^".repeat(caret_width),
+		label_text = label_text,
+	));
+	lines
+}
+
+fn render_diagnostic_notes(labels: &[LabeledSpan]) -> Vec<&'static str> {
+	if labels.len() > 1 {
+		vec![
+			"the first snippet marks the primary failure location",
+			"additional snippets show related locations referenced by this error",
+		]
+	} else {
+		Vec::new()
+	}
+}
+
+fn line_index_for_offset(source_contents: &str, offset: usize) -> usize {
+	let safe_offset = offset.min(source_contents.len());
+	source_contents[..safe_offset]
+		.bytes()
+		.filter(|byte| *byte == b'\n')
+		.count()
+}
+
+fn line_and_column_for_offset(source_contents: &str, offset: usize) -> (usize, usize) {
+	let line_index = line_index_for_offset(source_contents, offset);
+	let line_start = source_contents[..offset.min(source_contents.len())]
+		.rfind('\n')
+		.map_or(0, |index| index + 1);
+	(
+		line_index + 1,
+		offset.min(source_contents.len()) - line_start + 1,
+	)
+}
+
+fn frontmatter_span_for_line_column(
+	source_contents: &str,
+	line_number: usize,
+	column_number: usize,
+) -> Range<usize> {
+	let mut line_start = 0usize;
+	for (current_line, line) in (1usize..).zip(source_contents.split_inclusive('\n')) {
+		let line_end = line_start + line.len();
+		if current_line == line_number {
+			let line_contents = line.strip_suffix('\n').unwrap_or(line);
+			let offset = column_number.saturating_sub(1).min(line_contents.len());
+			let start = line_start + offset;
+			let end = start.saturating_add(1).min(source_contents.len());
+			return start..end;
+		}
+		line_start = line_end;
+	}
+	let start = line_start.min(source_contents.len());
+	start..start
 }
 
 fn range_to_span(range: Range<usize>) -> SourceSpan {
@@ -3672,6 +3828,7 @@ fn changeset_diagnostic(
 	let _ = report;
 	MonochangeError::Diagnostic(render_source_diagnostic(
 		&source_name,
+		contents,
 		&message,
 		&labels,
 		help.as_deref(),

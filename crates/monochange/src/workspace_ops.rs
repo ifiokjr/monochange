@@ -841,6 +841,20 @@ pub(crate) fn change_type_default_bump(
 	})
 }
 
+fn render_changeset_target_key(target_id: &str) -> String {
+	if target_id
+		.chars()
+		.all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
+	{
+		target_id.to_string()
+	} else {
+		format!(
+			"\"{}\"",
+			target_id.replace('\\', "\\\\").replace('"', "\\\"")
+		)
+	}
+}
+
 pub(crate) fn render_change_target_markdown(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	target_id: &str,
@@ -854,6 +868,7 @@ pub(crate) fn render_change_target_markdown(
 		)));
 	}
 	let mut lines = Vec::new();
+	let target_key = render_changeset_target_key(target_id);
 	if let Some(change_type) = change_type.filter(|value| !value.trim().is_empty()) {
 		let default_bump = change_type_default_bump(configuration, target_id, change_type)
 			.ok_or_else(|| {
@@ -862,10 +877,10 @@ pub(crate) fn render_change_target_markdown(
 				))
 			})?;
 		if version.is_none() && bump == default_bump {
-			lines.push(format!("{target_id}: {change_type}"));
+			lines.push(format!("{target_key}: {change_type}"));
 			return Ok(lines);
 		}
-		lines.push(format!("{target_id}:"));
+		lines.push(format!("{target_key}:"));
 		if bump != BumpSeverity::None {
 			lines.push(format!("  bump: {bump}"));
 		}
@@ -876,14 +891,14 @@ pub(crate) fn render_change_target_markdown(
 		return Ok(lines);
 	}
 	if let Some(version) = version {
-		lines.push(format!("{target_id}:"));
+		lines.push(format!("{target_key}:"));
 		if bump != BumpSeverity::None {
 			lines.push(format!("  bump: {bump}"));
 		}
 		lines.push(format!("  version: \"{version}\""));
 		return Ok(lines);
 	}
-	lines.push(format!("{target_id}: {bump}"));
+	lines.push(format!("{target_key}: {bump}"));
 	Ok(lines)
 }
 

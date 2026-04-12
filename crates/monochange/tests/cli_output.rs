@@ -360,3 +360,41 @@ fn validate_cli_rejects_packages_in_multiple_groups() {
 			.arg("validate")
 	);
 }
+
+#[test]
+fn validate_cli_reports_frontmatter_location_and_fix_hint() {
+	let tempdir = setup_scenario_workspace("changeset-target-metadata/render-workspace");
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[package.\"@monochange/skill\"]\npath = \"crates/core\"\ntype = \"cargo\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	fs::create_dir_all(tempdir.path().join(".changeset"))
+		.unwrap_or_else(|error| panic!("mkdir changeset dir: {error}"));
+	fs::write(
+		tempdir.path().join(".changeset/invalid.md"),
+		"---\n@monochange/skill: patch\n---\n\n# broken\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+
+	let output = monochange_command(None)
+		.current_dir(tempdir.path())
+		.arg("validate")
+		.output()
+		.unwrap_or_else(|error| panic!("validate output: {error}"));
+	assert!(!output.status.success());
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(stderr.contains("-->"), "stderr: {stderr}");
+	assert!(
+		stderr.contains(".changeset/invalid.md:2:1"),
+		"stderr: {stderr}"
+	);
+	assert!(
+		stderr.contains("2 | @monochange/skill: patch"),
+		"stderr: {stderr}"
+	);
+	assert!(
+		stderr.contains("wrap package or group ids that contain characters like `@`, `/`, `:`, or spaces in double quotes"),
+		"stderr: {stderr}"
+	);
+}
