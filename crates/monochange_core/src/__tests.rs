@@ -155,12 +155,17 @@ fn git_current_branch_reports_detached_head_as_an_error() {
 	for args in [
 		["config", "user.name", "monochange Tests"],
 		["config", "user.email", "monochange@example.com"],
+		["config", "commit.gpgsign", "false"],
 	] {
 		let output = git_command(root)
 			.args(args)
 			.output()
 			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
-		assert!(output.status.success());
+		assert!(
+			output.status.success(),
+			"git {args:?} failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
 	}
 	must_ok(
 		fs::write(root.join("README.md"), "hello\n"),
@@ -175,7 +180,11 @@ fn git_current_branch_reports_detached_head_as_an_error() {
 			.args(args)
 			.output()
 			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
-		assert!(output.status.success());
+		assert!(
+			output.status.success(),
+			"git {args:?} failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
 	}
 
 	let error = must_err(git_current_branch(root), "expected detached-head error");
