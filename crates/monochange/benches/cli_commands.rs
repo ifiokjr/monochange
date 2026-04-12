@@ -193,6 +193,22 @@ fn release_pr_args(dry_run: bool) -> Vec<OsString> {
 	args
 }
 
+fn command_args(command: &str, dry_run: bool) -> Vec<OsString> {
+	let mut args = vec![OsString::from("mc"), OsString::from(command)];
+	if dry_run {
+		args.push(OsString::from("--dry-run"));
+	}
+	args.push(OsString::from("--format"));
+	args.push(OsString::from("json"));
+	args
+}
+
+fn run_command(root: &Path, command: &str, dry_run: bool) -> String {
+	temp_env::with_vars([("MONOCHANGE_RELEASE_DATE", Some("2026-04-06"))], || {
+		monochange::run_with_args_in_dir("mc", command_args(command, dry_run), root).unwrap()
+	})
+}
+
 fn run_release_pr_command(root: &Path, dry_run: bool, github_api_url: Option<&str>) -> String {
 	temp_env::with_vars(
 		[
@@ -586,6 +602,43 @@ fn bench_release_pr(c: &mut Criterion) {
 	group.finish();
 }
 
+fn bench_prepared_release_cache(c: &mut Criterion) {
+	let mut group = c.benchmark_group("prepared_release_cache");
+	group.sample_size(10);
+
+	group.bench_function("commit_release_after_release", |b| {
+		b.iter_batched(
+			|| {
+				let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
+				seed_release_pr_git_repository(tempdir.path());
+				let _ = run_command(tempdir.path(), "release", false);
+				tempdir
+			},
+			|tempdir| {
+				let _ = run_command(tempdir.path(), "commit-release", false);
+			},
+			BatchSize::LargeInput,
+		);
+	});
+
+	group.bench_function("release_pr_dry_run_after_release", |b| {
+		b.iter_batched(
+			|| {
+				let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
+				seed_release_pr_git_repository(tempdir.path());
+				let _ = run_command(tempdir.path(), "release", false);
+				tempdir
+			},
+			|tempdir| {
+				let _ = run_command(tempdir.path(), "release-pr", true);
+			},
+			BatchSize::LargeInput,
+		);
+	});
+
+	group.finish();
+}
+
 criterion_group!(
 	benches,
 	bench_config_load,
@@ -597,5 +650,6 @@ criterion_group!(
 	bench_prepare_release_apply_cargo_lockfile_refresh,
 	bench_prepare_release_with_git_history,
 	bench_release_pr,
+	bench_prepared_release_cache,
 );
 criterion_main!(benches);

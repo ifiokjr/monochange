@@ -215,6 +215,7 @@ pub use release_record::execute_release_retarget;
 pub use release_record::plan_release_retarget;
 use release_record::render_release_record_discovery;
 pub use release_record::retarget_release;
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
 pub(crate) use versioned_files::*;
@@ -250,11 +251,15 @@ mod cli_runtime;
 mod git_support;
 mod interactive;
 mod mcp;
+mod prepared_release_cache;
 mod release_artifacts;
 mod release_record;
 mod tracing_setup;
 mod versioned_files;
 mod workspace_ops;
+
+pub(crate) use prepared_release_cache::maybe_load_prepared_release_execution;
+pub(crate) use prepared_release_cache::save_prepared_release_execution;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum OutputFormat {
@@ -297,7 +302,7 @@ pub enum AssistOutputFormat {
 	Json,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseTarget {
 	pub id: String,
 	pub kind: ReleaseOwnerKind,
@@ -311,7 +316,7 @@ pub struct ReleaseTarget {
 	pub rendered_changelog_title: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreparedChangelog {
 	pub owner_id: String,
 	pub owner_kind: ReleaseOwnerKind,
@@ -321,7 +326,7 @@ pub struct PreparedChangelog {
 	pub rendered: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreparedRelease {
 	pub plan: ReleasePlan,
 	pub changeset_paths: Vec<PathBuf>,

@@ -243,12 +243,19 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 		);
 
 	if command_supports_release_diff_preview(cli_command) {
-		command = command.arg(
-			Arg::new("diff")
-				.long("diff")
-				.help("Show unified file diffs for prepared release changes")
-				.action(ArgAction::SetTrue),
-		);
+		command = command
+			.arg(
+				Arg::new("diff")
+					.long("diff")
+					.help("Show unified file diffs for prepared release changes")
+					.action(ArgAction::SetTrue),
+			)
+			.arg(
+				Arg::new("prepared-release")
+					.long("prepared-release")
+					.help("Read or write the prepared release artifact at a specific path")
+					.value_name("PATH"),
+			);
 	}
 
 	if let Some(after_help) = cli_command_after_help(cli_command) {
