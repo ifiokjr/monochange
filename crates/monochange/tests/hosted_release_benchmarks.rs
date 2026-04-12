@@ -32,6 +32,12 @@ fn write_executable(path: &Path, contents: &str) {
 
 fn git_stdout(root: &Path, args: &[&str]) -> String {
 	let output = Command::new("git")
+		.env_remove("GIT_DIR")
+		.env_remove("GIT_WORK_TREE")
+		.env_remove("GIT_INDEX_FILE")
+		.env_remove("GIT_OBJECT_DIRECTORY")
+		.env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES")
+		.env_remove("GIT_COMMON_DIR")
 		.arg("-C")
 		.arg(root)
 		.args(args)
