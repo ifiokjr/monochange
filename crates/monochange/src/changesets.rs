@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use super::*;
 
 pub(crate) fn diagnose_changesets(
@@ -263,10 +265,7 @@ fn batch_load_changeset_contexts(
 		.map(|cs| root_relative(root, &cs.path))
 		.collect();
 
-	// Single git log for all introduced commits (--diff-filter=A).
-	let introduced_map = batch_git_log(root, &relative_paths, true);
-	// Single git log for all last-updated commits.
-	let last_updated_map = batch_git_log(root, &relative_paths, false);
+	let (introduced_map, last_updated_map) = batch_git_log(root, &relative_paths);
 
 	relative_paths
 		.iter()
@@ -285,45 +284,63 @@ fn batch_load_changeset_contexts(
 }
 
 /// Run a single `git log` command covering the entire `.changeset/` directory
-/// and return a map from relative path to the relevant revision.
+/// and return both the introduced and last-updated revision maps.
 ///
-/// For `introduced=true`: finds the commit that first added each file.
-/// For `introduced=false`: finds the most recent commit that touched each file.
-///
-/// This replaces N individual `git log` subprocess calls with a single call
-/// that walks the history once.
-#[tracing::instrument(skip_all, fields(count = paths.len(), introduced))]
+/// This replaces two independent history walks with one pass over the same git
+/// log stream. The first time we see a file is its latest update; the last
+/// added entry we see for the file is the commit that introduced it.
+#[tracing::instrument(skip_all, fields(count = paths.len()))]
 fn batch_git_log(
 	root: &Path,
 	paths: &[PathBuf],
-	introduced: bool,
-) -> std::collections::HashMap<String, ChangesetRevision> {
+) -> (
+	std::collections::HashMap<String, ChangesetRevision>,
+	std::collections::HashMap<String, ChangesetRevision>,
+) {
 	use std::collections::HashMap;
 
 	if paths.is_empty() {
-		return HashMap::new();
+		return (HashMap::new(), HashMap::new());
 	}
 
-	// Use NUL-delimited output to safely handle any filenames.
-	// Format: <commit-fields>\x1f\n<filename>\n\x00 per entry.
 	let mut command = ProcessCommand::new("git");
 	command
 		.current_dir(root)
 		.arg("log")
 		.arg("--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%cI")
-		.arg("--name-only");
-	if introduced {
-		command.arg("--diff-filter=A");
-	}
+		.arg("--name-status");
 	command.arg("--").arg(".changeset/");
 
 	let output = match command.output() {
 		Ok(output) if output.status.success() => output,
-		_ => return HashMap::new(),
+		_ => return (HashMap::new(), HashMap::new()),
 	};
-	let Ok(stdout) = String::from_utf8(output.stdout) else {
-		return HashMap::new();
+	parse_batch_git_log_bytes(&output.stdout, paths)
+}
+
+fn parse_batch_git_log_bytes(
+	stdout: &[u8],
+	paths: &[PathBuf],
+) -> (
+	std::collections::HashMap<String, ChangesetRevision>,
+	std::collections::HashMap<String, ChangesetRevision>,
+) {
+	use std::collections::HashMap;
+
+	let Ok(stdout) = std::str::from_utf8(stdout) else {
+		return (HashMap::new(), HashMap::new());
 	};
+	parse_batch_git_log_output(stdout, paths)
+}
+
+fn parse_batch_git_log_output(
+	stdout: &str,
+	paths: &[PathBuf],
+) -> (
+	std::collections::HashMap<String, ChangesetRevision>,
+	std::collections::HashMap<String, ChangesetRevision>,
+) {
+	use std::collections::HashMap;
 
 	let wanted_paths: std::collections::HashSet<String> = paths
 		.iter()
@@ -332,11 +349,11 @@ fn batch_git_log(
 
 	// Parse the git log output. Format is blocks separated by blank lines:
 	// <sha>\x1f<name>\x1f<email>\x1f<author_date>\x1f<commit_date>
-	// <filename1>
-	// <filename2>
+	// <status>\t<filename>
 	//
 	// (blank line between commits)
-	let mut result: HashMap<String, ChangesetRevision> = HashMap::new();
+	let mut introduced = HashMap::new();
+	let mut last_updated = HashMap::new();
 
 	let mut current_fields: Option<Vec<&str>> = None;
 	for line in stdout.lines() {
@@ -359,21 +376,14 @@ fn batch_git_log(
 		if fields.len() != 5 {
 			continue;
 		}
-		let file_path = trimmed;
-		if !wanted_paths.contains(file_path) {
+		let mut parts = trimmed.splitn(2, '\t');
+		let Some(status) = parts.next() else {
 			continue;
-		}
-		// For "introduced": we want the LAST (oldest) match per file since
-		// git log outputs newest first. For "last_updated": we want the
-		// FIRST (newest) match.
-		let dominated = if introduced {
-			// Keep overwriting — last write wins = oldest commit.
-			false
-		} else {
-			// Only take the first match = newest commit.
-			result.contains_key(file_path)
 		};
-		if dominated {
+		let Some(file_path) = parts.next() else {
+			continue;
+		};
+		if !wanted_paths.contains(file_path) {
 			continue;
 		}
 		let [sha, author_name, author_email, authored_at, committed_at] = fields.as_slice() else {
@@ -402,10 +412,15 @@ fn batch_git_log(
 			}),
 			review_request: None,
 		};
-		result.insert(file_path.to_string(), revision);
+		last_updated
+			.entry(file_path.to_string())
+			.or_insert_with(|| revision.clone());
+		if status == "A" {
+			introduced.insert(file_path.to_string(), revision);
+		}
 	}
 
-	result
+	(introduced, last_updated)
 }
 
 pub(crate) fn short_commit_sha(sha: &str) -> String {
@@ -478,14 +493,17 @@ pub(crate) fn released_package_names(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 ) -> Vec<String> {
+	let package_by_id = packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<BTreeMap<_, _>>();
 	let mut released_packages = plan
 		.decisions
 		.iter()
 		.filter(|decision| decision.recommended_bump.is_release())
 		.filter_map(|decision| {
-			packages
-				.iter()
-				.find(|package| package.id == decision.package_id)
+			package_by_id
+				.get(decision.package_id.as_str())
 				.map(|package| package.name.clone())
 		})
 		.collect::<Vec<_>>();
@@ -596,4 +614,48 @@ pub(crate) fn render_changeset_markdown(
 	}
 	lines.push(String::new());
 	Ok(lines.join("\n"))
+}
+
+#[cfg(test)]
+mod tests {
+	use std::path::Path;
+	use std::path::PathBuf;
+
+	use super::batch_git_log;
+	use super::parse_batch_git_log_bytes;
+	use super::parse_batch_git_log_output;
+
+	#[test]
+	fn batch_git_log_returns_empty_maps_for_empty_paths() {
+		let (introduced, last_updated) = batch_git_log(Path::new("."), &[]);
+		assert!(introduced.is_empty());
+		assert!(last_updated.is_empty());
+	}
+
+	#[test]
+	fn batch_git_log_returns_empty_maps_when_git_log_fails() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let (introduced, last_updated) =
+			batch_git_log(tempdir.path(), &[PathBuf::from(".changeset/feature.md")]);
+		assert!(introduced.is_empty());
+		assert!(last_updated.is_empty());
+	}
+
+	#[test]
+	fn parse_batch_git_log_bytes_returns_empty_maps_for_invalid_utf8_output() {
+		let (introduced, last_updated) =
+			parse_batch_git_log_bytes(b"\xff", &[PathBuf::from(".changeset/feature.md")]);
+		assert!(introduced.is_empty());
+		assert!(last_updated.is_empty());
+	}
+
+	#[test]
+	fn parse_batch_git_log_output_ignores_malformed_name_status_lines() {
+		let (introduced, last_updated) = parse_batch_git_log_output(
+			"abc123\x1fIfiok\x1fifiok@example.com\x1f2026-04-06T00:00:00Z\x1f2026-04-06T00:00:00Z\nM\n",
+			&[PathBuf::from(".changeset/feature.md")],
+		);
+		assert!(introduced.is_empty());
+		assert!(last_updated.is_empty());
+	}
 }

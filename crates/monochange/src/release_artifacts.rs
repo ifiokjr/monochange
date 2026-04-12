@@ -18,6 +18,10 @@ pub(crate) fn build_release_targets(
 	changeset_paths: &[PathBuf],
 ) -> Vec<ReleaseTarget> {
 	let changes_count = changeset_paths.len();
+	let package_by_id = packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<BTreeMap<_, _>>();
 	let source = configuration.source.as_ref();
 	let defaults_release_title = configuration.defaults.release_title.as_deref();
 	let defaults_changelog_title = configuration.defaults.changelog_version_title.as_deref();
@@ -82,7 +86,7 @@ pub(crate) fn build_release_targets(
 		.iter()
 		.filter(|d| d.recommended_bump.is_release() && d.group_id.is_none())
 	{
-		let Some(package) = packages.iter().find(|p| p.id == decision.package_id) else {
+		let Some(package) = package_by_id.get(decision.package_id.as_str()).copied() else {
 			continue;
 		};
 		let Some(version) = decision.planned_version.as_ref() else {
@@ -133,6 +137,27 @@ pub(crate) fn build_release_targets(
 	}
 	release_targets.sort_by(|left, right| left.id.cmp(&right.id));
 	release_targets
+}
+
+pub(crate) fn build_manifest_updates_parallel(
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let ((cargo_updates, npm_updates), (deno_updates, dart_updates)) = rayon::join(
+		|| {
+			rayon::join(
+				|| build_cargo_manifest_updates(packages, plan),
+				|| build_npm_manifest_updates(packages, plan),
+			)
+		},
+		|| {
+			rayon::join(
+				|| build_deno_manifest_updates(packages, plan),
+				|| build_dart_manifest_updates(packages, plan),
+			)
+		},
+	);
+	Ok([cargo_updates?, npm_updates?, deno_updates?, dart_updates?].concat())
 }
 
 pub(crate) fn render_tag_name(id: &str, version: &str, version_format: VersionFormat) -> String {
@@ -316,6 +341,8 @@ pub(crate) fn build_cargo_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<FileUpdate>> {
+	use rayon::prelude::*;
+
 	let released_versions = plan
 		.decisions
 		.iter()
@@ -339,43 +366,43 @@ pub(crate) fn build_cargo_manifest_updates(
 		return Ok(Vec::new());
 	}
 
-	let mut updated_documents = BTreeMap::<PathBuf, String>::new();
-	for package in packages
+	let mut updated_documents = packages
 		.iter()
 		.filter(|package| package.ecosystem == Ecosystem::Cargo)
-	{
-		let should_update_manifest = released_versions.contains_key(&package.id)
-			|| package
-				.declared_dependencies
-				.iter()
-				.any(|dependency| released_versions_by_name.contains_key(&dependency.name));
-		if !should_update_manifest {
-			continue;
-		}
-
-		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to read {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
-		let updated = monochange_cargo::update_versioned_file_text(
-			&contents,
-			monochange_cargo::CargoVersionedFileKind::Manifest,
-			&["dependencies", "dev-dependencies", "build-dependencies"],
-			released_versions.get(&package.id).map(String::as_str),
-			None,
-			&released_versions_by_name,
-			&BTreeMap::new(),
-		)
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"failed to parse {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
-		updated_documents.insert(package.manifest_path.clone(), updated);
-	}
+		.par_bridge()
+		.filter_map(|package| {
+			let should_update_manifest = released_versions.contains_key(&package.id)
+				|| package
+					.declared_dependencies
+					.iter()
+					.any(|dependency| released_versions_by_name.contains_key(&dependency.name));
+			should_update_manifest.then_some(package)
+		})
+		.map(|package| {
+			let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+				MonochangeError::Io(format!(
+					"failed to read {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			let updated = monochange_cargo::update_versioned_file_text(
+				&contents,
+				monochange_cargo::CargoVersionedFileKind::Manifest,
+				&["dependencies", "dev-dependencies", "build-dependencies"],
+				released_versions.get(&package.id).map(String::as_str),
+				None,
+				&released_versions_by_name,
+				&BTreeMap::new(),
+			)
+			.map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			Ok((package.manifest_path.clone(), updated))
+		})
+		.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
 
 	for workspace_root in packages
 		.iter()
@@ -448,112 +475,131 @@ pub(crate) fn build_npm_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<FileUpdate>> {
+	use rayon::prelude::*;
+
 	let released_versions = released_versions_by_record_id(plan);
-	let mut updates = Vec::new();
-	for package in packages
+	packages
 		.iter()
 		.filter(|package| package.ecosystem == Ecosystem::Npm)
-	{
-		let Some(version) = released_versions.get(&package.id) else {
-			continue;
-		};
-		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to read {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
-		let rendered = monochange_core::update_json_manifest_text(
-			&contents,
-			Some(version),
-			&[],
-			&BTreeMap::new(),
-		)
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"failed to parse {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
-		updates.push(FileUpdate {
-			path: package.manifest_path.clone(),
-			content: rendered.into_bytes(),
-		});
-	}
-	Ok(updates)
+		.par_bridge()
+		.filter_map(|package| {
+			released_versions
+				.get(&package.id)
+				.map(|version| (package, version))
+		})
+		.map(|(package, version)| {
+			let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+				MonochangeError::Io(format!(
+					"failed to read {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			let rendered = monochange_core::update_json_manifest_text(
+				&contents,
+				Some(version),
+				&[],
+				&BTreeMap::new(),
+			)
+			.map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			Ok(FileUpdate {
+				path: package.manifest_path.clone(),
+				content: rendered.into_bytes(),
+			})
+		})
+		.collect()
 }
 
 pub(crate) fn build_deno_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<FileUpdate>> {
+	use rayon::prelude::*;
+
 	let released_versions = released_versions_by_record_id(plan);
-	let mut updates = Vec::new();
-	for package in packages
+	packages
 		.iter()
 		.filter(|package| package.ecosystem == Ecosystem::Deno)
-	{
-		let Some(version) = released_versions.get(&package.id) else {
-			continue;
-		};
-		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to read {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
-		let rendered = monochange_core::update_json_manifest_text(
-			&contents,
-			Some(version),
-			&[],
-			&BTreeMap::new(),
-		)
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"failed to parse {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
-		updates.push(FileUpdate {
-			path: package.manifest_path.clone(),
-			content: rendered.into_bytes(),
-		});
-	}
-	Ok(updates)
+		.par_bridge()
+		.filter_map(|package| {
+			released_versions
+				.get(&package.id)
+				.map(|version| (package, version))
+		})
+		.map(|(package, version)| {
+			let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+				MonochangeError::Io(format!(
+					"failed to read {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			let rendered = monochange_core::update_json_manifest_text(
+				&contents,
+				Some(version),
+				&[],
+				&BTreeMap::new(),
+			)
+			.map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			Ok(FileUpdate {
+				path: package.manifest_path.clone(),
+				content: rendered.into_bytes(),
+			})
+		})
+		.collect()
 }
 
 pub(crate) fn build_dart_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<FileUpdate>> {
+	use rayon::prelude::*;
+
 	let released_versions = released_versions_by_record_id(plan);
-	let mut updates = Vec::new();
-	for package in packages.iter().filter(|package| {
-		package.ecosystem == Ecosystem::Dart || package.ecosystem == Ecosystem::Flutter
-	}) {
-		let Some(version) = released_versions.get(&package.id) else {
-			continue;
-		};
-		let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to read {}: {error}",
-				package.manifest_path.display()
-			))
-		})?;
-		let rendered =
-			monochange_dart::update_manifest_text(&contents, Some(version), &[], &BTreeMap::new())
-				.map_err(|error| {
-					MonochangeError::Config(format!(
-						"failed to parse {}: {error}",
-						package.manifest_path.display()
-					))
-				})?;
-		updates.push(FileUpdate {
-			path: package.manifest_path.clone(),
-			content: rendered.into_bytes(),
-		});
-	}
-	Ok(updates)
+	packages
+		.iter()
+		.filter(|package| {
+			package.ecosystem == Ecosystem::Dart || package.ecosystem == Ecosystem::Flutter
+		})
+		.par_bridge()
+		.filter_map(|package| {
+			released_versions
+				.get(&package.id)
+				.map(|version| (package, version))
+		})
+		.map(|(package, version)| {
+			let contents = fs::read_to_string(&package.manifest_path).map_err(|error| {
+				MonochangeError::Io(format!(
+					"failed to read {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			let rendered = monochange_dart::update_manifest_text(
+				&contents,
+				Some(version),
+				&[],
+				&BTreeMap::new(),
+			)
+			.map_err(|error| {
+				MonochangeError::Config(format!(
+					"failed to parse {}: {error}",
+					package.manifest_path.display()
+				))
+			})?;
+			Ok(FileUpdate {
+				path: package.manifest_path.clone(),
+				content: rendered.into_bytes(),
+			})
+		})
+		.collect()
 }
 
 pub(crate) fn apply_file_updates(updates: &[FileUpdate]) -> MonochangeResult<()> {

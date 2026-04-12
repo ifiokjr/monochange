@@ -62,6 +62,20 @@ pub fn git_push_branch_command(root: &Path, branch: &str) -> Command {
 	command
 }
 
+pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
+	let output =
+		git_command_output(root, &["symbolic-ref", "--short", "HEAD"]).map_err(|error| {
+			MonochangeError::Io(format!("failed to read current git branch: {error}"))
+		})?;
+	if !output.status.success() {
+		return Err(MonochangeError::Config(format!(
+			"failed to read current git branch: {}",
+			git_error_detail(&output)
+		)));
+	}
+	Ok(git_stdout_trimmed(&output))
+}
+
 #[tracing::instrument(skip_all, fields(args = ?args))]
 pub fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
 	let mut command = git_command(root);

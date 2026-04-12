@@ -3,7 +3,9 @@ use regex::Regex;
 use super::*;
 
 pub(crate) struct VersionedFileUpdateContext<'a> {
-	pub(crate) package_by_record_id: BTreeMap<&'a str, &'a PackageRecord>,
+	pub(crate) package_by_config_id: BTreeMap<&'a str, &'a PackageRecord>,
+	pub(crate) package_by_native_name: BTreeMap<&'a str, &'a PackageRecord>,
+	pub(crate) current_versions_by_native_name: BTreeMap<String, String>,
 	pub(crate) released_versions_by_native_name: BTreeMap<String, String>,
 	pub(crate) configuration: &'a monochange_core::WorkspaceConfiguration,
 }
@@ -76,9 +78,27 @@ pub(crate) fn build_versioned_file_updates(
 		return Ok(Vec::new());
 	}
 	let released_versions_by_record_id = released_versions_by_record_id(plan);
-	let package_by_record_id = packages
+	let package_by_config_id = packages
 		.iter()
-		.map(|package| (package.id.as_str(), package))
+		.filter_map(|package| {
+			package
+				.metadata
+				.get("config_id")
+				.map(|config_id| (config_id.as_str(), package))
+		})
+		.collect::<BTreeMap<_, _>>();
+	let package_by_native_name = packages
+		.iter()
+		.map(|package| (package.name.as_str(), package))
+		.collect::<BTreeMap<_, _>>();
+	let current_versions_by_native_name = packages
+		.iter()
+		.filter_map(|package| {
+			package
+				.current_version
+				.as_ref()
+				.map(|version| (package.name.clone(), version.to_string()))
+		})
 		.collect::<BTreeMap<_, _>>();
 	let released_versions_by_config_id = packages
 		.iter()
@@ -100,7 +120,9 @@ pub(crate) fn build_versioned_file_updates(
 		.collect::<BTreeMap<_, _>>();
 	let shared_release_version = shared_release_version(plan);
 	let context = VersionedFileUpdateContext {
-		package_by_record_id,
+		package_by_config_id,
+		package_by_native_name,
+		current_versions_by_native_name,
 		released_versions_by_native_name,
 		configuration,
 	};
@@ -111,9 +133,8 @@ pub(crate) fn build_versioned_file_updates(
 			continue;
 		};
 		let matched_package = context
-			.package_by_record_id
-			.values()
-			.find(|package| package.metadata.get("config_id") == Some(&package_definition.id));
+			.package_by_config_id
+			.get(package_definition.id.as_str());
 		let dep_names = if let Some(name) = matched_package.map(|package| package.name.clone()) {
 			vec![name]
 		} else {
@@ -154,9 +175,8 @@ pub(crate) fn build_versioned_file_updates(
 			.iter()
 			.map(|member_id| {
 				context
-					.package_by_record_id
-					.values()
-					.find(|package| package.metadata.get("config_id") == Some(member_id))
+					.package_by_config_id
+					.get(member_id.as_str())
 					.map_or_else(|| member_id.clone(), |package| package.name.clone())
 			})
 			.collect::<Vec<_>>();
@@ -664,8 +684,10 @@ pub(crate) fn apply_versioned_file_definition(
 		let package_paths_by_name = dep_names
 			.iter()
 			.filter_map(|name| {
-				context.package_by_record_id.values().find_map(|package| {
-					(package.name == *name).then(|| {
+				context
+					.package_by_native_name
+					.get(name.as_str())
+					.map(|package| {
 						(
 							name.clone(),
 							relative_to_root(
@@ -684,7 +706,6 @@ pub(crate) fn apply_versioned_file_definition(
 							}),
 						)
 					})
-				})
 			})
 			.collect::<BTreeMap<_, _>>();
 		let mut document = read_cached_document(updates, &resolved_path, ecosystem_type)?;
@@ -747,16 +768,10 @@ pub(crate) fn apply_versioned_file_definition(
 				let old_versions = dep_names
 					.iter()
 					.filter_map(|name| {
-						context.package_by_record_id.values().find_map(|package| {
-							(package.name == *name)
-								.then_some(
-									package
-										.current_version
-										.as_ref()
-										.map(|version| (name.clone(), version.to_string())),
-								)
-								.flatten()
-						})
+						context
+							.current_versions_by_native_name
+							.get(name)
+							.map(|version| (name.clone(), version.clone()))
 					})
 					.collect::<BTreeMap<_, _>>();
 				*contents =

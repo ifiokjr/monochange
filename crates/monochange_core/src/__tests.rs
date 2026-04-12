@@ -20,6 +20,7 @@ use crate::EcosystemSettings;
 use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
 use crate::HostingProviderKind;
+use crate::MonochangeError;
 use crate::PackageDefinition;
 use crate::PackageDependency;
 use crate::PackageRecord;
@@ -53,9 +54,34 @@ use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
 use crate::default_cli_commands;
 use crate::git::git_checkout_branch_command;
+use crate::git::git_current_branch;
 use crate::git::git_push_branch_command;
 use crate::materialize_dependency_edges;
 use crate::render_release_notes;
+
+fn must_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
+	match result {
+		Ok(value) => value,
+		Err(error) => panic!("{context}: {error}"),
+	}
+}
+
+fn must_err<T, E>(result: Result<T, E>, context: &str) -> E {
+	match result {
+		Ok(_) => panic!("{context}"),
+		Err(error) => error,
+	}
+}
+
+#[test]
+fn must_ok_panics_on_errors() {
+	assert!(std::panic::catch_unwind(|| must_ok::<(), _>(Err("boom"), "context")).is_err());
+}
+
+#[test]
+fn must_err_panics_on_ok_results() {
+	assert!(std::panic::catch_unwind(|| must_err(Ok::<(), &str>(()), "context")).is_err());
+}
 
 #[test]
 fn git_checkout_branch_command_builds_expected_arguments() {
@@ -81,6 +107,80 @@ fn git_push_branch_command_builds_expected_arguments() {
 		]
 	);
 	assert_eq!(command.get_current_dir(), Some(root.as_path()));
+}
+
+#[test]
+fn git_current_branch_reports_checked_out_branch_name() {
+	let tempdir = must_ok(tempdir(), "tempdir");
+	let root = tempdir.path();
+	let output = std::process::Command::new("git")
+		.args(["init", "-b", "main"])
+		.current_dir(root)
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	assert!(output.status.success());
+	let branch = must_ok(git_current_branch(root), "current branch");
+	assert_eq!(branch, "main");
+}
+
+#[test]
+fn git_current_branch_reports_detached_head_as_an_error() {
+	let tempdir = must_ok(tempdir(), "tempdir");
+	let root = tempdir.path();
+	let init = std::process::Command::new("git")
+		.args(["init", "-b", "main"])
+		.current_dir(root)
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	assert!(init.status.success());
+	for args in [
+		["config", "user.name", "monochange Tests"],
+		["config", "user.email", "monochange@example.com"],
+	] {
+		let output = std::process::Command::new("git")
+			.args(args)
+			.current_dir(root)
+			.output()
+			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+		assert!(output.status.success());
+	}
+	must_ok(
+		fs::write(root.join("README.md"), "hello\n"),
+		"write README.md",
+	);
+	for args in [
+		&["add", "README.md"][..],
+		&["commit", "-m", "initial"][..],
+		&["checkout", "--detach"][..],
+	] {
+		let output = std::process::Command::new("git")
+			.args(args)
+			.current_dir(root)
+			.output()
+			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+		assert!(output.status.success());
+	}
+
+	let error = must_err(git_current_branch(root), "expected detached-head error");
+	assert!(
+		error
+			.to_string()
+			.contains("failed to read current git branch"),
+		"error: {error}"
+	);
+}
+
+#[test]
+fn git_current_branch_reports_missing_directory_as_io_error() {
+	let tempdir = must_ok(tempdir(), "tempdir");
+	let missing_root = tempdir.path().join("missing");
+	let error = must_err(
+		git_current_branch(&missing_root),
+		"expected missing-directory error",
+	);
+	assert!(
+		matches!(error, MonochangeError::Io(message) if message.contains("failed to read current git branch"))
+	);
 }
 
 #[test]

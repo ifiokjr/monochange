@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::thread::JoinHandle;
 use std::time::Instant;
 
 use monochange_cargo::discover_cargo_packages;
@@ -622,11 +623,26 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	let mut warnings = Vec::new();
 	let mut packages = Vec::new();
 
+	let ((cargo_discovery, npm_discovery), (deno_discovery, dart_discovery)) = rayon::join(
+		|| {
+			rayon::join(
+				|| discover_cargo_packages(root),
+				|| discover_npm_packages(root),
+			)
+		},
+		|| {
+			rayon::join(
+				|| discover_deno_packages(root),
+				|| discover_dart_packages(root),
+			)
+		},
+	);
+
 	for discovery in [
-		discover_cargo_packages(root)?,
-		discover_npm_packages(root)?,
-		discover_deno_packages(root)?,
-		discover_dart_packages(root)?,
+		cargo_discovery?,
+		npm_discovery?,
+		deno_discovery?,
+		dart_discovery?,
 	] {
 		warnings.extend(discovery.warnings);
 		packages.extend(discovery.packages);
@@ -1319,16 +1335,32 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		.iter()
 		.flat_map(|changeset| changeset.signals.clone())
 		.collect::<Vec<_>>();
-	let mut changesets =
+	let prepared_changesets =
 		measure_prepare_phase(&mut phase_timings, "build prepared changesets", || {
 			Ok(build_prepared_changesets(root, &loaded_changesets))
 		})?;
-	if let Some(source) = configuration.source.as_ref() {
+	let mut changesets = Some(prepared_changesets);
+	let background_changeset_context =
+		configuration
+			.source
+			.as_ref()
+			.filter(|_| !dry_run)
+			.map(|source| {
+				assert!(changesets.is_some());
+				spawn_source_changeset_context_task(
+					source.clone(),
+					dry_run,
+					changesets.take().unwrap_or_default(),
+				)
+			});
+	if let Some(source) = configuration.source.as_ref().filter(|_| dry_run) {
 		apply_source_changeset_context_with_timing(
 			&mut phase_timings,
 			source,
 			dry_run,
-			&mut changesets,
+			changesets
+				.as_mut()
+				.unwrap_or_else(|| panic!("changesets should exist for dry-run annotation")),
 		);
 	}
 	let plan = measure_prepare_phase(&mut phase_timings, "build release plan", || {
@@ -1345,31 +1377,82 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		));
 	}
 
-	let changelog_targets =
-		measure_prepare_phase(&mut phase_timings, "resolve changelog targets", || {
-			resolve_changelog_targets(&configuration, &discovery.packages)
-		})?;
-	let manifest_updates =
-		measure_prepare_phase(&mut phase_timings, "build manifest updates", || {
-			let cargo_updates = build_cargo_manifest_updates(&discovery.packages, &plan)?;
-			let npm_updates = build_npm_manifest_updates(&discovery.packages, &plan)?;
-			let deno_updates = build_deno_manifest_updates(&discovery.packages, &plan)?;
-			let dart_updates = build_dart_manifest_updates(&discovery.packages, &plan)?;
-			Ok([cargo_updates, npm_updates, deno_updates, dart_updates].concat())
-		})?;
-	let versioned_file_updates =
-		measure_prepare_phase(&mut phase_timings, "build versioned file updates", || {
-			build_versioned_file_updates(root, &configuration, &discovery.packages, &plan)
-		})?;
-	let release_targets =
-		measure_prepare_phase(&mut phase_timings, "build release targets", || {
-			Ok(build_release_targets(
-				&configuration,
-				&discovery.packages,
-				&plan,
-				&changeset_paths,
-			))
-		})?;
+	let (
+		(changelog_targets_result, manifest_updates_result),
+		((versioned_file_updates_result, release_targets_result), lockfile_commands_result),
+	) = rayon::join(
+		|| {
+			rayon::join(
+				|| {
+					capture_prepare_phase("resolve changelog targets", || {
+						resolve_changelog_targets(&configuration, &discovery.packages)
+					})
+				},
+				|| {
+					capture_prepare_phase("build manifest updates", || {
+						build_manifest_updates_parallel(&discovery.packages, &plan)
+					})
+				},
+			)
+		},
+		|| {
+			rayon::join(
+				|| {
+					rayon::join(
+						|| {
+							capture_prepare_phase("build versioned file updates", || {
+								build_versioned_file_updates(
+									root,
+									&configuration,
+									&discovery.packages,
+									&plan,
+								)
+							})
+						},
+						|| {
+							capture_prepare_phase("build release targets", || {
+								Ok(build_release_targets(
+									&configuration,
+									&discovery.packages,
+									&plan,
+									&changeset_paths,
+								))
+							})
+						},
+					)
+				},
+				|| {
+					capture_prepare_phase("build lockfile refresh plan", || {
+						build_lockfile_command_executions(
+							root,
+							&configuration,
+							&discovery.packages,
+							&plan,
+						)
+					})
+				},
+			)
+		},
+	);
+	phase_timings.extend([
+		changelog_targets_result.1,
+		manifest_updates_result.1,
+		versioned_file_updates_result.1,
+		release_targets_result.1,
+		lockfile_commands_result.1,
+	]);
+	let changelog_targets = changelog_targets_result.0?;
+	let manifest_updates = manifest_updates_result.0?;
+	let versioned_file_updates = versioned_file_updates_result.0?;
+	let release_targets = release_targets_result.0?;
+	let lockfile_commands = lockfile_commands_result.0?;
+	let changesets = if let Some(handle) = background_changeset_context {
+		join_source_changeset_context_task(&mut phase_timings, handle)?
+	} else {
+		changesets
+			.take()
+			.unwrap_or_else(|| panic!("changesets should be available after local planning"))
+	};
 	let changelog_updates =
 		measure_prepare_phase(&mut phase_timings, "build changelog updates", || {
 			build_changelog_updates(
@@ -1395,10 +1478,6 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		changelog_file_updates.clone(),
 	]
 	.concat();
-	let lockfile_commands =
-		measure_prepare_phase(&mut phase_timings, "build lockfile refresh plan", || {
-			build_lockfile_command_executions(root, &configuration, &discovery.packages, &plan)
-		})?;
 	tracing::debug!(
 		manifest_updates = manifest_updates.len(),
 		lockfile_commands = lockfile_commands.len(),
@@ -1508,6 +1587,22 @@ fn measure_prepare_phase<T>(
 	result
 }
 
+fn capture_prepare_phase<T>(
+	label: impl Into<String>,
+	action: impl FnOnce() -> MonochangeResult<T>,
+) -> (MonochangeResult<T>, StepPhaseTiming) {
+	let label = label.into();
+	let started_at = Instant::now();
+	let result = action();
+	(
+		result,
+		StepPhaseTiming {
+			label,
+			duration: started_at.elapsed(),
+		},
+	)
+}
+
 fn record_prepare_phase_timing(
 	phase_timings: &mut Vec<StepPhaseTiming>,
 	label: impl Into<String>,
@@ -1548,6 +1643,36 @@ fn apply_source_changeset_context_with_timing(
 	let started_at = Instant::now();
 	apply_source_changeset_context(source, dry_run, changesets);
 	record_prepare_phase_timing(phase_timings, label, started_at);
+}
+
+fn spawn_source_changeset_context_task(
+	source: SourceConfiguration,
+	dry_run: bool,
+	mut changesets: Vec<PreparedChangeset>,
+) -> JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)> {
+	std::thread::spawn(move || {
+		let label = changeset_context_phase_label(&source, dry_run);
+		let started_at = Instant::now();
+		apply_source_changeset_context(&source, dry_run, &mut changesets);
+		(
+			changesets,
+			StepPhaseTiming {
+				label,
+				duration: started_at.elapsed(),
+			},
+		)
+	})
+}
+
+fn join_source_changeset_context_task(
+	phase_timings: &mut Vec<StepPhaseTiming>,
+	handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>,
+) -> MonochangeResult<Vec<PreparedChangeset>> {
+	let (changesets, timing) = handle.join().map_err(|_| {
+		MonochangeError::Io("background changeset context enrichment panicked".to_string())
+	})?;
+	phase_timings.push(timing);
+	Ok(changesets)
 }
 
 fn apply_source_changeset_context(
@@ -2216,5 +2341,57 @@ repo = "monochange"
 				.iter()
 				.any(|phase| phase.label == "annotate changeset context via gitlab")
 		);
+	}
+
+	#[test]
+	fn prepare_release_execution_tracks_github_background_context_phase_timing() {
+		let fixture = monochange_test_helpers::fs::setup_fixture_from(
+			env!("CARGO_MANIFEST_DIR"),
+			"monochange/release-base",
+		);
+		let config_path = fixture.path().join("monochange.toml");
+		let mut config = fs::read_to_string(&config_path)
+			.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
+		config.push_str(
+			r#"
+
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+"#,
+		);
+		fs::write(&config_path, config)
+			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+		let prepared = prepare_release_execution_with_file_diffs(fixture.path(), false, false)
+			.unwrap_or_else(|error| panic!("prepare release: {error}"));
+
+		assert!(
+			prepared
+				.phase_timings
+				.iter()
+				.any(|phase| phase.label == "enrich changeset context via github")
+		);
+	}
+
+	#[test]
+	fn join_source_changeset_context_task_reports_background_panic() {
+		let mut phase_timings = Vec::new();
+		let handle = std::thread::spawn(|| -> (Vec<PreparedChangeset>, StepPhaseTiming) {
+			panic!("boom");
+		});
+
+		let error = join_source_changeset_context_task(&mut phase_timings, handle)
+			.err()
+			.unwrap_or_else(|| panic!("expected join error"));
+
+		assert!(
+			error
+				.to_string()
+				.contains("background changeset context enrichment panicked"),
+			"error: {error}"
+		);
+		assert!(phase_timings.is_empty());
 	}
 }
