@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::thread;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -14,6 +15,7 @@ use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
+use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
 use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
@@ -747,7 +749,7 @@ fn publish_pull_request_updates_existing_pull_request() {
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				"[{\"number\":12,\"html_url\":\"https://codeberg.org/org/monochange/pulls/12\"}]",
+				"[{\"number\":12,\"html_url\":\"https://codeberg.org/org/monochange/pulls/12\",\"title\":\"old title\",\"body\":\"old body\",\"base\":{\"ref\":\"main\"},\"head\":{\"sha\":\"old-sha\"},\"labels\":[]}]",
 			);
 	});
 	let update = server.mock(|when, then| {
@@ -785,6 +787,80 @@ fn publish_pull_request_updates_existing_pull_request() {
 	update.assert();
 	labels.assert();
 	assert_eq!(outcome.operation, SourceChangeRequestOperation::Updated);
+}
+
+#[test]
+fn join_existing_pull_request_lookup_reports_panicked_thread() {
+	let error = join_existing_pull_request_lookup(thread::spawn(
+		|| -> MonochangeResult<Option<GiteaExistingPullRequest>> {
+			panic!("boom");
+		},
+	))
+	.err()
+	.unwrap_or_else(|| panic!("expected join error"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to join Gitea pull request lookup thread")
+	);
+}
+
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
+fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_local_head() {
+	let server = MockServer::start();
+	let (_tempdir, repo) = seed_git_repository();
+	let source = sample_source(
+		Some(format!("{}/api/v1", server.base_url())),
+		Some("https://codeberg.org".to_string()),
+	);
+	let request = build_release_pull_request_request(&source, &sample_manifest());
+
+	git(&repo, &["checkout", "-B", &request.head_branch]);
+	git(&repo, &["add", "-A", "--", "release.txt"]);
+	git(&repo, &["commit", "-m", "prepare release branch"]);
+	git(&repo, &["push", "-u", "origin", &request.head_branch]);
+	let head_commit = git_output(&repo, &["rev-parse", "HEAD"]).trim().to_string();
+	let labels = request
+		.labels
+		.iter()
+		.map(|label| format!("{{\"name\":{label:?}}}"))
+		.collect::<Vec<_>>()
+		.join(",");
+	let list = server.mock(|when, then| {
+		when.method(GET)
+			.path("/api/v1/repos/org/monochange/pulls")
+			.query_param("state", "open")
+			.query_param("head", "org:monochange/release/release")
+			.query_param("base", "main");
+			then.status(200)
+				.header("content-type", "application/json")
+				.body(format!(
+					"[{{\"number\":12,\"html_url\":\"https://codeberg.org/org/monochange/pulls/12\",\"title\":{title:?},\"body\":{body:?},\"base\":{{\"ref\":{base:?}}},\"head\":{{\"sha\":{head:?}}},\"labels\":[{labels}]}}]",
+					title = request.title,
+					body = request.body,
+					base = request.base_branch,
+					labels = labels,
+					head = head_commit,
+				));
+		});
+	git(
+		&repo,
+		&[
+			"remote",
+			"set-url",
+			"origin",
+			"/definitely/missing/gitea-origin.git",
+		],
+	);
+
+	let outcome = with_gitea_env(Some("token"), || {
+		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+	});
+
+	list.assert();
+	assert_eq!(outcome.operation, SourceChangeRequestOperation::Skipped);
+	assert_eq!(outcome.number, 12);
 }
 
 fn sample_source(api_url: Option<String>, host: Option<String>) -> SourceConfiguration {

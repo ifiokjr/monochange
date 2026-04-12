@@ -1,11 +1,16 @@
+use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 use criterion::BatchSize;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use httpmock::Method::GET;
+use httpmock::Method::POST;
+use httpmock::MockServer;
 
 /// Generate a workspace fixture with N cargo packages and M changesets.
 fn generate_fixture(root: &Path, num_packages: usize, num_changesets: usize) {
@@ -142,7 +147,61 @@ fn enable_explicit_cargo_refresh_command(root: &Path) {
 			"{config}\n[[ecosystems.cargo.lockfile_commands]]\ncommand = \"cargo generate-lockfile\"\ncwd = \".\"\n"
 		),
 	)
-	.unwrap();
+		.unwrap();
+}
+
+fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_scenario_workspace_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+fn git(root: &Path, args: &[&str]) {
+	let output = Command::new("git")
+		.current_dir(root)
+		.args(args)
+		.output()
+		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+	assert!(
+		output.status.success(),
+		"git {args:?} failed: {}{}",
+		String::from_utf8_lossy(&output.stdout),
+		String::from_utf8_lossy(&output.stderr)
+	);
+}
+
+fn seed_release_pr_git_repository(root: &Path) {
+	let bare = root.join(".bench-origin.git");
+	git(root, &["init", "-b", "main"]);
+	git(root, &["config", "user.name", "monochange Bench"]);
+	git(root, &["config", "user.email", "monochange@example.com"]);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "initial"]);
+	git(root, &["init", "--bare", bare.to_string_lossy().as_ref()]);
+	git(
+		root,
+		&["remote", "add", "origin", bare.to_string_lossy().as_ref()],
+	);
+	git(root, &["push", "-u", "origin", "main"]);
+}
+
+fn release_pr_args(dry_run: bool) -> Vec<OsString> {
+	let mut args = vec![OsString::from("mc"), OsString::from("release-pr")];
+	if dry_run {
+		args.push(OsString::from("--dry-run"));
+	}
+	args.push(OsString::from("--format"));
+	args.push(OsString::from("json"));
+	args
+}
+
+fn run_release_pr_command(root: &Path, dry_run: bool, github_api_url: Option<&str>) -> String {
+	temp_env::with_vars(
+		[
+			("MONOCHANGE_RELEASE_DATE", Some("2026-04-06")),
+			("GITHUB_TOKEN", Some("bench-token")),
+			("GITHUB_API_URL", github_api_url),
+		],
+		|| monochange::run_with_args_in_dir("mc", release_pr_args(dry_run), root).unwrap(),
+	)
 }
 
 const SCALES: &[(usize, usize)] = &[(5, 10), (20, 50), (50, 200)];
@@ -467,6 +526,66 @@ fn bench_prepare_release_with_git_history(c: &mut Criterion) {
 	group.finish();
 }
 
+fn bench_release_pr(c: &mut Criterion) {
+	let mut group = c.benchmark_group("release_pr");
+	group.sample_size(10);
+
+	group.bench_function("dry_run_preview", |b| {
+		b.iter_batched(
+			|| setup_scenario_workspace("source/github"),
+			|tempdir| {
+				let _ = run_release_pr_command(tempdir.path(), true, None);
+			},
+			BatchSize::LargeInput,
+		);
+	});
+
+	group.bench_function("github_create", |b| {
+		b.iter_batched(
+			|| {
+				let tempdir = setup_scenario_workspace("source/github");
+				seed_release_pr_git_repository(tempdir.path());
+				let server = MockServer::start();
+				server.mock(|when, then| {
+					when.method(GET).path("/repos/ifiokjr/monochange/pulls");
+					then.status(200)
+						.header("content-type", "application/json")
+						.body("[]");
+				});
+				server.mock(|when, then| {
+					when.method(POST).path("/repos/ifiokjr/monochange/pulls");
+					then.status(201)
+						.header("content-type", "application/json")
+						.body(
+							"{\"number\":7,\"html_url\":\"https://example.com/pr/7\",\"node_id\":\"PR_node\"}",
+						);
+				});
+				server.mock(|when, then| {
+					when.method(POST)
+						.path("/repos/ifiokjr/monochange/issues/7/labels");
+					then.status(200)
+						.header("content-type", "application/json")
+						.body("[]");
+				});
+				server.mock(|when, then| {
+					when.method(POST).path("/graphql");
+					then.status(200)
+						.header("content-type", "application/json")
+						.body("{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":7}}}");
+				});
+				(tempdir, server)
+			},
+			|(tempdir, server)| {
+				let api_url = server.base_url();
+				let _ = run_release_pr_command(tempdir.path(), false, Some(api_url.as_str()));
+			},
+			BatchSize::LargeInput,
+		);
+	});
+
+	group.finish();
+}
+
 criterion_group!(
 	benches,
 	bench_config_load,
@@ -477,5 +596,6 @@ criterion_group!(
 	bench_prepare_release_apply,
 	bench_prepare_release_apply_cargo_lockfile_refresh,
 	bench_prepare_release_with_git_history,
+	bench_release_pr,
 );
 criterion_main!(benches);

@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::thread;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -17,6 +18,7 @@ use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
+use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
 use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
@@ -769,7 +771,7 @@ fn publish_release_pull_request_updates_existing_pull_request_via_octocrab() {
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				"[{\"number\":9,\"html_url\":\"https://example.com/pr/9\",\"node_id\":\"PR_node\"}]",
+				"[{\"number\":9,\"html_url\":\"https://example.com/pr/9\",\"node_id\":\"PR_node\",\"title\":\"old title\",\"body\":\"old body\",\"base\":{\"ref\":\"main\"},\"head\":{\"sha\":\"old-sha\"},\"labels\":[]}]",
 			);
 	});
 	let update_pull_request = server.mock(|when, then| {
@@ -802,6 +804,116 @@ fn publish_release_pull_request_updates_existing_pull_request_via_octocrab() {
 	add_labels.assert();
 	assert_eq!(outcome.operation, GitHubPullRequestOperation::Updated);
 	assert_eq!(outcome.number, 9);
+}
+
+#[test]
+fn publish_release_pull_request_skips_matching_existing_pull_request() {
+	let server = MockServer::start();
+	let request = sample_pull_request_request();
+	let existing = GitHubExistingPullRequest {
+		number: 9,
+		html_url: Some("https://example.com/pr/9".to_string()),
+		node_id: "PR_node".to_string(),
+		title: request.title.clone(),
+		body: Some(request.body.clone()),
+		base: GitHubExistingPullRequestBase {
+			ref_name: request.base_branch.clone(),
+		},
+		head: GitHubExistingPullRequestHead {
+			sha: Some("head-sha".to_string()),
+		},
+		labels: request
+			.labels
+			.iter()
+			.cloned()
+			.map(|name| GitHubExistingPullRequestLabel { name })
+			.collect(),
+	};
+
+	let outcome = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			publish_release_pull_request_with_existing_pull_request(
+				&client,
+				&request,
+				Some(&existing),
+				"head-sha",
+			)
+			.await
+		})
+		.unwrap_or_else(|error| panic!("publish pull request: {error}"));
+
+	assert_eq!(outcome.operation, GitHubPullRequestOperation::Skipped);
+	assert_eq!(outcome.number, 9);
+	assert_eq!(outcome.url.as_deref(), Some("https://example.com/pr/9"));
+}
+
+#[test]
+fn join_existing_pull_request_lookup_reports_panicked_thread() {
+	let error = join_existing_pull_request_lookup(thread::spawn(
+		|| -> MonochangeResult<Option<GitHubExistingPullRequest>> {
+			panic!("boom");
+		},
+	))
+	.err()
+	.unwrap_or_else(|| panic!("expected join error"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to join GitHub pull request lookup thread")
+	);
+}
+
+#[test]
+fn publish_release_pull_request_marks_matching_auto_merge_request_as_updated() {
+	let server = MockServer::start();
+	let enable_auto_merge = server.mock(|when, then| {
+		when.method(POST).path("/graphql");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":9}}}");
+	});
+	let mut request = sample_pull_request_request();
+	request.auto_merge = true;
+	let existing = GitHubExistingPullRequest {
+		number: 9,
+		html_url: Some("https://example.com/pr/9".to_string()),
+		node_id: "PR_node".to_string(),
+		title: request.title.clone(),
+		body: Some(request.body.clone()),
+		base: GitHubExistingPullRequestBase {
+			ref_name: request.base_branch.clone(),
+		},
+		head: GitHubExistingPullRequestHead {
+			sha: Some("head-sha".to_string()),
+		},
+		labels: request
+			.labels
+			.iter()
+			.cloned()
+			.map(|name| GitHubExistingPullRequestLabel { name })
+			.collect(),
+	};
+
+	let outcome = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			publish_release_pull_request_with_existing_pull_request(
+				&client,
+				&request,
+				Some(&existing),
+				"head-sha",
+			)
+			.await
+		})
+		.unwrap_or_else(|error| panic!("publish pull request: {error}"));
+
+	assert_eq!(outcome.operation, GitHubPullRequestOperation::Updated);
+	assert_eq!(outcome.number, 9);
+	assert_eq!(outcome.url.as_deref(), Some("https://example.com/pr/9"));
+	enable_auto_merge.assert();
 }
 
 #[test]
@@ -892,6 +1004,54 @@ fn publish_release_pull_request_reports_auto_merge_payload_errors() {
 			.to_string()
 			.contains("auto merge returned no pull request payload")
 	);
+}
+
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
+fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_local_head() {
+	let server = MockServer::start();
+	let (tempdir, repo) = seed_git_repository();
+	let source = sample_source(Some(server.base_url()));
+	let request = sample_pull_request_request();
+
+	git(&repo, &["checkout", "-B", &request.head_branch]);
+	git(&repo, &["add", "-A", "--", "release.txt"]);
+	git(&repo, &["commit", "-m", "prepare release branch"]);
+	git(&repo, &["push", "-u", "origin", &request.head_branch]);
+	let head_commit = git_output(&repo, &["rev-parse", "HEAD"]).trim().to_string();
+	let list_pull_requests = server.mock(|when, then| {
+		when.method(GET).path("/repos/ifiokjr/monochange/pulls");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(
+				"[{{\"number\":9,\"html_url\":\"https://example.com/pr/9\",\"node_id\":\"PR_node\",\"title\":{title:?},\"body\":{body:?},\"base\":{{\"ref\":{base:?}}},\"head\":{{\"sha\":{head:?}}},\"labels\":[{{\"name\":\"release\"}},{{\"name\":\"automated\"}}]}}]",
+				title = request.title,
+				body = request.body,
+				base = request.base_branch,
+				head = head_commit,
+			));
+	});
+	git(
+		&repo,
+		&[
+			"remote",
+			"set-url",
+			"origin",
+			tempdir
+				.path()
+				.join("missing.git")
+				.to_string_lossy()
+				.as_ref(),
+		],
+	);
+
+	let outcome = with_github_env(Some("token"), || {
+		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+	});
+
+	list_pull_requests.assert();
+	assert_eq!(outcome.operation, GitHubPullRequestOperation::Skipped);
+	assert_eq!(outcome.number, 9);
 }
 
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
@@ -1505,6 +1665,19 @@ fn build_test_client(server: &MockServer) -> Octocrab {
 		.unwrap_or_else(|error| panic!("octocrab client: {error}"))
 }
 
+fn sample_source(api_url: Option<String>) -> SourceConfiguration {
+	SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		host: None,
+		api_url,
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	}
+}
+
 fn sample_manifest() -> ReleaseManifest {
 	ReleaseManifest {
 		command: "release".to_string(),
@@ -1556,4 +1729,34 @@ fn sample_manifest() -> ReleaseManifest {
 			compatibility_evidence: Vec::new(),
 		},
 	}
+}
+
+fn with_github_env<R>(token: Option<&str>, action: impl FnOnce() -> R) -> R {
+	temp_env::with_var("GITHUB_TOKEN", token, action)
+}
+
+fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let bare = tempdir.path().join("origin.git");
+	let repo = tempdir.path().join("repo");
+	git(
+		tempdir.path(),
+		&["init", "--bare", bare.to_string_lossy().as_ref()],
+	);
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
+	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	std::fs::write(repo.join("release.txt"), "before\n")
+		.unwrap_or_else(|error| panic!("write release file: {error}"));
+	git(&repo, &["add", "release.txt"]);
+	git(&repo, &["commit", "-m", "initial"]);
+	git(&repo, &["branch", "-M", "main"]);
+	git(
+		&repo,
+		&["remote", "add", "origin", bare.to_string_lossy().as_ref()],
+	);
+	git(&repo, &["push", "-u", "origin", "main"]);
+	std::fs::write(repo.join("release.txt"), "after\n")
+		.unwrap_or_else(|error| panic!("update release file: {error}"));
+	(tempdir, repo)
 }

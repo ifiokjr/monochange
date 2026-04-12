@@ -3,6 +3,7 @@
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostingCapabilities;
@@ -26,6 +27,7 @@ use monochange_core::SourceReleaseRequest;
 use monochange_core::git::git_checkout_branch_command;
 use monochange_core::git::git_commit_paths_command;
 use monochange_core::git::git_current_branch;
+use monochange_core::git::git_head_commit;
 use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
@@ -199,6 +201,18 @@ struct GitLabMergeRequestResponse {
 	web_url: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct GitLabExistingMergeRequest {
+	iid: u64,
+	web_url: Option<String>,
+	title: String,
+	description: Option<String>,
+	target_branch: String,
+	#[serde(default)]
+	labels: Vec<String>,
+	sha: Option<String>,
+}
+
 fn gitlab_host(source: &SourceConfiguration) -> &str {
 	source
 		.host
@@ -303,15 +317,36 @@ pub fn publish_release_pull_request(
 	request: &SourceChangeRequest,
 	tracked_paths: &[PathBuf],
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
+	let lookup_source = source.clone();
+	let lookup_request = request.clone();
+	let existing_merge_request = thread::spawn(move || {
+		let client = gitlab_client()?;
+		let token = gitlab_token()?;
+		let api_base = gitlab_api_base(&lookup_source)?;
+		lookup_existing_merge_request(&client, &token, &api_base, &lookup_request)
+	});
 	git_checkout_branch(root, &request.head_branch)?;
 	git_stage_paths(root, tracked_paths)?;
 	git_commit_paths(root, &request.commit_message)?;
-	git_push_branch(root, &request.head_branch)?;
+	let head_commit = git_head_commit(root)?;
+	let existing = join_existing_merge_request_lookup(existing_merge_request)?;
+	let head_matches_existing =
+		existing.as_ref().and_then(|mr| mr.sha.as_deref()) == Some(head_commit.as_str());
+	if !head_matches_existing {
+		git_push_branch(root, &request.head_branch)?;
+	}
 
 	let client = gitlab_client()?;
 	let token = gitlab_token()?;
 	let api_base = gitlab_api_base(source)?;
-	publish_merge_request(&client, &token, &api_base, request)
+	publish_merge_request_with_existing(
+		&client,
+		&token,
+		&api_base,
+		request,
+		existing.as_ref(),
+		&head_commit,
+	)
 }
 
 fn publish_release_request(
@@ -368,39 +403,64 @@ fn publish_release_request(
 	})
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn publish_merge_request(
 	client: &Client,
 	token: &str,
 	api_base: &str,
 	request: &SourceChangeRequest,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
-	let project_id = encode(&format!("{}/{}", request.owner, request.repo)).into_owned();
-	let list_url = format!(
-		"{api_base}/projects/{project_id}/merge_requests?state=opened&source_branch={}&target_branch={}",
-		encode(&request.head_branch),
-		encode(&request.base_branch),
-	);
-	let create_url = format!("{api_base}/projects/{project_id}/merge_requests");
+	let existing = lookup_existing_merge_request(client, token, api_base, request)?;
+	publish_merge_request_with_existing(client, token, api_base, request, existing.as_ref(), "")
+}
+
+fn publish_merge_request_with_existing(
+	client: &Client,
+	token: &str,
+	api_base: &str,
+	request: &SourceChangeRequest,
+	existing: Option<&GitLabExistingMergeRequest>,
+	head_commit: &str,
+) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let labels = request.labels.join(",");
-	let existing = get_json::<Vec<GitLabMergeRequestResponse>>(client, token, &list_url)?
-		.into_iter()
-		.next();
+	let labels_match = existing.is_some_and(|merge_request| {
+		let mut existing_labels = merge_request.labels.clone();
+		existing_labels.sort();
+		existing_labels.dedup();
+		let mut requested_labels = request.labels.clone();
+		requested_labels.sort();
+		requested_labels.dedup();
+		existing_labels == requested_labels
+	});
+	let content_matches = existing.is_some_and(|merge_request| {
+		merge_request.title == request.title
+			&& merge_request.description.as_deref().unwrap_or_default() == request.body
+			&& merge_request.target_branch == request.base_branch
+	});
+	let head_matches_existing =
+		existing.and_then(|merge_request| merge_request.sha.as_deref()) == Some(head_commit);
+	let project_id = encode(&format!("{}/{}", request.owner, request.repo)).into_owned();
+	let create_url = format!("{api_base}/projects/{project_id}/merge_requests");
 	let response: GitLabMergeRequestResponse = if let Some(existing_mr) = &existing {
-		let update_url = format!(
-			"{api_base}/projects/{project_id}/merge_requests/{}",
-			existing_mr.iid
-		);
-		put_json(
-			client,
-			token,
-			&update_url,
-			&GitLabMergeRequestUpdatePayload {
+		if content_matches && labels_match {
+			GitLabMergeRequestResponse {
+				iid: existing_mr.iid,
+				web_url: existing_mr.web_url.clone(),
+			}
+		} else {
+			let update_url = format!(
+				"{api_base}/projects/{project_id}/merge_requests/{}",
+				existing_mr.iid
+			);
+			let update_payload = GitLabMergeRequestUpdatePayload {
 				title: &request.title,
 				target_branch: &request.base_branch,
 				description: &request.body,
 				labels: &labels,
-			},
-		)?
+			};
+
+			put_json(client, token, &update_url, &update_payload)?
+		}
 	} else {
 		post_json(
 			client,
@@ -420,13 +480,42 @@ fn publish_merge_request(
 		repository: request.repository.clone(),
 		number: response.iid,
 		head_branch: request.head_branch.clone(),
-		operation: if existing.is_some() {
-			SourceChangeRequestOperation::Updated
-		} else {
+		operation: if existing.is_none() {
 			SourceChangeRequestOperation::Created
+		} else if content_matches && labels_match && head_matches_existing {
+			SourceChangeRequestOperation::Skipped
+		} else {
+			SourceChangeRequestOperation::Updated
 		},
 		url: response.web_url,
 	})
+}
+
+fn lookup_existing_merge_request(
+	client: &Client,
+	token: &str,
+	api_base: &str,
+	request: &SourceChangeRequest,
+) -> MonochangeResult<Option<GitLabExistingMergeRequest>> {
+	let project_id = encode(&format!("{}/{}", request.owner, request.repo)).into_owned();
+	let list_url = format!(
+		"{api_base}/projects/{project_id}/merge_requests?state=opened&source_branch={}&target_branch={}",
+		encode(&request.head_branch),
+		encode(&request.base_branch),
+	);
+	Ok(
+		get_json::<Vec<GitLabExistingMergeRequest>>(client, token, &list_url)?
+			.into_iter()
+			.next(),
+	)
+}
+
+fn join_existing_merge_request_lookup(
+	handle: thread::JoinHandle<MonochangeResult<Option<GitLabExistingMergeRequest>>>,
+) -> MonochangeResult<Option<GitLabExistingMergeRequest>> {
+	handle.join().map_err(|_| {
+		MonochangeError::Config("failed to join GitLab merge request lookup thread".to_string())
+	})?
 }
 
 fn gitlab_client() -> MonochangeResult<Client> {

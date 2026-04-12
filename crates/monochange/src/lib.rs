@@ -567,7 +567,12 @@ where
 }
 
 #[tracing::instrument(skip_all, fields(bin_name))]
-fn run_with_args_in_dir<I>(bin_name: &'static str, args: I, root: &Path) -> MonochangeResult<String>
+#[doc(hidden)]
+pub fn run_with_args_in_dir<I>(
+	bin_name: &'static str,
+	args: I,
+	root: &Path,
+) -> MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
 {

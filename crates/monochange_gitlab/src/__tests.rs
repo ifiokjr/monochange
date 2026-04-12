@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::thread;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -15,6 +16,7 @@ use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
+use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
 use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
@@ -796,7 +798,7 @@ fn publish_merge_request_updates_existing_merge_request() {
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				"[{\"iid\":12,\"web_url\":\"https://gitlab.example.com/group/monochange/-/merge_requests/12\"}]",
+				"[{\"iid\":12,\"web_url\":\"https://gitlab.example.com/group/monochange/-/merge_requests/12\",\"title\":\"old title\",\"description\":\"old body\",\"target_branch\":\"main\",\"labels\":[],\"sha\":\"old-sha\"}]",
 			);
 	});
 	let update = server.mock(|when, then| {
@@ -825,6 +827,73 @@ fn publish_merge_request_updates_existing_merge_request() {
 	list.assert();
 	update.assert();
 	assert_eq!(outcome.operation, SourceChangeRequestOperation::Updated);
+}
+
+#[test]
+fn join_existing_merge_request_lookup_reports_panicked_thread() {
+	let error = join_existing_merge_request_lookup(thread::spawn(
+		|| -> MonochangeResult<Option<GitLabExistingMergeRequest>> {
+			panic!("boom");
+		},
+	))
+	.err()
+	.unwrap_or_else(|| panic!("expected join error"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to join GitLab merge request lookup thread")
+	);
+}
+
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
+fn publish_release_pull_request_skips_push_when_existing_merge_request_matches_local_head() {
+	let server = MockServer::start();
+	let (_tempdir, repo) = seed_git_repository();
+	let source = sample_source(Some(format!("{}/api/v4", server.base_url())));
+	let request = build_release_pull_request_request(&source, &sample_manifest());
+
+	git(&repo, &["checkout", "-B", &request.head_branch]);
+	git(&repo, &["add", "-A", "--", "release.txt"]);
+	git(&repo, &["commit", "-m", "prepare release branch"]);
+	git(&repo, &["push", "-u", "origin", &request.head_branch]);
+	let head_commit = git_output(&repo, &["rev-parse", "HEAD"]).trim().to_string();
+	let labels = serde_json::to_string(&request.labels)
+		.unwrap_or_else(|error| panic!("labels json: {error}"));
+	let list = server.mock(|when, then| {
+		when.method(GET)
+			.path("/api/v4/projects/group%2Fmonochange/merge_requests")
+			.query_param("state", "opened")
+			.query_param("source_branch", "monochange/release/release")
+			.query_param("target_branch", "main");
+			then.status(200)
+				.header("content-type", "application/json")
+				.body(format!(
+					"[{{\"iid\":12,\"web_url\":\"https://gitlab.example.com/group/monochange/-/merge_requests/12\",\"title\":{title:?},\"description\":{body:?},\"target_branch\":{base:?},\"labels\":{labels},\"sha\":{head:?}}}]",
+					title = request.title,
+					body = request.body,
+					base = request.base_branch,
+					labels = labels,
+					head = head_commit,
+				));
+		});
+	git(
+		&repo,
+		&[
+			"remote",
+			"set-url",
+			"origin",
+			"/definitely/missing/gitlab-origin.git",
+		],
+	);
+
+	let outcome = with_gitlab_env(Some("token"), || {
+		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
+			.unwrap_or_else(|error| panic!("publish merge request: {error}"))
+	});
+
+	list.assert();
+	assert_eq!(outcome.operation, SourceChangeRequestOperation::Skipped);
+	assert_eq!(outcome.number, 12);
 }
 
 fn sample_source(api_url: Option<String>) -> SourceConfiguration {

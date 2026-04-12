@@ -2648,6 +2648,7 @@ pub struct SourceChangeRequest {
 pub enum SourceChangeRequestOperation {
 	Created,
 	Updated,
+	Skipped,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
