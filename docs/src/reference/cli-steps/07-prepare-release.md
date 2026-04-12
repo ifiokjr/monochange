@@ -50,8 +50,10 @@ It can produce:
 - updated changelogs
 - deleted or consumed changeset files
 - release target information
-- final command output in text or JSON form
+- final command output in markdown, text, or JSON form
 - structured `release.*` template values for later `Command` steps
+
+Built-in release-oriented commands now default their human-readable `format` input to `markdown`. Use `text` when you explicitly want the older plain-text style, or `json` for automation.
 
 It also fills the shorthand template values commonly used by `Command` steps:
 
@@ -141,3 +143,4 @@ Because the later steps all depend on the same prepared state, you should genera
 - putting `PublishRelease` or `OpenReleaseRequest` before `PrepareRelease`
 - assuming `PrepareRelease` is just a read-only planner in non-dry-run mode
 - forgetting that later `Command` steps can consume its structured output directly
+- forgetting that `--quiet` suppresses stdout/stderr and forces dry-run behavior when the command supports dry-run semantics
