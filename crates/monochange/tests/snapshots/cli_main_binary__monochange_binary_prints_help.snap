@@ -31,8 +31,9 @@ Commands:
   help            Print this message or the help of the given subcommand(s)
 
 Options:
-  -q, --quiet  Suppress stdout/stderr output and run in dry-run mode when supported
-  -h, --help   Print help
+  -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
+      --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
+  -h, --help                      Print help
 
 
 ----- stderr -----

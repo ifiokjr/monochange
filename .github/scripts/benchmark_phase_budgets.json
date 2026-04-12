@@ -1,0 +1,60 @@
+{
+	"baseline": {
+		"mc release --dry-run": {
+			"stepTotalMs": 450,
+			"phases": {
+				"discover release workspace": 180,
+				"read changeset files": 120,
+				"parse changeset files": 120,
+				"build release plan": 80,
+				"build manifest updates": 80,
+				"build versioned file updates": 80,
+				"build release targets": 80,
+				"build lockfile refresh plan": 40
+			}
+		},
+		"mc release": {
+			"stepTotalMs": 550,
+			"phases": {
+				"discover release workspace": 180,
+				"read changeset files": 120,
+				"parse changeset files": 120,
+				"build release plan": 80,
+				"build manifest updates": 80,
+				"build versioned file updates": 80,
+				"build release targets": 80,
+				"build lockfile refresh plan": 40,
+				"apply release changes": 160
+			}
+		}
+	},
+	"history_x10": {
+		"mc release --dry-run": {
+			"stepTotalMs": 1600,
+			"phases": {
+				"discover release workspace": 700,
+				"read changeset files": 320,
+				"parse changeset files": 320,
+				"build release plan": 120,
+				"build manifest updates": 180,
+				"build versioned file updates": 180,
+				"build release targets": 180,
+				"build lockfile refresh plan": 80
+			}
+		},
+		"mc release": {
+			"stepTotalMs": 1800,
+			"phases": {
+				"discover release workspace": 700,
+				"read changeset files": 320,
+				"parse changeset files": 320,
+				"build release plan": 120,
+				"build manifest updates": 180,
+				"build versioned file updates": 180,
+				"build release targets": 180,
+				"build lockfile refresh plan": 80,
+				"apply release changes": 260
+			}
+		}
+	}
+}

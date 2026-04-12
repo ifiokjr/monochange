@@ -153,7 +153,8 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    continue-on-error: true
+    env:
+      MONOCHANGE_ALLOW_BENCHMARK_BUDGET_FAILURES: "false"
     permissions:
       pull-requests: write
     steps:
@@ -186,17 +187,29 @@ jobs:
           .github/scripts/benchmark_cli.sh run \
             --main-bin /tmp/mc-main \
             --pr-bin /tmp/mc-pr \
-            --output /tmp/benchmark-comment.md
+            --output /tmp/benchmark-comment.md \
+            --violations-output /tmp/benchmark-violations.txt
 
           {
             echo "results<<ENDOFBENCH"
             cat /tmp/benchmark-comment.md
             echo "ENDOFBENCH"
+            echo "violations=$(cat /tmp/benchmark-violations.txt)"
           } >> "$GITHUB_OUTPUT"
         shell: devenv shell -- bash -e {0}
 
       - name: comment benchmark results on PR
+        if: always() && steps.bench.outcome == 'success'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: binary-benchmark
           message: ${{ steps.bench.outputs.results }}
+
+      - name: fail on phase budget regressions
+        if: always() && steps.bench.outcome == 'success' && env.MONOCHANGE_ALLOW_BENCHMARK_BUDGET_FAILURES != 'true'
+        run: |
+          if [ "${{ steps.bench.outputs.violations }}" -gt 0 ]; then
+            echo "benchmark phase budget regressions detected: ${{ steps.bench.outputs.violations }}"
+            exit 1
+          fi
+        shell: devenv shell -- bash -e {0}

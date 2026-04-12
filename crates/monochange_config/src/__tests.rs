@@ -2387,6 +2387,80 @@ fn load_workspace_configuration_rejects_empty_command_step_id() {
 }
 
 #[test]
+fn load_workspace_configuration_rejects_empty_step_name() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir core: {error}"));
+	std::fs::write(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.release]
+[[cli.release.steps]]
+type = "PrepareRelease"
+name = "   "
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange: {error}"));
+
+	let error = load_workspace_configuration(root)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for empty step name"));
+	assert!(error.to_string().contains("empty `name`"), "error: {error}");
+}
+
+#[test]
+fn load_workspace_configuration_rejects_duplicate_step_names() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir core: {error}"));
+	std::fs::write(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write cargo: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.release]
+[[cli.release.steps]]
+type = "PrepareRelease"
+name = "plan release"
+
+[[cli.release.steps]]
+type = "Command"
+name = "plan release"
+command = "echo hi"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange: {error}"));
+
+	let error = load_workspace_configuration(root)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for duplicate step names"));
+	assert!(
+		error.to_string().contains("duplicate step name"),
+		"error: {error}"
+	);
+}
+
+#[test]
 fn load_workspace_configuration_accepts_command_step_with_shell_string() {
 	let root = fixture_path("config/accepts-shell-string");
 	let configuration = load_workspace_configuration(&root)

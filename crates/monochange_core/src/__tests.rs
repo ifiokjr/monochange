@@ -533,7 +533,7 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 	assert_eq!(
 		validate_cli_command.steps,
 		vec![CliStepDefinition::Validate {
-			name: None,
+			name: Some("validate workspace".to_string()),
 			when: None,
 			inputs: BTreeMap::new(),
 		}]

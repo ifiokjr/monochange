@@ -587,14 +587,14 @@ comment_on_failure = true
 
 [cli.validate]
 help_text = "Validate monochange configuration and changesets"
-steps = [{ type = "Validate" }]
+steps = [{ name = "validate workspace", type = "Validate" }]
 
 [cli.discover]
 help_text = "Discover packages across supported ecosystems"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
-steps = [{ type = "Discover" }]
+steps = [{ name = "discover packages", type = "Discover" }]
 
 [cli.change]
 help_text = "Create a change file for one or more packages"
@@ -606,14 +606,14 @@ inputs = [
 	{ name = "details", type = "string" },
 	{ name = "output", type = "path" },
 ]
-steps = [{ type = "CreateChangeFile" }]
+steps = [{ name = "create change file", type = "CreateChangeFile" }]
 
 [cli.release]
 help_text = "Prepare a release from discovered change files"
 inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
 ]
-steps = [{ type = "PrepareRelease" }]
+steps = [{ name = "prepare release", type = "PrepareRelease" }]
 
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"
@@ -625,7 +625,7 @@ inputs = [
 {% raw -%}
 # Step inputs example: { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
 {% endraw -%}
-steps = [{ type = "AffectedPackages" }]
+steps = [{ name = "evaluate affected packages", type = "AffectedPackages" }]
 
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"
@@ -633,7 +633,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 	{ name = "changeset", type = "string_list", help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)" },
 ]
-steps = [{ type = "DiagnoseChangesets" }]
+steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets" }]
 
 [cli.repair-release]
 help_text = "Repair a recent release by moving its release tags to a later commit"
@@ -644,4 +644,4 @@ inputs = [
 	{ name = "sync_provider", type = "boolean", help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)", default = "true" },
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
-steps = [{ type = "RetargetRelease" }]
+steps = [{ name = "retarget release", type = "RetargetRelease" }]

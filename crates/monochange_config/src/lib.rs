@@ -3148,6 +3148,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 		}
 
 		let mut seen_step_ids: BTreeSet<String> = BTreeSet::new();
+		let mut seen_step_names: BTreeSet<String> = BTreeSet::new();
 		for step in &cli_command.steps {
 			if let Some(condition) = step.when()
 				&& condition.trim().is_empty()
@@ -3157,6 +3158,22 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 					cli_command.name,
 					step.kind_name()
 				)));
+			}
+			if let Some(name) = step.name() {
+				let trimmed = name.trim();
+				if trimmed.is_empty() {
+					return Err(MonochangeError::Config(format!(
+						"CLI command `{}` step `{}` has an empty `name`",
+						cli_command.name,
+						step.kind_name()
+					)));
+				}
+				if !seen_step_names.insert(trimmed.to_string()) {
+					return Err(MonochangeError::Config(format!(
+						"CLI command `{}` has duplicate step name `{trimmed}`",
+						cli_command.name
+					)));
+				}
 			}
 			for input_name in step.inputs().keys() {
 				if input_name.trim().is_empty() {

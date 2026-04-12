@@ -18,17 +18,18 @@ Create a change file for one or more packages
 Usage: mc change [OPTIONS]
 
 Options:
-      --dry-run            Run the command in dry-run mode when supported
-  -i, --interactive        Select packages, bumps, and options interactively
-  -q, --quiet              Suppress stdout/stderr output and run in dry-run mode when supported
-      --package <PACKAGE>  Package or group to include in the change
-      --bump <BUMP>        Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
-      --version <VERSION>  Pin an explicit version for this release
-      --reason <REASON>    Short release-note summary for this change
-      --type <TYPE>        Optional release-note type such as `security` or `note`
-      --details <DETAILS>  Optional multi-line release-note details
-      --output <PATH>      Write the generated change file to a specific path
-  -h, --help               Print help
+      --dry-run                   Run the command in dry-run mode when supported
+  -i, --interactive               Select packages, bumps, and options interactively
+  -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
+      --package <PACKAGE>         Package or group to include in the change
+      --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
+      --bump <BUMP>               Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
+      --version <VERSION>         Pin an explicit version for this release
+      --reason <REASON>           Short release-note summary for this change
+      --type <TYPE>               Optional release-note type such as `security` or `note`
+      --details <DETAILS>         Optional multi-line release-note details
+      --output <PATH>             Write the generated change file to a specific path
+  -h, --help                      Print help
 
 Examples:
   mc change --package sdk-core --bump patch --reason "fix panic"
