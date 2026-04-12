@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/cli_step_input_overrides.rs
-assertion_line: 44
+assertion_line: 46
 expression: json
 ---
 {
@@ -45,7 +45,7 @@ expression: json
           "host": "github.com",
           "introduced": null,
           "lastUpdated": null,
-          "provider": "git_hub",
+          "provider": "github",
           "relatedIssues": []
         },
         "details": null,

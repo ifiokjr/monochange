@@ -19,6 +19,7 @@ use crate::Ecosystem;
 use crate::EcosystemSettings;
 use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
+use crate::HostingProviderKind;
 use crate::PackageDefinition;
 use crate::PackageDependency;
 use crate::PackageRecord;
@@ -415,6 +416,7 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 	assert_eq!(
 		validate_cli_command.steps,
 		vec![CliStepDefinition::Validate {
+			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
 		}]
@@ -427,6 +429,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 	let cases: Vec<(CliStepDefinition, &str)> = vec![
 		(
 			CliStepDefinition::Validate {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -434,6 +437,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::Discover {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -441,6 +445,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::CreateChangeFile {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -448,6 +453,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::PrepareRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -455,6 +461,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::CommitRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -462,6 +469,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::RenderReleaseManifest {
+				name: None,
 				when: None,
 				path: None,
 				inputs: BTreeMap::new(),
@@ -470,6 +478,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::PublishRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -477,6 +486,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::OpenReleaseRequest {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -484,6 +494,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::CommentReleasedIssues {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -491,6 +502,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::AffectedPackages {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -498,6 +510,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::DiagnoseChangesets {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -505,6 +518,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::RetargetRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -512,6 +526,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::Command {
+				name: None,
 				when: None,
 				command: "echo".into(),
 				dry_run_command: None,
@@ -529,8 +544,101 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 }
 
 #[test]
+fn cli_step_display_name_prefers_explicit_name_over_kind() {
+	let named = CliStepDefinition::PrepareRelease {
+		name: Some("plan release".to_string()),
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	let unnamed = CliStepDefinition::PrepareRelease {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(named.display_name(), "plan release");
+	assert_eq!(unnamed.display_name(), "PrepareRelease");
+}
+
+#[test]
+fn cli_step_name_returns_explicit_names_for_all_variants() {
+	let expected = "named step";
+	let steps = vec![
+		CliStepDefinition::Discover {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::CreateChangeFile {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::PrepareRelease {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::CommitRelease {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::RenderReleaseManifest {
+			name: Some(expected.to_string()),
+			when: None,
+			path: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::PublishRelease {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::OpenReleaseRequest {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::CommentReleasedIssues {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::AffectedPackages {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::DiagnoseChangesets {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::RetargetRelease {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::Command {
+			name: Some(expected.to_string()),
+			when: None,
+			command: "echo hi".to_string(),
+			dry_run_command: None,
+			shell: ShellConfig::None,
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		},
+	];
+	for step in steps {
+		assert_eq!(step.name(), Some(expected));
+	}
+}
+
+#[test]
 fn valid_input_names_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
+		name: None,
 		when: None,
 		command: "echo hi".into(),
 		dry_run_command: None,
@@ -545,6 +653,7 @@ fn valid_input_names_returns_none_for_command_steps() {
 #[test]
 fn valid_input_names_returns_empty_for_validate() {
 	let step = CliStepDefinition::Validate {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -554,6 +663,7 @@ fn valid_input_names_returns_empty_for_validate() {
 #[test]
 fn valid_input_names_returns_empty_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -563,6 +673,7 @@ fn valid_input_names_returns_empty_for_commit_release() {
 #[test]
 fn valid_input_names_returns_expected_names_for_affected_packages() {
 	let step = CliStepDefinition::AffectedPackages {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -577,6 +688,7 @@ fn valid_input_names_returns_expected_names_for_affected_packages() {
 #[test]
 fn valid_input_names_returns_expected_names_for_retarget_release() {
 	let step = CliStepDefinition::RetargetRelease {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -589,6 +701,7 @@ fn valid_input_names_returns_expected_names_for_retarget_release() {
 #[test]
 fn valid_input_names_returns_expected_names_for_create_change_file() {
 	let step = CliStepDefinition::CreateChangeFile {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -634,6 +747,7 @@ fn default_change_command_supports_none_bump_and_omits_legacy_evidence_input() {
 fn expected_input_kind_returns_correct_types_for_affected_packages() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::AffectedPackages {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -663,6 +777,7 @@ fn expected_input_kind_returns_correct_types_for_affected_packages() {
 #[test]
 fn expected_input_kind_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
+		name: None,
 		when: None,
 		command: "echo".into(),
 		dry_run_command: None,
@@ -677,6 +792,7 @@ fn expected_input_kind_returns_none_for_command_steps() {
 #[test]
 fn expected_input_kind_returns_none_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -687,6 +803,7 @@ fn expected_input_kind_returns_none_for_commit_release() {
 fn expected_input_kind_returns_correct_types_for_create_change_file() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::CreateChangeFile {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -710,6 +827,7 @@ fn expected_input_kind_returns_correct_types_for_create_change_file() {
 fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::DiagnoseChangesets {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -728,6 +846,7 @@ fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
 fn expected_input_kind_returns_correct_types_for_retarget_release() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::RetargetRelease {
+		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
@@ -745,6 +864,16 @@ fn expected_input_kind_returns_correct_types_for_retarget_release() {
 		Some(CliInputKind::Boolean)
 	);
 	assert_eq!(step.expected_input_kind("nonexistent"), None);
+}
+
+#[test]
+fn hosting_provider_kind_as_str_and_display_cover_all_variants() {
+	assert_eq!(HostingProviderKind::GenericGit.as_str(), "generic_git");
+	assert_eq!(HostingProviderKind::GitHub.as_str(), "github");
+	assert_eq!(HostingProviderKind::GitLab.as_str(), "gitlab");
+	assert_eq!(HostingProviderKind::Gitea.as_str(), "gitea");
+	assert_eq!(HostingProviderKind::Bitbucket.as_str(), "bitbucket");
+	assert_eq!(HostingProviderKind::Gitea.to_string(), "gitea");
 }
 
 #[test]
@@ -803,6 +932,7 @@ fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
 	assert_eq!(
 		publish_release,
 		CliStepDefinition::PublishRelease {
+			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
 		}
@@ -810,6 +940,7 @@ fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
 	assert_eq!(
 		open_release_request,
 		CliStepDefinition::OpenReleaseRequest {
+			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
 		}

@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/source_providers.rs
+assertion_line: 26
 expression: json
 ---
 {
@@ -36,15 +37,15 @@ expression: json
         "context": {
           "capabilities": {
             "actorProfiles": false,
-            "commitWebUrls": false,
+            "commitWebUrls": true,
             "issueComments": false,
             "relatedIssues": false,
             "reviewRequestLookup": false
           },
-          "host": null,
+          "host": "gitlab.com",
           "introduced": null,
           "lastUpdated": null,
-          "provider": "generic_git",
+          "provider": "gitlab",
           "relatedIssues": []
         },
         "details": null,

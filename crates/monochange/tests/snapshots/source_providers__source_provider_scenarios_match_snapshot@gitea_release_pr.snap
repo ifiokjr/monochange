@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/source_providers.rs
+assertion_line: 26
 expression: json
 ---
 {
@@ -36,15 +37,15 @@ expression: json
         "context": {
           "capabilities": {
             "actorProfiles": false,
-            "commitWebUrls": false,
+            "commitWebUrls": true,
             "issueComments": false,
             "relatedIssues": false,
             "reviewRequestLookup": false
           },
-          "host": null,
+          "host": "codeberg.org",
           "introduced": null,
           "lastUpdated": null,
-          "provider": "generic_git",
+          "provider": "gitea",
           "relatedIssues": []
         },
         "details": null,

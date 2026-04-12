@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/github_releases.rs
+assertion_line: 23
 expression: json
 ---
 {
@@ -64,7 +65,7 @@ expression: json
           "host": "github.com",
           "introduced": null,
           "lastUpdated": null,
-          "provider": "git_hub",
+          "provider": "github",
           "relatedIssues": []
         },
         "details": null,

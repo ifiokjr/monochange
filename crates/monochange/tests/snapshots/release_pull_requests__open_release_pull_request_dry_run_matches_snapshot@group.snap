@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/release_pull_requests.rs
+assertion_line: 21
 expression: json
 ---
 {
@@ -69,7 +70,7 @@ expression: json
           "host": "github.com",
           "introduced": null,
           "lastUpdated": null,
-          "provider": "git_hub",
+          "provider": "github",
           "relatedIssues": []
         },
         "details": null,

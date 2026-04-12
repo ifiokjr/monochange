@@ -7,7 +7,15 @@ use httpmock::Method::PUT;
 use httpmock::MockServer;
 use insta::assert_snapshot;
 use monochange_core::BumpSeverity;
+use monochange_core::ChangesetContext;
+use monochange_core::ChangesetRevision;
 use monochange_core::CommitMessage;
+use monochange_core::HostedActorRef;
+use monochange_core::HostedActorSourceKind;
+use monochange_core::HostedCommitRef;
+use monochange_core::HostingCapabilities;
+use monochange_core::HostingProviderKind;
+use monochange_core::PreparedChangeset;
 use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseNotesSource;
@@ -225,6 +233,140 @@ fn tag_and_compare_urls_use_trimmed_gitlab_host() {
 		compare_url(&source, "v1.2.2", "v1.2.3"),
 		"https://forge.example.com/group/monochange/-/compare/v1.2.2...v1.2.3"
 	);
+}
+
+#[test]
+fn gitlab_context_annotation_updates_hosts_commits_and_authors() {
+	let source = SourceConfiguration {
+		host: Some("https://forge.example.com/group/monochange/subpath".to_string()),
+		..sample_source(None)
+	};
+	assert_eq!(
+		gitlab_host_name(&source).as_deref(),
+		Some("forge.example.com")
+	);
+	assert_eq!(
+		gitlab_commit_url(&source, "abc1234567890"),
+		"https://forge.example.com/group/monochange/subpath/group/monochange/-/commit/abc1234567890"
+	);
+	let mut changesets = vec![PreparedChangeset {
+		path: PathBuf::from(".changeset/feature.md"),
+		summary: Some("feature".to_string()),
+		details: None,
+		targets: Vec::new(),
+		context: Some(ChangesetContext {
+			provider: HostingProviderKind::GenericGit,
+			host: None,
+			capabilities: HostingCapabilities::default(),
+			introduced: Some(ChangesetRevision {
+				actor: Some(HostedActorRef {
+					provider: HostingProviderKind::GenericGit,
+					host: None,
+					id: None,
+					login: Some("ifiokjr".to_string()),
+					display_name: Some("Ifiok Jr.".to_string()),
+					url: None,
+					source: HostedActorSourceKind::CommitAuthor,
+				}),
+				commit: Some(HostedCommitRef {
+					provider: HostingProviderKind::GenericGit,
+					host: None,
+					sha: "abc1234567890".to_string(),
+					short_sha: "abc1234".to_string(),
+					url: None,
+					authored_at: None,
+					committed_at: None,
+					author_name: None,
+					author_email: None,
+				}),
+				review_request: None,
+			}),
+			last_updated: None,
+			related_issues: Vec::new(),
+		}),
+	}];
+
+	annotate_changeset_context(&source, &mut changesets);
+	enrich_changeset_context(&source, &mut changesets);
+
+	let context = changesets
+		.first()
+		.and_then(|changeset| changeset.context.as_ref())
+		.unwrap_or_else(|| panic!("expected changeset context"));
+	assert_eq!(context.provider, HostingProviderKind::GitLab);
+	assert_eq!(context.host.as_deref(), Some("forge.example.com"));
+	assert_eq!(
+		context
+			.introduced
+			.as_ref()
+			.and_then(|revision| revision.commit.as_ref())
+			.and_then(|commit| commit.url.as_deref()),
+		Some(
+			"https://forge.example.com/group/monochange/subpath/group/monochange/-/commit/abc1234567890"
+		)
+	);
+	assert_eq!(
+		context
+			.introduced
+			.as_ref()
+			.and_then(|revision| revision.actor.as_ref())
+			.map(|actor| (actor.provider, actor.host.clone())),
+		Some((
+			HostingProviderKind::GitLab,
+			Some("forge.example.com".to_string())
+		))
+	);
+}
+
+#[test]
+fn gitlab_context_annotation_handles_empty_hosts_and_missing_context_entries() {
+	let source = SourceConfiguration {
+		host: Some("".to_string()),
+		..sample_source(None)
+	};
+	assert_eq!(gitlab_host_name(&source), None);
+	let mut changesets = vec![
+		PreparedChangeset {
+			path: PathBuf::from(".changeset/no-context.md"),
+			summary: None,
+			details: None,
+			targets: Vec::new(),
+			context: None,
+		},
+		PreparedChangeset {
+			path: PathBuf::from(".changeset/partial.md"),
+			summary: Some("partial".to_string()),
+			details: None,
+			targets: Vec::new(),
+			context: Some(ChangesetContext {
+				provider: HostingProviderKind::GenericGit,
+				host: None,
+				capabilities: HostingCapabilities::default(),
+				introduced: Some(ChangesetRevision {
+					actor: None,
+					commit: None,
+					review_request: None,
+				}),
+				last_updated: None,
+				related_issues: Vec::new(),
+			}),
+		},
+	];
+
+	annotate_changeset_context(&source, &mut changesets);
+
+	assert!(
+		changesets
+			.first()
+			.and_then(|changeset| changeset.context.as_ref())
+			.is_none()
+	);
+	let context = changesets
+		.get(1)
+		.and_then(|changeset| changeset.context.as_ref())
+		.unwrap_or_else(|| panic!("expected partial context"));
+	assert_eq!(context.provider, HostingProviderKind::GitLab);
+	assert_eq!(context.host, None);
 }
 
 #[test]

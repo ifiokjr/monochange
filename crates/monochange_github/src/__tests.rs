@@ -1014,21 +1014,12 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 #[test]
 fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 	let server = MockServer::start();
-	let lookup_pull_request = server.mock(|when, then| {
-		when.method(GET)
-			.path("/repos/ifiokjr/monochange/commits/abc1234567890/pulls");
-		then.status(200)
-			.header("content-type", "application/json")
-			.body(
-				r#"[{"number":42,"title":"Add release context","html_url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","user":{"id":1,"login":"ifiokjr","html_url":"https://example.com/users/1"}}]"#,
-			);
-	});
-	let lookup_closing_issues = server.mock(|when, then| {
+	let lookup_review_requests = server.mock(|when, then| {
 		when.method(POST).path("/graphql");
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				r#"{"repository":{"pullRequest":{"closingIssuesReferences":{"nodes":[{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}}}"#,
+				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"},"closingIssuesReferences":{"nodes":[{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}]}}}}"#,
 			);
 	});
 	let github = SourceConfiguration {
@@ -1087,8 +1078,7 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 			});
 	});
 
-	lookup_pull_request.assert();
-	lookup_closing_issues.assert();
+	lookup_review_requests.assert();
 	let context = changesets
 		.first()
 		.and_then(|changeset| changeset.context.as_ref())
@@ -1192,6 +1182,161 @@ fn enrich_changeset_context_public_api_uses_source_configuration() {
 		commit_url,
 		"https://example.com/ifiokjr/monochange/commit/abc1234567890"
 	);
+}
+
+#[test]
+fn enrich_changeset_context_falls_back_to_commit_annotations_when_batch_lookup_fails() {
+	let server = MockServer::start();
+	let failing_lookup = server.mock(|when, then| {
+		when.method(POST).path("/graphql");
+		then.status(500);
+	});
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	};
+	let mut changesets = vec![PreparedChangeset {
+		path: PathBuf::from(".changeset/feature.md"),
+		summary: Some("add release context".to_string()),
+		details: None,
+		targets: Vec::new(),
+		context: Some(ChangesetContext {
+			provider: HostingProviderKind::GenericGit,
+			host: None,
+			capabilities: HostingCapabilities::default(),
+			introduced: Some(ChangesetRevision {
+				actor: Some(HostedActorRef {
+					provider: HostingProviderKind::GenericGit,
+					host: None,
+					id: None,
+					login: Some("ifiokjr".to_string()),
+					display_name: Some("Ifiok Jr.".to_string()),
+					url: None,
+					source: HostedActorSourceKind::CommitAuthor,
+				}),
+				commit: Some(HostedCommitRef {
+					provider: HostingProviderKind::GenericGit,
+					host: None,
+					sha: "abc1234567890".to_string(),
+					short_sha: "abc1234".to_string(),
+					url: None,
+					authored_at: None,
+					committed_at: None,
+					author_name: None,
+					author_email: None,
+				}),
+				review_request: None,
+			}),
+			last_updated: None,
+			related_issues: Vec::new(),
+		}),
+	}];
+
+	temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
+		github_runtime()
+			.unwrap_or_else(|error| panic!("runtime: {error}"))
+			.block_on(async {
+				let client = build_test_client(&server);
+				enrich_changeset_context_with_client(&client, &github, &mut changesets).await;
+			});
+	});
+
+	assert!(
+		failing_lookup.calls() >= 1,
+		"expected at least one failed batch lookup"
+	);
+	let context = changesets
+		.first()
+		.and_then(|changeset| changeset.context.as_ref())
+		.unwrap_or_else(|| panic!("expected context"));
+	assert_eq!(context.provider, HostingProviderKind::GitHub);
+	assert!(context.related_issues.is_empty());
+	assert_eq!(
+		context
+			.introduced
+			.as_ref()
+			.and_then(|revision| revision.commit.as_ref())
+			.and_then(|commit| commit.url.as_deref()),
+		Some("https://example.com/ifiokjr/monochange/commit/abc1234567890")
+	);
+}
+
+#[test]
+fn batch_review_request_lookup_reports_missing_repository_payload_and_skips_malformed_issues() {
+	let server = MockServer::start();
+	let missing_repository = server.mock(|when, then| {
+		when.method(POST)
+			.path("/graphql")
+			.header_exists("content-type");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"data":{}}"#);
+	});
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	};
+	github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			let error = load_review_request_batch_with_client(
+				&client,
+				&github,
+				&["abc1234567890".to_string()],
+			)
+			.await
+			.err()
+			.unwrap_or_else(|| panic!("expected missing repository error"));
+			assert!(
+				error
+					.to_string()
+					.contains("GitHub review-request lookup returned no repository payload")
+			);
+		});
+	missing_repository.assert();
+
+	let malformed_server = MockServer::start();
+	let malformed_issues = malformed_server.mock(|when, then| {
+		when.method(POST).path("/graphql");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(
+				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"","author":{"login":"ifiokjr","url":"https://example.com/users/1"},"closingIssuesReferences":{"nodes":[{"title":"missing number"},{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}]}}}}"#,
+			);
+	});
+	github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&malformed_server);
+			let review_requests = load_review_request_batch_with_client(
+				&client,
+				&github,
+				&["abc1234567890".to_string()],
+			)
+			.await
+			.unwrap_or_else(|error| panic!("batch lookup: {error}"));
+			let issues = review_requests
+				.get("abc1234567890")
+				.and_then(|value| value.as_ref())
+				.map(|related| related.issues.clone())
+				.unwrap_or_default();
+			assert_eq!(issues.len(), 1);
+			assert_eq!(issues.first().map(|issue| issue.id.as_str()), Some("#7"));
+		});
+	malformed_issues.assert();
 }
 
 #[test]

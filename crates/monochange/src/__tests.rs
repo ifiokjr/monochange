@@ -438,6 +438,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 		}],
 		steps: vec![
 			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				name: None,
 				when: Some("{{ inputs.enabled }}".to_string()),
 				path: Some(PathBuf::from("target/release-manifest.json")),
 				inputs: BTreeMap::from([(
@@ -446,6 +447,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
+				name: None,
 				when: None,
 				command: "echo hello".to_string(),
 				dry_run_command: Some("echo dry-run".to_string()),
@@ -458,6 +460,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
+				name: None,
 				when: None,
 				command: "echo through-shell".to_string(),
 				dry_run_command: None,
@@ -491,6 +494,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
+				name: None,
 				when: None,
 				command: "echo custom-shell".to_string(),
 				dry_run_command: None,
@@ -500,6 +504,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::CommitRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
@@ -507,6 +512,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::PublishRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
@@ -514,6 +520,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				name: None,
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
@@ -521,6 +528,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				name: None,
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
@@ -1846,6 +1854,7 @@ fn command_step_without_dry_run_override_reports_skipped_command() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			name: None,
 			when: None,
 			command: "echo hello".to_string(),
 			dry_run_command: None,
@@ -1877,6 +1886,7 @@ fn command_step_rejects_unparseable_commands() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			name: None,
 			when: None,
 			command: "\"unterminated".to_string(),
 			dry_run_command: None,
@@ -1913,6 +1923,7 @@ fn command_step_rejects_empty_commands() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			name: None,
 			when: None,
 			command: String::new(),
 			dry_run_command: None,
@@ -1945,6 +1956,7 @@ fn command_step_reports_process_spawn_failures() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			name: None,
 			when: None,
 			command: "definitely-not-a-real-command-12345".to_string(),
 			dry_run_command: None,
@@ -1981,6 +1993,7 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			name: None,
 			when: None,
 			command: "sh -c 'exit 7'".to_string(),
 			dry_run_command: None,
@@ -2016,6 +2029,7 @@ fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			name: None,
 			when: None,
 			command: "sh -c 'echo boom 1>&2; exit 1'".to_string(),
 			dry_run_command: None,
@@ -2741,6 +2755,13 @@ fn parse_direct_template_reference_returns_none_for_invalid_chars() {
 }
 
 #[test]
+fn parse_direct_template_reference_returns_none_for_literals() {
+	use super::parse_direct_template_reference;
+	assert_eq!(parse_direct_template_reference("{{ false }}"), None);
+	assert_eq!(parse_direct_template_reference("{{ 1 }}"), None);
+}
+
+#[test]
 fn parse_direct_template_reference_returns_none_when_not_a_bare_ref() {
 	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("prefix-{{ foo }}"), None);
@@ -2788,6 +2809,7 @@ fn should_execute_cli_step_runs_when_condition_is_true() {
 		("extra".to_string(), vec!["true".to_string()]),
 	]);
 	let step = monochange_core::CliStepDefinition::Command {
+		name: None,
 		when: Some("{{ inputs.run && inputs.extra }}".to_string()),
 		command: "printf hi".to_string(),
 		dry_run_command: None,
@@ -2807,6 +2829,7 @@ fn should_execute_cli_step_skips_when_condition_is_false() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec!["false".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
 		command: "printf hi".to_string(),
 		dry_run_command: None,
@@ -2826,6 +2849,7 @@ fn should_execute_cli_step_skips_for_zero_value() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec!["0".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
 		command: "printf hi".to_string(),
 		dry_run_command: None,
@@ -2845,6 +2869,7 @@ fn should_execute_cli_step_trims_and_treats_1_as_true() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec![" 1 ".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
 		command: "printf hi".to_string(),
 		dry_run_command: None,
@@ -2864,6 +2889,7 @@ fn should_execute_cli_step_skips_with_not_operator() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("skip".to_string(), vec!["true".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		name: None,
 		when: Some("{{ ! inputs.skip }}".to_string()),
 		command: "printf hi".to_string(),
 		dry_run_command: None,
@@ -2883,6 +2909,7 @@ fn should_execute_cli_step_rejects_unknown_template_reference() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec!["true".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		name: None,
 		when: Some("{{ inputs.missing }}".to_string()),
 		command: "printf hi".to_string(),
 		dry_run_command: None,
@@ -2905,6 +2932,7 @@ fn should_execute_cli_step_rejects_non_scalar_condition_value() {
 	let step_inputs =
 		BTreeMap::from([("list".to_string(), vec!["a".to_string(), "b".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		name: None,
 		when: Some("{{ inputs.list }}".to_string()),
 		command: "printf hi".to_string(),
 		dry_run_command: None,
@@ -3705,6 +3733,7 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::RetargetRelease {
+			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
 		}],
@@ -3735,6 +3764,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"release-manifest",
 			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				name: None,
 				when: None,
 				path: None,
 				inputs: BTreeMap::new(),
@@ -3744,6 +3774,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"publish-release",
 			monochange_core::CliStepDefinition::PublishRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3752,6 +3783,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"release-pr",
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3760,6 +3792,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		(
 			"release-comments",
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3807,10 +3840,12 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3841,6 +3876,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 		(
 			"publish-release",
 			monochange_core::CliStepDefinition::PublishRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3849,6 +3885,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 		(
 			"release-pr",
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3863,6 +3900,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 			inputs: Vec::new(),
 			steps: vec![
 				monochange_core::CliStepDefinition::PrepareRelease {
+					name: None,
 					when: None,
 					inputs: BTreeMap::new(),
 				},
@@ -3887,6 +3925,7 @@ fn execute_cli_command_change_step_requires_reason_input() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::CreateChangeFile {
+			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
 		}],
@@ -3933,10 +3972,12 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				name: None,
 				when: None,
 				path: Some(PathBuf::from("target/release-manifest.json")),
 				inputs: BTreeMap::new(),
@@ -3962,10 +4003,12 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::PublishRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -3988,10 +4031,12 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -4014,10 +4059,12 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		inputs: Vec::new(),
 		steps: vec![
 			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
 			},
@@ -4027,6 +4074,119 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		crate::execute_cli_command(root, &configuration, &issue_comments, true, BTreeMap::new())
 			.unwrap_or_else(|error| panic!("comment released issues: {error}"));
 	assert!(!comments_output.is_empty());
+}
+
+#[test]
+fn release_follow_up_helpers_render_real_operation_outputs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let manifest = sample_release_manifest_for_commit_message(true, true);
+	let written_path = crate::cli_runtime::write_release_manifest_file(
+		tempdir.path(),
+		Path::new("target/release-manifest.json"),
+		&manifest,
+	)
+	.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	assert_eq!(written_path, PathBuf::from("target/release-manifest.json"));
+	let manifest_contents =
+		fs::read_to_string(tempdir.path().join(&written_path)).unwrap_or_else(|error| {
+			panic!("read written manifest {}: {error}", written_path.display())
+		});
+	assert!(manifest_contents.contains("\"releaseTargets\""));
+
+	let release_requests = vec![monochange_core::SourceReleaseRequest {
+		provider: monochange_core::SourceProvider::GitHub,
+		repository: "ifiokjr/monochange".to_string(),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		target_id: "sdk".to_string(),
+		target_kind: monochange_core::ReleaseOwnerKind::Group,
+		tag_name: "v1.2.3".to_string(),
+		name: "monochange 1.2.3".to_string(),
+		body: Some("body".to_string()),
+		draft: false,
+		prerelease: false,
+		generate_release_notes: true,
+	}];
+	let release_results =
+		crate::cli_runtime::build_release_results(false, &release_requests, || {
+			Ok(vec![monochange_core::SourceReleaseOutcome {
+				provider: monochange_core::SourceProvider::GitHub,
+				repository: "ifiokjr/monochange".to_string(),
+				tag_name: "v1.2.3".to_string(),
+				operation: monochange_core::SourceReleaseOperation::Created,
+				url: Some("https://example.com/releases/1".to_string()),
+			}])
+		})
+		.unwrap_or_else(|error| panic!("render release results: {error}"));
+	assert_eq!(
+		release_results,
+		vec!["ifiokjr/monochange v1.2.3 (created) via github".to_string()]
+	);
+
+	let release_request = monochange_core::SourceChangeRequest {
+		provider: monochange_core::SourceProvider::GitHub,
+		repository: "ifiokjr/monochange".to_string(),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		base_branch: "main".to_string(),
+		head_branch: "release/v1.2.3".to_string(),
+		title: "chore(release): prepare release".to_string(),
+		body: "body".to_string(),
+		labels: vec!["release".to_string()],
+		auto_merge: true,
+		commit_message: monochange_core::CommitMessage {
+			subject: "subject".to_string(),
+			body: Some("body".to_string()),
+		},
+	};
+	let release_request_result =
+		crate::cli_runtime::build_release_request_result(false, &release_request, || {
+			Ok(monochange_core::SourceChangeRequestOutcome {
+				provider: monochange_core::SourceProvider::GitHub,
+				repository: "ifiokjr/monochange".to_string(),
+				number: 7,
+				head_branch: "release/v1.2.3".to_string(),
+				operation: monochange_core::SourceChangeRequestOperation::Updated,
+				url: Some("https://example.com/pr/7".to_string()),
+			})
+		})
+		.unwrap_or_else(|error| panic!("render release request result: {error}"));
+	assert_eq!(
+		release_request_result,
+		"ifiokjr/monochange #7 (updated) via github"
+	);
+
+	let issue_comment_plans = vec![monochange_github::GitHubIssueCommentPlan {
+		repository: "ifiokjr/monochange".to_string(),
+		issue_id: "#7".to_string(),
+		issue_url: Some("https://example.com/issues/7".to_string()),
+		body: "released".to_string(),
+	}];
+	let issue_comment_results =
+		crate::cli_runtime::build_issue_comment_results(false, &issue_comment_plans, || {
+			Ok(vec![
+				monochange_github::GitHubIssueCommentOutcome {
+					repository: "ifiokjr/monochange".to_string(),
+					issue_id: "#7".to_string(),
+					operation: monochange_github::GitHubIssueCommentOperation::Created,
+					url: Some("https://example.com/issues/7#comment-1".to_string()),
+				},
+				monochange_github::GitHubIssueCommentOutcome {
+					repository: "ifiokjr/monochange".to_string(),
+					issue_id: "#8".to_string(),
+					operation: monochange_github::GitHubIssueCommentOperation::SkippedExisting,
+					url: Some("https://example.com/issues/8#comment-2".to_string()),
+				},
+			])
+		})
+		.unwrap_or_else(|error| panic!("render issue comment results: {error}"));
+	assert_eq!(
+		issue_comment_results,
+		vec![
+			"ifiokjr/monochange #7 (created)".to_string(),
+			"ifiokjr/monochange #8 (skipped_existing)".to_string(),
+		]
+	);
 }
 
 #[test]
@@ -4892,6 +5052,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::CommitRelease {
+			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
 		}],
