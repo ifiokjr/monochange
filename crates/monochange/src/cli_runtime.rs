@@ -35,6 +35,8 @@ use crate::cli::command_supports_release_diff_preview;
 use crate::cli_progress::CliProgressReporter;
 use crate::cli_progress::CommandStream;
 use crate::cli_progress::ProgressFormat;
+use crate::maybe_load_prepared_release_execution;
+use crate::save_prepared_release_execution;
 use crate::*;
 
 pub(crate) fn execute_matches(
@@ -69,6 +71,10 @@ pub(crate) fn execute_matches(
 			},
 			|value| parse_progress_format(value),
 		)?;
+	let prepared_release_path = command_supports_release_diff_preview(cli_command)
+		.then(|| cli_command_matches.get_one::<String>("prepared-release"))
+		.flatten()
+		.map(PathBuf::from);
 	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
 	if show_diff {
 		execute_cli_command_with_options(
@@ -80,18 +86,23 @@ pub(crate) fn execute_matches(
 				quiet,
 				show_diff: true,
 				inputs,
+				prepared_release_path,
 				progress_format,
 			},
 		)
 	} else {
-		execute_cli_command_quiet(
+		execute_cli_command_with_options(
 			root,
 			configuration,
 			cli_command,
-			dry_run,
-			quiet,
-			inputs,
-			progress_format,
+			ExecuteCliCommandOptions {
+				dry_run,
+				quiet,
+				show_diff: false,
+				inputs,
+				prepared_release_path,
+				progress_format,
+			},
 		)
 	}
 }
@@ -401,36 +412,17 @@ pub(crate) fn execute_cli_command(
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
-	execute_cli_command_quiet(
-		root,
-		configuration,
-		cli_command,
-		dry_run,
-		false,
-		inputs,
-		ProgressFormat::Auto,
-	)
-}
-
-fn execute_cli_command_quiet(
-	root: &Path,
-	configuration: &monochange_core::WorkspaceConfiguration,
-	cli_command: &CliCommandDefinition,
-	dry_run: bool,
-	quiet: bool,
-	inputs: BTreeMap<String, Vec<String>>,
-	progress_format: ProgressFormat,
-) -> MonochangeResult<String> {
 	execute_cli_command_with_options(
 		root,
 		configuration,
 		cli_command,
 		ExecuteCliCommandOptions {
 			dry_run,
-			quiet,
+			quiet: false,
 			show_diff: false,
 			inputs,
-			progress_format,
+			prepared_release_path: None,
+			progress_format: ProgressFormat::Auto,
 		},
 	)
 }
@@ -440,6 +432,7 @@ pub(crate) struct ExecuteCliCommandOptions {
 	quiet: bool,
 	show_diff: bool,
 	inputs: BTreeMap<String, Vec<String>>,
+	prepared_release_path: Option<PathBuf>,
 	progress_format: ProgressFormat,
 }
 
@@ -455,6 +448,7 @@ pub(crate) fn execute_cli_command_with_options(
 		quiet,
 		show_diff,
 		inputs,
+		prepared_release_path,
 		progress_format,
 	} = options;
 	let mut context = CliContext {
@@ -629,8 +623,19 @@ pub(crate) fn execute_cli_command_with_options(
 				CliStepDefinition::PrepareRelease { .. } => {
 					let build_file_diffs = context.show_diff
 						|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
-					let prepared_execution =
-						prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?;
+					let prepared_execution = if let Some(loaded) =
+						maybe_load_prepared_release_execution(
+							root,
+							configuration,
+							prepared_release_path.as_deref(),
+							dry_run,
+							build_file_diffs,
+						)? {
+						context.command_logs.push(loaded.message);
+						loaded.execution
+					} else {
+						prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?
+					};
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					context.prepared_file_diffs = prepared_execution.file_diffs;
 					context.prepared_release = Some(prepared_execution.prepared_release);
@@ -880,6 +885,18 @@ pub(crate) fn execute_cli_command_with_options(
 	progress.command_finished(command_started_at.elapsed());
 
 	if let Some(prepared_release) = &context.prepared_release {
+		if let Err(error) = save_prepared_release_execution(
+			root,
+			configuration,
+			prepared_release,
+			&context.prepared_file_diffs,
+			prepared_release_path.as_deref(),
+		) {
+			if prepared_release_path.is_some() {
+				return Err(error);
+			}
+			tracing::warn!(%error, "failed to save prepared release artifact");
+		}
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		return match format {
 			OutputFormat::Json => {

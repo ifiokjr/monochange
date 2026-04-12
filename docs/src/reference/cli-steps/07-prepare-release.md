@@ -124,6 +124,28 @@ Typical production commands look like:
 
 Because the later steps all depend on the same prepared state, you should generally do one `PrepareRelease` and then fan out from it with several typed steps rather than trying to run several independent release commands.
 
+### Reuse prepared state across separate commands
+
+When you do need to split the workflow across separate commands, monochange can now reuse a prepared release artifact instead of recomputing the release plan from scratch.
+
+The default path is automatic:
+
+```bash
+mc release
+mc release-pr --dry-run
+```
+
+`mc release` stores the prepared state in `.monochange/prepared-release-cache.json`, and later commands with a `PrepareRelease` step reuse it when the git `HEAD`, workspace status, tracked release inputs, and relevant configuration still match.
+
+If you need to pass the artifact between explicit jobs or custom commands, use `--prepared-release`:
+
+```bash
+mc release --prepared-release /tmp/release-plan.json
+mc release-pr --prepared-release /tmp/release-plan.json --format json
+```
+
+If the artifact is stale, monochange falls back to a fresh `PrepareRelease` run instead of trusting outdated release data.
+
 ## Good fit / bad fit
 
 **Good fit:**

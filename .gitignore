@@ -8,6 +8,7 @@
 .devenv*
 .pre-commit-config.yaml
 devenv.local.nix
+.monochange/*
 
 **/dist/**
 node_modules/
