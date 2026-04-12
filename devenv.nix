@@ -43,8 +43,6 @@ in
   dotenv.disableHint = true;
 
   git-hooks = {
-    # package = pkgs.prek;
-
     hooks = {
       "secrets:commit" = {
         enable = true;
@@ -114,6 +112,7 @@ in
     "install:all" = {
       exec = ''
         set -e
+        clean:mc
         install:cargo:bin
       '';
       description = "Install all packages.";
@@ -127,11 +126,19 @@ in
       description = "Install cargo binaries locally.";
       binary = "bash";
     };
-    "update:mc" = {
+    "clean:mc" = {
       exec = ''
         set -e
         rm -rf $DEVENV_ROOT/.bin/rust-*/monochange  $DEVENV_ROOT/.bin/.shims/mc
-        mc --help
+      '';
+      description = "Alias for the `monochange` executable";
+      binary = "bash";
+    };
+    "update:mc" = {
+      exec = ''
+        set -e
+        clean:mc
+        mc
       '';
       description = "Alias for the `monochange` executable";
       binary = "bash";
