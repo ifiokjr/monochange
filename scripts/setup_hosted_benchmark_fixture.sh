@@ -37,10 +37,29 @@ EOF
 git_commit() {
 	local root="$1"
 	local message="$2"
-	git -C "$root" \
+	env -u GIT_DIR \
+		-u GIT_WORK_TREE \
+		-u GIT_INDEX_FILE \
+		-u GIT_OBJECT_DIRECTORY \
+		-u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+		-u GIT_COMMON_DIR \
+		git -C "$root" \
+		-c core.hooksPath=/dev/null \
 		-c user.name=fixture \
 		-c user.email=fixture@example.com \
 		commit -m "$message" >/dev/null
+}
+
+run_git() {
+	local root="$1"
+	shift
+	env -u GIT_DIR \
+		-u GIT_WORK_TREE \
+		-u GIT_INDEX_FILE \
+		-u GIT_OBJECT_DIRECTORY \
+		-u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+		-u GIT_COMMON_DIR \
+		git -C "$root" "$@"
 }
 
 remote_push_url() {
@@ -135,7 +154,7 @@ seed_filler_history() {
 	for commit_index in $(seq 1 "$FILLER_COMMITS"); do
 		local package_index=$(((commit_index - 1) % PACKAGE_COUNT))
 		append_package_change "$root" "$package_index" "history_commit_${commit_index}"
-		git -C "$root" add .
+		run_git "$root" add .
 		git_commit "$root" "chore: history commit ${commit_index}"
 	done
 }
@@ -144,9 +163,9 @@ merge_local_release_pr() {
 	local root="$1"
 	local pr_index="$2"
 	local branch_name="$3"
-	git -C "$root" checkout main >/dev/null
-	git -C "$root" merge --no-ff "$branch_name" -m "Merge pull request #${pr_index} from fixture/${branch_name}" >/dev/null
-	git -C "$root" branch -D "$branch_name" >/dev/null
+	run_git "$root" checkout main >/dev/null
+	run_git "$root" merge --no-ff "$branch_name" -m "Merge pull request #${pr_index} from fixture/${branch_name}" >/dev/null
+	run_git "$root" branch -D "$branch_name" >/dev/null
 }
 
 merge_hosted_release_pr() {
@@ -157,7 +176,7 @@ merge_hosted_release_pr() {
 	local branch_name="$5"
 	local pr_url
 
-	git -C "$root" push -u origin "$branch_name" >/dev/null
+	run_git "$root" push -u origin "$branch_name" >/dev/null
 	pr_url="$(
 		gh pr create \
 			--repo "${owner}/${repo}" \
@@ -174,8 +193,8 @@ merge_hosted_release_pr() {
 		"$pr_url" \
 		--squash \
 		--delete-branch >/dev/null
-	git -C "$root" checkout main >/dev/null
-	git -C "$root" pull --ff-only origin main >/dev/null
+	run_git "$root" checkout main >/dev/null
+	run_git "$root" pull --ff-only origin main >/dev/null
 }
 
 seed_release_prs() {
@@ -187,12 +206,12 @@ seed_release_prs() {
 		local branch_name
 		branch_name="fixture/release-pr-${pr_index}"
 		local package_index=$(((pr_index - 1) % PACKAGE_COUNT))
-		git -C "$root" checkout -b "$branch_name" main >/dev/null
+		run_git "$root" checkout -b "$branch_name" main >/dev/null
 
 		local commit_index
 		for commit_index in $(seq 1 "$COMMITS_PER_PR"); do
 			append_package_change "$root" "$package_index" "release_pr_${pr_index}_commit_${commit_index}"
-			git -C "$root" add .
+			run_git "$root" add .
 			git_commit "$root" "feat: release fixture commit ${pr_index}.${commit_index}"
 		done
 
@@ -203,7 +222,7 @@ pkg-${package_index}: patch
 
 Release fixture PR ${pr_index}.
 EOF
-		git -C "$root" add .
+		run_git "$root" add .
 		git_commit "$root" "docs: add release changeset ${pr_index}"
 
 		if [ "$LOCAL_ONLY" = true ]; then
@@ -292,22 +311,22 @@ main() {
 	mkdir -p "$OUTPUT_DIR"
 
 	create_workspace "$OUTPUT_DIR" "$OWNER" "$REPO"
-	git -C "$OUTPUT_DIR" init -b main >/dev/null
-	git -C "$OUTPUT_DIR" add .
+	run_git "$OUTPUT_DIR" init -b main >/dev/null
+	run_git "$OUTPUT_DIR" add .
 	git_commit "$OUTPUT_DIR" "chore: initialize hosted benchmark fixture"
 
 	seed_filler_history "$OUTPUT_DIR"
 
 	if [ "$LOCAL_ONLY" = false ]; then
 		ensure_remote_repo "$OWNER" "$REPO"
-		git -C "$OUTPUT_DIR" remote add origin "$(remote_push_url "$OWNER" "$REPO")"
-		git -C "$OUTPUT_DIR" push -u origin main >/dev/null
+		run_git "$OUTPUT_DIR" remote add origin "$(remote_push_url "$OWNER" "$REPO")"
+		run_git "$OUTPUT_DIR" push -u origin main >/dev/null
 	fi
 
 	seed_release_prs "$OUTPUT_DIR" "$OWNER" "$REPO"
 
 	printf 'fixture directory: %s\n' "$OUTPUT_DIR"
-	printf 'commit count: %s\n' "$(git -C "$OUTPUT_DIR" rev-list --count HEAD)"
+	printf 'commit count: %s\n' "$(run_git "$OUTPUT_DIR" rev-list --count HEAD)"
 	if [ "$LOCAL_ONLY" = false ]; then
 		printf 'repository url: https://github.com/%s/%s\n' "$OWNER" "$REPO"
 	fi
