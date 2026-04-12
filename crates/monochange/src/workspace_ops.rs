@@ -27,15 +27,11 @@ use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::ReleasePlan;
 use monochange_core::SourceConfiguration;
-use monochange_core::SourceProvider;
 use monochange_core::default_cli_commands;
 use monochange_dart::discover_dart_packages;
 use monochange_dart::load_configured_dart_package;
 use monochange_deno::discover_deno_packages;
 use monochange_deno::load_configured_deno_package;
-use monochange_gitea as gitea_provider;
-use monochange_github as github_provider;
-use monochange_gitlab as gitlab_provider;
 use monochange_npm::discover_npm_packages;
 use monochange_npm::load_configured_npm_package;
 use serde_json::json;
@@ -1695,28 +1691,11 @@ fn apply_source_changeset_context(
 	dry_run: bool,
 	changesets: &mut [PreparedChangeset],
 ) {
-	match source.provider {
-		SourceProvider::GitHub => {
-			if dry_run {
-				github_provider::annotate_changeset_context(source, changesets);
-			} else {
-				github_provider::enrich_changeset_context(source, changesets);
-			}
-		}
-		SourceProvider::GitLab => {
-			if dry_run {
-				gitlab_provider::annotate_changeset_context(source, changesets);
-			} else {
-				gitlab_provider::enrich_changeset_context(source, changesets);
-			}
-		}
-		SourceProvider::Gitea => {
-			if dry_run {
-				gitea_provider::annotate_changeset_context(source, changesets);
-			} else {
-				gitea_provider::enrich_changeset_context(source, changesets);
-			}
-		}
+	let adapter = hosted_sources::configured_hosted_source_adapter(source);
+	if dry_run {
+		adapter.annotate_changeset_context(source, changesets);
+	} else {
+		adapter.enrich_changeset_context(source, changesets);
 	}
 }
 

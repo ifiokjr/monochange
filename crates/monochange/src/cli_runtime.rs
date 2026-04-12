@@ -27,7 +27,6 @@ use monochange_core::ShellConfig;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOutcome;
 use monochange_core::SourceConfiguration;
-use monochange_core::SourceProvider;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
 
@@ -365,8 +364,8 @@ fn build_release_request_result_for_source(
 
 pub(crate) fn build_issue_comment_results(
 	dry_run: bool,
-	plans: &[github_provider::GitHubIssueCommentPlan],
-	publish: impl FnOnce() -> MonochangeResult<Vec<github_provider::GitHubIssueCommentOutcome>>,
+	plans: &[HostedIssueCommentPlan],
+	publish: impl FnOnce() -> MonochangeResult<Vec<monochange_core::HostedIssueCommentOutcome>>,
 ) -> MonochangeResult<Vec<String>> {
 	if dry_run {
 		Ok(plans
@@ -382,8 +381,8 @@ pub(crate) fn build_issue_comment_results(
 					result.repository,
 					result.issue_id,
 					match result.operation {
-						monochange_github::GitHubIssueCommentOperation::Created => "created",
-						monochange_github::GitHubIssueCommentOperation::SkippedExisting => {
+						monochange_core::HostedIssueCommentOperation::Created => "created",
+						monochange_core::HostedIssueCommentOperation::SkippedExisting => {
 							"skipped_existing"
 						}
 					}
@@ -397,10 +396,11 @@ fn build_issue_comment_results_for_source(
 	dry_run: bool,
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
-	plans: &[github_provider::GitHubIssueCommentPlan],
+	plans: &[HostedIssueCommentPlan],
 ) -> MonochangeResult<Vec<String>> {
+	let adapter = hosted_sources::configured_hosted_source_adapter(source);
 	#[rustfmt::skip]
-	let result = build_issue_comment_results(dry_run, plans, || github_provider::comment_released_issues(source, manifest));
+	let result = build_issue_comment_results(dry_run, plans, || adapter.comment_released_issues(source, manifest));
 	result
 }
 
@@ -734,23 +734,25 @@ pub(crate) fn execute_cli_command_with_options(
 								.to_string(),
 						)
 					})?;
-					let source = configuration
-						.source
-						.clone()
-						.filter(|source| source.provider == SourceProvider::GitHub)
-						.ok_or_else(|| {
-							MonochangeError::Config(
-							"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
-								.to_string(),
+					let source = configuration.source.clone().ok_or_else(|| {
+						MonochangeError::Config(
+							"`CommentReleasedIssues` requires `[source]` configuration".to_string(),
 						)
-						})?;
+					})?;
+					let adapter = hosted_sources::configured_hosted_source_adapter(&source);
+					if !adapter.features().released_issue_comments {
+						return Err(MonochangeError::Config(format!(
+							"`CommentReleasedIssues` is not supported for `[source].provider = \"{}\"`",
+							source.provider
+						)));
+					}
 					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,
 						&context.command_logs,
 					);
 					context.issue_comment_plans =
-						github_provider::plan_released_issue_comments(&source, &manifest);
+						adapter.plan_released_issue_comments(&source, &manifest);
 					let dry_run = context.dry_run;
 					let plans = &context.issue_comment_plans;
 					let results =

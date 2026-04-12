@@ -160,6 +160,7 @@ use monochange_core::GroupChangelogInclude;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
+use monochange_core::HostedIssueCommentPlan;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestRef;
@@ -249,6 +250,7 @@ mod cli;
 mod cli_progress;
 mod cli_runtime;
 mod git_support;
+mod hosted_sources;
 mod interactive;
 mod mcp;
 mod prepared_release_cache;
@@ -502,7 +504,7 @@ struct CliContext {
 	release_request: Option<SourceChangeRequest>,
 	release_request_result: Option<String>,
 	release_commit_report: Option<CommitReleaseReport>,
-	issue_comment_plans: Vec<github_provider::GitHubIssueCommentPlan>,
+	issue_comment_plans: Vec<HostedIssueCommentPlan>,
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
 	changeset_diagnostics: Option<ChangesetDiagnosticsReport>,

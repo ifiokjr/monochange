@@ -2585,6 +2585,127 @@ pub struct SourceConfiguration {
 	pub bot: ProviderBotSettings,
 }
 
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedSourceFeatures {
+	pub batched_changeset_context_lookup: bool,
+	pub released_issue_comments: bool,
+	pub release_retarget_sync: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedIssueCommentPlan {
+	pub repository: String,
+	pub issue_id: String,
+	pub issue_url: Option<String>,
+	pub body: String,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedIssueCommentOperation {
+	Created,
+	SkippedExisting,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedIssueCommentOutcome {
+	pub repository: String,
+	pub issue_id: String,
+	pub operation: HostedIssueCommentOperation,
+	pub url: Option<String>,
+}
+
+pub trait HostedSourceAdapter: Sync {
+	fn provider(&self) -> SourceProvider;
+
+	fn features(&self) -> HostedSourceFeatures {
+		HostedSourceFeatures::default()
+	}
+
+	fn annotate_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	);
+
+	fn enrich_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		self.annotate_changeset_context(source, changesets);
+	}
+
+	fn plan_released_issue_comments(
+		&self,
+		_source: &SourceConfiguration,
+		_manifest: &ReleaseManifest,
+	) -> Vec<HostedIssueCommentPlan> {
+		Vec::new()
+	}
+
+	fn comment_released_issues(
+		&self,
+		source: &SourceConfiguration,
+		manifest: &ReleaseManifest,
+	) -> MonochangeResult<Vec<HostedIssueCommentOutcome>> {
+		let plans = self.plan_released_issue_comments(source, manifest);
+		if plans.is_empty() {
+			return Ok(Vec::new());
+		}
+		Err(MonochangeError::Config(format!(
+			"released issue comments are not yet supported for {}",
+			self.provider()
+		)))
+	}
+
+	fn plan_retargeted_releases(
+		&self,
+		tag_results: &[RetargetTagResult],
+	) -> Vec<RetargetProviderResult> {
+		let provider = self.provider();
+		let supports_sync = self.features().release_retarget_sync;
+		tag_results
+			.iter()
+			.map(|update| {
+				RetargetProviderResult {
+					provider,
+					tag_name: update.tag_name.clone(),
+					target_commit: update.to_commit.clone(),
+					operation: if supports_sync {
+						RetargetProviderOperation::Planned
+					} else {
+						RetargetProviderOperation::Unsupported
+					},
+					url: None,
+					message: (!supports_sync).then_some(format!(
+						"provider sync is not yet supported for {provider} release retargeting"
+					)),
+				}
+			})
+			.collect()
+	}
+
+	fn sync_retargeted_releases(
+		&self,
+		source: &SourceConfiguration,
+		tag_results: &[RetargetTagResult],
+		dry_run: bool,
+	) -> MonochangeResult<Vec<RetargetProviderResult>> {
+		if dry_run {
+			return Ok(self.plan_retargeted_releases(tag_results));
+		}
+		Err(MonochangeError::Config(format!(
+			"provider sync is not yet supported for {} release retargeting",
+			source.provider
+		)))
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceReleaseRequest {

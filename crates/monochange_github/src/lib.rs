@@ -100,10 +100,15 @@ use std::thread;
 use monochange_core::CommitMessage;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
+use monochange_core::HostedIssueCommentOperation;
+use monochange_core::HostedIssueCommentOutcome;
+use monochange_core::HostedIssueCommentPlan;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestKind;
 use monochange_core::HostedReviewRequestRef;
+use monochange_core::HostedSourceAdapter;
+use monochange_core::HostedSourceFeatures;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
@@ -175,29 +180,67 @@ pub fn validate_source_configuration(source: &SourceConfiguration) -> Monochange
 	Ok(())
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubIssueCommentPlan {
-	pub repository: String,
-	pub issue_id: String,
-	pub issue_url: Option<String>,
-	pub body: String,
-}
+pub type GitHubIssueCommentPlan = HostedIssueCommentPlan;
+pub type GitHubIssueCommentOperation = HostedIssueCommentOperation;
+pub type GitHubIssueCommentOutcome = HostedIssueCommentOutcome;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GitHubIssueCommentOperation {
-	Created,
-	SkippedExisting,
-}
+pub static HOSTED_SOURCE_ADAPTER: GitHubHostedSourceAdapter = GitHubHostedSourceAdapter;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubIssueCommentOutcome {
-	pub repository: String,
-	pub issue_id: String,
-	pub operation: GitHubIssueCommentOperation,
-	pub url: Option<String>,
+pub struct GitHubHostedSourceAdapter;
+
+impl HostedSourceAdapter for GitHubHostedSourceAdapter {
+	fn provider(&self) -> SourceProvider {
+		SourceProvider::GitHub
+	}
+
+	fn features(&self) -> HostedSourceFeatures {
+		HostedSourceFeatures {
+			batched_changeset_context_lookup: true,
+			released_issue_comments: true,
+			release_retarget_sync: true,
+		}
+	}
+
+	fn annotate_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		annotate_changeset_context(source, changesets);
+	}
+
+	fn enrich_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		enrich_changeset_context(source, changesets);
+	}
+
+	fn plan_released_issue_comments(
+		&self,
+		source: &SourceConfiguration,
+		manifest: &ReleaseManifest,
+	) -> Vec<HostedIssueCommentPlan> {
+		plan_released_issue_comments(source, manifest)
+	}
+
+	fn comment_released_issues(
+		&self,
+		source: &SourceConfiguration,
+		manifest: &ReleaseManifest,
+	) -> MonochangeResult<Vec<HostedIssueCommentOutcome>> {
+		comment_released_issues(source, manifest)
+	}
+
+	fn sync_retargeted_releases(
+		&self,
+		source: &SourceConfiguration,
+		tag_results: &[RetargetTagResult],
+		dry_run: bool,
+	) -> MonochangeResult<Vec<RetargetProviderResult>> {
+		sync_retargeted_releases(source, tag_results, dry_run)
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

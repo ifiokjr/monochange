@@ -1115,7 +1115,7 @@ pub(crate) fn render_release_cli_command_json(
 	manifest: &ReleaseManifest,
 	releases: &[SourceReleaseRequest],
 	release_request: Option<&SourceChangeRequest>,
-	issue_comments: &[github_provider::GitHubIssueCommentPlan],
+	issue_comments: &[HostedIssueCommentPlan],
 	release_commit: Option<&CommitReleaseReport>,
 	file_diffs: &[PreparedFileDiff],
 ) -> MonochangeResult<String> {

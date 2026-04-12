@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use std::thread;
 
 use monochange_core::CommitMessage;
+use monochange_core::HostedSourceAdapter;
+use monochange_core::HostedSourceFeatures;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
@@ -51,6 +53,40 @@ pub const fn source_capabilities() -> SourceCapabilities {
 		auto_merge_change_requests: false,
 		released_issue_comments: false,
 		requires_host: true,
+	}
+}
+
+pub static HOSTED_SOURCE_ADAPTER: GiteaHostedSourceAdapter = GiteaHostedSourceAdapter;
+
+pub struct GiteaHostedSourceAdapter;
+
+impl HostedSourceAdapter for GiteaHostedSourceAdapter {
+	fn provider(&self) -> SourceProvider {
+		SourceProvider::Gitea
+	}
+
+	fn features(&self) -> HostedSourceFeatures {
+		HostedSourceFeatures {
+			batched_changeset_context_lookup: false,
+			released_issue_comments: false,
+			release_retarget_sync: false,
+		}
+	}
+
+	fn annotate_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		annotate_changeset_context(source, changesets);
+	}
+
+	fn enrich_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		enrich_changeset_context(source, changesets);
 	}
 }
 

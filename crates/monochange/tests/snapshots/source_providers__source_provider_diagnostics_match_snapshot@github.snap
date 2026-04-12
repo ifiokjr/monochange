@@ -1,0 +1,40 @@
+---
+source: crates/monochange/tests/source_providers.rs
+expression: json
+---
+{
+  "changesets": [
+    {
+      "context": {
+        "capabilities": {
+          "actorProfiles": true,
+          "commitWebUrls": true,
+          "issueComments": true,
+          "relatedIssues": true,
+          "reviewRequestLookup": true
+        },
+        "host": "github.com",
+        "introduced": null,
+        "lastUpdated": null,
+        "provider": "github",
+        "relatedIssues": []
+      },
+      "details": null,
+      "path": ".changeset/feature.md",
+      "summary": "add github fixture coverage",
+      "targets": [
+        {
+          "bump": "minor",
+          "changeType": null,
+          "evidenceRefs": [],
+          "id": "core",
+          "kind": "package",
+          "origin": "direct-change"
+        }
+      ]
+    }
+  ],
+  "requestedChangesets": [
+    ".changeset/feature.md"
+  ]
+}

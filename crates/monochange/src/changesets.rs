@@ -28,12 +28,9 @@ pub(crate) fn diagnose_changesets(
 		.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
 		.collect::<MonochangeResult<Vec<_>>>()?;
 	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
-	if let Some(source) = configuration
-		.source
-		.as_ref()
-		.filter(|source| source.provider == SourceProvider::GitHub)
-	{
-		github_provider::enrich_changeset_context(source, &mut changesets);
+	if let Some(source) = configuration.source.as_ref() {
+		hosted_sources::configured_hosted_source_adapter(source)
+			.enrich_changeset_context(source, &mut changesets);
 	}
 
 	let requested_changesets = changeset_paths
