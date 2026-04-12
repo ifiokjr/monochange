@@ -1279,6 +1279,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		show_progress: Option<bool>,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Prepare a release and expose structured `release.*` context to later
@@ -1395,6 +1397,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		show_progress: Option<bool>,
 		command: String,
 		#[serde(default, alias = "dry_run")]
 		dry_run_command: Option<String>,
@@ -1469,6 +1473,16 @@ impl CliStepDefinition {
 			| Self::DiagnoseChangesets { when, .. }
 			| Self::RetargetRelease { when, .. }
 			| Self::Command { when, .. } => when.as_deref(),
+		}
+	}
+
+	#[must_use]
+	pub fn show_progress(&self) -> Option<bool> {
+		match self {
+			Self::CreateChangeFile { show_progress, .. } | Self::Command { show_progress, .. } => {
+				*show_progress
+			}
+			_ => None,
 		}
 	}
 
@@ -2841,6 +2855,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::CreateChangeFile {
+				show_progress: None,
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),

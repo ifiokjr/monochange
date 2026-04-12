@@ -100,6 +100,10 @@ Use that when:
 - you want to hardcode a value for one step but not the entire command
 - you want to pass list or boolean values through direct template references such as `"{{ inputs.changed_paths }}"`
 
+### Step-local `show_progress`
+
+Interactive steps do not show the spinner by default when monochange is waiting on the user. For step kinds that support it, you can also set `show_progress = false` to suppress progress output explicitly.
+
 ### Structured template namespaces
 
 When you compose `Command` steps after built-in steps, monochange exposes structured context values such as:

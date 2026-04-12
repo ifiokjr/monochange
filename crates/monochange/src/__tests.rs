@@ -448,6 +448,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
+				show_progress: None,
 				name: None,
 				when: None,
 				command: "echo hello".to_string(),
@@ -461,6 +462,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
+				show_progress: None,
 				name: None,
 				when: None,
 				command: "echo through-shell".to_string(),
@@ -495,6 +497,7 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
+				show_progress: None,
 				name: None,
 				when: None,
 				command: "echo custom-shell".to_string(),
@@ -1856,6 +1859,7 @@ fn command_step_without_dry_run_override_reports_skipped_command() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			show_progress: None,
 			name: None,
 			when: None,
 			command: "echo hello".to_string(),
@@ -1888,6 +1892,7 @@ fn command_step_rejects_unparseable_commands() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			show_progress: None,
 			name: None,
 			when: None,
 			command: "\"unterminated".to_string(),
@@ -1925,6 +1930,7 @@ fn command_step_rejects_empty_commands() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			show_progress: None,
 			name: None,
 			when: None,
 			command: String::new(),
@@ -1958,6 +1964,7 @@ fn command_step_reports_process_spawn_failures() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			show_progress: None,
 			name: None,
 			when: None,
 			command: "definitely-not-a-real-command-12345".to_string(),
@@ -1995,6 +2002,7 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			show_progress: None,
 			name: None,
 			when: None,
 			command: "sh -c 'exit 7'".to_string(),
@@ -2031,6 +2039,7 @@ fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::Command {
+			show_progress: None,
 			name: None,
 			when: None,
 			command: "sh -c 'echo boom 1>&2; exit 1'".to_string(),
@@ -2812,6 +2821,7 @@ fn should_execute_cli_step_runs_when_condition_is_true() {
 		("extra".to_string(), vec!["true".to_string()]),
 	]);
 	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run && inputs.extra }}".to_string()),
 		command: "printf hi".to_string(),
@@ -2832,6 +2842,7 @@ fn should_execute_cli_step_skips_when_condition_is_false() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec!["false".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
 		command: "printf hi".to_string(),
@@ -2852,6 +2863,7 @@ fn should_execute_cli_step_skips_for_zero_value() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec!["0".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
 		command: "printf hi".to_string(),
@@ -2872,6 +2884,7 @@ fn should_execute_cli_step_trims_and_treats_1_as_true() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec![" 1 ".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
 		command: "printf hi".to_string(),
@@ -2892,6 +2905,7 @@ fn should_execute_cli_step_skips_with_not_operator() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("skip".to_string(), vec!["true".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: Some("{{ ! inputs.skip }}".to_string()),
 		command: "printf hi".to_string(),
@@ -2912,6 +2926,7 @@ fn should_execute_cli_step_rejects_unknown_template_reference() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec!["true".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.missing }}".to_string()),
 		command: "printf hi".to_string(),
@@ -2935,6 +2950,7 @@ fn should_execute_cli_step_rejects_non_scalar_condition_value() {
 	let step_inputs =
 		BTreeMap::from([("list".to_string(), vec!["a".to_string(), "b".to_string()])]);
 	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.list }}".to_string()),
 		command: "printf hi".to_string(),
@@ -3978,6 +3994,7 @@ fn execute_cli_command_change_step_requires_reason_input() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: vec![monochange_core::CliStepDefinition::CreateChangeFile {
+			show_progress: None,
 			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
