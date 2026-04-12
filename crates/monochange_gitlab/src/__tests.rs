@@ -40,6 +40,18 @@ use tempfile::tempdir;
 
 use super::*;
 
+fn must_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
+	match result {
+		Ok(value) => value,
+		Err(error) => panic!("{context}: {error}"),
+	}
+}
+
+#[test]
+fn must_ok_panics_on_errors() {
+	assert!(std::panic::catch_unwind(|| must_ok::<(), _>(Err("boom"), "context")).is_err());
+}
+
 #[test]
 fn build_release_requests_uses_gitlab_provider() {
 	let source = sample_source(None);
@@ -740,6 +752,35 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	assert_eq!(
 		git_output(&repo, &["rev-list", "--count", "HEAD"]).trim(),
 		"1"
+	);
+}
+
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
+fn git_checkout_branch_is_noop_when_branch_is_already_checked_out() {
+	let tempdir = must_ok(tempdir(), "tempdir");
+	let repo = tempdir.path().join("repo");
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
+	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "initial\n"),
+		"write release file",
+	);
+	git(&repo, &["add", "release.txt"]);
+	git(&repo, &["commit", "-m", "initial"]);
+
+	must_ok(
+		git_checkout_branch(&repo, "monochange/release/release"),
+		"checkout branch",
+	);
+	must_ok(
+		git_checkout_branch(&repo, "monochange/release/release"),
+		"repeat checkout branch",
+	);
+
+	assert_eq!(
+		git_output(&repo, &["rev-parse", "--abbrev-ref", "HEAD"]).trim(),
+		"monochange/release/release"
 	);
 }
 

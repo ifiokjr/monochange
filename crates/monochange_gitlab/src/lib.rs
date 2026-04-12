@@ -25,6 +25,7 @@ use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
 use monochange_core::git::git_checkout_branch_command;
 use monochange_core::git::git_commit_paths_command;
+use monochange_core::git::git_current_branch;
 use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
@@ -605,6 +606,9 @@ where
 }
 
 fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
+	if matches!(git_current_branch(root).as_deref(), Ok(current) if current == branch) {
+		return Ok(());
+	}
 	run_command(
 		git_checkout_branch_command(root, branch),
 		"prepare release merge request branch",

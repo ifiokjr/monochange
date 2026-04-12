@@ -42,6 +42,18 @@ use tempfile::tempdir;
 
 use super::*;
 
+fn must_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
+	match result {
+		Ok(value) => value,
+		Err(error) => panic!("{context}: {error}"),
+	}
+}
+
+#[test]
+fn must_ok_panics_on_errors() {
+	assert!(std::panic::catch_unwind(|| must_ok::<(), _>(Err("boom"), "context")).is_err());
+}
+
 #[test]
 fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 	let github = SourceConfiguration {
@@ -904,13 +916,23 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 		&["remote", "add", "origin", bare.to_string_lossy().as_ref()],
 	);
 	git(&repo, &["push", "-u", "origin", "main"]);
-	std::fs::write(repo.join("release.txt"), "after\n")
-		.unwrap_or_else(|error| panic!("update release file: {error}"));
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "after\n"),
+		"update release file",
+	);
 
-	git_checkout_branch(&repo, "monochange/release/release")
-		.unwrap_or_else(|error| panic!("checkout branch: {error}"));
-	git_stage_paths(&repo, &[PathBuf::from("release.txt")])
-		.unwrap_or_else(|error| panic!("stage paths: {error}"));
+	must_ok(
+		git_checkout_branch(&repo, "monochange/release/release"),
+		"checkout branch",
+	);
+	must_ok(
+		git_checkout_branch(&repo, "monochange/release/release"),
+		"repeat checkout branch",
+	);
+	must_ok(
+		git_stage_paths(&repo, &[PathBuf::from("release.txt")]),
+		"stage paths",
+	);
 	git_commit_paths(
 		&repo,
 		&CommitMessage {

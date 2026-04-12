@@ -1,0 +1,38 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+changelog = "{{ path }}/changelog.md"
+
+[package.core]
+path = "crates/core"
+versioned_files = [{ path = "crates/core/extra.toml", type = "cargo" }]
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+changelog = "changelog.md"
+versioned_files = [{ path = "group.toml", type = "cargo" }]
+tag = true
+release = true
+version_format = "primary"
+
+[ecosystems.cargo]
+enabled = true
+
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+
+[cli.release]
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"

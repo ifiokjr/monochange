@@ -15,7 +15,6 @@ use std::time::Instant;
 
 use clap::ArgMatches;
 use clap::parser::ValueSource;
-use monochange_config::load_workspace_configuration;
 use monochange_core::ChangesetPolicyStatus;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputKind;
@@ -482,7 +481,6 @@ pub(crate) fn execute_cli_command_with_options(
 						.is_some_and(|value| value == "true");
 
 					if is_interactive {
-						let configuration = load_workspace_configuration(root)?;
 						let options = interactive::InteractiveOptions {
 							reason: step_inputs
 								.get("reason")
@@ -493,7 +491,7 @@ pub(crate) fn execute_cli_command_with_options(
 								.and_then(|values| values.first())
 								.cloned(),
 						};
-						let result = interactive::run_interactive_change(&configuration, &options)?;
+						let result = interactive::run_interactive_change(configuration, &options)?;
 						let output_path = step_inputs
 							.get("output")
 							.and_then(|values| values.first())
@@ -603,7 +601,7 @@ pub(crate) fn execute_cli_command_with_options(
 								.to_string(),
 						)
 					})?;
-					let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
+					let source = configuration.source.clone().ok_or_else(|| {
 						MonochangeError::Config(
 							"`PublishRelease` requires `[source]` configuration".to_string(),
 						)
@@ -644,7 +642,7 @@ pub(crate) fn execute_cli_command_with_options(
 								.to_string(),
 						)
 					})?;
-					let source = load_workspace_configuration(root)?.source.ok_or_else(|| {
+					let source = configuration.source.clone().ok_or_else(|| {
 						MonochangeError::Config(
 							"`OpenReleaseRequest` requires `[source]` configuration".to_string(),
 						)
@@ -671,8 +669,9 @@ pub(crate) fn execute_cli_command_with_options(
 								.to_string(),
 						)
 					})?;
-					let source = load_workspace_configuration(root)?
+					let source = configuration
 						.source
+						.clone()
 						.filter(|source| source.provider == SourceProvider::GitHub)
 						.ok_or_else(|| {
 							MonochangeError::Config(

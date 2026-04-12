@@ -5390,7 +5390,9 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 	configuration.npm.dependency_version_prefix = Some("workspace:".to_string());
 	configuration.deno.dependency_version_prefix = None;
 	let context = crate::VersionedFileUpdateContext {
-		package_by_record_id: BTreeMap::new(),
+		package_by_config_id: BTreeMap::new(),
+		package_by_native_name: BTreeMap::new(),
+		current_versions_by_native_name: BTreeMap::new(),
 		released_versions_by_native_name: BTreeMap::new(),
 		configuration: &configuration,
 	};
@@ -5429,6 +5431,56 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 	assert_eq!(
 		crate::resolve_versioned_prefix(&fallback, &context),
 		monochange_core::EcosystemType::Deno.default_prefix()
+	);
+}
+
+#[test]
+fn build_versioned_file_updates_skips_unreleased_package_definitions() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+
+	let mut configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	configuration.groups.clear();
+	let discovery =
+		discover_workspace(tempdir.path()).unwrap_or_else(|error| panic!("discovery: {error}"));
+	let released_core = discovery
+		.packages
+		.iter()
+		.find(|package| package.metadata.get("config_id").map(String::as_str) == Some("core"))
+		.unwrap_or_else(|| panic!("expected core package"));
+	let plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: vec![monochange_core::ReleaseDecision {
+			package_id: released_core.id.clone(),
+			trigger_type: "changeset".to_string(),
+			recommended_bump: BumpSeverity::Minor,
+			planned_version: Some(
+				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
+			),
+			group_id: None,
+			reasons: vec!["release".to_string()],
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		}],
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+
+	let updates = crate::build_versioned_file_updates(
+		tempdir.path(),
+		&configuration,
+		&discovery.packages,
+		&plan,
+	)
+	.unwrap_or_else(|error| panic!("versioned file updates: {error}"));
+
+	assert_eq!(updates.len(), 1);
+	assert_eq!(
+		updates[0].path,
+		tempdir.path().join("crates/core/extra.toml")
 	);
 }
 
@@ -5878,6 +5930,122 @@ fn build_manifest_updates_report_parse_and_io_errors() {
 		crate::build_deno_manifest_updates(&[deno_missing], &unreleased_plan)
 			.unwrap_or_else(|error| panic!("unreleased deno updates: {error}"))
 			.is_empty()
+	);
+}
+
+#[test]
+fn build_cargo_manifest_updates_updates_dependents_of_released_packages() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let core_manifest = tempdir.path().join("crates/core/Cargo.toml");
+	let app_manifest = tempdir.path().join("crates/app/Cargo.toml");
+	fs::create_dir_all(core_manifest.parent().expect("core manifest parent"))
+		.unwrap_or_else(|error| panic!("create core dir: {error}"));
+	fs::create_dir_all(app_manifest.parent().expect("app manifest parent"))
+		.unwrap_or_else(|error| panic!("create app dir: {error}"));
+	fs::write(
+		&core_manifest,
+		"[package]\nname = \"workflow-core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write core Cargo.toml: {error}"));
+	fs::write(
+		&app_manifest,
+		"[package]\nname = \"workflow-app\"\nversion = \"1.0.0\"\nedition = \"2021\"\n\n[dependencies]\nworkflow-core = { path = \"../core\", version = \"1.0.0\" }\n",
+	)
+	.unwrap_or_else(|error| panic!("write app Cargo.toml: {error}"));
+
+	let core = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"workflow-core",
+		core_manifest,
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let mut app = monochange_core::PackageRecord::new(
+		Ecosystem::Cargo,
+		"workflow-app",
+		app_manifest.clone(),
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	app.declared_dependencies
+		.push(monochange_core::PackageDependency {
+			name: "workflow-core".to_string(),
+			kind: monochange_core::DependencyKind::Runtime,
+			version_constraint: Some("1.0.0".to_string()),
+			optional: false,
+		});
+
+	let plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: vec![monochange_core::ReleaseDecision {
+			package_id: core.id.clone(),
+			trigger_type: "changeset".to_string(),
+			recommended_bump: BumpSeverity::Minor,
+			planned_version: Some(
+				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
+			),
+			group_id: None,
+			reasons: vec!["release".to_string()],
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		}],
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+
+	let updates = crate::build_cargo_manifest_updates(&[core, app], &plan)
+		.unwrap_or_else(|error| panic!("cargo manifest updates: {error}"));
+	let app_update_index = updates
+		.iter()
+		.position(|update| update.path.ends_with("crates/app/Cargo.toml"));
+	assert!(app_update_index.is_some());
+	let app_update = &updates[app_update_index.unwrap_or(0)];
+	let app_update_content = String::from_utf8_lossy(&app_update.content);
+
+	assert!(app_update_content.contains("version = \"1.1.0\""));
+}
+
+#[test]
+fn build_npm_manifest_updates_reports_read_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let npm_missing = monochange_core::PackageRecord::new(
+		Ecosystem::Npm,
+		"web",
+		tempdir.path().join("missing/package.json"),
+		tempdir.path().to_path_buf(),
+		Some(Version::parse("1.0.0").unwrap_or_else(|error| panic!("version: {error}"))),
+		monochange_core::PublishState::Public,
+	);
+	let plan = monochange_core::ReleasePlan {
+		workspace_root: tempdir.path().to_path_buf(),
+		decisions: vec![monochange_core::ReleaseDecision {
+			package_id: npm_missing.id.clone(),
+			trigger_type: "changeset".to_string(),
+			recommended_bump: BumpSeverity::Minor,
+			planned_version: Some(
+				Version::parse("1.1.0").unwrap_or_else(|error| panic!("planned version: {error}")),
+			),
+			group_id: None,
+			reasons: vec!["release".to_string()],
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		}],
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+
+	let error = crate::build_npm_manifest_updates(std::slice::from_ref(&npm_missing), &plan)
+		.err()
+		.unwrap_or_else(|| panic!("expected npm read error"));
+	assert!(
+		error.to_string().contains("failed to read"),
+		"error: {error}"
 	);
 }
 
@@ -6827,9 +6995,27 @@ fn versioned_test_context<'a>(
 	packages: &'a [monochange_core::PackageRecord],
 ) -> crate::VersionedFileUpdateContext<'a> {
 	crate::VersionedFileUpdateContext {
-		package_by_record_id: packages
+		package_by_config_id: packages
 			.iter()
-			.map(|package| (package.id.as_str(), package))
+			.filter_map(|package| {
+				package
+					.metadata
+					.get("config_id")
+					.map(|config_id| (config_id.as_str(), package))
+			})
+			.collect(),
+		package_by_native_name: packages
+			.iter()
+			.map(|package| (package.name.as_str(), package))
+			.collect(),
+		current_versions_by_native_name: packages
+			.iter()
+			.filter_map(|package| {
+				package
+					.current_version
+					.as_ref()
+					.map(|version| (package.name.clone(), version.to_string()))
+			})
 			.collect(),
 		released_versions_by_native_name,
 		configuration,
