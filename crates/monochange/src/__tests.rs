@@ -1121,6 +1121,26 @@ fn render_change_target_markdown_quotes_special_character_ids() {
 	)
 	.unwrap_or_else(|error| panic!("render target: {error}"));
 	assert_eq!(lines, vec!["\"@monochange/skill\": patch".to_string()]);
+
+	let simple = render_change_target_markdown(
+		&configuration,
+		"plain-package",
+		BumpSeverity::Patch,
+		None,
+		None,
+	)
+	.unwrap_or_else(|error| panic!("render simple target: {error}"));
+	assert_eq!(simple, vec!["plain-package: patch".to_string()]);
+
+	let escaped = render_change_target_markdown(
+		&configuration,
+		"pkg\\\"name",
+		BumpSeverity::Patch,
+		None,
+		None,
+	)
+	.unwrap_or_else(|error| panic!("render escaped target: {error}"));
+	assert_eq!(escaped, vec!["\"pkg\\\\\\\"name\": patch".to_string()]);
 }
 
 #[test]

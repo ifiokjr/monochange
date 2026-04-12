@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use miette::LabeledSpan;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
@@ -17,10 +18,19 @@ use semver::Version;
 use tempfile::tempdir;
 
 use crate::apply_version_groups;
+use crate::frontmatter_span_for_line_column;
+use crate::line_and_column_for_offset;
+use crate::line_index_for_offset;
 use crate::load_change_signals;
 use crate::load_changeset_file;
 use crate::load_workspace_configuration;
+use crate::range_to_span;
+use crate::render_diagnostic_notes;
+use crate::render_source_diagnostic;
+use crate::render_source_snippet;
+use crate::render_source_snippets;
 use crate::resolve_package_reference;
+use crate::sort_labels_by_location;
 use crate::validate_workspace;
 
 fn fixture_path(relative: &str) -> PathBuf {
@@ -2318,6 +2328,74 @@ fn load_change_signals_reports_pretty_frontmatter_parse_errors_with_fix_hint() {
 	assert!(
 		rendered.contains("wrap package or group ids that contain characters like `@`, `/`, `:`, or spaces in double quotes"),
 		"rendered: {rendered}"
+	);
+}
+
+#[test]
+fn source_diagnostic_helpers_cover_empty_labels_sorting_and_fallback_spans() {
+	let source = "alpha\nbeta\ngamma";
+	let empty = render_source_diagnostic("demo.md", source, "plain failure", &[], None);
+	assert!(empty.contains("error: plain failure"), "{empty}");
+	assert!(empty.contains("  --> demo.md:1:1"), "{empty}");
+	assert!(!empty.contains("  = help:"), "{empty}");
+	assert!(!empty.contains("  = note:"), "{empty}");
+
+	let labels = vec![
+		LabeledSpan::new_with_span(Some("primary".to_string()), range_to_span(6..10)),
+		LabeledSpan::new_with_span(Some("later".to_string()), range_to_span(11..16)),
+		LabeledSpan::new_with_span(Some("earlier".to_string()), range_to_span(0..0)),
+	];
+	let sorted = sort_labels_by_location(&labels);
+	assert_eq!(sorted.first().and_then(LabeledSpan::label), Some("primary"));
+	assert_eq!(sorted.get(1).and_then(LabeledSpan::label), Some("earlier"));
+	assert_eq!(sorted.get(2).and_then(LabeledSpan::label), Some("later"));
+
+	let rendered = render_source_diagnostic(
+		"demo.md",
+		source,
+		"annotated failure",
+		&labels,
+		Some("try fixing it"),
+	);
+	assert!(rendered.contains("  --> demo.md:2:1"), "{rendered}");
+	assert!(rendered.contains("  ::: demo.md:1:1"), "{rendered}");
+	assert!(rendered.contains("  ::: demo.md:3:1"), "{rendered}");
+	assert!(rendered.contains("^ primary"), "{rendered}");
+	assert!(rendered.contains("^ earlier"), "{rendered}");
+	assert!(rendered.contains("^ later"), "{rendered}");
+	assert!(rendered.contains("  = help: try fixing it"), "{rendered}");
+	assert!(
+		rendered.contains("  = note: the first snippet marks the primary failure location"),
+		"{rendered}"
+	);
+
+	let secondary = render_source_snippet(
+		"demo.md",
+		source,
+		&LabeledSpan::new_with_span(None, range_to_span(0..0)),
+		false,
+	);
+	assert_eq!(secondary.first(), Some(&"  ::: demo.md:1:1".to_string()));
+	assert!(
+		secondary.iter().any(|line| line.contains("^ here")),
+		"{secondary:?}"
+	);
+
+	assert!(render_source_snippets("demo.md", source, &[]).is_empty());
+	assert!(sort_labels_by_location(&[]).is_empty());
+	assert!(render_diagnostic_notes(&[]).is_empty());
+	let single_label = labels
+		.first()
+		.cloned()
+		.map(|label| vec![label])
+		.unwrap_or_default();
+	assert!(render_diagnostic_notes(&single_label).is_empty());
+	assert_eq!(line_index_for_offset(source, usize::MAX), 2);
+	assert_eq!(line_and_column_for_offset(source, usize::MAX), (3, 6));
+	assert_eq!(frontmatter_span_for_line_column(source, 2, 99), 10..11);
+	assert_eq!(
+		frontmatter_span_for_line_column(source, 99, 1),
+		source.len()..source.len()
 	);
 }
 
