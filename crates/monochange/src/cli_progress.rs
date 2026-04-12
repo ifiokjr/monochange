@@ -38,6 +38,7 @@ pub(crate) struct CliProgressReporter {
 	total_steps: usize,
 	writer_lock: Arc<Mutex<()>>,
 	active_spinner: Option<SpinnerState>,
+	command_started: bool,
 }
 
 struct SpinnerState {
@@ -61,6 +62,7 @@ impl CliProgressReporter {
 			total_steps: cli_command.steps.len(),
 			writer_lock: Arc::new(Mutex::new(())),
 			active_spinner: None,
+			command_started: false,
 		}
 	}
 
@@ -69,7 +71,7 @@ impl CliProgressReporter {
 	}
 
 	pub(crate) fn command_started(&mut self) {
-		if !self.enabled {
+		if !self.enabled || self.command_started {
 			return;
 		}
 		let suffix = if self.dry_run { " (dry-run)" } else { "" };
@@ -79,10 +81,11 @@ impl CliProgressReporter {
 			self.paint(&format!("running `{}`", self.command_name), Style::Header),
 			suffix,
 		));
+		self.command_started = true;
 	}
 
 	pub(crate) fn command_finished(&mut self, duration: Duration) {
-		if !self.enabled {
+		if !self.enabled || !self.command_started {
 			return;
 		}
 		self.stop_spinner();
@@ -98,6 +101,7 @@ impl CliProgressReporter {
 		if !self.enabled {
 			return;
 		}
+		self.command_started();
 		let message = self.step_message(step_index, step);
 		if self.animate {
 			self.start_spinner(message);
@@ -115,6 +119,7 @@ impl CliProgressReporter {
 		if !self.enabled {
 			return;
 		}
+		self.command_started();
 		self.stop_spinner();
 		let mut line = format!(
 			"{} {} — {}",
@@ -142,6 +147,7 @@ impl CliProgressReporter {
 		if !self.enabled {
 			return;
 		}
+		self.command_started();
 		self.stop_spinner();
 		self.print_line(&format!(
 			"{} {} {}",
@@ -169,6 +175,7 @@ impl CliProgressReporter {
 		if !self.enabled {
 			return;
 		}
+		self.command_started();
 		self.stop_spinner();
 		self.print_line(&format!(
 			"{} {} {}",
@@ -192,6 +199,7 @@ impl CliProgressReporter {
 		if !self.enabled || text.trim().is_empty() {
 			return;
 		}
+		self.command_started();
 		let stream_label = match stream {
 			CommandStream::Stdout => self.paint("stdout", Style::Muted),
 			CommandStream::Stderr => self.paint("stderr", Style::Warning),
@@ -365,11 +373,13 @@ mod tests {
 			total_steps: 3,
 			writer_lock: Arc::new(Mutex::new(())),
 			active_spinner: None,
+			command_started: false,
 		}
 	}
 
 	fn named_command_step(name: &str) -> CliStepDefinition {
 		CliStepDefinition::Command {
+			show_progress: None,
 			name: Some(name.to_string()),
 			when: None,
 			command: "echo hi".to_string(),

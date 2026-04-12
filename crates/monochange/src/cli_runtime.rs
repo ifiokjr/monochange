@@ -427,15 +427,17 @@ pub(crate) fn execute_cli_command_with_options(
 	let mut output = None;
 	let command_started_at = Instant::now();
 	let mut progress = CliProgressReporter::new(cli_command, dry_run, quiet);
-	progress.command_started();
 
 	for (step_index, step) in cli_command.steps.iter().enumerate() {
 		let step_started_at = Instant::now();
 		let step_inputs = resolve_step_inputs(&context, step)?;
 		context.last_step_inputs = step_inputs.clone();
+		let show_progress = step_shows_progress(step, &step_inputs);
 
 		if !should_execute_cli_step(step, &context, &step_inputs)? {
-			progress.step_skipped(step_index, step, step.when());
+			if show_progress {
+				progress.step_skipped(step_index, step, step.when());
+			}
 			if let Some(condition) = step.when() {
 				tracing::debug!(step = step.kind_name(), condition = %condition, "skipped CLI step");
 				context.command_logs.push(format!(
@@ -446,7 +448,9 @@ pub(crate) fn execute_cli_command_with_options(
 			continue;
 		}
 
-		progress.step_started(step_index, step);
+		if show_progress {
+			progress.step_started(step_index, step);
+		}
 		tracing::debug!(step = step.kind_name(), "executing CLI step");
 		let mut step_phase_timings = Vec::new();
 		let step_result: MonochangeResult<()> = (|| {
@@ -785,6 +789,7 @@ pub(crate) fn execute_cli_command_with_options(
 						&mut context,
 						step,
 						&mut progress,
+						show_progress,
 						CommandStepOptions {
 							command,
 							dry_run_command: dry_run_command.as_deref(),
@@ -799,16 +804,20 @@ pub(crate) fn execute_cli_command_with_options(
 			}
 		})();
 		if let Err(error) = step_result {
-			let progress_error = progress_error_detail(&error).to_string();
-			progress.step_failed(step_index, step, step_started_at.elapsed(), &progress_error);
+			if show_progress {
+				let progress_error = progress_error_detail(&error).to_string();
+				progress.step_failed(step_index, step, step_started_at.elapsed(), &progress_error);
+			}
 			return Err(error);
 		}
-		progress.step_finished(
-			step_index,
-			step,
-			step_started_at.elapsed(),
-			&step_phase_timings,
-		);
+		if show_progress {
+			progress.step_finished(
+				step_index,
+				step,
+				step_started_at.elapsed(),
+				&step_phase_timings,
+			);
+		}
 	}
 
 	progress.command_finished(command_started_at.elapsed());
@@ -1051,10 +1060,26 @@ struct CommandStepOptions<'a> {
 	step_inputs: &'a BTreeMap<String, Vec<String>>,
 }
 
+fn step_shows_progress(
+	step: &CliStepDefinition,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) -> bool {
+	if matches!(step, CliStepDefinition::CreateChangeFile { .. })
+		&& step_inputs
+			.get("interactive")
+			.and_then(|values| values.first())
+			.is_some_and(|value| value == "true")
+	{
+		return false;
+	}
+	step.show_progress().unwrap_or(true)
+}
+
 fn run_cli_command_command(
 	context: &mut CliContext,
 	step: &CliStepDefinition,
 	progress: &mut CliProgressReporter,
+	show_progress: bool,
 	options: CommandStepOptions<'_>,
 ) -> MonochangeResult<()> {
 	let command_to_run = if context.dry_run {
@@ -1100,7 +1125,7 @@ fn run_cli_command_command(
 	};
 	process_command.current_dir(&context.root);
 
-	let output = if progress.is_enabled() {
+	let output = if progress.is_enabled() && show_progress {
 		run_process_with_streaming(&mut process_command, progress, step, &interpolated)?
 	} else {
 		let output = process_command.output().map_err(|error| {
@@ -2311,6 +2336,37 @@ mod tests {
 	}
 
 	#[test]
+	fn step_shows_progress_disables_interactive_change_steps_by_default() {
+		let step = CliStepDefinition::CreateChangeFile {
+			show_progress: None,
+			name: Some("interactive change".to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		};
+		let mut step_inputs = BTreeMap::new();
+		step_inputs.insert("interactive".to_string(), vec!["true".to_string()]);
+		assert!(!step_shows_progress(&step, &step_inputs));
+		step_inputs.insert("interactive".to_string(), vec!["false".to_string()]);
+		assert!(step_shows_progress(&step, &step_inputs));
+	}
+
+	#[test]
+	fn step_shows_progress_respects_explicit_step_flags() {
+		let step = CliStepDefinition::Command {
+			show_progress: Some(false),
+			name: Some("interactive shell".to_string()),
+			when: None,
+			command: "echo hello".to_string(),
+			dry_run_command: None,
+			shell: ShellConfig::Default,
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		};
+		assert!(!step_shows_progress(&step, &BTreeMap::new()));
+	}
+
+	#[test]
 	fn drain_stream_events_collects_stdout_stderr_and_handles_closed_channels() {
 		let cli_command = CliCommandDefinition {
 			name: "release".to_string(),
@@ -2320,6 +2376,7 @@ mod tests {
 		};
 		let mut progress = CliProgressReporter::new(&cli_command, false, false);
 		let step = CliStepDefinition::Command {
+			show_progress: None,
 			name: Some("stream output".to_string()),
 			when: None,
 			command: "echo hello".to_string(),
@@ -2378,6 +2435,7 @@ mod tests {
 			help_text: None,
 			inputs: Vec::new(),
 			steps: vec![CliStepDefinition::Command {
+				show_progress: None,
 				name: Some("fail loud".to_string()),
 				when: None,
 				command: "printf 'boom\\n' >&2; exit 3".to_string(),

@@ -50,6 +50,7 @@ None. `CreateChangeFile` is standalone.
 - writes a new changeset file
 - reports the written path
 - does not prepare release state for later steps
+- automatically hides the progress spinner during interactive prompting so the selector UI stays readable
 
 ## Example
 
@@ -123,6 +124,7 @@ help_text = "Create a change file interactively"
 
 [[cli.change-interactive.steps]]
 type = "CreateChangeFile"
+show_progress = false
 inputs = { interactive = true }
 ```
 

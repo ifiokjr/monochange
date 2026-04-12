@@ -117,6 +117,102 @@ fn run_tty_command(workspace: &Path, command_name: &str) -> String {
 	transcript
 }
 
+#[cfg(unix)]
+fn run_tty_interactive_change(workspace: &Path, output_path: &Path) -> (i32, String) {
+	const SCRIPT: &str = r"
+import os
+import pty
+import select
+import subprocess
+import sys
+import time
+
+workspace = os.environ['MC_WORKSPACE']
+output_path = os.environ['MC_OUTPUT']
+mc_bin = os.environ['MC_BIN']
+master, slave = pty.openpty()
+proc = subprocess.Popen(
+    [mc_bin, 'change', '--interactive', '--reason', 'interactive reason', '--details', 'interactive details', '--output', output_path],
+    cwd=workspace,
+    stdin=slave,
+    stdout=slave,
+    stderr=slave,
+    text=False,
+    close_fds=True,
+    env={**os.environ, 'NO_COLOR': '1'},
+)
+os.close(slave)
+transcript = bytearray()
+
+def drain(seconds):
+    end = time.time() + seconds
+    while time.time() < end:
+        ready, _, _ = select.select([master], [], [], 0.05)
+        if master in ready:
+            try:
+                data = os.read(master, 4096)
+            except OSError:
+                break
+            if not data:
+                break
+            transcript.extend(data)
+        if proc.poll() is not None:
+            break
+
+def send(data, pause=0.0):
+    try:
+        os.write(master, data)
+    except OSError:
+        return False
+    if pause:
+        time.sleep(pause)
+    return True
+
+drain(0.5)
+if send(b' ', 0.1):
+    send(b'\r')
+drain(0.5)
+if send(b'\x1b[B', 0.1):
+    send(b'\r')
+drain(0.5)
+send(b'\r')
+drain(0.5)
+send(b'\r')
+drain(0.5)
+proc.wait(timeout=10)
+drain(0.2)
+os.close(master)
+sys.stdout.buffer.write(transcript)
+sys.stderr.write(f'__MC_EXIT_STATUS__={proc.returncode}\n')
+sys.exit(0)
+";
+
+	let output = std::process::Command::new("python3")
+		.arg("-c")
+		.arg(SCRIPT)
+		.env("MC_BIN", insta_cmd::get_cargo_bin("mc"))
+		.env("MC_WORKSPACE", workspace)
+		.env("MC_OUTPUT", output_path)
+		.output()
+		.unwrap_or_else(|error| panic!("interactive tty python harness: {error}"));
+	assert!(
+		output.status.success(),
+		"interactive tty python harness failed:\n{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let stderr =
+		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("tty stderr utf8: {error}"));
+	let status_code = stderr
+		.lines()
+		.find_map(|line| line.strip_prefix(EXIT_STATUS_MARKER))
+		.unwrap_or_else(|| panic!("missing tty exit status marker:\n{stderr}"))
+		.parse::<i32>()
+		.unwrap_or_else(|error| panic!("parse tty exit status: {error}\n{stderr}"));
+	let transcript = String::from_utf8(output.stdout)
+		.unwrap_or_else(|error| panic!("interactive tty output utf8: {error}"));
+	(status_code, normalize_tty_transcript(&transcript))
+}
+
 #[cfg(not(unix))]
 fn run_tty_command(_workspace: &Path, _command_name: &str) -> String {
 	String::new()
@@ -186,9 +282,35 @@ steps = [
 }
 
 #[test]
+#[cfg(unix)]
+fn interactive_change_cli_hides_progress_output_on_tty() {
+	let tempdir = setup_fixture("monochange/release-base");
+	let output_path = tempdir.path().join(".changeset/interactive.md");
+
+	let (status, transcript) = run_tty_interactive_change(tempdir.path(), &output_path);
+
+	assert_eq!(
+		status, 0,
+		"unexpected interactive transcript:\n{transcript}"
+	);
+	assert!(!transcript.contains("running `change`"), "{transcript}");
+	assert!(!transcript.contains("[1/1]"), "{transcript}");
+	assert!(!transcript.contains("finished"), "{transcript}");
+	assert!(transcript.contains("wrote change file .changeset/interactive.md"));
+	assert!(
+		output_path.exists(),
+		"interactive change file should be created"
+	);
+}
+
+#[test]
 #[cfg(not(unix))]
 fn release_progress_streams_named_steps_on_tty() {}
 
 #[test]
 #[cfg(not(unix))]
 fn release_progress_renders_skipped_failed_steps_and_stderr_on_tty() {}
+
+#[test]
+#[cfg(not(unix))]
+fn interactive_change_cli_hides_progress_output_on_tty() {}

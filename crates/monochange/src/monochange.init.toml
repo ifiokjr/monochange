@@ -548,6 +548,9 @@ comment_on_failure = true
 {% endraw -%}
 #                     to forward values from command inputs without losing
 #                     list/boolean types.
+#   show_progress   — optional boolean for interactive CreateChangeFile / Command
+#                     steps. Set false when spinner output would interfere with
+#                     prompts or a custom terminal UI.
 #
 # Command step fields:
 #   command         — the command to run (supports minijinja interpolation)

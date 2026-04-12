@@ -54,6 +54,7 @@ use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
 use crate::default_cli_commands;
 use crate::git::git_checkout_branch_command;
+use crate::git::git_command;
 use crate::git::git_current_branch;
 use crate::git::git_push_branch_command;
 use crate::materialize_dependency_edges;
@@ -71,6 +72,34 @@ fn must_err<T, E>(result: Result<T, E>, context: &str) -> E {
 		Ok(_) => panic!("{context}"),
 		Err(error) => error,
 	}
+}
+
+fn init_git_repository(root: &Path) {
+	let init = git_command(root)
+		.args(["init", "-b", "main"])
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	if init.status.success() {
+		return;
+	}
+	let fallback = git_command(root)
+		.arg("init")
+		.output()
+		.unwrap_or_else(|error| panic!("git init fallback: {error}"));
+	assert!(
+		fallback.status.success(),
+		"git init failed:\n{}",
+		String::from_utf8_lossy(&init.stderr)
+	);
+	let checkout = git_command(root)
+		.args(["checkout", "-B", "main"])
+		.output()
+		.unwrap_or_else(|error| panic!("git checkout -B main: {error}"));
+	assert!(
+		checkout.status.success(),
+		"git checkout -B main failed:\n{}",
+		String::from_utf8_lossy(&checkout.stderr)
+	);
 }
 
 #[test]
@@ -113,12 +142,7 @@ fn git_push_branch_command_builds_expected_arguments() {
 fn git_current_branch_reports_checked_out_branch_name() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let root = tempdir.path();
-	let output = std::process::Command::new("git")
-		.args(["init", "-b", "main"])
-		.current_dir(root)
-		.output()
-		.unwrap_or_else(|error| panic!("git init: {error}"));
-	assert!(output.status.success());
+	init_git_repository(root);
 	let branch = must_ok(git_current_branch(root), "current branch");
 	assert_eq!(branch, "main");
 }
@@ -127,19 +151,13 @@ fn git_current_branch_reports_checked_out_branch_name() {
 fn git_current_branch_reports_detached_head_as_an_error() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let root = tempdir.path();
-	let init = std::process::Command::new("git")
-		.args(["init", "-b", "main"])
-		.current_dir(root)
-		.output()
-		.unwrap_or_else(|error| panic!("git init: {error}"));
-	assert!(init.status.success());
+	init_git_repository(root);
 	for args in [
 		["config", "user.name", "monochange Tests"],
 		["config", "user.email", "monochange@example.com"],
 	] {
-		let output = std::process::Command::new("git")
+		let output = git_command(root)
 			.args(args)
-			.current_dir(root)
 			.output()
 			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 		assert!(output.status.success());
@@ -153,9 +171,8 @@ fn git_current_branch_reports_detached_head_as_an_error() {
 		&["commit", "-m", "initial"][..],
 		&["checkout", "--detach"][..],
 	] {
-		let output = std::process::Command::new("git")
+		let output = git_command(root)
 			.args(args)
-			.current_dir(root)
 			.output()
 			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 		assert!(output.status.success());
@@ -567,6 +584,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::CreateChangeFile {
+				show_progress: None,
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
@@ -648,6 +666,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 		),
 		(
 			CliStepDefinition::Command {
+				show_progress: None,
 				name: None,
 				when: None,
 				command: "echo".into(),
@@ -663,6 +682,35 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 	for (step, expected) in cases {
 		assert_eq!(step.kind_name(), expected);
 	}
+}
+
+#[test]
+fn cli_step_show_progress_returns_configured_values_for_interactive_steps() {
+	let create_change = CliStepDefinition::CreateChangeFile {
+		show_progress: Some(false),
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	let command = CliStepDefinition::Command {
+		show_progress: Some(true),
+		name: None,
+		when: None,
+		command: "echo hi".to_string(),
+		dry_run_command: None,
+		shell: ShellConfig::None,
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	let validate = CliStepDefinition::Validate {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(create_change.show_progress(), Some(false));
+	assert_eq!(command.show_progress(), Some(true));
+	assert_eq!(validate.show_progress(), None);
 }
 
 #[test]
@@ -691,6 +739,7 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CreateChangeFile {
+			show_progress: None,
 			name: Some(expected.to_string()),
 			when: None,
 			inputs: BTreeMap::new(),
@@ -742,6 +791,7 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::Command {
+			show_progress: None,
 			name: Some(expected.to_string()),
 			when: None,
 			command: "echo hi".to_string(),
@@ -760,6 +810,7 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 #[test]
 fn valid_input_names_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: None,
 		command: "echo hi".into(),
@@ -823,6 +874,7 @@ fn valid_input_names_returns_expected_names_for_retarget_release() {
 #[test]
 fn valid_input_names_returns_expected_names_for_create_change_file() {
 	let step = CliStepDefinition::CreateChangeFile {
+		show_progress: None,
 		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
@@ -899,6 +951,7 @@ fn expected_input_kind_returns_correct_types_for_affected_packages() {
 #[test]
 fn expected_input_kind_returns_none_for_command_steps() {
 	let step = CliStepDefinition::Command {
+		show_progress: None,
 		name: None,
 		when: None,
 		command: "echo".into(),
@@ -925,6 +978,7 @@ fn expected_input_kind_returns_none_for_commit_release() {
 fn expected_input_kind_returns_correct_types_for_create_change_file() {
 	use crate::CliInputKind;
 	let step = CliStepDefinition::CreateChangeFile {
+		show_progress: None,
 		name: None,
 		when: None,
 		inputs: BTreeMap::new(),

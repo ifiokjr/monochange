@@ -31,6 +31,7 @@ Use `Command` for what is truly custom.
 - `id` — optional identifier that exposes `steps.<id>.stdout` and `steps.<id>.stderr` to later steps
 - `variables` — optional custom variable mapping for command substitution
 - `inputs` — optional step-local input overrides
+- `show_progress` — optional boolean; set to `false` when the command itself is interactive and spinner output would get in the way
 
 ## Prerequisites
 
