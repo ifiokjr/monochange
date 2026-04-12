@@ -17,13 +17,13 @@ fn repo_root() -> std::path::PathBuf {
 }
 
 fn write_executable(path: &Path, contents: &str) {
-	fs::write(path, contents).unwrap_or_else(|error| panic!("write {:?}: {error}", path));
+	fs::write(path, contents).unwrap_or_else(|error| panic!("write {path:?}: {error}"));
 	let mut permissions = fs::metadata(path)
-		.unwrap_or_else(|error| panic!("metadata {:?}: {error}", path))
+		.unwrap_or_else(|error| panic!("metadata {path:?}: {error}"))
 		.permissions();
 	permissions.set_mode(0o755);
 	fs::set_permissions(path, permissions)
-		.unwrap_or_else(|error| panic!("chmod {:?}: {error}", path));
+		.unwrap_or_else(|error| panic!("chmod {path:?}: {error}"));
 }
 
 fn git_stdout(root: &Path, args: &[&str]) -> String {
@@ -32,7 +32,7 @@ fn git_stdout(root: &Path, args: &[&str]) -> String {
 		.arg(root)
 		.args(args)
 		.output()
-		.unwrap_or_else(|error| panic!("git {:?}: {error}", args));
+		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 	assert!(
 		output.status.success(),
 		"git {:?} failed: {}",
