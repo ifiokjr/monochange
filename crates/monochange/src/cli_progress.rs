@@ -173,6 +173,7 @@ impl CliProgressReporter {
 		if !self.enabled || self.command_started {
 			return;
 		}
+		self.command_started = true;
 		if self.render_mode == ProgressRenderMode::Json {
 			let sequence = self.next_sequence();
 			self.emit_json_event(&serde_json::json!({
@@ -191,7 +192,6 @@ impl CliProgressReporter {
 			self.paint(&format!("running `{}`", self.command_name), Style::Header),
 			suffix,
 		));
-		self.command_started = true;
 	}
 
 	pub(crate) fn command_finished(&mut self, duration: Duration) {

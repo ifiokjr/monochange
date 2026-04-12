@@ -479,12 +479,12 @@ pub(crate) fn execute_cli_command_with_options(
 		retarget_report: None,
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
-		};
-		let mut output = None;
-		let command_started_at = Instant::now();
-		let mut progress = CliProgressReporter::new(cli_command, dry_run, quiet, progress_format);
+	};
+	let mut output = None;
+	let command_started_at = Instant::now();
+	let mut progress = CliProgressReporter::new(cli_command, dry_run, quiet, progress_format);
 
-		for (step_index, step) in cli_command.steps.iter().enumerate() {
+	for (step_index, step) in cli_command.steps.iter().enumerate() {
 		let step_started_at = Instant::now();
 		let step_inputs = resolve_step_inputs(&context, step)?;
 		context.last_step_inputs = step_inputs.clone();
@@ -1183,18 +1183,18 @@ fn run_cli_command_command(
 	};
 	process_command.current_dir(&context.root);
 
-		let output = if progress.is_enabled() && show_progress {
-			let streamed_output = run_process_with_streaming(
-				&mut process_command,
-				progress,
-				step_index,
-				step,
-				&interpolated,
-			);
-			streamed_output?
-		} else {
-			let output = process_command.output().map_err(|error| {
-				MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
+	let output = if progress.is_enabled() && show_progress {
+		let streamed_output = run_process_with_streaming(
+			&mut process_command,
+			progress,
+			step_index,
+			step,
+			&interpolated,
+		);
+		streamed_output?
+	} else {
+		let output = process_command.output().map_err(|error| {
+			MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
 		})?;
 		PreparedProcessOutput {
 			status: output.status,
@@ -2462,6 +2462,7 @@ mod tests {
 			when: None,
 			command: "printf 'streamed line\\n'".to_string(),
 			dry_run_command: None,
+			show_progress: None,
 			shell: ShellConfig::Default,
 			id: Some("stream".to_string()),
 			variables: None,
@@ -2481,6 +2482,7 @@ mod tests {
 			&step,
 			0,
 			&mut progress,
+			true,
 			CommandStepOptions {
 				command: "printf 'streamed line\\n'",
 				dry_run_command: None,
