@@ -2854,8 +2854,12 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				kind: CliInputKind::Choice,
 				help_text: Some("Output format".to_string()),
 				required: false,
-				default: Some("text".to_string()),
-				choices: vec!["text".to_string(), "json".to_string()],
+				default: Some("markdown".to_string()),
+				choices: vec![
+					"markdown".to_string(),
+					"text".to_string(),
+					"json".to_string(),
+				],
 				short: None,
 			}],
 			steps: vec![CliStepDefinition::PrepareRelease {

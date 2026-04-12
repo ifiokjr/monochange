@@ -424,6 +424,28 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 }
 
 #[test]
+fn default_release_command_prefers_markdown_output() {
+	let release = default_cli_commands()
+		.into_iter()
+		.find(|command| command.name == "release")
+		.unwrap_or_else(|| panic!("expected release command"));
+	let format = release
+		.inputs
+		.iter()
+		.find(|input| input.name == "format")
+		.unwrap_or_else(|| panic!("expected release format input"));
+	assert_eq!(format.default.as_deref(), Some("markdown"));
+	assert_eq!(
+		format.choices,
+		vec![
+			"markdown".to_string(),
+			"text".to_string(),
+			"json".to_string(),
+		]
+	);
+}
+
+#[test]
 fn cli_step_definition_kind_name_covers_all_variants() {
 	use std::collections::BTreeMap;
 	let cases: Vec<(CliStepDefinition, &str)> = vec![

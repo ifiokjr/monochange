@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
+assertion_line: 14
 info:
   program: monochange
   args:
@@ -12,7 +13,7 @@ exit_code: 0
 ----- stdout -----
 Manage versions and releases for your multiplatform, multilanguage monorepo
 
-Usage: monochange <COMMAND>
+Usage: monochange [OPTIONS] <COMMAND>
 
 Commands:
   init            Generate monochange.toml with detected packages, groups, and default CLI commands
@@ -30,7 +31,8 @@ Commands:
   help            Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help  Print help
+  -q, --quiet  Suppress stdout/stderr output and run in dry-run mode when supported
+  -h, --help   Print help
 
 
 ----- stderr -----

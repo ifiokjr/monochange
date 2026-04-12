@@ -102,6 +102,8 @@ mc release --dry-run --format json
 
 <!-- {/projectPlanCommand} -->
 
+For human-readable local output, `mc release --dry-run` now defaults to terminal-friendly markdown. Use `--format text` when you want the older plain-text style, or keep `--format json` for automation.
+
 Preferred repository command flow:
 
 <!-- {=projectDryRunCommand} -->
@@ -119,7 +121,9 @@ mc release --dry-run --diff
 mc release --dry-run --format json --diff
 ```
 
-Text output renders unified diffs directly in the terminal. JSON output wraps the normal manifest payload under `manifest` and adds `fileDiffs` entries for each changed file.
+Markdown and text output render unified diffs directly in the terminal. JSON output wraps the normal manifest payload under `manifest` and adds `fileDiffs` entries for each changed file.
+
+When you want command semantics without any command-line noise, add `--quiet`. Quiet mode suppresses stdout/stderr and uses dry-run behavior for release-oriented commands so the workspace stays unchanged.
 
 <!-- {=projectReleaseCommand} -->
 
@@ -246,6 +250,8 @@ Planning rules in this milestone:
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
+
+Across release-oriented commands, global `--quiet` suppresses stdout/stderr and reuses dry-run behavior for commands that support it.
 
 ## Concurrency
 

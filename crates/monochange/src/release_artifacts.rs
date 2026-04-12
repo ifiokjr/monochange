@@ -770,7 +770,7 @@ pub(crate) fn render_discovery_report(
 			serde_json::to_string_pretty(&json_discovery_report(report))
 				.map_err(|error| MonochangeError::Discovery(error.to_string()))
 		}
-		OutputFormat::Text => Ok(text_discovery_report(report)),
+		OutputFormat::Markdown | OutputFormat::Text => Ok(text_discovery_report(report)),
 	}
 }
 

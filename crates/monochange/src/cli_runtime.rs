@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::IsTerminal;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
@@ -41,6 +42,7 @@ pub(crate) fn execute_matches(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	cli_command_name: &str,
 	cli_command_matches: &ArgMatches,
+	quiet: bool,
 ) -> MonochangeResult<String> {
 	let Some(cli_command) = configuration
 		.cli
@@ -52,14 +54,22 @@ pub(crate) fn execute_matches(
 		)));
 	};
 
-	let dry_run = cli_command_matches.get_flag("dry-run");
+	let dry_run = quiet || cli_command_matches.get_flag("dry-run");
 	let show_diff =
 		command_supports_release_diff_preview(cli_command) && cli_command_matches.get_flag("diff");
 	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
 	if show_diff {
-		execute_cli_command_with_options(root, configuration, cli_command, dry_run, true, inputs)
+		execute_cli_command_with_options(
+			root,
+			configuration,
+			cli_command,
+			dry_run,
+			quiet,
+			true,
+			inputs,
+		)
 	} else {
-		execute_cli_command(root, configuration, cli_command, dry_run, inputs)
+		execute_cli_command_quiet(root, configuration, cli_command, dry_run, quiet, inputs)
 	}
 }
 
@@ -352,6 +362,7 @@ fn build_issue_comment_results_for_source(
 	result
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn execute_cli_command(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -359,7 +370,26 @@ pub(crate) fn execute_cli_command(
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
-	execute_cli_command_with_options(root, configuration, cli_command, dry_run, false, inputs)
+	execute_cli_command_quiet(root, configuration, cli_command, dry_run, false, inputs)
+}
+
+fn execute_cli_command_quiet(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	cli_command: &CliCommandDefinition,
+	dry_run: bool,
+	quiet: bool,
+	inputs: BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<String> {
+	execute_cli_command_with_options(
+		root,
+		configuration,
+		cli_command,
+		dry_run,
+		quiet,
+		false,
+		inputs,
+	)
 }
 
 #[tracing::instrument(skip_all, fields(command = cli_command.name))]
@@ -368,12 +398,14 @@ pub(crate) fn execute_cli_command_with_options(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	cli_command: &CliCommandDefinition,
 	dry_run: bool,
+	quiet: bool,
 	show_diff: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
 	let mut context = CliContext {
 		root: root.to_path_buf(),
 		dry_run,
+		quiet,
 		show_diff,
 		last_step_inputs: inputs.clone(),
 		inputs,
@@ -395,7 +427,7 @@ pub(crate) fn execute_cli_command_with_options(
 	};
 	let mut output = None;
 	let command_started_at = Instant::now();
-	let mut progress = CliProgressReporter::new(cli_command, dry_run);
+	let mut progress = CliProgressReporter::new(cli_command, dry_run, quiet);
 	progress.command_started();
 
 	for (step_index, step) in cli_command.steps.iter().enumerate() {
@@ -424,8 +456,10 @@ pub(crate) fn execute_cli_command_with_options(
 					validate_workspace(root)?;
 					validate_cargo_workspace_version_groups(root)?;
 					let warnings = validate_versioned_files_content(root)?;
-					for warning in &warnings {
-						eprintln!("warning: {warning}");
+					if !context.quiet {
+						for warning in &warnings {
+							eprintln!("warning: {warning}");
+						}
 					}
 					output = Some(format!(
 						"workspace validation passed for {}",
@@ -670,7 +704,7 @@ pub(crate) fn execute_cli_command_with_options(
 						.cloned()
 						.unwrap_or_default();
 					let changed_paths = if let Some(rev) = &since {
-						if !explicit_paths.is_empty() {
+						if !context.quiet && !explicit_paths.is_empty() {
 							eprintln!(
 								"warning: --since takes priority; --changed-paths was ignored"
 							);
@@ -799,6 +833,7 @@ pub(crate) fn execute_cli_command_with_options(
 					},
 				)
 			}
+			OutputFormat::Markdown => Ok(render_cli_command_markdown_result(cli_command, &context)),
 			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
 		};
 	}
@@ -812,10 +847,14 @@ pub(crate) fn execute_cli_command_with_options(
 					))
 				})?
 			}
-			OutputFormat::Text => render_cli_command_result(cli_command, &context),
+			OutputFormat::Markdown | OutputFormat::Text => {
+				render_cli_command_result(cli_command, &context)
+			}
 		};
 		if evaluation.enforce && evaluation.status == ChangesetPolicyStatus::Failed {
-			println!("{rendered}");
+			if !context.quiet {
+				println!("{rendered}");
+			}
 			return Err(MonochangeError::Config(evaluation.summary.clone()));
 		}
 		return Ok(rendered);
@@ -834,7 +873,7 @@ pub(crate) fn execute_cli_command_with_options(
 					))
 				})?
 			}
-			OutputFormat::Text => render_changeset_diagnostics(report),
+			OutputFormat::Markdown | OutputFormat::Text => render_changeset_diagnostics(report),
 		};
 		return Ok(rendered);
 	}
@@ -845,7 +884,7 @@ pub(crate) fn execute_cli_command_with_options(
 				serde_json::to_string_pretty(report)
 					.unwrap_or_else(|error| panic!("retarget report serialization bug: {error}"))
 			}
-			OutputFormat::Text => render_retarget_release_report(report),
+			OutputFormat::Markdown | OutputFormat::Text => render_retarget_release_report(report),
 		};
 		return Ok(rendered);
 	}
@@ -1872,10 +1911,259 @@ pub(crate) fn render_cli_command_result(
 			lines.push(format!("- {log}"));
 		}
 	}
-	lines.join(
-		"
-",
+	lines.join("\n")
+}
+
+pub(crate) fn render_cli_command_markdown_result(
+	cli_command: &CliCommandDefinition,
+	context: &CliContext,
+) -> String {
+	if context.prepared_release.is_none() {
+		return render_cli_command_result(cli_command, context);
+	}
+
+	let color = stdout_supports_color();
+	let mut sections = vec![format!(
+		"# {}{}",
+		paint_markdown_inline(
+			&format!("`{}`", cli_command.name),
+			MarkdownStyle::Title,
+			color
+		),
+		if context.dry_run {
+			format!(
+				" {}",
+				paint_markdown_inline("(dry-run)", MarkdownStyle::Muted, color)
+			)
+		} else {
+			String::new()
+		}
+	)];
+
+	if let Some(prepared_release) = &context.prepared_release {
+		let mut summary = Vec::new();
+		if let Some(version) = &prepared_release.version {
+			summary.push(format!(
+				"- **Version:** {}",
+				paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color)
+			));
+		}
+		if !prepared_release.released_packages.is_empty() {
+			summary.push(format!(
+				"- **Released packages:** {}",
+				prepared_release
+					.released_packages
+					.iter()
+					.map(|package| {
+						paint_markdown_inline(&format!("`{package}`"), MarkdownStyle::Code, color)
+					})
+					.collect::<Vec<_>>()
+					.join(", ")
+			));
+		}
+		if !summary.is_empty() {
+			sections.push(render_markdown_section("Summary", &summary, color));
+		}
+		if !prepared_release.release_targets.is_empty() {
+			let mut lines = Vec::new();
+			for target in &prepared_release.release_targets {
+				lines.push(format!(
+					"- **{} {}** → {}",
+					target.kind,
+					paint_markdown_inline(&format!("`{}`", target.id), MarkdownStyle::Code, color),
+					paint_markdown_inline(
+						&format!("`{}`", target.tag_name),
+						MarkdownStyle::Code,
+						color,
+					),
+				));
+				lines.push(format!(
+					"  - tag: {} · release: {}",
+					yes_no(target.tag),
+					yes_no(target.release)
+				));
+			}
+			sections.push(render_markdown_section("Release targets", &lines, color));
+		}
+		if let Some(path) = &context.release_manifest_path {
+			sections.push(render_markdown_section(
+				"Release manifest",
+				&[format!(
+					"- {}",
+					paint_markdown_inline(
+						&format!("`{}`", path.display()),
+						MarkdownStyle::Code,
+						color,
+					)
+				)],
+				color,
+			));
+		}
+		if !context.release_results.is_empty() {
+			let lines = context
+				.release_results
+				.iter()
+				.map(|release| format!("- {release}"))
+				.collect::<Vec<_>>();
+			sections.push(render_markdown_section("Releases", &lines, color));
+		}
+		if let Some(release_commit_report) = &context.release_commit_report {
+			sections.push(render_markdown_section(
+				"Release commit",
+				&render_release_commit_report_markdown(release_commit_report, color),
+				color,
+			));
+		}
+		if let Some(release_request_result) = &context.release_request_result {
+			sections.push(render_markdown_section(
+				"Release request",
+				&[format!("- {release_request_result}")],
+				color,
+			));
+		}
+		if !context.issue_comment_results.is_empty() {
+			let lines = context
+				.issue_comment_results
+				.iter()
+				.map(|issue_comment| format!("- {issue_comment}"))
+				.collect::<Vec<_>>();
+			sections.push(render_markdown_section("Issue comments", &lines, color));
+		}
+		if !prepared_release.changed_files.is_empty() {
+			let lines = prepared_release
+				.changed_files
+				.iter()
+				.map(|path| {
+					format!(
+						"- {}",
+						paint_markdown_inline(
+							&format!("`{}`", path.display()),
+							MarkdownStyle::Code,
+							color,
+						)
+					)
+				})
+				.collect::<Vec<_>>();
+			sections.push(render_markdown_section("Changed files", &lines, color));
+		}
+		if context.show_diff && !context.prepared_file_diffs.is_empty() {
+			let mut lines = Vec::new();
+			for file_diff in &context.prepared_file_diffs {
+				lines.push(format!(
+					"### {}",
+					paint_markdown_inline(
+						&format!("`{}`", file_diff.path.display()),
+						MarkdownStyle::Subtitle,
+						color,
+					)
+				));
+				lines.push("```diff".to_string());
+				lines.extend(file_diff.display_diff.lines().map(ToString::to_string));
+				lines.push("```".to_string());
+				lines.push(String::new());
+			}
+			while lines.last().is_some_and(String::is_empty) {
+				lines.pop();
+			}
+			sections.push(render_markdown_section("File diffs", &lines, color));
+		}
+		if !prepared_release.deleted_changesets.is_empty() {
+			let lines = prepared_release
+				.deleted_changesets
+				.iter()
+				.map(|path| {
+					format!(
+						"- {}",
+						paint_markdown_inline(
+							&format!("`{}`", path.display()),
+							MarkdownStyle::Code,
+							color,
+						)
+					)
+				})
+				.collect::<Vec<_>>();
+			sections.push(render_markdown_section("Deleted changesets", &lines, color));
+		}
+	}
+	if !context.command_logs.is_empty() {
+		let lines = context
+			.command_logs
+			.iter()
+			.map(|log| format!("- {log}"))
+			.collect::<Vec<_>>();
+		sections.push(render_markdown_section("Commands", &lines, color));
+	}
+	sections.join("\n\n")
+}
+
+#[derive(Clone, Copy)]
+enum MarkdownStyle {
+	Title,
+	Subtitle,
+	Code,
+	Muted,
+}
+
+fn stdout_supports_color() -> bool {
+	std::io::stdout().is_terminal()
+		&& std::env::var_os("NO_COLOR").is_none()
+		&& std::env::var("TERM").is_ok_and(|term| term != "dumb")
+}
+
+fn paint_markdown_inline(text: &str, style: MarkdownStyle, color: bool) -> String {
+	if !color {
+		return text.to_string();
+	}
+	let code = match style {
+		MarkdownStyle::Title => "36;1",
+		MarkdownStyle::Subtitle => "37;1",
+		MarkdownStyle::Code => "35",
+		MarkdownStyle::Muted => "2",
+	};
+	format!("\u{1b}[{code}m{text}\u{1b}[0m")
+}
+
+fn render_markdown_section(title: &str, lines: &[String], color: bool) -> String {
+	if lines.is_empty() {
+		return format!(
+			"## {}",
+			paint_markdown_inline(title, MarkdownStyle::Subtitle, color)
+		);
+	}
+	format!(
+		"## {}\n\n{}",
+		paint_markdown_inline(title, MarkdownStyle::Subtitle, color),
+		lines.join("\n")
 	)
+}
+
+fn render_release_commit_report_markdown(report: &CommitReleaseReport, color: bool) -> Vec<String> {
+	let mut lines = vec![format!("- **Subject:** {}", report.subject)];
+	if let Some(commit) = &report.commit {
+		lines.push(format!(
+			"- **Commit:** {}",
+			paint_markdown_inline(
+				&format!("`{}`", short_commit_sha(commit)),
+				MarkdownStyle::Code,
+				color,
+			)
+		));
+	}
+	if !report.tracked_paths.is_empty() {
+		lines.push("- **Tracked paths:**".to_string());
+		lines.extend(report.tracked_paths.iter().map(|path| {
+			format!(
+				"  - {}",
+				paint_markdown_inline(&format!("`{}`", path.display()), MarkdownStyle::Code, color,)
+			)
+		}));
+	}
+	lines.push(format!("- **Status:** {}", report.status.replace('_', "-")));
+	lines
+}
+
+fn yes_no(value: bool) -> &'static str {
+	if value { "yes" } else { "no" }
 }
 
 fn cli_command_output_format(
@@ -1890,6 +2178,7 @@ fn cli_command_output_format(
 pub(crate) fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
 	match value {
 		"text" => Ok(OutputFormat::Text),
+		"markdown" => Ok(OutputFormat::Markdown),
 		"json" => Ok(OutputFormat::Json),
 		other => {
 			Err(MonochangeError::Config(format!(
@@ -1929,6 +2218,7 @@ mod tests {
 		CliContext {
 			root: PathBuf::from("."),
 			dry_run: false,
+			quiet: false,
 			show_diff: false,
 			inputs: BTreeMap::new(),
 			last_step_inputs: BTreeMap::new(),
@@ -2029,7 +2319,7 @@ mod tests {
 			inputs: Vec::new(),
 			steps: Vec::new(),
 		};
-		let mut progress = CliProgressReporter::new(&cli_command, false);
+		let mut progress = CliProgressReporter::new(&cli_command, false, false);
 		let step = CliStepDefinition::Command {
 			name: Some("stream output".to_string()),
 			when: None,

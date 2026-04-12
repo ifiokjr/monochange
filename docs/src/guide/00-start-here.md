@@ -74,8 +74,10 @@ Use group ids only when the change is intentionally owned by the whole group.
 ## 6. Preview the release plan safely
 
 ```bash
-mc release --dry-run --format json
+mc release --dry-run
 ```
+
+By default this now renders a human-friendly markdown preview in the terminal. Use `--format json` when you want structured output for tooling, or `--format text` when you explicitly want the older plain-text rendering.
 
 Stop here on your first run. This previews the release plan without publishing anything.
 
@@ -89,6 +91,8 @@ A good first-time mental model is:
 4. Groups synchronize packages that intentionally share release identity.
 
 That is why most beginner flows should start with package ids, not groups.
+
+If you need a silent safety check, run `mc release --quiet`. Quiet mode suppresses stdout/stderr and keeps release-oriented commands in dry-run behavior.
 
 ## If you hit a problem
 
