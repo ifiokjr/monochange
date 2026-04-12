@@ -1,0 +1,14 @@
+---
+source: crates/monochange/tests/cli_progress.rs
+assertion_line: 318
+expression: normalized_ascii_progress(&stderr)
+---
+monochange running `progress-ascii`
+> [1/2] plan release (PrepareRelease)
++ [1/2] plan release (PrepareRelease) [duration]
+> [2/2] stream summary (Command)
+  | stream summary [stdout] line one
+  | stream summary [stdout] 
+  | stream summary [stdout] line three
++ [2/2] stream summary (Command) [duration]
++ `progress-ascii` finished [duration]

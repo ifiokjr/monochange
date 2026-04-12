@@ -293,6 +293,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.discover.steps]]
+name = "discover packages"
 type = "Discover"
 
 [cli.release]
@@ -305,15 +306,18 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.release.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [cli.release-manifest]
 help_text = "Prepare a release and write a stable JSON manifest"
 
 [[cli.release-manifest.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [[cli.release-manifest.steps]]
+name = "render release manifest"
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
@@ -327,12 +331,15 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.publish-release.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
+name = "publish release"
 type = "PublishRelease"
 
 [[cli.publish-release.steps]]
+name = "comment released issues"
 type = "CommentReleasedIssues"
 
 [cli.release-pr]
@@ -345,9 +352,11 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.release-pr.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
+name = "open release request"
 type = "OpenReleaseRequest"
 
 name = "format"
@@ -381,6 +390,7 @@ name = "label"
 type = "string_list"
 
 [[cli.affected.steps]]
+name = "evaluate affected packages"
 type = "AffectedPackages"
 ```
 
@@ -393,6 +403,7 @@ CLI command interpolation variables:
 - built-in command variables are available directly as `{{ version }}`, `{{ group_version }}`, `{{ released_packages }}`, `{{ changed_files }}`, and `{{ changesets }}`
 - command templates can read CLI inputs through `{{ inputs.name }}`; bare input names still work for backward compatibility
 - every step can override the inputs it receives with `inputs = { ... }`; direct references like `"{{ inputs.labels }}"` preserve list and boolean values when rebinding to built-in steps
+- built-in commands already attach descriptive step `name` labels such as `prepare release` and `publish release`; keep or replace those labels when you want progress output to stay readable
 - custom command variables become available when `variables` is present: map your own names to variables such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
 - `dry_run_command` on a `Command` step replaces `command` only when the CLI command is run with `--dry-run`
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting

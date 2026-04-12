@@ -2743,7 +2743,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			help_text: Some("Validate monochange configuration and changesets".to_string()),
 			inputs: Vec::new(),
 			steps: vec![CliStepDefinition::Validate {
-				name: None,
+				name: Some("validate workspace".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2761,7 +2761,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				short: None,
 			}],
 			steps: vec![CliStepDefinition::Discover {
-				name: None,
+				name: Some("discover packages".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2856,7 +2856,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			],
 			steps: vec![CliStepDefinition::CreateChangeFile {
 				show_progress: None,
-				name: None,
+				name: Some("create change file".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2878,7 +2878,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				short: None,
 			}],
 			steps: vec![CliStepDefinition::PrepareRelease {
-				name: None,
+				name: Some("prepare release".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2944,7 +2944,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::AffectedPackages {
-				name: None,
+				name: Some("evaluate affected packages".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -2978,7 +2978,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::DiagnoseChangesets {
-				name: None,
+				name: Some("diagnose changesets".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
@@ -3038,7 +3038,7 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				},
 			],
 			steps: vec![CliStepDefinition::RetargetRelease {
-				name: None,
+				name: Some("retarget release".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],

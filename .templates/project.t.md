@@ -220,6 +220,7 @@ requires = ["main"]
 help_text = "Validate monochange configuration and changesets"
 
 [[cli.validate.steps]]
+name = "validate workspace"
 type = "Validate"
 
 [cli.discover]
@@ -232,6 +233,7 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.discover.steps]]
+name = "discover packages"
 type = "Discover"
 
 [cli.change]
@@ -273,6 +275,7 @@ name = "output"
 type = "path"
 
 [[cli.change.steps]]
+name = "create change file"
 type = "CreateChangeFile"
 
 [cli.release]
@@ -285,15 +288,18 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.release.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [cli.release-manifest]
 help_text = "Prepare a release and write a stable JSON manifest"
 
 [[cli.release-manifest.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [[cli.release-manifest.steps]]
+name = "render release manifest"
 type = "RenderReleaseManifest"
 path = ".monochange/release-manifest.json"
 
@@ -307,9 +313,11 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.publish-release.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
+name = "publish release"
 type = "PublishRelease"
 
 [cli.release-pr]
@@ -322,9 +330,11 @@ choices = ["text", "json"]
 default = "text"
 
 [[cli.release-pr.steps]]
+name = "prepare release"
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
+name = "open release request"
 type = "OpenReleaseRequest"
 
 name = "format"
@@ -353,6 +363,7 @@ name = "label"
 type = "string_list"
 
 [[cli.affected.steps]]
+name = "evaluate affected packages"
 type = "AffectedPackages"
 ```
 

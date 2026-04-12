@@ -34,6 +34,7 @@ use monochange_core::SourceReleaseRequest;
 use crate::cli::command_supports_release_diff_preview;
 use crate::cli_progress::CliProgressReporter;
 use crate::cli_progress::CommandStream;
+use crate::cli_progress::ProgressFormat;
 use crate::*;
 
 pub(crate) fn execute_matches(
@@ -56,20 +57,51 @@ pub(crate) fn execute_matches(
 	let dry_run = quiet || cli_command_matches.get_flag("dry-run");
 	let show_diff =
 		command_supports_release_diff_preview(cli_command) && cli_command_matches.get_flag("diff");
+	let progress_format = cli_command_matches
+		.get_one::<String>("progress-format")
+		.map_or_else(
+			|| {
+				std::env::var("MONOCHANGE_PROGRESS_FORMAT")
+					.ok()
+					.map_or(Ok(ProgressFormat::Auto), |value| {
+						parse_progress_format(&value)
+					})
+			},
+			|value| parse_progress_format(value),
+		)?;
 	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
 	if show_diff {
 		execute_cli_command_with_options(
 			root,
 			configuration,
 			cli_command,
-			dry_run,
-			quiet,
-			true,
-			inputs,
+			ExecuteCliCommandOptions {
+				dry_run,
+				quiet,
+				show_diff: true,
+				inputs,
+				progress_format,
+			},
 		)
 	} else {
-		execute_cli_command_quiet(root, configuration, cli_command, dry_run, quiet, inputs)
+		execute_cli_command_quiet(
+			root,
+			configuration,
+			cli_command,
+			dry_run,
+			quiet,
+			inputs,
+			progress_format,
+		)
 	}
+}
+
+fn parse_progress_format(value: &str) -> MonochangeResult<ProgressFormat> {
+	ProgressFormat::parse(value).ok_or_else(|| {
+		MonochangeError::Config(format!(
+			"unknown progress format `{value}`; expected one of: auto, unicode, ascii, json"
+		))
+	})
 }
 
 pub(crate) fn collect_cli_command_inputs(
@@ -369,7 +401,15 @@ pub(crate) fn execute_cli_command(
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
-	execute_cli_command_quiet(root, configuration, cli_command, dry_run, false, inputs)
+	execute_cli_command_quiet(
+		root,
+		configuration,
+		cli_command,
+		dry_run,
+		false,
+		inputs,
+		ProgressFormat::Auto,
+	)
 }
 
 fn execute_cli_command_quiet(
@@ -379,16 +419,28 @@ fn execute_cli_command_quiet(
 	dry_run: bool,
 	quiet: bool,
 	inputs: BTreeMap<String, Vec<String>>,
+	progress_format: ProgressFormat,
 ) -> MonochangeResult<String> {
 	execute_cli_command_with_options(
 		root,
 		configuration,
 		cli_command,
-		dry_run,
-		quiet,
-		false,
-		inputs,
+		ExecuteCliCommandOptions {
+			dry_run,
+			quiet,
+			show_diff: false,
+			inputs,
+			progress_format,
+		},
 	)
+}
+
+pub(crate) struct ExecuteCliCommandOptions {
+	dry_run: bool,
+	quiet: bool,
+	show_diff: bool,
+	inputs: BTreeMap<String, Vec<String>>,
+	progress_format: ProgressFormat,
 }
 
 #[tracing::instrument(skip_all, fields(command = cli_command.name))]
@@ -396,11 +448,15 @@ pub(crate) fn execute_cli_command_with_options(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	cli_command: &CliCommandDefinition,
-	dry_run: bool,
-	quiet: bool,
-	show_diff: bool,
-	inputs: BTreeMap<String, Vec<String>>,
+	options: ExecuteCliCommandOptions,
 ) -> MonochangeResult<String> {
+	let ExecuteCliCommandOptions {
+		dry_run,
+		quiet,
+		show_diff,
+		inputs,
+		progress_format,
+	} = options;
 	let mut context = CliContext {
 		root: root.to_path_buf(),
 		dry_run,
@@ -423,12 +479,12 @@ pub(crate) fn execute_cli_command_with_options(
 		retarget_report: None,
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
-	};
-	let mut output = None;
-	let command_started_at = Instant::now();
-	let mut progress = CliProgressReporter::new(cli_command, dry_run, quiet);
+		};
+		let mut output = None;
+		let command_started_at = Instant::now();
+		let mut progress = CliProgressReporter::new(cli_command, dry_run, quiet, progress_format);
 
-	for (step_index, step) in cli_command.steps.iter().enumerate() {
+		for (step_index, step) in cli_command.steps.iter().enumerate() {
 		let step_started_at = Instant::now();
 		let step_inputs = resolve_step_inputs(&context, step)?;
 		context.last_step_inputs = step_inputs.clone();
@@ -788,6 +844,7 @@ pub(crate) fn execute_cli_command_with_options(
 					run_cli_command_command(
 						&mut context,
 						step,
+						step_index,
 						&mut progress,
 						show_progress,
 						CommandStepOptions {
@@ -1078,6 +1135,7 @@ fn step_shows_progress(
 fn run_cli_command_command(
 	context: &mut CliContext,
 	step: &CliStepDefinition,
+	step_index: usize,
 	progress: &mut CliProgressReporter,
 	show_progress: bool,
 	options: CommandStepOptions<'_>,
@@ -1125,11 +1183,18 @@ fn run_cli_command_command(
 	};
 	process_command.current_dir(&context.root);
 
-	let output = if progress.is_enabled() && show_progress {
-		run_process_with_streaming(&mut process_command, progress, step, &interpolated)?
-	} else {
-		let output = process_command.output().map_err(|error| {
-			MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
+		let output = if progress.is_enabled() && show_progress {
+			let streamed_output = run_process_with_streaming(
+				&mut process_command,
+				progress,
+				step_index,
+				step,
+				&interpolated,
+			);
+			streamed_output?
+		} else {
+			let output = process_command.output().map_err(|error| {
+				MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
 		})?;
 		PreparedProcessOutput {
 			status: output.status,
@@ -1185,6 +1250,7 @@ enum StreamEvent {
 fn run_process_with_streaming(
 	process_command: &mut ProcessCommand,
 	progress: &mut CliProgressReporter,
+	step_index: usize,
 	step: &CliStepDefinition,
 	interpolated: &str,
 ) -> MonochangeResult<PreparedProcessOutput> {
@@ -1198,7 +1264,7 @@ fn run_process_with_streaming(
 	let (sender, receiver) = mpsc::channel();
 	let stdout_handle = spawn_stream_reader(stdout, CommandStream::Stdout, sender.clone());
 	let stderr_handle = spawn_stream_reader(stderr, CommandStream::Stderr, sender);
-	let (stdout_buffer, stderr_buffer) = drain_stream_events(&receiver, progress, step);
+	let (stdout_buffer, stderr_buffer) = drain_stream_events(&receiver, progress, step_index, step);
 	let status = map_process_wait_result(child.wait(), interpolated)?;
 	let _ = stdout_handle.join();
 	let _ = stderr_handle.join();
@@ -1233,6 +1299,7 @@ fn take_process_stream<T>(
 fn drain_stream_events(
 	receiver: &mpsc::Receiver<StreamEvent>,
 	progress: &mut CliProgressReporter,
+	step_index: usize,
 	step: &CliStepDefinition,
 ) -> (Vec<u8>, Vec<u8>) {
 	let mut stdout_buffer = Vec::new();
@@ -1246,7 +1313,12 @@ fn drain_stream_events(
 					CommandStream::Stdout => stdout_buffer.extend_from_slice(&chunk),
 					CommandStream::Stderr => stderr_buffer.extend_from_slice(&chunk),
 				}
-				progress.log_command_output(step, stream, String::from_utf8_lossy(&chunk).as_ref());
+				progress.log_command_output(
+					step_index,
+					step,
+					stream,
+					String::from_utf8_lossy(&chunk).as_ref(),
+				);
 			}
 			Ok(StreamEvent::Closed(stream)) => {
 				match stream {
@@ -2233,7 +2305,10 @@ mod tests {
 	use std::path::PathBuf;
 	use std::sync::mpsc;
 
+	use monochange_config::load_workspace_configuration;
 	use monochange_core::CliCommandDefinition;
+	use monochange_core::CliStepDefinition;
+	use monochange_core::ShellConfig;
 	use tempfile::tempdir;
 
 	use super::*;
@@ -2262,6 +2337,17 @@ mod tests {
 			step_outputs: BTreeMap::new(),
 			command_logs: Vec::new(),
 		}
+	}
+
+	fn parse_validate_matches(
+		root: &Path,
+	) -> (monochange_core::WorkspaceConfiguration, ArgMatches) {
+		let configuration = load_workspace_configuration(root)
+			.unwrap_or_else(|error| panic!("workspace configuration: {error}"));
+		let matches = build_command_with_cli("mc", &configuration.cli)
+			.try_get_matches_from(["mc", "validate"])
+			.unwrap_or_else(|error| panic!("validate matches: {error}"));
+		(configuration, matches)
 	}
 
 	#[test]
@@ -2327,6 +2413,96 @@ mod tests {
 	}
 
 	#[test]
+	fn execute_matches_uses_progress_format_from_environment_and_rejects_invalid_values() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+
+		temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("json"), || {
+			let (configuration, matches) = parse_validate_matches(tempdir.path());
+			let validate_matches = matches
+				.subcommand_matches("validate")
+				.unwrap_or_else(|| panic!("validate subcommand matches"));
+			execute_matches(
+				tempdir.path(),
+				&configuration,
+				"validate",
+				validate_matches,
+				false,
+			)
+			.unwrap_or_else(|error| panic!("validate with env progress format: {error}"));
+		});
+
+		temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("wat"), || {
+			let (configuration, matches) = parse_validate_matches(tempdir.path());
+			let validate_matches = matches
+				.subcommand_matches("validate")
+				.unwrap_or_else(|| panic!("validate subcommand matches"));
+			let error = execute_matches(
+				tempdir.path(),
+				&configuration,
+				"validate",
+				validate_matches,
+				false,
+			)
+			.unwrap_err();
+			assert_eq!(
+				error.to_string(),
+				"config error: unknown progress format `wat`; expected one of: auto, unicode, ascii, json"
+			);
+		});
+	}
+
+	#[test]
+	fn run_cli_command_command_streams_output_when_progress_is_enabled() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let mut context = cli_context();
+		context.root = tempdir.path().to_path_buf();
+		let step_inputs = BTreeMap::new();
+		let step = CliStepDefinition::Command {
+			name: Some("announce release".to_string()),
+			when: None,
+			command: "printf 'streamed line\\n'".to_string(),
+			dry_run_command: None,
+			shell: ShellConfig::Default,
+			id: Some("stream".to_string()),
+			variables: None,
+			inputs: BTreeMap::new(),
+		};
+		let cli_command = CliCommandDefinition {
+			name: "release".to_string(),
+			help_text: Some("release".to_string()),
+			inputs: Vec::new(),
+			steps: vec![step.clone()],
+		};
+		let mut progress =
+			CliProgressReporter::new(&cli_command, false, false, ProgressFormat::Json);
+
+		run_cli_command_command(
+			&mut context,
+			&step,
+			0,
+			&mut progress,
+			CommandStepOptions {
+				command: "printf 'streamed line\\n'",
+				dry_run_command: None,
+				shell: &ShellConfig::Default,
+				step_id: Some("stream"),
+				variables: None,
+				step_inputs: &step_inputs,
+			},
+		)
+		.unwrap_or_else(|error| panic!("streaming command step: {error}"));
+
+		assert_eq!(context.command_logs, vec!["streamed line".to_string()]);
+		assert_eq!(
+			context
+				.step_outputs
+				.get("stream")
+				.map(|output| output.stdout.as_str()),
+			Some("streamed line")
+		);
+	}
+
+	#[test]
 	fn take_process_stream_reports_missing_pipes() {
 		let error = take_process_stream::<Vec<u8>>(None, "stdout", "echo hello").unwrap_err();
 		assert_eq!(
@@ -2374,7 +2550,8 @@ mod tests {
 			inputs: Vec::new(),
 			steps: Vec::new(),
 		};
-		let mut progress = CliProgressReporter::new(&cli_command, false, false);
+		let mut progress =
+			CliProgressReporter::new(&cli_command, false, false, ProgressFormat::Auto);
 		let step = CliStepDefinition::Command {
 			show_progress: None,
 			name: Some("stream output".to_string()),
@@ -2406,13 +2583,13 @@ mod tests {
 			.send(StreamEvent::Closed(CommandStream::Stderr))
 			.unwrap_or_else(|error| panic!("close stderr: {error}"));
 		drop(sender);
-		let (stdout, stderr) = drain_stream_events(&receiver, &mut progress, &step);
+		let (stdout, stderr) = drain_stream_events(&receiver, &mut progress, 0, &step);
 		assert_eq!(stdout, b"hello\n");
 		assert_eq!(stderr, b"warn\n");
 
 		let (sender, receiver) = mpsc::channel();
 		drop(sender);
-		let (stdout, stderr) = drain_stream_events(&receiver, &mut progress, &step);
+		let (stdout, stderr) = drain_stream_events(&receiver, &mut progress, 0, &step);
 		assert!(stdout.is_empty());
 		assert!(stderr.is_empty());
 	}

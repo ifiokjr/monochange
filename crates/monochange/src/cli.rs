@@ -135,6 +135,14 @@ pub(crate) fn build_command_with_cli(
 					.help("Suppress stdout/stderr output and run in dry-run mode when supported")
 					.action(ArgAction::SetTrue),
 			)
+			.arg(
+				Arg::new("progress-format")
+					.long("progress-format")
+					.global(true)
+					.help("Control progress output on stderr")
+					.value_name("FORMAT")
+					.value_parser(["auto", "unicode", "ascii", "json"]),
+			)
 			.subcommand(
 				Command::new("init")
 					.about(

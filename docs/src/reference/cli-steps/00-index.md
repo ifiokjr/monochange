@@ -82,6 +82,21 @@ Every step can declare a `name = "..."` label.
 
 Use that when you want human-friendly progress output such as `plan release`, `publish tags`, or `announce release` instead of the raw step kind.
 
+### Progress rendering
+
+monochange can stream step progress on stderr while keeping command output on stdout.
+
+Use `--progress-format auto|unicode|ascii|json` or `MONOCHANGE_PROGRESS_FORMAT` to choose the renderer:
+
+- `auto` enables the human renderer only when stderr is a terminal
+- `unicode` forces the human renderer with Unicode symbols
+- `ascii` forces the human renderer with ASCII-safe symbols
+- `json` emits newline-delimited progress events for automation and benchmarks
+
+`PrepareRelease` steps also report per-phase timings. Those timings power the benchmark phase-budget checks for `mc release --dry-run` and `mc release`.
+
+See [Progress output](../progress-output.md) for the full renderer behavior and JSON event shape.
+
 ### Step-local `when`
 
 Every step can declare a `when = "..."` expression.

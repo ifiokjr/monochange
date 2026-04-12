@@ -20,6 +20,7 @@
 
 # Reference
 
+- [Progress output](reference/progress-output.md)
 - [CLI step reference](reference/cli-steps/00-index.md)
   - [Validate](reference/cli-steps/01-validate.md)
   - [Discover](reference/cli-steps/02-discover.md)

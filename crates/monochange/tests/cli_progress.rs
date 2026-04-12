@@ -1,13 +1,133 @@
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
+use insta::assert_json_snapshot;
+use insta::assert_snapshot;
+use regex::Regex;
+use serde_json::Value;
+
 mod test_support;
+use test_support::current_test_name;
+use test_support::monochange_command;
 use test_support::setup_fixture;
+use test_support::snapshot_settings;
 
 const EXIT_STATUS_MARKER: &str = "__MC_EXIT_STATUS__=";
 
-#[cfg(unix)]
-fn normalize_tty_transcript(text: &str) -> String {
+fn append_progress_command(workspace: &Path, command_name: &str, body: &str) {
+	let config_path = workspace.join("monochange.toml");
+	let mut config = fs::read_to_string(&config_path)
+		.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
+	let _ = write!(
+		config,
+		r#"
+
+[cli.{command_name}]
+help_text = "Exercise progress output"
+{body}
+"#
+	);
+	fs::write(&config_path, config)
+		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+}
+
+fn normalize_duration_text(text: &str) -> String {
+	let duration_pattern = Regex::new(r"\b\d+(?:\.\d+)?(?:ms|s|µs)\b")
+		.unwrap_or_else(|error| panic!("regex: {error}"));
+	duration_pattern
+		.replace_all(text, "[duration]")
+		.into_owned()
+}
+
+fn normalized_ascii_progress(stderr: &str) -> String {
+	let normalized = normalize_duration_text(&normalize_terminal_transcript(stderr));
+	normalized
+		.lines()
+		.filter(|line| !line.starts_with("  - "))
+		.collect::<Vec<_>>()
+		.join("\n")
+}
+
+fn normalized_progress_events(stderr: &str) -> Vec<Value> {
+	let mut events = stderr
+		.lines()
+		.filter(|line| !line.trim().is_empty())
+		.map(|line| {
+			serde_json::from_str::<Value>(line)
+				.unwrap_or_else(|error| panic!("parse progress event `{line}`: {error}"))
+		})
+		.collect::<Vec<_>>();
+	for event in &mut events {
+		let Some(object) = event.as_object_mut() else {
+			panic!("progress event should be an object: {event}");
+		};
+		if let Some(duration) = object.get_mut("durationMs") {
+			*duration = Value::String("[duration_ms]".to_string());
+		}
+		if let Some(phase_timings) = object.get_mut("phaseTimings").and_then(Value::as_array_mut) {
+			for phase in phase_timings {
+				if let Some(duration) = phase.get_mut("durationMs") {
+					*duration = Value::String("[duration_ms]".to_string());
+				}
+			}
+		}
+	}
+	let mut normalized = Vec::with_capacity(events.len());
+	let mut index = 0;
+	while index < events.len() {
+		if events[index].get("event").and_then(Value::as_str) != Some("command_output") {
+			normalized.push(events[index].clone());
+			index += 1;
+			continue;
+		}
+		let start = index;
+		while index < events.len()
+			&& events[index].get("event").and_then(Value::as_str) == Some("command_output")
+		{
+			index += 1;
+		}
+		let mut output_events = events[start..index].to_vec();
+		output_events.sort_by(|left, right| {
+			let left_key = (
+				left.get("stepIndex")
+					.and_then(Value::as_u64)
+					.unwrap_or_default(),
+				left.get("stream")
+					.and_then(Value::as_str)
+					.unwrap_or_default(),
+				left.get("text").and_then(Value::as_str).unwrap_or_default(),
+			);
+			let right_key = (
+				right
+					.get("stepIndex")
+					.and_then(Value::as_u64)
+					.unwrap_or_default(),
+				right
+					.get("stream")
+					.and_then(Value::as_str)
+					.unwrap_or_default(),
+				right
+					.get("text")
+					.and_then(Value::as_str)
+					.unwrap_or_default(),
+			);
+			left_key.cmp(&right_key)
+		});
+		normalized.extend(output_events);
+	}
+	for (sequence, event) in normalized.iter_mut().enumerate() {
+		if let Some(object) = event.as_object_mut() {
+			object.insert(
+				"sequence".to_string(),
+				Value::String(format!("[sequence:{sequence}]")),
+			);
+		}
+	}
+	normalized
+}
+
+fn normalize_terminal_transcript(text: &str) -> String {
 	let mut normalized = String::with_capacity(text.len());
 	let mut chars = text.chars().peekable();
 	while let Some(ch) = chars.next() {
@@ -107,7 +227,7 @@ sys.exit(0)
 		.unwrap_or_else(|error| panic!("parse tty exit status: {error}\n{stderr}"));
 	let transcript =
 		String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("tty output utf8: {error}"));
-	(status_code, normalize_tty_transcript(&transcript))
+	(status_code, normalize_terminal_transcript(&transcript))
 }
 
 #[cfg(unix)]
@@ -222,22 +342,16 @@ fn run_tty_command(_workspace: &Path, _command_name: &str) -> String {
 #[cfg(unix)]
 fn release_progress_streams_named_steps_on_tty() {
 	let tempdir = setup_fixture("monochange/release-base");
-	let config_path = tempdir.path().join("monochange.toml");
-	let mut config = fs::read_to_string(&config_path)
-		.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
-	config.push_str(
+	append_progress_command(
+		tempdir.path(),
+		"progress-release",
 		r#"
-
-[cli.progress-release]
-help_text = "Prepare a release with progress output"
 steps = [
 	{ type = "PrepareRelease", name = "plan release" },
 	{ type = "Command", name = "stream summary", shell = true, command = "printf 'streamed line 1\n'; sleep 0.1; printf 'streamed line 2\n'" },
 ]
-"#,
+	"#,
 	);
-	fs::write(&config_path, config)
-		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
 	let transcript = run_tty_command(tempdir.path(), "progress-release");
 
@@ -253,23 +367,17 @@ steps = [
 #[cfg(unix)]
 fn release_progress_renders_skipped_failed_steps_and_stderr_on_tty() {
 	let tempdir = setup_fixture("monochange/release-base");
-	let config_path = tempdir.path().join("monochange.toml");
-	let mut config = fs::read_to_string(&config_path)
-		.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
-	config.push_str(
+	append_progress_command(
+		tempdir.path(),
+		"progress-failure",
 		r#"
-
-[cli.progress-failure]
-help_text = "Exercise skipped and failed progress output"
 steps = [
 	{ type = "Validate", name = "skip validate", when = "{{ false }}" },
 	{ type = "Command", name = "stderr only", shell = true, command = "printf 'warn line\n' >&2" },
 	{ type = "Command", name = "fail loud", shell = true, command = "printf 'bad line\n' >&2; exit 3" },
 ]
-"#,
+	"#,
 	);
-	fs::write(&config_path, config)
-		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
 	let (status, transcript) = run_tty_command_result(tempdir.path(), "progress-failure");
 
@@ -301,6 +409,78 @@ fn interactive_change_cli_hides_progress_output_on_tty() {
 		output_path.exists(),
 		"interactive change file should be created"
 	);
+}
+
+#[test]
+fn ascii_progress_renders_clean_captured_output() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_fixture("monochange/release-base");
+	append_progress_command(
+		tempdir.path(),
+		"progress-ascii",
+		r#"
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "Command", name = "stream summary", shell = true, command = "printf 'line one\n\nline three\n'" },
+]
+	"#,
+	);
+
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("progress-ascii")
+		.arg("--progress-format")
+		.arg("ascii")
+		.output()
+		.unwrap_or_else(|error| panic!("run ascii progress command: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let stderr = String::from_utf8(output.stderr)
+		.unwrap_or_else(|error| panic!("ascii stderr utf8: {error}"));
+	assert_snapshot!(normalized_ascii_progress(&stderr));
+}
+
+#[test]
+fn json_progress_emits_structured_events_for_machine_consumers() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_fixture("monochange/release-base");
+	append_progress_command(
+		tempdir.path(),
+		"progress-json",
+		r#"
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "Command", name = "stream summary", shell = true, command = "printf 'stdout line\n'; printf 'stderr line\n' >&2" },
+]
+	"#,
+	);
+
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("progress-json")
+		.arg("--progress-format")
+		.arg("json")
+		.output()
+		.unwrap_or_else(|error| panic!("run json progress command: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let stderr = String::from_utf8(output.stderr)
+		.unwrap_or_else(|error| panic!("json stderr utf8: {error}"));
+	assert_json_snapshot!(normalized_progress_events(&stderr));
 }
 
 #[test]

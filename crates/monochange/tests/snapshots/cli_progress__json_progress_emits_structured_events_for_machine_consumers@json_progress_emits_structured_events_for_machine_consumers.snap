@@ -1,0 +1,153 @@
+---
+source: crates/monochange/tests/cli_progress.rs
+assertion_line: 354
+expression: normalized_progress_events(&stderr)
+---
+[
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "event": "command_started",
+    "sequence": "[sequence:0]",
+    "totalSteps": 2
+  },
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "event": "step_started",
+    "sequence": "[sequence:1]",
+    "stepDisplayName": "plan release",
+    "stepIndex": 1,
+    "stepKind": "PrepareRelease",
+    "stepName": "plan release",
+    "totalSteps": 2
+  },
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "durationMs": "[duration_ms]",
+    "event": "step_finished",
+    "phaseTimings": [
+      {
+        "durationMs": "[duration_ms]",
+        "label": "load workspace configuration"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "discover release workspace"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "discover changeset paths"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "read changeset files"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "parse changeset files"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "build prepared changesets"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "build release plan"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "resolve changelog targets"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "build manifest updates"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "build versioned file updates"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "build release targets"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "build lockfile refresh plan"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "build changelog updates"
+      },
+      {
+        "durationMs": "[duration_ms]",
+        "label": "apply release changes"
+      }
+    ],
+    "sequence": "[sequence:2]",
+    "stepDisplayName": "plan release",
+    "stepIndex": 1,
+    "stepKind": "PrepareRelease",
+    "stepName": "plan release",
+    "totalSteps": 2
+  },
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "event": "step_started",
+    "sequence": "[sequence:3]",
+    "stepDisplayName": "stream summary",
+    "stepIndex": 2,
+    "stepKind": "Command",
+    "stepName": "stream summary",
+    "totalSteps": 2
+  },
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "event": "command_output",
+    "sequence": "[sequence:4]",
+    "stepDisplayName": "stream summary",
+    "stepIndex": 2,
+    "stepKind": "Command",
+    "stepName": "stream summary",
+    "stream": "stderr",
+    "text": "stderr line\n",
+    "totalSteps": 2
+  },
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "event": "command_output",
+    "sequence": "[sequence:5]",
+    "stepDisplayName": "stream summary",
+    "stepIndex": 2,
+    "stepKind": "Command",
+    "stepName": "stream summary",
+    "stream": "stdout",
+    "text": "stdout line\n",
+    "totalSteps": 2
+  },
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "durationMs": "[duration_ms]",
+    "event": "step_finished",
+    "phaseTimings": [],
+    "sequence": "[sequence:6]",
+    "stepDisplayName": "stream summary",
+    "stepIndex": 2,
+    "stepKind": "Command",
+    "stepName": "stream summary",
+    "totalSteps": 2
+  },
+  {
+    "command": "progress-json",
+    "dryRun": false,
+    "durationMs": "[duration_ms]",
+    "event": "command_finished",
+    "sequence": "[sequence:7]",
+    "totalSteps": 2
+  }
+]
