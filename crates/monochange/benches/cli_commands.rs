@@ -62,6 +62,39 @@ fn write_synthetic_cargo_lock(root: &Path, num_packages: usize) {
 	fs::write(root.join("Cargo.lock"), cargo_lock).unwrap();
 }
 
+fn add_dependency_chain_manifests(root: &Path, num_packages: usize) {
+	for i in 1..num_packages {
+		let manifest_path = root.join(format!("crates/pkg-{i}/Cargo.toml"));
+		let manifest = fs::read_to_string(&manifest_path).unwrap();
+		fs::write(
+			&manifest_path,
+			format!(
+				"{manifest}\n[dependencies]\npkg-{} = {{ path = \"../pkg-{}\", version = \"1.0.0\" }}\n",
+				i - 1,
+				i - 1
+			),
+		)
+		.unwrap();
+	}
+}
+
+fn write_dependency_chain_cargo_lock(root: &Path, num_packages: usize) {
+	use std::fmt::Write;
+
+	let mut cargo_lock = String::from("version = 3\n\n");
+	for i in 0..num_packages {
+		let _ = writeln!(
+			cargo_lock,
+			"[[package]]\nname = \"pkg-{i}\"\nversion = \"1.0.0\""
+		);
+		if i > 0 {
+			let _ = writeln!(cargo_lock, "dependencies = [\"pkg-{}\"]", i - 1);
+		}
+		cargo_lock.push('\n');
+	}
+	fs::write(root.join("Cargo.lock"), cargo_lock).unwrap();
+}
+
 fn generate_fixture_with_cargo_lock(root: &Path, num_packages: usize, num_changesets: usize) {
 	generate_fixture(root, num_packages, num_changesets);
 	let config_path = root.join("monochange.toml");
@@ -85,7 +118,30 @@ fn generate_fixture_with_cargo_lock(root: &Path, num_packages: usize, num_change
 	write_synthetic_cargo_lock(root, num_packages);
 }
 
+fn generate_fixture_with_dependency_chain_cargo_lock(
+	root: &Path,
+	num_packages: usize,
+	num_changesets: usize,
+) {
+	generate_fixture_with_cargo_lock(root, num_packages, num_changesets);
+	add_dependency_chain_manifests(root, num_packages);
+	write_dependency_chain_cargo_lock(root, num_packages);
+}
+
+fn enable_explicit_cargo_refresh_command(root: &Path) {
+	let config_path = root.join("monochange.toml");
+	let config = fs::read_to_string(&config_path).unwrap();
+	fs::write(
+		&config_path,
+		format!(
+			"{config}\n[[ecosystems.cargo.lockfile_commands]]\ncommand = \"cargo generate-lockfile\"\ncwd = \".\"\n"
+		),
+	)
+	.unwrap();
+}
+
 const SCALES: &[(usize, usize)] = &[(5, 10), (20, 50), (50, 200)];
+const LOCKFILE_COMPARE_SCALE: (usize, usize) = (20, 50);
 
 fn bench_config_load(c: &mut Criterion) {
 	let mut group = c.benchmark_group("config_load");
@@ -331,6 +387,61 @@ fn bench_prepare_release_apply(c: &mut Criterion) {
 	group.finish();
 }
 
+fn bench_prepare_release_apply_cargo_lockfile_refresh(c: &mut Criterion) {
+	let mut group = c.benchmark_group("prepare_release_apply_cargo_lockfile_refresh");
+	group.sample_size(10);
+
+	let (packages, changesets) = LOCKFILE_COMPARE_SCALE;
+	let label = format!("{packages}pkg_{changesets}cs");
+
+	group.bench_with_input(
+		BenchmarkId::new("direct_rewrite", &label),
+		&(packages, changesets),
+		|b, &(packages, changesets)| {
+			b.iter_batched(
+				|| {
+					let tempdir = tempfile::tempdir().unwrap();
+					generate_fixture_with_dependency_chain_cargo_lock(
+						tempdir.path(),
+						packages,
+						changesets,
+					);
+					tempdir
+				},
+				|tempdir| {
+					monochange::prepare_release(tempdir.path(), false).unwrap();
+				},
+				BatchSize::LargeInput,
+			);
+		},
+	);
+
+	group.bench_with_input(
+		BenchmarkId::new("full_refresh_command", &label),
+		&(packages, changesets),
+		|b, &(packages, changesets)| {
+			b.iter_batched(
+				|| {
+					let tempdir = tempfile::tempdir().unwrap();
+					generate_fixture_with_dependency_chain_cargo_lock(
+						tempdir.path(),
+						packages,
+						changesets,
+					);
+					enable_explicit_cargo_refresh_command(tempdir.path());
+					tempdir
+				},
+				|tempdir| {
+					monochange::prepare_release(tempdir.path(), false).unwrap();
+				},
+				BatchSize::LargeInput,
+			);
+		},
+	);
+
+	group.finish();
+}
+
 fn bench_prepare_release_with_git_history(c: &mut Criterion) {
 	let mut group = c.benchmark_group("prepare_release_git_history");
 	group.sample_size(10);
@@ -359,6 +470,7 @@ criterion_group!(
 	bench_changeset_loading,
 	bench_prepare_release_dry_run,
 	bench_prepare_release_apply,
+	bench_prepare_release_apply_cargo_lockfile_refresh,
 	bench_prepare_release_with_git_history,
 );
 criterion_main!(benches);
