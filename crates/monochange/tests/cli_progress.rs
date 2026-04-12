@@ -330,7 +330,7 @@ sys.exit(0)
 		.unwrap_or_else(|error| panic!("parse tty exit status: {error}\n{stderr}"));
 	let transcript = String::from_utf8(output.stdout)
 		.unwrap_or_else(|error| panic!("interactive tty output utf8: {error}"));
-	(status_code, normalize_tty_transcript(&transcript))
+	(status_code, normalize_terminal_transcript(&transcript))
 }
 
 #[cfg(not(unix))]
