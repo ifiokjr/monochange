@@ -56,7 +56,7 @@ fn git_stdout(root: &Path, args: &[&str]) -> String {
 fn hosted_fixture_setup_script_bootstraps_local_pr_history() {
 	let _lock = HOSTED_FIXTURE_SCRIPT_LOCK
 		.lock()
-		.unwrap_or_else(|poisoned| poisoned.into_inner());
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture_dir = tempdir.path().join("fixture");
 	let script_path = repo_root().join("scripts/setup_hosted_benchmark_fixture.sh");
@@ -118,7 +118,7 @@ fn hosted_fixture_setup_script_bootstraps_local_pr_history() {
 fn benchmark_cli_run_fixture_supports_hosted_fixture_metadata() {
 	let _lock = HOSTED_FIXTURE_SCRIPT_LOCK
 		.lock()
-		.unwrap_or_else(|poisoned| poisoned.into_inner());
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
