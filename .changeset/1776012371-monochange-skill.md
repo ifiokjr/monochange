@@ -1,5 +1,5 @@
 ---
-@monochange/skill:
+"@monochange/skill":
   bump: major
   version: "0.1.0"
 ---
