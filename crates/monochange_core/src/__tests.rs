@@ -56,6 +56,7 @@ use crate::default_cli_commands;
 use crate::git::git_checkout_branch_command;
 use crate::git::git_command;
 use crate::git::git_current_branch;
+use crate::git::git_head_commit;
 use crate::git::git_push_branch_command;
 use crate::materialize_dependency_edges;
 use crate::render_release_notes;
@@ -206,6 +207,66 @@ fn git_current_branch_reports_missing_directory_as_io_error() {
 	);
 	assert!(
 		matches!(error, MonochangeError::Io(message) if message.contains("failed to read current git branch"))
+	);
+}
+
+#[test]
+fn git_head_commit_reports_current_commit_sha() {
+	let tempdir = must_ok(tempdir(), "tempdir");
+	let root = tempdir.path();
+	init_git_repository(root);
+	for args in [
+		["config", "user.name", "monochange Tests"],
+		["config", "user.email", "monochange@example.com"],
+		["config", "commit.gpgsign", "false"],
+	] {
+		let output = git_command(root)
+			.args(args)
+			.output()
+			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+		assert!(
+			output.status.success(),
+			"git {args:?} failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
+	}
+	must_ok(
+		fs::write(root.join("README.md"), "hello\n"),
+		"write README.md",
+	);
+	for args in [&["add", "README.md"][..], &["commit", "-m", "initial"][..]] {
+		let output = git_command(root)
+			.args(args)
+			.output()
+			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+		assert!(
+			output.status.success(),
+			"git {args:?} failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
+	}
+
+	let sha = must_ok(git_head_commit(root), "head commit");
+	assert_eq!(sha.len(), 40);
+}
+
+#[test]
+fn git_head_commit_reports_unborn_head_as_config_error() {
+	let tempdir = must_ok(tempdir(), "tempdir");
+	let root = tempdir.path();
+	init_git_repository(root);
+	let error = must_err(git_head_commit(root), "expected unborn HEAD config error");
+	assert!(
+		matches!(error, MonochangeError::Config(message) if message.contains("failed to read HEAD commit"))
+	);
+}
+
+#[test]
+fn source_change_request_operation_serializes_skipped_variant() {
+	assert_eq!(
+		serde_json::to_value(crate::SourceChangeRequestOperation::Skipped)
+			.unwrap_or_else(|error| panic!("serialize skipped operation: {error}")),
+		json!("skipped")
 	);
 }
 

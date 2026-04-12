@@ -95,6 +95,7 @@ use std::env;
 use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
+use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostedActorRef;
@@ -128,6 +129,7 @@ use monochange_core::SourceReleaseRequest;
 use monochange_core::git::git_checkout_branch_command;
 use monochange_core::git::git_commit_paths_command;
 use monochange_core::git::git_current_branch;
+use monochange_core::git::git_head_commit;
 use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
@@ -233,6 +235,35 @@ struct GitHubPullRequestUpdatePayload<'a> {
 #[derive(Debug, Serialize)]
 struct GitHubLabelsPayload<'a> {
 	labels: &'a [String],
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubExistingPullRequestLabel {
+	name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubExistingPullRequestBase {
+	#[serde(rename = "ref")]
+	ref_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubExistingPullRequestHead {
+	sha: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubExistingPullRequest {
+	number: u64,
+	html_url: Option<String>,
+	node_id: String,
+	title: String,
+	body: Option<String>,
+	base: GitHubExistingPullRequestBase,
+	head: GitHubExistingPullRequestHead,
+	#[serde(default)]
+	labels: Vec<GitHubExistingPullRequestLabel>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -924,16 +955,34 @@ pub fn publish_release_pull_request(
 	request: &GitHubPullRequestRequest,
 	tracked_paths: &[PathBuf],
 ) -> MonochangeResult<GitHubPullRequestOutcome> {
+	let lookup_source = source.clone();
+	let lookup_request = request.clone();
+	let existing_pull_request =
+		thread::spawn(move || lookup_existing_pull_request(&lookup_source, &lookup_request));
 	git_checkout_branch(root, &request.head_branch)?;
 	git_stage_paths(root, tracked_paths)?;
 	git_commit_paths(root, &request.commit_message)?;
-	git_push_branch(root, &request.head_branch)?;
+	let head_commit = git_head_commit(root)?;
+	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
+	let head_matches_existing = existing
+		.as_ref()
+		.and_then(|pull_request| pull_request.head.sha.as_deref())
+		== Some(head_commit.as_str());
+	if !head_matches_existing {
+		git_push_branch(root, &request.head_branch)?;
+	}
 
 	let runtime = github_runtime()?;
 	runtime.block_on(async {
 		let client = github_client_from_env(source)?;
 
-		publish_release_pull_request_with_client(&client, request).await
+		publish_release_pull_request_with_existing_pull_request(
+			&client,
+			request,
+			existing.as_ref(),
+			&head_commit,
+		)
+		.await
 	})
 }
 
@@ -1013,20 +1062,60 @@ async fn publish_release_request_with_client(
 	})
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 async fn publish_release_pull_request_with_client(
 	client: &Octocrab,
 	request: &GitHubPullRequestRequest,
 ) -> MonochangeResult<GitHubPullRequestOutcome> {
 	let existing = lookup_existing_pull_request_with_client(client, request).await?;
+	publish_release_pull_request_with_existing_pull_request(client, request, existing.as_ref(), "")
+		.await
+}
+
+async fn publish_release_pull_request_with_existing_pull_request(
+	client: &Octocrab,
+	request: &GitHubPullRequestRequest,
+	existing: Option<&GitHubExistingPullRequest>,
+	head_commit: &str,
+) -> MonochangeResult<GitHubPullRequestOutcome> {
+	let labels_match = existing.is_some_and(|pull_request| {
+		request.labels.iter().all(|label| {
+			pull_request
+				.labels
+				.iter()
+				.any(|existing_label| existing_label.name == *label)
+		})
+	});
+	let content_matches = existing.is_some_and(|pull_request| {
+		pull_request.title == request.title
+			&& pull_request.body.as_deref().unwrap_or_default() == request.body
+			&& pull_request.base.ref_name == request.base_branch
+	});
+	let head_matches_existing =
+		existing.and_then(|pull_request| pull_request.head.sha.as_deref()) == Some(head_commit);
 	let (operation, pull_request) = match existing {
-		Some(existing) => {
+		Some(existing_pull_request) if content_matches => {
+			(
+				if head_matches_existing && labels_match && !request.auto_merge {
+					GitHubPullRequestOperation::Skipped
+				} else {
+					GitHubPullRequestOperation::Updated
+				},
+				GitHubPullRequestResponse {
+					number: existing_pull_request.number,
+					html_url: existing_pull_request.html_url.clone(),
+					node_id: existing_pull_request.node_id.clone(),
+				},
+			)
+		}
+		Some(existing_pull_request) => {
 			(
 				GitHubPullRequestOperation::Updated,
 				patch_json::<_, GitHubPullRequestResponse>(
 					client,
 					&format!(
 						"/repos/{}/{}/pulls/{}",
-						request.owner, request.repo, existing.number
+						request.owner, request.repo, existing_pull_request.number
 					),
 					&GitHubPullRequestUpdatePayload {
 						title: &request.title,
@@ -1055,7 +1144,7 @@ async fn publish_release_pull_request_with_client(
 			)
 		}
 	};
-	if !request.labels.is_empty() {
+	if !request.labels.is_empty() && !labels_match {
 		let _: serde_json::Value = post_json(
 			client,
 			&format!(
@@ -1166,7 +1255,7 @@ async fn lookup_existing_release_with_client(
 async fn lookup_existing_pull_request_with_client(
 	client: &Octocrab,
 	request: &GitHubPullRequestRequest,
-) -> MonochangeResult<Option<GitHubPullRequestResponse>> {
+) -> MonochangeResult<Option<GitHubExistingPullRequest>> {
 	let path = format!(
 		"/repos/{}/{}/pulls?state=open&head={}:{}&base={}&per_page=1",
 		request.owner,
@@ -1175,8 +1264,19 @@ async fn lookup_existing_pull_request_with_client(
 		encode(&request.head_branch),
 		encode(&request.base_branch)
 	);
-	let pull_requests = get_json::<Vec<GitHubPullRequestResponse>>(client, &path).await?;
+	let pull_requests = get_json::<Vec<GitHubExistingPullRequest>>(client, &path).await?;
 	Ok(pull_requests.into_iter().next())
+}
+
+fn lookup_existing_pull_request(
+	source: &SourceConfiguration,
+	request: &GitHubPullRequestRequest,
+) -> MonochangeResult<Option<GitHubExistingPullRequest>> {
+	let runtime = github_runtime()?;
+	runtime.block_on(async {
+		let client = github_client_from_env(source)?;
+		lookup_existing_pull_request_with_client(&client, request).await
+	})
 }
 
 async fn enable_pull_request_auto_merge_with_client(
@@ -1301,6 +1401,14 @@ where
 	client.patch(path, Some(body)).await.map_err(|error| {
 		MonochangeError::Config(format!("GitHub API PATCH `{path}` failed: {error}"))
 	})
+}
+
+fn join_existing_pull_request_lookup(
+	handle: thread::JoinHandle<MonochangeResult<Option<GitHubExistingPullRequest>>>,
+) -> MonochangeResult<Option<GitHubExistingPullRequest>> {
+	handle.join().map_err(|_| {
+		MonochangeError::Config("failed to join GitHub pull request lookup thread".to_string())
+	})?
 }
 
 fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> {

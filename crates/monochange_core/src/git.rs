@@ -76,6 +76,18 @@ pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
 	Ok(git_stdout_trimmed(&output))
 }
 
+pub fn git_head_commit(root: &Path) -> MonochangeResult<String> {
+	let output = git_command_output(root, &["rev-parse", "HEAD"])
+		.map_err(|error| MonochangeError::Io(format!("failed to read HEAD commit: {error}")))?;
+	if !output.status.success() {
+		return Err(MonochangeError::Config(format!(
+			"failed to read HEAD commit: {}",
+			git_error_detail(&output)
+		)));
+	}
+	Ok(git_stdout_trimmed(&output))
+}
+
 #[tracing::instrument(skip_all, fields(args = ?args))]
 pub fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
 	let mut command = git_command(root);

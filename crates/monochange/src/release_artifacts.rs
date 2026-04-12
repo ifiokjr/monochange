@@ -1107,6 +1107,7 @@ pub(crate) fn format_change_request_operation(
 	match operation {
 		SourceChangeRequestOperation::Created => "created",
 		SourceChangeRequestOperation::Updated => "updated",
+		SourceChangeRequestOperation::Skipped => "skipped",
 	}
 }
 

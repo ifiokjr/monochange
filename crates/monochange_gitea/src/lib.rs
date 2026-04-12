@@ -3,6 +3,7 @@
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostingCapabilities;
@@ -26,6 +27,7 @@ use monochange_core::SourceReleaseRequest;
 use monochange_core::git::git_checkout_branch_command;
 use monochange_core::git::git_commit_paths_command;
 use monochange_core::git::git_current_branch;
+use monochange_core::git::git_head_commit;
 use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
@@ -193,6 +195,34 @@ struct GiteaPullRequestResponse {
 	html_url: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct GiteaExistingPullRequestLabel {
+	name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaExistingPullRequestBase {
+	#[serde(rename = "ref")]
+	ref_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaExistingPullRequestHead {
+	sha: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaExistingPullRequest {
+	number: u64,
+	html_url: Option<String>,
+	title: String,
+	body: Option<String>,
+	base: GiteaExistingPullRequestBase,
+	head: GiteaExistingPullRequestHead,
+	#[serde(default)]
+	labels: Vec<GiteaExistingPullRequestLabel>,
+}
+
 fn gitea_host(source: &SourceConfiguration) -> &str {
 	source
 		.host
@@ -297,15 +327,38 @@ pub fn publish_release_pull_request(
 	request: &SourceChangeRequest,
 	tracked_paths: &[PathBuf],
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
+	let lookup_source = source.clone();
+	let lookup_request = request.clone();
+	let existing_pull_request = thread::spawn(move || {
+		let client = gitea_client()?;
+		let token = gitea_token()?;
+		let api_base = gitea_api_base(&lookup_source)?;
+		lookup_existing_pull_request(&client, &token, &api_base, &lookup_request)
+	});
 	git_checkout_branch(root, &request.head_branch)?;
 	git_stage_paths(root, tracked_paths)?;
 	git_commit_paths(root, &request.commit_message)?;
-	git_push_branch(root, &request.head_branch)?;
+	let head_commit = git_head_commit(root)?;
+	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
+	let head_matches_existing = existing
+		.as_ref()
+		.and_then(|pull_request| pull_request.head.sha.as_deref())
+		== Some(head_commit.as_str());
+	if !head_matches_existing {
+		git_push_branch(root, &request.head_branch)?;
+	}
 
 	let client = gitea_client()?;
 	let token = gitea_token()?;
 	let api_base = gitea_api_base(source)?;
-	publish_pull_request(&client, &token, &api_base, request)
+	publish_pull_request_with_existing(
+		&client,
+		&token,
+		&api_base,
+		request,
+		existing.as_ref(),
+		&head_commit,
+	)
 }
 
 fn publish_release_request(
@@ -374,38 +427,59 @@ fn publish_release_request(
 	})
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn publish_pull_request(
 	client: &Client,
 	token: &str,
 	api_base: &str,
 	request: &SourceChangeRequest,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
-	let list_url = format!(
-		"{api_base}/repos/{}/{}/pulls?state=open&head={}:{}&base={}",
-		request.owner,
-		request.repo,
-		encode(&request.owner),
-		encode(&request.head_branch),
-		encode(&request.base_branch),
-	);
-	let existing = get_json::<Vec<GiteaPullRequestResponse>>(client, token, &list_url)?
-		.into_iter()
-		.next();
+	let existing = lookup_existing_pull_request(client, token, api_base, request)?;
+	publish_pull_request_with_existing(client, token, api_base, request, existing.as_ref(), "")
+}
+
+fn publish_pull_request_with_existing(
+	client: &Client,
+	token: &str,
+	api_base: &str,
+	request: &SourceChangeRequest,
+	existing: Option<&GiteaExistingPullRequest>,
+	head_commit: &str,
+) -> MonochangeResult<SourceChangeRequestOutcome> {
+	let labels_match = existing.is_some_and(|pull_request| {
+		request.labels.iter().all(|label| {
+			pull_request
+				.labels
+				.iter()
+				.any(|existing_label| existing_label.name == *label)
+		})
+	});
+	let content_matches = existing.is_some_and(|pull_request| {
+		pull_request.title == request.title
+			&& pull_request.body.as_deref().unwrap_or_default() == request.body
+			&& pull_request.base.ref_name == request.base_branch
+	});
+	let head_matches_existing =
+		existing.and_then(|pull_request| pull_request.head.sha.as_deref()) == Some(head_commit);
 	let response: GiteaPullRequestResponse = if let Some(existing_pr) = &existing {
-		let update_url = format!(
-			"{api_base}/repos/{}/{}/pulls/{}",
-			request.owner, request.repo, existing_pr.number
-		);
-		patch_json(
-			client,
-			token,
-			&update_url,
-			&GiteaPullRequestUpdatePayload {
+		if content_matches {
+			GiteaPullRequestResponse {
+				number: existing_pr.number,
+				html_url: existing_pr.html_url.clone(),
+			}
+		} else {
+			let update_url = format!(
+				"{api_base}/repos/{}/{}/pulls/{}",
+				request.owner, request.repo, existing_pr.number
+			);
+			let update_payload = GiteaPullRequestUpdatePayload {
 				title: &request.title,
 				body: &request.body,
 				base: &request.base_branch,
-			},
-		)?
+			};
+
+			patch_json(client, token, &update_url, &update_payload)?
+		}
 	} else {
 		let create_url = format!("{api_base}/repos/{}/{}/pulls", request.owner, request.repo);
 		post_json(
@@ -420,7 +494,7 @@ fn publish_pull_request(
 			},
 		)?
 	};
-	if !request.labels.is_empty() {
+	if !request.labels.is_empty() && !labels_match {
 		let labels_url = format!(
 			"{api_base}/repos/{}/{}/issues/{}/labels",
 			request.owner, request.repo, response.number
@@ -439,13 +513,44 @@ fn publish_pull_request(
 		repository: request.repository.clone(),
 		number: response.number,
 		head_branch: request.head_branch.clone(),
-		operation: if existing.is_some() {
-			SourceChangeRequestOperation::Updated
-		} else {
+		operation: if existing.is_none() {
 			SourceChangeRequestOperation::Created
+		} else if content_matches && labels_match && head_matches_existing {
+			SourceChangeRequestOperation::Skipped
+		} else {
+			SourceChangeRequestOperation::Updated
 		},
 		url: response.html_url,
 	})
+}
+
+fn lookup_existing_pull_request(
+	client: &Client,
+	token: &str,
+	api_base: &str,
+	request: &SourceChangeRequest,
+) -> MonochangeResult<Option<GiteaExistingPullRequest>> {
+	let list_url = format!(
+		"{api_base}/repos/{}/{}/pulls?state=open&head={}:{}&base={}",
+		request.owner,
+		request.repo,
+		encode(&request.owner),
+		encode(&request.head_branch),
+		encode(&request.base_branch),
+	);
+	Ok(
+		get_json::<Vec<GiteaExistingPullRequest>>(client, token, &list_url)?
+			.into_iter()
+			.next(),
+	)
+}
+
+fn join_existing_pull_request_lookup(
+	handle: thread::JoinHandle<MonochangeResult<Option<GiteaExistingPullRequest>>>,
+) -> MonochangeResult<Option<GiteaExistingPullRequest>> {
+	handle.join().map_err(|_| {
+		MonochangeError::Config("failed to join Gitea pull request lookup thread".to_string())
+	})?
 }
 
 fn gitea_client() -> MonochangeResult<Client> {

@@ -8194,6 +8194,12 @@ fn format_publish_state_and_source_operation_labels_are_stable() {
 		),
 		"updated"
 	);
+	assert_eq!(
+		crate::format_change_request_operation(
+			&monochange_core::SourceChangeRequestOperation::Skipped
+		),
+		"skipped"
+	);
 }
 
 #[test]
