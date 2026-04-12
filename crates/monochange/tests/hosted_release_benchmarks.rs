@@ -17,13 +17,14 @@ fn repo_root() -> std::path::PathBuf {
 }
 
 fn write_executable(path: &Path, contents: &str) {
-	fs::write(path, contents).unwrap_or_else(|error| panic!("write {path:?}: {error}"));
+	let display = path.display();
+	fs::write(path, contents).unwrap_or_else(|error| panic!("write {display}: {error}"));
 	let mut permissions = fs::metadata(path)
-		.unwrap_or_else(|error| panic!("metadata {path:?}: {error}"))
+		.unwrap_or_else(|error| panic!("metadata {display}: {error}"))
 		.permissions();
 	permissions.set_mode(0o755);
 	fs::set_permissions(path, permissions)
-		.unwrap_or_else(|error| panic!("chmod {path:?}: {error}"));
+		.unwrap_or_else(|error| panic!("chmod {display}: {error}"));
 }
 
 fn git_stdout(root: &Path, args: &[&str]) -> String {
