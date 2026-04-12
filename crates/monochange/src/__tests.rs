@@ -9184,6 +9184,39 @@ fn parse_remote_url_returns_none_for_invalid_url() {
 }
 
 #[test]
+fn parse_remote_url_rejects_nested_repository_paths() {
+	assert!(
+		crate::workspace_ops::parse_remote_url("https://github.com/owner/repo/nested.git")
+			.is_none()
+	);
+}
+
+#[test]
+fn detect_remote_owner_repo_reads_origin_remote_from_a_live_git_repo() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["init", "-b", "main"])
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args([
+			"remote",
+			"add",
+			"origin",
+			"git@github.com:ifiokjr/monochange.git",
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("git remote add: {error}"));
+
+	let remote = crate::workspace_ops::detect_remote_owner_repo(tempdir.path())
+		.unwrap_or_else(|| panic!("expected remote info"));
+	assert_eq!(remote.owner, "ifiokjr");
+	assert_eq!(remote.repo, "monochange");
+}
+
+#[test]
 fn init_with_provider_writes_source_section_and_commit_release_command() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/init-scan", tempdir.path());
@@ -9289,6 +9322,35 @@ fn init_with_github_provider_creates_workflow_files() {
 }
 
 #[test]
+fn init_with_quiet_still_writes_provider_configuration_without_stdout() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("init"),
+			OsString::from("--provider"),
+			OsString::from("github"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+
+	assert!(output.is_empty(), "expected quiet init output to be empty");
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+	assert!(config.contains("provider = \"github\""));
+	assert!(
+		tempdir
+			.path()
+			.join(".github/workflows/release.yml")
+			.exists()
+	);
+}
+
+#[test]
 fn init_without_provider_does_not_create_workflow_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/init-scan", tempdir.path());
@@ -9331,6 +9393,53 @@ fn init_without_provider_comments_out_source_section() {
 		!config.contains("[cli.commit-release]"),
 		"expected no commit-release command without --provider"
 	);
+}
+
+#[test]
+fn init_with_github_provider_reports_workflow_directory_creation_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+	copy_fixture("monochange/init-github-workflow-dir-file", tempdir.path());
+
+	let error = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("init"),
+			OsString::from("--provider"),
+			OsString::from("github"),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected init failure"));
+
+	assert!(error.to_string().contains("failed to create"));
+	assert!(error.to_string().contains(".github/workflows"));
+}
+
+#[test]
+fn init_with_github_provider_reports_workflow_write_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/init-scan", tempdir.path());
+	copy_fixture(
+		"monochange/init-github-workflow-write-failure",
+		tempdir.path(),
+	);
+
+	let error = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("init"),
+			OsString::from("--provider"),
+			OsString::from("github"),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected init failure"));
+
+	assert!(error.to_string().contains("failed to write"));
+	assert!(error.to_string().contains("changeset-policy.yml"));
 }
 
 #[test]
