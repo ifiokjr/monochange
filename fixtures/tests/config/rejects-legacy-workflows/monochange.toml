@@ -1,5 +1,5 @@
 [[workflows]]
-name = "release"
+name = "legacy"
 
 [[workflows.steps]]
-type = "PrepareRelease"
+type = "Validate"

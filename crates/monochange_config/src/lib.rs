@@ -104,7 +104,6 @@ use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
 use monochange_core::ExtraChangelogSection;
-use monochange_core::GitHubConfiguration;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::GroupDefinition;
 use monochange_core::LockfileCommandDefinition;
@@ -158,6 +157,7 @@ const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 ];
 
 #[derive(Debug, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	defaults: RawWorkspaceDefaults,
@@ -170,13 +170,9 @@ struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	cli: BTreeMap<String, RawCliCommandDefinition>,
 	#[serde(default)]
-	workflows: Vec<CliCommandDefinition>,
-	#[serde(default)]
 	changesets: ChangesetSettings,
 	#[serde(default)]
 	source: Option<RawSourceConfiguration>,
-	#[serde(default)]
-	github: Option<RawGitHubConfiguration>,
 	#[serde(default)]
 	ecosystems: RawEcosystems,
 }
@@ -370,18 +366,6 @@ struct RawSourceConfiguration {
 	host: Option<String>,
 	#[serde(default)]
 	api_url: Option<String>,
-	#[serde(default)]
-	releases: ProviderReleaseSettings,
-	#[serde(default)]
-	pull_requests: ProviderMergeRequestSettings,
-	#[serde(default)]
-	bot: ProviderBotSettings,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawGitHubConfiguration {
-	owner: String,
-	repo: String,
 	#[serde(default)]
 	releases: ProviderReleaseSettings,
 	#[serde(default)]
@@ -931,14 +915,8 @@ fn build_group_definitions(
 
 fn resolve_source_configuration(
 	source: Option<RawSourceConfiguration>,
-	github: Option<&GitHubConfiguration>,
-) -> MonochangeResult<Option<SourceConfiguration>> {
-	if source.is_some() && github.is_some() {
-		return Err(MonochangeError::Config(
-			"configure either `[source]` or legacy `[github]`, but not both".to_string(),
-		));
-	}
-	let source = source.map(|source| {
+) -> Option<SourceConfiguration> {
+	source.map(|source| {
 		SourceConfiguration {
 			provider: source.provider,
 			owner: source.owner,
@@ -949,35 +927,7 @@ fn resolve_source_configuration(
 			pull_requests: source.pull_requests,
 			bot: source.bot,
 		}
-	});
-	let legacy_github = if let Some(source) = &source {
-		(source.provider == SourceProvider::GitHub).then(|| {
-			GitHubConfiguration {
-				owner: source.owner.clone(),
-				repo: source.repo.clone(),
-				releases: source.releases.clone(),
-				pull_requests: source.pull_requests.clone(),
-				bot: source.bot.clone(),
-			}
-		})
-	} else {
-		github.cloned()
-	};
-	let source = source.or_else(|| {
-		legacy_github.as_ref().map(|github| {
-			SourceConfiguration {
-				provider: SourceProvider::GitHub,
-				owner: github.owner.clone(),
-				repo: github.repo.clone(),
-				host: None,
-				api_url: None,
-				releases: github.releases.clone(),
-				pull_requests: github.pull_requests.clone(),
-				bot: github.bot.clone(),
-			}
-		})
-	});
-	Ok(source)
+	})
 }
 
 #[must_use = "the configuration result must be checked"]
@@ -991,17 +941,10 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		package,
 		group,
 		cli,
-		workflows,
 		changesets,
 		source,
-		github,
 		ecosystems,
 	} = raw;
-	if !workflows.is_empty() {
-		return Err(MonochangeError::Config(
-			"legacy `[[workflows]]` configuration is no longer supported; use `[cli.<command>]` with `[[cli.<command>.steps]]` instead".to_string(),
-		));
-	}
 	let cli = merge_cli_commands(cli);
 	let default_package_type = defaults.package_type;
 	let default_package_changelog = defaults.changelog.clone();
@@ -1041,16 +984,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		&default_extra_changelog_sections,
 		default_changelog_format,
 	)?;
-	let resolved_github = github.map(|raw| {
-		GitHubConfiguration {
-			owner: raw.owner,
-			repo: raw.repo,
-			releases: raw.releases,
-			pull_requests: raw.pull_requests,
-			bot: raw.bot,
-		}
-	});
-	let source = resolve_source_configuration(source, resolved_github.as_ref())?;
+	let source = resolve_source_configuration(source);
 
 	validate_cli(&cli)?;
 	validate_release_notes_configuration(
@@ -1061,7 +995,6 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		&groups,
 	)?;
 	validate_changesets_configuration(&changesets, &packages)?;
-	validate_github_configuration(resolved_github.as_ref())?;
 	validate_source_configuration(source.as_ref())?;
 	for (ecosystem_id, ecosystem_settings) in [
 		("cargo", &cargo_ecosystem),
@@ -2784,46 +2717,46 @@ fn change_template_variables(template: &str) -> Vec<String> {
 	variables.into_iter().collect()
 }
 
-fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> MonochangeResult<()> {
-	let Some(github) = github else {
+fn validate_source_configuration(source: Option<&SourceConfiguration>) -> MonochangeResult<()> {
+	let Some(source) = source else {
 		return Ok(());
 	};
-	if github.owner.trim().is_empty() {
+	if source.owner.trim().is_empty() {
 		return Err(MonochangeError::Config(
-			"[github].owner must not be empty".to_string(),
+			"[source].owner must not be empty".to_string(),
 		));
 	}
-	if github.repo.trim().is_empty() {
+	if source.repo.trim().is_empty() {
 		return Err(MonochangeError::Config(
-			"[github].repo must not be empty".to_string(),
+			"[source].repo must not be empty".to_string(),
 		));
 	}
-	if github.pull_requests.branch_prefix.trim().is_empty() {
+	if source.pull_requests.branch_prefix.trim().is_empty() {
 		return Err(MonochangeError::Config(
-			"[github.pull_requests].branch_prefix must not be empty".to_string(),
+			"[source.pull_requests].branch_prefix must not be empty".to_string(),
 		));
 	}
-	if github.pull_requests.base.trim().is_empty() {
+	if source.pull_requests.base.trim().is_empty() {
 		return Err(MonochangeError::Config(
-			"[github.pull_requests].base must not be empty".to_string(),
+			"[source.pull_requests].base must not be empty".to_string(),
 		));
 	}
-	if github.pull_requests.title.trim().is_empty() {
+	if source.pull_requests.title.trim().is_empty() {
 		return Err(MonochangeError::Config(
-			"[github.pull_requests].title must not be empty".to_string(),
+			"[source.pull_requests].title must not be empty".to_string(),
 		));
 	}
-	if github
+	if source
 		.pull_requests
 		.labels
 		.iter()
 		.any(|label| label.trim().is_empty())
 	{
 		return Err(MonochangeError::Config(
-			"[github.pull_requests].labels must not include empty values".to_string(),
+			"[source.pull_requests].labels must not include empty values".to_string(),
 		));
 	}
-	if github
+	if source
 		.bot
 		.changesets
 		.skip_labels
@@ -2831,17 +2764,17 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 		.any(|label| label.trim().is_empty())
 	{
 		return Err(MonochangeError::Config(
-			"[github.bot.changesets].skip_labels must not include empty values".to_string(),
+			"[source.bot.changesets].skip_labels must not include empty values".to_string(),
 		));
 	}
 	for (field, patterns) in [
 		(
-			"[github.bot.changesets].changed_paths",
-			&github.bot.changesets.changed_paths,
+			"[source.bot.changesets].changed_paths",
+			&source.bot.changesets.changed_paths,
 		),
 		(
-			"[github.bot.changesets].ignored_paths",
-			&github.bot.changesets.ignored_paths,
+			"[source.bot.changesets].ignored_paths",
+			&source.bot.changesets.ignored_paths,
 		),
 	] {
 		for pattern in patterns {
@@ -2856,33 +2789,6 @@ fn validate_github_configuration(github: Option<&GitHubConfiguration>) -> Monoch
 				))
 			})?;
 		}
-	}
-	let source = SourceConfiguration {
-		provider: SourceProvider::GitHub,
-		owner: github.owner.clone(),
-		repo: github.repo.clone(),
-		host: None,
-		api_url: None,
-		releases: github.releases.clone(),
-		pull_requests: github.pull_requests.clone(),
-		bot: github.bot.clone(),
-	};
-	monochange_github::validate_source_configuration(&source)
-}
-
-fn validate_source_configuration(source: Option<&SourceConfiguration>) -> MonochangeResult<()> {
-	let Some(source) = source else {
-		return Ok(());
-	};
-	if source.owner.trim().is_empty() {
-		return Err(MonochangeError::Config(
-			"[source].owner must not be empty".to_string(),
-		));
-	}
-	if source.repo.trim().is_empty() {
-		return Err(MonochangeError::Config(
-			"[source].repo must not be empty".to_string(),
-		));
 	}
 	if let Some(api_url) = &source.api_url {
 		validate_api_url_host(api_url, source.provider)?;

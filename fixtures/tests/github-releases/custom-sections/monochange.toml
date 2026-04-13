@@ -12,11 +12,12 @@ tag = true
 release = true
 extra_changelog_sections = [{ name = "Security", types = ["security"], default_bump = "patch" }]
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 source = "monochange"
 
 [ecosystems.cargo]

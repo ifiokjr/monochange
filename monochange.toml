@@ -292,8 +292,7 @@ changelog = { path = "changelog.md", format = "monochange", include = ["monochan
 # Controls the `AffectedPackages` CLI step which checks whether pull requests
 # include changeset files that cover all changed packages.
 #
-# This is the config-driven replacement for the legacy [github.bot.changesets]
-# section and works independently of any source provider.
+# This section works independently of any source provider.
 
 [changesets.verify]
 # Whether changeset verification is enabled. When false, the AffectedPackages
@@ -360,8 +359,7 @@ enabled = true
 # Configures the repository host for release automation: creating releases,
 # opening release pull requests, and evaluating changeset policy.
 #
-# The [source] section is the provider-agnostic replacement for the legacy
-# [github] section. It supports GitHub, GitLab, and Gitea.
+# The [source] section configures GitHub, GitLab, or Gitea automation.
 #
 # Required fields:
 #   provider — "github", "gitlab", or "gitea"
@@ -461,7 +459,6 @@ ignored_paths = [
 # =============================================================================
 #
 # Each [cli.<name>] table becomes a top-level `mc <name>` command.
-# Legacy [[workflows]] tables are no longer supported.
 #
 # Reserved names that cannot be used: "init", "help", "version"
 #
@@ -485,7 +482,7 @@ ignored_paths = [
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
-#   VerifyChangesets     — evaluate changeset policy from CI-supplied paths/labels
+#   AffectedPackages     — evaluate changeset policy from CI-supplied paths/labels
 #   Command              — run an arbitrary shell command
 #
 # Common step fields:
@@ -502,8 +499,7 @@ ignored_paths = [
 #   variables       — map of placeholder → variable for interpolation
 #
 # Command variables: Version, GroupVersion, ReleasedPackages, ChangedFiles, Changesets
-# Command templates can also use {{ inputs.name }} for CLI inputs; bare input names
-# remain available for backward compatibility.
+# Command templates can also use {{ inputs.name }} for CLI inputs.
 # {{ version }}, {{ group_version }}, {{ released_packages }}, {{changed_files}}, {{ changesets }}
 
 [cli.release]

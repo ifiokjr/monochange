@@ -61,7 +61,9 @@ fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
 {
-	run_with_args_in_dir("mc", args, root)
+	temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", None::<&str>, || {
+		run_with_args_in_dir("mc", args, root)
+	})
 }
 
 #[test]
@@ -2336,9 +2338,7 @@ fn configuration_guide_calls_out_current_implementation_limits() {
 
 	for expected in [
 		"`defaults.include_private`",
-		"`version_groups.strategy`",
 		"`[ecosystems.*].enabled/roots/exclude`",
-		"`package_overrides.changelog`",
 		"`PrepareRelease`",
 		"`RetargetRelease`",
 		"`Command`",
@@ -2413,7 +2413,6 @@ fn release_planning_guide_describes_release_cli_command_requirements() {
 
 	for expected in [
 		"`mc release` is part of monochange's built-in default command set.",
-		"`[[package_overrides]]`",
 		"`.changeset/*.md`",
 		"`--dry-run`",
 	] {
@@ -3728,6 +3727,17 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 			.get("custom_changesets")
 			.and_then(serde_json::Value::as_str),
 		Some("")
+	);
+	assert_eq!(
+		template_context
+			.get("inputs")
+			.and_then(|value| value.pointer("/format"))
+			.and_then(serde_json::Value::as_str),
+		Some("json")
+	);
+	assert!(
+		template_context.get("format").is_none(),
+		"CLI inputs should only be available under the inputs namespace"
 	);
 	assert_eq!(
 		template_context

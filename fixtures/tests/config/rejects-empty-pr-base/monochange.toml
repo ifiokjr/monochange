@@ -4,9 +4,10 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 base = ""

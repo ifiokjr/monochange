@@ -473,9 +473,22 @@ auto_merge = false
 # labels = ["release", "automated"]
 # auto_merge = false
 
-# [source.bot.changesets] — legacy changeset bot settings (source-provider-aware)
+# [source.bot.changesets] — changeset policy for provider-aware automation
+#
+# These settings feed the AffectedPackages step when it needs to know which
+# paths matter for a pull request on the configured source provider.
 #
 # For skip_labels, prefer [changesets.verify].skip_labels instead.
+#
+# Fields:
+#   enabled            — enable provider-aware changeset policy (default: false)
+#   required           — treat missing changesets as errors (default: true)
+#   skip_labels        — PR labels that skip enforcement (default: [])
+#   comment_on_failure — render a failure comment for CI (default: true)
+#   changed_paths      — glob patterns for paths that require changeset coverage;
+#                        only files matching at least one pattern trigger verification
+#   ignored_paths      — glob patterns for paths to exclude from verification even
+#                        when they match changed_paths
 #
 # [source.bot.changesets]
 # enabled = false
@@ -490,11 +503,10 @@ auto_merge = false
 # [changesets.verify] — changeset verification settings
 # =============================================================================
 #
-# Controls the `VerifyChangesets` CLI step which checks whether pull requests
+# Controls the `AffectedPackages` CLI step which checks whether pull requests
 # include changeset files that cover all changed packages.
 #
-# This is the config-driven replacement for the legacy [source.bot.changesets]
-# section and works independently of any source provider.
+# This section works independently of any source provider.
 
 [changesets.verify]
 # Whether changeset verification is enabled. When false, the AffectedPackages
@@ -523,7 +535,6 @@ comment_on_failure = true
 # =============================================================================
 #
 # Each [cli.<name>] table becomes a top-level `mc <name>` command.
-# Legacy [[workflows]] tables are no longer supported.
 #
 # monochange starts from its built-in default command set. If you redefine a
 # built-in command like [cli.release], your definition fully replaces the
@@ -609,7 +620,6 @@ comment_on_failure = true
 {% raw -%}
 # CLI inputs are available as {{ inputs.name }} in command templates.
 {% endraw -%}
-# For backward compatibility they are also injected by bare name.
 
 [cli.validate]
 help_text = "Validate monochange configuration and changesets"

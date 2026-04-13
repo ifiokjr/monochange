@@ -264,7 +264,7 @@ lockfile_commands = [
 
 ## CLI commands
 
-CLI commands are user-defined top-level commands. monochange starts from its built-in default command set, then applies each `[cli.<command>]` entry as a full command override when the name matches or as an additional command when it does not. Each resulting command becomes invocable as `mc <command>`, and legacy `[[workflows]]` tables are no longer supported.
+CLI commands are user-defined top-level commands. monochange starts from its built-in default command set, then applies each `[cli.<command>]` entry as a full command override when the name matches or as an additional command when it does not. Each resulting command becomes invocable as `mc <command>`.
 
 If you want editable copies of the built-in commands in your config file, run `mc populate`. It appends only the missing default command definitions to `monochange.toml` and leaves existing `[cli.<command>]` entries unchanged.
 
@@ -391,7 +391,7 @@ CLI command interpolation variables:
 <!-- {=configurationWorkflowVariables} -->
 
 - built-in command variables are available directly as `{{ version }}`, `{{ group_version }}`, `{{ released_packages }}`, `{{ changed_files }}`, and `{{ changesets }}`
-- command templates can read CLI inputs through `{{ inputs.name }}`; bare input names still work for backward compatibility
+- command templates can read CLI inputs through `{{ inputs.name }}`
 - every step can override the inputs it receives with `inputs = { ... }`; direct references like `"{{ inputs.labels }}"` preserve list and boolean values when rebinding to built-in steps
 - built-in commands already attach descriptive step `name` labels such as `prepare release` and `publish release`; keep or replace those labels when you want progress output to stay readable
 - custom command variables become available when `variables` is present: map your own names to variables such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
@@ -493,19 +493,11 @@ lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
 
 <!-- {/configurationEcosystemSettingsSnippet} -->
 
-## Package overrides migration note
+## Changelog configuration
 
 <!-- {=configurationPackageOverridesSnippet} -->
 
-Legacy repositories may still contain `[[package_overrides]]` entries such as:
-
-```toml
-[[package_overrides]]
-package = "crates/sdk_core"
-changelog = "crates/sdk_core/changelog.md"
-```
-
-Under the new model, move that changelog configuration onto the matching `[package.<id>]` declaration instead. When `[defaults].package_type` is set, package entries may also omit an explicit `type`.
+When `[defaults].package_type` is set, package entries may omit an explicit `type`.
 
 monochange currently supports two changelog formats:
 
@@ -554,7 +546,7 @@ Package references in changesets and CLI commands should use configured ids.
 
 Prefer package ids when a leaf package changed. That keeps the authored change as specific as possible, and monochange will still propagate bumps to dependents and synchronize any configured groups automatically.
 
-Use a group id only when the change is intentionally owned by the whole group and should read that way in release output. Legacy manifest-relative paths and directory paths may still appear in older repos during migration, but `mc validate` should guide you toward declared ids.
+Use a group id only when the change is intentionally owned by the whole group and should read that way in release output.
 
 <!-- {/configurationPackageReferenceRules} -->
 
@@ -565,10 +557,7 @@ Use a group id only when the change is intentionally owned by the whole group an
 Current implementation notes:
 
 - `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven CLI commands in this milestone
-- `version_groups.strategy` belongs to the legacy model and should be migrated to `[group.<id>]`
-- legacy `[[workflows]]` configuration is no longer supported; use `[cli.<command>]` plus `[[cli.<command>.steps]]` instead
 - `[ecosystems.*].enabled/roots/exclude` are parsed, but discovery still scans all supported ecosystems regardless of those settings today
-- `package_overrides.changelog` is a legacy setting that should be migrated to package declarations
 - `defaults.strict_version_conflicts` controls whether conflicting explicit `version` entries across changesets warn-and-pick-highest (default) or fail planning outright
 - source automation expects `[source]` with provider-specific settings under `[source.releases]`, `[source.pull_requests]`, and `[source.bot.changesets]`; GitHub remains the default provider
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs

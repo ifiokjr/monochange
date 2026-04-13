@@ -22,4 +22,4 @@ Before merging architecture-sensitive work, check:
 
 - Introduce new capabilities in core first.
 - Implement those capabilities in the relevant adapter crate.
-- Keep legacy compatibility at the parse/normalization edge rather than in the shared domain model.
+- Reject unsupported configuration shapes at the parse boundary rather than leaking compatibility concerns into the shared domain model.

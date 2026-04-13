@@ -454,14 +454,14 @@ fn load_workspace_configuration_rejects_missing_expected_manifests() {
 }
 
 #[test]
-fn load_workspace_configuration_rejects_empty_github_owner_and_repo() {
+fn load_workspace_configuration_rejects_empty_source_owner_and_repo() {
 	let root_owner = fixture_path("config/rejects-empty-github-owner");
 	assert!(
 		load_workspace_configuration(&root_owner)
 			.err()
 			.unwrap_or_else(|| panic!("expected config error"))
 			.to_string()
-			.contains("[github].owner must not be empty")
+			.contains("[source].owner must not be empty")
 	);
 
 	let root_repo = fixture_path("config/rejects-empty-github-repo");
@@ -470,7 +470,7 @@ fn load_workspace_configuration_rejects_empty_github_owner_and_repo() {
 			.err()
 			.unwrap_or_else(|| panic!("expected config error"))
 			.to_string()
-			.contains("[github].repo must not be empty")
+			.contains("[source].repo must not be empty")
 	);
 }
 
@@ -482,7 +482,7 @@ fn load_workspace_configuration_rejects_invalid_pull_request_settings() {
 			.err()
 			.unwrap_or_else(|| panic!("expected config error"))
 			.to_string()
-			.contains("[github.pull_requests].branch_prefix must not be empty")
+			.contains("[source.pull_requests].branch_prefix must not be empty")
 	);
 }
 
@@ -494,7 +494,7 @@ fn load_workspace_configuration_rejects_empty_pull_request_base_and_title() {
 			.err()
 			.unwrap_or_else(|| panic!("expected config error"))
 			.to_string()
-			.contains("[github.pull_requests].base must not be empty")
+			.contains("[source.pull_requests].base must not be empty")
 	);
 
 	let root_title = fixture_path("config/rejects-empty-pr-title");
@@ -503,7 +503,7 @@ fn load_workspace_configuration_rejects_empty_pull_request_base_and_title() {
 			.err()
 			.unwrap_or_else(|| panic!("expected config error"))
 			.to_string()
-			.contains("[github.pull_requests].title must not be empty")
+			.contains("[source.pull_requests].title must not be empty")
 	);
 }
 
@@ -527,7 +527,7 @@ fn load_workspace_configuration_rejects_empty_pull_request_labels() {
 			.err()
 			.unwrap_or_else(|| panic!("expected config error"))
 			.to_string()
-			.contains("labels must not include empty values")
+			.contains("[source.pull_requests].labels must not include empty values")
 	);
 }
 
@@ -754,21 +754,6 @@ fn load_workspace_configuration_rejects_group_changelog_tables_without_paths() {
 	let rendered = error.render();
 	assert!(rendered.contains("group `sdk` changelog must declare a `path`"));
 	assert!(rendered.contains("group changelog missing path"));
-}
-
-#[test]
-fn migration_guide_new_style_example_loads_successfully() {
-	let root = fixture_path("config/migration-guide-example");
-	let configuration = load_workspace_configuration(&root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert_eq!(configuration.packages.len(), 2);
-	assert_eq!(configuration.groups.len(), 1);
-	let group = configuration
-		.groups
-		.first()
-		.unwrap_or_else(|| panic!("expected migration group"));
-	assert_eq!(group.id, "main");
-	assert_eq!(group.packages, vec!["monochange", "monochange_core"]);
 }
 
 #[test]
@@ -1863,7 +1848,7 @@ fn validate_workspace_accepts_changesets_that_mix_group_and_member_references() 
 }
 
 #[test]
-fn load_workspace_configuration_rejects_publish_github_release_without_github_config() {
+fn load_workspace_configuration_rejects_publish_release_without_source_config() {
 	let root = fixture_path("config/rejects-publish-no-github");
 	let error = load_workspace_configuration(&root)
 		.err()
@@ -1876,7 +1861,7 @@ fn load_workspace_configuration_rejects_publish_github_release_without_github_co
 }
 
 #[test]
-fn load_workspace_configuration_rejects_open_release_pull_request_without_github_config() {
+fn load_workspace_configuration_rejects_open_release_pull_request_without_source_config() {
 	let root = fixture_path("config/rejects-pr-no-github");
 	let error = load_workspace_configuration(&root)
 		.err()
@@ -2258,17 +2243,13 @@ fn load_workspace_configuration_rejects_duplicate_cli_command_tables() {
 }
 
 #[test]
-fn load_workspace_configuration_rejects_legacy_workflows_namespace() {
+fn load_workspace_configuration_rejects_unsupported_workflows_namespace() {
 	let root = fixture_path("config/rejects-legacy-workflows");
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected configuration error"));
 
-	assert!(
-		error
-			.to_string()
-			.contains("legacy `[[workflows]]` configuration is no longer supported")
-	);
+	assert!(error.to_string().contains("unknown field `workflows`"));
 }
 
 #[test]
@@ -2403,16 +2384,12 @@ fn source_diagnostic_helpers_cover_empty_labels_sorting_and_fallback_spans() {
 }
 
 #[test]
-fn load_workspace_configuration_rejects_both_source_and_legacy_github_config() {
+fn load_workspace_configuration_rejects_unsupported_github_namespace() {
 	let root = fixture_path("config/rejects-source-and-github");
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"));
-	assert!(
-		error
-			.to_string()
-			.contains("configure either `[source]` or legacy `[github]`")
-	);
+	assert!(error.to_string().contains("unknown field `github`"));
 }
 
 #[test]
@@ -2811,10 +2788,38 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 			.to_string()
 			.contains("[changesets.verify].skip_labels must not include empty values")
 	);
+
+	let source_skip_label_error =
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: monochange_core::SourceProvider::GitHub,
+			host: None,
+			api_url: None,
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			releases: monochange_core::ProviderReleaseSettings::default(),
+			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+			bot: monochange_core::ProviderBotSettings {
+				changesets: monochange_core::ProviderChangesetBotSettings {
+					enabled: true,
+					required: true,
+					skip_labels: vec![String::new()],
+					comment_on_failure: true,
+					changed_paths: Vec::new(),
+					ignored_paths: Vec::new(),
+				},
+			},
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected source skip label validation error"));
+	assert!(
+		source_skip_label_error
+			.to_string()
+			.contains("[source.bot.changesets].skip_labels must not include empty values")
+	);
 }
 
 #[test]
-fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
+fn validate_package_and_source_settings_cover_duplicate_and_pattern_errors() {
 	let root = fixture_path("config/validation-helper-branches");
 
 	let duplicate_path_error = crate::validate_package_and_group_definitions(
@@ -2852,10 +2857,13 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 			.contains("`version_format = \"primary\"` is already used by `core`")
 	);
 
-	let github_error =
-		crate::validate_github_configuration(Some(&monochange_core::GitHubConfiguration {
+	let source_error =
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: monochange_core::SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),
 			repo: "monochange".to_string(),
+			host: None,
+			api_url: None,
 			releases: monochange_core::ProviderReleaseSettings::default(),
 			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
 			bot: monochange_core::ProviderBotSettings {
@@ -2870,11 +2878,11 @@ fn validate_package_and_github_settings_cover_duplicate_and_pattern_errors() {
 			},
 		}))
 		.err()
-		.unwrap_or_else(|| panic!("expected invalid github glob error"));
+		.unwrap_or_else(|| panic!("expected invalid source glob error"));
 	assert!(
-		github_error
+		source_error
 			.to_string()
-			.contains("[github.bot.changesets].changed_paths contains invalid glob pattern")
+			.contains("[source.bot.changesets].changed_paths contains invalid glob pattern")
 	);
 
 	let package_pattern_error = crate::validate_changesets_configuration(

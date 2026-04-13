@@ -4,18 +4,19 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 enabled = true
 draft = true
 prerelease = true
 source = "github_generated"
 generate_notes = true
 
-[github.pull_requests]
+[source.pull_requests]
 enabled = true
 branch_prefix = "automation/release"
 base = "develop"
