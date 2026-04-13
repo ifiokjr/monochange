@@ -155,7 +155,6 @@ import pty
 import select
 import subprocess
 import sys
-import time
 
 workspace = os.environ['MC_WORKSPACE']
 command_name = os.environ['MC_COMMAND']
@@ -173,31 +172,31 @@ proc = subprocess.Popen(
 )
 os.close(slave)
 transcript = bytearray()
-while True:
-    ready, _, _ = select.select([master], [], [], 0.05)
-    if master in ready:
-        try:
-            data = os.read(master, 4096)
-        except OSError:
-            break
-        if not data:
-            break
-        transcript.extend(data)
-    if proc.poll() is not None and not ready:
-        break
-proc.wait(timeout=10)
-time.sleep(0.1)
-while True:
-    ready, _, _ = select.select([master], [], [], 0.01)
+
+def drain(timeout=0.01):
+    ready, _, _ = select.select([master], [], [], timeout)
     if master not in ready:
-        break
+        return False
     try:
         data = os.read(master, 4096)
     except OSError:
-        break
+        return False
     if not data:
-        break
+        return False
     transcript.extend(data)
+    return True
+
+while True:
+    saw_output = drain(0.01)
+    if proc.poll() is not None and not saw_output:
+        break
+proc.wait(timeout=10)
+idle_polls = 0
+while idle_polls < 5:
+    if drain(0.05):
+        idle_polls = 0
+    else:
+        idle_polls += 1
 os.close(master)
 sys.stdout.buffer.write(transcript)
 sys.stderr.write(f'__MC_EXIT_STATUS__={proc.returncode}\n')
@@ -348,7 +347,7 @@ fn release_progress_streams_named_steps_on_tty() {
 		r#"
 steps = [
 	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "Command", name = "stream summary", shell = true, command = "printf 'streamed line 1\n'; sleep 0.1; printf 'streamed line 2\n'" },
+	{ type = "Command", name = "stream summary", shell = true, command = "printf 'streamed line 1\n'; sleep 0.01; printf 'streamed line 2\n'" },
 ]
 	"#,
 	);
