@@ -33,7 +33,8 @@ monochange is a cross-ecosystem release planner for monorepos that span more tha
 3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
 4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
 5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
-6. **Publish** — `mc publish-release --format json` creates provider releases after human review.
+6. **Inspect cached manifest** — `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload.
+7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
 
 <!-- {/recommendedCommandFlow} -->
 
