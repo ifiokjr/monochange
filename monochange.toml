@@ -203,6 +203,12 @@ path = "crates/monochange_gitea"
 [package.monochange_hosting]
 path = "crates/monochange_hosting"
 
+[package.monochange_test_helpers]
+path = "crates/monochange_test_helpers"
+tag = false
+release = false
+changelog = false
+
 [package."@monochange/skill"]
 path = "npm/skill"
 type = "npm"

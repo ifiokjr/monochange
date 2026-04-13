@@ -25,7 +25,7 @@ urlencoding = { workspace = true, default-features = true }
 etest = { workspace = true, default-features = true }
 httpmock = { workspace = true, default-features = true }
 insta = { workspace = true, default-features = true }
-monochange_test_helpers = { version = "0.0.0", path = "../../testing/monochange_test_helpers" }
+monochange_test_helpers = { workspace = true }
 temp-env = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 

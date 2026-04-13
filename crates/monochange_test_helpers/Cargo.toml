@@ -1,6 +1,6 @@
 [package]
 name = "monochange_test_helpers"
-version = { workspace = true }
+version = "0.0.0"
 edition = { workspace = true }
 license = { workspace = true }
 publish = false
