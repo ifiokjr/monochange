@@ -13,6 +13,31 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 
 <!-- {/githubAutomationOverview} -->
 
+## Quick start with `mc init --provider`
+
+The fastest way to configure GitHub automation is using the `--provider` flag during initialization:
+
+<!-- {=initProviderQuickStart} -->
+
+```bash
+# Initialize with GitHub automation pre-configured
+mc init --provider github
+
+# The generated monochange.toml includes:
+# - [source] section with GitHub releases and pull request settings
+# - CLI commands for commit-release and release-pr
+# - GitHub Actions workflows in .github/workflows/
+```
+
+This single command generates:
+
+1. **Complete source configuration** — `[source]`, `[source.releases]`, and `[source.pull_requests]` sections
+2. **Automation CLI commands** — `commit-release` and `release-pr` commands ready to use
+3. **GitHub Actions workflows** — `release.yml` and `changeset-policy.yml` for CI/CD
+4. **Auto-detected repository info** — parses your git remote to pre-fill owner and repo
+
+<!-- {/initProviderQuickStart} -->
+
 ## CLI commands
 
 <!-- {=githubAutomationWorkflowCommands} -->
@@ -282,3 +307,15 @@ The monochange repository itself can dogfood this model by:
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`
 
 <!-- {/githubAutomationDogfoodNotes} -->
+
+## Supported providers
+
+The `--provider` flag supports three source providers:
+
+| Provider | `--provider` value | Workflow generation | Release automation | Pull/merge requests |
+|------------|-------------------|---------------------|--------------------|---------------------|
+| GitHub     | `github`          | Yes — GitHub Actions | Yes                | Yes                 |
+| GitLab     | `gitlab`          | No — use `.gitlab-ci.yml` | Yes          | Yes                 |
+| Gitea      | `gitea`          | No — use Gitea Actions | Yes               | Yes                 |
+
+All providers configure the `[source]` section in `monochange.toml` with appropriate settings for releases and pull/merge requests. GitLab and Gitea require manual CI configuration since they don't support GitHub Actions workflow files.
