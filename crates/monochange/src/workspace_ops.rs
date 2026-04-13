@@ -48,12 +48,18 @@ use typed_builder::TypedBuilder;
 use crate::interactive;
 use crate::*;
 
+/// Result of initializing a workspace with `mc init`.
+///
+/// Contains the paths to generated configuration and workflow files.
 pub(crate) struct InitWorkspaceResult {
+	/// Path to the generated monochange.toml configuration file
 	pub config_path: PathBuf,
+	/// Paths to any generated workflow files (e.g., GitHub Actions)
 	pub workflow_paths: Vec<PathBuf>,
 }
 
 impl InitWorkspaceResult {
+	/// Returns a human-readable summary of what was written
 	pub fn summary(&self) -> String {
 		let mut lines = vec![format!("wrote {}", self.config_path.display())];
 		for path in &self.workflow_paths {
@@ -63,6 +69,23 @@ impl InitWorkspaceResult {
 	}
 }
 
+/// Initialize a new monochange workspace.
+///
+/// Generates a starter `monochange.toml` with detected packages and groups.
+/// When `provider` is specified, also configures source provider automation
+/// and generates workflow files appropriate for that provider.
+///
+/// # Arguments
+///
+/// * `root` - Repository root directory
+/// * `force` - Overwrite existing configuration if true
+/// * `provider` - Optional source provider ("github", "gitlab", or "gitea")
+///
+/// # Errors
+///
+/// Returns an error if:
+/// * Configuration already exists and force is false
+/// * Writing configuration or workflow files fails
 #[must_use = "the initialization result must be checked"]
 pub(crate) fn init_workspace(
 	root: &Path,

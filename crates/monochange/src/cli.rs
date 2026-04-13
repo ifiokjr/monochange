@@ -158,6 +158,16 @@ pub(crate) fn build_command_with_cli(
 						Arg::new("provider")
 							.long("provider")
 							.help("Source-control provider for release automation workflows")
+							.long_help(
+								"Configure release automation for the specified provider. \
+When provided, the generated config includes:\n\
+\n\
+- [source] section with the provider configured\n\
+- Release and pull request settings for the provider\n\
+- CLI commands for commit-release and release-pr\n\
+- GitHub Actions workflows (for --provider=github)\n\
+\nSupported providers: github, gitlab, gitea",
+							)
 							.value_parser(["github", "gitlab", "gitea"]),
 					),
 			)
