@@ -17,6 +17,9 @@ mc commit-release
 After:
 
 ```sh
+mc release
+# refreshes .monochange/release-manifest.json as a local cached artifact
+
 mc release --commit
 # succeeds even when .monochange/release-manifest.json is ignored
 
@@ -24,4 +27,4 @@ mc commit-from-cache
 # can reuse .monochange/prepared-release-cache.json without rerunning PrepareRelease
 ```
 
-`CommitRelease` now skips ignored untracked manifest files and stale missing pathspecs while still staging real release files, and it can reuse a saved prepared release artifact when the command does not include its own `PrepareRelease` step.
+`PrepareRelease` now refreshes `.monochange/release-manifest.json` automatically as local cached metadata, and `CommitRelease` skips ignored untracked manifest files and stale missing pathspecs while still staging real release files. `CommitRelease` can also reuse a saved prepared release artifact when the command does not include its own `PrepareRelease` step.

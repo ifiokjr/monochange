@@ -160,7 +160,7 @@ pub(crate) fn save_prepared_release_execution(
 	explicit_path: Option<&Path>,
 ) -> MonochangeResult<()> {
 	let artifact_path = resolve_prepared_release_artifact_path(root, explicit_path);
-	ensure_prepared_release_artifact_ignored(root, &artifact_path)?;
+	ensure_monochange_artifact_ignored(root, &artifact_path)?;
 	let parent = artifact_path.parent().map(Path::to_path_buf);
 	if let Some(parent) = parent {
 		fs::create_dir_all(&parent).map_err(|error| {
@@ -383,7 +383,7 @@ fn hash_file_at_path(root: &Path, path: &Path) -> MonochangeResult<String> {
 	Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-fn ensure_prepared_release_artifact_ignored(
+pub(crate) fn ensure_monochange_artifact_ignored(
 	root: &Path,
 	artifact_path: &Path,
 ) -> MonochangeResult<()> {

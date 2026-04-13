@@ -27,6 +27,10 @@ exit_code: 0
 - **package `core`** → `core/v1.1.0`
   - tag: no · release: no
 
+## Release manifest
+
+- `.monochange/release-manifest.json`
+
 ## Changed files
 
 - `crates/app/Cargo.toml`

@@ -81,14 +81,14 @@ mc validate
 
 Release planning and release repair use two different artifacts on purpose.
 
-- `RenderReleaseManifest` captures **what monochange is preparing right now** during command execution.
+- the cached release manifest at `.monochange/release-manifest.json` captures **what monochange is preparing right now** during command execution.
 - `ReleaseRecord` captures **what a release commit historically declared** inside the monochange-managed release commit body.
 
 Use the manifest when you want execution-time automation such as CI artifacts, MCP/server responses, previews, or downstream machine-readable release data.
 
 Use the release record when you want to rediscover or repair a release later from a tag or descendant commit.
 
-That is why `ReleaseRecord` does not replace `RenderReleaseManifest`: one is an execution-time automation artifact, the other is a durable git-history artifact.
+That is why `ReleaseRecord` does not replace the cached release manifest: one is an execution-time automation artifact, the other is a durable git-history artifact.
 
 When you need to inspect or repair a recent release, see [Repairable releases](./12-repairable-releases.md).
 

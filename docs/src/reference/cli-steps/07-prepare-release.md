@@ -18,7 +18,8 @@ It is the step that unlocks:
 - changelog rendering
 - release target calculation
 - structured `release.*` template context
-- later steps such as `CommitRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`
+- the cached `.monochange/release-manifest.json` artifact exposed as `manifest.path`
+- later steps such as `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`
 
 If your command eventually needs release metadata, start with `PrepareRelease` rather than trying to reconstruct that state in shell.
 
@@ -50,8 +51,10 @@ It can produce:
 - updated changelogs
 - deleted or consumed changeset files
 - release target information
+- a cached release manifest at `.monochange/release-manifest.json`
 - final command output in markdown, text, or JSON form
 - structured `release.*` template values for later `Command` steps
+- `manifest.path` for later `Command` steps that need the on-disk JSON artifact
 
 Built-in release-oriented commands now default their human-readable `format` input to `markdown`. Use `text` when you explicitly want the older plain-text style, or `json` for automation.
 
@@ -114,7 +117,6 @@ shell = true
 
 Typical production commands look like:
 
-- `PrepareRelease` → `RenderReleaseManifest`
 - `PrepareRelease` → `PublishRelease`
 - `PrepareRelease` → `OpenReleaseRequest`
 - `PrepareRelease` → `CommitRelease`
@@ -137,7 +139,7 @@ mc release-pr --dry-run
 
 `mc release` stores the prepared state in `.monochange/prepared-release-cache.json`, and later commands with a `PrepareRelease` step reuse it when the git `HEAD`, workspace status, tracked release inputs, and relevant configuration still match.
 
-That `.monochange/` directory is meant for local monochange artifacts. Keep it gitignored so reusable prepared state and other local release metadata do not pollute reviewable commits.
+That `.monochange/` directory is meant for local monochange artifacts. Keep it gitignored so reusable prepared state, the cached release manifest, and other local release metadata do not pollute reviewable commits.
 
 If you need to pass the artifact between explicit jobs or custom commands, use `--prepared-release`:
 

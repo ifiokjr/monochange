@@ -263,12 +263,15 @@ pub(crate) fn template_value_to_input_values(value: &serde_json::Value) -> Vec<S
 	}
 }
 
+const DEFAULT_RELEASE_MANIFEST_PATH: &str = ".monochange/release-manifest.json";
+
 pub(crate) fn write_release_manifest_file(
 	root: &Path,
 	path: &Path,
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let resolved_path = resolve_config_path(root, path);
+	ensure_monochange_artifact_ignored(root, &resolved_path)?;
 	let rendered = render_release_manifest_json(manifest)?;
 	let update = FileUpdate {
 		path: resolved_path.clone(),
@@ -278,13 +281,22 @@ pub(crate) fn write_release_manifest_file(
 	Ok(root_relative(root, &resolved_path))
 }
 
+fn write_default_release_manifest_file(
+	root: &Path,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<PathBuf> {
+	write_release_manifest_file(root, Path::new(DEFAULT_RELEASE_MANIFEST_PATH), manifest)
+}
+
 fn resolve_release_manifest_path(
 	root: &Path,
 	path: Option<&Path>,
 	manifest: &ReleaseManifest,
-) -> MonochangeResult<Option<PathBuf>> {
-	path.map(|path| write_release_manifest_file(root, path, manifest))
-		.transpose()
+) -> MonochangeResult<PathBuf> {
+	match path {
+		Some(path) => write_release_manifest_file(root, path, manifest),
+		None => write_default_release_manifest_file(root, manifest),
+	}
 }
 
 fn ensure_prepared_release_for_consumer_step(
@@ -669,6 +681,17 @@ pub(crate) fn execute_cli_command_with_options(
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					context.prepared_file_diffs = prepared_execution.file_diffs;
 					context.prepared_release = Some(prepared_execution.prepared_release);
+					let prepared_release = context
+						.prepared_release
+						.as_ref()
+						.expect("prepared release must be available after prepare step");
+					let manifest = build_release_manifest(
+						cli_command,
+						prepared_release,
+						&context.command_logs,
+					);
+					context.release_manifest_path =
+						Some(write_default_release_manifest_file(root, &manifest)?);
 					output = None;
 					Ok(())
 				}
@@ -684,8 +707,9 @@ pub(crate) fn execute_cli_command_with_options(
 						prepared_release,
 						&context.command_logs,
 					);
-					context.release_manifest_path =
+					let manifest_path =
 						resolve_release_manifest_path(root, path.as_deref(), &manifest)?;
+					context.release_manifest_path = Some(manifest_path);
 					output = None;
 					Ok(())
 				}

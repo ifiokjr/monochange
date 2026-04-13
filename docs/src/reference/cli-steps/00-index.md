@@ -4,7 +4,7 @@
 
 monochange CLI commands are built from ordered `[[cli.<command>.steps]]` entries.
 
-A step is the smallest execution unit in a monochange workflow. Some steps are **standalone** (`Validate`, `Discover`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`). Others are **stateful** and build on the result of an earlier `PrepareRelease` step (`RenderReleaseManifest`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`).
+A step is the smallest execution unit in a monochange workflow. Some steps are **standalone** (`Validate`, `Discover`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`). Others are **stateful** and build on the result of an earlier `PrepareRelease` step (`CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, and `CommentReleasedIssues`). `PrepareRelease` also refreshes the cached `.monochange/release-manifest.json` artifact exposed to later steps as `manifest.path`.
 
 When you design a command, think in terms of:
 
@@ -28,21 +28,21 @@ The reference pages in this section document each built-in step with:
 
 <!-- {=cliStepReferenceChoosingGuide} -->
 
-| Step                    | Use it when you want to…                                                 | Requires previous step?          | Typical follow-up                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `Validate`              | fail fast on invalid config, groups, or changesets                       | no                               | CI gate or local preflight                                                                                           |
-| `Discover`              | inspect normalized package discovery across ecosystems                   | no                               | local inspection, debug commands                                                                                     |
-| `CreateChangeFile`      | author a `.changeset/*.md` file from CLI inputs                          | no                               | run independently, or before planning                                                                                |
-| `PrepareRelease`        | build the release result and update files                                | no                               | `CommitRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command` |
-| `CommitRelease`         | create a local release commit with an embedded `ReleaseRecord`           | `PrepareRelease`                 | `OpenReleaseRequest`, manual review, custom `Command`                                                                |
-| `RenderReleaseManifest` | write a stable JSON artifact for downstream automation                   | `PrepareRelease`                 | CI upload, later `Command` steps                                                                                     |
-| `PublishRelease`        | create or update hosted provider releases                                | `PrepareRelease` + `[source]`    | `CommentReleasedIssues`, custom notification commands                                                                |
-| `OpenReleaseRequest`    | create or update a hosted release PR/MR                                  | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                                           |
-| `CommentReleasedIssues` | post release follow-up comments to closed issues                         | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                                                      |
-| `AffectedPackages`      | evaluate changeset coverage for changed files                            | no                               | CI enforcement, custom failure messaging                                                                             |
-| `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata | no                               | local debugging, CI inspection                                                                                       |
-| `RetargetRelease`       | repair a recent release by moving its tag set                            | no                               | custom `Command` steps using `retarget.*`                                                                            |
-| `Command`               | run arbitrary shell/program commands with monochange context             | depends on your workflow         | any external tool                                                                                                    |
+| Step                    | Use it when you want to…                                                 | Requires previous step?          | Typical follow-up                                                                           |
+| ----------------------- | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `Validate`              | fail fast on invalid config, groups, or changesets                       | no                               | CI gate or local preflight                                                                  |
+| `Discover`              | inspect normalized package discovery across ecosystems                   | no                               | local inspection, debug commands                                                            |
+| `CreateChangeFile`      | author a `.changeset/*.md` file from CLI inputs                          | no                               | run independently, or before planning                                                       |
+| `PrepareRelease`        | build the release result, update files, and refresh the cached manifest  | no                               | `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command` |
+| `CommitRelease`         | create a local release commit with an embedded `ReleaseRecord`           | `PrepareRelease`                 | `OpenReleaseRequest`, manual review, custom `Command`                                       |
+| `RenderReleaseManifest` | legacy compatibility step for rewriting the manifest to another path     | `PrepareRelease`                 | migration-only workflows, later `Command` steps                                             |
+| `PublishRelease`        | create or update hosted provider releases                                | `PrepareRelease` + `[source]`    | `CommentReleasedIssues`, custom notification commands                                       |
+| `OpenReleaseRequest`    | create or update a hosted release PR/MR                                  | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                  |
+| `CommentReleasedIssues` | post release follow-up comments to closed issues                         | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                             |
+| `AffectedPackages`      | evaluate changeset coverage for changed files                            | no                               | CI enforcement, custom failure messaging                                                    |
+| `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata | no                               | local debugging, CI inspection                                                              |
+| `RetargetRelease`       | repair a recent release by moving its tag set                            | no                               | custom `Command` steps using `retarget.*`                                                   |
+| `Command`               | run arbitrary shell/program commands with monochange context             | depends on your workflow         | any external tool                                                                           |
 
 <!-- {/cliStepReferenceChoosingGuide} -->
 
@@ -69,7 +69,7 @@ In practice, most workflows fit one of four patterns:
    - `CreateChangeFile`
 3. **release preparation and publication**
    - `PrepareRelease`
-   - then one or more of `CommitRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command`
+   - then one or more of `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command`
 4. **post-release repair**
    - `RetargetRelease`
    - optionally followed by `Command`
@@ -124,7 +124,7 @@ Interactive steps do not show the spinner by default when monochange is waiting 
 When you compose `Command` steps after built-in steps, monochange exposes structured context values such as:
 
 - `release.*` after `PrepareRelease`
-- `manifest.path` after `RenderReleaseManifest` with a `path`
+- `manifest.path` after `PrepareRelease` (and after the legacy `RenderReleaseManifest` compatibility step)
 - `affected.*` after `AffectedPackages`
 - `retarget.*` after `RetargetRelease`
 - `release_commit.*` after `CommitRelease`
@@ -142,7 +142,7 @@ Those namespaces are the main reason to prefer built-in steps over reimplementin
 - [RetargetRelease](06-retarget-release.md)
 - [PrepareRelease](07-prepare-release.md)
 - [CommitRelease](08-commit-release.md)
-- [RenderReleaseManifest](09-render-release-manifest.md)
+- [RenderReleaseManifest (legacy)](09-render-release-manifest.md)
 - [PublishRelease](10-publish-release.md)
 - [OpenReleaseRequest](11-open-release-request.md)
 - [CommentReleasedIssues](12-comment-released-issues.md)

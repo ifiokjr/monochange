@@ -2362,7 +2362,7 @@ fn repairable_releases_guide_distinguishes_manifest_and_release_record() {
 	for expected in [
 		"manifest = \"what monochange is preparing right now\"",
 		"release record = \"what this release commit historically declared\"",
-		"`ReleaseRecord` does **not** replace `RenderReleaseManifest`",
+		"`ReleaseRecord` does **not** replace the cached release manifest",
 		"mc release-record --from v1.2.3",
 		"mc repair-release --from v1.2.3 --target HEAD --dry-run",
 		"Prefer publishing a new patch release",
@@ -4126,7 +4126,8 @@ fn execute_cli_command_change_step_requires_reason_input() {
 }
 
 #[test]
-fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
+fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_up_steps_render_dry_run_outputs()
+ {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
 	fs::OpenOptions::new()
@@ -4144,34 +4145,26 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 
-	let manifest_path = root.join("target/release-manifest.json");
-	let render_manifest = monochange_core::CliCommandDefinition {
+	let manifest_path = root.join(".monochange/release-manifest.json");
+	let prepare_release = monochange_core::CliCommandDefinition {
 		name: "release-manifest".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
-		steps: vec![
-			monochange_core::CliStepDefinition::PrepareRelease {
-				name: None,
-				when: None,
-				inputs: BTreeMap::new(),
-			},
-			monochange_core::CliStepDefinition::RenderReleaseManifest {
-				name: None,
-				when: None,
-				path: Some(PathBuf::from("target/release-manifest.json")),
-				inputs: BTreeMap::new(),
-			},
-		],
+		steps: vec![monochange_core::CliStepDefinition::PrepareRelease {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		}],
 	};
 	let render_output = crate::execute_cli_command(
 		root,
 		&configuration,
-		&render_manifest,
+		&prepare_release,
 		true,
 		BTreeMap::new(),
 	)
-	.unwrap_or_else(|error| panic!("render manifest: {error}"));
-	assert!(render_output.contains("release manifest: target/release-manifest.json"));
+	.unwrap_or_else(|error| panic!("prepare release: {error}"));
+	assert!(render_output.contains("release manifest: .monochange/release-manifest.json"));
 	let manifest_contents =
 		fs::read_to_string(&manifest_path).unwrap_or_else(|error| panic!("read manifest: {error}"));
 	assert!(manifest_contents.contains("\"releaseTargets\""));
@@ -4253,6 +4246,70 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 		crate::execute_cli_command(root, &configuration, &issue_comments, true, BTreeMap::new())
 			.unwrap_or_else(|error| panic!("comment released issues: {error}"));
 	assert!(!comments_output.is_empty());
+}
+
+#[test]
+fn execute_cli_command_legacy_render_release_manifest_without_path_uses_default_manifest_cache() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "legacy-release-manifest".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				name: None,
+				when: None,
+				path: None,
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+	let output =
+		crate::execute_cli_command(root, &configuration, &cli_command, true, BTreeMap::new())
+			.unwrap_or_else(|error| panic!("legacy release manifest: {error}"));
+	assert!(output.contains("release manifest: .monochange/release-manifest.json"));
+	assert!(root.join(".monochange/release-manifest.json").is_file());
+}
+
+#[test]
+fn execute_cli_command_legacy_render_release_manifest_with_path_writes_requested_manifest() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "legacy-release-manifest-path".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::RenderReleaseManifest {
+				name: None,
+				when: None,
+				path: Some(PathBuf::from("target/release-manifest.json")),
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+	let output =
+		crate::execute_cli_command(root, &configuration, &cli_command, true, BTreeMap::new())
+			.unwrap_or_else(|error| panic!("legacy release manifest path: {error}"));
+	assert!(output.contains("release manifest: target/release-manifest.json"));
+	assert!(root.join("target/release-manifest.json").is_file());
 }
 
 #[test]

@@ -208,7 +208,7 @@ type = "PublishRelease"
 | `Release`          | `PublishRelease`        | knope's `Release` creates GitHub releases; monochange calls this `PublishRelease` and supports multiple providers |
 | `Command`          | `Command`               | Same name; monochange adds `dry_run_command` and `shell = true`                                                   |
 | —                  | `OpenReleaseRequest`    | New: open/update a release PR                                                                                     |
-| —                  | `RenderReleaseManifest` | New: write structured JSON for downstream CI                                                                      |
+| —                  | `PrepareRelease`        | New: refresh the cached `.monochange/release-manifest.json` artifact for downstream CI                            |
 | —                  | `AffectedPackages`      | New: PR changeset policy enforcement                                                                              |
 | —                  | `Validate`              | New: validate config and changesets                                                                               |
 | —                  | `Discover`              | New: list workspace packages                                                                                      |

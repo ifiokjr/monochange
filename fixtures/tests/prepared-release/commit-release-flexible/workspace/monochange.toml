@@ -59,8 +59,4 @@ default = "text"
 type = "PrepareRelease"
 
 [[cli.release-with-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-
-[[cli.release-with-manifest.steps]]
 type = "CommitRelease"

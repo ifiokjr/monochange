@@ -475,7 +475,7 @@ ignored_paths = [
 #   CreateChangeFile     — create a .changeset/*.md file
 #   PrepareRelease       — compute release plan, update versions, changelogs
 #   CommitRelease        — create a local release commit (requires PrepareRelease)
-#   RenderReleaseManifest — write release-manifest.json (requires PrepareRelease)
+#   RenderReleaseManifest — legacy: rewrite release-manifest.json after PrepareRelease
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
@@ -508,7 +508,6 @@ inputs = [
 ]
 steps = [
 	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "RenderReleaseManifest", name = "write release manifest", path = ".monochange/release-manifest.json", when = "{{ inputs.commit }}" },
 	{ type = "Command", name = "format changed files", command = "dprint fmt {{ changed_files }}" },
 	# Keep local `mc release` runs fast. The generated files are stable enough to
 	# inspect immediately, so we only pay for clippy/docs/validation right before

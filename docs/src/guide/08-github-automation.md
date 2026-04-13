@@ -41,7 +41,7 @@ mc repair-release --from v1.2.3 --target HEAD
 
 The important distinction is:
 
-- `RenderReleaseManifest` still describes the execution-time release plan for automation
+- the cached release manifest still describes the execution-time release plan for automation
 - `ReleaseRecord` describes the durable release declaration stored in the release commit body
 
 Use `--dry-run` first for `repair-release`. It is a destructive workflow because it retargets release tags.

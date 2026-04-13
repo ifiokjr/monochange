@@ -67,10 +67,6 @@ choices = ["text", "json"]
 [[cli.release-manifest.steps]]
 type = "PrepareRelease"
 
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-
 [cli.affected]
 help_text = "Evaluate affected packages"
 

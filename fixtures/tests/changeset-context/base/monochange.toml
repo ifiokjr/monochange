@@ -17,10 +17,6 @@ help_text = "Prepare a release and write a stable JSON manifest"
 [[cli.release-manifest.steps]]
 type = "PrepareRelease"
 
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"
 

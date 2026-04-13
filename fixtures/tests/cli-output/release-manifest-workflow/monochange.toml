@@ -26,7 +26,3 @@ enabled = true
 
 [[cli.release-manifest.steps]]
 type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
