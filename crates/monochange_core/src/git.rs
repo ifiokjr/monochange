@@ -62,6 +62,7 @@ pub fn git_push_branch_command(root: &Path, branch: &str) -> Command {
 	command
 }
 
+#[must_use = "the git branch result must be checked"]
 pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
 	let output =
 		git_command_output(root, &["symbolic-ref", "--short", "HEAD"]).map_err(|error| {
@@ -76,6 +77,7 @@ pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
 	Ok(git_stdout_trimmed(&output))
 }
 
+#[must_use = "the HEAD commit result must be checked"]
 pub fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 	let output = git_command_output(root, &["rev-parse", "HEAD"])
 		.map_err(|error| MonochangeError::Io(format!("failed to read HEAD commit: {error}")))?;
@@ -89,6 +91,7 @@ pub fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 }
 
 #[tracing::instrument(skip_all, fields(args = ?args))]
+#[must_use = "the command output must be checked"]
 pub fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
 	let mut command = git_command(root);
 	command.args(args).output()
@@ -118,6 +121,7 @@ pub fn git_reports_nothing_to_commit(output: &Output) -> bool {
 }
 
 #[tracing::instrument(skip_all, fields(action))]
+#[must_use = "the command result must be checked"]
 pub fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 	let output = command
 		.output()
@@ -131,6 +135,7 @@ pub fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 	Ok(())
 }
 
+#[must_use = "the commit command result must be checked"]
 pub fn run_commit_command_allow_nothing_to_commit(
 	mut command: Command,
 	action: &str,

@@ -164,6 +164,7 @@ pub fn enrich_changeset_context(
 	annotate_changeset_context(source, changesets);
 }
 
+#[must_use = "the validation result must be checked"]
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
 	if source.releases.draft {
 		return Err(MonochangeError::Config(
@@ -334,6 +335,7 @@ pub fn build_release_pull_request_request(
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the publish result must be checked"]
 pub fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
@@ -347,6 +349,7 @@ pub fn publish_release_requests(
 		.collect()
 }
 
+#[must_use = "the pull request result must be checked"]
 pub fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,

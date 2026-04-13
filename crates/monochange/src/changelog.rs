@@ -1080,7 +1080,6 @@ fn apply_change_template(
 	}
 	if let Some(value) = change.context.as_deref() {
 		context.insert("context", value);
-		context.insert("context", value);
 	}
 	if let Some(value) = change.changeset_path.as_deref() {
 		context.insert("changeset_path", value);
@@ -1146,11 +1145,13 @@ fn config_package_id(package: &PackageRecord) -> String {
 }
 
 impl BuiltinReleaseSection {
+	#[allow(clippy::match_same_arms)]
 	fn from_bump(bump: BumpSeverity) -> Self {
 		match bump {
 			BumpSeverity::Major => Self::Major,
 			BumpSeverity::Minor => Self::Minor,
 			BumpSeverity::None | BumpSeverity::Patch => Self::Patch,
+			_ => Self::Patch,
 		}
 	}
 

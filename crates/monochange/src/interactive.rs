@@ -195,9 +195,7 @@ fn prompt_select_targets(targets: &[SelectableTarget]) -> MonochangeResult<Vec<S
 	)
 	.with_page_size(15)
 	.prompt()
-	.map_err(|error| {
-		MonochangeError::Config(format!("interactive selection cancelled: {error}"))
-	})?;
+	.map_err(map_inquire_error)?;
 
 	Ok(selected)
 }
@@ -209,9 +207,10 @@ fn bump_options() -> Vec<&'static str> {
 fn parse_selected_bump(selection: &str) -> BumpSeverity {
 	match selection {
 		"none" => BumpSeverity::None,
+		"patch" => BumpSeverity::Patch,
 		"minor" => BumpSeverity::Minor,
 		"major" => BumpSeverity::Major,
-		_ => BumpSeverity::Patch,
+		_other => BumpSeverity::Patch,
 	}
 }
 
@@ -224,7 +223,7 @@ fn prompt_bump_for_target(target: &SelectableTarget) -> MonochangeResult<BumpSev
 	let selection = Select::new(&label, bump_options())
 		.with_starting_cursor(0)
 		.prompt()
-		.map_err(|error| MonochangeError::Config(format!("bump selection cancelled: {error}")))?;
+		.map_err(map_inquire_error)?;
 
 	Ok(parse_selected_bump(selection))
 }
@@ -260,7 +259,7 @@ fn prompt_version_for_target(target: &SelectableTarget) -> MonochangeResult<Opti
 			}
 		})
 		.prompt()
-		.map_err(|error| MonochangeError::Config(format!("version input cancelled: {error}")))?;
+		.map_err(map_inquire_error)?;
 
 	if version.is_empty() {
 		Ok(None)
@@ -297,9 +296,7 @@ fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<
 	let selection = Select::new(&label, options)
 		.with_starting_cursor(0)
 		.prompt()
-		.map_err(|error| {
-			MonochangeError::Config(format!("change type selection cancelled: {error}"))
-		})?;
+		.map_err(map_inquire_error)?;
 
 	Ok(parse_change_type_selection(&selection))
 }
@@ -314,20 +311,30 @@ fn prompt_reason() -> MonochangeResult<String> {
 			}
 		})
 		.prompt()
-		.map_err(|error| MonochangeError::Config(format!("reason input cancelled: {error}")))?;
+		.map_err(map_inquire_error)?;
 
 	Ok(reason)
 }
 
 fn prompt_optional(label: &str) -> MonochangeResult<Option<String>> {
-	let value = Text::new(label)
-		.prompt()
-		.map_err(|error| MonochangeError::Config(format!("input cancelled: {error}")))?;
+	let value = Text::new(label).prompt().map_err(map_inquire_error)?;
 
 	if value.trim().is_empty() {
 		Ok(None)
 	} else {
 		Ok(Some(value))
+	}
+}
+
+fn map_inquire_error(error: inquire::error::InquireError) -> MonochangeError {
+	match error {
+		inquire::error::InquireError::OperationInterrupted
+		| inquire::error::InquireError::OperationCanceled => MonochangeError::Cancelled,
+		other => {
+			MonochangeError::Interactive {
+				message: other.to_string(),
+			}
+		}
 	}
 }
 
@@ -340,6 +347,7 @@ mod __tests {
 	use monochange_core::ExtraChangelogSection;
 	use monochange_core::GroupChangelogInclude;
 	use monochange_core::GroupDefinition;
+	use monochange_core::MonochangeError;
 	use monochange_core::PackageDefinition;
 	use monochange_core::PackageType;
 	use monochange_core::ReleaseNotesSettings;
@@ -354,6 +362,7 @@ mod __tests {
 	use super::build_selectable_targets;
 	use super::bump_options;
 	use super::change_type_options;
+	use super::map_inquire_error;
 	use super::parse_change_type_selection;
 	use super::parse_selected_bump;
 	use super::prompt_change_type_for_target;
@@ -624,6 +633,176 @@ mod __tests {
 				"[package] app (member of group `sdk`)".to_string(),
 				"[package] core (member of group `sdk`)".to_string(),
 			]
+		);
+	}
+
+	#[test]
+	fn parse_selected_bump_falls_back_to_patch_for_unrecognized_input() {
+		assert_eq!(parse_selected_bump("unknown"), BumpSeverity::Patch);
+		assert_eq!(parse_selected_bump(""), BumpSeverity::Patch);
+		assert_eq!(parse_selected_bump("MAJOR"), BumpSeverity::Patch);
+		assert_eq!(parse_selected_bump("Minor"), BumpSeverity::Patch);
+	}
+
+	#[test]
+	fn parse_change_type_selection_returns_none_only_for_placeholder() {
+		assert_eq!(parse_change_type_selection("(none)"), None);
+		assert_eq!(
+			parse_change_type_selection("docs"),
+			Some("docs".to_string())
+		);
+		assert_eq!(
+			parse_change_type_selection("security"),
+			Some("security".to_string())
+		);
+		assert_eq!(
+			parse_change_type_selection("  spaced  "),
+			Some("  spaced  ".to_string())
+		);
+	}
+
+	#[test]
+	fn build_selectable_targets_returns_empty_vec_when_no_packages_or_groups() {
+		let configuration = empty_configuration();
+		let targets = build_selectable_targets(&configuration);
+		assert!(targets.is_empty());
+	}
+
+	#[test]
+	fn build_selectable_targets_handles_group_with_empty_packages() {
+		let configuration = WorkspaceConfiguration {
+			root_path: std::path::PathBuf::from("."),
+			defaults: WorkspaceDefaults::default(),
+			release_notes: ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: vec![GroupDefinition {
+				id: "empty-group".to_string(),
+				packages: Vec::new(),
+				changelog: None,
+				changelog_include: GroupChangelogInclude::All,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+			}],
+			cli: Vec::new(),
+			changesets: ChangesetSettings::default(),
+			source: None,
+			cargo: EcosystemSettings::default(),
+			npm: EcosystemSettings::default(),
+			deno: EcosystemSettings::default(),
+			dart: EcosystemSettings::default(),
+		};
+		let targets = build_selectable_targets(&configuration);
+		assert_eq!(targets.len(), 1);
+		assert_eq!(targets[0].kind, TargetKind::Group);
+		assert_eq!(targets[0].id, "empty-group");
+		assert_eq!(targets[0].display, "[group] empty-group ()");
+	}
+
+	#[test]
+	fn build_selectable_targets_with_only_standalone_packages() {
+		let configuration = WorkspaceConfiguration {
+			root_path: std::path::PathBuf::from("."),
+			defaults: WorkspaceDefaults::default(),
+			release_notes: ReleaseNotesSettings::default(),
+			packages: vec![
+				PackageDefinition {
+					id: "alpha".to_string(),
+					path: std::path::PathBuf::from("crates/alpha"),
+					package_type: PackageType::Cargo,
+					changelog: None,
+					extra_changelog_sections: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: VersionFormat::Primary,
+				},
+				PackageDefinition {
+					id: "beta".to_string(),
+					path: std::path::PathBuf::from("crates/beta"),
+					package_type: PackageType::Cargo,
+					changelog: None,
+					extra_changelog_sections: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: VersionFormat::Primary,
+				},
+			],
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: ChangesetSettings::default(),
+			source: None,
+			cargo: EcosystemSettings::default(),
+			npm: EcosystemSettings::default(),
+			deno: EcosystemSettings::default(),
+			dart: EcosystemSettings::default(),
+		};
+		let targets = build_selectable_targets(&configuration);
+		let ids: Vec<&str> = targets.iter().map(|t| t.id.as_str()).collect();
+		assert_eq!(ids, vec!["alpha", "beta"]);
+		assert!(targets.iter().all(|t| t.kind == TargetKind::Package));
+	}
+
+	#[test]
+	fn map_inquire_error_converts_interrupted_to_cancelled() {
+		let error = inquire::error::InquireError::OperationInterrupted;
+		assert!(matches!(
+			map_inquire_error(error),
+			MonochangeError::Cancelled
+		));
+	}
+
+	#[test]
+	fn map_inquire_error_converts_canceled_to_cancelled() {
+		let error = inquire::error::InquireError::OperationCanceled;
+		assert!(matches!(
+			map_inquire_error(error),
+			MonochangeError::Cancelled
+		));
+	}
+
+	#[test]
+	fn map_inquire_error_converts_other_errors_to_interactive() {
+		let error = inquire::error::InquireError::Custom(inquire::error::CustomUserError::from(
+			"test error".to_string(),
+		));
+		assert!(matches!(
+			map_inquire_error(error),
+			MonochangeError::Interactive { .. }
+		));
+	}
+
+	#[test]
+	fn run_interactive_change_returns_cancelled_variant_is_distinct_from_config_error() {
+		let config_error =
+			run_interactive_change(&empty_configuration(), &InteractiveOptions::default())
+				.err()
+				.unwrap_or_else(|| panic!("expected error"));
+		assert!(
+			matches!(config_error, MonochangeError::Config(..)),
+			"empty workspace should produce Config error, not Cancelled"
+		);
+		assert!(
+			!matches!(config_error, MonochangeError::Cancelled),
+			"empty workspace should not produce Cancelled"
 		);
 	}
 

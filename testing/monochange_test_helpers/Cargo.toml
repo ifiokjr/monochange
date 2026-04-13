@@ -1,12 +1,17 @@
 [package]
 name = "monochange_test_helpers"
-version = "0.0.0"
-edition = "2024"
-license = "Unlicense"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 publish = false
 description = "Internal shared test helpers for monochange"
 
 [dependencies]
-insta = { version = "1", default-features = false, features = ["filters", "json"] }
-rmcp = { version = "1", default-features = false }
-tempfile = { version = "3", default-features = false }
+insta = { workspace = true }
+monochange_core = { workspace = true }
+rmcp = { workspace = true }
+shlex = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

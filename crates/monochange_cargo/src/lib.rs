@@ -181,6 +181,7 @@ pub fn lockfile_requires_command_refresh(lockfile: &Path, packages: &[&PackageRe
 	})
 }
 
+#[must_use = "the validation result must be checked"]
 pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> MonochangeResult<()> {
 	let mut workspace_versioned = BTreeMap::<PathBuf, Vec<&PackageRecord>>::new();
 	for package in packages {
@@ -655,6 +656,7 @@ impl CompatibilityProvider for RustSemverProvider {
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the discovery result must be checked"]
 pub fn discover_cargo_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let workspace_manifests = find_workspace_manifests(root);
 	let mut included_manifests = HashSet::new();
@@ -698,6 +700,7 @@ pub fn discover_cargo_packages(root: &Path) -> MonochangeResult<AdapterDiscovery
 /// fixtures. Release planning already knows the configured package paths, so this
 /// helper lets higher-level code parse just the manifests it needs instead of
 /// rediscovering every Cargo fixture on disk.
+#[must_use = "the package result must be checked"]
 pub fn load_configured_cargo_package(
 	root: &Path,
 	package_path: &Path,

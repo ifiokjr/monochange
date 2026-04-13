@@ -168,6 +168,7 @@ pub const fn source_capabilities() -> SourceCapabilities {
 	}
 }
 
+#[must_use = "the validation result must be checked"]
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
 	if source.releases.generate_notes
 		&& matches!(
@@ -898,6 +899,7 @@ pub fn plan_released_issue_comments(
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the comment result must be checked"]
 pub fn comment_released_issues(
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
@@ -979,6 +981,7 @@ fn release_issue_comment_body(release_tags: &[String], marker: &str) -> String {
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the publish result must be checked"]
 pub fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[GitHubReleaseRequest],
@@ -992,6 +995,7 @@ pub fn publish_release_requests(
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the pull request result must be checked"]
 pub fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
@@ -1030,6 +1034,7 @@ pub fn publish_release_pull_request(
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the sync result must be checked"]
 pub fn sync_retargeted_releases(
 	source: &SourceConfiguration,
 	tag_updates: &[RetargetTagResult],

@@ -8,7 +8,9 @@ use std::process::Command as ProcessCommand;
 use std::thread::JoinHandle;
 use std::time::Instant;
 
+#[cfg(feature = "cargo")]
 use monochange_cargo::discover_cargo_packages;
+#[cfg(feature = "cargo")]
 use monochange_cargo::load_configured_cargo_package;
 use monochange_config::apply_version_groups;
 use monochange_config::build_changeset_load_context;
@@ -28,11 +30,17 @@ use monochange_core::PackageType;
 use monochange_core::ReleasePlan;
 use monochange_core::SourceConfiguration;
 use monochange_core::default_cli_commands;
+#[cfg(feature = "dart")]
 use monochange_dart::discover_dart_packages;
+#[cfg(feature = "dart")]
 use monochange_dart::load_configured_dart_package;
+#[cfg(feature = "deno")]
 use monochange_deno::discover_deno_packages;
+#[cfg(feature = "deno")]
 use monochange_deno::load_configured_deno_package;
+#[cfg(feature = "npm")]
 use monochange_npm::discover_npm_packages;
+#[cfg(feature = "npm")]
 use monochange_npm::load_configured_npm_package;
 use serde_json::json;
 use typed_builder::TypedBuilder;
@@ -40,6 +48,7 @@ use typed_builder::TypedBuilder;
 use crate::interactive;
 use crate::*;
 
+#[must_use = "the initialization result must be checked"]
 pub(crate) fn init_workspace(root: &Path, force: bool) -> MonochangeResult<PathBuf> {
 	let path = monochange_config::config_path(root);
 	if path.exists() && !force {
@@ -62,6 +71,7 @@ pub(crate) struct PopulateWorkspaceResult {
 	pub added_commands: Vec<String>,
 }
 
+#[must_use = "the population result must be checked"]
 pub(crate) fn populate_workspace(root: &Path) -> MonochangeResult<PopulateWorkspaceResult> {
 	let path = monochange_config::config_path(root);
 	if !path.exists() {
@@ -267,6 +277,9 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 		| monochange_core::CliStepDefinition::RetargetRelease { inputs, .. } => {
 			render_step_inputs_toml(rendered, inputs);
 		}
+		_ => {
+			render_step_inputs_toml(rendered, step.inputs());
+		}
 	}
 }
 
@@ -380,6 +393,7 @@ fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
 			PackageType::Deno => "deno",
 			PackageType::Dart => "dart",
 			PackageType::Flutter => "flutter",
+			_ => unreachable!(),
 		};
 		let mut entry = BTreeMap::new();
 		entry.insert("id", json!(id));
@@ -438,14 +452,14 @@ fn render_annotated_init_config(root: &Path) -> MonochangeResult<String> {
 
 fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
 	let mut packages = Vec::new();
-	for discovery in [
-		discover_cargo_packages(root)?,
-		discover_npm_packages(root)?,
-		discover_deno_packages(root)?,
-		discover_dart_packages(root)?,
-	] {
-		packages.extend(discovery.packages);
-	}
+	#[cfg(feature = "cargo")]
+	packages.extend(discover_cargo_packages(root)?.packages);
+	#[cfg(feature = "npm")]
+	packages.extend(discover_npm_packages(root)?.packages);
+	#[cfg(feature = "deno")]
+	packages.extend(discover_deno_packages(root)?.packages);
+	#[cfg(feature = "dart")]
+	packages.extend(discover_dart_packages(root)?.packages);
 	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
@@ -476,6 +490,7 @@ fn detect_default_changelog(root: &Path, manifest_dir: &Path) -> Option<PathBuf>
 	None
 }
 
+#[allow(clippy::match_same_arms)]
 fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 	match ecosystem {
 		Ecosystem::Cargo => PackageType::Cargo,
@@ -483,6 +498,7 @@ fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 		Ecosystem::Deno => PackageType::Deno,
 		Ecosystem::Dart => PackageType::Dart,
 		Ecosystem::Flutter => PackageType::Flutter,
+		_ => PackageType::Cargo,
 	}
 }
 
@@ -493,22 +509,33 @@ pub(crate) fn build_lockfile_command_executions(
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<LockfileCommandExecution>> {
 	let released_versions = released_versions_by_record_id(plan);
+	#[cfg(feature = "cargo")]
 	warn_about_incomplete_cargo_lockfiles(root, configuration, packages, &released_versions);
+	#[cfg(feature = "cargo")]
 	#[rustfmt::skip]
 	let cargo_executions = resolve_lockfile_command_executions(root, &configuration.cargo.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)))?;
+	#[cfg(feature = "npm")]
 	#[rustfmt::skip]
 	let npm_executions = resolve_lockfile_command_executions(root, &configuration.npm.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)))?;
+	#[cfg(feature = "deno")]
 	#[rustfmt::skip]
 	let deno_executions = resolve_lockfile_command_executions(root, &configuration.deno.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)))?;
+	#[cfg(feature = "dart")]
 	#[rustfmt::skip]
 	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().any(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)))?;
-	let mut executions = cargo_executions;
+	let mut executions = Vec::new();
+	#[cfg(feature = "cargo")]
+	executions.extend(cargo_executions);
+	#[cfg(feature = "npm")]
 	executions.extend(npm_executions);
+	#[cfg(feature = "deno")]
 	executions.extend(deno_executions);
+	#[cfg(feature = "dart")]
 	executions.extend(dart_executions);
 	Ok(dedup_lockfile_command_executions(executions))
 }
 
+#[cfg(feature = "cargo")]
 fn warn_about_incomplete_cargo_lockfiles(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -598,6 +625,8 @@ fn dedup_lockfile_command_executions(
 	deduped
 }
 
+#[must_use = "the validation result must be checked"]
+#[cfg(feature = "cargo")]
 pub(crate) fn validate_cargo_workspace_version_groups(root: &Path) -> MonochangeResult<()> {
 	let configuration = load_workspace_configuration(root)?;
 	if configuration.packages.is_empty() {
@@ -614,34 +643,65 @@ pub(crate) fn validate_cargo_workspace_version_groups(root: &Path) -> Monochange
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the discovery result must be checked"]
 pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	let configuration = load_workspace_configuration(root)?;
 	let mut warnings = Vec::new();
 	let mut packages = Vec::new();
 
-	let ((cargo_discovery, npm_discovery), (deno_discovery, dart_discovery)) = rayon::join(
-		|| {
-			rayon::join(
-				|| discover_cargo_packages(root),
-				|| discover_npm_packages(root),
-			)
-		},
-		|| {
-			rayon::join(
-				|| discover_deno_packages(root),
-				|| discover_dart_packages(root),
-			)
-		},
-	);
+	#[cfg(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart"))]
+	{
+		let ((cargo_discovery, npm_discovery), (deno_discovery, dart_discovery)) = rayon::join(
+			|| {
+				rayon::join(
+					|| discover_cargo_packages(root),
+					|| discover_npm_packages(root),
+				)
+			},
+			|| {
+				rayon::join(
+					|| discover_deno_packages(root),
+					|| discover_dart_packages(root),
+				)
+			},
+		);
+		for discovery in [
+			cargo_discovery?,
+			npm_discovery?,
+			deno_discovery?,
+			dart_discovery?,
+		] {
+			warnings.extend(discovery.warnings);
+			packages.extend(discovery.packages);
+		}
+	}
 
-	for discovery in [
-		cargo_discovery?,
-		npm_discovery?,
-		deno_discovery?,
-		dart_discovery?,
-	] {
-		warnings.extend(discovery.warnings);
-		packages.extend(discovery.packages);
+	#[cfg(not(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart")))]
+	{
+		#[cfg(feature = "cargo")]
+		{
+			let d = discover_cargo_packages(root)?;
+			warnings.extend(d.warnings);
+			packages.extend(d.packages);
+		}
+		#[cfg(feature = "npm")]
+		{
+			let d = discover_npm_packages(root)?;
+			warnings.extend(d.warnings);
+			packages.extend(d.packages);
+		}
+		#[cfg(feature = "deno")]
+		{
+			let d = discover_deno_packages(root)?;
+			warnings.extend(d.warnings);
+			packages.extend(d.packages);
+		}
+		#[cfg(feature = "dart")]
+		{
+			let d = discover_dart_packages(root)?;
+			warnings.extend(d.warnings);
+			packages.extend(d.packages);
+		}
 	}
 
 	normalize_package_ids(root, &mut packages);
@@ -693,10 +753,45 @@ fn discover_release_workspace(
 	for package_definition in &configuration.packages {
 		let path = root.join(&package_definition.path);
 		let package = match package_definition.package_type {
+			#[cfg(feature = "cargo")]
 			PackageType::Cargo => load_configured_cargo_package(root, &path)?,
+			#[cfg(not(feature = "cargo"))]
+			PackageType::Cargo => {
+				return Err(MonochangeError::Config(
+					"the `cargo` feature must be enabled to load Cargo packages".to_string(),
+				));
+			}
+			#[cfg(feature = "npm")]
 			PackageType::Npm => load_configured_npm_package(root, &path)?,
+			#[cfg(not(feature = "npm"))]
+			PackageType::Npm => {
+				return Err(MonochangeError::Config(
+					"the `npm` feature must be enabled to load npm packages".to_string(),
+				));
+			}
+			#[cfg(feature = "deno")]
 			PackageType::Deno => load_configured_deno_package(root, &path)?,
+			#[cfg(not(feature = "deno"))]
+			PackageType::Deno => {
+				return Err(MonochangeError::Config(
+					"the `deno` feature must be enabled to load Deno packages".to_string(),
+				));
+			}
+			#[cfg(feature = "dart")]
 			PackageType::Dart | PackageType::Flutter => load_configured_dart_package(root, &path)?,
+			#[cfg(not(feature = "dart"))]
+			PackageType::Dart | PackageType::Flutter => {
+				return Err(MonochangeError::Config(
+					"the `dart` feature must be enabled to load Dart packages".to_string(),
+				));
+			}
+			_ => {
+				return Err(MonochangeError::Config(format!(
+					"unsupported package type `{}` for `{}`",
+					package_definition.package_type.as_str(),
+					package_definition.id,
+				)));
+			}
 		}
 		.ok_or_else(|| {
 			MonochangeError::Discovery(format!(
@@ -926,6 +1021,7 @@ pub(crate) fn render_interactive_changeset_markdown(
 	Ok(lines.join("\n"))
 }
 
+#[must_use = "the release plan result must be checked"]
 pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<ReleasePlan> {
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
@@ -1059,70 +1155,23 @@ fn run_lockfile_command_in_place(
 }
 
 #[cfg(test)]
-fn remap_workspace_path(root: &Path, temp_root: &Path, path: &Path) -> MonochangeResult<PathBuf> {
-	let normalized_root = monochange_core::normalize_path(root);
-	let normalized_path = monochange_core::normalize_path(path);
-	let relative = normalized_path
-		.strip_prefix(&normalized_root)
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"path `{}` was outside workspace root `{}`: {error}",
-				path.display(),
-				root.display(),
-			))
-		})?;
-	Ok(temp_root.join(relative))
-}
-
+use monochange_test_helpers::workspace_ops::collect_workspace_files;
 #[cfg(test)]
-fn run_lockfile_command(
-	root: &Path,
-	temp_root: &Path,
-	command: &LockfileCommandExecution,
-) -> MonochangeResult<()> {
-	let cwd = remap_workspace_path(root, temp_root, &command.cwd)?;
-	let output = if let Some(shell_binary) = command.shell.shell_binary() {
-		ProcessCommand::new(shell_binary)
-			.arg("-c")
-			.arg(&command.command)
-			.current_dir(&cwd)
-			.output()
-	} else {
-		let parts = shlex::split(&command.command).ok_or_else(|| {
-			MonochangeError::Config(format!("failed to parse command `{}`", command.command))
-		})?;
-		let Some((program, args)) = parts.split_first() else {
-			return Err(MonochangeError::Config(
-				"lockfile command must not be empty".to_string(),
-			));
-		};
-		ProcessCommand::new(program)
-			.args(args)
-			.current_dir(&cwd)
-			.output()
-	};
-	let output = output.map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to run lockfile command `{}` in {}: {error}",
-			command.command,
-			root_relative(root, &command.cwd).display(),
-		))
-	})?;
-	if output.status.success() {
-		return Ok(());
-	}
-	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-	let details = if stderr.is_empty() {
-		format!("exit status {}", output.status)
-	} else {
-		stderr
-	};
-	Err(MonochangeError::Discovery(format!(
-		"lockfile command `{}` failed in {}: {details}",
-		command.command,
-		root_relative(root, &command.cwd).display(),
-	)))
-}
+use monochange_test_helpers::workspace_ops::copy_workspace_file;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::copy_workspace_tree;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::ensure_parent_directory;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::entry_file_type;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::read_optional_file;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::remap_workspace_path;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::run_lockfile_command;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
 
 #[cfg(test)]
 fn collect_workspace_file_updates(
@@ -1131,9 +1180,6 @@ fn collect_workspace_file_updates(
 	base_updates: &[FileUpdate],
 	lockfile_commands: &[LockfileCommandExecution],
 ) -> MonochangeResult<Vec<FileUpdate>> {
-	// Instead of walking the entire workspace tree, only scan directories
-	// that could have been modified: directories containing explicitly
-	// updated files and lockfile command working directories.
 	let normalized_root = monochange_core::normalize_path(root);
 	let mut dirs_to_scan = BTreeSet::new();
 	for update in base_updates {
@@ -1182,94 +1228,7 @@ fn collect_workspace_file_updates(
 	Ok(updates)
 }
 
-#[cfg(test)]
-fn read_optional_file(path: &Path) -> MonochangeResult<Option<Vec<u8>>> {
-	match fs::read(path) {
-		Ok(contents) => Ok(Some(contents)),
-		Err(error)
-			if matches!(
-				error.kind(),
-				std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
-			) =>
-		{
-			Ok(None)
-		}
-		Err(error) => {
-			Err(MonochangeError::Io(format!(
-				"failed to read {}: {error}",
-				path.display()
-			)))
-		}
-	}
-}
-
-#[cfg(test)]
-fn entry_file_type(entry: &fs::DirEntry, path: &Path) -> MonochangeResult<fs::FileType> {
-	entry
-		.file_type()
-		.map_err(|error| MonochangeError::Io(format!("failed to stat {}: {error}", path.display())))
-}
-
-#[cfg(test)]
-fn strip_workspace_prefix<'a>(path: &'a Path, root: &Path) -> MonochangeResult<&'a Path> {
-	path.strip_prefix(root).map_err(|error| {
-		MonochangeError::Config(format!(
-			"path `{}` was outside workspace root `{}`: {error}",
-			path.display(),
-			root.display()
-		))
-	})
-}
-
-#[cfg(test)]
-#[rustfmt::skip]
-fn ensure_parent_directory(path: &Path) -> MonochangeResult<()> {
-	if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|error| MonochangeError::Io(format!("failed to create {}: {error}", parent.display())))?; }
-	Ok(())
-}
-
-#[cfg(test)]
-fn copy_workspace_file(source: &Path, destination: &Path) -> MonochangeResult<()> {
-	fs::copy(source, destination).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to copy {} to {}: {error}",
-			source.display(),
-			destination.display()
-		))
-	})?;
-	Ok(())
-}
-
-#[cfg(test)]
-#[rustfmt::skip]
-fn collect_workspace_files(root: &Path, current: &Path, relative_paths: &mut BTreeSet<PathBuf>) -> MonochangeResult<()> {
-	for entry in fs::read_dir(current).map_err(|error| MonochangeError::Io(format!("failed to read {}: {error}", current.display())))? {
-		let entry = entry.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
-		let path = entry.path();
-		if path.file_name().is_some_and(|name| name == ".git") { continue; }
-		let file_type = entry_file_type(&entry, &path)?;
-		if file_type.is_dir() { collect_workspace_files(root, &path, relative_paths)?; continue; }
-		if file_type.is_file() { relative_paths.insert(strip_workspace_prefix(&path, root)?.to_path_buf()); }
-	}
-	Ok(())
-}
-
-#[cfg(test)]
-#[rustfmt::skip]
-fn copy_workspace_tree(source: &Path, destination: &Path) -> MonochangeResult<()> {
-	fs::create_dir_all(destination).map_err(|error| MonochangeError::Io(format!("failed to create {}: {error}", destination.display())))?;
-	for entry in fs::read_dir(source).map_err(|error| MonochangeError::Io(format!("failed to read {}: {error}", source.display())))? {
-		let entry = entry.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
-		let source_path = entry.path();
-		if source_path.file_name().is_some_and(|name| name == ".git") { continue; }
-		let destination_path = destination.join(entry.file_name());
-		let file_type = entry_file_type(&entry, &source_path)?;
-		if file_type.is_dir() { copy_workspace_tree(&source_path, &destination_path)?; continue; }
-		if file_type.is_file() { ensure_parent_directory(&destination_path)?; copy_workspace_file(&source_path, &destination_path)?; }
-	}
-	Ok(())
-}
-
+#[must_use = "the prepared release result must be checked"]
 pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
 	// The public API returns structured release state, not rendered diffs.
 	// Building unified diffs for large lockfiles can dominate wall time, so skip
