@@ -786,19 +786,18 @@ pub(crate) fn execute_cli_command_with_options(
 
 	progress.command_finished(command_started_at.elapsed());
 
-	if let Some(prepared_release) = &context.prepared_release {
-		if let Err(error) = save_prepared_release_execution(
+	if let Some(prepared_release) = &context.prepared_release
+		&& let Err(error) = save_prepared_release_execution(
 			root,
 			configuration,
 			prepared_release,
 			&context.prepared_file_diffs,
 			prepared_release_path.as_deref(),
 		) {
-			if prepared_release_path.is_some() {
-				return Err(error);
-			}
-			tracing::warn!(%error, "failed to save prepared release artifact");
+		if prepared_release_path.is_some() {
+			return Err(error);
 		}
+		tracing::warn!(%error, "failed to save prepared release artifact");
 	}
 
 	resolve_command_output(cli_command, &context, dry_run, output)

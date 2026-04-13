@@ -762,12 +762,12 @@ fn load_raw_configuration(root: &Path) -> MonochangeResult<(String, RawWorkspace
 	Ok((contents, raw))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::option_as_ref_cloned)]
 fn build_package_definitions(
 	contents: &str,
 	packages: BTreeMap<String, RawPackageDefinition>,
 	default_package_type: Option<PackageType>,
-	default_package_changelog: &Option<RawChangelogConfig>,
+	default_package_changelog: Option<&RawChangelogConfig>,
 	default_extra_changelog_sections: &[ExtraChangelogSection],
 	default_changelog_format: ChangelogFormat,
 	cargo_ecosystem: &EcosystemSettings,
@@ -1027,7 +1027,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		&contents,
 		package,
 		default_package_type,
-		&default_package_changelog,
+		default_package_changelog.as_ref(),
 		&default_extra_changelog_sections,
 		default_changelog_format,
 		&cargo_ecosystem,
@@ -3371,6 +3371,7 @@ fn validate_step_input_overrides(
 	Ok(())
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn config_diagnostic(
 	config_contents: &str,
 	message: String,
@@ -3668,6 +3669,7 @@ fn section_patterns(kind: &str, id: &str) -> [String; 2] {
 	[format!("[{kind}.{id}]"), format!("[{kind}.\"{id}\"]")]
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn changeset_diagnostic(
 	contents: &str,
 	changeset_path: &Path,
