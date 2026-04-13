@@ -45,6 +45,7 @@ git_commit() {
 		-u GIT_COMMON_DIR \
 		git -C "$root" \
 		-c core.hooksPath=/dev/null \
+		-c commit.gpgsign=false \
 		-c user.name=fixture \
 		-c user.email=fixture@example.com \
 		commit -m "$message" >/dev/null
@@ -61,6 +62,7 @@ run_git() {
 		-u GIT_COMMON_DIR \
 		git -C "$root" \
 		-c core.hooksPath=/dev/null \
+		-c commit.gpgsign=false \
 		-c user.name=fixture \
 		-c user.email=fixture@example.com \
 		"$@"
