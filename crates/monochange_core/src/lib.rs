@@ -1025,6 +1025,10 @@ pub struct ExtraChangelogSection {
 	pub types: Vec<String>,
 	#[serde(default)]
 	pub default_bump: Option<BumpSeverity>,
+	/// Description of when this change type should be used.
+	/// Helpful for LLMs and users to understand the purpose of this section.
+	#[serde(default)]
+	pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]

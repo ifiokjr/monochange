@@ -2140,6 +2140,30 @@ fn load_workspace_configuration_parses_release_note_customization() {
 	assert_eq!(extra_section.name, "Security");
 	assert_eq!(extra_section.types, vec!["security"]);
 	assert_eq!(extra_section.default_bump, Some(BumpSeverity::Patch));
+	assert_eq!(extra_section.description, None);
+}
+
+#[test]
+fn load_workspace_configuration_parses_extra_changelog_section_with_description() {
+	let root = fixture_path("config/release-note-customization-with-description");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.package_by_id("core")
+		.unwrap_or_else(|| panic!("expected package"));
+
+	assert_eq!(package.extra_changelog_sections.len(), 1);
+	let extra_section = package
+		.extra_changelog_sections
+		.first()
+		.unwrap_or_else(|| panic!("expected extra changelog section"));
+	assert_eq!(extra_section.name, "Testing");
+	assert_eq!(extra_section.types, vec!["test"]);
+	assert_eq!(extra_section.default_bump, Some(BumpSeverity::None));
+	assert_eq!(
+		extra_section.description,
+		Some("Changes that only modify tests".to_string())
+	);
 }
 
 #[test]

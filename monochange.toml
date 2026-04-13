@@ -266,8 +266,11 @@ packages = [
 	"monochange_hosting",
 ]
 extra_changelog_sections = [
-	{ name = "Testing", types = ["test"] },
-	{ name = "Documentation", types = ["docs"] },
+	{ name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" },
+	{ name = "Documentation", types = ["docs"], default_bump = "none", description = "Changes that only modify documentation" },
+	{ name = "Security", types = ["security"], default_bump = "none", description = "Security-related changes" },
+	{ name = "Performance", types = ["perf"], default_bump = "none", description = "Performance improvements" },
+	{ name = "Refactor", types = ["refactor"], default_bump = "none", description = "Code refactoring without functional changes" },
 ]
 tag = true
 release = true

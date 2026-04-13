@@ -552,6 +552,34 @@ fn workspace_defaults_default_has_no_extra_changelog_sections() {
 }
 
 #[test]
+fn extra_changelog_section_supports_description_field() {
+	let section = ExtraChangelogSection {
+		name: "Testing".to_string(),
+		types: vec!["test".to_string()],
+		default_bump: None,
+		description: Some("Changes that only modify tests".to_string()),
+	};
+	assert_eq!(section.name, "Testing");
+	assert_eq!(section.types, vec!["test"]);
+	assert_eq!(section.default_bump, None);
+	assert_eq!(
+		section.description,
+		Some("Changes that only modify tests".to_string())
+	);
+}
+
+#[test]
+fn extra_changelog_section_description_is_optional() {
+	let section = ExtraChangelogSection {
+		name: "Security".to_string(),
+		types: vec!["security".to_string()],
+		default_bump: Some(BumpSeverity::Patch),
+		description: None,
+	};
+	assert_eq!(section.description, None);
+}
+
+#[test]
 fn bump_severity_orders_from_none_to_major() {
 	assert!(BumpSeverity::Patch > BumpSeverity::None);
 	assert!(BumpSeverity::Minor > BumpSeverity::Patch);

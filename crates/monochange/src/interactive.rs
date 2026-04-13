@@ -822,11 +822,13 @@ mod __tests {
 						name: "Docs".to_string(),
 						types: vec!["test".to_string(), "docs".to_string()],
 						default_bump: None,
+						description: None,
 					},
 					ExtraChangelogSection {
 						name: "More".to_string(),
 						types: vec!["docs".to_string(), "security".to_string()],
 						default_bump: None,
+						description: None,
 					},
 				],
 				empty_update_message: None,

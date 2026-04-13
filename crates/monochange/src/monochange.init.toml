@@ -83,7 +83,19 @@ warn_on_group_mismatch = true
 #
 # Each entry maps one or more changeset `type` values into a named changelog
 # section. Example:
-# extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+# extra_changelog_sections = [
+#     { name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" },
+#     { name = "Documentation", types = ["docs"], default_bump = "none", description = "Changes that only modify documentation" },
+#     { name = "Security", types = ["security"], default_bump = "none", description = "Security-related changes" },
+#     { name = "Performance", types = ["perf"], default_bump = "none", description = "Performance improvements" },
+#     { name = "Refactor", types = ["refactor"], default_bump = "none", description = "Code refactoring without functional changes" },
+# ]
+#
+# Each section can include:
+#   - name: The display name for the changelog section
+#   - types: List of change types that route to this section
+#   - default_bump (optional): The default semver bump for this type (none, patch, minor, major)
+#   - description (optional): When this type should be used; helpful for LLMs and users
 #
 # Default: []
 
