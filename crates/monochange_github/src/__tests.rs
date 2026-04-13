@@ -1273,7 +1273,7 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"},"closingIssuesReferences":{"nodes":[{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}]}}}}"#,
+				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}"#,
 			);
 	});
 	let github = SourceConfiguration {
@@ -1372,6 +1372,16 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 			.and_then(|commit| commit.url.as_deref()),
 		Some("https://example.com/ifiokjr/monochange/commit/abc1234567890")
 	);
+}
+
+#[test]
+fn review_request_query_uses_lean_pull_request_payload() {
+	let query =
+		build_review_request_batch_query("ifiokjr", "monochange", &["abc1234567890".to_string()]);
+
+	assert!(query.contains("associatedPullRequests(first: 1)"));
+	assert!(query.contains("body"));
+	assert!(!query.contains("closingIssuesReferences"));
 }
 
 #[test]
@@ -1522,7 +1532,7 @@ fn enrich_changeset_context_falls_back_to_commit_annotations_when_batch_lookup_f
 }
 
 #[test]
-fn batch_review_request_lookup_reports_missing_repository_payload_and_skips_malformed_issues() {
+fn batch_review_request_lookup_reports_missing_repository_payload_and_parses_body_issue_refs() {
 	let server = MockServer::start();
 	let missing_repository = server.mock(|when, then| {
 		when.method(POST)
@@ -1562,19 +1572,19 @@ fn batch_review_request_lookup_reports_missing_repository_payload_and_skips_malf
 		});
 	missing_repository.assert();
 
-	let malformed_server = MockServer::start();
-	let malformed_issues = malformed_server.mock(|when, then| {
+	let parsing_server = MockServer::start();
+	let parsing_issues = parsing_server.mock(|when, then| {
 		when.method(POST).path("/graphql");
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"","author":{"login":"ifiokjr","url":"https://example.com/users/1"},"closingIssuesReferences":{"nodes":[{"title":"missing number"},{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}]}}}}"#,
+				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7, #9 and owner/repo#11\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}"#,
 			);
 	});
 	github_runtime()
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
-			let client = build_test_client(&malformed_server);
+			let client = build_test_client(&parsing_server);
 			let review_requests = load_review_request_batch_with_client(
 				&client,
 				&github,
@@ -1587,10 +1597,41 @@ fn batch_review_request_lookup_reports_missing_repository_payload_and_skips_malf
 				.and_then(|value| value.as_ref())
 				.map(|related| related.issues.clone())
 				.unwrap_or_default();
-			assert_eq!(issues.len(), 1);
-			assert_eq!(issues.first().map(|issue| issue.id.as_str()), Some("#7"));
+			assert_eq!(issues.len(), 4);
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#7"
+					&& issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest
+			}));
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#9"
+					&& issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest
+			}));
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#11"
+					&& issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest
+			}));
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#8"
+					&& issue.relationship == HostedIssueRelationshipKind::ReferencedByReviewRequest
+			}));
 		});
-	malformed_issues.assert();
+	parsing_issues.assert();
+}
+
+#[test]
+fn extract_closing_issue_numbers_only_marks_closing_keywords() {
+	let body = "Closes #7, #9 and owner/repo#11\nRefs #8\nFixed #10 and refs #12";
+
+	assert_eq!(
+		extract_issue_numbers(body).into_iter().collect::<Vec<_>>(),
+		vec![7, 8, 9, 10, 11, 12]
+	);
+	assert_eq!(
+		extract_closing_issue_numbers(body)
+			.into_iter()
+			.collect::<Vec<_>>(),
+		vec![7, 9, 10, 11]
+	);
 }
 
 #[test]

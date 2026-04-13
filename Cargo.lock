@@ -2072,6 +2072,7 @@ dependencies = [
  "monochange_core",
  "monochange_test_helpers",
  "octocrab",
+ "regex",
  "serde",
  "serde_json",
  "temp-env",

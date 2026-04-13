@@ -95,6 +95,7 @@ use std::env;
 use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::thread;
 
 use monochange_core::CommitMessage;
@@ -140,6 +141,7 @@ use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
 use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use octocrab::Octocrab;
+use regex::Regex;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -726,7 +728,7 @@ fn build_review_request_batch_query(owner: &str, repo: &str, shas: &[String]) ->
 		let alias = format!("commit_{index}");
 		let _ = write!(
 			query,
-			" {alias}: object(expression: \"{sha}\") {{ ... on Commit {{ associatedPullRequests(first: 1) {{ nodes {{ number title url body author {{ login url }} closingIssuesReferences(first: 50) {{ nodes {{ number title url }} }} }} }} }} }}"
+			" {alias}: object(expression: \"{sha}\") {{ ... on Commit {{ associatedPullRequests(first: 1) {{ nodes {{ number title url body author {{ login url }} }} }} }} }}"
 		);
 	}
 	query.push_str(" } }");
@@ -783,30 +785,19 @@ fn parse_review_request_from_graphql(
 		author,
 	};
 	let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
-	for issue in pull_request
-		.get("closingIssuesReferences")
-		.and_then(|issues| issues.get("nodes"))
-		.and_then(serde_json::Value::as_array)
-		.into_iter()
-		.flatten()
+	for issue_number in body
+		.as_deref()
+		.map(extract_closing_issue_numbers)
+		.unwrap_or_default()
 	{
-		let Some(number) = issue.get("number").and_then(serde_json::Value::as_u64) else {
-			continue;
-		};
 		issues_by_id.insert(
-			format!("#{number}"),
+			format!("#{issue_number}"),
 			HostedIssueRef {
 				provider: HostingProviderKind::GitHub,
 				host: github_host(),
-				id: format!("#{number}"),
-				title: issue
-					.get("title")
-					.and_then(serde_json::Value::as_str)
-					.map(str::to_string),
-				url: issue
-					.get("url")
-					.and_then(serde_json::Value::as_str)
-					.map(str::to_string),
+				id: format!("#{issue_number}"),
+				title: None,
+				url: Some(github_issue_url(source, issue_number)),
 				relationship: HostedIssueRelationshipKind::ClosedByReviewRequest,
 			},
 		);
@@ -835,30 +826,39 @@ fn parse_review_request_from_graphql(
 	})
 }
 
-fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
+fn issue_reference_regex() -> &'static Regex {
+	static ISSUE_REFERENCE_RE: OnceLock<Regex> = OnceLock::new();
+	ISSUE_REFERENCE_RE.get_or_init(|| {
+		Regex::new(r"(?:[\w.-]+/[\w.-]+)?#(?P<number>\d+)")
+			.unwrap_or_else(|error| panic!("issue reference regex should compile: {error}"))
+	})
+}
+
+fn closing_issue_reference_regex() -> &'static Regex {
+	static CLOSING_ISSUE_REFERENCE_RE: OnceLock<Regex> = OnceLock::new();
+	CLOSING_ISSUE_REFERENCE_RE.get_or_init(|| {
+		Regex::new(r"(?i)\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[:\s]*(?P<refs>(?:[\w.-]+/[\w.-]+)?#\d+(?:\s*(?:,|and)\s*(?:[\w.-]+/[\w.-]+)?#\d+)*)")
+		.unwrap_or_else(|error| panic!("closing issue regex should compile: {error}"))
+	})
+}
+
+fn extract_closing_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
 	let mut issue_numbers = std::collections::BTreeSet::new();
-	let bytes = text.as_bytes();
-	let mut index = 0;
-	while let Some(byte) = bytes.get(index) {
-		if *byte != b'#' {
-			index += 1;
+	for captures in closing_issue_reference_regex().captures_iter(text) {
+		let Some(references) = captures.name("refs") else {
 			continue;
-		}
-		let mut digits = String::new();
-		let mut cursor = index + 1;
-		while let Some(next) = bytes.get(cursor) {
-			if !next.is_ascii_digit() {
-				break;
-			}
-			digits.push(char::from(*next));
-			cursor += 1;
-		}
-		if let Ok(number) = digits.parse::<u64>() {
-			issue_numbers.insert(number);
-		}
-		index = cursor;
+		};
+		issue_numbers.extend(extract_issue_numbers(references.as_str()));
 	}
 	issue_numbers
+}
+
+fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
+	issue_reference_regex()
+		.captures_iter(text)
+		.filter_map(|captures| captures.name("number"))
+		.filter_map(|number| number.as_str().parse::<u64>().ok())
+		.collect()
 }
 
 #[must_use]
