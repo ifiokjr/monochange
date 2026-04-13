@@ -36,6 +36,7 @@ use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::SourceReleaseOperation;
 use monochange_core::VersionFormat;
+use monochange_hosting::push_body_entries;
 use monochange_test_helpers::git;
 use monochange_test_helpers::git_output;
 use tempfile::tempdir;
@@ -420,22 +421,29 @@ fn gitlab_json_helpers_cover_not_found_and_status_errors() {
 	});
 	let client = gitlab_client().unwrap_or_else(|error| panic!("client: {error}"));
 	let base = server.base_url();
+	let headers = auth_headers("token").unwrap_or_else(|error| panic!("headers: {error}"));
 
-	let missing_value =
-		get_optional_json::<serde_json::Value>(&client, "token", &format!("{base}/missing"))
-			.unwrap_or_else(|error| panic!("optional json: {error}"));
+	let missing_value = get_optional_json::<serde_json::Value>(
+		&client,
+		&headers,
+		&format!("{base}/missing"),
+		"GitLab",
+	)
+	.unwrap_or_else(|error| panic!("optional json: {error}"));
 	assert_eq!(missing_value, None);
 
-	let get_error = get_json::<serde_json::Value>(&client, "token", &format!("{base}/fail-get"))
-		.err()
-		.unwrap_or_else(|| panic!("expected get error"));
+	let get_error =
+		get_json::<serde_json::Value>(&client, &headers, &format!("{base}/fail-get"), "GitLab")
+			.err()
+			.unwrap_or_else(|| panic!("expected get error"));
 	assert!(get_error.to_string().contains("GitLab API GET"));
 
 	let post_error = post_json::<_, serde_json::Value>(
 		&client,
-		"token",
+		&headers,
 		&format!("{base}/fail-post"),
 		&serde_json::json!({"tag_name": "v1.2.3"}),
+		"GitLab",
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected post error"));
@@ -443,9 +451,10 @@ fn gitlab_json_helpers_cover_not_found_and_status_errors() {
 
 	let put_error = put_json::<_, serde_json::Value>(
 		&client,
-		"token",
+		&headers,
 		&format!("{base}/fail-put"),
 		&serde_json::json!({"title": "Release"}),
+		"GitLab",
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected put error"));
@@ -453,9 +462,10 @@ fn gitlab_json_helpers_cover_not_found_and_status_errors() {
 
 	let patch_error = patch_json::<_, serde_json::Value>(
 		&client,
-		"token",
+		&headers,
 		&format!("{base}/fail-patch"),
 		&serde_json::json!({"name": "v1.2.3"}),
+		"GitLab",
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected patch error"));
@@ -690,6 +700,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
+		"commit release merge request changes",
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
@@ -720,6 +731,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
+		"commit release merge request changes",
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
@@ -748,6 +760,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
+		"commit release merge request changes",
 	)
 	.unwrap_or_else(|error| panic!("commit paths: {error}"));
 
@@ -772,11 +785,11 @@ fn git_checkout_branch_is_noop_when_branch_is_already_checked_out() {
 	git(&repo, &["commit", "-m", "initial"]);
 
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release"),
+		git_checkout_branch(&repo, "monochange/release/release", "test context"),
 		"checkout branch",
 	);
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release"),
+		git_checkout_branch(&repo, "monochange/release/release", "test context"),
 		"repeat checkout branch",
 	);
 
@@ -815,10 +828,11 @@ fn publish_merge_request_updates_existing_merge_request() {
 		&sample_manifest(),
 	);
 	let client = gitlab_client().unwrap_or_else(|error| panic!("client: {error}"));
+	let headers = auth_headers("token").unwrap_or_else(|error| panic!("headers: {error}"));
 
 	let outcome = publish_merge_request(
 		&client,
-		"token",
+		&headers,
 		&format!("{}/api/v4", server.base_url()),
 		&request,
 	)
