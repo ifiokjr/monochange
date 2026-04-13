@@ -403,6 +403,10 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 	arg
 }
 
+/// Intentionally leaks a string to obtain a `&'static str` for clap arguments.
+///
+/// This is acceptable only in CLI binaries where the process lifetime is short
+/// and the leaked strings are never freed. Do not use this in library code.
 fn leak_string(value: impl Into<String>) -> &'static str {
 	Box::leak(value.into().into_boxed_str())
 }

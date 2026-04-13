@@ -133,6 +133,7 @@ pub(crate) use git_support::run_git_process;
 pub(crate) use git_support::run_git_status;
 use minijinja::Environment;
 use minijinja::UndefinedBehavior;
+#[cfg(feature = "cargo")]
 use monochange_cargo::RustSemverProvider;
 use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
@@ -204,8 +205,11 @@ use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
 use monochange_core::render_release_notes;
 use monochange_core::render_release_record_block;
+#[cfg(feature = "gitea")]
 use monochange_gitea as gitea_provider;
+#[cfg(feature = "github")]
 use monochange_github as github_provider;
+#[cfg(feature = "gitlab")]
 use monochange_gitlab as gitlab_provider;
 use monochange_graph::build_release_plan;
 use monochange_semver::CompatibilityProvider;
@@ -240,6 +244,7 @@ pub(crate) use workspace_ops::render_change_target_markdown;
 pub(crate) use workspace_ops::render_cli_commands_toml;
 #[cfg(test)]
 pub(crate) use workspace_ops::render_interactive_changeset_markdown;
+#[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
 mod assist;
@@ -522,6 +527,7 @@ struct CommandStepOutput {
 
 const CHANGESET_DIR: &str = ".changeset";
 
+#[must_use = "the run result must be checked"]
 pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
@@ -566,6 +572,7 @@ where
 	None
 }
 
+#[must_use = "the run result must be checked"]
 pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
@@ -703,6 +710,7 @@ fn format_publish_state(publish_state: monochange_core::PublishState) -> &'stati
 		monochange_core::PublishState::Private => "private",
 		monochange_core::PublishState::Unpublished => "unpublished",
 		monochange_core::PublishState::Excluded => "excluded",
+		_ => "unknown",
 	}
 }
 

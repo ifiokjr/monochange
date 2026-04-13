@@ -253,6 +253,7 @@ pub fn update_pnpm_lock(
 	}
 }
 
+#[must_use = "the lockfile update result must be checked"]
 pub fn update_pnpm_lock_text(
 	contents: &str,
 	raw_versions: &BTreeMap<String, String>,
@@ -583,6 +584,7 @@ impl EcosystemAdapter for NpmAdapter {
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the discovery result must be checked"]
 pub fn discover_npm_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let mut included_manifests = HashSet::new();
 	let mut packages = Vec::new();
@@ -635,6 +637,7 @@ pub fn discover_npm_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> 
 /// release planning only needs the configured package manifests. Walking the
 /// entire repository is wasted work in workspaces that contain fixture package
 /// trees, so higher-level code uses this helper to parse only the known package.
+#[must_use = "the package result must be checked"]
 pub fn load_configured_npm_package(
 	root: &Path,
 	package_path: &Path,

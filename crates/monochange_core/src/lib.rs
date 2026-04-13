@@ -82,6 +82,7 @@ pub const DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY: &str =
 pub const DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED: &str = "{% if tag_url %}{{ id }} [{{ version }}]({{ tag_url }}){% else %}{{ id }} {{ version }}{% endif %} ({{ date }})";
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum MonochangeError {
 	#[error("io error: {0}")]
 	Io(String),
@@ -91,6 +92,26 @@ pub enum MonochangeError {
 	Discovery(String),
 	#[error("{0}")]
 	Diagnostic(String),
+	#[error("io error at {path:?}: {source}")]
+	IoSource {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+	#[error("parse error at {path:?}: {source}")]
+	Parse {
+		path: PathBuf,
+		source: Box<dyn std::error::Error + Send + Sync>,
+	},
+	#[cfg(feature = "http")]
+	#[error("http error {context}: {source}")]
+	HttpRequest {
+		context: String,
+		source: reqwest::Error,
+	},
+	#[error("interactive error: {message}")]
+	Interactive { message: String },
+	#[error("cancelled")]
+	Cancelled,
 }
 
 impl MonochangeError {
@@ -98,6 +119,18 @@ impl MonochangeError {
 	pub fn render(&self) -> String {
 		match self {
 			Self::Diagnostic(report) => report.clone(),
+			Self::IoSource { path, source } => {
+				format!("io error at {}: {source}", path.display())
+			}
+			Self::Parse { path, source } => {
+				format!("parse error at {}: {source}", path.display())
+			}
+			#[cfg(feature = "http")]
+			Self::HttpRequest { context, source } => {
+				format!("http error {context}: {source}")
+			}
+			Self::Interactive { message } => message.clone(),
+			Self::Cancelled => "cancelled".to_string(),
 			_ => self.to_string(),
 		}
 	}
@@ -105,6 +138,7 @@ impl MonochangeError {
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum BumpSeverity {
 	None,
 	#[default]
@@ -181,6 +215,7 @@ impl fmt::Display for BumpSeverity {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Ecosystem {
 	Cargo,
 	Npm,
@@ -210,6 +245,7 @@ impl fmt::Display for Ecosystem {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PublishState {
 	Public,
 	Private,
@@ -219,6 +255,7 @@ pub enum PublishState {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DependencyKind {
 	Runtime,
 	Development,
@@ -243,6 +280,7 @@ impl fmt::Display for DependencyKind {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DependencySourceKind {
 	Manifest,
 	Workspace,
@@ -429,6 +467,7 @@ pub struct DependencyEdge {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PackageType {
 	Cargo,
 	Npm,
@@ -452,14 +491,16 @@ impl PackageType {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum VersionFormat {
 	#[default]
 	Namespaced,
 	Primary,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum EcosystemType {
 	Cargo,
 	Npm,
@@ -541,6 +582,7 @@ pub fn strip_json_comments(contents: &str) -> String {
 	output
 }
 
+#[must_use = "the manifest update result must be checked"]
 pub fn update_json_manifest_text(
 	contents: &str,
 	owner_version: Option<&str>,
@@ -918,7 +960,7 @@ fn json_span_is_object(contents: &str, span: JsonSpan) -> bool {
 		&& contents.as_bytes().get(span.end - 1) == Some(&b'}')
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct VersionedFileDefinition {
 	pub path: String,
 	#[serde(rename = "type", default)]
@@ -949,6 +991,7 @@ pub enum ChangelogDefinition {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ChangelogFormat {
 	#[default]
 	Monochange,
@@ -1251,6 +1294,7 @@ impl<'de> Deserialize<'de> for ShellConfig {
 /// See the CLI step reference in the book for full workflow guidance.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[non_exhaustive]
 pub enum CliStepDefinition {
 	/// Validate `monochange` configuration and changesets without preparing a
 	/// release.
@@ -2047,6 +2091,26 @@ fn default_release_record_kind() -> String {
 	RELEASE_RECORD_KIND.to_string()
 }
 
+fn default_true() -> bool {
+	true
+}
+
+fn default_pull_request_branch_prefix() -> String {
+	"monochange/release".to_string()
+}
+
+fn default_pull_request_base() -> String {
+	"main".to_string()
+}
+
+fn default_pull_request_title() -> String {
+	"chore(release): prepare release".to_string()
+}
+
+fn default_pull_request_labels() -> Vec<String> {
+	vec!["release".to_string(), "automated".to_string()]
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRecordTarget {
@@ -2226,6 +2290,7 @@ pub enum ReleaseRecordError {
 pub type ReleaseRecordResult<T> = Result<T, ReleaseRecordError>;
 
 /// Render a `ReleaseRecord` into the reserved commit-message block format.
+#[must_use = "the rendered record result must be checked"]
 pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResult<String> {
 	if record.kind != RELEASE_RECORD_KIND {
 		return Err(ReleaseRecordError::UnsupportedKind(record.kind.clone()));
@@ -2242,6 +2307,7 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 }
 
 /// Parse a `ReleaseRecord` from a full commit message body.
+#[must_use = "the parsed record result must be checked"]
 pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<ReleaseRecord> {
 	let start_matches = commit_message
 		.match_indices(RELEASE_RECORD_START_MARKER)
@@ -2335,33 +2401,88 @@ pub enum ProviderReleaseNotesSource {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderReleaseSettings {
+	#[serde(default = "default_true")]
 	pub enabled: bool,
+	#[serde(default)]
 	pub draft: bool,
+	#[serde(default)]
 	pub prerelease: bool,
+	#[serde(default)]
 	pub generate_notes: bool,
+	#[serde(default)]
 	pub source: ProviderReleaseNotesSource,
+}
+
+impl Default for ProviderReleaseSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			draft: false,
+			prerelease: false,
+			generate_notes: false,
+			source: ProviderReleaseNotesSource::default(),
+		}
+	}
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderMergeRequestSettings {
+	#[serde(default = "default_true")]
 	pub enabled: bool,
+	#[serde(default = "default_pull_request_branch_prefix")]
 	pub branch_prefix: String,
+	#[serde(default = "default_pull_request_base")]
 	pub base: String,
+	#[serde(default = "default_pull_request_title")]
 	pub title: String,
+	#[serde(default = "default_pull_request_labels")]
 	pub labels: Vec<String>,
+	#[serde(default)]
 	pub auto_merge: bool,
+}
+
+impl Default for ProviderMergeRequestSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			branch_prefix: default_pull_request_branch_prefix(),
+			base: default_pull_request_base(),
+			title: default_pull_request_title(),
+			labels: default_pull_request_labels(),
+			auto_merge: false,
+		}
+	}
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderChangesetBotSettings {
+	#[serde(default)]
 	pub enabled: bool,
+	#[serde(default = "default_true")]
 	pub required: bool,
+	#[serde(default)]
 	pub skip_labels: Vec<String>,
+	#[serde(default = "default_true")]
 	pub comment_on_failure: bool,
+	#[serde(default)]
 	pub changed_paths: Vec<String>,
+	#[serde(default)]
 	pub ignored_paths: Vec<String>,
+}
+
+impl Default for ProviderChangesetBotSettings {
+	fn default() -> Self {
+		Self {
+			enabled: false,
+			required: true,
+			skip_labels: Vec::new(),
+			comment_on_failure: true,
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
+		}
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -2373,10 +2494,25 @@ pub struct ProviderBotSettings {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangesetVerificationSettings {
+	#[serde(default = "default_true")]
 	pub enabled: bool,
+	#[serde(default = "default_true")]
 	pub required: bool,
+	#[serde(default)]
 	pub skip_labels: Vec<String>,
+	#[serde(default = "default_true")]
 	pub comment_on_failure: bool,
+}
+
+impl Default for ChangesetVerificationSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			required: true,
+			skip_labels: Vec::new(),
+			comment_on_failure: true,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -2442,55 +2578,6 @@ pub struct ChangesetPolicyEvaluation {
 	pub uncovered_package_ids: Vec<String>,
 	#[serde(default)]
 	pub errors: Vec<String>,
-}
-
-impl Default for ProviderReleaseSettings {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			draft: false,
-			prerelease: false,
-			generate_notes: false,
-			source: ProviderReleaseNotesSource::Monochange,
-		}
-	}
-}
-
-impl Default for ProviderMergeRequestSettings {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			branch_prefix: "monochange/release".to_string(),
-			base: "main".to_string(),
-			title: "chore(release): prepare release".to_string(),
-			labels: vec!["release".to_string(), "automated".to_string()],
-			auto_merge: false,
-		}
-	}
-}
-
-impl Default for ProviderChangesetBotSettings {
-	fn default() -> Self {
-		Self {
-			enabled: false,
-			required: true,
-			skip_labels: Vec::new(),
-			comment_on_failure: true,
-			changed_paths: Vec::new(),
-			ignored_paths: Vec::new(),
-		}
-	}
-}
-
-impl Default for ChangesetVerificationSettings {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			required: true,
-			skip_labels: Vec::new(),
-			comment_on_failure: true,
-		}
-	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

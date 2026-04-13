@@ -158,6 +158,7 @@ impl EcosystemAdapter for DenoAdapter {
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the discovery result must be checked"]
 pub fn discover_deno_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let workspace_manifests = find_workspace_manifests(root);
 	let mut included_manifests = HashSet::new();
@@ -194,6 +195,7 @@ pub fn discover_deno_packages(root: &Path) -> MonochangeResult<AdapterDiscovery>
 }
 
 /// Load one explicitly configured Deno package without scanning unrelated manifests.
+#[must_use = "the package result must be checked"]
 pub fn load_configured_deno_package(
 	root: &Path,
 	package_path: &Path,

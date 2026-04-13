@@ -2453,3 +2453,54 @@ fn json_helper_functions_cover_success_paths() {
 		r#"{"version":1,"imports":{"core":{"path":"./core"}}}"#
 	);
 }
+
+#[test]
+fn monochange_error_io_source_render_includes_path_and_source() {
+	let error = MonochangeError::IoSource {
+		path: PathBuf::from("/tmp/missing.toml"),
+		source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
+	};
+	let rendered = error.render();
+	assert!(rendered.contains("/tmp/missing.toml"), "got: {rendered}");
+	assert!(rendered.contains("not found"), "got: {rendered}");
+}
+
+#[test]
+fn monochange_error_parse_render_includes_path_and_source() {
+	let error = MonochangeError::Parse {
+		path: PathBuf::from("Cargo.toml"),
+		source: Box::new(std::io::Error::new(
+			std::io::ErrorKind::InvalidData,
+			"bad format",
+		)),
+	};
+	let rendered = error.render();
+	assert!(rendered.contains("Cargo.toml"), "got: {rendered}");
+	assert!(rendered.contains("bad format"), "got: {rendered}");
+}
+
+#[test]
+fn monochange_error_interactive_render_returns_message() {
+	let error = MonochangeError::Interactive {
+		message: "prompt failed".to_string(),
+	};
+	assert_eq!(error.render(), "prompt failed");
+}
+
+#[test]
+fn monochange_error_cancelled_render_returns_cancelled() {
+	let error = MonochangeError::Cancelled;
+	assert_eq!(error.render(), "cancelled");
+}
+
+#[cfg(feature = "http")]
+#[test]
+fn monochange_error_http_request_render_includes_context_and_source() {
+	let client = reqwest::blocking::Client::new();
+	let error = MonochangeError::HttpRequest {
+		context: "fetching releases".to_string(),
+		source: client.get("http://0.0.0.0:1").send().unwrap_err(),
+	};
+	let rendered = error.render();
+	assert!(rendered.contains("fetching releases"), "got: {rendered}");
+}

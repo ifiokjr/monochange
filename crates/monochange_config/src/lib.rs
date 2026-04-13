@@ -1,4 +1,3 @@
-#![allow(unused_assignments)]
 #![forbid(clippy::indexing_slicing)]
 
 //! # `monochange_config`
@@ -85,10 +84,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::Pattern;
-use miette::Diagnostic;
 use miette::LabeledSpan;
-use miette::NamedSource;
-use miette::Report;
 use miette::SourceSpan;
 use minijinja::Environment;
 use minijinja::UndefinedBehavior;
@@ -99,7 +95,6 @@ use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetSettings;
 use monochange_core::ChangesetTargetKind;
-use monochange_core::ChangesetVerificationSettings;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
@@ -119,9 +114,7 @@ use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::ProviderBotSettings;
-use monochange_core::ProviderChangesetBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
-use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ProviderReleaseSettings;
 use monochange_core::ReleaseNotesSettings;
 use monochange_core::SourceConfiguration;
@@ -148,7 +141,6 @@ const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"target_id",
 	"bump",
 	"type",
-	"context",
 	"context",
 	"changeset_path",
 	"change_owner",
@@ -180,7 +172,7 @@ struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	workflows: Vec<CliCommandDefinition>,
 	#[serde(default)]
-	changesets: RawChangesetSettings,
+	changesets: ChangesetSettings,
 	#[serde(default)]
 	source: Option<RawSourceConfiguration>,
 	#[serde(default)]
@@ -368,36 +360,6 @@ struct RawReleaseNotesSettings {
 	change_templates: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Default)]
-struct RawChangesetSettings {
-	#[serde(default)]
-	verify: RawChangesetVerificationSettings,
-}
-
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Deserialize)]
-struct RawChangesetVerificationSettings {
-	#[serde(default = "default_true")]
-	enabled: bool,
-	#[serde(default = "default_true")]
-	required: bool,
-	#[serde(default)]
-	skip_labels: Vec<String>,
-	#[serde(default = "default_true")]
-	comment_on_failure: bool,
-}
-
-impl Default for RawChangesetVerificationSettings {
-	fn default() -> Self {
-		Self {
-			enabled: default_true(),
-			required: default_true(),
-			skip_labels: Vec::new(),
-			comment_on_failure: default_true(),
-		}
-	}
-}
-
 #[derive(Debug, Deserialize)]
 struct RawSourceConfiguration {
 	#[serde(default)]
@@ -409,11 +371,11 @@ struct RawSourceConfiguration {
 	#[serde(default)]
 	api_url: Option<String>,
 	#[serde(default)]
-	releases: RawProviderReleaseSettings,
+	releases: ProviderReleaseSettings,
 	#[serde(default)]
-	pull_requests: RawProviderMergeRequestSettings,
+	pull_requests: ProviderMergeRequestSettings,
 	#[serde(default)]
-	bot: RawProviderBotSettings,
+	bot: ProviderBotSettings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -421,104 +383,11 @@ struct RawGitHubConfiguration {
 	owner: String,
 	repo: String,
 	#[serde(default)]
-	releases: RawProviderReleaseSettings,
+	releases: ProviderReleaseSettings,
 	#[serde(default)]
-	pull_requests: RawProviderMergeRequestSettings,
+	pull_requests: ProviderMergeRequestSettings,
 	#[serde(default)]
-	bot: RawProviderBotSettings,
-}
-
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Deserialize)]
-struct RawProviderReleaseSettings {
-	#[serde(default = "default_true")]
-	enabled: bool,
-	#[serde(default)]
-	draft: bool,
-	#[serde(default)]
-	prerelease: bool,
-	#[serde(default)]
-	generate_notes: bool,
-	#[serde(default)]
-	source: ProviderReleaseNotesSource,
-}
-
-impl Default for RawProviderReleaseSettings {
-	fn default() -> Self {
-		Self {
-			enabled: default_true(),
-			draft: false,
-			prerelease: false,
-			generate_notes: false,
-			source: ProviderReleaseNotesSource::Monochange,
-		}
-	}
-}
-
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Deserialize)]
-struct RawProviderMergeRequestSettings {
-	#[serde(default = "default_true")]
-	enabled: bool,
-	#[serde(default = "default_pull_request_branch_prefix")]
-	branch_prefix: String,
-	#[serde(default = "default_pull_request_base")]
-	base: String,
-	#[serde(default = "default_pull_request_title")]
-	title: String,
-	#[serde(default = "default_pull_request_labels")]
-	labels: Vec<String>,
-	#[serde(default)]
-	auto_merge: bool,
-}
-
-impl Default for RawProviderMergeRequestSettings {
-	fn default() -> Self {
-		Self {
-			enabled: default_true(),
-			branch_prefix: default_pull_request_branch_prefix(),
-			base: default_pull_request_base(),
-			title: default_pull_request_title(),
-			labels: default_pull_request_labels(),
-			auto_merge: false,
-		}
-	}
-}
-
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Deserialize)]
-struct RawProviderChangesetBotSettings {
-	#[serde(default)]
-	enabled: bool,
-	#[serde(default = "default_true")]
-	required: bool,
-	#[serde(default)]
-	skip_labels: Vec<String>,
-	#[serde(default = "default_true")]
-	comment_on_failure: bool,
-	#[serde(default)]
-	changed_paths: Vec<String>,
-	#[serde(default)]
-	ignored_paths: Vec<String>,
-}
-
-impl Default for RawProviderChangesetBotSettings {
-	fn default() -> Self {
-		Self {
-			enabled: false,
-			required: default_true(),
-			skip_labels: Vec::new(),
-			comment_on_failure: default_true(),
-			changed_paths: Vec::new(),
-			ignored_paths: Vec::new(),
-		}
-	}
-}
-
-#[derive(Debug, Deserialize, Default)]
-struct RawProviderBotSettings {
-	#[serde(default)]
-	changesets: RawProviderChangesetBotSettings,
+	bot: ProviderBotSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -562,19 +431,6 @@ pub struct LoadedChangesetFile {
 	pub signals: Vec<ChangeSignal>,
 }
 
-#[allow(unused_assignments)]
-#[derive(Debug, thiserror::Error, Diagnostic)]
-#[error("{message}")]
-struct SourceDiagnostic {
-	message: String,
-	#[source_code]
-	source_code: NamedSource<String>,
-	#[label(collection)]
-	labels: Vec<LabeledSpan>,
-	#[help]
-	help: Option<String>,
-}
-
 fn default_parent_bump() -> BumpSeverity {
 	BumpSeverity::Patch
 }
@@ -602,26 +458,6 @@ fn merge_cli_commands(cli: BTreeMap<String, RawCliCommandDefinition>) -> Vec<Cli
 		}
 	}
 	merged
-}
-
-fn default_true() -> bool {
-	true
-}
-
-fn default_pull_request_branch_prefix() -> String {
-	"monochange/release".to_string()
-}
-
-fn default_pull_request_base() -> String {
-	"main".to_string()
-}
-
-fn default_pull_request_title() -> String {
-	"chore(release): prepare release".to_string()
-}
-
-fn default_pull_request_labels() -> Vec<String> {
-	vec!["release".to_string(), "automated".to_string()]
 }
 
 fn render_changelog_path_template(template: &str, package_path: &Path) -> String {
@@ -831,12 +667,14 @@ pub fn config_path(root: &Path) -> PathBuf {
 	root.join(CONFIG_FILE)
 }
 
+#[allow(clippy::match_same_arms)]
 fn package_type_to_ecosystem_type(package_type: PackageType) -> EcosystemType {
 	match package_type {
 		PackageType::Cargo => EcosystemType::Cargo,
 		PackageType::Npm => EcosystemType::Npm,
 		PackageType::Deno => EcosystemType::Deno,
 		PackageType::Dart | PackageType::Flutter => EcosystemType::Dart,
+		_ => EcosystemType::Cargo,
 	}
 }
 
@@ -905,8 +743,7 @@ fn normalize_ecosystem_settings(
 	})
 }
 
-#[tracing::instrument(skip_all)]
-pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceConfiguration> {
+fn load_raw_configuration(root: &Path) -> MonochangeResult<(String, RawWorkspaceConfiguration)> {
 	let path = config_path(root);
 	let contents = if path.exists() {
 		fs::read_to_string(&path).map_err(|error| {
@@ -922,6 +759,231 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	} else {
 		RawWorkspaceConfiguration::default()
 	};
+	Ok((contents, raw))
+}
+
+#[allow(clippy::too_many_arguments, clippy::option_as_ref_cloned)]
+fn build_package_definitions(
+	contents: &str,
+	packages: BTreeMap<String, RawPackageDefinition>,
+	default_package_type: Option<PackageType>,
+	default_package_changelog: Option<&RawChangelogConfig>,
+	default_extra_changelog_sections: &[ExtraChangelogSection],
+	default_changelog_format: ChangelogFormat,
+	cargo_ecosystem: &EcosystemSettings,
+	npm_ecosystem: &EcosystemSettings,
+	deno_ecosystem: &EcosystemSettings,
+	dart_ecosystem: &EcosystemSettings,
+) -> MonochangeResult<Vec<PackageDefinition>> {
+	packages
+		.into_iter()
+		.map(|(id, package)| {
+			let package_type = package.package_type.or(default_package_type).ok_or_else(|| {
+				config_diagnostic(
+					contents,
+					format!(
+						"package `{id}` must declare `type` or set `[defaults].package_type`"
+					),
+					vec![config_section_label(
+						contents,
+						"package",
+						&id,
+						"package missing type",
+					)],
+					Some(
+						"set `type = \"cargo\"` (or another supported type) on the package, or set `[defaults].package_type` for a single-ecosystem repository"
+							.to_string(),
+					),
+				)
+			})?;
+			let changelog = package
+				.changelog
+				.as_ref()
+				.and_then(|definition| {
+					definition.resolve_for_package(&package.path, false).map(|path| ChangelogTarget {
+						path,
+						format: definition.format().unwrap_or(default_changelog_format),
+					})
+				})
+				.or_else(|| {
+					default_package_changelog.as_ref().and_then(|definition| {
+						definition.resolve_for_package(&package.path, true).map(|path| ChangelogTarget {
+							path,
+							format: definition.format().unwrap_or(default_changelog_format),
+						})
+					})
+				});
+			let inferred_ecosystem_type = package_type_to_ecosystem_type(package_type);
+			let inherited_versioned_files = if package.ignore_ecosystem_versioned_files {
+				Vec::new()
+			} else {
+				match inferred_ecosystem_type {
+					EcosystemType::Cargo => cargo_ecosystem.versioned_files.clone(),
+					EcosystemType::Npm => npm_ecosystem.versioned_files.clone(),
+					EcosystemType::Deno => deno_ecosystem.versioned_files.clone(),
+					EcosystemType::Dart => dart_ecosystem.versioned_files.clone(),
+					_ => Vec::new(),
+				}
+			};
+			let mut versioned_files = inherited_versioned_files;
+			versioned_files.extend(normalize_versioned_files(
+				contents,
+				package.versioned_files,
+				inferred_ecosystem_type,
+				"package",
+				&id,
+				true,
+			)?);
+			Ok::<_, MonochangeError>(PackageDefinition {
+				id,
+				path: package.path,
+				package_type,
+				changelog,
+				extra_changelog_sections: merge_extra_changelog_sections(
+					default_extra_changelog_sections,
+					package.extra_changelog_sections,
+				),
+				empty_update_message: package.empty_update_message,
+				release_title: package.release_title,
+				changelog_version_title: package.changelog_version_title,
+				versioned_files,
+				ignore_ecosystem_versioned_files: package.ignore_ecosystem_versioned_files,
+				ignored_paths: package.ignored_paths,
+				additional_paths: package.additional_paths,
+				tag: package.tag,
+				release: package.release,
+				version_format: package.version_format,
+			})
+		})
+		.collect::<Result<Vec<_>, _>>()
+}
+
+fn build_group_definitions(
+	contents: &str,
+	groups: BTreeMap<String, RawGroupDefinition>,
+	default_extra_changelog_sections: &[ExtraChangelogSection],
+	default_changelog_format: ChangelogFormat,
+) -> MonochangeResult<Vec<GroupDefinition>> {
+	groups
+		.into_iter()
+		.map(|(id, group)| {
+			let changelog = match group.changelog.as_ref() {
+				None => None,
+				Some(definition) => match definition.resolve_for_group() {
+					Some(path) => Some(ChangelogTarget {
+						path,
+						format: definition.format().unwrap_or(default_changelog_format),
+					}),
+					None if definition.is_disabled() => None,
+					None => {
+						return Err(config_diagnostic(
+							contents,
+							format!(
+								"group `{id}` changelog must declare a `path` when changelog output is enabled"
+							),
+							vec![config_section_label(
+								contents,
+								"group",
+								&id,
+								"group changelog missing path",
+							)],
+							Some(
+								"set `changelog = \"changelog.md\"` or `[group.<id>.changelog].path` when enabling grouped changelog output"
+									.to_string(),
+							),
+						));
+					}
+				},
+			};
+			let changelog_include = parse_group_changelog_include(
+				contents,
+				&id,
+				&group.packages,
+				group.changelog.as_ref().and_then(RawChangelogConfig::include),
+			)?;
+			Ok::<_, MonochangeError>(GroupDefinition {
+				id: id.clone(),
+				packages: group.packages,
+				changelog,
+				changelog_include,
+				extra_changelog_sections: merge_extra_changelog_sections(
+					default_extra_changelog_sections,
+					group.extra_changelog_sections,
+				),
+				empty_update_message: group.empty_update_message,
+				release_title: group.release_title,
+				changelog_version_title: group.changelog_version_title,
+				versioned_files: normalize_versioned_files(
+					contents,
+					group.versioned_files,
+					EcosystemType::Cargo,
+					"group",
+					&id,
+					false,
+				)?,
+				tag: group.tag,
+				release: group.release,
+				version_format: group.version_format,
+			})
+		})
+		.collect::<Result<Vec<_>, _>>()
+}
+
+fn resolve_source_configuration(
+	source: Option<RawSourceConfiguration>,
+	github: Option<&GitHubConfiguration>,
+) -> MonochangeResult<Option<SourceConfiguration>> {
+	if source.is_some() && github.is_some() {
+		return Err(MonochangeError::Config(
+			"configure either `[source]` or legacy `[github]`, but not both".to_string(),
+		));
+	}
+	let source = source.map(|source| {
+		SourceConfiguration {
+			provider: source.provider,
+			owner: source.owner,
+			repo: source.repo,
+			host: source.host,
+			api_url: source.api_url,
+			releases: source.releases,
+			pull_requests: source.pull_requests,
+			bot: source.bot,
+		}
+	});
+	let legacy_github = if let Some(source) = &source {
+		(source.provider == SourceProvider::GitHub).then(|| {
+			GitHubConfiguration {
+				owner: source.owner.clone(),
+				repo: source.repo.clone(),
+				releases: source.releases.clone(),
+				pull_requests: source.pull_requests.clone(),
+				bot: source.bot.clone(),
+			}
+		})
+	} else {
+		github.cloned()
+	};
+	let source = source.or_else(|| {
+		legacy_github.as_ref().map(|github| {
+			SourceConfiguration {
+				provider: SourceProvider::GitHub,
+				owner: github.owner.clone(),
+				repo: github.repo.clone(),
+				host: None,
+				api_url: None,
+				releases: github.releases.clone(),
+				pull_requests: github.pull_requests.clone(),
+				bot: github.bot.clone(),
+			}
+		})
+	});
+	Ok(source)
+}
+
+#[must_use = "the configuration result must be checked"]
+#[tracing::instrument(skip_all)]
+pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceConfiguration> {
+	let (contents, raw) = load_raw_configuration(root)?;
 
 	let RawWorkspaceConfiguration {
 		defaults,
@@ -961,253 +1023,34 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		.as_ref()
 		.and_then(RawChangelogConfig::format)
 		.unwrap_or_default();
-	let packages = package
-		.into_iter()
-		.map(|(id, package)| {
-			let package_type = package.package_type.or(default_package_type).ok_or_else(|| {
-				config_diagnostic(
-					&contents,
-					format!(
-						"package `{id}` must declare `type` or set `[defaults].package_type`"
-					),
-					vec![config_section_label(
-						&contents,
-						"package",
-						&id,
-						"package missing type",
-					)],
-					Some(
-						"set `type = \"cargo\"` (or another supported type) on the package, or set `[defaults].package_type` for a single-ecosystem repository"
-							.to_string(),
-					),
-				)
-			})?;
-			let changelog = package
-				.changelog
-				.as_ref()
-				.and_then(|definition| {
-					definition.resolve_for_package(&package.path, false).map(|path| ChangelogTarget {
-						path,
-						format: definition.format().unwrap_or(default_changelog_format),
-					})
-				})
-				.or_else(|| {
-					default_package_changelog.as_ref().and_then(|definition| {
-						definition.resolve_for_package(&package.path, true).map(|path| ChangelogTarget {
-							path,
-							format: definition.format().unwrap_or(default_changelog_format),
-						})
-					})
-				});
-			let inferred_ecosystem_type = package_type_to_ecosystem_type(package_type);
-			let inherited_versioned_files = if package.ignore_ecosystem_versioned_files {
-				Vec::new()
-			} else {
-				match inferred_ecosystem_type {
-					EcosystemType::Cargo => cargo_ecosystem.versioned_files.clone(),
-					EcosystemType::Npm => npm_ecosystem.versioned_files.clone(),
-					EcosystemType::Deno => deno_ecosystem.versioned_files.clone(),
-					EcosystemType::Dart => dart_ecosystem.versioned_files.clone(),
-				}
-			};
-			let mut versioned_files = inherited_versioned_files;
-			versioned_files.extend(normalize_versioned_files(
-				&contents,
-				package.versioned_files,
-				inferred_ecosystem_type,
-				"package",
-				&id,
-				true,
-			)?);
-			Ok::<_, MonochangeError>(PackageDefinition {
-				id,
-				path: package.path,
-				package_type,
-				changelog,
-				extra_changelog_sections: merge_extra_changelog_sections(
-					&default_extra_changelog_sections,
-					package.extra_changelog_sections,
-				),
-				empty_update_message: package.empty_update_message,
-				release_title: package.release_title,
-				changelog_version_title: package.changelog_version_title,
-				versioned_files,
-				ignore_ecosystem_versioned_files: package.ignore_ecosystem_versioned_files,
-				ignored_paths: package.ignored_paths,
-				additional_paths: package.additional_paths,
-				tag: package.tag,
-				release: package.release,
-				version_format: package.version_format,
-			})
-		})
-		.collect::<Result<Vec<_>, _>>()?;
-	let groups = group
-		.into_iter()
-		.map(|(id, group)| {
-			let changelog = match group.changelog.as_ref() {
-				None => None,
-				Some(definition) => match definition.resolve_for_group() {
-					Some(path) => Some(ChangelogTarget {
-						path,
-						format: definition.format().unwrap_or(default_changelog_format),
-					}),
-					None if definition.is_disabled() => None,
-					None => {
-						return Err(config_diagnostic(
-							&contents,
-							format!(
-								"group `{id}` changelog must declare a `path` when changelog output is enabled"
-							),
-							vec![config_section_label(
-								&contents,
-								"group",
-								&id,
-								"group changelog missing path",
-							)],
-							Some(
-								"set `changelog = \"changelog.md\"` or `[group.<id>.changelog].path` when enabling grouped changelog output"
-									.to_string(),
-							),
-						));
-					}
-				},
-			};
-			let changelog_include = parse_group_changelog_include(
-				&contents,
-				&id,
-				&group.packages,
-				group.changelog.as_ref().and_then(RawChangelogConfig::include),
-			)?;
-			Ok::<_, MonochangeError>(GroupDefinition {
-				id: id.clone(),
-				packages: group.packages,
-				changelog,
-				changelog_include,
-				extra_changelog_sections: merge_extra_changelog_sections(
-					&default_extra_changelog_sections,
-					group.extra_changelog_sections,
-				),
-				empty_update_message: group.empty_update_message,
-				release_title: group.release_title,
-				changelog_version_title: group.changelog_version_title,
-				versioned_files: normalize_versioned_files(
-					&contents,
-					group.versioned_files,
-					EcosystemType::Cargo,
-					"group",
-					&id,
-					false,
-				)?,
-				tag: group.tag,
-				release: group.release,
-				version_format: group.version_format,
-			})
-		})
-		.collect::<Result<Vec<_>, _>>()?;
-	if source.is_some() && github.is_some() {
-		return Err(MonochangeError::Config(
-			"configure either `[source]` or legacy `[github]`, but not both".to_string(),
-		));
-	}
-	let changesets = ChangesetSettings {
-		verify: ChangesetVerificationSettings {
-			enabled: changesets.verify.enabled,
-			required: changesets.verify.required,
-			skip_labels: changesets.verify.skip_labels,
-			comment_on_failure: changesets.verify.comment_on_failure,
-		},
-	};
-	let source = source.map(|source| {
-		SourceConfiguration {
-			provider: source.provider,
-			owner: source.owner,
-			repo: source.repo,
-			host: source.host,
-			api_url: source.api_url,
-			releases: ProviderReleaseSettings {
-				enabled: source.releases.enabled,
-				draft: source.releases.draft,
-				prerelease: source.releases.prerelease,
-				generate_notes: source.releases.generate_notes,
-				source: source.releases.source,
-			},
-			pull_requests: ProviderMergeRequestSettings {
-				enabled: source.pull_requests.enabled,
-				branch_prefix: source.pull_requests.branch_prefix,
-				base: source.pull_requests.base,
-				title: source.pull_requests.title,
-				labels: source.pull_requests.labels,
-				auto_merge: source.pull_requests.auto_merge,
-			},
-			bot: ProviderBotSettings {
-				changesets: ProviderChangesetBotSettings {
-					enabled: source.bot.changesets.enabled,
-					required: source.bot.changesets.required,
-					skip_labels: source.bot.changesets.skip_labels,
-					comment_on_failure: source.bot.changesets.comment_on_failure,
-					changed_paths: source.bot.changesets.changed_paths,
-					ignored_paths: source.bot.changesets.ignored_paths,
-				},
-			},
+	let packages = build_package_definitions(
+		&contents,
+		package,
+		default_package_type,
+		default_package_changelog.as_ref(),
+		&default_extra_changelog_sections,
+		default_changelog_format,
+		&cargo_ecosystem,
+		&npm_ecosystem,
+		&deno_ecosystem,
+		&dart_ecosystem,
+	)?;
+	let groups = build_group_definitions(
+		&contents,
+		group,
+		&default_extra_changelog_sections,
+		default_changelog_format,
+	)?;
+	let resolved_github = github.map(|raw| {
+		GitHubConfiguration {
+			owner: raw.owner,
+			repo: raw.repo,
+			releases: raw.releases,
+			pull_requests: raw.pull_requests,
+			bot: raw.bot,
 		}
 	});
-	let legacy_github = if let Some(source) = &source {
-		(source.provider == SourceProvider::GitHub).then(|| {
-			GitHubConfiguration {
-				owner: source.owner.clone(),
-				repo: source.repo.clone(),
-				releases: source.releases.clone(),
-				pull_requests: source.pull_requests.clone(),
-				bot: source.bot.clone(),
-			}
-		})
-	} else {
-		github.map(|github| {
-			GitHubConfiguration {
-				owner: github.owner,
-				repo: github.repo,
-				releases: ProviderReleaseSettings {
-					enabled: github.releases.enabled,
-					draft: github.releases.draft,
-					prerelease: github.releases.prerelease,
-					generate_notes: github.releases.generate_notes,
-					source: github.releases.source,
-				},
-				pull_requests: ProviderMergeRequestSettings {
-					enabled: github.pull_requests.enabled,
-					branch_prefix: github.pull_requests.branch_prefix,
-					base: github.pull_requests.base,
-					title: github.pull_requests.title,
-					labels: github.pull_requests.labels,
-					auto_merge: github.pull_requests.auto_merge,
-				},
-				bot: ProviderBotSettings {
-					changesets: ProviderChangesetBotSettings {
-						enabled: github.bot.changesets.enabled,
-						required: github.bot.changesets.required,
-						skip_labels: github.bot.changesets.skip_labels,
-						comment_on_failure: github.bot.changesets.comment_on_failure,
-						changed_paths: github.bot.changesets.changed_paths,
-						ignored_paths: github.bot.changesets.ignored_paths,
-					},
-				},
-			}
-		})
-	};
-	let source = source.or_else(|| {
-		legacy_github.as_ref().map(|github| {
-			SourceConfiguration {
-				provider: SourceProvider::GitHub,
-				owner: github.owner.clone(),
-				repo: github.repo.clone(),
-				host: None,
-				api_url: None,
-				releases: github.releases.clone(),
-				pull_requests: github.pull_requests.clone(),
-				bot: github.bot.clone(),
-			}
-		})
-	});
+	let source = resolve_source_configuration(source, resolved_github.as_ref())?;
 
 	validate_cli(&cli)?;
 	validate_release_notes_configuration(
@@ -1218,7 +1061,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		&groups,
 	)?;
 	validate_changesets_configuration(&changesets, &packages)?;
-	validate_github_configuration(legacy_github.as_ref())?;
+	validate_github_configuration(resolved_github.as_ref())?;
 	validate_source_configuration(source.as_ref())?;
 	for (ecosystem_id, ecosystem_settings) in [
 		("cargo", &cargo_ecosystem),
@@ -1407,6 +1250,7 @@ fn changeset_package_references(root: &Path, package: &PackageRecord) -> Vec<Str
 	references
 }
 
+#[must_use = "the change signals result must be checked"]
 pub fn load_change_signals(
 	changes_path: &Path,
 	configuration: &WorkspaceConfiguration,
@@ -1416,6 +1260,7 @@ pub fn load_change_signals(
 	Ok(load_changeset_file_with_context(changes_path, &context)?.signals)
 }
 
+#[must_use = "the changeset result must be checked"]
 pub fn load_changeset_file(
 	changes_path: &Path,
 	configuration: &WorkspaceConfiguration,
@@ -1425,6 +1270,7 @@ pub fn load_changeset_file(
 	load_changeset_file_with_context(changes_path, &context)
 }
 
+#[must_use = "the changeset result must be checked"]
 /// Load a changeset file with precomputed package/group indexes.
 ///
 /// Performance note:
@@ -1454,6 +1300,7 @@ pub fn load_changeset_file_with_context(
 	load_changeset_contents_with_context(changes_path, &contents, context)
 }
 
+#[must_use = "the changeset result must be checked"]
 /// Parse already-loaded changeset text with the shared lookup context.
 ///
 /// Performance note:
@@ -1662,6 +1509,7 @@ fn infer_group_bump_from_explicit_version_with_context(
 		.map(|current_version| infer_bump_from_versions(current_version, explicit_version)))
 }
 
+#[must_use = "the resolution result must be checked"]
 fn resolve_package_reference_with_context(
 	reference: &str,
 	context: &ChangesetLoadContext<'_>,
@@ -1948,6 +1796,11 @@ fn infer_bump_from_versions(current_version: &Version, explicit_version: &Versio
 	}
 }
 
+#[must_use = "the resolution result must be checked"]
+/// Resolve a package reference without a pre-built context.
+///
+/// Prefer [`resolve_package_reference_with_context`] for batch changeset loading
+/// as it reuses pre-computed lookup maps instead of scanning all packages on each call.
 pub fn resolve_package_reference(
 	reference: &str,
 	workspace_root: &Path,
@@ -1970,6 +1823,10 @@ pub fn resolve_package_reference(
 	}
 }
 
+/// Parse a markdown changeset file without a pre-built context.
+///
+/// Prefer [`parse_markdown_change_file_with_context`] for batch changeset loading
+/// as it reuses pre-computed lookup maps instead of rebuilding them for each file.
 fn parse_markdown_change_file(
 	contents: &str,
 	changes_path: &Path,
@@ -2205,6 +2062,9 @@ fn validate_configured_change_type(
 	)))
 }
 
+/// Parse a markdown changeset target without a pre-built context.
+///
+/// Prefer [`parse_markdown_change_target_with_context`] for batch changeset loading.
 fn parse_markdown_change_target(
 	value: &serde_yaml_ng::Value,
 	changes_path: &Path,
@@ -2551,6 +2411,7 @@ fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -
 		EcosystemType::Npm => monochange_npm::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Deno => monochange_deno::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Dart => monochange_dart::supported_versioned_file_kind(path).is_some(),
+		_ => false,
 	}
 }
 
@@ -2701,6 +2562,7 @@ fn validate_versioned_files(
 							EcosystemType::Npm => "npm",
 							EcosystemType::Deno => "deno",
 							EcosystemType::Dart => "dart",
+							_ => "unknown",
 						}
 					),
 					vec![config_section_label(
@@ -2758,12 +2620,14 @@ fn validate_lockfile_commands(
 	Ok(())
 }
 
+#[allow(clippy::match_same_arms)]
 fn expected_manifest_name(package_type: PackageType) -> &'static str {
 	match package_type {
 		PackageType::Cargo => "Cargo.toml",
 		PackageType::Npm => "package.json",
 		PackageType::Deno => "deno.json",
 		PackageType::Dart | PackageType::Flutter => "pubspec.yaml",
+		_ => "Cargo.toml",
 	}
 }
 
@@ -3100,6 +2964,7 @@ fn validate_changesets_configuration(
 	Ok(())
 }
 
+#[allow(clippy::match_same_arms)]
 fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 	let mut seen_names = BTreeSet::new();
 
@@ -3252,6 +3117,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				| CliStepDefinition::AffectedPackages { .. }
 				| CliStepDefinition::DiagnoseChangesets { .. }
 				| CliStepDefinition::RetargetRelease { .. } => {}
+				_ => {}
 			}
 		}
 	}
@@ -3504,13 +3370,6 @@ fn config_diagnostic(
 	labels: Vec<LabeledSpan>,
 	help: Option<String>,
 ) -> MonochangeError {
-	let report = Report::new(SourceDiagnostic {
-		message: message.clone(),
-		source_code: NamedSource::new(CONFIG_FILE, config_contents.to_string()),
-		labels: labels.clone(),
-		help: help.clone(),
-	});
-	let _ = report;
 	MonochangeError::Diagnostic(render_source_diagnostic(
 		CONFIG_FILE,
 		config_contents,
@@ -3811,13 +3670,6 @@ fn changeset_diagnostic(
 	help: Option<String>,
 ) -> MonochangeError {
 	let source_name = changeset_path.display().to_string();
-	let report = Report::new(SourceDiagnostic {
-		message: message.clone(),
-		source_code: NamedSource::new(source_name.clone(), contents.to_string()),
-		labels: labels.clone(),
-		help: help.clone(),
-	});
-	let _ = report;
 	MonochangeError::Diagnostic(render_source_diagnostic(
 		&source_name,
 		contents,
@@ -4033,6 +3885,7 @@ fn ecosystem_matches_package_type(ecosystem: Ecosystem, package_type: PackageTyp
 	)
 }
 
+#[must_use = "the validation result must be checked"]
 pub fn validate_workspace(root: &Path) -> MonochangeResult<()> {
 	let configuration = load_workspace_configuration(root)?;
 	let changeset_dir = root.join(".changeset");
@@ -4065,6 +3918,7 @@ pub fn validate_workspace(root: &Path) -> MonochangeResult<()> {
 /// This is separate from the structural validation in
 /// `validate_versioned_files()` because it performs file I/O and should only
 /// run during the explicit `mc validate` command, not on every config load.
+#[must_use = "the validation result must be checked"]
 pub fn validate_versioned_files_content(root: &Path) -> MonochangeResult<Vec<String>> {
 	let configuration = load_workspace_configuration(root)?;
 	let mut warnings = Vec::new();
@@ -4256,6 +4110,11 @@ fn validate_ecosystem_version_readable(
 					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `version` string field"
 				)));
 			}
+		}
+		_ => {
+			return Err(MonochangeError::Config(format!(
+				"{owner_kind} `{owner_id}` versioned file `{display_path}` is not supported for the configured ecosystem"
+			)));
 		}
 	}
 

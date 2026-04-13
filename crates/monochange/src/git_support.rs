@@ -12,6 +12,7 @@ use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::git_stderr_trimmed;
 use monochange_core::git::git_stdout_trimmed;
 
+#[must_use = "the tag commit result must be checked"]
 pub(crate) fn resolve_git_tag_commit(root: &Path, tag_name: &str) -> MonochangeResult<String> {
 	run_git_capture(
 		root,
@@ -52,6 +53,7 @@ pub(crate) fn move_git_tag(
 	)
 }
 
+#[must_use = "the push result must be checked"]
 pub(crate) fn push_git_tags(root: &Path, tags: &[&str]) -> MonochangeResult<()> {
 	let mut args = vec!["push", "--force", "origin"];
 	let tag_refs = tags
@@ -64,6 +66,7 @@ pub(crate) fn push_git_tags(root: &Path, tags: &[&str]) -> MonochangeResult<()> 
 	run_git_status(root, &args, "failed to push retargeted release tags")
 }
 
+#[must_use = "the ref resolution result must be checked"]
 pub(crate) fn resolve_git_commit_ref(root: &Path, from: &str) -> MonochangeResult<String> {
 	run_git_capture(
 		root,
@@ -72,6 +75,7 @@ pub(crate) fn resolve_git_commit_ref(root: &Path, from: &str) -> MonochangeResul
 	)
 }
 
+#[must_use = "the commit history result must be checked"]
 #[rustfmt::skip]
 #[tracing::instrument(skip_all, fields(commit))]
 pub(crate) fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResult<Vec<String>> {
@@ -87,6 +91,7 @@ pub(crate) fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResul
 		.collect())
 }
 
+#[must_use = "the commit message result must be checked"]
 pub(crate) fn read_git_commit_message(root: &Path, commit: &str) -> MonochangeResult<String> {
 	run_git_capture(
 		root,
@@ -124,6 +129,7 @@ pub(crate) fn run_git_status(
 	run_git_capture(root, args, error_message).map(|_| ())
 }
 
+#[must_use = "the staging result must be checked"]
 pub(crate) fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
 	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths)?;
 	if stageable_paths.is_empty() {
@@ -172,6 +178,7 @@ fn release_path_requires_staging(root: &Path, path: &Path) -> MonochangeResult<b
 	git_path_is_tracked(root, path)
 }
 
+#[must_use = "the tracked status result must be checked"]
 fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	let relative = path.to_string_lossy();
 	let output = git_command_output(root, &["ls-files", "--error-unmatch", "--", &relative])
@@ -194,6 +201,7 @@ fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	}
 }
 
+#[must_use = "the ignored status result must be checked"]
 fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	let relative = path.to_string_lossy();
 	let output =
@@ -216,6 +224,7 @@ fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	}
 }
 
+#[must_use = "the commit result must be checked"]
 pub(crate) fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
 	run_git_process(
 		git_commit_paths_command(root, message),
@@ -223,6 +232,7 @@ pub(crate) fn git_commit_paths(root: &Path, message: &CommitMessage) -> Monochan
 	)
 }
 
+#[must_use = "the HEAD commit result must be checked"]
 pub(crate) fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 	run_git_capture(
 		root,

@@ -43,6 +43,7 @@ pub(crate) fn diagnose_changesets(
 	})
 }
 
+#[must_use = "the changeset path result must be checked"]
 pub(crate) fn resolve_changeset_path(root: &Path, requested: &str) -> MonochangeResult<PathBuf> {
 	let requested_is_absolute = Path::new(requested).is_absolute();
 	let normalized = if requested_is_absolute {
@@ -163,6 +164,7 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 	lines.join("\n")
 }
 
+#[must_use = "the discovery result must be checked"]
 pub(crate) fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 	let changeset_dir = root.join(CHANGESET_DIR);
 	if !changeset_dir.exists() {
@@ -430,10 +432,14 @@ pub(crate) fn build_release_plan_from_signals(
 	discovery: &DiscoveryReport,
 	change_signals: &[ChangeSignal],
 ) -> MonochangeResult<ReleasePlan> {
+	#[cfg(feature = "cargo")]
 	let rust_provider = RustSemverProvider;
+	#[cfg(feature = "cargo")]
 	let providers: [&dyn CompatibilityProvider; 1] = [&rust_provider];
-	let compatibility_evidence =
-		collect_assessments(&providers, &discovery.packages, change_signals);
+	#[cfg(feature = "cargo")]
+	let compatibility_evidence = collect_assessments(&providers, &discovery.packages, change_signals);
+	#[cfg(not(feature = "cargo"))]
+	let compatibility_evidence = Vec::new();
 
 	build_release_plan(
 		&discovery.workspace_root,
