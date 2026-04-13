@@ -33,8 +33,7 @@ monochange is a cross-ecosystem release planner for monorepos that span more tha
 3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
 4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
 5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
-6. **Inspect cached manifest** — `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload.
-7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
+6. **Publish** — `mc publish-release --format json` creates provider releases after human review.
 
 <!-- {/recommendedCommandFlow} -->
 
@@ -50,7 +49,6 @@ monochange is a cross-ecosystem release planner for monorepos that span more tha
 | `mc release`         | Prepare a release plan from changesets                      | `--dry-run`, `--diff`, `--format` (markdown\|text\|json)                  |
 | `mc commit-release`  | Prepare a release and create a local commit                 | `--format`, `--dry-run`                                                   |
 | `mc publish-release` | Create provider releases                                    | `--format`, `--dry-run`                                                   |
-| `mc release-pr`      | Open or update a release pull request                       | `--format`, `--dry-run`                                                   |
 | `mc affected`        | Evaluate changeset policy from changed paths                | `--format`, `--changed-paths`, `--since`, `--verify`, `--label`           |
 | `mc diagnostics`     | Show changeset context with git and review metadata         | `--format`, `--changeset`                                                 |
 | `mc repair-release`  | Repair a recent release by retargeting tags                 | `--from`, `--target`, `--force`, `--sync-provider`                        |
@@ -314,9 +312,11 @@ mc release
 
 ### Create release PR
 
+When `--provider` was used during `mc init`, a `commit-release` command is available:
+
 ```bash
-mc release-pr --dry-run --format json  # preview
-mc release-pr  # create/update PR
+mc commit-release --dry-run --format json  # preview
+mc commit-release  # prepare, commit, and open PR
 ```
 
 ### Evaluate changeset policy
