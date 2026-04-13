@@ -12,6 +12,7 @@ PHASE_COMMAND_ARGS=(
 	"release"
 )
 PHASE_BUDGETS_FILE="$(cd "$(dirname "$0")" && pwd)/benchmark_phase_budgets.json"
+HYPERFINE_BIN="${MONOCHANGE_HYPERFINE_BIN:-hyperfine}"
 
 SCENARIO_IDS=(baseline history_x10)
 SCENARIO_NAMES=("Baseline fixture" "Large history fixture")
@@ -420,7 +421,7 @@ run_scenario() {
 
 	(
 		cd "$fixture_dir"
-		hyperfine \
+		"$HYPERFINE_BIN" \
 			--prepare "git reset --hard HEAD >/dev/null && git clean -fd >/dev/null" \
 			--style basic \
 			--warmup "$WARMUP_RUNS" \
@@ -429,6 +430,92 @@ run_scenario() {
 			--export-markdown "$table_path" \
 			"${hyperfine_args[@]}"
 	)
+}
+
+run_fixture_mode() {
+	local main_bin=""
+	local pr_bin=""
+	local fixture_dir=""
+	local scenario_id=""
+	local scenario_name=""
+	local scenario_description=""
+	local output_path=""
+	local violations_output=""
+
+	while [ "$#" -gt 0 ]; do
+		case "$1" in
+		--main-bin)
+			main_bin="$2"
+			shift 2
+			;;
+		--pr-bin)
+			pr_bin="$2"
+			shift 2
+			;;
+		--fixture-dir)
+			fixture_dir="$2"
+			shift 2
+			;;
+		--scenario-id)
+			scenario_id="$2"
+			shift 2
+			;;
+		--scenario-name)
+			scenario_name="$2"
+			shift 2
+			;;
+		--scenario-description)
+			scenario_description="$2"
+			shift 2
+			;;
+		--output)
+			output_path="$2"
+			shift 2
+			;;
+		--violations-output)
+			violations_output="$2"
+			shift 2
+			;;
+		*)
+			echo "unknown argument: $1" >&2
+			exit 1
+			;;
+		esac
+	done
+
+	if [ -z "$main_bin" ] || [ -z "$pr_bin" ] || [ -z "$fixture_dir" ] || [ -z "$scenario_id" ] || [ -z "$scenario_name" ] || [ -z "$scenario_description" ] || [ -z "$output_path" ]; then
+		echo "run-fixture requires --main-bin, --pr-bin, --fixture-dir, --scenario-id, --scenario-name, --scenario-description, and --output" >&2
+		exit 1
+	fi
+
+	local table_path
+	local phase_path
+	local scenario_violations_path
+	table_path="$(mktemp -t monochange-bench-table.XXXXXX.md)"
+	phase_path="$(mktemp -t monochange-bench-phases.XXXXXX.md)"
+	scenario_violations_path="$(mktemp -t monochange-bench-violations.XXXXXX.txt)"
+
+	run_scenario \
+		"$main_bin" \
+		"$pr_bin" \
+		"$fixture_dir" \
+		"$table_path"
+	collect_phase_markdown \
+		"$scenario_id" \
+		"$fixture_dir" \
+		"$main_bin" \
+		"$pr_bin" \
+		"$phase_path" \
+		"$scenario_violations_path"
+	render_comment \
+		"$output_path" \
+		"$scenario_name" \
+		"$scenario_description" \
+		"$table_path" \
+		"$phase_path"
+	if [ -n "$violations_output" ]; then
+		cat "$scenario_violations_path" >"$violations_output"
+	fi
 }
 
 run_mode() {
@@ -546,9 +633,10 @@ main() {
 
 	case "$mode" in
 	run) run_mode "$@" ;;
+	run-fixture) run_fixture_mode "$@" ;;
 	render-fixture) render_fixture_mode "$@" ;;
 	*)
-		echo "usage: $0 <run|render-fixture> [args...]" >&2
+		echo "usage: $0 <run|run-fixture|render-fixture> [args...]" >&2
 		exit 1
 		;;
 	esac
