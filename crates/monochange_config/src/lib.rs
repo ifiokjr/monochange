@@ -425,6 +425,7 @@ fn default_warn_on_group_mismatch() -> bool {
 
 fn merge_cli_commands(cli: BTreeMap<String, RawCliCommandDefinition>) -> Vec<CliCommandDefinition> {
 	let mut merged = default_cli_commands();
+
 	for (name, definition) in cli {
 		let command = CliCommandDefinition {
 			name: name.clone(),
@@ -432,6 +433,7 @@ fn merge_cli_commands(cli: BTreeMap<String, RawCliCommandDefinition>) -> Vec<Cli
 			inputs: definition.inputs,
 			steps: definition.steps,
 		};
+
 		if let Some(existing) = merged
 			.iter_mut()
 			.find(|cli_command| cli_command.name == name)
@@ -441,13 +443,16 @@ fn merge_cli_commands(cli: BTreeMap<String, RawCliCommandDefinition>) -> Vec<Cli
 			merged.push(command);
 		}
 	}
+
 	merged
 }
 
 fn render_changelog_path_template(template: &str, package_path: &Path) -> String {
 	let package_path_str = package_path.to_string_lossy();
 	let mut env = Environment::new();
+
 	env.set_undefined_behavior(UndefinedBehavior::Lenient);
+
 	let context = minijinja::context! { path => package_path_str.as_ref() };
 	env.render_str(template, context)
 		.unwrap_or_else(|_| template.replace("{{ path }}", &package_path_str))

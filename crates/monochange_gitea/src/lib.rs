@@ -135,22 +135,27 @@ pub fn annotate_changeset_context(
 ) {
 	let host = gitea_host_name(source);
 	let capabilities = gitea_hosting_capabilities();
+
 	for changeset in changesets {
 		let Some(context) = changeset.context.as_mut() else {
 			continue;
 		};
+
 		context.provider = HostingProviderKind::Gitea;
 		context.host.clone_from(&host);
 		context.capabilities = capabilities.clone();
+
 		for revision in [&mut context.introduced, &mut context.last_updated] {
 			let Some(revision) = revision.as_mut() else {
 				continue;
 			};
+
 			if let Some(commit) = revision.commit.as_mut() {
 				commit.provider = HostingProviderKind::Gitea;
 				commit.host.clone_from(&host);
 				commit.url = Some(gitea_commit_url(source, &commit.sha));
 			}
+
 			if let Some(actor) = revision.actor.as_mut() {
 				actor.provider = HostingProviderKind::Gitea;
 				actor.host.clone_from(&host);

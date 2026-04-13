@@ -561,14 +561,17 @@ where
 	I: IntoIterator<Item = String>,
 {
 	let mut args = args.into_iter();
+
 	while let Some(arg) = args.next() {
 		if arg == "--log-level" {
 			return args.next();
 		}
+
 		if let Some(value) = arg.strip_prefix("--log-level=") {
 			return Some(value.to_string());
 		}
 	}
+
 	None
 }
 

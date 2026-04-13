@@ -9,6 +9,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 /// 2. `log_level` parameter from `--log-level` CLI flag
 /// 3. No subscriber installed (silent, near-zero overhead)
 pub(crate) fn init_tracing(log_level: Option<&str>) {
+	// Try environment variable first, then fall back to CLI parameter
 	let filter = match EnvFilter::try_from_default_env() {
 		Ok(env_filter) => env_filter,
 		Err(_) => {

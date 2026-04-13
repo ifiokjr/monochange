@@ -84,16 +84,19 @@ pub(crate) fn run_assist(
 	format: AssistOutputFormat,
 ) -> MonochangeResult<String> {
 	let payload = assistant_setup_payload(assistant);
+
 	match format {
 		AssistOutputFormat::Json => {
 			serde_json::to_string_pretty(&payload)
 				.map_err(|error| MonochangeError::Config(error.to_string()))
 		}
+
 		AssistOutputFormat::Text => {
 			let mcp_config = serde_json::to_string_pretty(&payload["mcp_config"])
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;
 			let install = serde_json::to_string_pretty(&payload["install"])
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;
+
 			let mut output = String::new();
 			let _ = writeln!(output, "monochange assist");
 			let _ = writeln!(output);
@@ -115,18 +118,22 @@ pub(crate) fn run_assist(
 			let _ = writeln!(output, "{mcp_config}");
 			let _ = writeln!(output);
 			let _ = writeln!(output, "Suggested repo-local guidance:");
+
 			for item in payload["repo_guidance"].as_array().into_iter().flatten() {
 				if let Some(text) = item.as_str() {
 					let _ = writeln!(output, "- {text}");
 				}
 			}
+
 			let _ = writeln!(output);
 			let _ = writeln!(output, "Notes for {}:", assistant_display_name(assistant));
+
 			for item in payload["notes"].as_array().into_iter().flatten() {
 				if let Some(text) = item.as_str() {
 					let _ = writeln!(output, "- {text}");
 				}
 			}
+
 			Ok(output.trim_end().to_string())
 		}
 	}

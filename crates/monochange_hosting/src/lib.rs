@@ -26,6 +26,7 @@ use serde::de::DeserializeOwned;
 pub fn push_body_entries(lines: &mut Vec<String>, entries: &[String]) {
 	for (index, entry) in entries.iter().enumerate() {
 		let trimmed = entry.trim();
+
 		if trimmed.contains('\n') {
 			lines.extend(trimmed.lines().map(ToString::to_string));
 			if index + 1 < entries.len() {
@@ -33,6 +34,7 @@ pub fn push_body_entries(lines: &mut Vec<String>, entries: &[String]) {
 			}
 			continue;
 		}
+
 		if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with('#') {
 			lines.push(trimmed.to_string());
 		} else {
@@ -43,10 +45,12 @@ pub fn push_body_entries(lines: &mut Vec<String>, entries: &[String]) {
 
 pub fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifestTarget) -> String {
 	let mut lines = vec![format!("Release target `{}`", target.id), String::new()];
+
 	if !target.members.is_empty() {
 		lines.push(format!("Members: {}", target.members.join(", ")));
 		lines.push(String::new());
 	}
+
 	let reasons = manifest
 		.plan
 		.decisions
@@ -56,6 +60,7 @@ pub fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifest
 		})
 		.flat_map(|decision| decision.reasons.iter().cloned())
 		.collect::<Vec<_>>();
+
 	if reasons.is_empty() {
 		lines.push("- prepare release".to_string());
 	} else {
@@ -63,6 +68,7 @@ pub fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifest
 			lines.push(format!("- {reason}"));
 		}
 	}
+
 	lines.join("\n")
 }
 
@@ -79,17 +85,20 @@ pub fn release_pull_request_branch(branch_prefix: &str, command: &str) -> String
 		.collect::<String>()
 		.trim_matches('-')
 		.to_string();
+
 	let command = if command.is_empty() {
 		"release".to_string()
 	} else {
 		command
 	};
+
 	format!("{}/{}", branch_prefix.trim_end_matches('/'), command)
 }
 
 pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 	let mut lines = vec!["## Prepared release".to_string(), String::new()];
 	lines.push(format!("- command: `{}`", manifest.command));
+
 	for target in manifest
 		.release_targets
 		.iter()
@@ -100,11 +109,14 @@ pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 			target.kind, target.id, target.tag_name
 		));
 	}
+
 	if !manifest.release_targets.iter().any(|target| target.release) {
 		lines.push("- no outward release targets".to_string());
 	}
+
 	lines.push(String::new());
 	lines.push("## Release notes".to_string());
+
 	for target in manifest
 		.release_targets
 		.iter()
@@ -112,6 +124,7 @@ pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 	{
 		lines.push(String::new());
 		lines.push(format!("### {} {}", target.id, target.version));
+
 		if let Some(changelog) = manifest.changelogs.iter().find(|changelog| {
 			changelog.owner_id == target.id && changelog.owner_kind == target.kind
 		}) {
@@ -119,6 +132,7 @@ pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 				lines.push(String::new());
 				lines.push(paragraph.clone());
 			}
+
 			for section in &changelog.notes.sections {
 				if section.entries.is_empty() {
 					continue;
@@ -133,14 +147,17 @@ pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 			lines.push(minimal_release_body(manifest, target));
 		}
 	}
+
 	if !manifest.changed_files.is_empty() {
 		lines.push(String::new());
 		lines.push("## Changed files".to_string());
 		lines.push(String::new());
+
 		for path in &manifest.changed_files {
 			lines.push(format!("- {}", path.display()));
 		}
 	}
+
 	lines.join("\n")
 }
 

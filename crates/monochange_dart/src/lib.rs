@@ -92,10 +92,12 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	} else {
 		package.workspace_root.clone()
 	};
+
 	let mut discovered = [scope.join("pubspec.lock")]
 		.into_iter()
 		.filter(|path| path.exists())
 		.collect::<Vec<_>>();
+
 	if discovered.is_empty() && scope != manifest_dir {
 		discovered.extend(
 			[manifest_dir.join("pubspec.lock")]
@@ -103,6 +105,7 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 				.filter(|path| path.exists()),
 		);
 	}
+
 	discovered
 }
 
@@ -112,6 +115,7 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 		Ecosystem::Dart => "dart pub get",
 		_ => return Vec::new(),
 	};
+
 	discover_lockfiles(package)
 		.into_iter()
 		.map(|lockfile| {
@@ -133,12 +137,16 @@ pub fn update_dependency_fields(
 	versioned_deps: &std::collections::BTreeMap<String, String>,
 ) {
 	for field in fields {
-		if let Some(Value::Mapping(section)) = mapping.get_mut(Value::String(field.to_string())) {
-			for (dep_name, dep_version) in versioned_deps {
-				let key = Value::String(dep_name.clone());
-				if section.contains_key(&key) {
-					section.insert(key, Value::String(dep_version.clone()));
-				}
+		let Some(Value::Mapping(section)) = mapping.get_mut(Value::String(field.to_string()))
+		else {
+			continue;
+		};
+
+		for (dep_name, dep_version) in versioned_deps {
+			let key = Value::String(dep_name.clone());
+
+			if section.contains_key(&key) {
+				section.insert(key, Value::String(dep_version.clone()));
 			}
 		}
 	}
@@ -154,8 +162,10 @@ pub fn update_manifest_text(
 	serde_yaml_ng::from_str::<Mapping>(contents).map_err(|error| {
 		MonochangeError::Config(format!("failed to parse pubspec yaml: {error}"))
 	})?;
+
 	let line_ranges = yaml_line_ranges(contents);
 	let mut replacements = Vec::<((usize, usize), String)>::new();
+
 	if let Some(owner_version) = owner_version
 		&& let Some(span) = find_yaml_scalar_for_key(contents, &line_ranges, 0, "version")
 	{
@@ -164,10 +174,12 @@ pub fn update_manifest_text(
 			render_yaml_scalar(&contents[span.0..span.1], owner_version),
 		));
 	}
+
 	for field in fields {
 		let Some(section_index) = find_yaml_key_line(contents, &line_ranges, 0, field) else {
 			continue;
 		};
+
 		for (dep_name, dep_version) in versioned_deps {
 			if let Some(span) =
 				find_yaml_dependency_scalar(contents, &line_ranges, section_index, dep_name)
@@ -179,11 +191,14 @@ pub fn update_manifest_text(
 			}
 		}
 	}
+
 	replacements.sort_by_key(|right| std::cmp::Reverse(right.0.0));
+
 	let mut updated = contents.to_string();
 	for ((start, end), replacement) in replacements {
 		updated.replace_range(start..end, &replacement);
 	}
+
 	Ok(updated)
 }
 

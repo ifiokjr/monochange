@@ -87,10 +87,12 @@ pub(crate) fn load_prepared_release_execution(
 	build_file_diffs: bool,
 ) -> MonochangeResult<Option<LoadedPreparedReleaseExecution>> {
 	let artifact_path = resolve_prepared_release_artifact_path(root, explicit_path);
+
 	if !artifact_path.exists() {
 		return Ok(None);
 	}
 
+	// Load and validate the artifact
 	let artifact = read_prepared_release_artifact(&artifact_path)?;
 	validate_prepared_release_artifact(
 		root,
@@ -101,6 +103,7 @@ pub(crate) fn load_prepared_release_execution(
 		build_file_diffs,
 	)?;
 
+	// Transform persisted diffs into runtime format
 	let load_started_at = Instant::now();
 	let file_diffs = artifact
 		.file_diffs
@@ -113,6 +116,7 @@ pub(crate) fn load_prepared_release_execution(
 			}
 		})
 		.collect();
+
 	let execution = PreparedReleaseExecution {
 		prepared_release: artifact.prepared_release,
 		file_diffs,
@@ -125,6 +129,7 @@ pub(crate) fn load_prepared_release_execution(
 		"reused prepared release artifact `{}`",
 		root_relative(root, &artifact_path).display()
 	);
+
 	Ok(Some(LoadedPreparedReleaseExecution { execution, message }))
 }
 

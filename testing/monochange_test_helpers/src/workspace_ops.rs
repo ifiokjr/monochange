@@ -11,6 +11,7 @@ use monochange_core::MonochangeResult;
 fn root_relative(root: &Path, path: &Path) -> PathBuf {
 	let relative =
 		monochange_core::relative_to_root(root, path).unwrap_or_else(|| path.to_path_buf());
+
 	if relative.as_os_str().is_empty() {
 		PathBuf::from(".")
 	} else {
@@ -43,6 +44,7 @@ pub fn run_lockfile_command(
 	command: &LockfileCommandExecution,
 ) -> MonochangeResult<()> {
 	let cwd = remap_workspace_path(root, temp_root, &command.cwd)?;
+
 	let output = if let Some(shell_binary) = command.shell.shell_binary() {
 		Command::new(shell_binary)
 			.arg("-c")
@@ -60,6 +62,7 @@ pub fn run_lockfile_command(
 		};
 		Command::new(program).args(args).current_dir(&cwd).output()
 	};
+
 	let output = output.map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to run lockfile command `{}` in {}: {error}",
@@ -67,15 +70,18 @@ pub fn run_lockfile_command(
 			root_relative(root, &command.cwd).display(),
 		))
 	})?;
+
 	if output.status.success() {
 		return Ok(());
 	}
+
 	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 	let details = if stderr.is_empty() {
 		format!("exit status {}", output.status)
 	} else {
 		stderr
 	};
+
 	Err(MonochangeError::Discovery(format!(
 		"lockfile command `{}` failed in {}: {details}",
 		command.command,
@@ -86,6 +92,7 @@ pub fn run_lockfile_command(
 pub fn read_optional_file(path: &Path) -> MonochangeResult<Option<Vec<u8>>> {
 	match fs::read(path) {
 		Ok(contents) => Ok(Some(contents)),
+
 		Err(error)
 			if matches!(
 				error.kind(),
@@ -94,6 +101,7 @@ pub fn read_optional_file(path: &Path) -> MonochangeResult<Option<Vec<u8>>> {
 		{
 			Ok(None)
 		}
+
 		Err(error) => {
 			Err(MonochangeError::Io(format!(
 				"failed to read {}: {error}",
@@ -149,19 +157,24 @@ pub fn collect_workspace_files(
 	})? {
 		let entry = entry
 			.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
+
 		let path = entry.path();
 		if path.file_name().is_some_and(|name| name == ".git") {
 			continue;
 		}
+
 		let file_type = entry_file_type(&entry, &path)?;
+
 		if file_type.is_dir() {
 			collect_workspace_files(root, &path, relative_paths)?;
 			continue;
 		}
+
 		if file_type.is_file() {
 			relative_paths.insert(strip_workspace_prefix(&path, root)?.to_path_buf());
 		}
 	}
+
 	Ok(())
 }
 
@@ -172,25 +185,31 @@ pub fn copy_workspace_tree(source: &Path, destination: &Path) -> MonochangeResul
 			destination.display()
 		))
 	})?;
+
 	for entry in fs::read_dir(source).map_err(|error| {
 		MonochangeError::Io(format!("failed to read {}: {error}", source.display()))
 	})? {
 		let entry = entry
 			.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
+
 		let source_path = entry.path();
 		if source_path.file_name().is_some_and(|name| name == ".git") {
 			continue;
 		}
+
 		let destination_path = destination.join(entry.file_name());
 		let file_type = entry_file_type(&entry, &source_path)?;
+
 		if file_type.is_dir() {
 			copy_workspace_tree(&source_path, &destination_path)?;
 			continue;
 		}
+
 		if file_type.is_file() {
 			ensure_parent_directory(&destination_path)?;
 			copy_workspace_file(&source_path, &destination_path)?;
 		}
 	}
+
 	Ok(())
 }

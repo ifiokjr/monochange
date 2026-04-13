@@ -158,12 +158,14 @@ pub fn build_release_plan(
 		.iter()
 		.map(|group| (group.group_id.as_str(), group))
 		.collect::<BTreeMap<_, _>>();
+
 	let (explicit_package_versions, explicit_group_versions, warnings) = resolve_explicit_versions(
 		&package_by_id,
 		&group_by_id,
 		change_signals,
 		strict_version_conflicts,
 	)?;
+
 	let mut states = packages
 		.iter()
 		.map(|package| {
@@ -178,6 +180,7 @@ pub fn build_release_plan(
 		.collect::<BTreeMap<&str, _>>();
 	let mut queue: VecDeque<&str> = VecDeque::new();
 
+	// Process all change signals to establish initial decisions.
 	for change_signal in change_signals {
 		let assessment =
 			strongest_assessment_for_package(compatibility_evidence, &change_signal.package_id);
@@ -188,6 +191,7 @@ pub fn build_release_plan(
 			.clone()
 			.unwrap_or_else(|| "explicit change input".to_string());
 		let upstream_sources = BTreeSet::from([change_signal.package_id.clone()]);
+
 		apply_decision(
 			&mut states,
 			&mut queue,
@@ -199,12 +203,14 @@ pub fn build_release_plan(
 		);
 	}
 
+	// Propagate decisions through the dependency graph.
 	while let Some(source_package_id) = queue.pop_front() {
 		let source_state = if let Some(state) = states.get(source_package_id) {
 			state.clone()
 		} else {
 			continue;
 		};
+
 		if !source_state.severity.is_release() {
 			continue;
 		}
@@ -229,43 +235,45 @@ pub fn build_release_plan(
 			}
 		}
 
-		if let Some(group_id) = package_by_id
+		let group_id = package_by_id
 			.get(source_package_id)
-			.and_then(|package| package.version_group_id.as_deref())
-		{
-			let Some(group) = group_by_id.get(group_id) else {
-				continue;
-			};
-			let group_max = group
-				.members
-				.iter()
-				.map(|member| {
-					states.get(member.as_str()).map_or_else(
-						|| {
-							eprintln!(
-								"warning: version group `{group_id}` member `{member}` was not found in discovered packages"
-							);
-							BumpSeverity::None
-						},
-						|state| state.severity,
-					)
-				})
-				.max()
-				.unwrap_or(BumpSeverity::None);
+			.and_then(|package| package.version_group_id.as_deref());
+		let Some(group_id) = group_id else {
+			continue;
+		};
+		let Some(group) = group_by_id.get(group_id) else {
+			continue;
+		};
 
-			if group_max.is_release() {
-				let reason = format!("shares version group `{group_id}`");
-				for member_id in &group.members {
-					apply_decision(
-						&mut states,
-						&mut queue,
-						member_id,
-						group_max,
-						"version-group-synchronization",
-						&reason,
-						&source_state.upstream_sources,
-					);
-				}
+		let group_max = group
+			.members
+			.iter()
+			.map(|member| {
+				states.get(member.as_str()).map_or_else(
+					|| {
+						eprintln!(
+							"warning: version group `{group_id}` member `{member}` was not found in discovered packages"
+						);
+						BumpSeverity::None
+					},
+					|state| state.severity,
+				)
+			})
+			.max()
+			.unwrap_or(BumpSeverity::None);
+
+		if group_max.is_release() {
+			let reason = format!("shares version group `{group_id}`");
+			for member_id in &group.members {
+				apply_decision(
+					&mut states,
+					&mut queue,
+					member_id,
+					group_max,
+					"version-group-synchronization",
+					&reason,
+					&source_state.upstream_sources,
+				);
 			}
 		}
 	}

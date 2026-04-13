@@ -135,22 +135,27 @@ pub fn annotate_changeset_context(
 ) {
 	let host = gitlab_host_name(source);
 	let capabilities = gitlab_hosting_capabilities();
+
 	for changeset in changesets {
 		let Some(context) = changeset.context.as_mut() else {
 			continue;
 		};
+
 		context.provider = HostingProviderKind::GitLab;
 		context.host.clone_from(&host);
 		context.capabilities = capabilities.clone();
+
 		for revision in [&mut context.introduced, &mut context.last_updated] {
 			let Some(revision) = revision.as_mut() else {
 				continue;
 			};
+
 			if let Some(commit) = revision.commit.as_mut() {
 				commit.provider = HostingProviderKind::GitLab;
 				commit.host.clone_from(&host);
 				commit.url = Some(gitlab_commit_url(source, &commit.sha));
 			}
+
 			if let Some(actor) = revision.actor.as_mut() {
 				actor.provider = HostingProviderKind::GitLab;
 				actor.host.clone_from(&host);

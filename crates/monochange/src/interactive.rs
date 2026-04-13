@@ -64,6 +64,7 @@ pub fn run_interactive_change(
 	options: &InteractiveOptions,
 ) -> MonochangeResult<InteractiveChangeResult> {
 	let targets = build_selectable_targets(configuration);
+
 	if targets.is_empty() {
 		return Err(MonochangeError::Config(
 			"no packages or groups found in workspace configuration".to_string(),
@@ -72,6 +73,7 @@ pub fn run_interactive_change(
 
 	// Step 1: Select packages/groups
 	let selected = prompt_select_targets(&targets)?;
+
 	if selected.is_empty() {
 		return Err(MonochangeError::Config(
 			"no packages or groups selected".to_string(),
@@ -80,10 +82,12 @@ pub fn run_interactive_change(
 
 	// Step 2: For each selected target, choose bump, optional version, and optional change type
 	let mut interactive_targets = Vec::new();
+
 	for target in &selected {
 		let bump = prompt_bump_for_target(target)?;
 		let version = prompt_version_for_target(target)?;
 		let change_type = prompt_change_type_for_target(target)?;
+
 		interactive_targets.push(InteractiveTarget {
 			id: target.id.clone(),
 			bump,

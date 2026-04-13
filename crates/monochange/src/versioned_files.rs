@@ -94,7 +94,9 @@ pub(crate) fn build_versioned_file_updates(
 	if configuration.packages.is_empty() && configuration.groups.is_empty() {
 		return Ok(Vec::new());
 	}
+
 	let released_versions_by_record_id = released_versions_by_record_id(plan);
+
 	let package_by_config_id = packages
 		.iter()
 		.filter_map(|package| {
@@ -104,10 +106,12 @@ pub(crate) fn build_versioned_file_updates(
 				.map(|config_id| (config_id.as_str(), package))
 		})
 		.collect::<BTreeMap<_, _>>();
+
 	let package_by_native_name = packages
 		.iter()
 		.map(|package| (package.name.as_str(), package))
 		.collect::<BTreeMap<_, _>>();
+
 	let current_versions_by_native_name = packages
 		.iter()
 		.filter_map(|package| {
@@ -117,6 +121,7 @@ pub(crate) fn build_versioned_file_updates(
 				.map(|version| (package.name.clone(), version.to_string()))
 		})
 		.collect::<BTreeMap<_, _>>();
+
 	let released_versions_by_config_id = packages
 		.iter()
 		.filter_map(|package| {
@@ -127,6 +132,7 @@ pub(crate) fn build_versioned_file_updates(
 			})
 		})
 		.collect::<BTreeMap<_, _>>();
+
 	let released_versions_by_native_name = packages
 		.iter()
 		.filter_map(|package| {
@@ -135,7 +141,9 @@ pub(crate) fn build_versioned_file_updates(
 				.map(|version| (package.name.clone(), version.clone()))
 		})
 		.collect::<BTreeMap<_, _>>();
+
 	let shared_release_version = shared_release_version(plan);
+
 	let context = VersionedFileUpdateContext {
 		package_by_config_id,
 		package_by_native_name,
@@ -143,27 +151,33 @@ pub(crate) fn build_versioned_file_updates(
 		released_versions_by_native_name,
 		configuration,
 	};
+
 	let mut updates = BTreeMap::<PathBuf, CachedDocument>::new();
 
 	for package_definition in &configuration.packages {
 		let Some(version) = released_versions_by_config_id.get(&package_definition.id) else {
 			continue;
 		};
+
 		let matched_package = context
 			.package_by_config_id
 			.get(package_definition.id.as_str());
+
 		let dep_names = if let Some(name) = matched_package.map(|package| package.name.clone()) {
 			vec![name]
 		} else {
 			vec![package_definition.id.clone()]
 		};
+
 		let effective_versioned_files = package_definition.versioned_files.clone();
+
 		for versioned_file in dedup_versioned_file_definitions(effective_versioned_files) {
 			let effective_dep_names = if let Some(override_name) = &versioned_file.name {
 				vec![override_name.clone()]
 			} else {
 				dep_names.clone()
 			};
+
 			apply_versioned_file_definition(
 				root,
 				&mut updates,
@@ -186,6 +200,7 @@ pub(crate) fn build_versioned_file_updates(
 		else {
 			continue;
 		};
+
 		// For groups, collect all member native names
 		let group_dep_names = group_definition
 			.packages
@@ -197,6 +212,7 @@ pub(crate) fn build_versioned_file_updates(
 					.map_or_else(|| member_id.clone(), |package| package.name.clone())
 			})
 			.collect::<Vec<_>>();
+
 		for versioned_file in &group_definition.versioned_files {
 			apply_versioned_file_definition(
 				root,
@@ -248,6 +264,7 @@ fn apply_inferred_lockfile_updates(
 		else {
 			continue;
 		};
+
 		for lockfile_path in inferred_lockfile_paths(package) {
 			let relative_lockfile = root_relative(root, &lockfile_path);
 			let (_, dep_names) = dep_names_by_lockfile
@@ -266,6 +283,7 @@ fn apply_inferred_lockfile_updates(
 			name: None,
 			regex: None,
 		};
+
 		// Supported lockfiles can be rewritten directly from the release plan.
 		// That keeps normal `mc release` runs on the fast path instead of paying
 		// package-manager startup and dependency-resolution costs for every bump.
@@ -333,12 +351,15 @@ fn render_cached_document_bytes(
 			rendered.push('\n');
 			Ok(rendered.into_bytes())
 		}
+
 		CachedDocument::Yaml(mapping) => {
 			serde_yaml_ng::to_string(&mapping)
 				.map(String::into_bytes)
 				.map_err(|error| MonochangeError::Config(error.to_string()))
 		}
+
 		CachedDocument::Text(contents) => Ok(contents.into_bytes()),
+
 		CachedDocument::Bytes(contents) => Ok(contents),
 	}
 }
@@ -391,6 +412,7 @@ pub(crate) fn read_cached_document(
 	if let Some(cached) = updates.remove(path) {
 		return Ok(cached);
 	}
+
 	let Some(kind) = versioned_file_kind(ecosystem_type, path) else {
 		return Err(MonochangeError::Config(format!(
 			"unsupported versioned file `{}` for ecosystem `{}`",
@@ -404,9 +426,11 @@ pub(crate) fn read_cached_document(
 			},
 		)));
 	};
+
 	let contents = fs::read(path).map_err(|error| {
 		MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
 	})?;
+
 	let text_contents = String::from_utf8(contents.clone())
 		.map_err(|error| {
 			MonochangeError::Config(format!(
@@ -415,6 +439,7 @@ pub(crate) fn read_cached_document(
 			))
 		})
 		.ok();
+
 	match kind {
 		#[cfg(feature = "cargo")]
 		VersionedFileKind::Cargo(kind) => {

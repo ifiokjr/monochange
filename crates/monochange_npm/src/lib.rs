@@ -98,17 +98,20 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	} else {
 		package.workspace_root.clone()
 	};
+
 	let candidate_names = [
 		"pnpm-lock.yaml",
 		"package-lock.json",
 		"bun.lock",
 		"bun.lockb",
 	];
+
 	let mut discovered = candidate_names
 		.iter()
 		.map(|name| scope.join(name))
 		.filter(|path| path.exists())
 		.collect::<Vec<_>>();
+
 	if discovered.is_empty() && scope != manifest_dir {
 		discovered.extend(
 			candidate_names
@@ -117,6 +120,7 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 				.filter(|path| path.exists()),
 		);
 	}
+
 	discovered
 }
 
@@ -135,6 +139,7 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 			} else {
 				"bun install --lockfile-only"
 			};
+
 			LockfileCommandExecution {
 				command: command.to_string(),
 				cwd: lockfile

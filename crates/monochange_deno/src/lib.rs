@@ -82,8 +82,10 @@ pub fn supported_versioned_file_kind(path: &Path) -> Option<DenoVersionedFileKin
 
 fn rewrite_dependency_reference(text: &str, package_name: &str, version: &str) -> String {
 	let mut updated = text.to_string();
+
 	for prefix in [format!("npm:{package_name}@"), format!("{package_name}@")] {
 		let mut cursor = 0usize;
+
 		while let Some(found) = updated[cursor..].find(&prefix) {
 			let start = cursor + found + prefix.len();
 			let end = updated[start..]
@@ -93,10 +95,12 @@ fn rewrite_dependency_reference(text: &str, package_name: &str, version: &str) -
 						.then_some(start + index)
 				})
 				.unwrap_or(updated.len());
+
 			updated.replace_range(start..end, version);
 			cursor = start + version.len();
 		}
 	}
+
 	updated
 }
 
@@ -104,9 +108,11 @@ pub fn update_lockfile(value: &mut Value, raw_versions: &BTreeMap<String, String
 	let Ok(mut rendered) = serde_json::to_string(value) else {
 		return;
 	};
+
 	for (package_name, version) in raw_versions {
 		rendered = rewrite_dependency_reference(&rendered, package_name, version);
 	}
+
 	if let Ok(updated) = serde_json::from_str::<Value>(&rendered) {
 		*value = updated;
 	}
@@ -122,10 +128,12 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	} else {
 		package.workspace_root.clone()
 	};
+
 	let mut discovered = [scope.join("deno.lock")]
 		.into_iter()
 		.filter(|path| path.exists())
 		.collect::<Vec<_>>();
+
 	if discovered.is_empty() && scope != manifest_dir {
 		discovered.extend(
 			[manifest_dir.join("deno.lock")]
@@ -133,10 +141,12 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 				.filter(|path| path.exists()),
 		);
 	}
+
 	discovered
 }
 
 pub fn default_lockfile_commands(_package: &PackageRecord) -> Vec<LockfileCommandExecution> {
+	// Deno does not require lockfile commands for version updates.
 	Vec::new()
 }
 

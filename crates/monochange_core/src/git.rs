@@ -11,6 +11,7 @@ use crate::MonochangeResult;
 pub fn git_command(root: &Path) -> Command {
 	let mut command = Command::new("git");
 	command.current_dir(root);
+
 	for variable in [
 		"GIT_DIR",
 		"GIT_WORK_TREE",
@@ -21,6 +22,7 @@ pub fn git_command(root: &Path) -> Command {
 	] {
 		command.env_remove(variable);
 	}
+
 	command
 }
 
@@ -68,12 +70,14 @@ pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
 		git_command_output(root, &["symbolic-ref", "--short", "HEAD"]).map_err(|error| {
 			MonochangeError::Io(format!("failed to read current git branch: {error}"))
 		})?;
+
 	if !output.status.success() {
 		return Err(MonochangeError::Config(format!(
 			"failed to read current git branch: {}",
 			git_error_detail(&output)
 		)));
 	}
+
 	Ok(git_stdout_trimmed(&output))
 }
 
@@ -81,12 +85,14 @@ pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
 pub fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 	let output = git_command_output(root, &["rev-parse", "HEAD"])
 		.map_err(|error| MonochangeError::Io(format!("failed to read HEAD commit: {error}")))?;
+
 	if !output.status.success() {
 		return Err(MonochangeError::Config(format!(
 			"failed to read HEAD commit: {}",
 			git_error_detail(&output)
 		)));
 	}
+
 	Ok(git_stdout_trimmed(&output))
 }
 
@@ -126,12 +132,14 @@ pub fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 	let output = command
 		.output()
 		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
+
 	if !output.status.success() {
 		return Err(MonochangeError::Config(format!(
 			"failed to {action}: {}",
 			git_error_detail(&output)
 		)));
 	}
+
 	Ok(())
 }
 
@@ -143,9 +151,11 @@ pub fn run_commit_command_allow_nothing_to_commit(
 	let output = command
 		.output()
 		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
+
 	if output.status.success() || git_reports_nothing_to_commit(&output) {
 		return Ok(());
 	}
+
 	Err(MonochangeError::Config(format!(
 		"failed to {action}: {}",
 		git_error_detail(&output)

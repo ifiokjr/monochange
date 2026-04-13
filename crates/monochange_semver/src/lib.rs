@@ -78,11 +78,13 @@ pub fn collect_assessments(
 		.collect()
 }
 
+/// Merge two bump severities and return the higher one.
 #[must_use]
 pub fn merge_severities(left: BumpSeverity, right: BumpSeverity) -> BumpSeverity {
 	left.max(right)
 }
 
+/// Return the strongest assessment from a list.
 #[must_use]
 pub fn strongest_assessment(
 	assessments: &[CompatibilityAssessment],
@@ -93,6 +95,7 @@ pub fn strongest_assessment(
 		.max_by_key(|assessment| assessment.severity)
 }
 
+/// Return the strongest assessment for a specific package.
 #[must_use]
 pub fn strongest_assessment_for_package(
 	assessments: &[CompatibilityAssessment],
@@ -103,6 +106,7 @@ pub fn strongest_assessment_for_package(
 		.filter(|assessment| assessment.package_id == package_id)
 		.cloned()
 		.collect::<Vec<_>>();
+
 	strongest_assessment(&matching)
 }
 
