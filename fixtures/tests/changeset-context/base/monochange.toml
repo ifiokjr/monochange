@@ -11,10 +11,10 @@ change_templates = ["#### {{ summary }}\n\n{{ details }}\n\n{{ context }}", "###
 [package.core]
 path = "crates/core"
 
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
+[cli.release]
+help_text = "Prepare a release and refresh the cached release manifest"
 
-[[cli.release-manifest.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
 
 [cli.diagnostics]

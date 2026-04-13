@@ -1304,20 +1304,6 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
-	/// Render the prepared release as a stable JSON manifest and optionally write
-	/// it to disk.
-	///
-	/// Requires a previous `PrepareRelease` step.
-	RenderReleaseManifest {
-		#[serde(default)]
-		name: Option<String>,
-		#[serde(default)]
-		when: Option<String>,
-		#[serde(default)]
-		path: Option<PathBuf>,
-		#[serde(default)]
-		inputs: BTreeMap<String, CliStepInputValue>,
-	},
 	#[serde(alias = "PublishGitHubRelease")]
 	/// Publish hosted releases from a prepared `monochange` release.
 	///
@@ -1422,7 +1408,6 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { inputs, .. }
 			| Self::PrepareRelease { inputs, .. }
 			| Self::CommitRelease { inputs, .. }
-			| Self::RenderReleaseManifest { inputs, .. }
 			| Self::PublishRelease { inputs, .. }
 			| Self::OpenReleaseRequest { inputs, .. }
 			| Self::CommentReleasedIssues { inputs, .. }
@@ -1441,7 +1426,6 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { name, .. }
 			| Self::PrepareRelease { name, .. }
 			| Self::CommitRelease { name, .. }
-			| Self::RenderReleaseManifest { name, .. }
 			| Self::PublishRelease { name, .. }
 			| Self::OpenReleaseRequest { name, .. }
 			| Self::CommentReleasedIssues { name, .. }
@@ -1465,7 +1449,6 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { when, .. }
 			| Self::PrepareRelease { when, .. }
 			| Self::CommitRelease { when, .. }
-			| Self::RenderReleaseManifest { when, .. }
 			| Self::PublishRelease { when, .. }
 			| Self::OpenReleaseRequest { when, .. }
 			| Self::CommentReleasedIssues { when, .. }
@@ -1494,7 +1477,6 @@ impl CliStepDefinition {
 			Self::CreateChangeFile { .. } => "CreateChangeFile",
 			Self::PrepareRelease { .. } => "PrepareRelease",
 			Self::CommitRelease { .. } => "CommitRelease",
-			Self::RenderReleaseManifest { .. } => "RenderReleaseManifest",
 			Self::PublishRelease { .. } => "PublishRelease",
 			Self::OpenReleaseRequest { .. } => "OpenReleaseRequest",
 			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
@@ -1513,9 +1495,7 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
-			Self::Validate { .. }
-			| Self::CommitRelease { .. }
-			| Self::RenderReleaseManifest { .. } => Some(&[]),
+			Self::Validate { .. } | Self::CommitRelease { .. } => Some(&[]),
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
@@ -1548,10 +1528,7 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn expected_input_kind(&self, name: &str) -> Option<CliInputKind> {
 		match self {
-			Self::Validate { .. }
-			| Self::CommitRelease { .. }
-			| Self::RenderReleaseManifest { .. }
-			| Self::Command { .. } => None,
+			Self::Validate { .. } | Self::CommitRelease { .. } | Self::Command { .. } => None,
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }

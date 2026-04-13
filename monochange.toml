@@ -475,7 +475,6 @@ ignored_paths = [
 #   CreateChangeFile     — create a .changeset/*.md file
 #   PrepareRelease       — compute release plan, update versions, changelogs
 #   CommitRelease        — create a local release commit (requires PrepareRelease)
-#   RenderReleaseManifest — legacy: rewrite release-manifest.json after PrepareRelease
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets

@@ -35,7 +35,6 @@ The reference pages in this section document each built-in step with:
 | `CreateChangeFile`      | author a `.changeset/*.md` file from CLI inputs                          | no                               | run independently, or before planning                                                       |
 | `PrepareRelease`        | build the release result, update files, and refresh the cached manifest  | no                               | `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command` |
 | `CommitRelease`         | create a local release commit with an embedded `ReleaseRecord`           | `PrepareRelease`                 | `OpenReleaseRequest`, manual review, custom `Command`                                       |
-| `RenderReleaseManifest` | legacy compatibility step for rewriting the manifest to another path     | `PrepareRelease`                 | migration-only workflows, later `Command` steps                                             |
 | `PublishRelease`        | create or update hosted provider releases                                | `PrepareRelease` + `[source]`    | `CommentReleasedIssues`, custom notification commands                                       |
 | `OpenReleaseRequest`    | create or update a hosted release PR/MR                                  | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                  |
 | `CommentReleasedIssues` | post release follow-up comments to closed issues                         | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                             |
@@ -124,7 +123,7 @@ Interactive steps do not show the spinner by default when monochange is waiting 
 When you compose `Command` steps after built-in steps, monochange exposes structured context values such as:
 
 - `release.*` after `PrepareRelease`
-- `manifest.path` after `PrepareRelease` (and after the legacy `RenderReleaseManifest` compatibility step)
+- `manifest.path` after `PrepareRelease`
 - `affected.*` after `AffectedPackages`
 - `retarget.*` after `RetargetRelease`
 - `release_commit.*` after `CommitRelease`
@@ -142,7 +141,6 @@ Those namespaces are the main reason to prefer built-in steps over reimplementin
 - [RetargetRelease](06-retarget-release.md)
 - [PrepareRelease](07-prepare-release.md)
 - [CommitRelease](08-commit-release.md)
-- [RenderReleaseManifest (legacy)](09-render-release-manifest.md)
 - [PublishRelease](10-publish-release.md)
 - [OpenReleaseRequest](11-open-release-request.md)
 - [CommentReleasedIssues](12-comment-released-issues.md)

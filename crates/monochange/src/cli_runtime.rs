@@ -288,17 +288,6 @@ fn write_default_release_manifest_file(
 	write_release_manifest_file(root, Path::new(DEFAULT_RELEASE_MANIFEST_PATH), manifest)
 }
 
-fn resolve_release_manifest_path(
-	root: &Path,
-	path: Option<&Path>,
-	manifest: &ReleaseManifest,
-) -> MonochangeResult<PathBuf> {
-	match path {
-		Some(path) => write_release_manifest_file(root, path, manifest),
-		None => write_default_release_manifest_file(root, manifest),
-	}
-}
-
 fn ensure_prepared_release_for_consumer_step(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -690,24 +679,6 @@ pub(crate) fn execute_cli_command_with_options(
 					output = None;
 					Ok(())
 				}
-				CliStepDefinition::RenderReleaseManifest { path, .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`RenderReleaseManifest` requires a previous `PrepareRelease` step"
-								.to_string(),
-						)
-					})?;
-					let manifest = build_release_manifest(
-						cli_command,
-						prepared_release,
-						&context.command_logs,
-					);
-					let manifest_path =
-						resolve_release_manifest_path(root, path.as_deref(), &manifest)?;
-					context.release_manifest_path = Some(manifest_path);
-					output = None;
-					Ok(())
-				}
 				CliStepDefinition::PublishRelease { .. } => {
 					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 						MonochangeError::Config(
@@ -1072,11 +1043,6 @@ fn step_references_release_file_diffs(step: &CliStepDefinition) -> bool {
 		return true;
 	}
 	match step {
-		CliStepDefinition::RenderReleaseManifest { path, .. } => {
-			path.as_ref()
-				.and_then(|path| path.to_str())
-				.is_some_and(mentions_file_diffs)
-		}
 		CliStepDefinition::Command {
 			command,
 			dry_run_command,

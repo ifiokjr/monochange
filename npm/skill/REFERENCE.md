@@ -83,7 +83,7 @@ Use dry-run output before real release preparation. Review:
 ### Generate downstream automation input
 
 ```bash
-mc release-manifest --dry-run
+mc release --dry-run --format json
 ```
 
 Use this when downstream CI or source-provider automation needs stable machine-readable release data.

@@ -524,7 +524,6 @@ comment_on_failure = true
 #   PrepareRelease       — compute release plan, update versions, changelogs,
 #                          and refresh .monochange/release-manifest.json
 #   CommitRelease        — create a local release commit (requires PrepareRelease)
-#   RenderReleaseManifest — legacy: rewrite release-manifest.json after PrepareRelease
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets

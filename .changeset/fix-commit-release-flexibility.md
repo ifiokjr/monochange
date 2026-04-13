@@ -28,6 +28,6 @@ mc commit-from-cache
 # can reuse .monochange/prepared-release-cache.json without rerunning PrepareRelease
 ```
 
-`PrepareRelease` now refreshes `.monochange/release-manifest.json` automatically as local cached metadata, and `CommitRelease` skips ignored untracked manifest files and stale missing pathspecs while still staging real release files. `CommitRelease` can also reuse a saved prepared release artifact when the command does not include its own `PrepareRelease` step.
+`PrepareRelease` now refreshes `.monochange/release-manifest.json` automatically as local cached metadata, and `CommitRelease` skips ignored untracked manifest files and stale missing pathspecs while still staging real release files. `CommitRelease` can also reuse a saved prepared release artifact when the command does not include its own `PrepareRelease` step. The separate `RenderReleaseManifest` step has been removed; `PrepareRelease` is now the only supported way to refresh the cached manifest.
 
 The GitHub release PR flow now applies the same staging guardrails, so ignored local release artifacts do not break release PR preparation or related CI coverage/benchmark paths.

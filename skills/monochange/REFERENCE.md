@@ -47,7 +47,7 @@ monochange-skill --print-install
 3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
 4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
 5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
-6. **Generate manifest** — `mc release-manifest --dry-run` writes a stable JSON artifact for downstream automation.
+6. **Inspect cached manifest** — `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload.
 7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
 
 <!-- {/recommendedCommandFlow} -->
@@ -112,7 +112,6 @@ Redesign the public API surface.
 
 - `PrepareRelease` — compute release plan, update versions, changelogs, and versioned files
 - `CommitRelease` — create a local release commit
-- `RenderReleaseManifest` — write a stable JSON manifest
 - `PublishRelease` — create provider releases
 - `OpenReleaseRequest` — open or update a release pull request
 - `CommentReleasedIssues` — comment on issues referenced in changesets

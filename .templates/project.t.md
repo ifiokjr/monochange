@@ -68,7 +68,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 monochange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
-- `mc release-manifest` writes a stable JSON artifact for downstream jobs, including authored changesets plus linked release context metadata
+- `mc release --dry-run --format json` refreshes the cached manifest and shows downstream automation data, including authored changesets plus linked release context metadata
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
@@ -89,7 +89,6 @@ mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
 mc diagnostics --format json
 mc release --dry-run --format json
-mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-record --from v1.2.3
@@ -290,18 +289,6 @@ default = "text"
 [[cli.release.steps]]
 name = "prepare release"
 type = "PrepareRelease"
-
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
-
-[[cli.release-manifest.steps]]
-name = "prepare release"
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-name = "render release manifest"
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
 help_text = "Prepare a release and publish provider releases"

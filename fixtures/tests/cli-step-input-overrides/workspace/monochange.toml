@@ -55,17 +55,6 @@ help_text = "Prepare a release"
 type = "PrepareRelease"
 inputs = { format = "json" }
 
-[cli.release-manifest]
-help_text = "Prepare a release manifest"
-
-[[cli.release-manifest.inputs]]
-name = "format"
-type = "choice"
-default = "json"
-choices = ["text", "json"]
-
-[[cli.release-manifest.steps]]
-type = "PrepareRelease"
 
 [cli.affected]
 help_text = "Evaluate affected packages"
