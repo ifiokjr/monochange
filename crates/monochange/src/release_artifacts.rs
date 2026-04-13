@@ -25,6 +25,7 @@ pub(crate) fn build_release_targets(
 	let source = configuration.source.as_ref();
 	let defaults_release_title = configuration.defaults.release_title.as_deref();
 	let defaults_changelog_title = configuration.defaults.changelog_version_title.as_deref();
+
 	// Cache the sorted tag list once for the whole command.
 	//
 	// Performance note:

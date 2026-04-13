@@ -182,6 +182,7 @@ pub fn validate_source_configuration(source: &SourceConfiguration) -> Monochange
 				.to_string(),
 		));
 	}
+
 	Ok(())
 }
 
@@ -614,18 +615,23 @@ async fn enrich_changeset_context_with_client(
 				tracing::warn!(commits = review_request_lookup_shas.len(), %error, "failed to batch load GitHub review requests; continuing with commit annotations only");
 				std::collections::BTreeMap::new()
 			});
+
 	for changeset in changesets.iter_mut() {
 		let Some(context) = changeset.context.as_mut() else {
 			continue;
 		};
+
 		let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
+
 		for revision in [&mut context.introduced, &mut context.last_updated] {
 			let Some(revision) = revision.as_mut() else {
 				continue;
 			};
+
 			let Some(commit) = revision.commit.as_ref() else {
 				continue;
 			};
+
 			if let Some(related_review_request) = review_requests_by_sha
 				.get(&commit.sha)
 				.and_then(Clone::clone)
@@ -638,11 +644,13 @@ async fn enrich_changeset_context_with_client(
 					revision.actor = Some(author);
 				}
 			}
+
 			if let Some(actor) = revision.actor.as_mut() {
 				actor.provider = HostingProviderKind::GitHub;
 				actor.host.clone_from(&host);
 			}
 		}
+
 		context.related_issues = issues_by_id.into_values().collect();
 	}
 }
@@ -656,8 +664,10 @@ fn collect_review_request_lookup_shas(changesets: &[PreparedChangeset]) -> Vec<S
 		.filter_map(|revision| revision.commit.as_ref())
 		.map(|commit| commit.sha.clone())
 		.collect::<Vec<_>>();
+
 	shas.sort();
 	shas.dedup();
+
 	shas
 }
 
@@ -669,16 +679,21 @@ async fn load_review_requests_for_commits_with_client(
 	if shas.is_empty() {
 		return Ok(std::collections::BTreeMap::new());
 	}
+
 	#[rustfmt::skip]
 	tracing::info!(commits = shas.len(), requests = 1, "loading GitHub review requests");
+
 	let review_requests_by_sha =
 		load_review_request_batch_with_client(client, source, shas).await?;
+
 	let review_requests_found = review_requests_by_sha
 		.values()
 		.filter(|review_request| review_request.is_some())
 		.count();
+
 	#[rustfmt::skip]
 	tracing::debug!(commits = shas.len(), review_requests = review_requests_found, "resolved GitHub review requests");
+
 	Ok(review_requests_by_sha)
 }
 
@@ -688,6 +703,7 @@ async fn load_review_request_batch_with_client(
 	shas: &[String],
 ) -> MonochangeResult<std::collections::BTreeMap<String, Option<GitHubRelatedReviewRequest>>> {
 	let query = build_review_request_batch_query(&source.owner, &source.repo, shas);
+
 	let response = client
 		.graphql::<serde_json::Value>(&json!({ "query": query }))
 		.await
@@ -697,6 +713,7 @@ async fn load_review_request_batch_with_client(
 				shas.len()
 			))
 		})?;
+
 	let repository = response
 		.get("repository")
 		.or_else(|| response.get("data").and_then(|data| data.get("repository")))
@@ -706,8 +723,10 @@ async fn load_review_request_batch_with_client(
 				"GitHub review-request lookup returned no repository payload".to_string(),
 			)
 		})?;
+
 	let mut review_requests_by_sha =
 		std::collections::BTreeMap::<String, Option<GitHubRelatedReviewRequest>>::new();
+
 	for (index, sha) in shas.iter().enumerate() {
 		let alias = format!("commit_{index}");
 		let review_request = repository
@@ -722,6 +741,7 @@ async fn load_review_request_batch_with_client(
 			.and_then(|pull_request| parse_review_request_from_graphql(source, pull_request));
 		review_requests_by_sha.insert(sha.clone(), review_request);
 	}
+
 	Ok(review_requests_by_sha)
 }
 

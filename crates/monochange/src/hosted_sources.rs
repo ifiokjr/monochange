@@ -2,6 +2,11 @@ use monochange_core::HostedSourceAdapter;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 
+/// Returns the appropriate hosted source adapter for the given provider.
+///
+/// # Panics
+///
+/// Panics if the provider feature is not enabled at compile time.
 pub(crate) fn hosted_source_adapter(provider: SourceProvider) -> &'static dyn HostedSourceAdapter {
 	match provider {
 		#[cfg(feature = "github")]

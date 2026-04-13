@@ -155,6 +155,7 @@ pub fn lockfile_requires_command_refresh(lockfile: &Path, packages: &[&PackageRe
 	let Ok(document) = toml::from_str::<Value>(&contents) else {
 		return true;
 	};
+
 	let locked_package_names = document
 		.get("package")
 		.and_then(Value::as_array)
@@ -162,13 +163,16 @@ pub fn lockfile_requires_command_refresh(lockfile: &Path, packages: &[&PackageRe
 		.flatten()
 		.filter_map(|package| package.get("name").and_then(Value::as_str))
 		.collect::<HashSet<_>>();
+
 	if locked_package_names.is_empty() {
 		return true;
 	}
+
 	let workspace_package_names = packages
 		.iter()
 		.map(|package| package.name.as_str())
 		.collect::<HashSet<_>>();
+
 	packages.iter().any(|package| {
 		package
 			.declared_dependencies
@@ -184,6 +188,7 @@ pub fn lockfile_requires_command_refresh(lockfile: &Path, packages: &[&PackageRe
 #[must_use = "the validation result must be checked"]
 pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> MonochangeResult<()> {
 	let mut workspace_versioned = BTreeMap::<PathBuf, Vec<&PackageRecord>>::new();
+
 	for package in packages {
 		if package.ecosystem == Ecosystem::Cargo
 			&& package.metadata.contains_key("config_id")
@@ -204,10 +209,12 @@ pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> Monochan
 		if packages.len() < 2 {
 			continue;
 		}
+
 		let group_ids = packages
 			.iter()
 			.map(|package| package.version_group_id.as_deref())
 			.collect::<BTreeSet<_>>();
+
 		if group_ids.len() > 1 || group_ids.contains(&None) {
 			let details = packages
 				.iter()
@@ -218,6 +225,7 @@ pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> Monochan
 					}
 				})
 				.collect::<Vec<_>>();
+
 			return Err(MonochangeError::Config(format!(
 				"cargo packages using `version.workspace = true` must belong to the same version group, but found mismatched assignments: {}",
 				details.join(", ")

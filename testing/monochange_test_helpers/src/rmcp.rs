@@ -1,12 +1,10 @@
 pub fn content_text(result: &rmcp::model::CallToolResult) -> String {
-	result
-		.content
-		.first()
-		.and_then(|content| {
-			match &content.raw {
-				rmcp::model::RawContent::Text(text) => Some(text.text.clone()),
-				_ => None,
-			}
-		})
-		.unwrap_or_default()
+	let Some(content) = result.content.first() else {
+		return String::new();
+	};
+
+	match &content.raw {
+		rmcp::model::RawContent::Text(text) => text.text.clone(),
+		_ => String::new(),
+	}
 }

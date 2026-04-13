@@ -34,6 +34,7 @@ pub(crate) fn git_is_ancestor(
 		.map_err(|error| {
 		MonochangeError::Discovery(format!("failed to compare commit ancestry: {error}"))
 	})?;
+
 	match output.status.code() {
 		Some(0) => Ok(true),
 		Some(1) => Ok(false),
@@ -56,13 +57,16 @@ pub(crate) fn move_git_tag(
 #[must_use = "the push result must be checked"]
 pub(crate) fn push_git_tags(root: &Path, tags: &[&str]) -> MonochangeResult<()> {
 	let mut args = vec!["push", "--force", "origin"];
-	let tag_refs = tags
+
+	let tag_refs: Vec<String> = tags
 		.iter()
 		.map(|tag| format!("refs/tags/{tag}:refs/tags/{tag}"))
-		.collect::<Vec<_>>();
+		.collect();
+
 	for tag_ref in &tag_refs {
 		args.push(tag_ref.as_str());
 	}
+
 	run_git_status(root, &args, "failed to push retargeted release tags")
 }
 
@@ -84,6 +88,7 @@ pub(crate) fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResul
 		&["rev-list", "--first-parent", commit],
 		"failed to read first-parent commit ancestry",
 	)?;
+
 	Ok(output
 		.lines()
 		.map(str::to_string)
@@ -108,16 +113,20 @@ pub(crate) fn run_git_capture(
 ) -> MonochangeResult<String> {
 	let output = git_command_output(root, args)
 		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
+
 	if !output.status.success() {
 		let stderr = git_stderr_trimmed(&output);
 		tracing::warn!(args = ?args, %stderr, "git command failed");
+
 		let detail = [error_message, stderr.as_str()]
 			.into_iter()
 			.filter(|part| !part.is_empty())
 			.collect::<Vec<_>>()
 			.join(": ");
+
 		return Err(MonochangeError::Discovery(detail));
 	}
+
 	Ok(git_stdout_trimmed(&output))
 }
 
@@ -132,20 +141,24 @@ pub(crate) fn run_git_status(
 #[must_use = "the staging result must be checked"]
 pub(crate) fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
 	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths)?;
+
 	if stageable_paths.is_empty() {
 		let skipped_count = tracked_paths.len();
 		tracing::debug!(
 			count = skipped_count,
 			"no release commit paths required staging"
 		);
+
 		return Ok(());
 	}
+
 	let stageable_count = stageable_paths.len();
 	tracing::debug!(
 		count = stageable_count,
 		?stageable_paths,
 		"staging release commit paths"
 	);
+
 	run_git_process(
 		git_stage_paths_command(root, &stageable_paths),
 		"failed to stage release commit files",
@@ -157,6 +170,7 @@ fn resolve_stageable_release_paths(
 	tracked_paths: &[PathBuf],
 ) -> MonochangeResult<Vec<PathBuf>> {
 	let mut stageable_paths = Vec::with_capacity(tracked_paths.len());
+
 	for path in tracked_paths {
 		if release_path_requires_staging(root, path)? {
 			stageable_paths.push(path.clone());
@@ -164,18 +178,22 @@ fn resolve_stageable_release_paths(
 			tracing::debug!(path = %path.display(), "skipping non-stageable release path");
 		}
 	}
+
 	Ok(stageable_paths)
 }
 
 fn release_path_requires_staging(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	let absolute_path = root.join(path);
-	if absolute_path.exists() {
-		if git_path_is_tracked(root, path)? {
-			return Ok(true);
-		}
-		return Ok(!git_path_is_ignored(root, path)?);
+
+	if !absolute_path.exists() {
+		return git_path_is_tracked(root, path);
 	}
-	git_path_is_tracked(root, path)
+
+	if git_path_is_tracked(root, path)? {
+		return Ok(true);
+	}
+
+	Ok(!git_path_is_ignored(root, path)?)
 }
 
 #[must_use = "the tracked status result must be checked"]
@@ -188,6 +206,7 @@ fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
 				path.display()
 			))
 		})?;
+
 	match output.status.code() {
 		Some(0) => Ok(true),
 		Some(1) => Ok(false),
@@ -211,6 +230,7 @@ fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 				path.display()
 			))
 		})?;
+
 	match output.status.code() {
 		Some(0) => Ok(true),
 		Some(1) => Ok(false),

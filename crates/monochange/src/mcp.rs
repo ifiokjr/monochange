@@ -90,10 +90,11 @@ impl ServerHandler for MonochangeMcpServer {
 }
 
 fn resolve_root(path: Option<&str>) -> PathBuf {
-	path.map_or_else(
-		|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-		PathBuf::from,
-	)
+	let Some(path_str) = path else {
+		return std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+	};
+
+	PathBuf::from(path_str)
 }
 
 fn json_result(value: serde_json::Value) -> CallToolResult {
@@ -154,25 +155,23 @@ impl MonochangeMcpServer {
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		match validate_workspace(&root) {
-			Ok(()) => {
-				Ok(json_result(json!({
-					"ok": true,
-					"action": "validate",
-					"root": root,
-					"summary": "workspace validation passed"
-				})))
-			}
-			Err(error) => {
-				Ok(json_error_result(json!({
-					"ok": false,
-					"action": "validate",
-					"root": root,
-					"summary": error.render(),
-					"error": error.render()
-				})))
-			}
+
+		if let Err(error) = validate_workspace(&root) {
+			return Ok(json_error_result(json!({
+				"ok": false,
+				"action": "validate",
+				"root": root,
+				"summary": error.render(),
+				"error": error.render()
+			})));
 		}
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "validate",
+			"root": root,
+			"summary": "workspace validation passed"
+		})))
 	}
 
 	#[tool(
@@ -184,29 +183,30 @@ impl MonochangeMcpServer {
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		match crate::discover_workspace(&root) {
-			Ok(report) => {
-				Ok(json_result(json!({
-					"ok": true,
-					"action": "discover",
-					"summary": format!(
-						"Discovered {} package(s) and {} dependency edge(s).",
-						report.packages.len(),
-						report.dependencies.len()
-					),
-					"report": report,
-				})))
-			}
+
+		let report = match crate::discover_workspace(&root) {
+			Ok(report) => report,
 			Err(error) => {
-				Ok(json_error_result(json!({
+				return Ok(json_error_result(json!({
 					"ok": false,
 					"action": "discover",
 					"root": root,
 					"summary": error.render(),
 					"error": error.render()
-				})))
+				})));
 			}
-		}
+		};
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "discover",
+			"summary": format!(
+				"Discovered {} package(s) and {} dependency edge(s).",
+				report.packages.len(),
+				report.dependencies.len()
+			),
+			"report": report,
+		})))
 	}
 
 	#[tool(
@@ -220,37 +220,37 @@ impl MonochangeMcpServer {
 		let root = resolve_root(params.path.as_deref());
 		let output = params.output.as_deref().map(Path::new);
 		let bump = ChangeBump::from(params.bump);
-		match crate::add_change_file(
-			&root,
-			crate::AddChangeFileRequest::builder()
-				.package_refs(&params.package)
-				.bump(bump.into())
-				.reason(&params.reason)
-				.version(params.version.as_deref())
-				.change_type(params.change_type.as_deref())
-				.details(params.details.as_deref())
-				.output(output)
-				.build(),
-		) {
-			Ok(path) => {
-				Ok(json_result(json!({
-					"ok": true,
-					"action": "change",
-					"root": root,
-					"path": path,
-					"summary": format!("Wrote change file {}", path.display())
-				})))
-			}
+
+		let request = crate::AddChangeFileRequest::builder()
+			.package_refs(&params.package)
+			.bump(bump.into())
+			.reason(&params.reason)
+			.version(params.version.as_deref())
+			.change_type(params.change_type.as_deref())
+			.details(params.details.as_deref())
+			.output(output)
+			.build();
+
+		let path = match crate::add_change_file(&root, request) {
+			Ok(path) => path,
 			Err(error) => {
-				Ok(json_error_result(json!({
+				return Ok(json_error_result(json!({
 					"ok": false,
 					"action": "change",
 					"root": root,
 					"summary": error.render(),
 					"error": error.render()
-				})))
+				})));
 			}
-		}
+		};
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "change",
+			"root": root,
+			"path": path,
+			"summary": format!("Wrote change file {}", path.display())
+		})))
 	}
 
 	#[tool(
@@ -262,28 +262,29 @@ impl MonochangeMcpServer {
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		match crate::prepare_release(&root, true) {
-			Ok(prepared_release) => {
-				Ok(json_result(json!({
-					"ok": true,
-					"action": "release_preview",
-					"summary": format!(
-						"Prepared dry-run release preview with {} release target(s).",
-						prepared_release.release_targets.len()
-					),
-					"release": prepared_release_value(&prepared_release)
-				})))
-			}
+
+		let prepared_release = match crate::prepare_release(&root, true) {
+			Ok(release) => release,
 			Err(error) => {
-				Ok(json_error_result(json!({
+				return Ok(json_error_result(json!({
 					"ok": false,
 					"action": "release_preview",
 					"root": root,
 					"summary": error.render(),
 					"error": error.render()
-				})))
+				})));
 			}
-		}
+		};
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "release_preview",
+			"summary": format!(
+				"Prepared dry-run release preview with {} release target(s).",
+				prepared_release.release_targets.len()
+			),
+			"release": prepared_release_value(&prepared_release)
+		})))
 	}
 
 	#[tool(
@@ -295,29 +296,31 @@ impl MonochangeMcpServer {
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		match crate::prepare_release(&root, true) {
-			Ok(prepared_release) => {
-				let manifest = manifest_for_prepared_release(&prepared_release);
-				Ok(json_result(json!({
-					"ok": true,
-					"action": "release_manifest",
-					"summary": format!(
-						"Generated dry-run release manifest with {} release target(s).",
-						manifest.release_targets.len()
-					),
-					"manifest": manifest,
-				})))
-			}
+
+		let prepared_release = match crate::prepare_release(&root, true) {
+			Ok(release) => release,
 			Err(error) => {
-				Ok(json_error_result(json!({
+				return Ok(json_error_result(json!({
 					"ok": false,
 					"action": "release_manifest",
 					"root": root,
 					"summary": error.render(),
 					"error": error.render()
-				})))
+				})));
 			}
-		}
+		};
+
+		let manifest = manifest_for_prepared_release(&prepared_release);
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "release_manifest",
+			"summary": format!(
+				"Generated dry-run release manifest with {} release target(s).",
+				manifest.release_targets.len()
+			),
+			"manifest": manifest,
+		})))
 	}
 
 	#[tool(
@@ -329,25 +332,27 @@ impl MonochangeMcpServer {
 		Parameters(params): Parameters<AffectedParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		match crate::affected_packages(&root, &params.changed_paths, &params.labels) {
-			Ok(evaluation) => {
-				Ok(json_result(json!({
-					"ok": evaluation.status != monochange_core::ChangesetPolicyStatus::Failed,
-					"action": "affected_packages",
-					"summary": evaluation.summary,
-					"evaluation": evaluation,
-				})))
-			}
-			Err(error) => {
-				Ok(json_error_result(json!({
-					"ok": false,
-					"action": "affected_packages",
-					"root": root,
-					"summary": error.render(),
-					"error": error.render()
-				})))
-			}
-		}
+
+		let evaluation =
+			match crate::affected_packages(&root, &params.changed_paths, &params.labels) {
+				Ok(eval) => eval,
+				Err(error) => {
+					return Ok(json_error_result(json!({
+						"ok": false,
+						"action": "affected_packages",
+						"root": root,
+						"summary": error.render(),
+						"error": error.render()
+					})));
+				}
+			};
+
+		Ok(json_result(json!({
+			"ok": evaluation.status != monochange_core::ChangesetPolicyStatus::Failed,
+			"action": "affected_packages",
+			"summary": evaluation.summary,
+			"evaluation": evaluation,
+		})))
 	}
 }
 
@@ -355,14 +360,15 @@ pub async fn run_server() {
 	let server = MonochangeMcpServer::new();
 	let transport = rmcp::transport::io::stdio();
 
-	match server.serve(transport).await {
-		Ok(running) => {
-			let _ = running.waiting().await;
-		}
+	let running = match server.serve(transport).await {
+		Ok(running) => running,
 		Err(error) => {
 			eprintln!("monochange-mcp: failed to start server: {error}");
+			return;
 		}
-	}
+	};
+
+	let _ = running.waiting().await;
 }
 
 #[cfg(test)]

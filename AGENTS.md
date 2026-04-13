@@ -36,4 +36,5 @@
 - [Documentation workflow](docs/agents/documentation.md)
 - [Product and architecture rules](docs/agents/product-rules.md)
 - [Rust quality and safety](docs/agents/rust-quality.md)
+- [Coding style](docs/agents/coding-style.md)
 - [Changeset quality](docs/agents/changeset-quality.md)

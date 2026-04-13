@@ -221,12 +221,16 @@ fn append_changelog_section(path: &Path, section: &str) -> MonochangeResult<Stri
 	} else {
 		String::new()
 	};
+
 	let mut content = current.trim_end().to_string();
+
 	if !content.is_empty() {
 		content.push_str("\n\n");
 	}
+
 	content.push_str(section);
 	content.push('\n');
+
 	Ok(content)
 }
 

@@ -20,15 +20,19 @@ pub fn affected_packages(
 	changed_paths: &[String],
 	labels: &[String],
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
+	// Load and validate configuration
 	let configuration = load_workspace_configuration(root)?;
 	let verify = &configuration.changesets.verify;
+
 	if !verify.enabled {
 		return Err(MonochangeError::Config(
 			"changeset verification requires `[changesets.verify].enabled = true`".to_string(),
 		));
 	}
 
+	// Discover workspace and normalize inputs
 	let discovery = discover_workspace(root)?;
+	// Normalize labels and changed paths
 	let labels = labels
 		.iter()
 		.map(|label| label.trim().to_string())
@@ -39,6 +43,8 @@ pub fn affected_packages(
 		.map(|path| normalize_changed_path(path))
 		.filter(|path| !path.is_empty())
 		.collect::<Vec<_>>();
+
+	// Identify skip labels and changeset paths
 	let matched_skip_labels = labels
 		.iter()
 		.filter(|label| {
@@ -54,6 +60,8 @@ pub fn affected_packages(
 		.filter(|path| is_changeset_markdown_path(path))
 		.cloned()
 		.collect::<Vec<_>>();
+
+	// Build package ID mapping
 	let config_ids_by_package_id = configuration
 		.packages
 		.iter()
@@ -63,6 +71,7 @@ pub fn affected_packages(
 		})
 		.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
 
+	// Classify changed paths against package definitions
 	let mut matched_paths = Vec::new();
 	let mut ignored_paths = Vec::new();
 	let mut affected_package_ids = BTreeSet::new();

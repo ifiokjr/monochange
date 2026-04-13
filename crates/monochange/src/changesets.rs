@@ -8,6 +8,7 @@ pub(crate) fn diagnose_changesets(
 ) -> MonochangeResult<ChangesetDiagnosticsReport> {
 	let configuration = load_workspace_configuration(root)?;
 	let discovery = discover_workspace(root)?;
+
 	let changeset_paths = if requested.is_empty() {
 		discover_changeset_paths(root)?
 			.into_iter()
@@ -15,9 +16,11 @@ pub(crate) fn diagnose_changesets(
 			.collect::<Vec<_>>()
 	} else {
 		let mut resolved = Vec::new();
+
 		for path in requested {
 			resolved.push(resolve_changeset_path(root, path)?);
 		}
+
 		resolved.sort();
 		resolved.dedup();
 		resolved
@@ -27,7 +30,9 @@ pub(crate) fn diagnose_changesets(
 		.iter()
 		.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
 		.collect::<MonochangeResult<Vec<_>>>()?;
+
 	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
+
 	if let Some(source) = configuration.source.as_ref() {
 		hosted_sources::configured_hosted_source_adapter(source)
 			.enrich_changeset_context(source, &mut changesets);
@@ -37,6 +42,7 @@ pub(crate) fn diagnose_changesets(
 		.iter()
 		.map(|path| root_relative(root, path))
 		.collect();
+
 	Ok(ChangesetDiagnosticsReport {
 		requested_changesets,
 		changesets,
@@ -46,11 +52,13 @@ pub(crate) fn diagnose_changesets(
 #[must_use = "the changeset path result must be checked"]
 pub(crate) fn resolve_changeset_path(root: &Path, requested: &str) -> MonochangeResult<PathBuf> {
 	let requested_is_absolute = Path::new(requested).is_absolute();
+
 	let normalized = if requested_is_absolute {
 		requested.to_string()
 	} else {
 		normalize_changed_path(requested)
 	};
+
 	if normalized.is_empty() {
 		return Err(MonochangeError::Config(
 			"changeset path cannot be empty".to_string(),
@@ -62,13 +70,16 @@ pub(crate) fn resolve_changeset_path(root: &Path, requested: &str) -> Monochange
 	} else {
 		Path::new(&normalized)
 	};
+
 	let candidates = if candidate.is_absolute() {
 		vec![candidate.to_path_buf()]
 	} else {
 		let mut candidates = vec![root.join(candidate)];
+
 		if !normalized.starts_with(CHANGESET_DIR) {
 			candidates.push(root.join(CHANGESET_DIR).join(candidate));
 		}
+
 		candidates
 	};
 
@@ -76,13 +87,16 @@ pub(crate) fn resolve_changeset_path(root: &Path, requested: &str) -> Monochange
 		let Some(relative_candidate) = relative_to_root(root, &candidate) else {
 			continue;
 		};
+
 		if !is_changeset_markdown_path(&relative_candidate.to_string_lossy()) {
 			continue;
 		}
+
 		if candidate.exists() {
 			return Ok(candidate);
 		}
 	}
+
 	Err(MonochangeError::Config(format!(
 		"requested changeset `{requested}` does not exist"
 	)))
@@ -94,15 +108,20 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 	}
 
 	let mut lines = Vec::new();
+
 	for changeset in &report.changesets {
 		let change_summary = changeset.summary.as_deref().unwrap_or("<missing summary>");
+
 		lines.push(format!("changeset: {}", changeset.path.display()));
 		lines.push(format!("  summary: {change_summary}"));
+
 		if let Some(details) = &changeset.details {
 			lines.push(format!("  details: {details}"));
 		}
+
 		if !changeset.targets.is_empty() {
 			lines.push("  targets:".to_string());
+
 			for target in &changeset.targets {
 				let bump = target
 					.bump
@@ -111,11 +130,13 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 					"  - {} {} (bump: {}, origin: {})",
 					target.kind, target.id, bump, target.origin,
 				));
+
 				if !target.evidence_refs.is_empty() {
 					lines.push(format!("    evidence: {}", target.evidence_refs.join(", ")));
 				}
 			}
 		}
+
 		if let Some(context) = &changeset.context {
 			if let Some(introduced) = context
 				.introduced
@@ -124,6 +145,7 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 			{
 				lines.push(format!("  introduced: {}", introduced.short_sha));
 			}
+
 			if let Some(last_updated) = context
 				.last_updated
 				.as_ref()
@@ -131,6 +153,7 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 			{
 				lines.push(format!("  last-updated: {}", last_updated.short_sha));
 			}
+
 			let review_request = context
 				.introduced
 				.as_ref()
@@ -141,6 +164,7 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 						.as_ref()
 						.and_then(|revision| revision.review_request.as_ref())
 				});
+
 			if let Some(review_request) = review_request {
 				if let Some(url) = &review_request.url {
 					lines.push(format!("  review request: {} ({})", review_request.id, url));
@@ -148,6 +172,7 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 					lines.push(format!("  review request: {}", review_request.id));
 				}
 			}
+
 			if !context.related_issues.is_empty() {
 				let issues = context
 					.related_issues
@@ -158,8 +183,10 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 				lines.push(format!("  related issues: {issues}"));
 			}
 		}
+
 		lines.push(String::new());
 	}
+
 	lines.pop();
 	lines.join("\n")
 }
@@ -167,6 +194,7 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 #[must_use = "the discovery result must be checked"]
 pub(crate) fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 	let changeset_dir = root.join(CHANGESET_DIR);
+
 	if !changeset_dir.exists() {
 		return Err(MonochangeError::Config(format!(
 			"no markdown changesets found under {CHANGESET_DIR}"
@@ -184,12 +212,15 @@ pub(crate) fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<Path
 		.map(|entry| entry.path())
 		.filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
 		.collect::<Vec<_>>();
+
 	changeset_paths.sort();
+
 	if changeset_paths.is_empty() {
 		return Err(MonochangeError::Config(format!(
 			"no markdown changesets found under {CHANGESET_DIR}"
 		)));
 	}
+
 	Ok(changeset_paths)
 }
 
@@ -270,6 +301,7 @@ fn batch_load_changeset_contexts(
 		.iter()
 		.map(|path| {
 			let path_str = path.to_string_lossy();
+
 			ChangesetContext {
 				provider: HostingProviderKind::GenericGit,
 				host: None,

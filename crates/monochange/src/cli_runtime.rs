@@ -119,6 +119,7 @@ pub(crate) fn collect_cli_command_inputs(
 	matches: &ArgMatches,
 ) -> BTreeMap<String, Vec<String>> {
 	let mut inputs = BTreeMap::new();
+
 	for input in &cli_command.inputs {
 		let value_source = matches.value_source(input.name.as_str());
 		let values = match input.kind {
@@ -141,6 +142,7 @@ pub(crate) fn collect_cli_command_inputs(
 				}
 			}
 			CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => {
+				// Special case: `change` command with `bump` default value
 				if cli_command.name == "change"
 					&& input.name == "bump"
 					&& value_source == Some(ValueSource::DefaultValue)
@@ -156,6 +158,7 @@ pub(crate) fn collect_cli_command_inputs(
 		};
 		inputs.insert(input.name.clone(), values);
 	}
+
 	inputs
 }
 
@@ -1278,6 +1281,7 @@ pub(crate) fn build_cli_template_context(
 ) -> serde_json::Map<String, serde_json::Value> {
 	let mut template_context = serde_json::Map::new();
 
+	// Core release variables
 	template_context.insert(
 		"version".to_string(),
 		serde_json::Value::String(cli_command_variable_value(
@@ -1314,6 +1318,7 @@ pub(crate) fn build_cli_template_context(
 		)),
 	);
 
+	// Released packages list (structured)
 	if let Some(prepared) = &context.prepared_release {
 		template_context.insert(
 			"released_packages_list".to_string(),
@@ -1395,12 +1400,14 @@ pub(crate) fn build_cli_template_context(
 		template_context.insert("steps".to_string(), serde_json::Value::Object(steps_map));
 	}
 
+	// User-provided inputs
 	let input_context = cli_inputs_template_value(inputs);
 	template_context.insert(
 		"inputs".to_string(),
 		serde_json::Value::Object(input_context),
 	);
 
+	// Custom template variables
 	if let Some(variables) = variables {
 		for (needle, variable) in variables {
 			template_context.insert(

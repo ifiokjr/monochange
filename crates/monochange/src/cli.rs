@@ -19,7 +19,7 @@ pub fn build_command(bin_name: &'static str) -> Command {
 pub(crate) fn configured_change_type_choices(
 	configuration: &monochange_core::WorkspaceConfiguration,
 ) -> Vec<String> {
-	configuration
+	let all_sections = configuration
 		.packages
 		.iter()
 		.flat_map(|package| package.extra_changelog_sections.iter())
@@ -28,7 +28,9 @@ pub(crate) fn configured_change_type_choices(
 				.groups
 				.iter()
 				.flat_map(|group| group.extra_changelog_sections.iter()),
-		)
+		);
+
+	all_sections
 		.flat_map(|section| section.types.iter())
 		.map(|value| value.trim().to_string())
 		.filter(|value| !value.is_empty())
@@ -42,18 +44,24 @@ pub(crate) fn apply_runtime_change_type_choices(
 	configuration: &monochange_core::WorkspaceConfiguration,
 ) {
 	let choices = configured_change_type_choices(configuration);
+
 	if choices.is_empty() {
 		return;
 	}
-	if let Some(change_command) = cli.iter_mut().find(|command| command.name == "change")
-		&& let Some(change_type_input) = change_command
-			.inputs
-			.iter_mut()
-			.find(|input| input.name == "type" && input.choices.is_empty())
-	{
-		change_type_input.kind = CliInputKind::Choice;
-		change_type_input.choices = choices;
-	}
+
+	let Some(change_command) = cli.iter_mut().find(|command| command.name == "change") else {
+		return;
+	};
+	let Some(change_type_input) = change_command
+		.inputs
+		.iter_mut()
+		.find(|input| input.name == "type" && input.choices.is_empty())
+	else {
+		return;
+	};
+
+	change_type_input.kind = CliInputKind::Choice;
+	change_type_input.choices = choices;
 }
 
 pub(crate) fn cli_commands_for_root(root: &Path) -> Vec<CliCommandDefinition> {
@@ -69,15 +77,15 @@ pub(crate) fn cli_commands_from_config(
 		monochange_core::MonochangeError,
 	>,
 ) -> Vec<CliCommandDefinition> {
-	match configuration {
-		Ok(configuration) => {
-			let mut cli = configuration.cli.clone();
-			apply_runtime_change_type_choices(&mut cli, configuration);
-			apply_runtime_prepare_release_markdown_defaults(&mut cli);
-			cli
-		}
-		Err(_) => default_cli_commands(),
-	}
+	let Ok(configuration) = configuration else {
+		return default_cli_commands();
+	};
+
+	let mut cli = configuration.cli.clone();
+	apply_runtime_change_type_choices(&mut cli, configuration);
+	apply_runtime_prepare_release_markdown_defaults(&mut cli);
+
+	cli
 }
 
 pub(crate) fn apply_runtime_prepare_release_markdown_defaults(cli: &mut [CliCommandDefinition]) {
@@ -85,6 +93,7 @@ pub(crate) fn apply_runtime_prepare_release_markdown_defaults(cli: &mut [CliComm
 		if !command_supports_release_diff_preview(cli_command) {
 			continue;
 		}
+
 		let Some(format_input) = cli_command
 			.inputs
 			.iter_mut()
@@ -92,13 +101,15 @@ pub(crate) fn apply_runtime_prepare_release_markdown_defaults(cli: &mut [CliComm
 		else {
 			continue;
 		};
-		if !format_input
+
+		let has_markdown = format_input
 			.choices
 			.iter()
-			.any(|choice| choice == "markdown")
-		{
+			.any(|choice| choice == "markdown");
+		if !has_markdown {
 			format_input.choices.insert(0, "markdown".to_string());
 		}
+
 		if format_input.default.as_deref() == Some("text") {
 			format_input.default = Some("markdown".to_string());
 		}
@@ -244,13 +255,13 @@ pub(crate) fn command_supports_release_diff_preview(cli_command: &CliCommandDefi
 }
 
 pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
+	let help_text = cli_command
+		.help_text
+		.clone()
+		.unwrap_or_else(|| format!("Run the `{}` command", cli_command.name));
+
 	let mut command = Command::new(leak_string(cli_command.name.clone()))
-		.about(
-			cli_command
-				.help_text
-				.clone()
-				.unwrap_or_else(|| format!("Run the `{}` command", cli_command.name)),
-		)
+		.about(help_text)
 		.arg(
 			Arg::new("dry-run")
 				.long("dry-run")
@@ -373,15 +384,18 @@ Repair notes:
 fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 	let long_name = leak_string(input.name.replace('_', "-"));
 	let value_name = leak_string(input.name.to_uppercase());
+	let help_text = input.help_text.clone().unwrap_or_default();
+
 	let mut arg = Arg::new(leak_string(input.name.clone()))
 		.long(long_name)
 		.required(input.required)
-		.help(input.help_text.clone().unwrap_or_default());
+		.help(help_text);
 
 	arg = match input.kind {
 		CliInputKind::String => arg.value_name(value_name),
 		CliInputKind::StringList => arg.value_name(value_name).action(ArgAction::Append),
 		CliInputKind::Path => arg.value_name("PATH"),
+
 		CliInputKind::Boolean => {
 			if input.default.as_deref() == Some("true") {
 				arg.value_name(value_name)
@@ -393,16 +407,12 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 				arg.action(ArgAction::SetTrue)
 			}
 		}
+
 		CliInputKind::Choice => {
+			let possible_values: Vec<_> = input.choices.iter().cloned().map(leak_string).collect();
+
 			arg.value_name(value_name)
-				.value_parser(clap::builder::PossibleValuesParser::new(
-					input
-						.choices
-						.iter()
-						.cloned()
-						.map(leak_string)
-						.collect::<Vec<_>>(),
-				))
+				.value_parser(clap::builder::PossibleValuesParser::new(possible_values))
 		}
 	};
 
@@ -410,10 +420,13 @@ fn build_cli_command_input_arg(input: &CliInputDefinition) -> Arg {
 		arg = arg.short(short);
 	}
 
-	if let Some(default) = &input.default
-		&& (!matches!(input.kind, CliInputKind::Boolean) || default == "true")
-	{
-		arg = arg.default_value(leak_string(default.clone()));
+	let should_apply_default = input
+		.default
+		.as_ref()
+		.is_some_and(|default| !matches!(input.kind, CliInputKind::Boolean) || default == "true");
+
+	if should_apply_default {
+		arg = arg.default_value(leak_string(input.default.clone().unwrap()));
 	}
 
 	arg

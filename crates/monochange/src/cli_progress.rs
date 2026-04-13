@@ -170,10 +170,12 @@ impl CliProgressReporter {
 	}
 
 	pub(crate) fn command_started(&mut self) {
+		// Guard: skip if disabled or already started
 		if !self.enabled || self.command_started {
 			return;
 		}
 		self.command_started = true;
+
 		if self.render_mode == ProgressRenderMode::Json {
 			let sequence = self.next_sequence();
 			self.emit_json_event(&serde_json::json!({
@@ -185,6 +187,7 @@ impl CliProgressReporter {
 			}));
 			return;
 		}
+
 		let suffix = if self.dry_run { " (dry-run)" } else { "" };
 		self.print_line(&format!(
 			"{} {}{}",

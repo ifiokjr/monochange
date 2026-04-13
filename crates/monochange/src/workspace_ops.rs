@@ -93,6 +93,7 @@ pub(crate) fn init_workspace(
 	provider: Option<&str>,
 ) -> MonochangeResult<InitWorkspaceResult> {
 	let path = monochange_config::config_path(root);
+
 	if path.exists() && !force {
 		return Err(MonochangeError::Config(format!(
 			"{} already exists; rerun with --force to overwrite it",
@@ -102,6 +103,7 @@ pub(crate) fn init_workspace(
 
 	let remote = provider.and_then(|_| detect_remote_owner_repo(root));
 	let content = render_annotated_init_config(root, provider, remote.as_ref())?;
+
 	fs::write(&path, &content).map_err(|error| {
 		MonochangeError::Io(format!("failed to write {}: {error}", path.display()))
 	})?;
@@ -209,6 +211,7 @@ pub(crate) struct PopulateWorkspaceResult {
 #[must_use = "the population result must be checked"]
 pub(crate) fn populate_workspace(root: &Path) -> MonochangeResult<PopulateWorkspaceResult> {
 	let path = monochange_config::config_path(root);
+
 	if !path.exists() {
 		return Err(MonochangeError::Config(format!(
 			"{} does not exist; run `mc init` first or create a monochange.toml before running `mc populate`",
@@ -225,6 +228,7 @@ pub(crate) fn populate_workspace(root: &Path) -> MonochangeResult<PopulateWorksp
 			)));
 		}
 	};
+
 	let existing = existing_cli_command_names(&contents, &path)?;
 	let missing = default_cli_commands()
 		.into_iter()
@@ -244,6 +248,7 @@ pub(crate) fn populate_workspace(root: &Path) -> MonochangeResult<PopulateWorksp
 	}
 	updated.push_str(&render_cli_commands_toml(&missing));
 	updated.push('\n');
+
 	if let Err(error) = fs::write(&path, updated) {
 		return Err(MonochangeError::Io(format!(
 			"failed to write {}: {error}",
@@ -261,9 +266,11 @@ fn existing_cli_command_names(contents: &str, path: &Path) -> MonochangeResult<B
 	if contents.trim().is_empty() {
 		return Ok(BTreeSet::new());
 	}
+
 	let document = toml::from_str::<toml::Value>(contents).map_err(|error| {
 		MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
 	})?;
+
 	Ok(document
 		.get("cli")
 		.and_then(toml::Value::as_table)
@@ -512,6 +519,7 @@ fn render_annotated_init_config(
 			format!("{}-{}", package.name, package.ecosystem.as_str())
 		};
 		package_ids.push(id.clone());
+
 		let manifest_dir = package.manifest_path.parent().unwrap_or(root).to_path_buf();
 		let relative_dir = root_relative(root, &manifest_dir);
 		let pkg_type = package_type_for_ecosystem(package.ecosystem);
@@ -524,13 +532,16 @@ fn render_annotated_init_config(
 			PackageType::Flutter => "flutter",
 			_ => unreachable!(),
 		};
+
 		let mut entry = BTreeMap::new();
 		entry.insert("id", json!(id));
 		entry.insert("path", json!(relative_dir.display().to_string()));
 		entry.insert("type", json!(type_str));
+
 		if let Some(cl) = changelog {
 			entry.insert("changelog", json!(cl.display().to_string()));
 		}
+
 		template_packages.push(json!(entry));
 	}
 
@@ -566,6 +577,7 @@ fn render_annotated_init_config(
 	// Collapse runs of 3+ blank lines down to 2 (one visual blank line)
 	let mut collapsed = String::with_capacity(rendered.len());
 	let mut consecutive_blanks = 0u32;
+
 	for line in rendered.lines() {
 		if line.trim().is_empty() {
 			consecutive_blanks += 1;
@@ -584,6 +596,7 @@ fn render_annotated_init_config(
 
 fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
 	let mut packages = Vec::new();
+
 	#[cfg(feature = "cargo")]
 	packages.extend(discover_cargo_packages(root)?.packages);
 	#[cfg(feature = "npm")]
@@ -592,33 +605,39 @@ fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
 	packages.extend(discover_deno_packages(root)?.packages);
 	#[cfg(feature = "dart")]
 	packages.extend(discover_dart_packages(root)?.packages);
+
 	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
+
 	Ok(packages)
 }
 
 fn normalize_package_ids(root: &Path, packages: &mut [PackageRecord]) {
 	for package in packages {
-		if let Some(relative_manifest) = relative_to_root(root, &package.manifest_path) {
-			package.id = format!(
-				"{}:{}",
-				package.ecosystem.as_str(),
-				relative_manifest.display()
-			);
-		}
+		let Some(relative_manifest) = relative_to_root(root, &package.manifest_path) else {
+			continue;
+		};
+		package.id = format!(
+			"{}:{}",
+			package.ecosystem.as_str(),
+			relative_manifest.display()
+		);
 	}
 }
 
 fn detect_default_changelog(root: &Path, manifest_dir: &Path) -> Option<PathBuf> {
-	for candidate in [
+	let candidates = [
 		manifest_dir.join("CHANGELOG.md"),
 		manifest_dir.join("changelog.md"),
-	] {
+	];
+
+	for candidate in candidates {
 		if candidate.exists() {
 			return Some(root_relative(root, &candidate));
 		}
 	}
+
 	None
 }
 
@@ -743,6 +762,7 @@ fn dedup_lockfile_command_executions(
 ) -> Vec<LockfileCommandExecution> {
 	let mut seen = BTreeSet::new();
 	let mut deduped = Vec::new();
+
 	for execution in executions {
 		let key = format!(
 			"{}::{:?}::{}",
@@ -750,10 +770,12 @@ fn dedup_lockfile_command_executions(
 			execution.shell,
 			execution.command,
 		);
+
 		if seen.insert(key) {
 			deduped.push(execution);
 		}
 	}
+
 	deduped
 }
 
@@ -761,16 +783,19 @@ fn dedup_lockfile_command_executions(
 #[cfg(feature = "cargo")]
 pub(crate) fn validate_cargo_workspace_version_groups(root: &Path) -> MonochangeResult<()> {
 	let configuration = load_workspace_configuration(root)?;
+
 	if configuration.packages.is_empty() {
 		return Ok(());
 	}
 
 	let mut packages = discover_cargo_packages(root)?.packages;
+
 	if packages.is_empty() {
 		return Ok(());
 	}
 
 	apply_version_groups(&mut packages, &configuration)?;
+
 	monochange_cargo::validate_workspace_version_groups(&packages)
 }
 
@@ -976,9 +1001,11 @@ pub fn add_change_file(
 		&configuration,
 		&discovery.packages,
 	)?;
+
 	let output_path = request
 		.output
 		.map_or_else(|| default_change_path(root, &packages), Path::to_path_buf);
+
 	if let Some(parent) = output_path.parent() {
 		fs::create_dir_all(parent).map_err(|error| {
 			MonochangeError::Io(format!("failed to create {}: {error}", parent.display()))
@@ -1002,12 +1029,14 @@ pub fn add_change_file(
 		request.change_type,
 		request.details,
 	)?;
+
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write {}: {error}",
 			output_path.display()
 		))
 	})?;
+
 	Ok(output_path)
 }
 
@@ -1021,10 +1050,12 @@ pub(crate) fn add_interactive_change_file(
 		.iter()
 		.map(|target| target.id.clone())
 		.collect::<Vec<_>>();
+
 	let output_path = output.map_or_else(
 		|| default_change_path(root, &package_refs),
 		Path::to_path_buf,
 	);
+
 	if let Some(parent) = output_path.parent() {
 		fs::create_dir_all(parent).map_err(|error| {
 			MonochangeError::Io(format!("failed to create {}: {error}", parent.display()))
@@ -1033,12 +1064,14 @@ pub(crate) fn add_interactive_change_file(
 
 	let configuration = load_workspace_configuration(root)?;
 	let content = render_interactive_changeset_markdown(&configuration, result)?;
+
 	fs::write(&output_path, content).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write {}: {error}",
 			output_path.display()
 		))
 	})?;
+
 	Ok(output_path)
 }
 
@@ -1055,6 +1088,7 @@ pub(crate) fn change_type_default_bump(
 				.group_by_id(target_id)
 				.map(|group| group.extra_changelog_sections.as_slice())
 		})?;
+
 	sections.iter().find_map(|section| {
 		section
 			.types
@@ -1090,8 +1124,11 @@ pub(crate) fn render_change_target_markdown(
 			"target `{target_id}` must not use a `none` bump without also declaring `type` or `version`"
 		)));
 	}
+
 	let mut lines = Vec::new();
 	let target_key = render_changeset_target_key(target_id);
+
+	// Handle explicit change type
 	if let Some(change_type) = change_type.filter(|value| !value.trim().is_empty()) {
 		let default_bump = change_type_default_bump(configuration, target_id, change_type)
 			.ok_or_else(|| {
@@ -1099,10 +1136,12 @@ pub(crate) fn render_change_target_markdown(
 					"target `{target_id}` uses unknown change type `{change_type}`"
 				))
 			})?;
+
 		if version.is_none() && bump == default_bump {
 			lines.push(format!("{target_key}: {change_type}"));
 			return Ok(lines);
 		}
+
 		lines.push(format!("{target_key}:"));
 		if bump != BumpSeverity::None {
 			lines.push(format!("  bump: {bump}"));
@@ -1113,6 +1152,8 @@ pub(crate) fn render_change_target_markdown(
 		}
 		return Ok(lines);
 	}
+
+	// Handle explicit version
 	if let Some(version) = version {
 		lines.push(format!("{target_key}:"));
 		if bump != BumpSeverity::None {
@@ -1121,7 +1162,9 @@ pub(crate) fn render_change_target_markdown(
 		lines.push(format!("  version: \"{version}\""));
 		return Ok(lines);
 	}
+
 	lines.push(format!("{target_key}: {bump}"));
+
 	Ok(lines)
 }
 
@@ -1130,6 +1173,7 @@ pub(crate) fn render_interactive_changeset_markdown(
 	result: &interactive::InteractiveChangeResult,
 ) -> MonochangeResult<String> {
 	let mut lines = vec!["---".to_string()];
+
 	for target in &result.targets {
 		let id = &target.id;
 		let version = target.version.as_deref();
@@ -1138,9 +1182,11 @@ pub(crate) fn render_interactive_changeset_markdown(
 			render_change_target_markdown(configuration, id, target.bump, version, change_type)?;
 		lines.extend(target_lines);
 	}
+
 	lines.push("---".to_string());
 	lines.push(String::new());
 	lines.push(format!("# {}", result.reason));
+
 	if let Some(details) = result
 		.details
 		.as_deref()
@@ -1149,7 +1195,9 @@ pub(crate) fn render_interactive_changeset_markdown(
 		lines.push(String::new());
 		lines.push(details.trim().to_string());
 	}
+
 	lines.push(String::new());
+
 	Ok(lines.join("\n"))
 }
 
@@ -1222,10 +1270,12 @@ fn snapshot_directory_files(
 	let entries = fs::read_dir(dir).map_err(|error| {
 		MonochangeError::Io(format!("failed to read {}: {error}", dir.display()))
 	})?;
+
 	for entry in entries {
 		let entry = entry
 			.map_err(|error| MonochangeError::Io(format!("directory entry error: {error}")))?;
 		let path = entry.path();
+
 		if path.is_file() {
 			let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
 			let content = fs::read(&path).map_err(|error| {
@@ -1234,6 +1284,7 @@ fn snapshot_directory_files(
 			snapshots.insert(relative, content);
 		}
 	}
+
 	Ok(())
 }
 
@@ -1263,6 +1314,7 @@ fn run_lockfile_command_in_place(
 			.current_dir(&cwd)
 			.output()
 	};
+
 	let output = output.map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to run lockfile command `{}` in {}: {error}",
@@ -1270,15 +1322,18 @@ fn run_lockfile_command_in_place(
 			root_relative(root, &command.cwd).display(),
 		))
 	})?;
+
 	if output.status.success() {
 		return Ok(());
 	}
+
 	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 	let details = if stderr.is_empty() {
 		format!("exit status {}", output.status)
 	} else {
 		stderr
 	};
+
 	Err(MonochangeError::Config(format!(
 		"lockfile command `{}` failed in {}: {details}",
 		command.command,
@@ -1312,6 +1367,7 @@ fn collect_workspace_file_updates(
 ) -> MonochangeResult<Vec<FileUpdate>> {
 	let normalized_root = monochange_core::normalize_path(root);
 	let mut dirs_to_scan = BTreeSet::new();
+
 	for update in base_updates {
 		if let Some(parent) = update.path.parent() {
 			let normalized = monochange_core::normalize_path(parent);
@@ -1320,6 +1376,7 @@ fn collect_workspace_file_updates(
 			}
 		}
 	}
+
 	for command in lockfile_commands {
 		let normalized = monochange_core::normalize_path(&command.cwd);
 		if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
@@ -1328,10 +1385,12 @@ fn collect_workspace_file_updates(
 			dirs_to_scan.insert(command.cwd.clone());
 		}
 	}
+
 	// Always scan the changeset directory (files are deleted during release).
 	dirs_to_scan.insert(PathBuf::from(".changeset"));
 
 	let mut relative_paths = BTreeSet::new();
+
 	for dir in &dirs_to_scan {
 		let original_dir = root.join(dir);
 		let temp_dir = temp_root.join(dir);
@@ -1344,6 +1403,7 @@ fn collect_workspace_file_updates(
 	}
 
 	let mut updates = Vec::new();
+
 	for relative in relative_paths {
 		let before = read_optional_file(&root.join(&relative))?;
 		let after = read_optional_file(&temp_root.join(&relative))?;
@@ -1354,7 +1414,9 @@ fn collect_workspace_file_updates(
 			});
 		}
 	}
+
 	updates.sort_by(|left, right| left.path.cmp(&right.path));
+
 	Ok(updates)
 }
 
