@@ -25,6 +25,8 @@ use monochange_test_helpers::snapshot_settings;
 use semver::Version;
 use tempfile::tempdir;
 
+use crate::AssistOutputFormat;
+use crate::Assistant;
 use crate::CliContext;
 use crate::PreparedFileDiff;
 use crate::add_change_file;
@@ -37,6 +39,8 @@ use crate::cli_runtime::should_execute_cli_step;
 use crate::discover_workspace;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
+use crate::parse_assist_output_format_or_default;
+use crate::parse_assistant_or_default;
 use crate::parse_change_bump;
 use crate::plan_release;
 use crate::prepare_release_execution;
@@ -227,6 +231,104 @@ fn assist_command_supports_json_output() {
 	assert!(output.contains("\"mcp_config\""));
 	assert!(output.contains("\"install\""));
 	assert!(output.contains("@monochange/skill"));
+}
+
+#[test]
+fn assist_command_requires_assistant_and_valid_format() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+
+	let missing_assistant = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("assist")],
+	)
+	.expect_err("assist without assistant should fail");
+	assert!(
+		missing_assistant
+			.to_string()
+			.contains("required arguments were not provided")
+	);
+
+	let invalid_format = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("assist"),
+			OsString::from("pi"),
+			OsString::from("--format"),
+			OsString::from("yaml"),
+		],
+	)
+	.expect_err("invalid assist format should fail");
+	assert!(invalid_format.to_string().contains("invalid value 'yaml'"));
+}
+
+#[test]
+fn assist_parsing_helpers_cover_defaults_and_unknown_values() {
+	assert_eq!(parse_assistant_or_default(None), Assistant::Generic);
+	assert_eq!(
+		parse_assistant_or_default(Some(&"cursor".to_string())),
+		Assistant::Cursor
+	);
+	assert_eq!(
+		parse_assistant_or_default(Some(&"unknown".to_string())),
+		Assistant::Generic
+	);
+	assert_eq!(
+		parse_assist_output_format_or_default(None),
+		AssistOutputFormat::Text
+	);
+	assert_eq!(
+		parse_assist_output_format_or_default(Some(&"json".to_string())),
+		AssistOutputFormat::Json
+	);
+	assert_eq!(
+		parse_assist_output_format_or_default(Some(&"yaml".to_string())),
+		AssistOutputFormat::Text
+	);
+}
+
+#[test]
+fn mcp_and_root_command_support_quiet_and_missing_subcommands() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+
+	let quiet_output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("mcp"),
+			OsString::from("--quiet"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet mcp output: {error}"));
+	assert!(quiet_output.is_empty());
+
+	let no_subcommand = run_cli(tempdir.path(), [OsString::from("mc")])
+		.expect_err("missing subcommand should fail");
+	assert!(no_subcommand.to_string().contains("Usage: mc"));
+}
+
+#[test]
+fn release_record_supports_json_output() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	write_blank_monochange_config(root);
+	create_release_record_history(root);
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("release-record"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("release-record json output: {error}"));
+
+	assert!(output.contains("\"record\""));
+	assert!(output.contains("\"recordCommit\""));
+	assert!(output.contains("\"resolvedCommit\""));
 }
 
 #[test]
@@ -924,6 +1026,14 @@ fn parse_change_bump_supports_none() {
 		BumpSeverity::from(crate::ChangeBump::None),
 		BumpSeverity::None
 	);
+}
+
+#[test]
+fn parse_change_bump_rejects_unsupported_values() {
+	let error = parse_change_bump("prerelease")
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid bump error"));
+	assert!(error.to_string().contains("unsupported bump `prerelease`"));
 }
 
 #[test]
@@ -3359,8 +3469,7 @@ fn text_release_record_discovery_omits_empty_sections() {
 fn commit_release_command_creates_local_commit_with_release_record() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
-	copy_fixture("monochange/release-base", root);
-	copy_fixture("monochange/commit-release", root);
+	copy_fixture("prepared-release/source-github-follow-up/workspace", root);
 	init_git_repo(root);
 	git_in_temp_repo(root, &["add", "."]);
 	git_in_temp_repo(root, &["commit", "-m", "initial"]);
@@ -3389,8 +3498,7 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 fn commit_release_command_reports_json_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
-	copy_fixture("monochange/release-base", root);
-	copy_fixture("monochange/commit-release", root);
+	copy_fixture("prepared-release/source-github-follow-up/workspace", root);
 
 	let output = run_cli(
 		root,
@@ -3428,19 +3536,21 @@ fn repair_release_command_dry_run_reports_text_output() {
 	write_blank_monochange_config(root);
 	create_release_record_history(root);
 
-	let output = run_cli(
-		root,
-		[
-			OsString::from("mc"),
-			OsString::from("repair-release"),
-			OsString::from("--from"),
-			OsString::from("v1.2.3"),
-			OsString::from("--target"),
-			OsString::from("HEAD"),
-			OsString::from("--sync-provider=false"),
-			OsString::from("--dry-run"),
-		],
-	)
+	let output = temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", None::<&str>, || {
+		run_cli(
+			root,
+			[
+				OsString::from("mc"),
+				OsString::from("repair-release"),
+				OsString::from("--from"),
+				OsString::from("v1.2.3"),
+				OsString::from("--target"),
+				OsString::from("HEAD"),
+				OsString::from("--sync-provider=false"),
+				OsString::from("--dry-run"),
+			],
+		)
+	})
 	.unwrap_or_else(|error| panic!("repair-release output: {error}"));
 
 	assert!(output.contains("repair release:"));
@@ -3458,19 +3568,21 @@ fn repair_release_command_reports_json_output() {
 	write_blank_monochange_config(root);
 	create_release_record_history(root);
 
-	let output = run_cli(
-		root,
-		[
-			OsString::from("mc"),
-			OsString::from("repair-release"),
-			OsString::from("--from"),
-			OsString::from("v1.2.3"),
-			OsString::from("--sync-provider=false"),
-			OsString::from("--format"),
-			OsString::from("json"),
-			OsString::from("--dry-run"),
-		],
-	)
+	let output = temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", None::<&str>, || {
+		run_cli(
+			root,
+			[
+				OsString::from("mc"),
+				OsString::from("repair-release"),
+				OsString::from("--from"),
+				OsString::from("v1.2.3"),
+				OsString::from("--sync-provider=false"),
+				OsString::from("--format"),
+				OsString::from("json"),
+				OsString::from("--dry-run"),
+			],
+		)
+	})
 	.unwrap_or_else(|error| panic!("repair-release json output: {error}"));
 	let value: serde_json::Value =
 		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
@@ -3868,6 +3980,63 @@ fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release
 	assert!(rendered.contains("```diff"));
 	assert!(rendered.contains("## Commands"));
 	assert!(rendered.contains("skipped command `cargo publish` (dry-run)"));
+}
+
+#[test]
+fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+	};
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: false,
+		quiet: false,
+		show_diff: true,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: Some(sample_prepared_release_for_cli_render()),
+		prepared_file_diffs: vec![PreparedFileDiff {
+			path: PathBuf::from("Cargo.toml"),
+			diff: "@@ -1 +1 @@".to_string(),
+			display_diff: "diff --git a/Cargo.toml b/Cargo.toml\n@@ -1 +1 @@".to_string(),
+		}],
+		release_manifest_path: Some(PathBuf::from("target/release-manifest.json")),
+		release_requests: Vec::new(),
+		release_results: vec!["published monochange v1.2.3".to_string()],
+		release_request: None,
+		release_request_result: Some("opened monochange/release".to_string()),
+		release_commit_report: Some(crate::CommitReleaseReport {
+			subject: "chore(release): prepare release".to_string(),
+			body: "## monochange Release Record".to_string(),
+			commit: Some("abcdef1234567890".to_string()),
+			tracked_paths: vec![PathBuf::from("Cargo.toml"), PathBuf::from("CHANGELOG.md")],
+			dry_run: false,
+			status: "completed".to_string(),
+		}),
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: vec!["commented on #123".to_string()],
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: vec!["executed release workflow".to_string()],
+	};
+
+	let rendered = crate::render_cli_command_markdown_result(&cli_command, &context);
+	assert!(rendered.contains("## Releases"));
+	assert!(rendered.contains("published monochange v1.2.3"));
+	assert!(rendered.contains("## Release commit"));
+	assert!(rendered.contains("abcdef1"));
+	assert!(rendered.contains("## Release request"));
+	assert!(rendered.contains("opened monochange/release"));
+	assert!(rendered.contains("## Issue comments"));
+	assert!(rendered.contains("commented on #123"));
+	assert!(rendered.contains("## Changed files"));
+	assert!(rendered.contains("abcdef1"));
+	assert!(rendered.contains("CHANGELOG.md"));
 }
 
 #[test]
@@ -4402,6 +4571,46 @@ fn parse_boolean_step_input_rejects_invalid_values() {
 			.to_string()
 			.contains("invalid boolean value `maybe` for `force`")
 	);
+}
+
+#[test]
+fn quiet_builtin_commands_return_empty_output() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	let init_output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("init"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet init output: {error}"));
+	assert!(init_output.is_empty());
+	assert!(root.join("monochange.toml").exists());
+
+	let populate_output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("populate"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet populate output: {error}"));
+	assert!(populate_output.is_empty());
+
+	let mcp_output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("mcp"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet mcp output: {error}"));
+	assert!(mcp_output.is_empty());
 }
 
 #[test]
@@ -7439,27 +7648,21 @@ fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::G
 #[test]
 fn assistant_display_name_covers_all_variants() {
 	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Generic),
+		crate::assistant_display_name(Assistant::Generic),
 		"Generic MCP client"
 	);
+	assert_eq!(crate::assistant_display_name(Assistant::Claude), "Claude");
+	assert_eq!(crate::assistant_display_name(Assistant::Cursor), "Cursor");
 	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Claude),
-		"Claude"
-	);
-	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Cursor),
-		"Cursor"
-	);
-	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Copilot),
+		crate::assistant_display_name(Assistant::Copilot),
 		"GitHub Copilot"
 	);
-	assert_eq!(crate::assistant_display_name(crate::Assistant::Pi), "Pi");
+	assert_eq!(crate::assistant_display_name(Assistant::Pi), "Pi");
 }
 
 #[test]
 fn assistant_setup_payload_contains_mcp_config_and_guidance() {
-	let payload = crate::assistant_setup_payload(crate::Assistant::Pi);
+	let payload = crate::assistant_setup_payload(Assistant::Pi);
 	assert_eq!(payload["assistant"].as_str(), Some("Pi"));
 	assert_eq!(
 		payload["mcp_config"]["mcpServers"]["monochange"]["command"],
@@ -7481,14 +7684,11 @@ fn assistant_setup_payload_contains_mcp_config_and_guidance() {
 #[test]
 fn assistant_setup_payload_includes_variant_specific_notes() {
 	let cases = [
-		(crate::Assistant::Generic, "supports stdio MCP servers"),
-		(crate::Assistant::Claude, "Claude's MCP configuration"),
+		(Assistant::Generic, "supports stdio MCP servers"),
+		(Assistant::Claude, "Claude's MCP configuration"),
+		(Assistant::Cursor, "Configure the MCP server in Cursor"),
 		(
-			crate::Assistant::Cursor,
-			"Configure the MCP server in Cursor",
-		),
-		(
-			crate::Assistant::Copilot,
+			Assistant::Copilot,
 			"support MCP-compatible server definitions",
 		),
 	];
@@ -7981,12 +8181,12 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 
 #[test]
 fn run_assist_renders_json_and_text_outputs() {
-	let json_output = crate::run_assist(crate::Assistant::Cursor, crate::AssistOutputFormat::Json)
+	let json_output = crate::run_assist(Assistant::Cursor, AssistOutputFormat::Json)
 		.unwrap_or_else(|error| panic!("assist json: {error}"));
 	assert!(json_output.contains("\"assistant\": \"Cursor\""));
 	assert!(json_output.contains("\"mcp_config\""));
 
-	let text_output = crate::run_assist(crate::Assistant::Copilot, crate::AssistOutputFormat::Text)
+	let text_output = crate::run_assist(Assistant::Copilot, AssistOutputFormat::Text)
 		.unwrap_or_else(|error| panic!("assist text: {error}"));
 	assert!(text_output.contains("monochange assist"));
 	assert!(text_output.contains("Notes for GitHub Copilot:"));
@@ -8644,7 +8844,7 @@ fn sample_github_source_configuration(api_url: &str) -> monochange_core::SourceC
 }
 
 fn init_git_repo(root: &Path) {
-	git_in_temp_repo(root, &["init"]);
+	git_in_temp_repo(root, &["init", "-b", "main"]);
 	git_in_temp_repo(root, &["config", "user.name", "monochange Tests"]);
 	git_in_temp_repo(root, &["config", "user.email", "monochange@example.com"]);
 	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);

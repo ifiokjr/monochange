@@ -54,7 +54,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run cargo tests
-        run: test:cargo
+        run: test:cargo:expensive
         shell: devenv shell -- bash -e {0}
 
       - name: run doc tests
