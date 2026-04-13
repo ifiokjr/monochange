@@ -531,6 +531,6 @@ steps = [
 [cli.publish]
 help_text = "Publish all packages after a release"
 steps = [
-	{ type = "Command", command = "pnpm -r publish --access public --no-git-checks" },
-	{ type = "Command", command = "cargo workspaces publish --from-git --allow-dirty --yes" },
+	{ type = "Command", command = "pnpm -r publish --access public --no-git-checks", name = "publish npm packages" },
+	{ type = "Command", command = "cargo workspaces publish --from-git --allow-dirty --yes", name = "publish cargo workspace crates" },
 ]
