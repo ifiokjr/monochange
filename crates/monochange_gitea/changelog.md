@@ -1,26 +1,12 @@
----
-main: major
-"@monochange/skill": major
-monochange: major
-monochange_cargo: major
-monochange_config: major
-monochange_core: major
-monochange_dart: major
-monochange_deno: major
-monochange_gitea: major
-monochange_github: major
-monochange_gitlab: major
-monochange_graph: major
-monochange_hosting: major
-monochange_npm: major
-monochange_semver: major
----
+## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
 
-# 🚀 Initial public release of monochange
+### Breaking changes
+
+#### 🚀 Initial public release of monochange
 
 **monochange** is a Rust-based release-planning toolkit for monorepos that span multiple package ecosystems. It is designed from the ground up to support the modern, AI-driven development landscape where agents and automation play a central role in software delivery.
 
-## What is monochange?
+##### What is monochange?
 
 In today's agent-driven development environment, managing releases across diverse package ecosystems (Rust, JavaScript/TypeScript, Dart, Python, etc.) becomes increasingly complex. monochange provides a unified, programmatic interface for:
 
@@ -30,11 +16,11 @@ In today's agent-driven development environment, managing releases across divers
 - **CI/CD integration**: Seamless workflows for Gitea, GitHub, and GitLab
 - **Graph-based dependency analysis**: Understanding package relationships across your monorepo
 
-## Why monochange matters for AI-driven workflows
+##### Why monochange matters for AI-driven workflows
 
 As development teams increasingly rely on AI agents to generate code, manage dependencies, and orchestrate releases, monochange provides the structured foundation these agents need to operate effectively. It transforms release management from a manual, error-prone process into a deterministic, automatable workflow.
 
-## What's included in this release
+##### What's included in this release
 
 This first release includes:
 
@@ -46,3 +32,5 @@ This first release includes:
 - CLI tooling for validation and release orchestration
 
 For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
+
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)

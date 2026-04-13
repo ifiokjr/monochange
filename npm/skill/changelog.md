@@ -1,8 +1,4 @@
-# Changelog
-
-All notable changes to `monochange_semver` will be documented in this file.
-
-## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
+## @monochange/skill [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/@monochange/skill/v0.1.0) (2026-04-13)
 
 ### Breaking changes
 

@@ -1879,7 +1879,7 @@ dependencies = [
 
 [[package]]
 name = "monochange"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
@@ -1945,7 +1945,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_cargo"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "glob",
  "insta",
@@ -1965,7 +1965,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_config"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "doc-comment",
  "glob",
@@ -1996,7 +1996,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_core"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "ignore",
  "insta",
@@ -2013,7 +2013,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_dart"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "glob",
  "insta",
@@ -2030,7 +2030,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_deno"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "glob",
  "insta",
@@ -2047,7 +2047,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitea"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2066,7 +2066,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_github"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2087,7 +2087,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitlab"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2106,7 +2106,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_graph"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2119,7 +2119,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_hosting"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "monochange_core",
  "reqwest",
@@ -2128,7 +2128,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_npm"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "glob",
  "insta",
@@ -2146,7 +2146,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_semver"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2157,7 +2157,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_test_helpers"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "insta",
  "monochange_core",
