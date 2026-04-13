@@ -200,6 +200,9 @@ path = "crates/monochange_gitlab"
 [package.monochange_gitea]
 path = "crates/monochange_gitea"
 
+[package.monochange_hosting]
+path = "crates/monochange_hosting"
+
 [package."@monochange/skill"]
 path = "npm/skill"
 type = "npm"
@@ -260,6 +263,7 @@ packages = [
 	"monochange_github",
 	"monochange_gitlab",
 	"monochange_gitea",
+	"monochange_hosting",
 ]
 extra_changelog_sections = [
 	{ name = "Testing", types = ["test"] },
