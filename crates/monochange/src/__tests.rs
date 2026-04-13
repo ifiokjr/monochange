@@ -7648,27 +7648,21 @@ fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::G
 #[test]
 fn assistant_display_name_covers_all_variants() {
 	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Generic),
+		crate::assistant_display_name(Assistant::Generic),
 		"Generic MCP client"
 	);
+	assert_eq!(crate::assistant_display_name(Assistant::Claude), "Claude");
+	assert_eq!(crate::assistant_display_name(Assistant::Cursor), "Cursor");
 	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Claude),
-		"Claude"
-	);
-	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Cursor),
-		"Cursor"
-	);
-	assert_eq!(
-		crate::assistant_display_name(crate::Assistant::Copilot),
+		crate::assistant_display_name(Assistant::Copilot),
 		"GitHub Copilot"
 	);
-	assert_eq!(crate::assistant_display_name(crate::Assistant::Pi), "Pi");
+	assert_eq!(crate::assistant_display_name(Assistant::Pi), "Pi");
 }
 
 #[test]
 fn assistant_setup_payload_contains_mcp_config_and_guidance() {
-	let payload = crate::assistant_setup_payload(crate::Assistant::Pi);
+	let payload = crate::assistant_setup_payload(Assistant::Pi);
 	assert_eq!(payload["assistant"].as_str(), Some("Pi"));
 	assert_eq!(
 		payload["mcp_config"]["mcpServers"]["monochange"]["command"],
@@ -7690,14 +7684,11 @@ fn assistant_setup_payload_contains_mcp_config_and_guidance() {
 #[test]
 fn assistant_setup_payload_includes_variant_specific_notes() {
 	let cases = [
-		(crate::Assistant::Generic, "supports stdio MCP servers"),
-		(crate::Assistant::Claude, "Claude's MCP configuration"),
+		(Assistant::Generic, "supports stdio MCP servers"),
+		(Assistant::Claude, "Claude's MCP configuration"),
+		(Assistant::Cursor, "Configure the MCP server in Cursor"),
 		(
-			crate::Assistant::Cursor,
-			"Configure the MCP server in Cursor",
-		),
-		(
-			crate::Assistant::Copilot,
+			Assistant::Copilot,
 			"support MCP-compatible server definitions",
 		),
 	];
@@ -8190,12 +8181,12 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 
 #[test]
 fn run_assist_renders_json_and_text_outputs() {
-	let json_output = crate::run_assist(crate::Assistant::Cursor, crate::AssistOutputFormat::Json)
+	let json_output = crate::run_assist(Assistant::Cursor, AssistOutputFormat::Json)
 		.unwrap_or_else(|error| panic!("assist json: {error}"));
 	assert!(json_output.contains("\"assistant\": \"Cursor\""));
 	assert!(json_output.contains("\"mcp_config\""));
 
-	let text_output = crate::run_assist(crate::Assistant::Copilot, crate::AssistOutputFormat::Text)
+	let text_output = crate::run_assist(Assistant::Copilot, AssistOutputFormat::Text)
 		.unwrap_or_else(|error| panic!("assist text: {error}"));
 	assert!(text_output.contains("monochange assist"));
 	assert!(text_output.contains("Notes for GitHub Copilot:"));

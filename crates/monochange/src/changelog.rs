@@ -1458,7 +1458,7 @@ mod tests {
 			context: Some(ChangesetContext {
 				provider: HostingProviderKind::GitHub,
 				host: Some("github.com".to_string()),
-				capabilities: Default::default(),
+				capabilities: HostingCapabilities::default(),
 				introduced: Some(ChangesetRevision {
 					actor: Some(HostedActorRef {
 						provider: HostingProviderKind::GitHub,
@@ -1589,7 +1589,7 @@ mod tests {
 		let source_path = root_relative(tempdir.path(), &changeset.path);
 		let mapped = build_release_note_change(
 			&signal,
-			&[package.clone()],
+			std::slice::from_ref(&package),
 			tempdir.path(),
 			&BTreeMap::from([(source_path, rendered.clone())]),
 		)
@@ -1658,7 +1658,7 @@ mod tests {
 			render_markdown_link("linked", Some("https://example.com")),
 			"[linked](https://example.com)"
 		);
-		let issues = vec![
+		let issues = [
 			HostedIssueRef {
 				id: "#1".to_string(),
 				url: Some("https://example.com/issues/1".to_string()),
@@ -2087,7 +2087,7 @@ mod tests {
 					change_type: Some("note".to_string()),
 					..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
 				},
-				&[selected.clone()],
+				std::slice::from_ref(&selected),
 			),
 			ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note)
 		);
@@ -2097,7 +2097,7 @@ mod tests {
 					change_type: Some("custom".to_string()),
 					..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
 				},
-				&[selected.clone()],
+				std::slice::from_ref(&selected),
 			),
 			ResolvedReleaseSectionTarget::Extra(0)
 		);

@@ -521,11 +521,17 @@ mod diagnostics_tests {
 		assert!(batch_load_changeset_contexts(Path::new("."), &[]).is_empty());
 		assert_eq!(
 			batch_git_log(Path::new("."), &[]),
-			(Default::default(), Default::default())
+			(
+				std::collections::HashMap::default(),
+				std::collections::HashMap::default(),
+			)
 		);
 		assert_eq!(
 			parse_batch_git_log_bytes(&[0xff, 0xfe], &[PathBuf::from(".changeset/feature.md")]),
-			(Default::default(), Default::default())
+			(
+				std::collections::HashMap::default(),
+				std::collections::HashMap::default(),
+			)
 		);
 
 		let malformed = "\

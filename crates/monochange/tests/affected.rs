@@ -228,7 +228,7 @@ fn run_affected_json(root: &Path, args: &[&str]) -> Value {
 	let output = monochange::run_with_args_in_dir("mc", cli_args, root)
 		.unwrap_or_else(|error| panic!("command output: {error}"));
 	serde_json::from_str(&output)
-		.unwrap_or_else(|error| panic!("parse json: {error}\nstdout: {output}",))
+		.unwrap_or_else(|error| panic!("parse json: {error}\nstdout: {output}"))
 }
 
 fn run_affected_raw(root: &Path, args: &[&str]) -> std::process::Output {

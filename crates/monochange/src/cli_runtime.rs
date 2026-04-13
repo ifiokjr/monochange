@@ -2962,7 +2962,7 @@ mod tests {
 			id: None,
 			variables: Some(BTreeMap::from([(
 				"file_diffs_payload".to_string(),
-				monochange_core::CommandVariable::ChangedFiles,
+				CommandVariable::ChangedFiles,
 			)])),
 			inputs: BTreeMap::new(),
 		};

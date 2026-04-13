@@ -312,7 +312,6 @@ pub enum AssistOutputFormat {
 
 fn parse_assistant_or_default(value: Option<&String>) -> Assistant {
 	match value.map_or("generic", String::as_str) {
-		"generic" => Assistant::Generic,
 		"claude" => Assistant::Claude,
 		"cursor" => Assistant::Cursor,
 		"copilot" => Assistant::Copilot,

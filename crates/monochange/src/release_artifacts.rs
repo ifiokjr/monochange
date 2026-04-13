@@ -1467,7 +1467,7 @@ mod tests {
 			PackageType::Deno => Ecosystem::Deno,
 			PackageType::Dart => Ecosystem::Dart,
 			PackageType::Flutter => Ecosystem::Flutter,
-			_ => Ecosystem::Cargo,
+			_ => unreachable!("unsupported package type in sample_package"),
 		};
 		let mut package = PackageRecord::new(
 			ecosystem,

@@ -2897,7 +2897,7 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 
 	let source_skip_label_error =
 		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: monochange_core::SourceProvider::GitHub,
+			provider: SourceProvider::GitHub,
 			host: None,
 			api_url: None,
 			owner: "ifiokjr".to_string(),
@@ -3416,7 +3416,7 @@ fn validate_package_and_source_settings_cover_duplicate_and_pattern_errors() {
 
 	let source_error =
 		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: monochange_core::SourceProvider::GitHub,
+			provider: SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),
 			repo: "monochange".to_string(),
 			host: None,
