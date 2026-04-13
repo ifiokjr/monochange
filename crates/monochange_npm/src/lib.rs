@@ -71,6 +71,7 @@ pub enum NpmVersionedFileKind {
 	BunLockBinary,
 }
 
+/// Classify an npm-family versioned file path.
 pub fn supported_versioned_file_kind(path: &Path) -> Option<NpmVersionedFileKind> {
 	let file_name = path
 		.file_name()
@@ -88,6 +89,7 @@ pub fn supported_versioned_file_kind(path: &Path) -> Option<NpmVersionedFileKind
 	}
 }
 
+/// Discover lockfiles that should be refreshed for `package`.
 pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	let manifest_dir = package
 		.manifest_path
@@ -124,6 +126,7 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	discovered
 }
 
+/// Return the default lockfile refresh commands for `package`.
 pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommandExecution> {
 	discover_lockfiles(package)
 		.into_iter()
@@ -152,6 +155,7 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 		.collect()
 }
 
+/// Update dependency sections inside a parsed `package.json`-style value.
 pub fn update_json_dependency_fields(
 	value: &mut Value,
 	fields: &[&str],
@@ -168,6 +172,7 @@ pub fn update_json_dependency_fields(
 	}
 }
 
+/// Update versions embedded in a parsed `package-lock.json` document.
 pub fn update_package_lock(
 	value: &mut Value,
 	package_paths_by_name: &BTreeMap<String, PathBuf>,
@@ -208,6 +213,7 @@ pub fn update_package_lock(
 	}
 }
 
+/// Update versions embedded in a parsed `pnpm-lock.yaml` mapping.
 pub fn update_pnpm_lock(
 	mapping: &mut serde_yaml_ng::Mapping,
 	raw_versions: &BTreeMap<String, String>,
@@ -258,6 +264,7 @@ pub fn update_pnpm_lock(
 	}
 }
 
+/// Update `pnpm-lock.yaml` text in place using direct YAML-aware replacements.
 #[must_use = "the lockfile update result must be checked"]
 pub fn update_pnpm_lock_text(
 	contents: &str,
@@ -523,6 +530,7 @@ fn render_yaml_scalar(existing: &str, value: &str) -> String {
 	value.to_string()
 }
 
+/// Update text-based Bun lockfiles by replacing package version literals.
 pub fn update_bun_lock(contents: &str, raw_versions: &BTreeMap<String, String>) -> String {
 	let mut updated = contents.to_string();
 	for (name, version) in raw_versions {
@@ -537,6 +545,7 @@ pub fn update_bun_lock(contents: &str, raw_versions: &BTreeMap<String, String>) 
 	updated
 }
 
+/// Update a binary `bun.lockb` file in place.
 pub fn update_bun_lock_binary(
 	contents: &[u8],
 	old_versions: &BTreeMap<String, String>,
@@ -571,8 +580,10 @@ pub fn update_bun_lock_binary(
 	updated
 }
 
+/// Shared npm-family ecosystem adapter.
 pub struct NpmAdapter;
 
+/// Return the shared npm-family ecosystem adapter.
 #[must_use]
 pub const fn adapter() -> NpmAdapter {
 	NpmAdapter
@@ -590,6 +601,7 @@ impl EcosystemAdapter for NpmAdapter {
 
 #[tracing::instrument(skip_all)]
 #[must_use = "the discovery result must be checked"]
+/// Discover npm, pnpm, and Bun packages rooted at `root`.
 pub fn discover_npm_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let mut included_manifests = HashSet::new();
 	let mut packages = Vec::new();

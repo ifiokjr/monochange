@@ -46,6 +46,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use urlencoding::encode;
 
+/// Return the hosted-source capabilities supported by the Gitea provider.
 #[must_use]
 pub const fn source_capabilities() -> SourceCapabilities {
 	SourceCapabilities {
@@ -58,8 +59,10 @@ pub const fn source_capabilities() -> SourceCapabilities {
 	}
 }
 
+/// Shared Gitea hosted-source adapter instance used by the workspace.
 pub static HOSTED_SOURCE_ADAPTER: GiteaHostedSourceAdapter = GiteaHostedSourceAdapter;
 
+/// Hosted-source adapter for Gitea repositories.
 pub struct GiteaHostedSourceAdapter;
 
 impl HostedSourceAdapter for GiteaHostedSourceAdapter {
@@ -92,6 +95,7 @@ impl HostedSourceAdapter for GiteaHostedSourceAdapter {
 	}
 }
 
+/// Return the hosting metadata features available from Gitea changeset context.
 #[must_use]
 pub const fn gitea_hosting_capabilities() -> HostingCapabilities {
 	HostingCapabilities {
@@ -103,6 +107,7 @@ pub const fn gitea_hosting_capabilities() -> HostingCapabilities {
 	}
 }
 
+/// Extract the host name used for rendered Gitea links.
 #[must_use]
 pub fn gitea_host_name(source: &SourceConfiguration) -> Option<String> {
 	let host = gitea_host(source)
@@ -119,6 +124,7 @@ pub fn gitea_host_name(source: &SourceConfiguration) -> Option<String> {
 	}
 }
 
+/// Build a web URL for a commit on the configured Gitea repository.
 #[must_use]
 pub fn gitea_commit_url(source: &SourceConfiguration, sha: &str) -> String {
 	format!(
@@ -129,6 +135,7 @@ pub fn gitea_commit_url(source: &SourceConfiguration, sha: &str) -> String {
 	)
 }
 
+/// Apply Gitea provider metadata and commit URLs to prepared changesets.
 pub fn annotate_changeset_context(
 	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
@@ -164,6 +171,10 @@ pub fn annotate_changeset_context(
 	}
 }
 
+/// Enrich changeset context for Gitea-backed workspaces.
+///
+/// Gitea currently exposes only local annotations, so this delegates to
+/// [`annotate_changeset_context`].
 #[tracing::instrument(skip_all)]
 pub fn enrich_changeset_context(
 	source: &SourceConfiguration,
@@ -172,6 +183,7 @@ pub fn enrich_changeset_context(
 	annotate_changeset_context(source, changesets);
 }
 
+/// Validate that a source configuration is compatible with the Gitea provider.
 #[must_use = "the validation result must be checked"]
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
 	if source.host.as_deref().is_none_or(str::is_empty) {
@@ -275,6 +287,7 @@ fn gitea_host(source: &SourceConfiguration) -> &str {
 		.trim_end_matches('/')
 }
 
+/// Build the public release URL for a tag on the configured Gitea repository.
 #[must_use]
 pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
 	let host = gitea_host(source);
@@ -284,6 +297,7 @@ pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
 	)
 }
 
+/// Build the comparison URL between two tags on the configured Gitea repository.
 #[must_use]
 pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag: &str) -> String {
 	let host = gitea_host(source);
@@ -293,6 +307,7 @@ pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag
 	)
 }
 
+/// Convert releasable targets into provider-specific Gitea release requests.
 #[must_use]
 pub fn build_release_requests(
 	source: &SourceConfiguration,
@@ -321,6 +336,7 @@ pub fn build_release_requests(
 		.collect()
 }
 
+/// Build the release pull request request for the configured Gitea repository.
 #[must_use]
 pub fn build_release_pull_request_request(
 	source: &SourceConfiguration,
@@ -349,6 +365,7 @@ pub fn build_release_pull_request_request(
 	}
 }
 
+/// Publish or update all planned Gitea releases for a manifest.
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
 pub fn publish_release_requests(
@@ -365,6 +382,7 @@ pub fn publish_release_requests(
 		.collect()
 }
 
+/// Commit, push, and publish the release pull request against Gitea.
 #[must_use = "the pull request result must be checked"]
 pub fn publish_release_pull_request(
 	source: &SourceConfiguration,

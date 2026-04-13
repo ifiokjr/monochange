@@ -1,5 +1,3 @@
-use std::fmt::Write as _;
-use std::fs;
 use std::path::Path;
 
 use insta::assert_json_snapshot;
@@ -14,23 +12,6 @@ use test_support::monochange_command;
 use test_support::run_in_tty;
 use test_support::setup_fixture;
 use test_support::snapshot_settings;
-
-fn append_progress_command(workspace: &Path, command_name: &str, body: &str) {
-	let config_path = workspace.join("monochange.toml");
-	let mut config = fs::read_to_string(&config_path)
-		.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
-	let _ = write!(
-		config,
-		r#"
-
-[cli.{command_name}]
-help_text = "Exercise progress output"
-{body}
-"#
-	);
-	fs::write(&config_path, config)
-		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
-}
 
 fn normalize_duration_text(text: &str) -> String {
 	let duration_pattern = Regex::new(r"\b\d+(?:\.\d+)?(?:ms|s|µs)\b")
@@ -216,17 +197,7 @@ fn run_tty_command(_workspace: &Path, _command_name: &str) -> String {
 #[test]
 #[cfg(unix)]
 fn release_progress_streams_named_steps_on_tty() {
-	let tempdir = setup_fixture("monochange/release-base");
-	append_progress_command(
-		tempdir.path(),
-		"progress-release",
-		r#"
-steps = [
-	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "Command", name = "stream summary", shell = true, command = "printf 'streamed line 1\n'; sleep 0.01; printf 'streamed line 2\n'" },
-]
-	"#,
-	);
+	let tempdir = setup_fixture("monochange/release-progress");
 
 	let transcript = run_tty_command(tempdir.path(), "progress-release");
 
@@ -241,18 +212,7 @@ steps = [
 #[test]
 #[cfg(unix)]
 fn release_progress_renders_skipped_failed_steps_and_stderr_on_tty() {
-	let tempdir = setup_fixture("monochange/release-base");
-	append_progress_command(
-		tempdir.path(),
-		"progress-failure",
-		r#"
-steps = [
-	{ type = "Validate", name = "skip validate", when = "{{ false }}" },
-	{ type = "Command", name = "stderr only", shell = true, command = "printf 'warn line\n' >&2" },
-	{ type = "Command", name = "fail loud", shell = true, command = "printf 'bad line\n' >&2; exit 3" },
-]
-	"#,
-	);
+	let tempdir = setup_fixture("monochange/release-progress-failure");
 
 	let (status, transcript) = run_tty_command_result(tempdir.path(), "progress-failure");
 
@@ -292,17 +252,7 @@ fn ascii_progress_renders_clean_captured_output() {
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
 
-	let tempdir = setup_fixture("monochange/release-base");
-	append_progress_command(
-		tempdir.path(),
-		"progress-ascii",
-		r#"
-steps = [
-	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "Command", name = "stream summary", shell = true, command = "printf 'line one\n\nline three\n'" },
-]
-	"#,
-	);
+	let tempdir = setup_fixture("monochange/release-progress");
 
 	let output = monochange_command(Some("2026-04-06"))
 		.current_dir(tempdir.path())
@@ -328,17 +278,7 @@ fn json_progress_emits_structured_events_for_machine_consumers() {
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
 
-	let tempdir = setup_fixture("monochange/release-base");
-	append_progress_command(
-		tempdir.path(),
-		"progress-json",
-		r#"
-steps = [
-	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "Command", name = "stream summary", shell = true, command = "printf 'stdout line\n'; printf 'stderr line\n' >&2" },
-]
-	"#,
-	);
+	let tempdir = setup_fixture("monochange/release-progress");
 
 	let output = monochange_command(Some("2026-04-06"))
 		.current_dir(tempdir.path())

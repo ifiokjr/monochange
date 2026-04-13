@@ -269,6 +269,7 @@ pub(crate) use prepared_release_cache::ensure_monochange_artifact_ignored;
 pub(crate) use prepared_release_cache::maybe_load_prepared_release_execution;
 pub(crate) use prepared_release_cache::save_prepared_release_execution;
 
+/// Output renderer used by CLI commands and preview helpers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum OutputFormat {
 	Text,
@@ -276,6 +277,7 @@ pub enum OutputFormat {
 	Json,
 }
 
+/// Semver bump accepted by `mc change` and related APIs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum ChangeBump {
 	None,
@@ -295,6 +297,7 @@ impl From<ChangeBump> for BumpSeverity {
 	}
 }
 
+/// Assistant profile understood by `mc assist`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum Assistant {
 	Generic,
@@ -304,6 +307,7 @@ pub enum Assistant {
 	Pi,
 }
 
+/// Output renderer for assistant setup payloads.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum AssistOutputFormat {
 	Text,
@@ -327,6 +331,7 @@ fn parse_assist_output_format_or_default(value: Option<&String>) -> AssistOutput
 	}
 }
 
+/// Outward release target derived from a prepared release.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseTarget {
 	pub id: String,
@@ -341,6 +346,7 @@ pub struct ReleaseTarget {
 	pub rendered_changelog_title: String,
 }
 
+/// Rendered changelog payload produced during release preparation.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreparedChangelog {
 	pub owner_id: String,
@@ -351,6 +357,7 @@ pub struct PreparedChangelog {
 	pub rendered: String,
 }
 
+/// Structured result returned by release preparation APIs.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreparedRelease {
 	pub plan: ReleasePlan,
@@ -544,6 +551,11 @@ struct CommandStepOutput {
 
 const CHANGESET_DIR: &str = ".changeset";
 
+/// Run the `monochange` CLI from the current process environment.
+///
+/// This initializes tracing, parses `std::env::args_os()`, executes the
+/// matching subcommand, and prints any non-empty stdout payload unless
+/// `--quiet` was requested.
 #[must_use = "the run result must be checked"]
 pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
@@ -592,6 +604,7 @@ where
 	None
 }
 
+/// Execute the `monochange` CLI with an explicit argument iterator.
 #[must_use = "the run result must be checked"]
 pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
 where
@@ -602,6 +615,11 @@ where
 }
 
 #[tracing::instrument(skip_all, fields(bin_name))]
+/// Execute the `monochange` CLI against an explicit repository root.
+///
+/// This is primarily useful for tests and embedding, where the caller wants to
+/// control both the argv payload and the workspace root used for config loading
+/// and command execution.
 #[doc(hidden)]
 pub fn run_with_args_in_dir<I>(
 	bin_name: &'static str,

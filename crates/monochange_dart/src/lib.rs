@@ -66,6 +66,7 @@ pub enum DartVersionedFileKind {
 	Lock,
 }
 
+/// Classify a Dart or Flutter versioned file path.
 pub fn supported_versioned_file_kind(path: &Path) -> Option<DartVersionedFileKind> {
 	let file_name = path
 		.file_name()
@@ -82,6 +83,7 @@ pub fn supported_versioned_file_kind(path: &Path) -> Option<DartVersionedFileKin
 	}
 }
 
+/// Discover lockfiles that should be refreshed for `package`.
 pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	let manifest_dir = package
 		.manifest_path
@@ -109,6 +111,7 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	discovered
 }
 
+/// Return the default lockfile refresh commands for `package`.
 pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommandExecution> {
 	let command = match package.ecosystem {
 		Ecosystem::Flutter => "flutter pub get",
@@ -131,6 +134,7 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 		.collect()
 }
 
+/// Update dependency sections inside a parsed `pubspec.yaml` mapping.
 pub fn update_dependency_fields(
 	mapping: &mut Mapping,
 	fields: &[&str],
@@ -153,6 +157,7 @@ pub fn update_dependency_fields(
 }
 
 #[must_use = "the manifest update result must be checked"]
+/// Update `pubspec.yaml` text while preserving the existing layout.
 pub fn update_manifest_text(
 	contents: &str,
 	owner_version: Option<&str>,
@@ -357,6 +362,7 @@ fn render_yaml_scalar(existing: &str, value: &str) -> String {
 	value.to_string()
 }
 
+/// Update versions embedded in a parsed `pubspec.lock` mapping.
 pub fn update_pubspec_lock(
 	mapping: &mut Mapping,
 	raw_versions: &std::collections::BTreeMap<String, String>,
@@ -379,6 +385,7 @@ pub fn update_pubspec_lock(
 
 pub struct DartAdapter;
 
+/// Return the shared Dart and Flutter ecosystem adapter.
 #[must_use]
 pub const fn adapter() -> DartAdapter {
 	DartAdapter
@@ -396,6 +403,7 @@ impl EcosystemAdapter for DartAdapter {
 
 #[tracing::instrument(skip_all)]
 #[must_use = "the discovery result must be checked"]
+/// Discover Dart and Flutter packages rooted at `root`.
 pub fn discover_dart_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let workspace_manifests = find_workspace_manifests(root);
 	let mut included_manifests = HashSet::new();

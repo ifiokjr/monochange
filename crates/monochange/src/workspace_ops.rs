@@ -799,6 +799,7 @@ pub(crate) fn validate_cargo_workspace_version_groups(root: &Path) -> Monochange
 	monochange_cargo::validate_workspace_version_groups(&packages)
 }
 
+/// Discover all supported packages, dependency edges, and configured groups.
 #[tracing::instrument(skip_all)]
 #[must_use = "the discovery result must be checked"]
 pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
@@ -974,6 +975,7 @@ fn discover_release_workspace(
 	})
 }
 
+/// Parameters for creating a `.changeset/*.md` file through the library API.
 #[derive(Clone, Copy, Debug, TypedBuilder)]
 pub struct AddChangeFileRequest<'a> {
 	pub package_refs: &'a [String],
@@ -989,6 +991,7 @@ pub struct AddChangeFileRequest<'a> {
 	pub output: Option<&'a Path>,
 }
 
+/// Create a changeset markdown file for one or more package or group ids.
 pub fn add_change_file(
 	root: &Path,
 	request: AddChangeFileRequest<'_>,
@@ -1201,6 +1204,7 @@ pub(crate) fn render_interactive_changeset_markdown(
 	Ok(lines.join("\n"))
 }
 
+/// Build a release plan from a single changeset file.
 #[must_use = "the release plan result must be checked"]
 pub fn plan_release(root: &Path, changes_path: &Path) -> MonochangeResult<ReleasePlan> {
 	let configuration = load_workspace_configuration(root)?;
@@ -1420,6 +1424,7 @@ fn collect_workspace_file_updates(
 	Ok(updates)
 }
 
+/// Prepare a release, update versioned files, and return the structured result.
 #[must_use = "the prepared release result must be checked"]
 pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
 	// The public API returns structured release state, not rendered diffs.

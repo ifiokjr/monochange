@@ -2,7 +2,7 @@
 
 `monochange` discovers packages from native manifests and workspace definitions.
 
-Supported sources in this milestone:
+Supported sources today:
 
 <!-- {=discoverySupportedSources} -->
 

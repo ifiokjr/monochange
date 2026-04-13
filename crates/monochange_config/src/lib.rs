@@ -652,6 +652,7 @@ fn parse_group_changelog_include(
 }
 
 #[must_use]
+/// Return the canonical `monochange.toml` path under `root`.
 pub fn config_path(root: &Path) -> PathBuf {
 	root.join(CONFIG_FILE)
 }
@@ -937,6 +938,7 @@ fn resolve_source_configuration(
 
 #[must_use = "the configuration result must be checked"]
 #[tracing::instrument(skip_all)]
+/// Load and fully validate `monochange.toml` for `root`.
 pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceConfiguration> {
 	let (contents, raw) = load_raw_configuration(root)?;
 
@@ -1189,6 +1191,7 @@ fn changeset_package_references(root: &Path, package: &PackageRecord) -> Vec<Str
 }
 
 #[must_use = "the change signals result must be checked"]
+/// Load change signals from one `.changeset/*.md` file.
 pub fn load_change_signals(
 	changes_path: &Path,
 	configuration: &WorkspaceConfiguration,
@@ -1199,6 +1202,7 @@ pub fn load_change_signals(
 }
 
 #[must_use = "the changeset result must be checked"]
+/// Load one `.changeset/*.md` file into the structured changeset model.
 pub fn load_changeset_file(
 	changes_path: &Path,
 	configuration: &WorkspaceConfiguration,
@@ -3611,6 +3615,7 @@ fn extract_frontmatter(contents: &str) -> Option<(Range<usize>, &str)> {
 	Some((start..start + frontmatter.len(), frontmatter))
 }
 
+/// Apply configured version groups to discovered packages.
 pub fn apply_version_groups(
 	packages: &mut [PackageRecord],
 	configuration: &WorkspaceConfiguration,
@@ -3797,6 +3802,7 @@ fn ecosystem_matches_package_type(ecosystem: Ecosystem, package_type: PackageTyp
 }
 
 #[must_use = "the validation result must be checked"]
+/// Validate configured changesets and their targets for `root`.
 pub fn validate_workspace(root: &Path) -> MonochangeResult<()> {
 	let configuration = load_workspace_configuration(root)?;
 	let changeset_dir = root.join(".changeset");
@@ -3830,6 +3836,7 @@ pub fn validate_workspace(root: &Path) -> MonochangeResult<()> {
 /// `validate_versioned_files()` because it performs file I/O and should only
 /// run during the explicit `mc validate` command, not on every config load.
 #[must_use = "the validation result must be checked"]
+/// Validate versioned-file paths and parsers against real files on disk.
 pub fn validate_versioned_files_content(root: &Path) -> MonochangeResult<Vec<String>> {
 	let configuration = load_workspace_configuration(root)?;
 	let mut warnings = Vec::new();

@@ -15,6 +15,12 @@ use monochange_core::MonochangeResult;
 
 use crate::discover_workspace;
 
+/// Evaluate pull-request changeset coverage for the supplied changed paths.
+///
+/// This is the library entry point behind `mc affected` and the GitHub
+/// changeset-policy workflow. It loads the workspace configuration, resolves
+/// changed files against configured packages, reads any attached changesets, and
+/// returns a structured pass/skip/fail report.
 pub fn affected_packages(
 	root: &Path,
 	changed_paths: &[String],
@@ -204,6 +210,7 @@ pub fn affected_packages(
 	Ok(evaluation)
 }
 
+/// Backwards-compatible alias for [`affected_packages`].
 pub fn verify_changesets(
 	root: &Path,
 	changed_paths: &[String],
@@ -212,6 +219,7 @@ pub fn verify_changesets(
 	affected_packages(root, changed_paths, labels)
 }
 
+/// Backwards-compatible alias for [`affected_packages`].
 pub fn evaluate_changeset_policy(
 	root: &Path,
 	changed_paths: &[String],

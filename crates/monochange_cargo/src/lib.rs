@@ -73,6 +73,7 @@ pub const RUST_SEMVER_PROVIDER_ID: &str = "rust-semver";
 
 pub struct CargoAdapter;
 
+/// Return the shared Cargo ecosystem adapter.
 #[must_use]
 pub const fn adapter() -> CargoAdapter {
 	CargoAdapter
@@ -94,6 +95,7 @@ pub enum CargoVersionedFileKind {
 	Lock,
 }
 
+/// Classify a Cargo versioned file path.
 pub fn supported_versioned_file_kind(path: &Path) -> Option<CargoVersionedFileKind> {
 	let file_name = path
 		.file_name()
@@ -108,6 +110,7 @@ pub fn supported_versioned_file_kind(path: &Path) -> Option<CargoVersionedFileKi
 	}
 }
 
+/// Discover lockfiles that should be refreshed for `package`.
 pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	let manifest_dir = package
 		.manifest_path
@@ -132,6 +135,7 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	discovered
 }
 
+/// Return the default lockfile refresh commands for `package`.
 pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommandExecution> {
 	discover_lockfiles(package)
 		.into_iter()
@@ -148,6 +152,7 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 		.collect()
 }
 
+/// Return `true` when a lockfile still needs command-based refresh.
 pub fn lockfile_requires_command_refresh(lockfile: &Path, packages: &[&PackageRecord]) -> bool {
 	let Ok(contents) = fs::read_to_string(lockfile) else {
 		return true;
@@ -185,6 +190,7 @@ pub fn lockfile_requires_command_refresh(lockfile: &Path, packages: &[&PackageRe
 	})
 }
 
+/// Validate version-group assignments for workspace-version Cargo packages.
 #[must_use = "the validation result must be checked"]
 pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> MonochangeResult<()> {
 	let mut workspace_versioned = BTreeMap::<PathBuf, Vec<&PackageRecord>>::new();
@@ -236,6 +242,7 @@ pub fn validate_workspace_version_groups(packages: &[PackageRecord]) -> Monochan
 	Ok(())
 }
 
+/// Update a parsed Cargo manifest or lockfile in memory.
 pub fn update_versioned_file(
 	document: &mut DocumentMut,
 	kind: CargoVersionedFileKind,
@@ -280,6 +287,7 @@ pub fn update_versioned_file(
 	}
 }
 
+/// Update Cargo manifest or lockfile text while preserving formatting where possible.
 pub fn update_versioned_file_text(
 	contents: &str,
 	kind: CargoVersionedFileKind,
@@ -665,6 +673,7 @@ impl CompatibilityProvider for RustSemverProvider {
 
 #[tracing::instrument(skip_all)]
 #[must_use = "the discovery result must be checked"]
+/// Discover Cargo packages rooted at `root`.
 pub fn discover_cargo_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let workspace_manifests = find_workspace_manifests(root);
 	let mut included_manifests = HashSet::new();

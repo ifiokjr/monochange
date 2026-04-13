@@ -158,6 +158,7 @@ pub type GitHubPullRequestRequest = SourceChangeRequest;
 pub type GitHubPullRequestOperation = SourceChangeRequestOperation;
 pub type GitHubPullRequestOutcome = SourceChangeRequestOutcome;
 
+/// Return the hosted-source capabilities supported by the GitHub provider.
 #[must_use]
 pub const fn source_capabilities() -> SourceCapabilities {
 	SourceCapabilities {
@@ -170,6 +171,7 @@ pub const fn source_capabilities() -> SourceCapabilities {
 	}
 }
 
+/// Validate that a source configuration is compatible with the GitHub provider.
 #[must_use = "the validation result must be checked"]
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
 	if source.releases.generate_notes
@@ -186,12 +188,17 @@ pub fn validate_source_configuration(source: &SourceConfiguration) -> Monochange
 	Ok(())
 }
 
+/// Shared issue-comment planning type for GitHub issue release comments.
 pub type GitHubIssueCommentPlan = HostedIssueCommentPlan;
+/// Shared issue-comment operation type for GitHub issue release comments.
 pub type GitHubIssueCommentOperation = HostedIssueCommentOperation;
+/// Shared issue-comment outcome type for GitHub issue release comments.
 pub type GitHubIssueCommentOutcome = HostedIssueCommentOutcome;
 
+/// Shared GitHub hosted-source adapter instance used by the workspace.
 pub static HOSTED_SOURCE_ADAPTER: GitHubHostedSourceAdapter = GitHubHostedSourceAdapter;
 
+/// Hosted-source adapter for GitHub repositories.
 pub struct GitHubHostedSourceAdapter;
 
 impl HostedSourceAdapter for GitHubHostedSourceAdapter {
@@ -363,6 +370,7 @@ struct GitHubIssueCommentResponse {
 	body: Option<String>,
 }
 
+/// Return the hosting metadata features available from GitHub changeset context.
 #[must_use]
 pub fn github_hosting_capabilities() -> HostingCapabilities {
 	HostingCapabilities {
@@ -374,11 +382,13 @@ pub fn github_hosting_capabilities() -> HostingCapabilities {
 	}
 }
 
+/// Return the GitHub web base URL for building browser links.
 #[must_use]
 pub fn github_web_base_url() -> String {
 	env::var("GITHUB_SERVER_URL").unwrap_or_else(|_| "https://github.com".to_string())
 }
 
+/// Extract the host name used for rendered GitHub links.
 #[must_use]
 pub fn github_host() -> Option<String> {
 	let base_url = github_web_base_url();
@@ -393,6 +403,7 @@ pub fn github_host() -> Option<String> {
 	}
 }
 
+/// Build a web URL for a commit on the configured GitHub repository.
 #[must_use]
 pub fn github_commit_url(source: &SourceConfiguration, sha: &str) -> String {
 	format!(
@@ -404,6 +415,7 @@ pub fn github_commit_url(source: &SourceConfiguration, sha: &str) -> String {
 	)
 }
 
+/// Build a web URL for a pull request on the configured GitHub repository.
 #[must_use]
 pub fn github_pull_request_url(source: &SourceConfiguration, number: u64) -> String {
 	format!(
@@ -415,6 +427,7 @@ pub fn github_pull_request_url(source: &SourceConfiguration, number: u64) -> Str
 	)
 }
 
+/// Build a web URL for an issue on the configured GitHub repository.
 #[must_use]
 pub fn github_issue_url(source: &SourceConfiguration, number: u64) -> String {
 	format!(
@@ -498,6 +511,7 @@ pub fn annotate_changeset_context(
 	apply_github_changeset_annotations(source, changesets);
 }
 
+/// Enrich changeset context with remote GitHub review-request and issue data.
 #[tracing::instrument(skip_all)]
 pub fn enrich_changeset_context(
 	source: &SourceConfiguration,
@@ -521,6 +535,7 @@ pub fn enrich_changeset_context(
 	});
 }
 
+/// Convert releasable targets into provider-specific GitHub release requests.
 #[must_use]
 pub fn build_release_requests(
 	source: &SourceConfiguration,
@@ -549,6 +564,7 @@ pub fn build_release_requests(
 		.collect()
 }
 
+/// Build the release pull request request for the configured GitHub repository.
 #[must_use]
 pub fn build_release_pull_request_request(
 	source: &SourceConfiguration,
@@ -884,6 +900,7 @@ fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
 		.collect()
 }
 
+/// Plan release comments for issues that are closed by the manifest's review requests.
 #[must_use]
 pub fn plan_released_issue_comments(
 	source: &SourceConfiguration,
@@ -920,6 +937,7 @@ pub fn plan_released_issue_comments(
 	plans_by_issue.into_values().collect()
 }
 
+/// Create release comments on linked GitHub issues when they have not been posted yet.
 #[tracing::instrument(skip_all)]
 #[must_use = "the comment result must be checked"]
 pub fn comment_released_issues(
@@ -1002,6 +1020,7 @@ fn release_issue_comment_body(release_tags: &[String], marker: &str) -> String {
 	}
 }
 
+/// Publish or update all planned GitHub releases for a manifest.
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
 pub fn publish_release_requests(
@@ -1016,6 +1035,7 @@ pub fn publish_release_requests(
 	})
 }
 
+/// Commit, push, and publish the release pull request against GitHub.
 #[tracing::instrument(skip_all)]
 #[must_use = "the pull request result must be checked"]
 pub fn publish_release_pull_request(
@@ -1055,6 +1075,7 @@ pub fn publish_release_pull_request(
 	})
 }
 
+/// Sync existing GitHub releases so retargeted tags point at the new commits.
 #[tracing::instrument(skip_all)]
 #[must_use = "the sync result must be checked"]
 pub fn sync_retargeted_releases(

@@ -224,7 +224,7 @@ jobs:
 
 <!-- {/changesetPolicyGitHubActionWorkflow} -->
 
-Planning rules in this milestone:
+Current planning rules:
 
 <!-- {=releasePlanningRules} -->
 

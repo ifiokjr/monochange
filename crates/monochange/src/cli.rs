@@ -11,6 +11,11 @@ use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
 use monochange_core::default_cli_commands;
 
+/// Build the top-level Clap command for the `monochange` binary.
+///
+/// The returned command includes built-in subcommands such as `init`, `assist`,
+/// `mcp`, and `release-record`, plus any config-defined commands resolved from
+/// the current working directory.
 pub fn build_command(bin_name: &'static str) -> Command {
 	let root = current_dir_or_dot();
 	build_command_for_root(bin_name, &root)

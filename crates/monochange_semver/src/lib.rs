@@ -46,6 +46,7 @@ use monochange_core::ChangeSignal;
 use monochange_core::CompatibilityAssessment;
 use monochange_core::PackageRecord;
 
+/// Provider interface for ecosystem-specific compatibility evidence.
 pub trait CompatibilityProvider {
 	fn provider_id(&self) -> &'static str;
 
@@ -56,6 +57,7 @@ pub trait CompatibilityProvider {
 	) -> Option<CompatibilityAssessment>;
 }
 
+/// Collect compatibility assessments for the supplied change signals.
 #[must_use]
 pub fn collect_assessments(
 	providers: &[&dyn CompatibilityProvider],
@@ -110,6 +112,7 @@ pub fn strongest_assessment_for_package(
 	strongest_assessment(&matching)
 }
 
+/// Calculate the effective direct-release severity for a package.
 #[must_use]
 pub fn direct_release_severity(
 	requested_bump: Option<BumpSeverity>,
@@ -121,6 +124,7 @@ pub fn direct_release_severity(
 	)
 }
 
+/// Calculate the propagated severity applied to dependents of a changed package.
 #[must_use]
 pub fn propagated_release_severity(
 	default_parent_bump: BumpSeverity,
