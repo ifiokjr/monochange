@@ -1467,6 +1467,7 @@ mod tests {
 			PackageType::Deno => Ecosystem::Deno,
 			PackageType::Dart => Ecosystem::Dart,
 			PackageType::Flutter => Ecosystem::Flutter,
+			_ => Ecosystem::Cargo,
 		};
 		let mut package = PackageRecord::new(
 			ecosystem,

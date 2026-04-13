@@ -1969,7 +1969,7 @@ mod workspace_ops_tests {
 		let root = tempdir.path();
 		fs::create_dir_all(root.join("monochange.toml"))
 			.unwrap_or_else(|error| panic!("create blocking config dir: {error}"));
-		let init_error = init_workspace(root, true)
+		let init_error = init_workspace(root, true, None)
 			.err()
 			.unwrap_or_else(|| panic!("expected init write error"));
 		assert!(init_error.to_string().contains("failed to write"));
@@ -2032,7 +2032,7 @@ mod workspace_ops_tests {
 		.unwrap();
 		fs::write(root.join("packages/core/changelog.md"), "# Changelog\n").unwrap();
 
-		let rendered = render_annotated_init_config(root)
+		let rendered = render_annotated_init_config(root, None, None)
 			.unwrap_or_else(|error| panic!("render annotated config: {error}"));
 		assert!(rendered.contains("type = \"cargo\""));
 		assert!(rendered.contains("type = \"npm\""));

@@ -3723,7 +3723,10 @@ fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths()
 #[test]
 fn validate_github_source_and_api_configuration_cover_remaining_paths() {
 	let github_error =
-		crate::validate_github_configuration(Some(&monochange_core::GitHubConfiguration {
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: SourceProvider::GitHub,
+			host: None,
+			api_url: None,
 			owner: "ifiokjr".to_string(),
 			repo: "monochange".to_string(),
 			releases: monochange_core::ProviderReleaseSettings::default(),
@@ -3738,11 +3741,14 @@ fn validate_github_source_and_api_configuration_cover_remaining_paths() {
 	assert!(
 		github_error
 			.to_string()
-			.contains("[github.pull_requests].labels must not include empty values")
+			.contains("[source.pull_requests].labels must not include empty values")
 	);
 
 	let github_skip_label_error =
-		crate::validate_github_configuration(Some(&monochange_core::GitHubConfiguration {
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: SourceProvider::GitHub,
+			host: None,
+			api_url: None,
 			owner: "ifiokjr".to_string(),
 			repo: "monochange".to_string(),
 			releases: monochange_core::ProviderReleaseSettings::default(),
@@ -3759,7 +3765,7 @@ fn validate_github_source_and_api_configuration_cover_remaining_paths() {
 	assert!(
 		github_skip_label_error
 			.to_string()
-			.contains("[github.bot.changesets].skip_labels must not include empty values")
+			.contains("[source.bot.changesets].skip_labels must not include empty values")
 	);
 
 	let source_api_error =

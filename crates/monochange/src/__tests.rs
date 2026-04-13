@@ -4588,7 +4588,7 @@ fn quiet_builtin_commands_return_empty_output() {
 	)
 	.unwrap_or_else(|error| panic!("quiet init output: {error}"));
 	assert!(init_output.is_empty());
-	assert!(!root.join("monochange.toml").exists());
+	assert!(root.join("monochange.toml").exists());
 
 	let populate_output = run_cli(
 		root,

@@ -1728,11 +1728,13 @@ mod tests {
 				name: "Highlights".to_string(),
 				types: vec!["minor".to_string()],
 				default_bump: None,
+				description: None,
 			},
 			ExtraChangelogSection {
 				name: "Notes".to_string(),
 				types: vec!["note".to_string()],
 				default_bump: None,
+				description: None,
 			},
 		];
 		let sections = render_release_note_sections(
