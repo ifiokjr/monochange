@@ -1,4 +1,3 @@
-use std::ffi::OsString;
 use std::path::Path;
 
 use insta::assert_json_snapshot;
@@ -220,15 +219,25 @@ fn affected_since_takes_priority_over_changed_paths_with_warning() {
 }
 
 fn run_affected_json(root: &Path, args: &[&str]) -> Value {
-	let cli_args = std::iter::once(OsString::from("mc"))
-		.chain(std::iter::once(OsString::from("affected")))
-		.chain(std::iter::once(OsString::from("--format")))
-		.chain(std::iter::once(OsString::from("json")))
-		.chain(args.iter().map(|value| OsString::from(*value)));
-	let output = monochange::run_with_args_in_dir("mc", cli_args, root)
+	let output = monochange_command(None)
+		.current_dir(root)
+		.arg("affected")
+		.arg("--format")
+		.arg("json")
+		.args(args)
+		.output()
 		.unwrap_or_else(|error| panic!("command output: {error}"));
-	serde_json::from_str(&output)
-		.unwrap_or_else(|error| panic!("parse json: {error}\nstdout: {output}"))
+	assert!(
+		output.status.success(),
+		"stderr: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+		panic!(
+			"parse json: {error}\nstdout: {}",
+			String::from_utf8_lossy(&output.stdout)
+		)
+	})
 }
 
 fn run_affected_raw(root: &Path, args: &[&str]) -> std::process::Output {

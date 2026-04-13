@@ -310,23 +310,6 @@ pub enum AssistOutputFormat {
 	Json,
 }
 
-fn parse_assistant_or_default(value: Option<&String>) -> Assistant {
-	match value.map_or("generic", String::as_str) {
-		"claude" => Assistant::Claude,
-		"cursor" => Assistant::Cursor,
-		"copilot" => Assistant::Copilot,
-		"pi" => Assistant::Pi,
-		_ => Assistant::Generic,
-	}
-}
-
-fn parse_assist_output_format_or_default(value: Option<&String>) -> AssistOutputFormat {
-	match value.map_or("text", String::as_str) {
-		"json" => AssistOutputFormat::Json,
-		_ => AssistOutputFormat::Text,
-	}
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseTarget {
 	pub id: String,
@@ -657,10 +640,34 @@ where
 			}
 		}
 		Some(("assist", assist_matches)) => {
-			let assistant =
-				parse_assistant_or_default(assist_matches.get_one::<String>("assistant"));
-			let format =
-				parse_assist_output_format_or_default(assist_matches.get_one::<String>("format"));
+			let assistant = match assist_matches
+				.get_one::<String>("assistant")
+				.map(String::as_str)
+			{
+				Some("generic") => Assistant::Generic,
+				Some("claude") => Assistant::Claude,
+				Some("cursor") => Assistant::Cursor,
+				Some("copilot") => Assistant::Copilot,
+				Some("pi") => Assistant::Pi,
+				Some(value) => {
+					return Err(MonochangeError::Config(format!(
+						"unknown assistant `{value}`"
+					)));
+				}
+				None => return Err(MonochangeError::Config("missing assistant".to_string())),
+			};
+			let format = match assist_matches
+				.get_one::<String>("format")
+				.map_or("text", String::as_str)
+			{
+				"text" => AssistOutputFormat::Text,
+				"json" => AssistOutputFormat::Json,
+				value => {
+					return Err(MonochangeError::Config(format!(
+						"unknown assist output format `{value}`"
+					)));
+				}
+			};
 			run_assist(assistant, format)
 		}
 		Some(("mcp", _)) => {
@@ -697,7 +704,7 @@ where
 				quiet,
 			)
 		}
-		None => Err(MonochangeError::Config("Usage: mc".to_string())),
+		None => Err(MonochangeError::Config("unknown command".to_string())),
 	}
 }
 

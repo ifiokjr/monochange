@@ -962,28 +962,16 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 	let repo = tempdir.path().join("repo");
 	git(
 		tempdir.path(),
-		&[
-			"init",
-			"--bare",
-			"--initial-branch=main",
-			bare.to_string_lossy().as_ref(),
-		],
+		&["init", "--bare", bare.to_string_lossy().as_ref()],
 	);
-	git(
-		tempdir.path(),
-		&[
-			"init",
-			"--initial-branch=main",
-			repo.to_string_lossy().as_ref(),
-		],
-	);
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
-	git(&repo, &["config", "commit.gpgsign", "false"]);
 	std::fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
+	git(&repo, &["branch", "-M", "main"]);
 	git(
 		&repo,
 		&["remote", "add", "origin", bare.to_string_lossy().as_ref()],

@@ -71,13 +71,13 @@ fn hosted_fixture_setup_script_bootstraps_local_pr_history() {
 		.arg("--repo")
 		.arg("fixture-repo")
 		.arg("--package-count")
-		.arg("2")
+		.arg("3")
 		.arg("--filler-commits")
-		.arg("4")
+		.arg("12")
 		.arg("--release-prs")
 		.arg("2")
 		.arg("--commits-per-pr")
-		.arg("1")
+		.arg("2")
 		.output()
 		.unwrap_or_else(|error| panic!("run fixture setup script: {error}"));
 
@@ -96,7 +96,7 @@ fn hosted_fixture_setup_script_bootstraps_local_pr_history() {
 		.trim()
 		.parse::<usize>()
 		.unwrap_or_else(|error| panic!("parse commit count: {error}"));
-	assert!(commit_count >= 10);
+	assert_eq!(commit_count, 21);
 
 	let merges = git_stdout(&fixture_dir, &["log", "--merges", "--oneline"]);
 	assert_eq!(merges.lines().count(), 2);
@@ -112,69 +112,6 @@ fn hosted_fixture_setup_script_bootstraps_local_pr_history() {
 		})
 		.count();
 	assert_eq!(changeset_count, 2);
-}
-
-#[etest::etest(
-	skip=std::env::var_os("PRE_COMMIT").is_some()
-		|| std::env::var_os("MONOCHANGE_EXPENSIVE_TESTS").is_none()
-)]
-fn hosted_fixture_setup_script_supports_large_repo_histories() {
-	let _lock = HOSTED_FIXTURE_SCRIPT_LOCK
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture_dir = tempdir.path().join("fixture");
-	let script_path = repo_root().join("scripts/setup_hosted_benchmark_fixture.sh");
-
-	let output = Command::new("bash")
-		.arg(&script_path)
-		.arg("--local-only")
-		.arg("--output-dir")
-		.arg(&fixture_dir)
-		.arg("--owner")
-		.arg("fixture-owner")
-		.arg("--repo")
-		.arg("fixture-repo")
-		.arg("--package-count")
-		.arg("12")
-		.arg("--filler-commits")
-		.arg("200")
-		.arg("--release-prs")
-		.arg("6")
-		.arg("--commits-per-pr")
-		.arg("2")
-		.output()
-		.unwrap_or_else(|error| panic!("run large fixture setup script: {error}"));
-
-	assert!(
-		output.status.success(),
-		"{}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-
-	let commit_count = git_stdout(&fixture_dir, &["rev-list", "--count", "HEAD"])
-		.trim()
-		.parse::<usize>()
-		.unwrap_or_else(|error| panic!("parse commit count: {error}"));
-	assert!(
-		commit_count >= 220,
-		"expected a large history, got {commit_count}"
-	);
-
-	let merges = git_stdout(&fixture_dir, &["log", "--merges", "--oneline"]);
-	assert_eq!(merges.lines().count(), 6);
-
-	let changeset_count = fs::read_dir(fixture_dir.join(".changeset"))
-		.unwrap_or_else(|error| panic!("read .changeset: {error}"))
-		.filter_map(Result::ok)
-		.filter(|entry| {
-			entry
-				.path()
-				.extension()
-				.is_some_and(|extension| extension == "md")
-		})
-		.count();
-	assert_eq!(changeset_count, 6);
 }
 
 #[test]

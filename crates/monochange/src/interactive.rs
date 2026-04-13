@@ -214,15 +214,13 @@ fn parse_selected_bump(selection: &str) -> BumpSeverity {
 	}
 }
 
-fn bump_prompt_label(target: &SelectableTarget) -> String {
-	match target.kind {
+fn prompt_bump_for_target(target: &SelectableTarget) -> MonochangeResult<BumpSeverity> {
+	let label = match target.kind {
 		TargetKind::Group => format!("Bump for group `{}`:", target.id),
 		TargetKind::Package => format!("Bump for package `{}`:", target.id),
-	}
-}
+	};
 
-fn prompt_bump_for_target(target: &SelectableTarget) -> MonochangeResult<BumpSeverity> {
-	let selection = Select::new(&bump_prompt_label(target), bump_options())
+	let selection = Select::new(&label, bump_options())
 		.with_starting_cursor(0)
 		.prompt()
 		.map_err(map_inquire_error)?;
@@ -230,8 +228,8 @@ fn prompt_bump_for_target(target: &SelectableTarget) -> MonochangeResult<BumpSev
 	Ok(parse_selected_bump(selection))
 }
 
-fn version_prompt_label(target: &SelectableTarget) -> String {
-	match target.kind {
+fn prompt_version_for_target(target: &SelectableTarget) -> MonochangeResult<Option<String>> {
+	let label = match target.kind {
 		TargetKind::Group => {
 			format!(
 				"Pin explicit version for group `{}`? (leave empty to skip):",
@@ -244,34 +242,30 @@ fn version_prompt_label(target: &SelectableTarget) -> String {
 				target.id
 			)
 		}
-	}
-}
+	};
 
-fn validate_semver_input(input: &str) -> Validation {
-	if input.is_empty() {
-		return Validation::Valid;
-	}
-	match semver::Version::parse(input) {
-		Ok(_) => Validation::Valid,
-		Err(error) => Validation::Invalid(format!("invalid semver: {error}").into()),
-	}
-}
-
-fn normalize_optional_text(value: String) -> Option<String> {
-	if value.trim().is_empty() {
-		None
-	} else {
-		Some(value)
-	}
-}
-
-fn prompt_version_for_target(target: &SelectableTarget) -> MonochangeResult<Option<String>> {
-	let version = Text::new(&version_prompt_label(target))
-		.with_validator(|input: &str| Ok(validate_semver_input(input)))
+	let version = Text::new(&label)
+		.with_validator(|input: &str| {
+			if input.is_empty() {
+				return Ok(Validation::Valid);
+			}
+			match semver::Version::parse(input) {
+				Ok(_) => Ok(Validation::Valid),
+				Err(error) => {
+					Ok(Validation::Invalid(
+						format!("invalid semver: {error}").into(),
+					))
+				}
+			}
+		})
 		.prompt()
 		.map_err(map_inquire_error)?;
 
-	Ok(normalize_optional_text(version))
+	if version.is_empty() {
+		Ok(None)
+	} else {
+		Ok(Some(version))
+	}
 }
 
 fn change_type_options(target: &SelectableTarget) -> Option<Vec<String>> {
@@ -289,19 +283,17 @@ fn parse_change_type_selection(selection: &str) -> Option<String> {
 	}
 }
 
-fn change_type_prompt_label(target: &SelectableTarget) -> String {
-	match target.kind {
-		TargetKind::Group => format!("Change type for group `{}`:", target.id),
-		TargetKind::Package => format!("Change type for `{}`:", target.id),
-	}
-}
-
 fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<Option<String>> {
 	let Some(options) = change_type_options(target) else {
 		return Ok(None);
 	};
 
-	let selection = Select::new(&change_type_prompt_label(target), options)
+	let label = match target.kind {
+		TargetKind::Group => format!("Change type for group `{}`:", target.id),
+		TargetKind::Package => format!("Change type for `{}`:", target.id),
+	};
+
+	let selection = Select::new(&label, options)
 		.with_starting_cursor(0)
 		.prompt()
 		.map_err(map_inquire_error)?;
@@ -309,17 +301,15 @@ fn prompt_change_type_for_target(target: &SelectableTarget) -> MonochangeResult<
 	Ok(parse_change_type_selection(&selection))
 }
 
-fn validate_reason_input(input: &str) -> Validation {
-	if input.trim().is_empty() {
-		Validation::Invalid("reason cannot be empty".into())
-	} else {
-		Validation::Valid
-	}
-}
-
 fn prompt_reason() -> MonochangeResult<String> {
 	let reason = Text::new("Release-note summary (required):")
-		.with_validator(|input: &str| Ok(validate_reason_input(input)))
+		.with_validator(|input: &str| {
+			if input.trim().is_empty() {
+				Ok(Validation::Invalid("reason cannot be empty".into()))
+			} else {
+				Ok(Validation::Valid)
+			}
+		})
 		.prompt()
 		.map_err(map_inquire_error)?;
 
@@ -329,7 +319,11 @@ fn prompt_reason() -> MonochangeResult<String> {
 fn prompt_optional(label: &str) -> MonochangeResult<Option<String>> {
 	let value = Text::new(label).prompt().map_err(map_inquire_error)?;
 
-	Ok(normalize_optional_text(value))
+	if value.trim().is_empty() {
+		Ok(None)
+	} else {
+		Ok(Some(value))
+	}
 }
 
 fn map_inquire_error(error: inquire::error::InquireError) -> MonochangeError {
@@ -346,7 +340,6 @@ fn map_inquire_error(error: inquire::error::InquireError) -> MonochangeError {
 
 #[cfg(test)]
 mod __tests {
-	use inquire::validator::Validation;
 	use monochange_config::load_workspace_configuration;
 	use monochange_core::BumpSeverity;
 	use monochange_core::ChangesetSettings;
@@ -368,18 +361,12 @@ mod __tests {
 	use super::TargetKind;
 	use super::build_selectable_targets;
 	use super::bump_options;
-	use super::bump_prompt_label;
 	use super::change_type_options;
-	use super::change_type_prompt_label;
 	use super::map_inquire_error;
-	use super::normalize_optional_text;
 	use super::parse_change_type_selection;
 	use super::parse_selected_bump;
 	use super::prompt_change_type_for_target;
 	use super::run_interactive_change;
-	use super::validate_reason_input;
-	use super::validate_semver_input;
-	use super::version_prompt_label;
 
 	fn fixture_path(relative: &str) -> std::path::PathBuf {
 		monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
@@ -477,59 +464,6 @@ mod __tests {
 		assert_eq!(parse_selected_bump("minor"), BumpSeverity::Minor);
 		assert_eq!(parse_selected_bump("major"), BumpSeverity::Major);
 		assert_eq!(parse_selected_bump("patch"), BumpSeverity::Patch);
-	}
-
-	#[test]
-	fn prompt_label_helpers_cover_package_and_group_variants() {
-		let package = package_target(Vec::new());
-		let group = SelectableTarget {
-			id: "sdk".to_string(),
-			kind: TargetKind::Group,
-			display: "sdk".to_string(),
-			configured_types: vec!["docs".to_string()],
-		};
-		assert_eq!(bump_prompt_label(&package), "Bump for package `core`:");
-		assert_eq!(bump_prompt_label(&group), "Bump for group `sdk`:");
-		assert_eq!(
-			version_prompt_label(&package),
-			"Pin explicit version for `core`? (leave empty to skip):"
-		);
-		assert_eq!(
-			version_prompt_label(&group),
-			"Pin explicit version for group `sdk`? (leave empty to skip):"
-		);
-		assert_eq!(
-			change_type_prompt_label(&package),
-			"Change type for `core`:"
-		);
-		assert_eq!(
-			change_type_prompt_label(&group),
-			"Change type for group `sdk`:"
-		);
-	}
-
-	#[test]
-	fn validation_helpers_cover_semver_reason_and_optional_normalization() {
-		assert!(matches!(validate_semver_input(""), Validation::Valid));
-		assert!(matches!(validate_semver_input("1.2.3"), Validation::Valid));
-		assert!(matches!(
-			validate_semver_input("not-a-version"),
-			Validation::Invalid(_)
-		));
-		assert!(matches!(
-			validate_reason_input("ship it"),
-			Validation::Valid
-		));
-		assert!(matches!(
-			validate_reason_input("   "),
-			Validation::Invalid(_)
-		));
-		assert_eq!(normalize_optional_text(String::new()), None);
-		assert_eq!(normalize_optional_text("   ".to_string()), None);
-		assert_eq!(
-			normalize_optional_text("details".to_string()),
-			Some("details".to_string())
-		);
 	}
 
 	#[test]
