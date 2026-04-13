@@ -115,6 +115,7 @@ pub enum MonochangeError {
 }
 
 impl MonochangeError {
+	/// Render a stable human-readable diagnostic string for the error.
 	#[must_use]
 	pub fn render(&self) -> String {
 		match self {
@@ -148,6 +149,7 @@ pub enum BumpSeverity {
 }
 
 impl BumpSeverity {
+	/// Return `true` when this severity produces a release.
 	#[must_use]
 	pub fn is_release(self) -> bool {
 		self != Self::None
@@ -162,6 +164,7 @@ impl BumpSeverity {
 		version.major == 0
 	}
 
+	/// Apply the severity to `version`, including pre-1.0 bump shifting.
 	#[must_use]
 	pub fn apply_to_version(self, version: &Version) -> Version {
 		let effective = if Self::is_pre_stable(version) {
@@ -225,6 +228,7 @@ pub enum Ecosystem {
 }
 
 impl Ecosystem {
+	/// Return the canonical config and serialization string for the ecosystem.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -311,6 +315,7 @@ pub struct PackageRecord {
 
 impl PackageRecord {
 	#[allow(clippy::needless_pass_by_value)]
+	/// Construct a normalized package record for a discovered package.
 	#[must_use]
 	pub fn new(
 		ecosystem: Ecosystem,
@@ -341,12 +346,14 @@ impl PackageRecord {
 		}
 	}
 
+	/// Return the manifest path relative to `root` when possible.
 	#[must_use]
 	pub fn relative_manifest_path(&self, root: &Path) -> Option<PathBuf> {
 		relative_to_root(root, &self.manifest_path)
 	}
 }
 
+/// Normalize a path to an absolute, canonicalized path when possible.
 #[must_use]
 pub fn normalize_path(path: &Path) -> PathBuf {
 	let absolute = if path.is_absolute() {
@@ -357,6 +364,7 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 	fs::canonicalize(&absolute).unwrap_or(absolute)
 }
 
+/// Return `path` relative to `root` after normalizing both paths.
 #[must_use]
 pub fn relative_to_root(root: &Path, path: &Path) -> Option<PathBuf> {
 	let normalized_root = normalize_path(root);
@@ -374,6 +382,7 @@ pub struct DiscoveryPathFilter {
 }
 
 impl DiscoveryPathFilter {
+	/// Build a discovery filter from repository gitignore rules.
 	#[must_use]
 	pub fn new(root: &Path) -> Self {
 		let root = normalize_path(root);
@@ -388,11 +397,13 @@ impl DiscoveryPathFilter {
 		Self { root, gitignore }
 	}
 
+	/// Return `true` when `path` should be considered during discovery.
 	#[must_use]
 	pub fn allows(&self, path: &Path) -> bool {
 		!self.is_ignored(path, path.is_dir())
 	}
 
+	/// Return `true` when directory traversal should continue into `path`.
 	#[must_use]
 	pub fn should_descend(&self, path: &Path) -> bool {
 		!self.is_ignored(path, true)
@@ -477,6 +488,7 @@ pub enum PackageType {
 }
 
 impl PackageType {
+	/// Return the canonical config string for the package type.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -509,6 +521,7 @@ pub enum EcosystemType {
 }
 
 impl EcosystemType {
+	/// Return the default dependency-version prefix for this ecosystem.
 	#[must_use]
 	pub fn default_prefix(self) -> &'static str {
 		match self {
@@ -517,6 +530,7 @@ impl EcosystemType {
 		}
 	}
 
+	/// Return the manifest fields that usually contain dependency versions.
 	#[must_use]
 	pub fn default_fields(self) -> &'static [&'static str] {
 		match self {
@@ -534,6 +548,7 @@ struct JsonSpan {
 	end: usize,
 }
 
+/// Remove `//` and `/* ... */` comments from JSON-like text.
 pub fn strip_json_comments(contents: &str) -> String {
 	let bytes = contents.as_bytes();
 	let mut output = String::with_capacity(contents.len());
@@ -582,6 +597,7 @@ pub fn strip_json_comments(contents: &str) -> String {
 	output
 }
 
+/// Update JSON manifest text while preserving most existing formatting.
 #[must_use = "the manifest update result must be checked"]
 pub fn update_json_manifest_text(
 	contents: &str,
@@ -976,6 +992,7 @@ pub struct VersionedFileDefinition {
 }
 
 impl VersionedFileDefinition {
+	/// Return `true` when the definition uses raw regex replacement mode.
 	#[must_use]
 	pub fn uses_regex(&self) -> bool {
 		self.regex.is_some()
@@ -1227,6 +1244,7 @@ pub enum ShellConfig {
 }
 
 impl ShellConfig {
+	/// Return the shell binary used to execute a `Command` step, if any.
 	#[must_use]
 	pub fn shell_binary(&self) -> Option<&str> {
 		match self {
@@ -1445,6 +1463,7 @@ pub enum CliStepDefinition {
 }
 
 impl CliStepDefinition {
+	/// Return the step-local input overrides configured for this step.
 	#[must_use]
 	pub fn inputs(&self) -> &BTreeMap<String, CliStepInputValue> {
 		match self {
@@ -1463,6 +1482,7 @@ impl CliStepDefinition {
 		}
 	}
 
+	/// Return the optional configured display name for this step.
 	#[must_use]
 	pub fn name(&self) -> Option<&str> {
 		match self {
@@ -1481,11 +1501,13 @@ impl CliStepDefinition {
 		}
 	}
 
+	/// Return the label shown in human-readable progress output.
 	#[must_use]
 	pub fn display_name(&self) -> &str {
 		self.name().unwrap_or(self.kind_name())
 	}
 
+	/// Return the optional `when` condition for this step.
 	#[must_use]
 	pub fn when(&self) -> Option<&str> {
 		match self {
@@ -1504,6 +1526,7 @@ impl CliStepDefinition {
 		}
 	}
 
+	/// Return whether progress output is explicitly enabled or disabled.
 	#[must_use]
 	pub fn show_progress(&self) -> Option<bool> {
 		match self {
@@ -1514,6 +1537,7 @@ impl CliStepDefinition {
 		}
 	}
 
+	/// Return the built-in step kind name.
 	#[must_use]
 	pub fn kind_name(&self) -> &'static str {
 		match self {
@@ -1632,6 +1656,7 @@ pub struct CliCommandDefinition {
 	pub steps: Vec<CliStepDefinition>,
 }
 
+/// Render release notes in the selected changelog format.
 #[must_use]
 pub fn render_release_notes(format: ChangelogFormat, document: &ReleaseNotesDocument) -> String {
 	match format {
@@ -1717,6 +1742,7 @@ pub enum ReleaseOwnerKind {
 }
 
 impl ReleaseOwnerKind {
+	/// Return the canonical serialized name for the release-owner kind.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -1777,6 +1803,7 @@ pub enum HostingProviderKind {
 }
 
 impl HostingProviderKind {
+	/// Return the canonical serialized name for the hosting provider.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -1861,6 +1888,7 @@ pub enum HostedReviewRequestKind {
 }
 
 impl HostedReviewRequestKind {
+	/// Return the canonical serialized name for the review-request kind.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -1903,6 +1931,7 @@ pub enum HostedIssueRelationshipKind {
 }
 
 impl HostedIssueRelationshipKind {
+	/// Return the canonical serialized name for the issue relationship kind.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -1969,6 +1998,7 @@ pub enum ChangesetTargetKind {
 }
 
 impl ChangesetTargetKind {
+	/// Return the canonical serialized name for the changeset target kind.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -2242,6 +2272,7 @@ pub struct RetargetResult {
 	pub dry_run: bool,
 }
 
+/// Return all tag names owned by the release record, deduplicated and sorted.
 #[must_use]
 pub fn release_record_tag_names(record: &ReleaseRecord) -> Vec<String> {
 	record
@@ -2254,6 +2285,7 @@ pub fn release_record_tag_names(record: &ReleaseRecord) -> Vec<String> {
 		.collect()
 }
 
+/// Return tag names that correspond to outward hosted releases.
 #[must_use]
 pub fn release_record_release_tag_names(record: &ReleaseRecord) -> Vec<String> {
 	record
@@ -2288,6 +2320,7 @@ pub enum ReleaseRecordError {
 	InvalidJson(#[from] serde_json::Error),
 }
 
+/// Result type used by release-record parsing and rendering helpers.
 pub type ReleaseRecordResult<T> = Result<T, ReleaseRecordError>;
 
 /// Render a `ReleaseRecord` into the reserved commit-message block format.
@@ -2532,6 +2565,7 @@ pub enum ChangesetPolicyStatus {
 }
 
 impl ChangesetPolicyStatus {
+	/// Return the canonical serialized name for the policy status.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -2593,6 +2627,7 @@ pub enum SourceProvider {
 }
 
 impl SourceProvider {
+	/// Return the canonical serialized name for the source provider.
 	#[must_use]
 	pub fn as_str(self) -> &'static str {
 		match self {
@@ -2864,6 +2899,7 @@ pub struct WorkspaceConfiguration {
 }
 
 impl WorkspaceConfiguration {
+	/// Look up a configured package by its package id.
 	#[must_use]
 	pub fn package_by_id(&self, package_id: &str) -> Option<&PackageDefinition> {
 		self.packages
@@ -2871,11 +2907,13 @@ impl WorkspaceConfiguration {
 			.find(|package| package.id == package_id)
 	}
 
+	/// Look up a configured group by its group id.
 	#[must_use]
 	pub fn group_by_id(&self, group_id: &str) -> Option<&GroupDefinition> {
 		self.groups.iter().find(|group| group.id == group_id)
 	}
 
+	/// Return the configured group that directly owns `package_id`, if any.
 	#[must_use]
 	pub fn group_for_package(&self, package_id: &str) -> Option<&GroupDefinition> {
 		self.groups
@@ -2883,6 +2921,7 @@ impl WorkspaceConfiguration {
 			.find(|group| group.packages.iter().any(|member| member == package_id))
 	}
 
+	/// Resolve the effective outward release identity for a package.
 	#[must_use]
 	pub fn effective_release_identity(&self, package_id: &str) -> Option<EffectiveReleaseIdentity> {
 		let package = self.package_by_id(package_id)?;
@@ -2910,6 +2949,7 @@ impl WorkspaceConfiguration {
 	}
 }
 
+/// Return the built-in CLI command definitions used when config omits them.
 #[must_use]
 pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 	vec![
@@ -3305,6 +3345,7 @@ pub trait EcosystemAdapter {
 	fn discover(&self, root: &Path) -> MonochangeResult<AdapterDiscovery>;
 }
 
+/// Build dependency edges by matching declared dependency names to known packages.
 #[must_use]
 pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<DependencyEdge> {
 	let mut package_ids_by_name = BTreeMap::<String, Vec<String>>::new();

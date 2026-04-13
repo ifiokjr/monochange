@@ -20,11 +20,13 @@ use serde_json::json;
 use crate::ChangeBump;
 use crate::PreparedRelease;
 
+/// Common `path` parameter used by MCP tools that operate on a repository root.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct PathParam {
 	pub path: Option<String>,
 }
 
+/// Input payload for the MCP change-file creation tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ChangeParam {
 	pub path: Option<String>,
@@ -38,6 +40,7 @@ pub struct ChangeParam {
 	pub output: Option<String>,
 }
 
+/// Input payload for the MCP changeset-policy evaluation tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct AffectedParam {
 	pub path: Option<String>,
@@ -46,6 +49,7 @@ pub struct AffectedParam {
 	pub labels: Vec<String>,
 }
 
+/// Semver bump accepted by the MCP change-file tool.
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpChangeBump {
@@ -66,6 +70,7 @@ impl From<McpChangeBump> for ChangeBump {
 	}
 }
 
+/// Stdio MCP server exposing structured `monochange` tools.
 #[derive(Debug, Clone)]
 pub struct MonochangeMcpServer {
 	#[allow(dead_code)]
@@ -140,6 +145,7 @@ fn prepared_release_value(prepared_release: &PreparedRelease) -> serde_json::Val
 
 #[tool_router]
 impl MonochangeMcpServer {
+	/// Construct a server with the default tool router.
 	pub fn new() -> Self {
 		Self {
 			tool_router: Self::tool_router(),
@@ -356,6 +362,7 @@ impl MonochangeMcpServer {
 	}
 }
 
+/// Run the stdio MCP server used by `mc mcp`.
 pub async fn run_server() {
 	let server = MonochangeMcpServer::new();
 	let transport = rmcp::transport::io::stdio();

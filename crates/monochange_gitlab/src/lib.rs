@@ -46,6 +46,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use urlencoding::encode;
 
+/// Return the hosted-source capabilities supported by the GitLab provider.
 #[must_use]
 pub const fn source_capabilities() -> SourceCapabilities {
 	SourceCapabilities {
@@ -58,8 +59,10 @@ pub const fn source_capabilities() -> SourceCapabilities {
 	}
 }
 
+/// Shared GitLab hosted-source adapter instance used by the workspace.
 pub static HOSTED_SOURCE_ADAPTER: GitLabHostedSourceAdapter = GitLabHostedSourceAdapter;
 
+/// Hosted-source adapter for GitLab repositories.
 pub struct GitLabHostedSourceAdapter;
 
 impl HostedSourceAdapter for GitLabHostedSourceAdapter {
@@ -92,6 +95,7 @@ impl HostedSourceAdapter for GitLabHostedSourceAdapter {
 	}
 }
 
+/// Return the hosting metadata features available from GitLab changeset context.
 #[must_use]
 pub const fn gitlab_hosting_capabilities() -> HostingCapabilities {
 	HostingCapabilities {
@@ -103,6 +107,7 @@ pub const fn gitlab_hosting_capabilities() -> HostingCapabilities {
 	}
 }
 
+/// Extract the host name used for rendered GitLab links.
 #[must_use]
 pub fn gitlab_host_name(source: &SourceConfiguration) -> Option<String> {
 	let host = gitlab_host(source)
@@ -119,6 +124,7 @@ pub fn gitlab_host_name(source: &SourceConfiguration) -> Option<String> {
 	}
 }
 
+/// Build a web URL for a commit on the configured GitLab repository.
 #[must_use]
 pub fn gitlab_commit_url(source: &SourceConfiguration, sha: &str) -> String {
 	format!(
@@ -129,6 +135,7 @@ pub fn gitlab_commit_url(source: &SourceConfiguration, sha: &str) -> String {
 	)
 }
 
+/// Apply GitLab provider metadata and commit URLs to prepared changesets.
 pub fn annotate_changeset_context(
 	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
@@ -164,6 +171,10 @@ pub fn annotate_changeset_context(
 	}
 }
 
+/// Enrich changeset context for GitLab-backed workspaces.
+///
+/// GitLab currently exposes only local annotations, so this delegates to
+/// [`annotate_changeset_context`].
 #[tracing::instrument(skip_all)]
 pub fn enrich_changeset_context(
 	source: &SourceConfiguration,
@@ -172,6 +183,7 @@ pub fn enrich_changeset_context(
 	annotate_changeset_context(source, changesets);
 }
 
+/// Validate that a source configuration is compatible with the GitLab provider.
 #[must_use = "the validation result must be checked"]
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
 	if source.releases.draft {
@@ -266,6 +278,7 @@ fn gitlab_host(source: &SourceConfiguration) -> &str {
 		.trim_end_matches('/')
 }
 
+/// Build the public release URL for a tag on the configured GitLab repository.
 #[must_use]
 pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
 	let host = gitlab_host(source);
@@ -275,6 +288,7 @@ pub fn tag_url(source: &SourceConfiguration, tag_name: &str) -> String {
 	)
 }
 
+/// Build the comparison URL between two tags on the configured GitLab repository.
 #[must_use]
 pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag: &str) -> String {
 	let host = gitlab_host(source);
@@ -284,6 +298,7 @@ pub fn compare_url(source: &SourceConfiguration, previous_tag: &str, current_tag
 	)
 }
 
+/// Convert releasable targets into provider-specific GitLab release requests.
 #[must_use]
 pub fn build_release_requests(
 	source: &SourceConfiguration,
@@ -312,6 +327,7 @@ pub fn build_release_requests(
 		.collect()
 }
 
+/// Build the release merge request request for the configured GitLab repository.
 #[must_use]
 pub fn build_release_pull_request_request(
 	source: &SourceConfiguration,
@@ -340,6 +356,7 @@ pub fn build_release_pull_request_request(
 	}
 }
 
+/// Publish or update all planned GitLab releases for a manifest.
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
 pub fn publish_release_requests(
@@ -356,6 +373,7 @@ pub fn publish_release_requests(
 		.collect()
 }
 
+/// Commit, push, and publish the release merge request against GitLab.
 #[must_use = "the pull request result must be checked"]
 pub fn publish_release_pull_request(
 	source: &SourceConfiguration,

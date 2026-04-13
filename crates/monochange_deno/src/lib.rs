@@ -64,6 +64,7 @@ pub enum DenoVersionedFileKind {
 	Lock,
 }
 
+/// Classify a Deno versioned file path.
 pub fn supported_versioned_file_kind(path: &Path) -> Option<DenoVersionedFileKind> {
 	let file_name = path
 		.file_name()
@@ -104,6 +105,7 @@ fn rewrite_dependency_reference(text: &str, package_name: &str, version: &str) -
 	updated
 }
 
+/// Update versions embedded in a parsed `deno.lock` document.
 pub fn update_lockfile(value: &mut Value, raw_versions: &BTreeMap<String, String>) {
 	let Ok(mut rendered) = serde_json::to_string(value) else {
 		return;
@@ -118,6 +120,7 @@ pub fn update_lockfile(value: &mut Value, raw_versions: &BTreeMap<String, String
 	}
 }
 
+/// Discover lockfiles that should be refreshed for `package`.
 pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	let manifest_dir = package
 		.manifest_path
@@ -145,6 +148,7 @@ pub fn discover_lockfiles(package: &PackageRecord) -> Vec<PathBuf> {
 	discovered
 }
 
+/// Return the default lockfile refresh commands for `package`.
 pub fn default_lockfile_commands(_package: &PackageRecord) -> Vec<LockfileCommandExecution> {
 	// Deno does not require lockfile commands for version updates.
 	Vec::new()
@@ -152,6 +156,7 @@ pub fn default_lockfile_commands(_package: &PackageRecord) -> Vec<LockfileComman
 
 pub struct DenoAdapter;
 
+/// Return the shared Deno ecosystem adapter.
 #[must_use]
 pub const fn adapter() -> DenoAdapter {
 	DenoAdapter
@@ -169,6 +174,7 @@ impl EcosystemAdapter for DenoAdapter {
 
 #[tracing::instrument(skip_all)]
 #[must_use = "the discovery result must be checked"]
+/// Discover Deno packages rooted at `root`.
 pub fn discover_deno_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let workspace_manifests = find_workspace_manifests(root);
 	let mut included_manifests = HashSet::new();

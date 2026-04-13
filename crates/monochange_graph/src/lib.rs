@@ -88,6 +88,7 @@ impl Default for DecisionState {
 }
 
 impl<'a> NormalizedGraph<'a> {
+	/// Build a reverse-dependency graph from discovered packages and edges.
 	#[must_use]
 	pub fn new(packages: &'a [PackageRecord], dependency_edges: &'a [DependencyEdge]) -> Self {
 		let mut reverse_edges = BTreeMap::<&'a str, BTreeSet<&'a str>>::new();
@@ -106,6 +107,7 @@ impl<'a> NormalizedGraph<'a> {
 		}
 	}
 
+	/// Return the packages that directly depend on `package_id`.
 	#[must_use]
 	pub fn direct_dependents(&self, package_id: &str) -> Vec<&'a str> {
 		self.reverse_edges
@@ -114,6 +116,7 @@ impl<'a> NormalizedGraph<'a> {
 			.unwrap_or_default()
 	}
 
+	/// Return the transitive dependent closure for `package_id`.
 	#[must_use]
 	pub fn transitive_dependents(&self, package_id: &str) -> BTreeSet<&'a str> {
 		let mut discovered = BTreeSet::new();
@@ -130,6 +133,7 @@ impl<'a> NormalizedGraph<'a> {
 		discovered
 	}
 
+	/// Return `true` when the graph contains `package_id`.
 	#[must_use]
 	pub fn contains(&self, package_id: &str) -> bool {
 		self.package_ids.contains(package_id)
@@ -138,6 +142,7 @@ impl<'a> NormalizedGraph<'a> {
 
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip_all)]
+/// Compute a release plan from normalized packages, changes, and compatibility evidence.
 #[must_use = "the release plan result must be checked"]
 pub fn build_release_plan(
 	workspace_root: &Path,

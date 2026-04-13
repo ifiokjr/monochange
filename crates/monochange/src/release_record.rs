@@ -43,6 +43,11 @@ pub(crate) fn render_release_record_discovery(
 }
 
 #[tracing::instrument(skip_all, fields(from))]
+/// Discover the durable release record associated with a tag or commit-ish.
+///
+/// The lookup resolves `from`, walks first-parent ancestry, and returns the
+/// first embedded monochange release record it finds together with discovery
+/// metadata such as the resolved commit and ancestry distance.
 pub fn discover_release_record(
 	root: &Path,
 	from: &str,
@@ -90,6 +95,7 @@ pub fn discover_release_record(
 	)))
 }
 
+/// Build a retarget plan for a previously published release.
 pub fn plan_release_retarget(
 	root: &Path,
 	discovery: &ReleaseRecordDiscovery,
@@ -175,6 +181,7 @@ pub fn plan_release_retarget(
 	})
 }
 
+/// Execute a previously prepared release-retarget plan.
 pub fn execute_release_retarget(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
@@ -239,6 +246,7 @@ pub fn execute_release_retarget(
 	})
 }
 
+/// Plan and execute a release retarget operation in one call.
 pub fn retarget_release(
 	root: &Path,
 	discovery: &ReleaseRecordDiscovery,

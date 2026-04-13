@@ -23,6 +23,7 @@ use reqwest::header::HeaderMap;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+/// Append release-note entries to a markdown body, normalizing bullet formatting.
 pub fn push_body_entries(lines: &mut Vec<String>, entries: &[String]) {
 	for (index, entry) in entries.iter().enumerate() {
 		let trimmed = entry.trim();
@@ -43,6 +44,7 @@ pub fn push_body_entries(lines: &mut Vec<String>, entries: &[String]) {
 	}
 }
 
+/// Render a fallback release body when no changelog body is available.
 pub fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifestTarget) -> String {
 	let mut lines = vec![format!("Release target `{}`", target.id), String::new()];
 
@@ -72,6 +74,7 @@ pub fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifest
 	lines.join("\n")
 }
 
+/// Build the provider change-request branch for a release command.
 pub fn release_pull_request_branch(branch_prefix: &str, command: &str) -> String {
 	let command = command
 		.chars()
@@ -95,6 +98,7 @@ pub fn release_pull_request_branch(branch_prefix: &str, command: &str) -> String
 	format!("{}/{}", branch_prefix.trim_end_matches('/'), command)
 }
 
+/// Render the markdown body used for provider release requests.
 pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 	let mut lines = vec!["## Prepared release".to_string(), String::new()];
 	lines.push(format!("- command: `{}`", manifest.command));
@@ -161,6 +165,7 @@ pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 	lines.join("\n")
 }
 
+/// Resolve the provider release body for one outward release target.
 pub fn release_body(
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
@@ -181,12 +186,14 @@ pub fn release_body(
 	}
 }
 
+/// Build a blocking HTTP client for provider API calls.
 pub fn build_http_client(provider: &str) -> MonochangeResult<Client> {
 	Client::builder().build().map_err(|error| {
 		MonochangeError::Config(format!("failed to build {provider} HTTP client: {error}"))
 	})
 }
 
+/// Perform a GET request that treats `404` as `Ok(None)`.
 pub fn get_optional_json<T>(
 	client: &Client,
 	headers: &HeaderMap,
@@ -217,6 +224,7 @@ where
 	})
 }
 
+/// Perform a GET request and deserialize a successful JSON response.
 pub fn get_json<T>(
 	client: &Client,
 	headers: &HeaderMap,
@@ -244,6 +252,7 @@ where
 	})
 }
 
+/// Perform a POST request and deserialize a successful JSON response.
 pub fn post_json<Body, Response>(
 	client: &Client,
 	headers: &HeaderMap,
@@ -274,6 +283,7 @@ where
 	})
 }
 
+/// Perform a PUT request and deserialize a successful JSON response.
 pub fn put_json<Body, Response>(
 	client: &Client,
 	headers: &HeaderMap,
@@ -304,6 +314,7 @@ where
 	})
 }
 
+/// Perform a PATCH request and deserialize a successful JSON response.
 pub fn patch_json<Body, Response>(
 	client: &Client,
 	headers: &HeaderMap,
@@ -334,6 +345,7 @@ where
 	})
 }
 
+/// Check out or reset the local release branch used for provider requests.
 pub fn git_checkout_branch(root: &Path, branch: &str, context: &str) -> MonochangeResult<()> {
 	if matches!(git_current_branch(root).as_deref(), Ok(current) if current == branch) {
 		return Ok(());
@@ -341,6 +353,7 @@ pub fn git_checkout_branch(root: &Path, branch: &str, context: &str) -> Monochan
 	run_command(git_checkout_branch_command(root, branch), context)
 }
 
+/// Stage the provided paths before creating a release commit.
 pub fn git_stage_paths(
 	root: &Path,
 	tracked_paths: &[PathBuf],
@@ -349,6 +362,7 @@ pub fn git_stage_paths(
 	run_command(git_stage_paths_command(root, tracked_paths), context)
 }
 
+/// Commit the prepared release changes, tolerating a no-op commit.
 pub fn git_commit_paths(
 	root: &Path,
 	message: &CommitMessage,
@@ -357,6 +371,7 @@ pub fn git_commit_paths(
 	run_commit_command_allow_nothing_to_commit(git_commit_paths_command(root, message), context)
 }
 
+/// Push the release branch to `origin` with `--force-with-lease`.
 pub fn git_push_branch(root: &Path, branch: &str, context: &str) -> MonochangeResult<()> {
 	run_command(git_push_branch_command(root, branch), context)
 }
