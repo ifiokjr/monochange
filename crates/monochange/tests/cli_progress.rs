@@ -8,12 +8,12 @@ use regex::Regex;
 use serde_json::Value;
 
 mod test_support;
+use test_support::TtyAction;
 use test_support::current_test_name;
 use test_support::monochange_command;
+use test_support::run_in_tty;
 use test_support::setup_fixture;
 use test_support::snapshot_settings;
-
-const EXIT_STATUS_MARKER: &str = "__MC_EXIT_STATUS__=";
 
 fn append_progress_command(workspace: &Path, command_name: &str, body: &str) {
 	let config_path = workspace.join("monochange.toml");
@@ -149,84 +149,8 @@ fn normalize_terminal_transcript(text: &str) -> String {
 
 #[cfg(unix)]
 fn run_tty_command_result(workspace: &Path, command_name: &str) -> (i32, String) {
-	const SCRIPT: &str = r"
-import os
-import pty
-import select
-import subprocess
-import sys
-
-workspace = os.environ['MC_WORKSPACE']
-command_name = os.environ['MC_COMMAND']
-mc_bin = os.environ['MC_BIN']
-master, slave = pty.openpty()
-proc = subprocess.Popen(
-    [mc_bin, command_name],
-    cwd=workspace,
-    stdin=slave,
-    stdout=slave,
-    stderr=slave,
-    text=False,
-    close_fds=True,
-    env={**os.environ, 'NO_COLOR': '1'},
-)
-os.close(slave)
-transcript = bytearray()
-
-def drain(timeout=0.01):
-    ready, _, _ = select.select([master], [], [], timeout)
-    if master not in ready:
-        return False
-    try:
-        data = os.read(master, 4096)
-    except OSError:
-        return False
-    if not data:
-        return False
-    transcript.extend(data)
-    return True
-
-while True:
-    saw_output = drain(0.01)
-    if proc.poll() is not None and not saw_output:
-        break
-proc.wait(timeout=10)
-idle_polls = 0
-while idle_polls < 5:
-    if drain(0.05):
-        idle_polls = 0
-    else:
-        idle_polls += 1
-os.close(master)
-sys.stdout.buffer.write(transcript)
-sys.stderr.write(f'__MC_EXIT_STATUS__={proc.returncode}\n')
-sys.exit(0)
-";
-
-	let output = std::process::Command::new("python3")
-		.arg("-c")
-		.arg(SCRIPT)
-		.env("MC_BIN", insta_cmd::get_cargo_bin("mc"))
-		.env("MC_WORKSPACE", workspace)
-		.env("MC_COMMAND", command_name)
-		.output()
-		.unwrap_or_else(|error| panic!("tty python harness: {error}"));
-	assert!(
-		output.status.success(),
-		"tty python harness failed:\n{}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-	let stderr =
-		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("tty stderr utf8: {error}"));
-	let status_code = stderr
-		.lines()
-		.find_map(|line| line.strip_prefix(EXIT_STATUS_MARKER))
-		.unwrap_or_else(|| panic!("missing tty exit status marker:\n{stderr}"))
-		.parse::<i32>()
-		.unwrap_or_else(|error| panic!("parse tty exit status: {error}\n{stderr}"));
-	let transcript =
-		String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("tty output utf8: {error}"));
-	(status_code, normalize_terminal_transcript(&transcript))
+	let (status, transcript) = run_in_tty(workspace, &[command_name], None, &[]);
+	(status, normalize_terminal_transcript(&transcript))
 }
 
 #[cfg(unix)]
@@ -238,98 +162,50 @@ fn run_tty_command(workspace: &Path, command_name: &str) -> String {
 
 #[cfg(unix)]
 fn run_tty_interactive_change(workspace: &Path, output_path: &Path) -> (i32, String) {
-	const SCRIPT: &str = r"
-import os
-import pty
-import select
-import subprocess
-import sys
-import time
-
-workspace = os.environ['MC_WORKSPACE']
-output_path = os.environ['MC_OUTPUT']
-mc_bin = os.environ['MC_BIN']
-master, slave = pty.openpty()
-proc = subprocess.Popen(
-    [mc_bin, 'change', '--interactive', '--reason', 'interactive reason', '--details', 'interactive details', '--output', output_path],
-    cwd=workspace,
-    stdin=slave,
-    stdout=slave,
-    stderr=slave,
-    text=False,
-    close_fds=True,
-    env={**os.environ, 'NO_COLOR': '1'},
-)
-os.close(slave)
-transcript = bytearray()
-
-def drain(seconds):
-    end = time.time() + seconds
-    while time.time() < end:
-        ready, _, _ = select.select([master], [], [], 0.05)
-        if master in ready:
-            try:
-                data = os.read(master, 4096)
-            except OSError:
-                break
-            if not data:
-                break
-            transcript.extend(data)
-        if proc.poll() is not None:
-            break
-
-def send(data, pause=0.0):
-    try:
-        os.write(master, data)
-    except OSError:
-        return False
-    if pause:
-        time.sleep(pause)
-    return True
-
-drain(0.5)
-if send(b' ', 0.1):
-    send(b'\r')
-drain(0.5)
-if send(b'\x1b[B', 0.1):
-    send(b'\r')
-drain(0.5)
-send(b'\r')
-drain(0.5)
-send(b'\r')
-drain(0.5)
-proc.wait(timeout=10)
-drain(0.2)
-os.close(master)
-sys.stdout.buffer.write(transcript)
-sys.stderr.write(f'__MC_EXIT_STATUS__={proc.returncode}\n')
-sys.exit(0)
-";
-
-	let output = std::process::Command::new("python3")
-		.arg("-c")
-		.arg(SCRIPT)
-		.env("MC_BIN", insta_cmd::get_cargo_bin("mc"))
-		.env("MC_WORKSPACE", workspace)
-		.env("MC_OUTPUT", output_path)
-		.output()
-		.unwrap_or_else(|error| panic!("interactive tty python harness: {error}"));
-	assert!(
-		output.status.success(),
-		"interactive tty python harness failed:\n{}",
-		String::from_utf8_lossy(&output.stderr)
+	let actions = [
+		TtyAction::Sleep(std::time::Duration::from_millis(500)),
+		TtyAction::Send {
+			bytes: b" ",
+			pause_after: std::time::Duration::from_millis(100),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+		TtyAction::Send {
+			bytes: b"\x1b[B",
+			pause_after: std::time::Duration::from_millis(100),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+	];
+	let output = output_path.display().to_string();
+	let (status, transcript) = run_in_tty(
+		workspace,
+		&[
+			"change",
+			"--interactive",
+			"--reason",
+			"interactive reason",
+			"--details",
+			"interactive details",
+			"--output",
+			output.as_str(),
+		],
+		None,
+		&actions,
 	);
-	let stderr =
-		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("tty stderr utf8: {error}"));
-	let status_code = stderr
-		.lines()
-		.find_map(|line| line.strip_prefix(EXIT_STATUS_MARKER))
-		.unwrap_or_else(|| panic!("missing tty exit status marker:\n{stderr}"))
-		.parse::<i32>()
-		.unwrap_or_else(|error| panic!("parse tty exit status: {error}\n{stderr}"));
-	let transcript = String::from_utf8(output.stdout)
-		.unwrap_or_else(|error| panic!("interactive tty output utf8: {error}"));
-	(status_code, normalize_terminal_transcript(&transcript))
+	(status, normalize_terminal_transcript(&transcript))
 }
 
 #[cfg(not(unix))]
