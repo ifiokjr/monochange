@@ -78,22 +78,13 @@ in
         entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
         stages = [ "pre-push" ];
       };
-      "lint" = {
+      "lint:test" = {
         enable = true;
         verbose = true;
         pass_filenames = false;
-        name = "lint";
-        description = "Run the local CI lint rules suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all";
-        stages = [ "pre-push" ];
-      };
-      "test" = {
-        enable = true;
-        verbose = true;
-        pass_filenames = false;
-        name = "test";
-        description = "Run the local CI validation suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/test:all";
+        name = "lint and test";
+        description = "Run the local CI lint rules and test suite before push.";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all";
         stages = [ "pre-push" ];
       };
     };

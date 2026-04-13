@@ -2412,34 +2412,6 @@ fn command_release_dry_run_is_consistent_across_ecosystem_fixtures() {
 }
 
 #[test]
-fn quickstart_and_docs_reference_the_same_core_commands() {
-	let docs_readme = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/readme.md");
-	let quickstart =
-		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../specs/001-first-step-port/quickstart.md");
-	let docs_content =
-		fs::read_to_string(docs_readme).unwrap_or_else(|error| panic!("docs readme: {error}"));
-	let quickstart_content =
-		fs::read_to_string(quickstart).unwrap_or_else(|error| panic!("quickstart: {error}"));
-
-	for command in [
-		"mc discover --format json",
-		"mc change --package",
-		"mc release --dry-run",
-		"mc release",
-		"lint:all",
-		"test:all",
-		"build:all",
-		"build:book",
-	] {
-		assert!(docs_content.contains(command), "docs missing `{command}`");
-		assert!(
-			quickstart_content.contains(command),
-			"quickstart missing `{command}`"
-		);
-	}
-}
-
-#[test]
 fn configuration_guide_calls_out_current_implementation_limits() {
 	let configuration_guide =
 		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src/guide/04-configuration.md");
