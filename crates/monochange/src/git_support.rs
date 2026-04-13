@@ -125,10 +125,93 @@ pub(crate) fn run_git_status(
 }
 
 pub(crate) fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
+	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths)?;
+	if stageable_paths.is_empty() {
+		tracing::debug!(
+			count = tracked_paths.len(),
+			"no release commit paths required staging"
+		);
+		return Ok(());
+	}
+	tracing::debug!(
+		count = stageable_paths.len(),
+		?stageable_paths,
+		"staging release commit paths"
+	);
 	run_git_process(
-		git_stage_paths_command(root, tracked_paths),
+		git_stage_paths_command(root, &stageable_paths),
 		"failed to stage release commit files",
 	)
+}
+
+fn resolve_stageable_release_paths(
+	root: &Path,
+	tracked_paths: &[PathBuf],
+) -> MonochangeResult<Vec<PathBuf>> {
+	let mut stageable_paths = Vec::with_capacity(tracked_paths.len());
+	for path in tracked_paths {
+		if release_path_requires_staging(root, path)? {
+			stageable_paths.push(path.clone());
+		} else {
+			tracing::debug!(path = %path.display(), "skipping non-stageable release path");
+		}
+	}
+	Ok(stageable_paths)
+}
+
+fn release_path_requires_staging(root: &Path, path: &Path) -> MonochangeResult<bool> {
+	let absolute_path = root.join(path);
+	if absolute_path.exists() {
+		if git_path_is_tracked(root, path)? {
+			return Ok(true);
+		}
+		return Ok(!git_path_is_ignored(root, path)?);
+	}
+	git_path_is_tracked(root, path)
+}
+
+fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
+	let relative = path.to_string_lossy();
+	let output = git_command_output(root, &["ls-files", "--error-unmatch", "--", &relative])
+		.map_err(|error| {
+			MonochangeError::Discovery(format!(
+				"failed to inspect tracked git path {}: {error}",
+				path.display()
+			))
+		})?;
+	match output.status.code() {
+		Some(0) => Ok(true),
+		Some(1) => Ok(false),
+		_ => {
+			Err(MonochangeError::Discovery(format!(
+				"failed to inspect tracked git path {}: {}",
+				path.display(),
+				git_error_detail(&output)
+			)))
+		}
+	}
+}
+
+fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
+	let relative = path.to_string_lossy();
+	let output =
+		git_command_output(root, &["check-ignore", "-q", "--", &relative]).map_err(|error| {
+			MonochangeError::Discovery(format!(
+				"failed to inspect ignored git path {}: {error}",
+				path.display()
+			))
+		})?;
+	match output.status.code() {
+		Some(0) => Ok(true),
+		Some(1) => Ok(false),
+		_ => {
+			Err(MonochangeError::Discovery(format!(
+				"failed to inspect ignored git path {}: {}",
+				path.display(),
+				git_error_detail(&output)
+			)))
+		}
+	}
 }
 
 pub(crate) fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {

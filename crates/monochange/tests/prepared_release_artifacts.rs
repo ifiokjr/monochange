@@ -164,6 +164,50 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 }
 
 #[test]
+fn commit_release_can_reuse_saved_prepared_release_without_prepare_step() {
+	let tempdir = setup_scenario_workspace("prepared-release/commit-release-flexible");
+	let root = tempdir.path();
+	init_git_repo(root);
+
+	run_cli(root, command_args(&["release", "--format", "json"]))
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		root.join(".monochange/prepared-release-cache.json")
+			.is_file()
+	);
+
+	run_cli(
+		root,
+		command_args(&["commit-from-cache", "--format", "json"]),
+	)
+	.unwrap_or_else(|error| panic!("commit-from-cache output: {error}"));
+	assert_eq!(git_output(root, &["status", "--short"]), "");
+	assert_eq!(
+		git_output(root, &["log", "-1", "--pretty=%s"]),
+		"chore(release): prepare release"
+	);
+}
+
+#[test]
+fn commit_release_succeeds_when_manifest_is_gitignored() {
+	let tempdir = setup_scenario_workspace("prepared-release/commit-release-flexible");
+	let root = tempdir.path();
+	init_git_repo(root);
+
+	run_cli(
+		root,
+		command_args(&["release-with-manifest", "--format", "json"]),
+	)
+	.unwrap_or_else(|error| panic!("release-with-manifest output: {error}"));
+	assert!(root.join(".monochange/release-manifest.json").is_file());
+	assert_eq!(git_output(root, &["status", "--short"]), "");
+	assert_eq!(
+		git_output(root, &["log", "-1", "--pretty=%s"]),
+		"chore(release): prepare release"
+	);
+}
+
+#[test]
 fn prepared_release_artifact_rejects_workspace_content_drift() {
 	let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
 	let root = tempdir.path();

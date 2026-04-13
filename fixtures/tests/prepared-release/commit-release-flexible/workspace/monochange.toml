@@ -1,0 +1,66 @@
+[defaults]
+package_type = "cargo"
+changelog = "{{ path }}/CHANGELOG.md"
+
+[package.core]
+path = "crates/core"
+tag = true
+release = true
+
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+
+[source.releases]
+source = "github_generated"
+generate_notes = true
+
+[source.pull_requests]
+base = "main"
+branch_prefix = "monochange/release"
+labels = ["release"]
+auto_merge = true
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release.steps]]
+type = "PrepareRelease"
+
+[cli.commit-from-cache]
+
+[[cli.commit-from-cache.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.commit-from-cache.steps]]
+type = "CommitRelease"
+
+[cli.release-with-manifest]
+
+[[cli.release-with-manifest.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
+[[cli.release-with-manifest.steps]]
+type = "PrepareRelease"
+
+[[cli.release-with-manifest.steps]]
+type = "RenderReleaseManifest"
+path = ".monochange/release-manifest.json"
+
+[[cli.release-with-manifest.steps]]
+type = "CommitRelease"

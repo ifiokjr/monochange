@@ -137,6 +137,8 @@ mc release-pr --dry-run
 
 `mc release` stores the prepared state in `.monochange/prepared-release-cache.json`, and later commands with a `PrepareRelease` step reuse it when the git `HEAD`, workspace status, tracked release inputs, and relevant configuration still match.
 
+That `.monochange/` directory is meant for local monochange artifacts. Keep it gitignored so reusable prepared state and other local release metadata do not pollute reviewable commits.
+
 If you need to pass the artifact between explicit jobs or custom commands, use `--prepared-release`:
 
 ```bash

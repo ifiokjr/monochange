@@ -5247,14 +5247,14 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 	.err()
 	.unwrap_or_else(|| panic!("expected missing PrepareRelease error"));
 	assert!(
-		error
-			.to_string()
-			.contains("`CommitRelease` requires a previous `PrepareRelease` step")
+		error.to_string().contains(
+			"`CommitRelease` requires a previous `PrepareRelease` step or a reusable prepared release artifact"
+		)
 	);
 }
 
 #[test]
-fn git_stage_paths_reports_git_failures() {
+fn git_stage_paths_reports_git_inspection_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let error = crate::git_stage_paths(tempdir.path(), &[PathBuf::from("release.txt")])
 		.err()
@@ -5262,7 +5262,42 @@ fn git_stage_paths_reports_git_failures() {
 	assert!(
 		error
 			.to_string()
-			.contains("failed to stage release commit files")
+			.contains("failed to inspect tracked git path release.txt")
+	);
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	copy_fixture("prepared-release/commit-release-flexible/workspace", root);
+	init_git_repo(root);
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+
+	let mut cargo_toml = fs::read_to_string(root.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("read Cargo.toml: {error}"));
+	cargo_toml.push_str("\n# staged release update\n");
+	fs::write(root.join("Cargo.toml"), cargo_toml)
+		.unwrap_or_else(|error| panic!("write Cargo.toml: {error}"));
+	fs::create_dir_all(root.join(".monochange"))
+		.unwrap_or_else(|error| panic!("create .monochange: {error}"));
+	fs::write(root.join(".monochange/release-manifest.json"), "{}\n")
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+
+	crate::git_stage_paths(
+		root,
+		&[
+			PathBuf::from("Cargo.toml"),
+			PathBuf::from(".monochange/release-manifest.json"),
+			PathBuf::from(".changeset/001-release-foundation.md"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("git stage paths: {error}"));
+
+	assert_eq!(
+		git_output_in_temp_repo(root, &["diff", "--cached", "--name-only"]),
+		"Cargo.toml"
 	);
 }
 
