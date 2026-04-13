@@ -514,14 +514,15 @@ mod tests {
 
 	#[test]
 	fn compute_changed_paths_since_reports_git_failures_and_includes_untracked_files() {
-		let non_git = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		let error = compute_changed_paths_since(non_git.path(), "HEAD")
+		let failing_repo = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		git(failing_repo.path(), &["init", "-b", "main"]);
+		let error = compute_changed_paths_since(failing_repo.path(), "definitely-missing-rev")
 			.err()
 			.unwrap_or_else(|| panic!("expected git diff failure"));
 		assert!(
 			error
 				.to_string()
-				.contains("git diff --name-only HEAD failed")
+				.contains("git diff --name-only definitely-missing-rev failed")
 		);
 
 		let repo = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
