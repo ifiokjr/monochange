@@ -44,8 +44,8 @@ Example generated configuration with `--provider github`:
 ```toml
 [source]
 provider = "github"
-owner = "ifiokjr"      # auto-detected from git remote
-repo = "monochange"   # auto-detected from git remote
+owner = "ifiokjr" # auto-detected from git remote
+repo = "monochange" # auto-detected from git remote
 
 [source.releases]
 enabled = true

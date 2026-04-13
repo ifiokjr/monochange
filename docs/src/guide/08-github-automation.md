@@ -312,10 +312,10 @@ The monochange repository itself can dogfood this model by:
 
 The `--provider` flag supports three source providers:
 
-| Provider | `--provider` value | Workflow generation | Release automation | Pull/merge requests |
-|------------|-------------------|---------------------|--------------------|---------------------|
-| GitHub     | `github`          | Yes — GitHub Actions | Yes                | Yes                 |
-| GitLab     | `gitlab`          | No — use `.gitlab-ci.yml` | Yes          | Yes                 |
-| Gitea      | `gitea`          | No — use Gitea Actions | Yes               | Yes                 |
+| Provider | `--provider` value | Workflow generation       | Release automation | Pull/merge requests |
+| -------- | ------------------ | ------------------------- | ------------------ | ------------------- |
+| GitHub   | `github`           | Yes — GitHub Actions      | Yes                | Yes                 |
+| GitLab   | `gitlab`           | No — use `.gitlab-ci.yml` | Yes                | Yes                 |
+| Gitea    | `gitea`            | No — use Gitea Actions    | Yes                | Yes                 |
 
 All providers configure the `[source]` section in `monochange.toml` with appropriate settings for releases and pull/merge requests. GitLab and Gitea require manual CI configuration since they don't support GitHub Actions workflow files.
