@@ -1,7 +1,7 @@
 {
 	"name": "@monochange/skill",
 	"version": "0.0.0",
-	"description": "Installable agent skill for monochange workflows and release planning guidance",
+	"description": "Skill for monochange workflows and release planning guidance",
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
@@ -12,22 +12,18 @@
 		"url": "https://github.com/ifiokjr/monochange/issues"
 	},
 	"files": [
-		"bin",
 		"SKILL.md",
 		"REFERENCE.md",
 		"README.md",
 		"LICENSE",
 		"changelog.md"
 	],
-	"bin": {
-		"monochange-skill": "bin/monochange-skill.js"
-	},
 	"publishConfig": {
 		"access": "public",
 		"provenance": true
 	},
 	"engines": {
-		"node": ">=18"
+		"node": ">=20"
 	},
 	"keywords": [
 		"monochange",
