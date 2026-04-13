@@ -6,13 +6,18 @@ use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
 use monochange_core::ChangelogTarget;
+use monochange_core::CliCommandDefinition;
+use monochange_core::CliInputDefinition;
+use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
+use monochange_core::CliStepInputValue;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemType;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::SourceProvider;
 use monochange_test_helpers::current_test_name;
 use semver::Version;
 use tempfile::tempdir;
@@ -364,7 +369,7 @@ fn load_workspace_configuration_parses_github_release_settings() {
 	let source = configuration
 		.source
 		.unwrap_or_else(|| panic!("expected source config"));
-	assert_eq!(source.provider, monochange_core::SourceProvider::GitHub);
+	assert_eq!(source.provider, SourceProvider::GitHub);
 	assert_eq!(source.owner, "ifiokjr");
 	assert_eq!(source.repo, "monochange");
 	assert!(source.releases.enabled);
@@ -397,7 +402,7 @@ fn load_workspace_configuration_parses_github_changeset_bot_settings() {
 	let source = configuration
 		.source
 		.unwrap_or_else(|| panic!("expected source config"));
-	assert_eq!(source.provider, monochange_core::SourceProvider::GitHub);
+	assert_eq!(source.provider, SourceProvider::GitHub);
 	let bot = &source.bot.changesets;
 	assert!(bot.enabled);
 	assert!(bot.comment_on_failure);
@@ -2473,6 +2478,46 @@ fn package_definition(id: &str, path: &str) -> monochange_core::PackageDefinitio
 	}
 }
 
+fn cli_input(name: &str, kind: CliInputKind) -> CliInputDefinition {
+	CliInputDefinition {
+		name: name.to_string(),
+		kind,
+		help_text: None,
+		required: false,
+		default: None,
+		choices: Vec::new(),
+		short: None,
+	}
+}
+
+fn cli_command(name: &str, steps: Vec<CliStepDefinition>) -> CliCommandDefinition {
+	CliCommandDefinition {
+		name: name.to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps,
+	}
+}
+
+fn sample_source_configuration(provider: SourceProvider) -> monochange_core::SourceConfiguration {
+	monochange_core::SourceConfiguration {
+		provider,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ProviderReleaseSettings {
+			enabled: true,
+			..Default::default()
+		},
+		pull_requests: monochange_core::ProviderMergeRequestSettings {
+			enabled: true,
+			..Default::default()
+		},
+		bot: monochange_core::ProviderBotSettings::default(),
+	}
+}
+
 #[test]
 fn load_workspace_configuration_rejects_duplicate_command_step_ids() {
 	let root = fixture_path("config/rejects-duplicate-step-ids");
@@ -2492,6 +2537,62 @@ fn load_workspace_configuration_rejects_empty_command_step_id() {
 		.err()
 		.unwrap_or_else(|| panic!("expected error for empty step id"));
 	assert!(error.to_string().contains("empty id"), "error: {error}");
+}
+
+#[test]
+fn load_changeset_file_reports_io_and_toml_parse_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+	let missing = load_changeset_file(&tempdir.path().join("missing.toml"), &configuration, &[])
+		.err()
+		.unwrap_or_else(|| panic!("expected missing file error"));
+	assert!(missing.to_string().contains("failed to read"));
+
+	let invalid = tempdir.path().join("invalid.toml");
+	std::fs::write(&invalid, "changes = [")
+		.unwrap_or_else(|error| panic!("write invalid: {error}"));
+	let parse_error = load_changeset_file(&invalid, &configuration, &[])
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	assert!(parse_error.to_string().contains("failed to parse"));
+}
+
+#[test]
+fn resolve_package_reference_reports_missing_and_ambiguous_matches() {
+	let root = PathBuf::from("/workspace");
+	let package_a = PackageRecord::new(
+		Ecosystem::Cargo,
+		"shared",
+		root.join("crates/shared/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let package_b = PackageRecord::new(
+		Ecosystem::Cargo,
+		"shared",
+		root.join("packages/shared/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+
+	let missing =
+		resolve_package_reference("missing", &root, &[package_a.clone(), package_b.clone()])
+			.err()
+			.unwrap_or_else(|| panic!("expected missing package error"));
+	assert!(
+		missing
+			.to_string()
+			.contains("did not match any discovered package")
+	);
+
+	let ambiguous = resolve_package_reference("shared", &root, &[package_a, package_b])
+		.err()
+		.unwrap_or_else(|| panic!("expected ambiguous package error"));
+	assert!(ambiguous.to_string().contains("matched multiple packages"));
 }
 
 #[test]
@@ -2749,13 +2850,18 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		),
 		Some(BumpSeverity::Patch)
 	);
+	assert_eq!(
+		crate::infer_group_bump_from_explicit_version(&group, &workspace_root, &[], None)
+			.unwrap_or_else(|error| panic!("expected Ok, got: {error}")),
+		None
+	);
 }
 
 #[test]
 fn validate_source_and_changeset_settings_reject_empty_values() {
 	let source_error =
 		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: monochange_core::SourceProvider::GitHub,
+			provider: SourceProvider::GitHub,
 			host: None,
 			api_url: None,
 			owner: " ".to_string(),
@@ -2791,7 +2897,7 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 
 	let source_skip_label_error =
 		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: monochange_core::SourceProvider::GitHub,
+			provider: SourceProvider::GitHub,
 			host: None,
 			api_url: None,
 			owner: "ifiokjr".to_string(),
@@ -2815,6 +2921,457 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 		source_skip_label_error
 			.to_string()
 			.contains("[source.bot.changesets].skip_labels must not include empty values")
+	);
+
+	let source_repo_error =
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: SourceProvider::GitHub,
+			host: None,
+			api_url: None,
+			owner: "ifiokjr".to_string(),
+			repo: " ".to_string(),
+			releases: monochange_core::ProviderReleaseSettings::default(),
+			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+			bot: monochange_core::ProviderBotSettings::default(),
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected source repo validation error"));
+	assert!(
+		source_repo_error
+			.to_string()
+			.contains("[source].repo must not be empty")
+	);
+}
+
+#[test]
+fn validate_changesets_configuration_rejects_invalid_additional_path_globs() {
+	let error = crate::validate_changesets_configuration(
+		&monochange_core::ChangesetSettings::default(),
+		&[monochange_core::PackageDefinition {
+			additional_paths: vec!["[".to_string()],
+			..package_definition("core", "crates/core")
+		}],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid additional path glob"));
+	assert!(
+		error
+			.to_string()
+			.contains("[package.core].additional_paths contains invalid glob pattern")
+	);
+
+	let empty_value = crate::validate_changesets_configuration(
+		&monochange_core::ChangesetSettings::default(),
+		&[monochange_core::PackageDefinition {
+			additional_paths: vec![" ".to_string()],
+			..package_definition("core", "crates/core")
+		}],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected empty additional path error"));
+	assert!(
+		empty_value
+			.to_string()
+			.contains("[package.core].additional_paths must not include empty values")
+	);
+}
+
+#[test]
+fn validate_cli_rejects_invalid_command_shapes() {
+	let duplicate = crate::validate_cli(&[
+		cli_command(
+			"release",
+			vec![CliStepDefinition::Validate {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		),
+		cli_command(
+			"release",
+			vec![CliStepDefinition::Validate {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		),
+	])
+	.err()
+	.unwrap_or_else(|| panic!("expected duplicate command error"));
+	assert!(
+		duplicate
+			.to_string()
+			.contains("duplicate CLI command `release`")
+	);
+
+	let reserved = crate::validate_cli(&[cli_command(
+		"help",
+		vec![CliStepDefinition::Validate {
+			name: None,
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected reserved name error"));
+	assert!(reserved.to_string().contains("reserved built-in command"));
+
+	let no_steps = crate::validate_cli(&[cli_command("release", Vec::new())])
+		.err()
+		.unwrap_or_else(|| panic!("expected missing steps error"));
+	assert!(
+		no_steps
+			.to_string()
+			.contains("must define at least one step")
+	);
+}
+
+#[test]
+fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
+	let mut duplicate_inputs = cli_command(
+		"release",
+		vec![CliStepDefinition::Validate {
+			name: Some("Validate workspace".to_string()),
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	);
+	duplicate_inputs.inputs = vec![
+		cli_input("token", CliInputKind::String),
+		cli_input("token", CliInputKind::String),
+	];
+	let duplicate_input_error = crate::validate_cli(&[duplicate_inputs])
+		.err()
+		.unwrap_or_else(|| panic!("expected duplicate input error"));
+	assert!(
+		duplicate_input_error
+			.to_string()
+			.contains("defines duplicate input `token`")
+	);
+
+	let mut invalid_choice_default = cli_command(
+		"release",
+		vec![CliStepDefinition::Validate {
+			name: Some("Validate workspace".to_string()),
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	);
+	let mut channel = cli_input("channel", CliInputKind::Choice);
+	channel.choices = vec!["stable".to_string()];
+	channel.default = Some("beta".to_string());
+	invalid_choice_default.inputs = vec![channel];
+	let choice_error = crate::validate_cli(&[invalid_choice_default])
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid choice default"));
+	assert!(
+		choice_error
+			.to_string()
+			.contains("default `beta` is not one of the configured choices")
+	);
+
+	let mut invalid_boolean_default = cli_command(
+		"release",
+		vec![CliStepDefinition::Validate {
+			name: Some("Validate workspace".to_string()),
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	);
+	let mut confirm = cli_input("confirm", CliInputKind::Boolean);
+	confirm.default = Some("yes".to_string());
+	invalid_boolean_default.inputs = vec![confirm];
+	let boolean_error = crate::validate_cli(&[invalid_boolean_default])
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid boolean default"));
+	assert!(
+		boolean_error
+			.to_string()
+			.contains("boolean default must be `true` or `false`")
+	);
+
+	let empty_step_name = crate::validate_cli(&[cli_command(
+		"release",
+		vec![CliStepDefinition::Validate {
+			name: Some("   ".to_string()),
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected empty step name error"));
+	assert!(empty_step_name.to_string().contains("has an empty `name`"));
+
+	let duplicate_step_names = crate::validate_cli(&[cli_command(
+		"release",
+		vec![
+			CliStepDefinition::Validate {
+				name: Some("Shared".to_string()),
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			},
+			CliStepDefinition::Discover {
+				name: Some("Shared".to_string()),
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			},
+		],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected duplicate step name error"));
+	assert!(
+		duplicate_step_names
+			.to_string()
+			.contains("duplicate step name `Shared`")
+	);
+
+	let invalid_command = crate::validate_cli(&[cli_command(
+		"release",
+		vec![CliStepDefinition::Command {
+			name: Some("Run command".to_string()),
+			when: Some(" ".to_string()),
+			show_progress: None,
+			command: String::new(),
+			dry_run_command: Some(" ".to_string()),
+			shell: ShellConfig::Default,
+			id: Some(" ".to_string()),
+			variables: None,
+			inputs: std::collections::BTreeMap::from([(
+				String::new(),
+				CliStepInputValue::String("value".to_string()),
+			)]),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid command step"));
+	assert!(
+		invalid_command
+			.to_string()
+			.contains("has an empty `when` condition")
+	);
+
+	let empty_input_name = crate::validate_cli(&[CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: vec![cli_input(" ", CliInputKind::String)],
+		steps: vec![CliStepDefinition::Validate {
+			name: Some("Validate workspace".to_string()),
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	}])
+	.err()
+	.unwrap_or_else(|| panic!("expected empty input name error"));
+	assert!(
+		empty_input_name
+			.to_string()
+			.contains("has an input with an empty name")
+	);
+
+	let reserved_input_name = crate::validate_cli(&[CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: vec![cli_input("help", CliInputKind::String)],
+		steps: vec![CliStepDefinition::Validate {
+			name: Some("Validate workspace".to_string()),
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	}])
+	.err()
+	.unwrap_or_else(|| panic!("expected reserved input name error"));
+	assert!(
+		reserved_input_name
+			.to_string()
+			.contains("collides with an implicit command flag")
+	);
+
+	let empty_choices = crate::validate_cli(&[CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: vec![cli_input("channel", CliInputKind::Choice)],
+		steps: vec![CliStepDefinition::Validate {
+			name: Some("Validate workspace".to_string()),
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	}])
+	.err()
+	.unwrap_or_else(|| panic!("expected empty choices error"));
+	assert!(
+		empty_choices
+			.to_string()
+			.contains("must define at least one choice")
+	);
+}
+
+#[test]
+fn validate_cli_runtime_requirements_enforce_source_features() {
+	let publish_without_source = crate::validate_cli_runtime_requirements(
+		&[cli_command(
+			"release",
+			vec![CliStepDefinition::PublishRelease {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		)],
+		&monochange_core::ChangesetSettings::default(),
+		None,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing source error"));
+	assert!(
+		publish_without_source
+			.to_string()
+			.contains("PublishRelease")
+	);
+	assert!(
+		publish_without_source
+			.to_string()
+			.contains("not configured")
+	);
+
+	let mut source = sample_source_configuration(SourceProvider::GitHub);
+	source.releases.enabled = false;
+	let publish_disabled = crate::validate_cli_runtime_requirements(
+		&[cli_command(
+			"release",
+			vec![CliStepDefinition::PublishRelease {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		)],
+		&monochange_core::ChangesetSettings::default(),
+		Some(&source),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected disabled release error"));
+	assert!(publish_disabled.to_string().contains("PublishRelease"));
+	assert!(publish_disabled.to_string().contains("enabled` is false"));
+
+	let mut pull_requests_disabled = sample_source_configuration(SourceProvider::GitHub);
+	pull_requests_disabled.pull_requests.enabled = false;
+	let open_request_error = crate::validate_cli_runtime_requirements(
+		&[cli_command(
+			"release",
+			vec![CliStepDefinition::OpenReleaseRequest {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		)],
+		&monochange_core::ChangesetSettings::default(),
+		Some(&pull_requests_disabled),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected disabled pull request error"));
+	assert!(
+		open_request_error
+			.to_string()
+			.contains("OpenReleaseRequest")
+	);
+	assert!(open_request_error.to_string().contains("enabled` is false"));
+
+	let comment_provider_error = crate::validate_cli_runtime_requirements(
+		&[cli_command(
+			"release",
+			vec![CliStepDefinition::CommentReleasedIssues {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		)],
+		&monochange_core::ChangesetSettings::default(),
+		Some(&sample_source_configuration(SourceProvider::GitLab)),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported provider error"));
+	assert!(
+		comment_provider_error
+			.to_string()
+			.contains("does not support released-issue comments")
+	);
+}
+
+#[test]
+fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
+	let verify_disabled = crate::validate_cli_runtime_requirements(
+		&[cli_command(
+			"affected",
+			vec![CliStepDefinition::AffectedPackages {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		)],
+		&monochange_core::ChangesetSettings {
+			verify: monochange_core::ChangesetVerificationSettings {
+				enabled: false,
+				..Default::default()
+			},
+		},
+		Some(&sample_source_configuration(SourceProvider::GitHub)),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected verify disabled error"));
+	assert!(verify_disabled.to_string().contains("AffectedPackages"));
+	assert!(verify_disabled.to_string().contains("enabled` is false"));
+
+	let missing_selector = crate::validate_cli_runtime_requirements(
+		&[cli_command(
+			"affected",
+			vec![CliStepDefinition::AffectedPackages {
+				name: None,
+				when: None,
+				inputs: std::collections::BTreeMap::new(),
+			}],
+		)],
+		&monochange_core::ChangesetSettings {
+			verify: monochange_core::ChangesetVerificationSettings {
+				enabled: true,
+				..Default::default()
+			},
+		},
+		Some(&sample_source_configuration(SourceProvider::GitHub)),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected selector error"));
+	assert!(
+		missing_selector
+			.to_string()
+			.contains("declares neither a `changed_paths` nor a `since` input")
+	);
+
+	let mut command = cli_command(
+		"affected",
+		vec![CliStepDefinition::AffectedPackages {
+			name: None,
+			when: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	);
+	command.inputs = vec![
+		cli_input("changed_paths", CliInputKind::StringList),
+		cli_input("label", CliInputKind::String),
+	];
+	let invalid_label = crate::validate_cli_runtime_requirements(
+		&[command],
+		&monochange_core::ChangesetSettings {
+			verify: monochange_core::ChangesetVerificationSettings {
+				enabled: true,
+				..Default::default()
+			},
+		},
+		Some(&sample_source_configuration(SourceProvider::GitHub)),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid label kind error"));
+	assert!(
+		invalid_label
+			.to_string()
+			.contains("input `label` must use type `string_list`")
 	);
 }
 
@@ -2859,7 +3416,7 @@ fn validate_package_and_source_settings_cover_duplicate_and_pattern_errors() {
 
 	let source_error =
 		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: monochange_core::SourceProvider::GitHub,
+			provider: SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),
 			repo: "monochange".to_string(),
 			host: None,
@@ -2899,6 +3456,335 @@ fn validate_package_and_source_settings_cover_duplicate_and_pattern_errors() {
 			.to_string()
 			.contains("[package.core].ignored_paths must not include empty values")
 	);
+
+	let duplicate_id_error = crate::validate_package_and_group_definitions(
+		&root,
+		"[package.core]\npath = 'crates/core'\n",
+		&[
+			package_definition("core", "crates/core"),
+			package_definition("core", "crates/util"),
+		],
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected duplicate id error"));
+	assert!(
+		duplicate_id_error
+			.to_string()
+			.contains("duplicate package id `core`")
+	);
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::create_dir_all(tempdir.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir core dir: {error}"));
+	let missing_manifest_error = crate::validate_package_and_group_definitions(
+		tempdir.path(),
+		"[package.core]\npath = 'crates/core'\ntype = 'cargo'\n",
+		&[package_definition("core", "crates/core")],
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing manifest error"));
+	assert!(
+		missing_manifest_error
+			.to_string()
+			.contains("missing expected cargo manifest")
+	);
+}
+
+#[test]
+fn parse_markdown_change_target_and_validation_helpers_cover_remaining_error_paths() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+	let invalid_scalar = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("docs")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let scalar_error = crate::parse_markdown_change_target(
+		&invalid_scalar,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid scalar error"));
+	assert!(
+		scalar_error
+			.to_string()
+			.contains("invalid scalar value `docs`")
+	);
+	assert!(scalar_error.to_string().contains("configured types"));
+
+	let unknown_keys = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("extra: true")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let unknown_keys_error = crate::parse_markdown_change_target(
+		&unknown_keys,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported field error"));
+	assert!(
+		unknown_keys_error
+			.to_string()
+			.contains("uses unsupported field(s): extra")
+	);
+
+	let invalid_bump = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("bump: nope")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let invalid_bump_error = crate::parse_markdown_change_target(
+		&invalid_bump,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid bump error"));
+	assert!(
+		invalid_bump_error
+			.to_string()
+			.contains("has invalid bump `nope`")
+	);
+
+	let invalid_version = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("version: nope")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let invalid_version_error = crate::parse_markdown_change_target(
+		&invalid_version,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid version error"));
+	assert!(
+		invalid_version_error
+			.to_string()
+			.contains("has invalid version `nope`")
+	);
+
+	let none_only = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("bump: none")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let none_only_error = crate::parse_markdown_change_target(
+		&none_only,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected none-only error"));
+	assert!(
+		none_only_error
+			.to_string()
+			.contains("must not use `bump = \"none\"`")
+	);
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::create_dir_all(tempdir.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("mkdir core: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[package.core]\npath = \"crates/core\"\ntype = \"cargo\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+	std::fs::write(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write Cargo.toml: {error}"));
+	let no_types_configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("workspace configuration: {error}"));
+	let no_types_error = crate::validate_configured_change_type(
+		&no_types_configuration,
+		Path::new("change.md"),
+		"core",
+		"docs",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid type error"));
+	assert!(
+		no_types_error
+			.to_string()
+			.contains("no configured types are available")
+	);
+}
+
+#[test]
+fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths() {
+	let root = fixture_path("config/validation-helper-branches");
+	let config_contents = "[package.core]\npath = 'crates/core'\n";
+	let declared_packages = std::collections::BTreeSet::from(["core"]);
+
+	let missing_type = crate::validate_versioned_files(
+		&root,
+		config_contents,
+		&[monochange_core::VersionedFileDefinition {
+			path: "README.md".to_string(),
+			ecosystem_type: None,
+			name: None,
+			fields: None,
+			prefix: None,
+			regex: None,
+		}],
+		&declared_packages,
+		"package",
+		"core",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing type error"));
+	assert!(
+		missing_type
+			.to_string()
+			.contains("versioned_files must set `type`")
+	);
+
+	let invalid_glob = crate::validate_versioned_files(
+		&root,
+		config_contents,
+		&[monochange_core::VersionedFileDefinition {
+			path: "[".to_string(),
+			ecosystem_type: Some(EcosystemType::Cargo),
+			name: None,
+			fields: None,
+			prefix: None,
+			regex: None,
+		}],
+		&declared_packages,
+		"package",
+		"core",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid glob error"));
+	assert!(
+		invalid_glob
+			.to_string()
+			.contains("invalid glob pattern `[`")
+	);
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::create_dir_all(tempdir.path().join("packages/web"))
+		.unwrap_or_else(|error| panic!("mkdir web package: {error}"));
+	std::fs::write(
+		tempdir.path().join("packages/web/package.json"),
+		"{\"name\":\"web\",\"version\":\"1.0.0\"}\n",
+	)
+	.unwrap_or_else(|error| panic!("write package.json: {error}"));
+	let unsupported_match = crate::validate_versioned_files(
+		tempdir.path(),
+		config_contents,
+		&[monochange_core::VersionedFileDefinition {
+			path: "packages/*/package.json".to_string(),
+			ecosystem_type: Some(EcosystemType::Cargo),
+			name: None,
+			fields: None,
+			prefix: None,
+			regex: None,
+		}],
+		&declared_packages,
+		"package",
+		"core",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported match error"));
+	assert!(
+		unsupported_match
+			.to_string()
+			.contains("matched unsupported file")
+	);
+	assert!(
+		unsupported_match
+			.to_string()
+			.contains("for ecosystem `cargo`")
+	);
+
+	let empty_template = crate::validate_release_notes_configuration(
+		"",
+		&crate::RawReleaseNotesSettings {
+			change_templates: vec![" ".to_string()],
+		},
+		&[],
+		&[],
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected empty template error"));
+	assert!(
+		empty_template
+			.to_string()
+			.contains("must not include empty templates")
+	);
+
+	assert_eq!(
+		crate::change_template_variables("{{ summary }} {{ details | default('') }} {{"),
+		vec!["details".to_string(), "summary".to_string()]
+	);
+}
+
+#[test]
+fn validate_github_source_and_api_configuration_cover_remaining_paths() {
+	let github_error =
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: SourceProvider::GitHub,
+			host: None,
+			api_url: None,
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			releases: monochange_core::ProviderReleaseSettings::default(),
+			pull_requests: monochange_core::ProviderMergeRequestSettings {
+				labels: vec![" ".to_string()],
+				..Default::default()
+			},
+			bot: monochange_core::ProviderBotSettings::default(),
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid github labels error"));
+	assert!(
+		github_error
+			.to_string()
+			.contains("[source.pull_requests].labels must not include empty values")
+	);
+
+	let github_skip_label_error =
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: SourceProvider::GitHub,
+			host: None,
+			api_url: None,
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			releases: monochange_core::ProviderReleaseSettings::default(),
+			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+			bot: monochange_core::ProviderBotSettings {
+				changesets: monochange_core::ProviderChangesetBotSettings {
+					skip_labels: vec![" ".to_string()],
+					..Default::default()
+				},
+			},
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid github skip label error"));
+	assert!(
+		github_skip_label_error
+			.to_string()
+			.contains("[source.bot.changesets].skip_labels must not include empty values")
+	);
+
+	let source_api_error =
+		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
+			provider: SourceProvider::GitHub,
+			host: Some("https://example.invalid".to_string()),
+			api_url: Some("http://api.example.invalid".to_string()),
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			releases: monochange_core::ProviderReleaseSettings::default(),
+			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+			bot: monochange_core::ProviderBotSettings::default(),
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected insecure api_url error"));
+	assert!(source_api_error.to_string().contains("insecure scheme"));
+
+	crate::validate_api_url_host("https://github.example.com/api/v3", SourceProvider::GitHub)
+		.unwrap_or_else(|error| panic!("custom GitHub host should warn but succeed: {error}"));
 }
 
 #[test]
@@ -3019,22 +3905,16 @@ fn validate_versioned_files_content_warns_on_empty_glob() {
 
 #[test]
 fn validate_api_url_host_rejects_insecure_http_scheme() {
-	let error = crate::validate_api_url_host(
-		"http://attacker.com/api/v3",
-		monochange_core::SourceProvider::GitHub,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected error for http://"));
+	let error = crate::validate_api_url_host("http://attacker.com/api/v3", SourceProvider::GitHub)
+		.err()
+		.unwrap_or_else(|| panic!("expected error for http://"));
 	assert!(error.to_string().contains("insecure scheme"));
 }
 
 #[test]
 fn validate_api_url_host_accepts_https_scheme() {
-	crate::validate_api_url_host(
-		"https://api.github.com",
-		monochange_core::SourceProvider::GitHub,
-	)
-	.unwrap_or_else(|error| panic!("expected Ok for https://: {error}"));
+	crate::validate_api_url_host("https://api.github.com", SourceProvider::GitHub)
+		.unwrap_or_else(|error| panic!("expected Ok for https://: {error}"));
 }
 
 #[test]

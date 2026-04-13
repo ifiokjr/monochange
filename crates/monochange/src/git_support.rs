@@ -395,4 +395,33 @@ mod tests {
 				.contains("failed to inspect ignored git path release.txt")
 		);
 	}
+
+	#[test]
+	fn run_git_capture_includes_stderr_for_failed_commands() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		init_git_repo(root);
+
+		let error = run_git_capture(root, &["show", "missing-commit"], "capture failure")
+			.err()
+			.unwrap_or_else(|| panic!("expected failed git capture"));
+		assert!(error.to_string().contains("capture failure"));
+		assert!(error.to_string().contains("missing-commit"));
+	}
+
+	#[test]
+	fn run_git_process_reports_nonzero_exit_status_details() {
+		let mut command = ProcessCommand::new("git");
+		command.arg("definitely-not-a-real-git-command");
+
+		let error = run_git_process(command, "process failure")
+			.err()
+			.unwrap_or_else(|| panic!("expected failed git process"));
+		assert!(error.to_string().contains("process failure"));
+		assert!(
+			error
+				.to_string()
+				.contains("definitely-not-a-real-git-command")
+		);
+	}
 }
