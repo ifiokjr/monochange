@@ -13,12 +13,12 @@ pub fn current_test_name() -> String {
 		.split("::")
 		.last()
 		.unwrap_or("unknown");
-	if let Some(rest) = name.strip_prefix("case_") {
-		if let Some((index, suffix)) = rest.split_once('_') {
-			if index.chars().all(|ch| ch.is_ascii_digit()) && !suffix.is_empty() {
-				return suffix.to_string();
-			}
-		}
+	if let Some(rest) = name.strip_prefix("case_")
+		&& let Some((index, suffix)) = rest.split_once('_')
+		&& index.chars().all(|ch| ch.is_ascii_digit())
+		&& !suffix.is_empty()
+	{
+		return suffix.to_string();
 	}
 	name.to_string()
 }

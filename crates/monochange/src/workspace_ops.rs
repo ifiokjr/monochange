@@ -1163,8 +1163,6 @@ use monochange_test_helpers::workspace_ops::copy_workspace_tree;
 #[cfg(test)]
 use monochange_test_helpers::workspace_ops::ensure_parent_directory;
 #[cfg(test)]
-use monochange_test_helpers::workspace_ops::entry_file_type;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::read_optional_file;
 #[cfg(test)]
 use monochange_test_helpers::workspace_ops::remap_workspace_path;
