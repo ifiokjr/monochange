@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 use std::thread;
 
@@ -1228,6 +1229,92 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	assert_eq!(
 		git_output(&repo, &["diff", "--cached", "--name-only"]).trim(),
 		""
+	);
+}
+
+#[test]
+fn git_path_is_tracked_reports_command_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path().join("missing");
+
+	let error = git_path_is_tracked(&root, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected tracked command failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect tracked git path release.txt")
+	);
+}
+
+#[test]
+fn git_path_is_tracked_reports_inspection_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	must_ok(std::fs::create_dir_all(&repo), "create repo dir");
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "release\n"),
+		"write release file",
+	);
+
+	let error = git_path_is_tracked(&repo, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected tracked inspection failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect tracked git path release.txt")
+	);
+}
+
+#[test]
+fn git_path_is_ignored_reports_false_for_unignored_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "release\n"),
+		"write release file",
+	);
+
+	assert!(
+		!git_path_is_ignored(&repo, Path::new("release.txt"))
+			.unwrap_or_else(|error| panic!("git path ignored: {error}"))
+	);
+}
+
+#[test]
+fn git_path_is_ignored_reports_inspection_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	must_ok(std::fs::create_dir_all(&repo), "create repo dir");
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "release\n"),
+		"write release file",
+	);
+
+	let error = git_path_is_ignored(&repo, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected ignored inspection failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect ignored git path release.txt")
+	);
+}
+
+#[test]
+fn git_path_is_ignored_reports_command_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path().join("missing");
+
+	let error = git_path_is_ignored(&root, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected ignored command failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect ignored git path release.txt")
 	);
 }
 
