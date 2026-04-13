@@ -1816,6 +1816,7 @@ mod workspace_ops_tests {
 	use monochange_core::HostedCommitRef;
 	use monochange_core::HostingCapabilities;
 	use monochange_core::HostingProviderKind;
+	use monochange_core::PackageDefinition;
 	use monochange_core::PreparedChangeset;
 	use monochange_core::ProviderBotSettings;
 	use monochange_core::ProviderMergeRequestSettings;
@@ -1823,6 +1824,7 @@ mod workspace_ops_tests {
 	use monochange_core::ShellConfig;
 	use monochange_core::SourceConfiguration;
 	use monochange_core::SourceProvider;
+	use monochange_core::VersionFormat;
 	use monochange_core::WorkspaceConfiguration;
 
 	use super::*;
@@ -1832,6 +1834,10 @@ mod workspace_ops_tests {
 			env!("CARGO_MANIFEST_DIR"),
 			"workspace-ops/lockfile-command-helpers",
 		)
+	}
+
+	fn setup_fixture(relative: &str) -> tempfile::TempDir {
+		monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
 	}
 
 	#[cfg(unix)]
@@ -1940,6 +1946,295 @@ mod workspace_ops_tests {
 		.err()
 		.unwrap_or_else(|| panic!("expected remap error"));
 		assert!(error.to_string().contains("was outside workspace root"));
+	}
+
+	#[test]
+	fn remap_workspace_path_maps_workspace_paths_into_the_temp_root() {
+		let fixture = setup_workspace_ops_fixture();
+		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+
+		let remapped = remap_workspace_path(
+			fixture.path(),
+			temp_root.path(),
+			&fixture.path().join("root.txt"),
+		)
+		.unwrap_or_else(|error| panic!("remap workspace path: {error}"));
+
+		assert_eq!(remapped, temp_root.path().join("root.txt"));
+	}
+
+	#[test]
+	fn init_and_populate_workspace_cover_common_error_and_noop_paths() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("monochange.toml"))
+			.unwrap_or_else(|error| panic!("create blocking config dir: {error}"));
+		let init_error = init_workspace(root, true)
+			.err()
+			.unwrap_or_else(|| panic!("expected init write error"));
+		assert!(init_error.to_string().contains("failed to write"));
+
+		let empty_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let missing_error = populate_workspace(empty_root.path())
+			.err()
+			.unwrap_or_else(|| panic!("expected missing config error"));
+		assert!(missing_error.to_string().contains("run `mc init` first"));
+
+		let populated_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::write(
+			populated_root.path().join("monochange.toml"),
+			render_cli_commands_toml(&default_cli_commands()),
+		)
+		.unwrap_or_else(|error| panic!("write populated config: {error}"));
+		let populated = populate_workspace(populated_root.path())
+			.unwrap_or_else(|error| panic!("populate no-op: {error}"));
+		assert!(populated.added_commands.is_empty());
+	}
+
+	#[test]
+	fn init_rendering_helpers_cover_duplicate_names_changelogs_and_package_types() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("crates/core/src")).unwrap();
+		fs::create_dir_all(root.join("packages/core")).unwrap();
+		fs::create_dir_all(root.join("apps/cli")).unwrap();
+		fs::create_dir_all(root.join("apps/mobile")).unwrap();
+		fs::write(
+			root.join("Cargo.toml"),
+			"[workspace]\nmembers = [\"crates/core\"]\n",
+		)
+		.unwrap();
+		fs::write(
+			root.join("crates/core/Cargo.toml"),
+			"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+		)
+		.unwrap();
+		fs::write(
+			root.join("packages/core/package.json"),
+			r#"{ "name": "core", "version": "1.0.0" }"#,
+		)
+		.unwrap();
+		fs::write(
+			root.join("apps/cli/deno.json"),
+			r#"{ "name": "@acme/cli", "version": "1.0.0" }"#,
+		)
+		.unwrap();
+		fs::write(
+			root.join("apps/mobile/pubspec.yaml"),
+			"name: mobile\nversion: 1.0.0\nflutter:\n  uses-material-design: true\n",
+		)
+		.unwrap();
+		fs::create_dir_all(root.join("packages/dart_pkg/lib")).unwrap();
+		fs::write(
+			root.join("packages/dart_pkg/pubspec.yaml"),
+			"name: dart_pkg\nversion: 1.0.0\n",
+		)
+		.unwrap();
+		fs::write(root.join("packages/core/changelog.md"), "# Changelog\n").unwrap();
+
+		let rendered = render_annotated_init_config(root)
+			.unwrap_or_else(|error| panic!("render annotated config: {error}"));
+		assert!(rendered.contains("type = \"cargo\""));
+		assert!(rendered.contains("type = \"npm\""));
+		assert!(rendered.contains("type = \"deno\""));
+		assert!(rendered.contains("type = \"dart\""));
+		assert!(rendered.contains("type = \"flutter\""));
+		assert!(rendered.contains("changelog = \"packages/core/changelog.md\""));
+		assert!(rendered.contains("packages/core"));
+
+		assert_eq!(
+			detect_default_changelog(root, &root.join("packages/core")),
+			Some(PathBuf::from("packages/core/changelog.md"))
+		);
+		assert_eq!(
+			package_type_for_ecosystem(Ecosystem::Cargo),
+			PackageType::Cargo
+		);
+		assert_eq!(package_type_for_ecosystem(Ecosystem::Npm), PackageType::Npm);
+		assert_eq!(
+			package_type_for_ecosystem(Ecosystem::Deno),
+			PackageType::Deno
+		);
+		assert_eq!(
+			package_type_for_ecosystem(Ecosystem::Dart),
+			PackageType::Dart
+		);
+		assert_eq!(
+			package_type_for_ecosystem(Ecosystem::Flutter),
+			PackageType::Flutter
+		);
+	}
+
+	#[test]
+	fn validate_and_discover_release_workspace_cover_fallback_and_errors() {
+		let empty_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::write(empty_root.path().join("monochange.toml"), "").unwrap();
+		validate_cargo_workspace_version_groups(empty_root.path())
+			.unwrap_or_else(|error| panic!("validate empty workspace: {error}"));
+
+		let fixture = setup_fixture("monochange/release-base");
+		let configuration = load_workspace_configuration(fixture.path())
+			.unwrap_or_else(|error| panic!("load config: {error}"));
+		let report = discover_release_workspace(fixture.path(), &configuration)
+			.unwrap_or_else(|error| panic!("discover release workspace: {error}"));
+		assert_eq!(report.packages.len(), 2);
+
+		let fallback = discover_release_workspace(
+			fixture.path(),
+			&WorkspaceConfiguration {
+				packages: Vec::new(),
+				..configuration.clone()
+			},
+		)
+		.unwrap_or_else(|error| panic!("discover fallback workspace: {error}"));
+		assert!(!fallback.packages.is_empty());
+
+		let broken = WorkspaceConfiguration {
+			packages: vec![PackageDefinition {
+				id: "missing".to_string(),
+				path: PathBuf::from("missing"),
+				package_type: PackageType::Cargo,
+				changelog: None,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+			}],
+			..configuration
+		};
+		let error = discover_release_workspace(fixture.path(), &broken)
+			.err()
+			.unwrap_or_else(|| panic!("expected configured package discovery error"));
+		assert!(
+			error.to_string().contains("failed to read")
+				|| error.to_string().contains("could not be discovered")
+		);
+
+		let undetected_root =
+			tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::create_dir_all(undetected_root.path().join("empty-package"))
+			.unwrap_or_else(|error| panic!("create empty package dir: {error}"));
+		let undetected = WorkspaceConfiguration {
+			root_path: undetected_root.path().to_path_buf(),
+			defaults: monochange_core::WorkspaceDefaults {
+				package_type: Some(PackageType::Cargo),
+				..monochange_core::WorkspaceDefaults::default()
+			},
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: vec![PackageDefinition {
+				id: "empty".to_string(),
+				path: PathBuf::from("empty-package"),
+				package_type: PackageType::Cargo,
+				changelog: None,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+			}],
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		};
+		let undetected_error = discover_release_workspace(undetected_root.path(), &undetected)
+			.err()
+			.unwrap_or_else(|| panic!("expected configured package none-discovered error"));
+		assert!(
+			undetected_error
+				.to_string()
+				.contains("could not be discovered")
+				|| undetected_error.to_string().contains("failed to read")
+		);
+
+		let missing_manifest_root =
+			tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::create_dir_all(missing_manifest_root.path().join("packages/pkg"))
+			.unwrap_or_else(|error| panic!("create package dir: {error}"));
+		let missing_manifest = WorkspaceConfiguration {
+			root_path: missing_manifest_root.path().to_path_buf(),
+			defaults: monochange_core::WorkspaceDefaults {
+				package_type: Some(PackageType::Npm),
+				..monochange_core::WorkspaceDefaults::default()
+			},
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: vec![PackageDefinition {
+				id: "pkg".to_string(),
+				path: PathBuf::from("packages/pkg"),
+				package_type: PackageType::Npm,
+				changelog: None,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+			}],
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		};
+		let missing_manifest_error =
+			discover_release_workspace(missing_manifest_root.path(), &missing_manifest)
+				.err()
+				.unwrap_or_else(|| panic!("expected configured package discovery failure"));
+		assert!(
+			missing_manifest_error
+				.to_string()
+				.contains("could not be discovered")
+				|| missing_manifest_error
+					.to_string()
+					.contains("failed to read")
+		);
+
+		let non_cargo_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::create_dir_all(non_cargo_root.path().join("packages/web"))
+			.unwrap_or_else(|error| panic!("create npm package dir: {error}"));
+		fs::write(
+			non_cargo_root.path().join("monochange.toml"),
+			r#"
+[defaults]
+package_type = "npm"
+
+[package.web]
+path = "packages/web"
+"#,
+		)
+		.unwrap_or_else(|error| panic!("write npm-only monochange config: {error}"));
+		fs::write(
+			non_cargo_root.path().join("packages/web/package.json"),
+			r#"{ "name": "web", "version": "1.0.0" }"#,
+		)
+		.unwrap_or_else(|error| panic!("write package.json: {error}"));
+		validate_cargo_workspace_version_groups(non_cargo_root.path())
+			.unwrap_or_else(|error| panic!("validate npm-only workspace: {error}"));
 	}
 
 	#[test]
@@ -2197,6 +2492,132 @@ mod workspace_ops_tests {
 	}
 
 	#[test]
+	fn snapshot_and_change_file_helpers_cover_error_paths() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let snapshot_error =
+			snapshot_directory_files(root, &root.join("missing-dir"), &mut BTreeMap::new())
+				.err()
+				.unwrap_or_else(|| panic!("expected snapshot error"));
+		assert!(snapshot_error.to_string().contains("failed to read"));
+
+		let fixture = setup_fixture("monochange/release-base");
+		let invalid_version_error = add_change_file(
+			fixture.path(),
+			AddChangeFileRequest::builder()
+				.package_refs(&["core".to_string()])
+				.bump(BumpSeverity::Patch)
+				.reason("reason")
+				.version(Some("not-a-version"))
+				.build(),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid version error"));
+		assert!(
+			invalid_version_error
+				.to_string()
+				.contains("invalid explicit version")
+		);
+
+		let blocking_parent = fixture.path().join("blocked");
+		fs::write(&blocking_parent, "file").unwrap();
+		let write_error = add_interactive_change_file(
+			fixture.path(),
+			&interactive::InteractiveChangeResult {
+				targets: vec![interactive::InteractiveTarget {
+					id: "core".to_string(),
+					bump: BumpSeverity::Patch,
+					version: None,
+					change_type: None,
+				}],
+				reason: "reason".to_string(),
+				details: None,
+			},
+			Some(&blocking_parent.join("feature.md")),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected interactive write error"));
+		assert!(write_error.to_string().contains("failed to create"));
+
+		let blocking_output = fixture.path().join(".changeset");
+		let add_change_write_error = add_change_file(
+			fixture.path(),
+			AddChangeFileRequest::builder()
+				.package_refs(&["core".to_string()])
+				.bump(BumpSeverity::Patch)
+				.reason("reason")
+				.output(Some(blocking_output.as_path()))
+				.build(),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected add_change_file write error"));
+		assert!(
+			add_change_write_error
+				.to_string()
+				.contains("failed to write")
+		);
+
+		let blocked_parent = fixture.path().join("parent-file");
+		fs::write(&blocked_parent, "file").unwrap();
+		let add_change_parent_error = add_change_file(
+			fixture.path(),
+			AddChangeFileRequest::builder()
+				.package_refs(&["core".to_string()])
+				.bump(BumpSeverity::Patch)
+				.reason("reason")
+				.output(Some(blocked_parent.join("feature.md").as_path()))
+				.build(),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected add_change_file parent creation error"));
+		assert!(
+			add_change_parent_error
+				.to_string()
+				.contains("failed to create")
+		);
+
+		let interactive_write_error = add_interactive_change_file(
+			fixture.path(),
+			&interactive::InteractiveChangeResult {
+				targets: vec![interactive::InteractiveTarget {
+					id: "core".to_string(),
+					bump: BumpSeverity::Patch,
+					version: None,
+					change_type: None,
+				}],
+				reason: "reason".to_string(),
+				details: Some("extra details".to_string()),
+			},
+			Some(blocking_output.as_path()),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected add_interactive_change_file write error"));
+		assert!(
+			interactive_write_error
+				.to_string()
+				.contains("failed to write")
+		);
+
+		let interactive_default_output = add_interactive_change_file(
+			fixture.path(),
+			&interactive::InteractiveChangeResult {
+				targets: vec![interactive::InteractiveTarget {
+					id: "core".to_string(),
+					bump: BumpSeverity::Patch,
+					version: None,
+					change_type: None,
+				}],
+				reason: "reason".to_string(),
+				details: None,
+			},
+			None,
+		)
+		.unwrap_or_else(|error| panic!("write interactive default changeset: {error}"));
+		assert!(interactive_default_output.starts_with(fixture.path().join(".changeset")));
+		assert!(interactive_default_output.exists());
+	}
+
+	#[test]
 	fn materialize_lockfile_updates_captures_in_place_changes() {
 		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path();
@@ -2246,9 +2667,97 @@ mod workspace_ops_tests {
 	}
 
 	#[test]
+	fn lockfile_update_helpers_cover_missing_dirs_unreadable_files_and_stderr_paths() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let unreadable_dir = root.join("snapshots");
+		fs::create_dir_all(&unreadable_dir).unwrap();
+		let unreadable_file = unreadable_dir.join("blocked.txt");
+		fs::write(&unreadable_file, "blocked").unwrap();
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			fs::set_permissions(&unreadable_file, fs::Permissions::from_mode(0o000)).unwrap();
+		}
+		let snapshot_error = snapshot_directory_files(root, &unreadable_dir, &mut BTreeMap::new())
+			.err()
+			.unwrap_or_else(|| panic!("expected unreadable snapshot file error"));
+		assert!(snapshot_error.to_string().contains("failed to read"));
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			fs::set_permissions(&unreadable_file, fs::Permissions::from_mode(0o644)).unwrap();
+		}
+
+		fs::create_dir_all(root.join("tools/bin")).unwrap();
+		let script_path = root.join("tools/bin/fail-with-stderr");
+		fs::write(&script_path, "#!/bin/sh\necho 'bad stderr' >&2\nexit 4\n").unwrap();
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755)).unwrap();
+		}
+		let stderr_error = run_lockfile_command_in_place(
+			root,
+			&LockfileCommandExecution {
+				command: script_path.display().to_string(),
+				cwd: PathBuf::from("."),
+				shell: ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected stderr failure for in-place lockfile command"));
+		assert!(stderr_error.to_string().contains("bad stderr"));
+	}
+
+	#[test]
 	fn run_lockfile_command_in_place_reports_failures() {
 		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path();
+
+		let parse_error = run_lockfile_command_in_place(
+			root,
+			&LockfileCommandExecution {
+				command: "'".to_string(),
+				cwd: root.to_path_buf(),
+				shell: ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+		assert!(parse_error.to_string().contains("failed to parse command"));
+
+		let empty_error = run_lockfile_command_in_place(
+			root,
+			&LockfileCommandExecution {
+				command: "   ".to_string(),
+				cwd: root.to_path_buf(),
+				shell: ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected empty command error"));
+		assert!(
+			empty_error
+				.to_string()
+				.contains("lockfile command must not be empty")
+		);
+
+		let spawn_error = run_lockfile_command_in_place(
+			root,
+			&LockfileCommandExecution {
+				command: "definitely-not-a-real-command".to_string(),
+				cwd: root.to_path_buf(),
+				shell: ShellConfig::None,
+			},
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected spawn error"));
+		assert!(
+			spawn_error
+				.to_string()
+				.contains("failed to run lockfile command")
+		);
 
 		let error = run_lockfile_command_in_place(
 			root,
@@ -2262,6 +2771,81 @@ mod workspace_ops_tests {
 		.unwrap_or_else(|| panic!("expected error from failing command"));
 
 		assert!(error.to_string().contains("failed"));
+	}
+
+	#[test]
+	fn run_lockfile_command_variants_cover_success_and_shell_paths() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("tools/bin"))
+			.unwrap_or_else(|error| panic!("create tools dir: {error}"));
+		let success_script = root.join("tools/bin/succeed");
+		fs::write(
+			&success_script,
+			"#!/bin/sh\necho shell-success > \"$PWD/shell-output.txt\"\n",
+		)
+		.unwrap_or_else(|error| panic!("write success script: {error}"));
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			fs::set_permissions(&success_script, fs::Permissions::from_mode(0o755))
+				.unwrap_or_else(|error| panic!("chmod success script: {error}"));
+		}
+
+		run_lockfile_command_in_place(
+			root,
+			&LockfileCommandExecution {
+				command: success_script.display().to_string(),
+				cwd: root.to_path_buf(),
+				shell: ShellConfig::None,
+			},
+		)
+		.unwrap_or_else(|error| panic!("run in-place direct command: {error}"));
+		assert!(root.join("shell-output.txt").exists());
+
+		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_workspace_tree(root, temp_root.path())
+			.unwrap_or_else(|error| panic!("copy workspace for test command: {error}"));
+		let remapped_script = temp_root.path().join("tools/bin/succeed");
+		run_lockfile_command(
+			root,
+			temp_root.path(),
+			&LockfileCommandExecution {
+				command: remapped_script.display().to_string(),
+				cwd: root.to_path_buf(),
+				shell: ShellConfig::Default,
+			},
+		)
+		.unwrap_or_else(|error| panic!("run workspace lockfile command through shell: {error}"));
+		assert!(temp_root.path().join("shell-output.txt").exists());
+	}
+
+	#[test]
+	fn collect_workspace_file_updates_handles_outside_command_cwds() {
+		let fixture = setup_workspace_ops_fixture();
+		let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_workspace_tree(fixture.path(), temp_root.path())
+			.unwrap_or_else(|error| panic!("copy workspace: {error}"));
+
+		let updates = collect_workspace_file_updates(
+			fixture.path(),
+			temp_root.path(),
+			&[FileUpdate {
+				path: fixture.path().join("Cargo.toml"),
+				content: b"[workspace]\n".to_vec(),
+			}],
+			&[LockfileCommandExecution {
+				command: "echo ignored".to_string(),
+				cwd: PathBuf::from("/tmp/outside-workspace"),
+				shell: ShellConfig::None,
+			}],
+		)
+		.unwrap_or_else(|error| panic!("collect workspace file updates: {error}"));
+		assert!(
+			updates
+				.iter()
+				.all(|update| update.path.starts_with(fixture.path()))
+		);
 	}
 
 	#[test]

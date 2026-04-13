@@ -32,8 +32,15 @@ in
 
   enterShell = ''
     set -e
-    rustup toolchain install nightly --component rustfmt --no-self-update 2>/dev/null || true
-    rustup update stable --no-self-update 2>/dev/null || true
+
+    # Keep shell entry fast for local iteration. Only bootstrap missing toolchains
+    # here; explicit updates happen via install/update tasks instead of every shell.
+    if ! rustup toolchain list | grep -Eq '^nightly'; then
+      rustup toolchain install nightly --component rustfmt --no-self-update 2>/dev/null || true
+    fi
+    if ! rustup toolchain list | grep -Eq '^stable'; then
+      rustup toolchain install stable --no-self-update 2>/dev/null || true
+    fi
 
     export PATH="$DEVENV_ROOT/scripts:$PATH"
     eval "$(pnpm-activate-env)"
@@ -113,9 +120,19 @@ in
       exec = ''
         set -e
         clean:mc
+        install:toolchains
         install:cargo:bin
       '';
       description = "Install all packages.";
+      binary = "bash";
+    };
+    "install:toolchains" = {
+      exec = ''
+        set -e
+        rustup toolchain install nightly --component rustfmt --no-self-update
+        rustup toolchain install stable --no-self-update
+      '';
+      description = "Install the Rust toolchains used by monochange.";
       binary = "bash";
     };
     "install:cargo:bin" = {
@@ -147,10 +164,20 @@ in
       exec = ''
         set -e
         update:mc
+        update:toolchains
         cargo update
         devenv update
       '';
       description = "Update dependencies.";
+      binary = "bash";
+    };
+    "update:toolchains" = {
+      exec = ''
+        set -e
+        rustup toolchain install nightly --component rustfmt --no-self-update
+        rustup update stable --no-self-update
+      '';
+      description = "Refresh the Rust toolchains used by monochange.";
       binary = "bash";
     };
     "build:all" = {
@@ -191,6 +218,14 @@ in
         cargo bin cargo-nextest run --workspace --all-features --no-tests pass
       '';
       description = "Run cargo tests with nextest.";
+      binary = "bash";
+    };
+    "test:cargo:expensive" = {
+      exec = ''
+        set -e
+        MONOCHANGE_EXPENSIVE_TESTS=1 cargo bin cargo-nextest run --workspace --all-features --no-tests pass
+      '';
+      description = "Run cargo tests with the CI-only large-fixture cases enabled.";
       binary = "bash";
     };
     "test:docs" = {

@@ -1315,3 +1315,410 @@ pub(crate) fn text_discovery_report(report: &DiscoveryReport) -> String {
 	}
 	lines.join("\n")
 }
+
+#[cfg(test)]
+mod tests {
+	use std::fs;
+
+	use monochange_core::GroupChangelogInclude;
+	use monochange_core::PackageDefinition;
+	use monochange_core::PackageType;
+	use monochange_core::ProviderBotSettings;
+	use monochange_core::ProviderMergeRequestSettings;
+	use monochange_core::ProviderReleaseNotesSource;
+	use monochange_core::ProviderReleaseSettings;
+	use monochange_core::PublishState;
+	use monochange_core::ReleaseDecision;
+	use monochange_core::ReleaseManifest;
+	use monochange_core::ReleaseManifestChangelog;
+	use monochange_core::ReleaseManifestCompatibilityEvidence;
+	use monochange_core::ReleaseManifestPlan;
+	use monochange_core::ReleaseManifestPlanDecision;
+	use monochange_core::ReleaseManifestPlanGroup;
+	use monochange_core::ReleaseManifestTarget;
+	use monochange_core::ReleaseNotesSettings;
+	use monochange_core::SourceChangeRequest;
+	use monochange_core::SourceConfiguration;
+	use monochange_core::SourceProvider;
+	use monochange_core::WorkspaceConfiguration;
+	use monochange_core::WorkspaceDefaults;
+	use semver::Version;
+	use tempfile::tempdir;
+
+	use super::*;
+
+	fn empty_configuration(root: &Path) -> WorkspaceConfiguration {
+		WorkspaceConfiguration {
+			root_path: root.to_path_buf(),
+			defaults: WorkspaceDefaults::default(),
+			release_notes: ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		}
+	}
+
+	fn source_configuration(provider: SourceProvider) -> SourceConfiguration {
+		SourceConfiguration {
+			provider,
+			owner: "acme".to_string(),
+			repo: "monochange".to_string(),
+			host: Some("https://example.com".to_string()),
+			api_url: None,
+			releases: ProviderReleaseSettings {
+				generate_notes: matches!(provider, SourceProvider::GitHub),
+				source: ProviderReleaseNotesSource::Monochange,
+				..ProviderReleaseSettings::default()
+			},
+			pull_requests: ProviderMergeRequestSettings::default(),
+			bot: ProviderBotSettings::default(),
+		}
+	}
+
+	fn sample_manifest() -> ReleaseManifest {
+		ReleaseManifest {
+			command: "release".to_string(),
+			dry_run: false,
+			version: Some("1.2.3".to_string()),
+			group_version: Some("2.0.0".to_string()),
+			release_targets: vec![ReleaseManifestTarget {
+				id: "sdk".to_string(),
+				kind: ReleaseOwnerKind::Group,
+				version: "2.0.0".to_string(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Namespaced,
+				tag_name: "sdk/v2.0.0".to_string(),
+				members: vec!["pkg-a".to_string(), "pkg-b".to_string()],
+				rendered_title: "Release sdk v2.0.0".to_string(),
+				rendered_changelog_title: "sdk v2.0.0".to_string(),
+			}],
+			released_packages: vec!["pkg-a".to_string(), "pkg-b".to_string()],
+			changed_files: vec![
+				PathBuf::from("Cargo.toml"),
+				PathBuf::from("packages/pkg-a/package.json"),
+			],
+			changelogs: vec![ReleaseManifestChangelog {
+				owner_id: "sdk".to_string(),
+				owner_kind: ReleaseOwnerKind::Group,
+				path: PathBuf::from("CHANGELOG.md"),
+				format: ChangelogFormat::Monochange,
+				notes: ReleaseNotesDocument {
+					title: "2.0.0".to_string(),
+					summary: vec!["Grouped release".to_string()],
+					sections: vec![ReleaseNotesSection {
+						title: "Features".to_string(),
+						entries: vec!["- Added batching".to_string()],
+					}],
+				},
+				rendered: "## 2.0.0\n- Added batching".to_string(),
+			}],
+			changesets: Vec::new(),
+			deleted_changesets: vec![PathBuf::from(".changeset/feature.md")],
+			plan: ReleaseManifestPlan {
+				workspace_root: PathBuf::from("."),
+				decisions: vec![ReleaseManifestPlanDecision {
+					package: "pkg-a".to_string(),
+					bump: BumpSeverity::Minor,
+					trigger: "changeset".to_string(),
+					planned_version: Some("1.2.3".to_string()),
+					reasons: vec!["feature".to_string()],
+					upstream_sources: vec!["github".to_string()],
+				}],
+				groups: vec![ReleaseManifestPlanGroup {
+					id: "sdk".to_string(),
+					planned_version: Some("2.0.0".to_string()),
+					members: vec!["pkg-a".to_string(), "pkg-b".to_string()],
+					bump: BumpSeverity::Minor,
+				}],
+				warnings: vec!["warn".to_string()],
+				unresolved_items: vec!["todo".to_string()],
+				compatibility_evidence: vec![ReleaseManifestCompatibilityEvidence {
+					package: "pkg-a".to_string(),
+					provider: "rust-semver".to_string(),
+					severity: BumpSeverity::Minor,
+					summary: "minor api expansion".to_string(),
+					confidence: "high".to_string(),
+					evidence_location: Some("src/lib.rs".to_string()),
+				}],
+			},
+		}
+	}
+
+	fn sample_package(root: &Path, config_id: &str, package_type: PackageType) -> PackageRecord {
+		let manifest_path = root.join(format!("{config_id}/manifest"));
+		fs::create_dir_all(
+			manifest_path
+				.parent()
+				.unwrap_or_else(|| panic!("manifest path should have a parent")),
+		)
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+		fs::write(&manifest_path, "manifest\n")
+			.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		let ecosystem = match package_type {
+			PackageType::Cargo => Ecosystem::Cargo,
+			PackageType::Npm => Ecosystem::Npm,
+			PackageType::Deno => Ecosystem::Deno,
+			PackageType::Dart => Ecosystem::Dart,
+			PackageType::Flutter => Ecosystem::Flutter,
+		};
+		let mut package = PackageRecord::new(
+			ecosystem,
+			config_id,
+			manifest_path,
+			root.to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		);
+		package
+			.metadata
+			.insert("config_id".to_string(), config_id.to_string());
+		package
+	}
+
+	#[test]
+	fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let mut configuration = empty_configuration(root);
+		let source = source_configuration(SourceProvider::Gitea);
+		configuration.source = Some(source.clone());
+		configuration.packages = vec![PackageDefinition {
+			id: "pkg-a".to_string(),
+			path: PathBuf::from("pkg-a"),
+			package_type: PackageType::Cargo,
+			changelog: None,
+			extra_changelog_sections: Vec::new(),
+			empty_update_message: None,
+			release_title: Some(
+				"Package {{ id }} {{ previous_version }} -> {{ version }}".to_string(),
+			),
+			changelog_version_title: Some("{{ version }}".to_string()),
+			versioned_files: Vec::new(),
+			ignore_ecosystem_versioned_files: false,
+			ignored_paths: Vec::new(),
+			additional_paths: Vec::new(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Namespaced,
+		}];
+		configuration.groups = vec![monochange_core::GroupDefinition {
+			id: "sdk".to_string(),
+			packages: vec!["pkg-a".to_string()],
+			changelog: None,
+			changelog_include: GroupChangelogInclude::All,
+			extra_changelog_sections: Vec::new(),
+			empty_update_message: None,
+			release_title: Some("Group {{ id }} {{ compare_url }}".to_string()),
+			changelog_version_title: None,
+			versioned_files: Vec::new(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Namespaced,
+		}];
+		let package = sample_package(root, "pkg-a", PackageType::Cargo);
+		let sorted_tags = vec![
+			"sdk/v2.0.0".to_string(),
+			"sdk/v1.5.0".to_string(),
+			"pkg-a/v1.0.0".to_string(),
+			"pkg-a/v0.9.0".to_string(),
+		];
+		assert_eq!(
+			find_previous_tag_in("pkg-a/v1.0.0", &sorted_tags),
+			Some("pkg-a/v0.9.0".to_string())
+		);
+		assert_eq!(
+			parse_tag_prefix_and_version("pkg-a/v1.2.3"),
+			Some(("pkg-a/v".to_string(), Version::new(1, 2, 3)))
+		);
+		assert_eq!(
+			compare_url_for_provider(&source, "pkg-a/v0.9.0", "pkg-a/v1.0.0"),
+			"https://example.com/acme/monochange/compare/pkg-a/v0.9.0...pkg-a/v1.0.0"
+		);
+
+		let plan = ReleasePlan {
+			workspace_root: root.to_path_buf(),
+			decisions: vec![
+				ReleaseDecision {
+					package_id: "missing".to_string(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Patch,
+					planned_version: Some(Version::new(1, 0, 1)),
+					group_id: None,
+					reasons: Vec::new(),
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+				ReleaseDecision {
+					package_id: package.id.clone(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Patch,
+					planned_version: None,
+					group_id: None,
+					reasons: Vec::new(),
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+				ReleaseDecision {
+					package_id: package.id.clone(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Minor,
+					planned_version: Some(Version::new(1, 0, 0)),
+					group_id: None,
+					reasons: vec!["feature".to_string()],
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+			],
+			groups: vec![monochange_core::PlannedVersionGroup {
+				group_id: "sdk".to_string(),
+				display_name: "SDK".to_string(),
+				members: vec![package.id.clone()],
+				mismatch_detected: false,
+				planned_version: Some(Version::new(2, 0, 0)),
+				recommended_bump: BumpSeverity::Minor,
+			}],
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+
+		let targets = build_release_targets(
+			&configuration,
+			&[package],
+			&plan,
+			&[PathBuf::from(".changeset/feature.md")],
+		);
+		assert_eq!(targets.len(), 2);
+		assert!(
+			targets
+				.iter()
+				.any(|target| target.id == "sdk" && !target.rendered_title.is_empty())
+		);
+		assert!(
+			targets
+				.iter()
+				.all(|target| !target.rendered_changelog_title.is_empty())
+		);
+
+		assert_eq!(
+			effective_title_template(Some("specific"), Some("default"), "builtin"),
+			"specific"
+		);
+		assert_eq!(
+			effective_title_template(None, Some("default"), "builtin"),
+			"default"
+		);
+		assert_eq!(
+			default_release_title_for_format(VersionFormat::Primary),
+			DEFAULT_RELEASE_TITLE_PRIMARY
+		);
+		assert_eq!(
+			default_changelog_version_title_for_format(VersionFormat::Namespaced),
+			DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED
+		);
+		assert!(
+			build_cargo_manifest_updates(
+				&[],
+				&ReleasePlan {
+					workspace_root: root.to_path_buf(),
+					decisions: Vec::new(),
+					groups: Vec::new(),
+					warnings: Vec::new(),
+					unresolved_items: Vec::new(),
+					compatibility_evidence: Vec::new(),
+				}
+			)
+			.unwrap_or_else(|error| panic!("build empty cargo manifest updates: {error}"))
+			.is_empty()
+		);
+
+		assert!(
+			!resolve_release_datetime()
+				.format("%Y-%m-%d")
+				.to_string()
+				.is_empty()
+		);
+	}
+
+	#[test]
+	fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
+		let manifest = sample_manifest();
+		let source = source_configuration(SourceProvider::GitLab);
+		let record = build_release_record(Some(&source), &manifest);
+		assert_eq!(record.kind, monochange_core::RELEASE_RECORD_KIND);
+		assert!(record.created_at.ends_with('Z'));
+		assert_eq!(
+			record
+				.provider
+				.as_ref()
+				.map(|provider| provider.repo.as_str()),
+			Some("monochange")
+		);
+		assert_eq!(
+			record.updated_changelogs,
+			vec![PathBuf::from("CHANGELOG.md")]
+		);
+		assert_eq!(record.release_targets[0].tag_name, "sdk/v2.0.0");
+
+		let release_request = build_source_release_requests(&source, &manifest);
+		assert_eq!(release_request.len(), 1);
+		assert_eq!(release_request[0].provider, SourceProvider::GitLab);
+
+		let change_request = build_source_change_request(&source, &manifest);
+		assert_eq!(change_request.provider, SourceProvider::GitLab);
+		assert!(
+			change_request
+				.commit_message
+				.body
+				.as_deref()
+				.is_some_and(|body| body.contains("Prepare release."))
+		);
+
+		let gitea = source_configuration(SourceProvider::Gitea);
+		let gitea_change_request = build_source_change_request(&gitea, &manifest);
+		assert_eq!(gitea_change_request.provider, SourceProvider::Gitea);
+		assert!(tag_url_for_provider(&gitea, "sdk/v2.0.0").contains("/releases/tag/"));
+
+		let dry_requests_error = publish_source_release_requests(&gitea, &[])
+			.err()
+			.unwrap_or_else(|| {
+				panic!("expected publishing gitea release requests without auth to fail")
+			});
+		assert!(dry_requests_error.to_string().contains("GITEA_TOKEN"));
+
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let publish_error = publish_source_change_request(
+			&gitea,
+			tempdir.path(),
+			&SourceChangeRequest {
+				provider: SourceProvider::Gitea,
+				repository: "acme/monochange".to_string(),
+				owner: "acme".to_string(),
+				repo: "monochange".to_string(),
+				base_branch: "main".to_string(),
+				head_branch: "release/v2.0.0".to_string(),
+				title: "chore: prepare release".to_string(),
+				body: "release body".to_string(),
+				labels: vec!["release".to_string()],
+				auto_merge: false,
+				commit_message: build_release_commit_message(Some(&gitea), &manifest),
+			},
+			&manifest.changed_files,
+		)
+		.err()
+		.unwrap_or_else(|| {
+			panic!("expected publishing a gitea change request outside a git repo to fail")
+		});
+		assert!(
+			publish_error.to_string().contains("git")
+				|| publish_error.to_string().contains("failed")
+		);
+	}
+}
