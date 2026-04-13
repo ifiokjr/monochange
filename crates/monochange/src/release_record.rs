@@ -23,7 +23,7 @@ use crate::git_support::push_git_tags;
 use crate::git_support::read_git_commit_message;
 use crate::git_support::resolve_git_commit_ref;
 use crate::git_support::resolve_git_tag_commit;
-use crate::github_provider;
+use crate::hosted_sources;
 
 pub(crate) fn render_release_record_discovery(
 	root: &Path,
@@ -137,31 +137,20 @@ pub fn plan_release_retarget(
 	let provider_updates = if sync_provider {
 		match provider {
 			Some(provider) => {
-				release_record_release_tag_names(&discovery.record)
+				let planned_provider_tags = release_record_release_tag_names(&discovery.record)
 					.into_iter()
 					.map(|tag_name| {
-						RetargetProviderResult {
-							provider,
+						RetargetTagResult {
 							tag_name,
-							target_commit: target_commit.clone(),
-							operation: match provider {
-								SourceProvider::GitHub => RetargetProviderOperation::Planned,
-								SourceProvider::GitLab | SourceProvider::Gitea => {
-									RetargetProviderOperation::Unsupported
-								}
-							},
-							url: None,
-							message: match provider {
-								SourceProvider::GitHub => None,
-								SourceProvider::GitLab | SourceProvider::Gitea => {
-									Some(format!(
-										"provider sync is not yet supported for {provider} release retargeting"
-									))
-								}
-							},
+							operation: RetargetOperation::Planned,
+							from_commit: discovery.record_commit.clone(),
+							to_commit: target_commit.clone(),
+							message: None,
 						}
 					})
-					.collect()
+					.collect::<Vec<_>>();
+				hosted_sources::hosted_source_adapter(provider)
+					.plan_retargeted_releases(&planned_provider_tags)
 			}
 			None => Vec::new(),
 		}
@@ -292,36 +281,11 @@ pub(crate) fn sync_retargeted_provider_releases(
 	tag_results: &[RetargetTagResult],
 	dry_run: bool,
 ) -> MonochangeResult<Vec<RetargetProviderResult>> {
-	match source.provider {
-		SourceProvider::GitHub => {
-			github_provider::sync_retargeted_releases(source, tag_results, dry_run)
-		}
-		SourceProvider::GitLab | SourceProvider::Gitea => {
-			if dry_run {
-				Ok(tag_results
-					.iter()
-					.map(|update| {
-						RetargetProviderResult {
-							provider: source.provider,
-							tag_name: update.tag_name.clone(),
-							target_commit: update.to_commit.clone(),
-							operation: RetargetProviderOperation::Unsupported,
-							url: None,
-							message: Some(format!(
-								"provider sync is not yet supported for {} release retargeting",
-								source.provider
-							)),
-						}
-					})
-					.collect())
-			} else {
-				Err(MonochangeError::Config(format!(
-					"provider sync is not yet supported for {} release retargeting",
-					source.provider
-				)))
-			}
-		}
-	}
+	hosted_sources::configured_hosted_source_adapter(source).sync_retargeted_releases(
+		source,
+		tag_results,
+		dry_run,
+	)
 }
 
 pub(crate) fn text_release_record_discovery(discovery: &ReleaseRecordDiscovery) -> String {

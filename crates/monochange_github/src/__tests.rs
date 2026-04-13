@@ -15,6 +15,7 @@ use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
+use monochange_core::HostedSourceAdapter;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
@@ -249,6 +250,77 @@ fn comment_released_issues_public_api_uses_source_configuration() {
 			.unwrap_or_else(|| panic!("expected one issue comment outcome"))
 			.issue_id,
 		"#7"
+	);
+}
+
+#[test]
+fn github_hosted_source_adapter_comments_released_issues() {
+	let server = MockServer::start();
+	let list_issue_comments = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let create_issue_comment = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body("{\"html_url\":\"https://example.com/issues/7#comment-1\"}");
+	});
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	};
+	let mut manifest = sample_manifest();
+	manifest.changesets = vec![PreparedChangeset {
+		path: PathBuf::from(".changeset/feature.md"),
+		summary: Some("add release context".to_string()),
+		details: None,
+		targets: Vec::new(),
+		context: Some(ChangesetContext {
+			provider: HostingProviderKind::GitHub,
+			host: Some("example.com".to_string()),
+			capabilities: github_hosting_capabilities(),
+			introduced: None,
+			last_updated: None,
+			related_issues: vec![HostedIssueRef {
+				provider: HostingProviderKind::GitHub,
+				host: Some("example.com".to_string()),
+				id: "#7".to_string(),
+				title: Some("Track release context".to_string()),
+				url: Some("https://example.com/issues/7".to_string()),
+				relationship: HostedIssueRelationshipKind::ClosedByReviewRequest,
+			}],
+		}),
+	}];
+
+	let outcomes = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_SERVER_URL", Some("https://example.com")),
+		],
+		|| HOSTED_SOURCE_ADAPTER.comment_released_issues(&source, &manifest),
+	)
+	.unwrap_or_else(|error| panic!("adapter issue comments: {error}"));
+
+	list_issue_comments.assert();
+	create_issue_comment.assert();
+	assert_eq!(outcomes.len(), 1);
+	assert_eq!(
+		outcomes
+			.first()
+			.unwrap_or_else(|| panic!("expected one issue comment outcome"))
+			.operation,
+		GitHubIssueCommentOperation::Created
 	);
 }
 

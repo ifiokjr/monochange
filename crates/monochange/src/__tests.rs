@@ -4000,9 +4000,47 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected github source requirement error"));
-	assert!(error.to_string().contains(
-		"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
-	));
+	assert!(
+		error.to_string().contains(
+			"`CommentReleasedIssues` is not supported for `[source].provider = \"gitlab\"`"
+		)
+	);
+}
+
+#[test]
+fn execute_cli_command_comment_released_issues_requires_source_configuration() {
+	let root = fixture_path("monochange/release-base");
+	let mut configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	configuration.source = None;
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "release-comments".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+
+	let error =
+		crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
+			.err()
+			.unwrap_or_else(|| panic!("expected missing source configuration error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("`CommentReleasedIssues` requires `[source]` configuration")
+	);
 }
 
 #[test]
