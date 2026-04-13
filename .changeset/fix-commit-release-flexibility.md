@@ -1,5 +1,8 @@
 ---
+"@monochange/skill": patch
 "monochange": patch
+"monochange_config": patch
+"monochange_core": patch
 "monochange_github": patch
 ---
 
