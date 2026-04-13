@@ -1188,6 +1188,49 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	assert!(commit_body.contains("<!-- monochange:release-record:start -->"));
 }
 
+#[test]
+fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
+	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	must_ok(
+		std::fs::write(repo.join(".gitignore"), ".monochange/\n"),
+		"write gitignore",
+	);
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "before\n"),
+		"write release file",
+	);
+	git(&repo, &["add", "."]);
+	git(&repo, &["commit", "-m", "initial"]);
+	must_ok(
+		std::fs::create_dir_all(repo.join(".monochange")),
+		"create monochange dir",
+	);
+	must_ok(
+		std::fs::write(repo.join(".monochange/release-manifest.json"), "{}\n"),
+		"write manifest",
+	);
+
+	must_ok(
+		git_stage_paths(
+			&repo,
+			&[
+				PathBuf::from(".monochange/release-manifest.json"),
+				PathBuf::from(".changeset/missing.md"),
+			],
+		),
+		"stage paths",
+	);
+
+	assert_eq!(
+		git_output(&repo, &["diff", "--cached", "--name-only"]).trim(),
+		""
+	);
+}
+
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_reports_io_and_non_noop_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
