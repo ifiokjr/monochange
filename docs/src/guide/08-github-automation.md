@@ -6,7 +6,7 @@ monochange keeps source-provider automation layered on top of the same `PrepareR
 
 That means one set of `.changeset/*.md` inputs can drive all of these commands and automation flows consistently:
 
-- `mc release-manifest` writes a stable JSON artifact for downstream automation
+- `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload
 - `mc publish-release` previews or publishes provider releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent provider release request
 - `mc affected` evaluates pull-request changeset policy from CI-supplied changed paths and labels
@@ -19,7 +19,6 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 
 ```bash
 mc release --dry-run --format json
-mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc affected --format json --changed-paths crates/monochange/src/lib.rs
@@ -41,7 +40,7 @@ mc repair-release --from v1.2.3 --target HEAD
 
 The important distinction is:
 
-- `RenderReleaseManifest` still describes the execution-time release plan for automation
+- the cached release manifest still describes the execution-time release plan for automation
 - `ReleaseRecord` describes the durable release declaration stored in the release commit body
 
 Use `--dry-run` first for `repair-release`. It is a destructive workflow because it retargets release tags.
@@ -85,16 +84,6 @@ base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
-
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
-
-[[cli.release-manifest.steps]]
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
 help_text = "Prepare a release and publish provider releases"

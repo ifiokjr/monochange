@@ -26,7 +26,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 - Inspect workspace state with `mc discover --format json`.
 - Add or update changesets with `mc change`.
 - Preview release effects with `mc release --dry-run --format json`.
-- Use `mc release-manifest --dry-run` for downstream automation inputs.
+- Use `mc release --dry-run --format json` for downstream automation inputs.
 - Only use source-provider publishing after reviewing prepared release data.
 
 ## Guidance

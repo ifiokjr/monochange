@@ -19,7 +19,7 @@
 
 - [x] T020 Add release manifest domain types in `crates/monochange_core/src/lib.rs`.
 - [x] T021 Add release manifest rendering in `crates/monochange/src/lib.rs`.
-- [x] T022 Add workflow support for a `RenderReleaseManifest` step.
+- [x] T022 Fold release-manifest generation into `PrepareRelease`.
 - [x] T023 Add JSON snapshot tests for release manifests.
 - [x] T024 Document the release manifest contract in `specs/` and user docs.
 

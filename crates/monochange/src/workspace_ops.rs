@@ -211,16 +211,6 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 	}
 	match step {
-		monochange_core::CliStepDefinition::RenderReleaseManifest { path, inputs, .. } => {
-			if let Some(path) = path {
-				write_toml_key_value(
-					rendered,
-					"path",
-					&render_toml_string(&path.display().to_string()),
-				);
-			}
-			render_step_inputs_toml(rendered, inputs);
-		}
 		monochange_core::CliStepDefinition::Command {
 			command,
 			dry_run_command,

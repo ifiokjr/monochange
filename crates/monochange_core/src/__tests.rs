@@ -924,15 +924,6 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			"CommitRelease",
 		),
 		(
-			CliStepDefinition::RenderReleaseManifest {
-				name: None,
-				when: None,
-				path: None,
-				inputs: BTreeMap::new(),
-			},
-			"RenderReleaseManifest",
-		),
-		(
 			CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
@@ -1068,12 +1059,6 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 		CliStepDefinition::CommitRelease {
 			name: Some(expected.to_string()),
 			when: None,
-			inputs: BTreeMap::new(),
-		},
-		CliStepDefinition::RenderReleaseManifest {
-			name: Some(expected.to_string()),
-			when: None,
-			path: None,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishRelease {

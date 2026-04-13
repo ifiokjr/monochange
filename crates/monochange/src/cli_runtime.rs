@@ -263,12 +263,15 @@ pub(crate) fn template_value_to_input_values(value: &serde_json::Value) -> Vec<S
 	}
 }
 
+const DEFAULT_RELEASE_MANIFEST_PATH: &str = ".monochange/release-manifest.json";
+
 pub(crate) fn write_release_manifest_file(
 	root: &Path,
 	path: &Path,
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let resolved_path = resolve_config_path(root, path);
+	ensure_monochange_artifact_ignored(root, &resolved_path)?;
 	let rendered = render_release_manifest_json(manifest)?;
 	let update = FileUpdate {
 		path: resolved_path.clone(),
@@ -278,13 +281,36 @@ pub(crate) fn write_release_manifest_file(
 	Ok(root_relative(root, &resolved_path))
 }
 
-fn resolve_release_manifest_path(
+fn write_default_release_manifest_file(
 	root: &Path,
-	path: Option<&Path>,
 	manifest: &ReleaseManifest,
-) -> MonochangeResult<Option<PathBuf>> {
-	path.map(|path| write_release_manifest_file(root, path, manifest))
-		.transpose()
+) -> MonochangeResult<PathBuf> {
+	write_release_manifest_file(root, Path::new(DEFAULT_RELEASE_MANIFEST_PATH), manifest)
+}
+
+fn ensure_prepared_release_for_consumer_step(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	context: &mut CliContext,
+	prepared_release_path: Option<&Path>,
+	dry_run: bool,
+	build_file_diffs: bool,
+	step_name: &str,
+) -> MonochangeResult<()> {
+	if context.prepared_release.is_some() {
+		return Ok(());
+	}
+	#[rustfmt::skip]
+	let loaded = maybe_load_prepared_release_execution(root, configuration, prepared_release_path, dry_run, build_file_diffs)?;
+	let Some(loaded) = loaded else {
+		return Err(MonochangeError::Config(format!(
+			"`{step_name}` requires a previous `PrepareRelease` step or a reusable prepared release artifact"
+		)));
+	};
+	context.command_logs.push(loaded.message);
+	context.prepared_file_diffs = loaded.execution.file_diffs;
+	context.prepared_release = Some(loaded.execution.prepared_release);
+	Ok(())
 }
 
 pub(crate) fn build_release_results(
@@ -555,23 +581,17 @@ pub(crate) fn execute_cli_command_with_options(
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					context.prepared_file_diffs = prepared_execution.file_diffs;
 					context.prepared_release = Some(prepared_execution.prepared_release);
-					output = None;
-					Ok(())
-				}
-				CliStepDefinition::RenderReleaseManifest { path, .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`RenderReleaseManifest` requires a previous `PrepareRelease` step"
-								.to_string(),
-						)
-					})?;
+					let prepared_release = context
+						.prepared_release
+						.as_ref()
+						.expect("prepared release must be available after prepare step");
 					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,
 						&context.command_logs,
 					);
 					context.release_manifest_path =
-						resolve_release_manifest_path(root, path.as_deref(), &manifest)?;
+						Some(write_default_release_manifest_file(root, &manifest)?);
 					output = None;
 					Ok(())
 				}
@@ -600,11 +620,19 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::CommitRelease { .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`CommitRelease` requires a previous `PrepareRelease` step".to_string(),
-						)
-					})?;
+					ensure_prepared_release_for_consumer_step(
+						root,
+						configuration,
+						&mut context,
+						prepared_release_path.as_deref(),
+						dry_run,
+						false,
+						"CommitRelease",
+					)?;
+					let prepared_release = context
+						.prepared_release
+						.as_ref()
+						.expect("prepared release must be available before committing release");
 					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,
@@ -833,11 +861,6 @@ fn step_references_release_file_diffs(step: &CliStepDefinition) -> bool {
 		return true;
 	}
 	match step {
-		CliStepDefinition::RenderReleaseManifest { path, .. } => {
-			path.as_ref()
-				.and_then(|path| path.to_str())
-				.is_some_and(mentions_file_diffs)
-		}
 		CliStepDefinition::Command {
 			command,
 			dry_run_command,

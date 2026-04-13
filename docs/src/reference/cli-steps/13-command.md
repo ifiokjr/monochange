@@ -39,8 +39,7 @@ Use `Command` for what is truly custom.
 
 What it can see depends on where you place it:
 
-- after `PrepareRelease`, it can consume `release.*`
-- after `RenderReleaseManifest`, it can consume `manifest.path`
+- after `PrepareRelease`, it can consume `release.*` and `manifest.path`
 - after `AffectedPackages`, it can consume `affected.*`
 - after `RetargetRelease`, it can consume `retarget.*`
 - after `CommitRelease`, it can consume `release_commit.*`

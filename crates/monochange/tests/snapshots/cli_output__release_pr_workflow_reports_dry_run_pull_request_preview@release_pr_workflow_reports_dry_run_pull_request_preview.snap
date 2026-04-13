@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 184
+assertion_line: 240
 info:
   program: mc
   args:
@@ -9,6 +9,7 @@ info:
   env:
     MONOCHANGE_RELEASE_DATE: 2026-04-06
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: true
 exit_code: 0
@@ -18,6 +19,7 @@ version: 1.1.0
 released packages: workflow-app, workflow-core
 release targets:
 - group sdk -> v1.1.0 (tag: true, release: true)
+release manifest: .monochange/release-manifest.json
 release request:
 - dry-run ifiokjr/monochange monochange/release/release-pr -> main via github
 changed files:

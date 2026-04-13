@@ -69,6 +69,7 @@ fn init_git_repo(root: &Path) {
 	git(root, &["init", "-b", "main"]);
 	git(root, &["config", "user.name", "monochange tests"]);
 	git(root, &["config", "user.email", "monochange@example.com"]);
+	git(root, &["config", "commit.gpgsign", "false"]);
 	git(root, &["add", "."]);
 	git(
 		root,
@@ -140,6 +141,10 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 		root.join(".monochange/prepared-release-cache.json")
 			.is_file()
 	);
+	assert!(root.join(".monochange/release-manifest.json").is_file());
+	let git_exclude = fs::read_to_string(root.join(".git/info/exclude"))
+		.unwrap_or_else(|error| panic!("read git exclude: {error}"));
+	assert!(git_exclude.contains(".monochange/"));
 	assert!(!root.join(".changeset/feature.md").exists());
 
 	run_cli(root, command_args(&["commit-release", "--format", "json"]))
@@ -161,6 +166,53 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 		))
 	);
 	assert_eq!(git_output(root, &["status", "--short"]), "");
+}
+
+#[test]
+fn commit_release_can_reuse_saved_prepared_release_without_prepare_step() {
+	let tempdir = setup_scenario_workspace("prepared-release/commit-release-flexible");
+	let root = tempdir.path();
+	init_git_repo(root);
+
+	run_cli(root, command_args(&["release", "--format", "json"]))
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		root.join(".monochange/prepared-release-cache.json")
+			.is_file()
+	);
+
+	run_cli(
+		root,
+		command_args(&["commit-from-cache", "--format", "json"]),
+	)
+	.unwrap_or_else(|error| panic!("commit-from-cache output: {error}"));
+	assert_eq!(git_output(root, &["status", "--short"]), "");
+	assert_eq!(
+		git_output(root, &["log", "-1", "--pretty=%s"]),
+		"chore(release): prepare release"
+	);
+}
+
+#[test]
+fn commit_release_succeeds_when_manifest_is_gitignored() {
+	let tempdir = setup_scenario_workspace("prepared-release/commit-release-flexible");
+	let root = tempdir.path();
+	init_git_repo(root);
+
+	run_cli(root, command_args(&["release", "--format", "json"]))
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(root.join(".monochange/release-manifest.json").is_file());
+
+	run_cli(
+		root,
+		command_args(&["commit-from-cache", "--format", "json"]),
+	)
+	.unwrap_or_else(|error| panic!("commit-from-cache output: {error}"));
+	assert_eq!(git_output(root, &["status", "--short"]), "");
+	assert_eq!(
+		git_output(root, &["log", "-1", "--pretty=%s"]),
+		"chore(release): prepare release"
+	);
 }
 
 #[test]

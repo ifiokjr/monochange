@@ -31,7 +31,6 @@
   - [RetargetRelease](reference/cli-steps/06-retarget-release.md)
   - [PrepareRelease](reference/cli-steps/07-prepare-release.md)
   - [CommitRelease](reference/cli-steps/08-commit-release.md)
-  - [RenderReleaseManifest](reference/cli-steps/09-render-release-manifest.md)
   - [PublishRelease](reference/cli-steps/10-publish-release.md)
   - [OpenReleaseRequest](reference/cli-steps/11-open-release-request.md)
   - [CommentReleasedIssues](reference/cli-steps/12-comment-released-issues.md)

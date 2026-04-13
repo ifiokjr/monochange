@@ -521,9 +521,9 @@ comment_on_failure = true
 #   Validate             — validate monochange.toml and changesets
 #   Discover             — discover packages across ecosystems
 #   CreateChangeFile     — create a .changeset/*.md file
-#   PrepareRelease       — compute release plan, update versions, changelogs
+#   PrepareRelease       — compute release plan, update versions, changelogs,
+#                          and refresh .monochange/release-manifest.json
 #   CommitRelease        — create a local release commit (requires PrepareRelease)
-#   RenderReleaseManifest — write release-manifest.json (requires PrepareRelease)
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
@@ -567,7 +567,7 @@ comment_on_failure = true
 #   release.*       — from PrepareRelease: version, group_version, dry_run,
 #                     released_packages, changed_files, updated_changelogs,
 #                     deleted_changesets, changeset_paths, targets
-#   manifest.path   — from RenderReleaseManifest: path to the written manifest
+#   manifest.path   — from PrepareRelease: path to the cached release manifest
 #   release_commit.* — from CommitRelease: subject, body, commit, tracked_paths, status
 #   affected.*      — from AffectedPackages: status, summary
 #   steps.ID.*      — from Command steps with id: stdout, stderr

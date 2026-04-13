@@ -3106,14 +3106,6 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 						)));
 					}
 				}
-				CliStepDefinition::RenderReleaseManifest { path, .. } => {
-					if matches!(path, Some(path) if path.as_os_str().is_empty()) {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` render-manifest steps must provide a non-empty path when `path` is set",
-							cli_command.name
-						)));
-					}
-				}
 				CliStepDefinition::Validate { .. }
 				| CliStepDefinition::Discover { .. }
 				| CliStepDefinition::CreateChangeFile { .. }

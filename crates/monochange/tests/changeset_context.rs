@@ -10,7 +10,7 @@ use test_support::monochange_command;
 use test_support::setup_scenario_workspace;
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn release_manifest_records_git_changeset_context_and_renders_context_templates() {
+fn prepare_release_records_git_changeset_context_and_renders_context_templates() {
 	let tempdir = setup_scenario_workspace("changeset-context/base");
 	let root = tempdir.path();
 
@@ -33,13 +33,13 @@ fn release_manifest_records_git_changeset_context_and_renders_context_templates(
 
 	let output = monochange_command(Some("2026-04-06"))
 		.current_dir(root)
-		.arg("release-manifest")
+		.arg("release")
 		.arg("--dry-run")
 		.output()
-		.unwrap_or_else(|error| panic!("release-manifest: {error}"));
+		.unwrap_or_else(|error| panic!("release: {error}"));
 	assert!(
 		output.status.success(),
-		"release-manifest failed: {}",
+		"release failed: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
 

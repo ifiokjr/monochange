@@ -246,7 +246,7 @@ fn release_pr_workflow_reports_dry_run_pull_request_preview() {
 }
 
 #[test]
-fn release_manifest_workflow_writes_manifest_json() {
+fn prepare_release_writes_manifest_json() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
@@ -255,7 +255,7 @@ fn release_manifest_workflow_writes_manifest_json() {
 	assert_cmd_snapshot!(
 		release_cli_command()
 			.current_dir(tempdir.path())
-			.arg("release-manifest")
+			.arg("release")
 			.arg("--dry-run")
 	);
 

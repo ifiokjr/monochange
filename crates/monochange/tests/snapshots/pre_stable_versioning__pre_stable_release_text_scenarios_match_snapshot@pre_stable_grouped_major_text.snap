@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/pre_stable_versioning.rs
+assertion_line: 41
 expression: "String::from_utf8_lossy(&output.stdout)"
 ---
 command `release` completed (dry-run)
@@ -7,6 +8,7 @@ version: 0.2.0
 released packages: workflow-app, workflow-core
 release targets:
 - group sdk -> v0.2.0 (tag: true, release: true)
+release manifest: .monochange/release-manifest.json
 changed files:
 - Cargo.toml
 - crates/app/Cargo.toml

@@ -32,30 +32,29 @@ description: Guides agents through monochange discovery, changesets, release pla
 3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
 4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
 5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
-6. **Generate manifest** — `mc release-manifest --dry-run` writes a stable JSON artifact for downstream automation.
+6. **Inspect cached manifest** — `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload.
 7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
 
 <!-- {/recommendedCommandFlow} -->
 
 ## CLI commands
 
-| Command               | Purpose                                                     |
-| --------------------- | ----------------------------------------------------------- |
-| `mc init`             | Generate a starter `monochange.toml` from detected packages |
-| `mc populate`         | Append missing built-in CLI command definitions to config   |
-| `mc validate`         | Validate config and changeset targets                       |
-| `mc discover`         | Discover packages across ecosystems                         |
-| `mc change`           | Create a `.changeset/*.md` file                             |
-| `mc release`          | Prepare a release plan from changesets                      |
-| `mc commit-release`   | Prepare a release and create a local commit                 |
-| `mc release-manifest` | Write a stable JSON manifest for automation                 |
-| `mc publish-release`  | Create provider releases                                    |
-| `mc release-pr`       | Open or update a release pull request                       |
-| `mc affected`         | Evaluate changeset policy from changed paths                |
-| `mc diagnostics`      | Show changeset context with git and review metadata         |
-| `mc repair-release`   | Repair a recent release by retargeting tags                 |
-| `mc assist`           | Print assistant install and MCP setup guidance              |
-| `mc mcp`              | Start the stdio MCP server                                  |
+| Command              | Purpose                                                                |
+| -------------------- | ---------------------------------------------------------------------- |
+| `mc init`            | Generate a starter `monochange.toml` from detected packages            |
+| `mc populate`        | Append missing built-in CLI command definitions to config              |
+| `mc validate`        | Validate config and changeset targets                                  |
+| `mc discover`        | Discover packages across ecosystems                                    |
+| `mc change`          | Create a `.changeset/*.md` file                                        |
+| `mc release`         | Prepare a release plan from changesets and refresh the cached manifest |
+| `mc commit-release`  | Prepare a release and create a local commit                            |
+| `mc publish-release` | Create provider releases                                               |
+| `mc release-pr`      | Open or update a release pull request                                  |
+| `mc affected`        | Evaluate changeset policy from changed paths                           |
+| `mc diagnostics`     | Show changeset context with git and review metadata                    |
+| `mc repair-release`  | Repair a recent release by retargeting tags                            |
+| `mc assist`          | Print assistant install and MCP setup guidance                         |
+| `mc mcp`             | Start the stdio MCP server                                             |
 
 ## CLI step types
 
@@ -74,7 +73,6 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 - `PrepareRelease` — compute release plan, update versions, changelogs, and versioned files
 - `CommitRelease` — create a local release commit
-- `RenderReleaseManifest` — write a stable JSON manifest
 - `PublishRelease` — create provider releases
 - `OpenReleaseRequest` — open or update a release pull request
 - `CommentReleasedIssues` — comment on issues referenced in changesets

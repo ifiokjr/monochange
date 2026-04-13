@@ -31,7 +31,6 @@ fn validate_step_runs_without_input_overrides() {
 #[rstest]
 #[case::discover_workspace("cli-step-input-overrides/workspace", "discover")]
 #[case::prepare_release("cli-step-input-overrides/workspace", "release")]
-#[case::render_release_manifest("cli-step-input-overrides/workspace", "release-manifest")]
 #[case::affected_packages("cli-step-input-overrides/workspace", "affected")]
 #[case::publish_release("cli-step-input-overrides/source-github", "publish-release")]
 #[case::open_release_request("cli-step-input-overrides/source-github", "release-pr")]

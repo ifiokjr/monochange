@@ -38,7 +38,12 @@ when = "{{ inputs.enabled }}"
 
 ## Prerequisites
 
-- a previous `PrepareRelease` step in the same command
+`CommitRelease` needs prepared release state.
+
+You can provide that state in either of two ways:
+
+- run a previous `PrepareRelease` step in the same command
+- reuse a saved prepared release artifact from `.monochange/prepared-release-cache.json` or `--prepared-release`
 
 `CommitRelease` is a **consumer** step. It does not plan a release on its own.
 
@@ -144,6 +149,7 @@ A raw shell commit can create a commit, but it cannot automatically preserve the
 ## Common mistakes
 
 - treating `CommitRelease` as a replacement for `PrepareRelease`
+- assuming the cached `.monochange/release-manifest.json` artifact must be committed for `CommitRelease` to succeed
 - assuming it publishes releases or opens a release request by itself
 - forgetting that `--dry-run` previews the commit rather than creating it
 - reaching for a custom `git commit` command and then losing durable release metadata

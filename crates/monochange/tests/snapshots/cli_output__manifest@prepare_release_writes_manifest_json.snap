@@ -1,10 +1,10 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 209
+assertion_line: 265
 expression: manifest
 ---
 {
-  "command": "release-manifest",
+  "command": "release",
   "dryRun": true,
   "version": "1.1.0",
   "groupVersion": "1.1.0",

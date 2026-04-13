@@ -273,18 +273,6 @@ default = "text"
 name = "prepare release"
 type = "PrepareRelease"
 
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
-
-[[cli.release-manifest.steps]]
-name = "prepare release"
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-name = "render release manifest"
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-
 [cli.publish-release]
 help_text = "Prepare a release and publish provider releases"
 
