@@ -1,0 +1,40 @@
+---
+source: crates/monochange/tests/source_providers.rs
+expression: json
+---
+{
+  "changesets": [
+    {
+      "context": {
+        "capabilities": {
+          "actorProfiles": false,
+          "commitWebUrls": true,
+          "issueComments": false,
+          "relatedIssues": false,
+          "reviewRequestLookup": false
+        },
+        "host": "codeberg.org",
+        "introduced": null,
+        "lastUpdated": null,
+        "provider": "gitea",
+        "relatedIssues": []
+      },
+      "details": null,
+      "path": ".changeset/feature.md",
+      "summary": "add gitea fixture coverage",
+      "targets": [
+        {
+          "bump": "patch",
+          "changeType": null,
+          "evidenceRefs": [],
+          "id": "core",
+          "kind": "package",
+          "origin": "direct-change"
+        }
+      ]
+    }
+  ],
+  "requestedChangesets": [
+    ".changeset/feature.md"
+  ]
+}

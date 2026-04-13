@@ -81,14 +81,14 @@ mc validate
 
 Release planning and release repair use two different artifacts on purpose.
 
-- `RenderReleaseManifest` captures **what monochange is preparing right now** during command execution.
+- the cached release manifest at `.monochange/release-manifest.json` captures **what monochange is preparing right now** during command execution.
 - `ReleaseRecord` captures **what a release commit historically declared** inside the monochange-managed release commit body.
 
 Use the manifest when you want execution-time automation such as CI artifacts, MCP/server responses, previews, or downstream machine-readable release data.
 
 Use the release record when you want to rediscover or repair a release later from a tag or descendant commit.
 
-That is why `ReleaseRecord` does not replace `RenderReleaseManifest`: one is an execution-time automation artifact, the other is a durable git-history artifact.
+That is why `ReleaseRecord` does not replace the cached release manifest: one is an execution-time automation artifact, the other is a durable git-history artifact.
 
 When you need to inspect or repair a recent release, see [Repairable releases](./12-repairable-releases.md).
 
@@ -149,7 +149,7 @@ Current `PrepareRelease` behavior:
 - renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
 - groups release notes into default `Breaking changes`, `Features`, `Fixes`, and `Notes` sections, with package/group overrides available through `extra_changelog_sections`
 - applies workspace-wide release-note templates from `[release_notes].change_templates`
-- can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
+- refreshes the cached `.monochange/release-manifest.json` artifact during `PrepareRelease` for downstream automation
 - can preview or publish provider releases via `PublishRelease`
 - can preview or open/update release requests via `OpenReleaseRequest`
 - can comment on released issues via `CommentReleasedIssues`

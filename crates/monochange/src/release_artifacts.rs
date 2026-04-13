@@ -143,36 +143,60 @@ pub(crate) fn build_manifest_updates_parallel(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
 ) -> MonochangeResult<Vec<FileUpdate>> {
-	let ((cargo_updates, npm_updates), (deno_updates, dart_updates)) = rayon::join(
-		|| {
-			rayon::join(
-				|| build_cargo_manifest_updates(packages, plan),
-				|| build_npm_manifest_updates(packages, plan),
-			)
-		},
-		|| {
-			rayon::join(
-				|| build_deno_manifest_updates(packages, plan),
-				|| build_dart_manifest_updates(packages, plan),
-			)
-		},
-	);
-	Ok([cargo_updates?, npm_updates?, deno_updates?, dart_updates?].concat())
+	#[cfg(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart"))]
+	{
+		let ((cargo_updates, npm_updates), (deno_updates, dart_updates)) = rayon::join(
+			|| {
+				rayon::join(
+					|| build_cargo_manifest_updates(packages, plan),
+					|| build_npm_manifest_updates(packages, plan),
+				)
+			},
+			|| {
+				rayon::join(
+					|| build_deno_manifest_updates(packages, plan),
+					|| build_dart_manifest_updates(packages, plan),
+				)
+			},
+		);
+		Ok([cargo_updates?, npm_updates?, deno_updates?, dart_updates?].concat())
+	}
+
+	#[cfg(not(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart")))]
+	{
+		let mut updates = Vec::new();
+		#[cfg(feature = "cargo")]
+		updates.extend(build_cargo_manifest_updates(packages, plan)?);
+		#[cfg(feature = "npm")]
+		updates.extend(build_npm_manifest_updates(packages, plan)?);
+		#[cfg(feature = "deno")]
+		updates.extend(build_deno_manifest_updates(packages, plan)?);
+		#[cfg(feature = "dart")]
+		updates.extend(build_dart_manifest_updates(packages, plan)?);
+		Ok(updates)
+	}
 }
 
+#[allow(clippy::match_same_arms)]
 pub(crate) fn render_tag_name(id: &str, version: &str, version_format: VersionFormat) -> String {
 	match version_format {
 		VersionFormat::Namespaced => format!("{id}/v{version}"),
 		VersionFormat::Primary => format!("v{version}"),
+		_ => format!("v{version}"),
 	}
 }
 
 /// Dispatch tag URL generation to the appropriate provider crate.
 pub(crate) fn tag_url_for_provider(source: &SourceConfiguration, tag_name: &str) -> String {
 	match source.provider {
+		#[cfg(feature = "github")]
 		SourceProvider::GitHub => github_provider::tag_url(source, tag_name),
+		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => gitlab_provider::tag_url(source, tag_name),
+		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::tag_url(source, tag_name),
+		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		_ => String::new(),
 	}
 }
 
@@ -183,9 +207,14 @@ pub(crate) fn compare_url_for_provider(
 	current_tag: &str,
 ) -> String {
 	match source.provider {
+		#[cfg(feature = "github")]
 		SourceProvider::GitHub => github_provider::compare_url(source, previous_tag, current_tag),
+		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => gitlab_provider::compare_url(source, previous_tag, current_tag),
+		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::compare_url(source, previous_tag, current_tag),
+		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		_ => String::new(),
 	}
 }
 
@@ -321,22 +350,27 @@ pub(crate) fn effective_title_template<'a>(
 	specific.or(defaults).unwrap_or(builtin)
 }
 
+#[allow(clippy::match_same_arms)]
 pub(crate) fn default_release_title_for_format(version_format: VersionFormat) -> &'static str {
 	match version_format {
 		VersionFormat::Primary => DEFAULT_RELEASE_TITLE_PRIMARY,
 		VersionFormat::Namespaced => DEFAULT_RELEASE_TITLE_NAMESPACED,
+		_ => DEFAULT_RELEASE_TITLE_PRIMARY,
 	}
 }
 
+#[allow(clippy::match_same_arms)]
 pub(crate) fn default_changelog_version_title_for_format(
 	version_format: VersionFormat,
 ) -> &'static str {
 	match version_format {
 		VersionFormat::Primary => DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY,
 		VersionFormat::Namespaced => DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED,
+		_ => DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY,
 	}
 }
 
+#[cfg(feature = "cargo")]
 pub(crate) fn build_cargo_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
@@ -471,6 +505,7 @@ pub(crate) fn build_cargo_manifest_updates(
 		.collect())
 }
 
+#[cfg(feature = "npm")]
 pub(crate) fn build_npm_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
@@ -514,6 +549,7 @@ pub(crate) fn build_npm_manifest_updates(
 		.collect()
 }
 
+#[cfg(feature = "deno")]
 pub(crate) fn build_deno_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
@@ -557,6 +593,7 @@ pub(crate) fn build_deno_manifest_updates(
 		.collect()
 }
 
+#[cfg(feature = "dart")]
 pub(crate) fn build_dart_manifest_updates(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
@@ -602,6 +639,7 @@ pub(crate) fn build_dart_manifest_updates(
 		.collect()
 }
 
+#[must_use = "the file update result must be checked"]
 pub(crate) fn apply_file_updates(updates: &[FileUpdate]) -> MonochangeResult<()> {
 	for update in updates {
 		if let Some(parent) = update.path.parent() {
@@ -1029,6 +1067,7 @@ pub(crate) fn render_release_commit_body(
 	format!("{}\n\n{}", lines.join("\n"), release_record_block)
 }
 
+#[must_use = "the manifest render result must be checked"]
 pub(crate) fn render_release_manifest_json(manifest: &ReleaseManifest) -> MonochangeResult<String> {
 	serde_json::to_string_pretty(manifest)
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
@@ -1039,9 +1078,14 @@ pub(crate) fn build_source_release_requests(
 	manifest: &ReleaseManifest,
 ) -> Vec<SourceReleaseRequest> {
 	match source.provider {
+		#[cfg(feature = "github")]
 		SourceProvider::GitHub => github_provider::build_release_requests(source, manifest),
+		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => gitlab_provider::build_release_requests(source, manifest),
+		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::build_release_requests(source, manifest),
+		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		_ => Vec::new(),
 	}
 }
 
@@ -1050,14 +1094,17 @@ pub(crate) fn build_source_change_request(
 	manifest: &ReleaseManifest,
 ) -> SourceChangeRequest {
 	let mut request = match source.provider {
-		SourceProvider::GitHub => {
-			github_provider::build_release_pull_request_request(source, manifest)
-		}
-		SourceProvider::GitLab => {
-			gitlab_provider::build_release_pull_request_request(source, manifest)
-		}
-		SourceProvider::Gitea => {
-			gitea_provider::build_release_pull_request_request(source, manifest)
+		#[cfg(feature = "github")]
+		SourceProvider::GitHub => github_provider::build_release_pull_request_request(source, manifest),
+		#[cfg(feature = "gitlab")]
+		SourceProvider::GitLab => gitlab_provider::build_release_pull_request_request(source, manifest),
+		#[cfg(feature = "gitea")]
+		SourceProvider::Gitea => gitea_provider::build_release_pull_request_request(source, manifest),
+		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		_ => {
+			unreachable!(
+				"a hosting provider feature must be enabled to build source change requests"
+			)
 		}
 	};
 	request.commit_message = build_release_commit_message(Some(source), manifest);
@@ -1069,9 +1116,14 @@ pub(crate) fn publish_source_release_requests(
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
 	match source.provider {
+		#[cfg(feature = "github")]
 		SourceProvider::GitHub => github_provider::publish_release_requests(source, requests),
+		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => gitlab_provider::publish_release_requests(source, requests),
+		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::publish_release_requests(source, requests),
+		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		_ => Ok(Vec::new()),
 	}
 }
 
@@ -1082,14 +1134,23 @@ pub(crate) fn publish_source_change_request(
 	tracked_paths: &[PathBuf],
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	match source.provider {
+		#[cfg(feature = "github")]
 		SourceProvider::GitHub => {
 			github_provider::publish_release_pull_request(source, root, request, tracked_paths)
 		}
+		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => {
 			gitlab_provider::publish_release_pull_request(source, root, request, tracked_paths)
 		}
+		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => {
 			gitea_provider::publish_release_pull_request(source, root, request, tracked_paths)
+		}
+		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		_ => {
+			Err(MonochangeError::Config(
+				"no hosting provider feature enabled".to_string(),
+			))
 		}
 	}
 }
@@ -1115,7 +1176,7 @@ pub(crate) fn render_release_cli_command_json(
 	manifest: &ReleaseManifest,
 	releases: &[SourceReleaseRequest],
 	release_request: Option<&SourceChangeRequest>,
-	issue_comments: &[github_provider::GitHubIssueCommentPlan],
+	issue_comments: &[HostedIssueCommentPlan],
 	release_commit: Option<&CommitReleaseReport>,
 	file_diffs: &[PreparedFileDiff],
 ) -> MonochangeResult<String> {

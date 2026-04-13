@@ -8,6 +8,12 @@ pub use monochange_test_helpers::copy_directory;
 pub use monochange_test_helpers::current_test_name;
 #[allow(unused_imports)]
 pub use monochange_test_helpers::snapshot_settings;
+#[cfg(unix)]
+use portable_pty::CommandBuilder;
+#[cfg(unix)]
+use portable_pty::PtySize;
+#[cfg(unix)]
+use portable_pty::native_pty_system;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -35,6 +41,104 @@ pub fn monochange_command(release_date: Option<&str>) -> Command {
 		command.env("MONOCHANGE_RELEASE_DATE", release_date);
 	}
 	command
+}
+
+#[cfg(unix)]
+#[allow(dead_code)]
+pub enum TtyAction<'a> {
+	Sleep(std::time::Duration),
+	Send {
+		bytes: &'a [u8],
+		pause_after: std::time::Duration,
+	},
+}
+
+#[cfg(unix)]
+#[allow(dead_code)]
+pub fn run_in_tty(
+	workspace: &Path,
+	args: &[&str],
+	release_date: Option<&str>,
+	actions: &[TtyAction<'_>],
+) -> (i32, String) {
+	use std::io::Read as _;
+	use std::io::Write as _;
+	use std::thread;
+
+	let pty_system = native_pty_system();
+	let pair = pty_system
+		.openpty(PtySize {
+			rows: 24,
+			cols: 80,
+			pixel_width: 0,
+			pixel_height: 0,
+		})
+		.unwrap_or_else(|error| panic!("open pty: {error}"));
+	let mut command = CommandBuilder::new(get_cargo_bin("mc"));
+	command.cwd(workspace);
+	command.env("NO_COLOR", "1");
+	command.env_remove("RUST_LOG");
+	if let Some(release_date) = release_date {
+		command.env("MONOCHANGE_RELEASE_DATE", release_date);
+	}
+	for arg in args {
+		command.arg(arg);
+	}
+	let mut child = pair
+		.slave
+		.spawn_command(command)
+		.unwrap_or_else(|error| panic!("spawn tty command: {error}"));
+	drop(pair.slave);
+
+	let mut reader = pair
+		.master
+		.try_clone_reader()
+		.unwrap_or_else(|error| panic!("clone tty reader: {error}"));
+	let reader_thread = thread::spawn(move || {
+		let mut transcript = Vec::new();
+		reader
+			.read_to_end(&mut transcript)
+			.unwrap_or_else(|error| panic!("read tty transcript: {error}"));
+		transcript
+	});
+	let mut writer = pair
+		.master
+		.take_writer()
+		.unwrap_or_else(|error| panic!("take tty writer: {error}"));
+	for action in actions {
+		match action {
+			TtyAction::Sleep(duration) => thread::sleep(*duration),
+			TtyAction::Send { bytes, pause_after } => {
+				match writer.write_all(bytes) {
+					Ok(()) => {
+						writer
+							.flush()
+							.unwrap_or_else(|error| panic!("flush tty input: {error}"));
+						thread::sleep(*pause_after);
+					}
+					Err(error) if error.raw_os_error() == Some(5) => break,
+					Err(error) => panic!("write tty input: {error}"),
+				}
+			}
+		}
+	}
+	drop(writer);
+	let status = child
+		.wait()
+		.unwrap_or_else(|error| panic!("wait for tty command: {error}"));
+	drop(pair.master);
+	let transcript = reader_thread
+		.join()
+		.unwrap_or_else(|_| panic!("tty reader thread panicked"));
+	let status_code = status
+		.exit_code()
+		.try_into()
+		.unwrap_or_else(|error| panic!("tty exit status conversion: {error}"));
+	(
+		status_code,
+		String::from_utf8(transcript)
+			.unwrap_or_else(|error| panic!("tty transcript utf8: {error}")),
+	)
 }
 
 #[allow(dead_code)]

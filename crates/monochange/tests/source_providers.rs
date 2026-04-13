@@ -25,3 +25,17 @@ fn source_provider_scenarios_match_snapshot(
 	let json = run_json_command(tempdir.path(), command, Some("2026-04-06"));
 	assert_json_snapshot!(json);
 }
+
+#[rstest]
+#[case::github("source/github")]
+#[case::gitlab("source/gitlab")]
+#[case::gitea("source/gitea")]
+fn source_provider_diagnostics_match_snapshot(#[case] scenario_relative: &str) {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace(scenario_relative);
+	let json = run_json_command(tempdir.path(), "diagnostics", Some("2026-04-06"));
+	assert_json_snapshot!(json);
+}

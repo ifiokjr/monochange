@@ -72,3 +72,5 @@ Example:
 The binary benchmark workflow uses `--progress-format json` to extract `PrepareRelease` phase timings for both `mc release --dry-run` and `mc release`.
 
 Those timings are summarized and compared against `.github/scripts/benchmark_phase_budgets.json`, which lets pull requests fail when real release-path regressions exceed the configured budget.
+
+For hosted-provider analysis outside CI, `.github/scripts/benchmark_cli.sh run-fixture` can benchmark an existing repository checkout and render the same markdown summary against a real hosted fixture. See [Hosted release benchmarks](./hosted-release-benchmarks.md).

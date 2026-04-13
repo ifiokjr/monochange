@@ -133,6 +133,7 @@ pub(crate) use git_support::run_git_process;
 pub(crate) use git_support::run_git_status;
 use minijinja::Environment;
 use minijinja::UndefinedBehavior;
+#[cfg(feature = "cargo")]
 use monochange_cargo::RustSemverProvider;
 use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
@@ -160,6 +161,7 @@ use monochange_core::GroupChangelogInclude;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
+use monochange_core::HostedIssueCommentPlan;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestRef;
@@ -203,8 +205,11 @@ use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
 use monochange_core::render_release_notes;
 use monochange_core::render_release_record_block;
+#[cfg(feature = "gitea")]
 use monochange_gitea as gitea_provider;
+#[cfg(feature = "github")]
 use monochange_github as github_provider;
+#[cfg(feature = "gitlab")]
 use monochange_gitlab as gitlab_provider;
 use monochange_graph::build_release_plan;
 use monochange_semver::CompatibilityProvider;
@@ -215,6 +220,7 @@ pub use release_record::execute_release_retarget;
 pub use release_record::plan_release_retarget;
 use release_record::render_release_record_discovery;
 pub use release_record::retarget_release;
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
 pub(crate) use versioned_files::*;
@@ -238,6 +244,7 @@ pub(crate) use workspace_ops::render_change_target_markdown;
 pub(crate) use workspace_ops::render_cli_commands_toml;
 #[cfg(test)]
 pub(crate) use workspace_ops::render_interactive_changeset_markdown;
+#[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
 mod assist;
@@ -248,13 +255,19 @@ mod cli;
 mod cli_progress;
 mod cli_runtime;
 mod git_support;
+mod hosted_sources;
 mod interactive;
 mod mcp;
+mod prepared_release_cache;
 mod release_artifacts;
 mod release_record;
 mod tracing_setup;
 mod versioned_files;
 mod workspace_ops;
+
+pub(crate) use prepared_release_cache::ensure_monochange_artifact_ignored;
+pub(crate) use prepared_release_cache::maybe_load_prepared_release_execution;
+pub(crate) use prepared_release_cache::save_prepared_release_execution;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum OutputFormat {
@@ -297,7 +310,7 @@ pub enum AssistOutputFormat {
 	Json,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseTarget {
 	pub id: String,
 	pub kind: ReleaseOwnerKind,
@@ -311,7 +324,7 @@ pub struct ReleaseTarget {
 	pub rendered_changelog_title: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreparedChangelog {
 	pub owner_id: String,
 	pub owner_kind: ReleaseOwnerKind,
@@ -321,7 +334,7 @@ pub struct PreparedChangelog {
 	pub rendered: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreparedRelease {
 	pub plan: ReleasePlan,
 	pub changeset_paths: Vec<PathBuf>,
@@ -497,7 +510,7 @@ struct CliContext {
 	release_request: Option<SourceChangeRequest>,
 	release_request_result: Option<String>,
 	release_commit_report: Option<CommitReleaseReport>,
-	issue_comment_plans: Vec<github_provider::GitHubIssueCommentPlan>,
+	issue_comment_plans: Vec<HostedIssueCommentPlan>,
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,
 	changeset_diagnostics: Option<ChangesetDiagnosticsReport>,
@@ -514,6 +527,7 @@ struct CommandStepOutput {
 
 const CHANGESET_DIR: &str = ".changeset";
 
+#[must_use = "the run result must be checked"]
 pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
@@ -558,6 +572,7 @@ where
 	None
 }
 
+#[must_use = "the run result must be checked"]
 pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
@@ -699,6 +714,7 @@ fn format_publish_state(publish_state: monochange_core::PublishState) -> &'stati
 		monochange_core::PublishState::Private => "private",
 		monochange_core::PublishState::Unpublished => "unpublished",
 		monochange_core::PublishState::Excluded => "excluded",
+		_ => "unknown",
 	}
 }
 

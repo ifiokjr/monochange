@@ -195,18 +195,6 @@ default = "text"
 name = "prepare release"
 type = "PrepareRelease"
 
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
-
-[[cli.release-manifest.steps]]
-name = "prepare release"
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-name = "render release manifest"
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
-
 [cli.publish-release]
 help_text = "Prepare a release and publish provider releases"
 
@@ -397,7 +385,7 @@ Current implementation notes:
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `CommitRelease`, `RenderReleaseManifest`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`, and `Command`
+- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`, and `Command`
 - see the [CLI step reference](../reference/cli-steps/00-index.md) for detailed per-step guidance, prerequisites, and composition examples
 
 <!-- {/configurationCurrentStatus} -->
@@ -535,7 +523,7 @@ Current `PrepareRelease` behavior:
 - renders changelog files through structured release notes using the configured `monochange` or `keep_a_changelog` format
 - groups release notes into default `Breaking changes`, `Features`, `Fixes`, and `Notes` sections, with package/group overrides available through `extra_changelog_sections`
 - applies workspace-wide release-note templates from `[release_notes].change_templates`
-- can snapshot the prepared release as a stable JSON manifest via `RenderReleaseManifest`
+- refreshes the cached `.monochange/release-manifest.json` artifact during `PrepareRelease` for downstream automation
 - can preview or publish provider releases via `PublishRelease`
 - can preview or open/update release requests via `OpenReleaseRequest`
 - can comment on released issues via `CommentReleasedIssues`
@@ -618,7 +606,7 @@ monochange keeps source-provider automation layered on top of the same `PrepareR
 
 That means one set of `.changeset/*.md` inputs can drive all of these commands and automation flows consistently:
 
-- `mc release-manifest` writes a stable JSON artifact for downstream automation
+- `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload
 - `mc publish-release` previews or publishes provider releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent provider release request
 - `mc affected` evaluates pull-request changeset policy from CI-supplied changed paths and labels
@@ -629,7 +617,6 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 
 ```bash
 mc release --dry-run --format json
-mc release-manifest --dry-run
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc affected --format json --changed-paths crates/monochange/src/lib.rs
@@ -672,16 +659,6 @@ base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
-
-[cli.release-manifest]
-help_text = "Prepare a release and write a stable JSON manifest"
-
-[[cli.release-manifest.steps]]
-type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"
 
 [cli.publish-release]
 help_text = "Prepare a release and publish provider releases"
@@ -833,7 +810,7 @@ The monochange repository itself can dogfood this model by:
 3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
 4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
 5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
-6. **Generate manifest** — `mc release-manifest --dry-run` writes a stable JSON artifact for downstream automation.
+6. **Inspect cached manifest** — `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload.
 7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
 
 <!-- {/recommendedCommandFlow} -->
@@ -864,7 +841,6 @@ The monochange repository itself can dogfood this model by:
 
 - `PrepareRelease` — compute release plan, update versions, changelogs, and versioned files
 - `CommitRelease` — create a local release commit
-- `RenderReleaseManifest` — write a stable JSON manifest
 - `PublishRelease` — create provider releases
 - `OpenReleaseRequest` — open or update a release pull request
 - `CommentReleasedIssues` — comment on issues referenced in changesets

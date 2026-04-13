@@ -2,9 +2,7 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn git(root: &Path, args: &[&str]) {
-	let output = Command::new("git")
-		.current_dir(root)
-		.args(args)
+	let output = git_command(root, args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 	assert!(
@@ -16,9 +14,7 @@ pub fn git(root: &Path, args: &[&str]) {
 }
 
 pub fn git_output(root: &Path, args: &[&str]) -> String {
-	let output = Command::new("git")
-		.current_dir(root)
-		.args(args)
+	let output = git_command(root, args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 	assert!(
@@ -32,4 +28,24 @@ pub fn git_output(root: &Path, args: &[&str]) -> String {
 
 pub fn git_output_trimmed(root: &Path, args: &[&str]) -> String {
 	git_output(root, args).trim().to_string()
+}
+
+fn git_command(root: &Path, args: &[&str]) -> Command {
+	let mut command = Command::new("git");
+	command.current_dir(root);
+	for variable in [
+		"GIT_DIR",
+		"GIT_WORK_TREE",
+		"GIT_COMMON_DIR",
+		"GIT_INDEX_FILE",
+		"GIT_OBJECT_DIRECTORY",
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	] {
+		command.env_remove(variable);
+	}
+	if matches!(args.first(), Some(&"commit")) {
+		command.args(["-c", "commit.gpgsign=false"]);
+	}
+	command.args(args);
+	command
 }

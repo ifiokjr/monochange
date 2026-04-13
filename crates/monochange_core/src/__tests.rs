@@ -19,18 +19,26 @@ use crate::Ecosystem;
 use crate::EcosystemSettings;
 use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
+use crate::HostedIssueCommentPlan;
+use crate::HostedSourceAdapter;
+use crate::HostedSourceFeatures;
 use crate::HostingProviderKind;
 use crate::MonochangeError;
 use crate::PackageDefinition;
 use crate::PackageDependency;
 use crate::PackageRecord;
 use crate::PackageType;
+use crate::ProviderBotSettings;
+use crate::ProviderMergeRequestSettings;
+use crate::ProviderReleaseSettings;
 use crate::PublishState;
 use crate::RELEASE_RECORD_END_MARKER;
 use crate::RELEASE_RECORD_HEADING;
 use crate::RELEASE_RECORD_KIND;
 use crate::RELEASE_RECORD_SCHEMA_VERSION;
 use crate::RELEASE_RECORD_START_MARKER;
+use crate::ReleaseManifest;
+use crate::ReleaseManifestPlan;
 use crate::ReleaseNotesDocument;
 use crate::ReleaseNotesSection;
 use crate::ReleaseNotesSettings;
@@ -47,6 +55,7 @@ use crate::RetargetProviderResult;
 use crate::RetargetResult;
 use crate::RetargetTagResult;
 use crate::ShellConfig;
+use crate::SourceConfiguration;
 use crate::SourceProvider;
 use crate::VersionFormat;
 use crate::VersionedFileDefinition;
@@ -73,6 +82,104 @@ fn must_err<T, E>(result: Result<T, E>, context: &str) -> E {
 		Ok(_) => panic!("{context}"),
 		Err(error) => error,
 	}
+}
+
+#[derive(Clone)]
+struct TestHostedSourceAdapter {
+	provider: SourceProvider,
+	features: HostedSourceFeatures,
+	issue_comment_plans: Vec<HostedIssueCommentPlan>,
+}
+
+impl HostedSourceAdapter for TestHostedSourceAdapter {
+	fn provider(&self) -> SourceProvider {
+		self.provider
+	}
+
+	fn features(&self) -> HostedSourceFeatures {
+		self.features
+	}
+
+	fn annotate_changeset_context(
+		&self,
+		_source: &SourceConfiguration,
+		_changesets: &mut [crate::PreparedChangeset],
+	) {
+	}
+
+	fn plan_released_issue_comments(
+		&self,
+		_source: &SourceConfiguration,
+		_manifest: &ReleaseManifest,
+	) -> Vec<HostedIssueCommentPlan> {
+		self.issue_comment_plans.clone()
+	}
+}
+
+struct DefaultHostedSourceAdapter {
+	provider: SourceProvider,
+}
+
+impl HostedSourceAdapter for DefaultHostedSourceAdapter {
+	fn provider(&self) -> SourceProvider {
+		self.provider
+	}
+
+	fn annotate_changeset_context(
+		&self,
+		_source: &SourceConfiguration,
+		changesets: &mut [crate::PreparedChangeset],
+	) {
+		if let Some(first) = changesets.first_mut() {
+			first.summary = Some("annotated".to_string());
+		}
+	}
+}
+
+fn test_source_configuration(provider: SourceProvider) -> SourceConfiguration {
+	SourceConfiguration {
+		provider,
+		owner: "org".to_string(),
+		repo: "repo".to_string(),
+		host: None,
+		api_url: None,
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	}
+}
+
+fn test_release_manifest() -> ReleaseManifest {
+	ReleaseManifest {
+		command: "release".to_string(),
+		dry_run: true,
+		version: Some("1.2.3".to_string()),
+		group_version: Some("1.2.3".to_string()),
+		release_targets: Vec::new(),
+		released_packages: Vec::new(),
+		changed_files: Vec::new(),
+		changelogs: Vec::new(),
+		changesets: Vec::new(),
+		deleted_changesets: Vec::new(),
+		plan: ReleaseManifestPlan {
+			workspace_root: PathBuf::from("."),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		},
+	}
+}
+
+fn test_retarget_tags() -> Vec<RetargetTagResult> {
+	vec![RetargetTagResult {
+		tag_name: "v1.2.3".to_string(),
+		from_commit: "abc1234".to_string(),
+		to_commit: "def5678".to_string(),
+		operation: RetargetOperation::Planned,
+		message: None,
+	}]
 }
 
 fn init_git_repository(root: &Path) {
@@ -111,6 +218,145 @@ fn must_ok_panics_on_errors() {
 #[test]
 fn must_err_panics_on_ok_results() {
 	assert!(std::panic::catch_unwind(|| must_err(Ok::<(), &str>(()), "context")).is_err());
+}
+
+#[test]
+fn hosted_source_adapter_default_comment_publishing_returns_empty_when_no_plans_exist() {
+	let adapter = DefaultHostedSourceAdapter {
+		provider: SourceProvider::GitLab,
+	};
+	let source = test_source_configuration(SourceProvider::GitLab);
+	let manifest = test_release_manifest();
+
+	let outcomes = must_ok(
+		adapter.comment_released_issues(&source, &manifest),
+		"default comment publishing should allow empty plans",
+	);
+
+	assert!(outcomes.is_empty());
+}
+
+#[test]
+fn hosted_source_adapter_default_features_are_empty_and_comment_plans_are_empty() {
+	let adapter = DefaultHostedSourceAdapter {
+		provider: SourceProvider::GitLab,
+	};
+	let source = test_source_configuration(SourceProvider::GitLab);
+	let manifest = test_release_manifest();
+
+	assert_eq!(adapter.features(), HostedSourceFeatures::default());
+	assert!(
+		adapter
+			.plan_released_issue_comments(&source, &manifest)
+			.is_empty()
+	);
+}
+
+#[test]
+fn hosted_source_adapter_default_enrich_delegates_to_annotate() {
+	let adapter = DefaultHostedSourceAdapter {
+		provider: SourceProvider::GitLab,
+	};
+	let source = test_source_configuration(SourceProvider::GitLab);
+	let mut changesets = vec![crate::PreparedChangeset {
+		path: PathBuf::from(".changeset/example.md"),
+		summary: None,
+		details: None,
+		targets: Vec::new(),
+		context: None,
+	}];
+
+	adapter.enrich_changeset_context(&source, &mut changesets);
+
+	assert_eq!(
+		changesets
+			.first()
+			.and_then(|changeset| changeset.summary.as_deref()),
+		Some("annotated")
+	);
+}
+
+#[test]
+fn hosted_source_adapter_default_comment_publishing_errors_when_provider_lacks_support() {
+	let adapter = TestHostedSourceAdapter {
+		provider: SourceProvider::GitLab,
+		features: HostedSourceFeatures::default(),
+		issue_comment_plans: vec![HostedIssueCommentPlan {
+			repository: "org/repo".to_string(),
+			issue_id: "#7".to_string(),
+			issue_url: Some("https://gitlab.example.com/org/repo/-/issues/7".to_string()),
+			body: "Released in v1.2.3.".to_string(),
+		}],
+	};
+	let source = test_source_configuration(SourceProvider::GitLab);
+	let manifest = test_release_manifest();
+
+	let error = must_err(
+		adapter.comment_released_issues(&source, &manifest),
+		"default comment publishing should reject unsupported providers",
+	);
+
+	assert!(
+		error
+			.to_string()
+			.contains("released issue comments are not yet supported for gitlab")
+	);
+}
+
+#[test]
+fn hosted_source_adapter_default_retarget_planning_marks_unsupported_providers() {
+	let adapter = TestHostedSourceAdapter {
+		provider: SourceProvider::GitLab,
+		features: HostedSourceFeatures::default(),
+		issue_comment_plans: Vec::new(),
+	};
+
+	let plan = adapter.plan_retargeted_releases(&test_retarget_tags());
+	let plan_entry = plan
+		.first()
+		.expect("default retarget planning should emit one entry");
+
+	assert_eq!(plan.len(), 1);
+	assert_eq!(plan_entry.provider, SourceProvider::GitLab);
+	assert_eq!(plan_entry.operation, RetargetProviderOperation::Unsupported);
+	assert_eq!(
+		plan_entry.message.as_deref(),
+		Some("provider sync is not yet supported for gitlab release retargeting")
+	);
+}
+
+#[test]
+fn hosted_source_adapter_default_retarget_sync_uses_dry_run_plans_and_blocks_real_runs() {
+	let adapter = TestHostedSourceAdapter {
+		provider: SourceProvider::GitHub,
+		features: HostedSourceFeatures {
+			batched_changeset_context_lookup: true,
+			released_issue_comments: true,
+			release_retarget_sync: true,
+		},
+		issue_comment_plans: Vec::new(),
+	};
+	let source = test_source_configuration(SourceProvider::GitHub);
+	let tags = test_retarget_tags();
+
+	let dry_run_plan = must_ok(
+		adapter.sync_retargeted_releases(&source, &tags, true),
+		"default retarget sync should reuse dry-run planning",
+	);
+	let dry_run_entry = dry_run_plan
+		.first()
+		.expect("default retarget sync should emit one dry-run entry");
+	assert_eq!(dry_run_entry.operation, RetargetProviderOperation::Planned);
+
+	let error = must_err(
+		adapter.sync_retargeted_releases(&source, &tags, false),
+		"default retarget sync should reject unsupported real runs",
+	);
+	assert!(
+		error
+			.to_string()
+			.contains("provider sync is not yet supported for github release retargeting")
+	);
 }
 
 #[test]
@@ -678,15 +924,6 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			"CommitRelease",
 		),
 		(
-			CliStepDefinition::RenderReleaseManifest {
-				name: None,
-				when: None,
-				path: None,
-				inputs: BTreeMap::new(),
-			},
-			"RenderReleaseManifest",
-		),
-		(
 			CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
@@ -822,12 +1059,6 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 		CliStepDefinition::CommitRelease {
 			name: Some(expected.to_string()),
 			when: None,
-			inputs: BTreeMap::new(),
-		},
-		CliStepDefinition::RenderReleaseManifest {
-			name: Some(expected.to_string()),
-			when: None,
-			path: None,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishRelease {
@@ -2221,4 +2452,55 @@ fn json_helper_functions_cover_success_paths() {
 		updated,
 		r#"{"version":1,"imports":{"core":{"path":"./core"}}}"#
 	);
+}
+
+#[test]
+fn monochange_error_io_source_render_includes_path_and_source() {
+	let error = MonochangeError::IoSource {
+		path: PathBuf::from("/tmp/missing.toml"),
+		source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
+	};
+	let rendered = error.render();
+	assert!(rendered.contains("/tmp/missing.toml"), "got: {rendered}");
+	assert!(rendered.contains("not found"), "got: {rendered}");
+}
+
+#[test]
+fn monochange_error_parse_render_includes_path_and_source() {
+	let error = MonochangeError::Parse {
+		path: PathBuf::from("Cargo.toml"),
+		source: Box::new(std::io::Error::new(
+			std::io::ErrorKind::InvalidData,
+			"bad format",
+		)),
+	};
+	let rendered = error.render();
+	assert!(rendered.contains("Cargo.toml"), "got: {rendered}");
+	assert!(rendered.contains("bad format"), "got: {rendered}");
+}
+
+#[test]
+fn monochange_error_interactive_render_returns_message() {
+	let error = MonochangeError::Interactive {
+		message: "prompt failed".to_string(),
+	};
+	assert_eq!(error.render(), "prompt failed");
+}
+
+#[test]
+fn monochange_error_cancelled_render_returns_cancelled() {
+	let error = MonochangeError::Cancelled;
+	assert_eq!(error.render(), "cancelled");
+}
+
+#[cfg(feature = "http")]
+#[test]
+fn monochange_error_http_request_render_includes_context_and_source() {
+	let client = reqwest::blocking::Client::new();
+	let error = MonochangeError::HttpRequest {
+		context: "fetching releases".to_string(),
+		source: client.get("http://0.0.0.0:1").send().unwrap_err(),
+	};
+	let rendered = error.render();
+	assert!(rendered.contains("fetching releases"), "got: {rendered}");
 }

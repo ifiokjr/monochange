@@ -22,11 +22,8 @@ version_format = "primary"
 [ecosystems.cargo]
 enabled = true
 
-[cli.release-manifest]
+[cli.release]
+help_text = "Prepare a release and refresh the cached release manifest"
 
-[[cli.release-manifest.steps]]
+[[cli.release.steps]]
 type = "PrepareRelease"
-
-[[cli.release-manifest.steps]]
-type = "RenderReleaseManifest"
-path = ".monochange/release-manifest.json"

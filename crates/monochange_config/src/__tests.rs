@@ -155,8 +155,7 @@ fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_c
 			"release",
 			"affected",
 			"diagnostics",
-			"repair-release",
-			"release-manifest"
+			"repair-release"
 		]
 	);
 
@@ -178,34 +177,14 @@ fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_c
 		.unwrap_or_else(|| panic!("expected release command"));
 	assert_eq!(
 		release.help_text.as_deref(),
-		Some("Prepare a release and write a stable JSON manifest")
+		Some("Prepare a release and refresh the cached release manifest")
 	);
 	assert!(release.inputs.is_empty());
 	assert!(matches!(
 		release.steps.first(),
 		Some(CliStepDefinition::PrepareRelease { .. })
 	));
-	assert!(matches!(
-		release.steps.get(1),
-		Some(CliStepDefinition::RenderReleaseManifest {
-			path: Some(path),
-			..
-		}) if path == &PathBuf::from(".monochange/release-manifest.json")
-	));
-
-	let release_manifest = configuration
-		.cli
-		.iter()
-		.find(|command| command.name == "release-manifest")
-		.unwrap_or_else(|| panic!("expected release-manifest command"));
-	assert!(matches!(
-		release_manifest.steps.first(),
-		Some(CliStepDefinition::PrepareRelease { .. })
-	));
-	assert!(matches!(
-		release_manifest.steps.get(1),
-		Some(CliStepDefinition::RenderReleaseManifest { .. })
-	));
+	assert_eq!(release.steps.len(), 1);
 }
 
 #[test]
@@ -351,7 +330,7 @@ fn load_workspace_configuration_parses_package_group_and_cli_command_declaration
 			.unwrap_or_else(|| panic!("expected release CLI command"))
 			.steps
 			.len(),
-		2
+		1
 	);
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert_eq!(configuration.npm.roots, vec!["packages/*"]);

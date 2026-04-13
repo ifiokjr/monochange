@@ -424,7 +424,7 @@ fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
 }
 
 #[test]
-fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
+fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 	let rendered = crate::render_cli_commands_toml(&[monochange_core::CliCommandDefinition {
 		name: "custom".to_string(),
 		help_text: None,
@@ -438,10 +438,9 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 			short: Some('m'),
 		}],
 		steps: vec![
-			monochange_core::CliStepDefinition::RenderReleaseManifest {
+			monochange_core::CliStepDefinition::PrepareRelease {
 				name: None,
 				when: Some("{{ inputs.enabled }}".to_string()),
-				path: Some(PathBuf::from("target/release-manifest.json")),
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
@@ -552,9 +551,8 @@ fn render_cli_commands_toml_handles_manifest_and_command_step_variants() {
 	assert!(rendered.contains("choices = [\"safe\", \"fast\"]"));
 	assert!(rendered.contains("short = \"m\""));
 	assert!(rendered.contains("[[cli.custom.steps]]"));
-	assert!(rendered.contains("type = \"RenderReleaseManifest\""));
+	assert!(rendered.contains("type = \"PrepareRelease\""));
 	assert!(rendered.contains("when = \"{{ inputs.enabled }}\""));
-	assert!(rendered.contains("path = \"target/release-manifest.json\""));
 	assert!(rendered.contains("inputs = { format = \"json\" }"));
 	assert!(rendered.contains("dry_run_command = \"echo dry-run\""));
 	assert!(rendered.contains("inputs = { enabled = true }"));
@@ -2362,7 +2360,7 @@ fn repairable_releases_guide_distinguishes_manifest_and_release_record() {
 	for expected in [
 		"manifest = \"what monochange is preparing right now\"",
 		"release record = \"what this release commit historically declared\"",
-		"`ReleaseRecord` does **not** replace `RenderReleaseManifest`",
+		"`ReleaseRecord` does **not** replace the cached release manifest",
 		"mc release-record --from v1.2.3",
 		"mc repair-release --from v1.2.3 --target HEAD --dry-run",
 		"Prefer publishing a new patch release",
@@ -3902,16 +3900,6 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let cases = [
 		(
-			"release-manifest",
-			monochange_core::CliStepDefinition::RenderReleaseManifest {
-				name: None,
-				when: None,
-				path: None,
-				inputs: BTreeMap::new(),
-			},
-			"`RenderReleaseManifest` requires a previous `PrepareRelease` step",
-		),
-		(
 			"publish-release",
 			monochange_core::CliStepDefinition::PublishRelease {
 				name: None,
@@ -4000,9 +3988,47 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected github source requirement error"));
-	assert!(error.to_string().contains(
-		"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
-	));
+	assert!(
+		error.to_string().contains(
+			"`CommentReleasedIssues` is not supported for `[source].provider = \"gitlab\"`"
+		)
+	);
+}
+
+#[test]
+fn execute_cli_command_comment_released_issues_requires_source_configuration() {
+	let root = fixture_path("monochange/release-base");
+	let mut configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	configuration.source = None;
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "release-comments".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			monochange_core::CliStepDefinition::PrepareRelease {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			monochange_core::CliStepDefinition::CommentReleasedIssues {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+		],
+	};
+
+	let error =
+		crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
+			.err()
+			.unwrap_or_else(|| panic!("expected missing source configuration error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("`CommentReleasedIssues` requires `[source]` configuration")
+	);
 }
 
 #[test]
@@ -4088,7 +4114,8 @@ fn execute_cli_command_change_step_requires_reason_input() {
 }
 
 #[test]
-fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
+fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_up_steps_render_dry_run_outputs()
+ {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
 	fs::OpenOptions::new()
@@ -4106,34 +4133,26 @@ fn execute_cli_command_release_follow_up_steps_render_dry_run_outputs() {
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 
-	let manifest_path = root.join("target/release-manifest.json");
-	let render_manifest = monochange_core::CliCommandDefinition {
-		name: "release-manifest".to_string(),
+	let manifest_path = root.join(".monochange/release-manifest.json");
+	let prepare_release = monochange_core::CliCommandDefinition {
+		name: "release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
-		steps: vec![
-			monochange_core::CliStepDefinition::PrepareRelease {
-				name: None,
-				when: None,
-				inputs: BTreeMap::new(),
-			},
-			monochange_core::CliStepDefinition::RenderReleaseManifest {
-				name: None,
-				when: None,
-				path: Some(PathBuf::from("target/release-manifest.json")),
-				inputs: BTreeMap::new(),
-			},
-		],
+		steps: vec![monochange_core::CliStepDefinition::PrepareRelease {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		}],
 	};
 	let render_output = crate::execute_cli_command(
 		root,
 		&configuration,
-		&render_manifest,
+		&prepare_release,
 		true,
 		BTreeMap::new(),
 	)
-	.unwrap_or_else(|error| panic!("render manifest: {error}"));
-	assert!(render_output.contains("release manifest: target/release-manifest.json"));
+	.unwrap_or_else(|error| panic!("prepare release: {error}"));
+	assert!(render_output.contains("release manifest: .monochange/release-manifest.json"));
 	let manifest_contents =
 		fs::read_to_string(&manifest_path).unwrap_or_else(|error| panic!("read manifest: {error}"));
 	assert!(manifest_contents.contains("\"releaseTargets\""));
@@ -5209,14 +5228,14 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 	.err()
 	.unwrap_or_else(|| panic!("expected missing PrepareRelease error"));
 	assert!(
-		error
-			.to_string()
-			.contains("`CommitRelease` requires a previous `PrepareRelease` step")
+		error.to_string().contains(
+			"`CommitRelease` requires a previous `PrepareRelease` step or a reusable prepared release artifact"
+		)
 	);
 }
 
 #[test]
-fn git_stage_paths_reports_git_failures() {
+fn git_stage_paths_reports_git_inspection_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let error = crate::git_stage_paths(tempdir.path(), &[PathBuf::from("release.txt")])
 		.err()
@@ -5224,7 +5243,42 @@ fn git_stage_paths_reports_git_failures() {
 	assert!(
 		error
 			.to_string()
-			.contains("failed to stage release commit files")
+			.contains("failed to inspect tracked git path release.txt")
+	);
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	copy_fixture("prepared-release/commit-release-flexible/workspace", root);
+	init_git_repo(root);
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+
+	let mut cargo_toml = fs::read_to_string(root.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("read Cargo.toml: {error}"));
+	cargo_toml.push_str("\n# staged release update\n");
+	fs::write(root.join("Cargo.toml"), cargo_toml)
+		.unwrap_or_else(|error| panic!("write Cargo.toml: {error}"));
+	fs::create_dir_all(root.join(".monochange"))
+		.unwrap_or_else(|error| panic!("create .monochange: {error}"));
+	fs::write(root.join(".monochange/release-manifest.json"), "{}\n")
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+
+	crate::git_stage_paths(
+		root,
+		&[
+			PathBuf::from("Cargo.toml"),
+			PathBuf::from(".monochange/release-manifest.json"),
+			PathBuf::from(".changeset/001-release-foundation.md"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("git stage paths: {error}"));
+
+	assert_eq!(
+		git_output_in_temp_repo(root, &["diff", "--cached", "--name-only"]),
+		"Cargo.toml"
 	);
 }
 
@@ -7658,7 +7712,7 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 			.unwrap_or_else(|| panic!("expected release command"))
 			.steps
 			.len(),
-		2
+		1
 	);
 }
 

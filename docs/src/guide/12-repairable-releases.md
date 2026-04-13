@@ -14,10 +14,10 @@ monochange solves that by storing a durable release declaration in git history a
 
 monochange now has two related but different release artifacts:
 
-| Artifact                                   | What it means                                  | When it exists                                    | What it is for                                                                    |
-| ------------------------------------------ | ---------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `RenderReleaseManifest` / release manifest | what monochange is preparing right now         | during command execution                          | CI, MCP/server consumers, previews, downstream automation, and AI/agent workflows |
-| `ReleaseRecord`                            | what this release commit historically declared | inside the monochange-managed release commit body | later inspection and repair from git history                                      |
+| Artifact                                                      | What it means                                  | When it exists                                    | What it is for                                                                    |
+| ------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------- |
+| cached release manifest (`.monochange/release-manifest.json`) | what monochange is preparing right now         | during command execution and cached locally       | CI, MCP/server consumers, previews, downstream automation, and AI/agent workflows |
+| `ReleaseRecord`                                               | what this release commit historically declared | inside the monochange-managed release commit body | later inspection and repair from git history                                      |
 
 Plain-language summary:
 
@@ -29,7 +29,7 @@ If you prefer the emphasized version:
 - **manifest** = "what monochange is preparing right now"
 - **release record** = "what this release commit historically declared"
 
-The important consequence is that `ReleaseRecord` does **not** replace `RenderReleaseManifest`.
+The important consequence is that `ReleaseRecord` does **not** replace the cached release manifest.
 
 Use the manifest when you want execution-time automation. Use the release record when you want history-time inspection or repair.
 
@@ -183,7 +183,7 @@ When provider sync is unsupported, monochange reports that clearly in dry-run an
 
 The new history-oriented repair workflow does not remove the execution-time manifest workflow.
 
-Keep using `RenderReleaseManifest` and manifest JSON when you want:
+Keep using the cached manifest JSON from `PrepareRelease` when you want:
 
 - machine-readable release plans in CI
 - MCP/server responses for assistants

@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 use std::thread;
 
@@ -15,6 +16,7 @@ use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
+use monochange_core::HostedSourceAdapter;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
@@ -249,6 +251,77 @@ fn comment_released_issues_public_api_uses_source_configuration() {
 			.unwrap_or_else(|| panic!("expected one issue comment outcome"))
 			.issue_id,
 		"#7"
+	);
+}
+
+#[test]
+fn github_hosted_source_adapter_comments_released_issues() {
+	let server = MockServer::start();
+	let list_issue_comments = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let create_issue_comment = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body("{\"html_url\":\"https://example.com/issues/7#comment-1\"}");
+	});
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	};
+	let mut manifest = sample_manifest();
+	manifest.changesets = vec![PreparedChangeset {
+		path: PathBuf::from(".changeset/feature.md"),
+		summary: Some("add release context".to_string()),
+		details: None,
+		targets: Vec::new(),
+		context: Some(ChangesetContext {
+			provider: HostingProviderKind::GitHub,
+			host: Some("example.com".to_string()),
+			capabilities: github_hosting_capabilities(),
+			introduced: None,
+			last_updated: None,
+			related_issues: vec![HostedIssueRef {
+				provider: HostingProviderKind::GitHub,
+				host: Some("example.com".to_string()),
+				id: "#7".to_string(),
+				title: Some("Track release context".to_string()),
+				url: Some("https://example.com/issues/7".to_string()),
+				relationship: HostedIssueRelationshipKind::ClosedByReviewRequest,
+			}],
+		}),
+	}];
+
+	let outcomes = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_SERVER_URL", Some("https://example.com")),
+		],
+		|| HOSTED_SOURCE_ADAPTER.comment_released_issues(&source, &manifest),
+	)
+	.unwrap_or_else(|error| panic!("adapter issue comments: {error}"));
+
+	list_issue_comments.assert();
+	create_issue_comment.assert();
+	assert_eq!(outcomes.len(), 1);
+	assert_eq!(
+		outcomes
+			.first()
+			.unwrap_or_else(|| panic!("expected one issue comment outcome"))
+			.operation,
+		GitHubIssueCommentOperation::Created
 	);
 }
 
@@ -1116,6 +1189,135 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	assert!(commit_body.contains("<!-- monochange:release-record:start -->"));
 }
 
+#[test]
+fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	git(&repo, &["config", "user.name", "monochange Tests"]);
+	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	must_ok(
+		std::fs::write(repo.join(".gitignore"), ".monochange/\n"),
+		"write gitignore",
+	);
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "before\n"),
+		"write release file",
+	);
+	git(&repo, &["add", "."]);
+	git(&repo, &["commit", "-m", "initial"]);
+	must_ok(
+		std::fs::create_dir_all(repo.join(".monochange")),
+		"create monochange dir",
+	);
+	must_ok(
+		std::fs::write(repo.join(".monochange/release-manifest.json"), "{}\n"),
+		"write manifest",
+	);
+
+	must_ok(
+		git_stage_paths(
+			&repo,
+			&[
+				PathBuf::from(".monochange/release-manifest.json"),
+				PathBuf::from(".changeset/missing.md"),
+			],
+		),
+		"stage paths",
+	);
+
+	assert_eq!(
+		git_output(&repo, &["diff", "--cached", "--name-only"]).trim(),
+		""
+	);
+}
+
+#[test]
+fn git_path_is_tracked_reports_command_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path().join("missing");
+
+	let error = git_path_is_tracked(&root, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected tracked command failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect tracked git path release.txt")
+	);
+}
+
+#[test]
+fn git_path_is_tracked_reports_inspection_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	must_ok(std::fs::create_dir_all(&repo), "create repo dir");
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "release\n"),
+		"write release file",
+	);
+
+	let error = git_path_is_tracked(&repo, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected tracked inspection failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect tracked git path release.txt")
+	);
+}
+
+#[test]
+fn git_path_is_ignored_reports_false_for_unignored_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "release\n"),
+		"write release file",
+	);
+
+	assert!(
+		!git_path_is_ignored(&repo, Path::new("release.txt"))
+			.unwrap_or_else(|error| panic!("git path ignored: {error}"))
+	);
+}
+
+#[test]
+fn git_path_is_ignored_reports_inspection_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let repo = tempdir.path().join("repo");
+	must_ok(std::fs::create_dir_all(&repo), "create repo dir");
+	must_ok(
+		std::fs::write(repo.join("release.txt"), "release\n"),
+		"write release file",
+	);
+
+	let error = git_path_is_ignored(&repo, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected ignored inspection failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect ignored git path release.txt")
+	);
+}
+
+#[test]
+fn git_path_is_ignored_reports_command_failures() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path().join("missing");
+
+	let error = git_path_is_ignored(&root, Path::new("release.txt"))
+		.err()
+		.unwrap_or_else(|| panic!("expected ignored command failure"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to inspect ignored git path release.txt")
+	);
+}
+
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn git_commit_paths_reports_io_and_non_noop_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -1201,7 +1403,7 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"},"closingIssuesReferences":{"nodes":[{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}]}}}}"#,
+				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}"#,
 			);
 	});
 	let github = SourceConfiguration {
@@ -1300,6 +1502,16 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 			.and_then(|commit| commit.url.as_deref()),
 		Some("https://example.com/ifiokjr/monochange/commit/abc1234567890")
 	);
+}
+
+#[test]
+fn review_request_query_uses_lean_pull_request_payload() {
+	let query =
+		build_review_request_batch_query("ifiokjr", "monochange", &["abc1234567890".to_string()]);
+
+	assert!(query.contains("associatedPullRequests(first: 1)"));
+	assert!(query.contains("body"));
+	assert!(!query.contains("closingIssuesReferences"));
 }
 
 #[test]
@@ -1450,7 +1662,7 @@ fn enrich_changeset_context_falls_back_to_commit_annotations_when_batch_lookup_f
 }
 
 #[test]
-fn batch_review_request_lookup_reports_missing_repository_payload_and_skips_malformed_issues() {
+fn batch_review_request_lookup_reports_missing_repository_payload_and_parses_body_issue_refs() {
 	let server = MockServer::start();
 	let missing_repository = server.mock(|when, then| {
 		when.method(POST)
@@ -1490,19 +1702,19 @@ fn batch_review_request_lookup_reports_missing_repository_payload_and_skips_malf
 		});
 	missing_repository.assert();
 
-	let malformed_server = MockServer::start();
-	let malformed_issues = malformed_server.mock(|when, then| {
+	let parsing_server = MockServer::start();
+	let parsing_issues = parsing_server.mock(|when, then| {
 		when.method(POST).path("/graphql");
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"","author":{"login":"ifiokjr","url":"https://example.com/users/1"},"closingIssuesReferences":{"nodes":[{"title":"missing number"},{"number":7,"title":"Track release context","url":"https://example.com/issues/7"}]}}]}}}}"#,
+				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7, #9 and owner/repo#11\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}"#,
 			);
 	});
 	github_runtime()
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
 		.block_on(async {
-			let client = build_test_client(&malformed_server);
+			let client = build_test_client(&parsing_server);
 			let review_requests = load_review_request_batch_with_client(
 				&client,
 				&github,
@@ -1515,10 +1727,41 @@ fn batch_review_request_lookup_reports_missing_repository_payload_and_skips_malf
 				.and_then(|value| value.as_ref())
 				.map(|related| related.issues.clone())
 				.unwrap_or_default();
-			assert_eq!(issues.len(), 1);
-			assert_eq!(issues.first().map(|issue| issue.id.as_str()), Some("#7"));
+			assert_eq!(issues.len(), 4);
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#7"
+					&& issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest
+			}));
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#9"
+					&& issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest
+			}));
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#11"
+					&& issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest
+			}));
+			assert!(issues.iter().any(|issue| {
+				issue.id == "#8"
+					&& issue.relationship == HostedIssueRelationshipKind::ReferencedByReviewRequest
+			}));
 		});
-	malformed_issues.assert();
+	parsing_issues.assert();
+}
+
+#[test]
+fn extract_closing_issue_numbers_only_marks_closing_keywords() {
+	let body = "Closes #7, #9 and owner/repo#11\nRefs #8\nFixed #10 and refs #12";
+
+	assert_eq!(
+		extract_issue_numbers(body).into_iter().collect::<Vec<_>>(),
+		vec![7, 8, 9, 10, 11, 12]
+	);
+	assert_eq!(
+		extract_closing_issue_numbers(body)
+			.into_iter()
+			.collect::<Vec<_>>(),
+		vec![7, 9, 10, 11]
+	);
 }
 
 #[test]

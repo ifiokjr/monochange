@@ -4,7 +4,9 @@ use std::path::Path;
 use serde_json::Value;
 
 mod test_support;
+use test_support::TtyAction;
 use test_support::monochange_command;
+use test_support::run_in_tty;
 use test_support::setup_scenario_workspace;
 
 fn cli() -> std::process::Command {
@@ -12,75 +14,50 @@ fn cli() -> std::process::Command {
 }
 
 #[cfg(unix)]
-fn run_interactive_change_cli(workspace: &Path, output_path: &Path) -> std::process::Output {
-	const SCRIPT: &str = r"
-import os
-import pty
-import select
-import subprocess
-import time
-import sys
-
-workspace = os.environ['MC_WORKSPACE']
-output_path = os.environ['MC_OUTPUT']
-mc_bin = os.environ['MC_BIN']
-master, slave = pty.openpty()
-proc = subprocess.Popen(
-    [mc_bin, 'change', '--interactive', '--reason', 'interactive reason', '--details', 'interactive details', '--output', output_path],
-    cwd=workspace,
-    stdin=slave,
-    stdout=slave,
-    stderr=slave,
-    text=False,
-    close_fds=True,
-)
-os.close(slave)
-
-transcript = bytearray()
-
-def drain(seconds):
-    end = time.time() + seconds
-    while time.time() < end:
-        ready, _, _ = select.select([master], [], [], 0.05)
-        if master in ready:
-            try:
-                data = os.read(master, 4096)
-            except OSError:
-                break
-            if not data:
-                break
-            transcript.extend(data)
-        if proc.poll() is not None:
-            break
-
-drain(0.5)
-os.write(master, b' ')
-time.sleep(0.1)
-os.write(master, b'\r')
-drain(0.5)
-os.write(master, b'\x1b[B')
-time.sleep(0.1)
-os.write(master, b'\r')
-drain(0.5)
-os.write(master, b'\r')
-drain(0.5)
-os.write(master, b'\r')
-drain(0.5)
-proc.wait(timeout=10)
-drain(0.2)
-os.close(master)
-sys.stdout.buffer.write(transcript)
-sys.exit(proc.returncode)
-";
-
-	std::process::Command::new("python3")
-		.arg("-c")
-		.arg(SCRIPT)
-		.env("MC_BIN", insta_cmd::get_cargo_bin("mc"))
-		.env("MC_WORKSPACE", workspace)
-		.env("MC_OUTPUT", output_path)
-		.output()
-		.unwrap_or_else(|error| panic!("interactive python harness: {error}"))
+fn run_interactive_change_cli(workspace: &Path, output_path: &Path) -> (i32, String) {
+	let actions = [
+		TtyAction::Sleep(std::time::Duration::from_millis(500)),
+		TtyAction::Send {
+			bytes: b" ",
+			pause_after: std::time::Duration::from_millis(100),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+		TtyAction::Send {
+			bytes: b"\x1b[B",
+			pause_after: std::time::Duration::from_millis(100),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+		TtyAction::Send {
+			bytes: b"\r",
+			pause_after: std::time::Duration::from_millis(500),
+		},
+	];
+	let output = output_path.display().to_string();
+	run_in_tty(
+		workspace,
+		&[
+			"change",
+			"--interactive",
+			"--reason",
+			"interactive reason",
+			"--details",
+			"interactive details",
+			"--output",
+			output.as_str(),
+		],
+		Some("2026-04-06"),
+		&actions,
+	)
 }
 
 #[test]
@@ -193,13 +170,9 @@ fn interactive_change_cli_writes_selected_bump() {
 	let tempdir = setup_scenario_workspace("changeset-target-metadata/render-workspace");
 	let output_path = tempdir.path().join("interactive.md");
 
-	let output = run_interactive_change_cli(tempdir.path(), &output_path);
-	assert!(
-		output.status.success(),
-		"{}",
-		String::from_utf8_lossy(&output.stdout)
-	);
-	assert!(String::from_utf8_lossy(&output.stdout).contains("wrote change file interactive.md"));
+	let (status, transcript) = run_interactive_change_cli(tempdir.path(), &output_path);
+	assert!(status == 0, "{transcript}");
+	assert!(transcript.contains("wrote change file interactive.md"));
 
 	let contents = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
 	assert!(contents.contains("sdk: patch"));

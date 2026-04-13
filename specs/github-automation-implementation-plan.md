@@ -82,7 +82,6 @@ Recommended responsibilities:
 
 Add these typed steps to `WorkflowStepDefinition`:
 
-- `RenderReleaseManifest`
 - `PublishRelease`
 - `OpenReleaseRequest`
 - `Deploy`

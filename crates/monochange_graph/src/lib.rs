@@ -138,6 +138,7 @@ impl<'a> NormalizedGraph<'a> {
 
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip_all)]
+#[must_use = "the release plan result must be checked"]
 pub fn build_release_plan(
 	workspace_root: &Path,
 	packages: &[PackageRecord],

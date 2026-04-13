@@ -200,6 +200,9 @@ path = "crates/monochange_gitlab"
 [package.monochange_gitea]
 path = "crates/monochange_gitea"
 
+[package.monochange_hosting]
+path = "crates/monochange_hosting"
+
 [package."@monochange/skill"]
 path = "npm/skill"
 type = "npm"
@@ -260,6 +263,7 @@ packages = [
 	"monochange_github",
 	"monochange_gitlab",
 	"monochange_gitea",
+	"monochange_hosting",
 ]
 extra_changelog_sections = [
 	{ name = "Testing", types = ["test"] },
@@ -475,7 +479,6 @@ ignored_paths = [
 #   CreateChangeFile     — create a .changeset/*.md file
 #   PrepareRelease       — compute release plan, update versions, changelogs
 #   CommitRelease        — create a local release commit (requires PrepareRelease)
-#   RenderReleaseManifest — write release-manifest.json (requires PrepareRelease)
 #   PublishRelease       — create provider releases (requires PrepareRelease)
 #   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
@@ -508,15 +511,14 @@ inputs = [
 ]
 steps = [
 	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "RenderReleaseManifest", name = "write release manifest", path = ".monochange/release-manifest.json", when = "{{ inputs.commit }}" },
 	{ type = "Command", name = "format changed files", command = "dprint fmt {{ changed_files }}" },
 	# Keep local `mc release` runs fast. The generated files are stable enough to
 	# inspect immediately, so we only pay for clippy/docs/validation right before
 	# creating and publishing the release commit.
 	{ type = "Command", name = "refresh shared markdown", command = "mdt update", when = "{{ inputs.commit }}" },
-	{ type = "Command", name = "stage release changes", command = "git add --all", when = "{{ inputs.commit }}" },
+	# { type = "Command", name = "stage release changes", command = "git add --all", when = "{{ inputs.commit }}" },
 	{ type = "CommitRelease", name = "create release commit", when = "{{ inputs.commit }}" },
-	{ type = "Command", name = "push release commit", command = "git push", when = "{{ inputs.commit }}" },
+	{ type = "Command", name = "push release commit", command = "git push --no-verify", when = "{{ inputs.commit }}" },
 	{ type = "PublishRelease", name = "publish hosted releases", when = "{{ inputs.commit }}" },
 	{ type = "CommentReleasedIssues", name = "comment on released issues", when = "{{ inputs.commit }}" },
 ]

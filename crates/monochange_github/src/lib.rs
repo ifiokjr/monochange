@@ -95,15 +95,21 @@ use std::env;
 use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
+use monochange_core::HostedIssueCommentOperation;
+use monochange_core::HostedIssueCommentOutcome;
+use monochange_core::HostedIssueCommentPlan;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestKind;
 use monochange_core::HostedReviewRequestRef;
+use monochange_core::HostedSourceAdapter;
+use monochange_core::HostedSourceFeatures;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
@@ -127,14 +133,17 @@ use monochange_core::SourceReleaseOperation;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
 use monochange_core::git::git_checkout_branch_command;
+use monochange_core::git::git_command_output;
 use monochange_core::git::git_commit_paths_command;
 use monochange_core::git::git_current_branch;
+use monochange_core::git::git_error_detail;
 use monochange_core::git::git_head_commit;
 use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
 use monochange_core::git::run_commit_command_allow_nothing_to_commit;
 use octocrab::Octocrab;
+use regex::Regex;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -161,6 +170,7 @@ pub const fn source_capabilities() -> SourceCapabilities {
 	}
 }
 
+#[must_use = "the validation result must be checked"]
 pub fn validate_source_configuration(source: &SourceConfiguration) -> MonochangeResult<()> {
 	if source.releases.generate_notes
 		&& matches!(
@@ -175,29 +185,67 @@ pub fn validate_source_configuration(source: &SourceConfiguration) -> Monochange
 	Ok(())
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubIssueCommentPlan {
-	pub repository: String,
-	pub issue_id: String,
-	pub issue_url: Option<String>,
-	pub body: String,
-}
+pub type GitHubIssueCommentPlan = HostedIssueCommentPlan;
+pub type GitHubIssueCommentOperation = HostedIssueCommentOperation;
+pub type GitHubIssueCommentOutcome = HostedIssueCommentOutcome;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GitHubIssueCommentOperation {
-	Created,
-	SkippedExisting,
-}
+pub static HOSTED_SOURCE_ADAPTER: GitHubHostedSourceAdapter = GitHubHostedSourceAdapter;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubIssueCommentOutcome {
-	pub repository: String,
-	pub issue_id: String,
-	pub operation: GitHubIssueCommentOperation,
-	pub url: Option<String>,
+pub struct GitHubHostedSourceAdapter;
+
+impl HostedSourceAdapter for GitHubHostedSourceAdapter {
+	fn provider(&self) -> SourceProvider {
+		SourceProvider::GitHub
+	}
+
+	fn features(&self) -> HostedSourceFeatures {
+		HostedSourceFeatures {
+			batched_changeset_context_lookup: true,
+			released_issue_comments: true,
+			release_retarget_sync: true,
+		}
+	}
+
+	fn annotate_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		annotate_changeset_context(source, changesets);
+	}
+
+	fn enrich_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		enrich_changeset_context(source, changesets);
+	}
+
+	fn plan_released_issue_comments(
+		&self,
+		source: &SourceConfiguration,
+		manifest: &ReleaseManifest,
+	) -> Vec<HostedIssueCommentPlan> {
+		plan_released_issue_comments(source, manifest)
+	}
+
+	fn comment_released_issues(
+		&self,
+		source: &SourceConfiguration,
+		manifest: &ReleaseManifest,
+	) -> MonochangeResult<Vec<HostedIssueCommentOutcome>> {
+		comment_released_issues(source, manifest)
+	}
+
+	fn sync_retargeted_releases(
+		&self,
+		source: &SourceConfiguration,
+		tag_results: &[RetargetTagResult],
+		dry_run: bool,
+	) -> MonochangeResult<Vec<RetargetProviderResult>> {
+		sync_retargeted_releases(source, tag_results, dry_run)
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -683,7 +731,7 @@ fn build_review_request_batch_query(owner: &str, repo: &str, shas: &[String]) ->
 		let alias = format!("commit_{index}");
 		let _ = write!(
 			query,
-			" {alias}: object(expression: \"{sha}\") {{ ... on Commit {{ associatedPullRequests(first: 1) {{ nodes {{ number title url body author {{ login url }} closingIssuesReferences(first: 50) {{ nodes {{ number title url }} }} }} }} }} }}"
+			" {alias}: object(expression: \"{sha}\") {{ ... on Commit {{ associatedPullRequests(first: 1) {{ nodes {{ number title url body author {{ login url }} }} }} }} }}"
 		);
 	}
 	query.push_str(" } }");
@@ -740,30 +788,19 @@ fn parse_review_request_from_graphql(
 		author,
 	};
 	let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
-	for issue in pull_request
-		.get("closingIssuesReferences")
-		.and_then(|issues| issues.get("nodes"))
-		.and_then(serde_json::Value::as_array)
-		.into_iter()
-		.flatten()
+	for issue_number in body
+		.as_deref()
+		.map(extract_closing_issue_numbers)
+		.unwrap_or_default()
 	{
-		let Some(number) = issue.get("number").and_then(serde_json::Value::as_u64) else {
-			continue;
-		};
 		issues_by_id.insert(
-			format!("#{number}"),
+			format!("#{issue_number}"),
 			HostedIssueRef {
 				provider: HostingProviderKind::GitHub,
 				host: github_host(),
-				id: format!("#{number}"),
-				title: issue
-					.get("title")
-					.and_then(serde_json::Value::as_str)
-					.map(str::to_string),
-				url: issue
-					.get("url")
-					.and_then(serde_json::Value::as_str)
-					.map(str::to_string),
+				id: format!("#{issue_number}"),
+				title: None,
+				url: Some(github_issue_url(source, issue_number)),
 				relationship: HostedIssueRelationshipKind::ClosedByReviewRequest,
 			},
 		);
@@ -792,30 +829,39 @@ fn parse_review_request_from_graphql(
 	})
 }
 
-fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
+fn issue_reference_regex() -> &'static Regex {
+	static ISSUE_REFERENCE_RE: OnceLock<Regex> = OnceLock::new();
+	ISSUE_REFERENCE_RE.get_or_init(|| {
+		Regex::new(r"(?:[\w.-]+/[\w.-]+)?#(?P<number>\d+)")
+			.unwrap_or_else(|error| panic!("issue reference regex should compile: {error}"))
+	})
+}
+
+fn closing_issue_reference_regex() -> &'static Regex {
+	static CLOSING_ISSUE_REFERENCE_RE: OnceLock<Regex> = OnceLock::new();
+	CLOSING_ISSUE_REFERENCE_RE.get_or_init(|| {
+		Regex::new(r"(?i)\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[:\s]*(?P<refs>(?:[\w.-]+/[\w.-]+)?#\d+(?:\s*(?:,|and)\s*(?:[\w.-]+/[\w.-]+)?#\d+)*)")
+		.unwrap_or_else(|error| panic!("closing issue regex should compile: {error}"))
+	})
+}
+
+fn extract_closing_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
 	let mut issue_numbers = std::collections::BTreeSet::new();
-	let bytes = text.as_bytes();
-	let mut index = 0;
-	while let Some(byte) = bytes.get(index) {
-		if *byte != b'#' {
-			index += 1;
+	for captures in closing_issue_reference_regex().captures_iter(text) {
+		let Some(references) = captures.name("refs") else {
 			continue;
-		}
-		let mut digits = String::new();
-		let mut cursor = index + 1;
-		while let Some(next) = bytes.get(cursor) {
-			if !next.is_ascii_digit() {
-				break;
-			}
-			digits.push(char::from(*next));
-			cursor += 1;
-		}
-		if let Ok(number) = digits.parse::<u64>() {
-			issue_numbers.insert(number);
-		}
-		index = cursor;
+		};
+		issue_numbers.extend(extract_issue_numbers(references.as_str()));
 	}
 	issue_numbers
+}
+
+fn extract_issue_numbers(text: &str) -> std::collections::BTreeSet<u64> {
+	issue_reference_regex()
+		.captures_iter(text)
+		.filter_map(|captures| captures.name("number"))
+		.filter_map(|number| number.as_str().parse::<u64>().ok())
+		.collect()
 }
 
 #[must_use]
@@ -855,6 +901,7 @@ pub fn plan_released_issue_comments(
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the comment result must be checked"]
 pub fn comment_released_issues(
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
@@ -936,6 +983,7 @@ fn release_issue_comment_body(release_tags: &[String], marker: &str) -> String {
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the publish result must be checked"]
 pub fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[GitHubReleaseRequest],
@@ -949,6 +997,7 @@ pub fn publish_release_requests(
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the pull request result must be checked"]
 pub fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
@@ -987,6 +1036,7 @@ pub fn publish_release_pull_request(
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the sync result must be checked"]
 pub fn sync_retargeted_releases(
 	source: &SourceConfiguration,
 	tag_updates: &[RetargetTagResult],
@@ -1422,10 +1472,82 @@ fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
 }
 
 fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
+	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths)?;
+	if stageable_paths.is_empty() {
+		return Ok(());
+	}
 	run_command(
-		git_stage_paths_command(root, tracked_paths),
+		git_stage_paths_command(root, &stageable_paths),
 		"stage release pull request files",
 	)
+}
+
+fn resolve_stageable_release_paths(
+	root: &Path,
+	tracked_paths: &[PathBuf],
+) -> MonochangeResult<Vec<PathBuf>> {
+	let mut stageable_paths = Vec::with_capacity(tracked_paths.len());
+	for path in tracked_paths {
+		if release_path_requires_staging(root, path)? {
+			stageable_paths.push(path.clone());
+		}
+	}
+	Ok(stageable_paths)
+}
+
+fn release_path_requires_staging(root: &Path, path: &Path) -> MonochangeResult<bool> {
+	let absolute_path = root.join(path);
+	if absolute_path.exists() {
+		if git_path_is_tracked(root, path)? {
+			return Ok(true);
+		}
+		return Ok(!git_path_is_ignored(root, path)?);
+	}
+	git_path_is_tracked(root, path)
+}
+
+fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
+	let relative = path.to_string_lossy();
+	let output = git_command_output(root, &["ls-files", "--error-unmatch", "--", &relative])
+		.map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to inspect tracked git path {}: {error}",
+				path.display()
+			))
+		})?;
+	match output.status.code() {
+		Some(0) => Ok(true),
+		Some(1) => Ok(false),
+		_ => {
+			Err(MonochangeError::Config(format!(
+				"failed to inspect tracked git path {}: {}",
+				path.display(),
+				git_error_detail(&output)
+			)))
+		}
+	}
+}
+
+fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
+	let relative = path.to_string_lossy();
+	let output =
+		git_command_output(root, &["check-ignore", "-q", "--", &relative]).map_err(|error| {
+			MonochangeError::Config(format!(
+				"failed to inspect ignored git path {}: {error}",
+				path.display()
+			))
+		})?;
+	match output.status.code() {
+		Some(0) => Ok(true),
+		Some(1) => Ok(false),
+		_ => {
+			Err(MonochangeError::Config(format!(
+				"failed to inspect ignored git path {}: {}",
+				path.display(),
+				git_error_detail(&output)
+			)))
+		}
+	}
 }
 
 fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {

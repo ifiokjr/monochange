@@ -1,19 +1,20 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 199
+assertion_line: 255
 info:
   program: mc
   args:
-    - release-manifest
+    - release
     - "--dry-run"
   env:
     MONOCHANGE_RELEASE_DATE: 2026-04-06
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-command `release-manifest` completed (dry-run)
+command `release` completed (dry-run)
 version: 1.1.0
 released packages: workflow-app, workflow-core
 release targets:

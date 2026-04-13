@@ -82,6 +82,7 @@ pub const DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY: &str =
 pub const DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED: &str = "{% if tag_url %}{{ id }} [{{ version }}]({{ tag_url }}){% else %}{{ id }} {{ version }}{% endif %} ({{ date }})";
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum MonochangeError {
 	#[error("io error: {0}")]
 	Io(String),
@@ -91,6 +92,26 @@ pub enum MonochangeError {
 	Discovery(String),
 	#[error("{0}")]
 	Diagnostic(String),
+	#[error("io error at {path:?}: {source}")]
+	IoSource {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+	#[error("parse error at {path:?}: {source}")]
+	Parse {
+		path: PathBuf,
+		source: Box<dyn std::error::Error + Send + Sync>,
+	},
+	#[cfg(feature = "http")]
+	#[error("http error {context}: {source}")]
+	HttpRequest {
+		context: String,
+		source: reqwest::Error,
+	},
+	#[error("interactive error: {message}")]
+	Interactive { message: String },
+	#[error("cancelled")]
+	Cancelled,
 }
 
 impl MonochangeError {
@@ -98,6 +119,18 @@ impl MonochangeError {
 	pub fn render(&self) -> String {
 		match self {
 			Self::Diagnostic(report) => report.clone(),
+			Self::IoSource { path, source } => {
+				format!("io error at {}: {source}", path.display())
+			}
+			Self::Parse { path, source } => {
+				format!("parse error at {}: {source}", path.display())
+			}
+			#[cfg(feature = "http")]
+			Self::HttpRequest { context, source } => {
+				format!("http error {context}: {source}")
+			}
+			Self::Interactive { message } => message.clone(),
+			Self::Cancelled => "cancelled".to_string(),
 			_ => self.to_string(),
 		}
 	}
@@ -105,6 +138,7 @@ impl MonochangeError {
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum BumpSeverity {
 	None,
 	#[default]
@@ -181,6 +215,7 @@ impl fmt::Display for BumpSeverity {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Ecosystem {
 	Cargo,
 	Npm,
@@ -210,6 +245,7 @@ impl fmt::Display for Ecosystem {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PublishState {
 	Public,
 	Private,
@@ -219,6 +255,7 @@ pub enum PublishState {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DependencyKind {
 	Runtime,
 	Development,
@@ -243,6 +280,7 @@ impl fmt::Display for DependencyKind {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DependencySourceKind {
 	Manifest,
 	Workspace,
@@ -429,6 +467,7 @@ pub struct DependencyEdge {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PackageType {
 	Cargo,
 	Npm,
@@ -452,14 +491,16 @@ impl PackageType {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum VersionFormat {
 	#[default]
 	Namespaced,
 	Primary,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum EcosystemType {
 	Cargo,
 	Npm,
@@ -541,6 +582,7 @@ pub fn strip_json_comments(contents: &str) -> String {
 	output
 }
 
+#[must_use = "the manifest update result must be checked"]
 pub fn update_json_manifest_text(
 	contents: &str,
 	owner_version: Option<&str>,
@@ -918,7 +960,7 @@ fn json_span_is_object(contents: &str, span: JsonSpan) -> bool {
 		&& contents.as_bytes().get(span.end - 1) == Some(&b'}')
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct VersionedFileDefinition {
 	pub path: String,
 	#[serde(rename = "type", default)]
@@ -949,6 +991,7 @@ pub enum ChangelogDefinition {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ChangelogFormat {
 	#[default]
 	Monochange,
@@ -1251,6 +1294,7 @@ impl<'de> Deserialize<'de> for ShellConfig {
 /// See the CLI step reference in the book for full workflow guidance.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[non_exhaustive]
 pub enum CliStepDefinition {
 	/// Validate `monochange` configuration and changesets without preparing a
 	/// release.
@@ -1301,20 +1345,6 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
-		#[serde(default)]
-		inputs: BTreeMap<String, CliStepInputValue>,
-	},
-	/// Render the prepared release as a stable JSON manifest and optionally write
-	/// it to disk.
-	///
-	/// Requires a previous `PrepareRelease` step.
-	RenderReleaseManifest {
-		#[serde(default)]
-		name: Option<String>,
-		#[serde(default)]
-		when: Option<String>,
-		#[serde(default)]
-		path: Option<PathBuf>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
@@ -1422,7 +1452,6 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { inputs, .. }
 			| Self::PrepareRelease { inputs, .. }
 			| Self::CommitRelease { inputs, .. }
-			| Self::RenderReleaseManifest { inputs, .. }
 			| Self::PublishRelease { inputs, .. }
 			| Self::OpenReleaseRequest { inputs, .. }
 			| Self::CommentReleasedIssues { inputs, .. }
@@ -1441,7 +1470,6 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { name, .. }
 			| Self::PrepareRelease { name, .. }
 			| Self::CommitRelease { name, .. }
-			| Self::RenderReleaseManifest { name, .. }
 			| Self::PublishRelease { name, .. }
 			| Self::OpenReleaseRequest { name, .. }
 			| Self::CommentReleasedIssues { name, .. }
@@ -1465,7 +1493,6 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { when, .. }
 			| Self::PrepareRelease { when, .. }
 			| Self::CommitRelease { when, .. }
-			| Self::RenderReleaseManifest { when, .. }
 			| Self::PublishRelease { when, .. }
 			| Self::OpenReleaseRequest { when, .. }
 			| Self::CommentReleasedIssues { when, .. }
@@ -1494,7 +1521,6 @@ impl CliStepDefinition {
 			Self::CreateChangeFile { .. } => "CreateChangeFile",
 			Self::PrepareRelease { .. } => "PrepareRelease",
 			Self::CommitRelease { .. } => "CommitRelease",
-			Self::RenderReleaseManifest { .. } => "RenderReleaseManifest",
 			Self::PublishRelease { .. } => "PublishRelease",
 			Self::OpenReleaseRequest { .. } => "OpenReleaseRequest",
 			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
@@ -1513,9 +1539,7 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
-			Self::Validate { .. }
-			| Self::CommitRelease { .. }
-			| Self::RenderReleaseManifest { .. } => Some(&[]),
+			Self::Validate { .. } | Self::CommitRelease { .. } => Some(&[]),
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
@@ -1548,10 +1572,7 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn expected_input_kind(&self, name: &str) -> Option<CliInputKind> {
 		match self {
-			Self::Validate { .. }
-			| Self::CommitRelease { .. }
-			| Self::RenderReleaseManifest { .. }
-			| Self::Command { .. } => None,
+			Self::Validate { .. } | Self::CommitRelease { .. } | Self::Command { .. } => None,
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
@@ -2070,6 +2091,26 @@ fn default_release_record_kind() -> String {
 	RELEASE_RECORD_KIND.to_string()
 }
 
+fn default_true() -> bool {
+	true
+}
+
+fn default_pull_request_branch_prefix() -> String {
+	"monochange/release".to_string()
+}
+
+fn default_pull_request_base() -> String {
+	"main".to_string()
+}
+
+fn default_pull_request_title() -> String {
+	"chore(release): prepare release".to_string()
+}
+
+fn default_pull_request_labels() -> Vec<String> {
+	vec!["release".to_string(), "automated".to_string()]
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRecordTarget {
@@ -2249,6 +2290,7 @@ pub enum ReleaseRecordError {
 pub type ReleaseRecordResult<T> = Result<T, ReleaseRecordError>;
 
 /// Render a `ReleaseRecord` into the reserved commit-message block format.
+#[must_use = "the rendered record result must be checked"]
 pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResult<String> {
 	if record.kind != RELEASE_RECORD_KIND {
 		return Err(ReleaseRecordError::UnsupportedKind(record.kind.clone()));
@@ -2265,6 +2307,7 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 }
 
 /// Parse a `ReleaseRecord` from a full commit message body.
+#[must_use = "the parsed record result must be checked"]
 pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<ReleaseRecord> {
 	let start_matches = commit_message
 		.match_indices(RELEASE_RECORD_START_MARKER)
@@ -2358,33 +2401,88 @@ pub enum ProviderReleaseNotesSource {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderReleaseSettings {
+	#[serde(default = "default_true")]
 	pub enabled: bool,
+	#[serde(default)]
 	pub draft: bool,
+	#[serde(default)]
 	pub prerelease: bool,
+	#[serde(default)]
 	pub generate_notes: bool,
+	#[serde(default)]
 	pub source: ProviderReleaseNotesSource,
+}
+
+impl Default for ProviderReleaseSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			draft: false,
+			prerelease: false,
+			generate_notes: false,
+			source: ProviderReleaseNotesSource::default(),
+		}
+	}
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderMergeRequestSettings {
+	#[serde(default = "default_true")]
 	pub enabled: bool,
+	#[serde(default = "default_pull_request_branch_prefix")]
 	pub branch_prefix: String,
+	#[serde(default = "default_pull_request_base")]
 	pub base: String,
+	#[serde(default = "default_pull_request_title")]
 	pub title: String,
+	#[serde(default = "default_pull_request_labels")]
 	pub labels: Vec<String>,
+	#[serde(default)]
 	pub auto_merge: bool,
+}
+
+impl Default for ProviderMergeRequestSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			branch_prefix: default_pull_request_branch_prefix(),
+			base: default_pull_request_base(),
+			title: default_pull_request_title(),
+			labels: default_pull_request_labels(),
+			auto_merge: false,
+		}
+	}
 }
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderChangesetBotSettings {
+	#[serde(default)]
 	pub enabled: bool,
+	#[serde(default = "default_true")]
 	pub required: bool,
+	#[serde(default)]
 	pub skip_labels: Vec<String>,
+	#[serde(default = "default_true")]
 	pub comment_on_failure: bool,
+	#[serde(default)]
 	pub changed_paths: Vec<String>,
+	#[serde(default)]
 	pub ignored_paths: Vec<String>,
+}
+
+impl Default for ProviderChangesetBotSettings {
+	fn default() -> Self {
+		Self {
+			enabled: false,
+			required: true,
+			skip_labels: Vec::new(),
+			comment_on_failure: true,
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
+		}
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -2396,10 +2494,25 @@ pub struct ProviderBotSettings {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangesetVerificationSettings {
+	#[serde(default = "default_true")]
 	pub enabled: bool,
+	#[serde(default = "default_true")]
 	pub required: bool,
+	#[serde(default)]
 	pub skip_labels: Vec<String>,
+	#[serde(default = "default_true")]
 	pub comment_on_failure: bool,
+}
+
+impl Default for ChangesetVerificationSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			required: true,
+			skip_labels: Vec::new(),
+			comment_on_failure: true,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -2465,55 +2578,6 @@ pub struct ChangesetPolicyEvaluation {
 	pub uncovered_package_ids: Vec<String>,
 	#[serde(default)]
 	pub errors: Vec<String>,
-}
-
-impl Default for ProviderReleaseSettings {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			draft: false,
-			prerelease: false,
-			generate_notes: false,
-			source: ProviderReleaseNotesSource::Monochange,
-		}
-	}
-}
-
-impl Default for ProviderMergeRequestSettings {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			branch_prefix: "monochange/release".to_string(),
-			base: "main".to_string(),
-			title: "chore(release): prepare release".to_string(),
-			labels: vec!["release".to_string(), "automated".to_string()],
-			auto_merge: false,
-		}
-	}
-}
-
-impl Default for ProviderChangesetBotSettings {
-	fn default() -> Self {
-		Self {
-			enabled: false,
-			required: true,
-			skip_labels: Vec::new(),
-			comment_on_failure: true,
-			changed_paths: Vec::new(),
-			ignored_paths: Vec::new(),
-		}
-	}
-}
-
-impl Default for ChangesetVerificationSettings {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			required: true,
-			skip_labels: Vec::new(),
-			comment_on_failure: true,
-		}
-	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -2583,6 +2647,127 @@ pub struct SourceConfiguration {
 	pub pull_requests: ProviderMergeRequestSettings,
 	#[serde(default)]
 	pub bot: ProviderBotSettings,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedSourceFeatures {
+	pub batched_changeset_context_lookup: bool,
+	pub released_issue_comments: bool,
+	pub release_retarget_sync: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedIssueCommentPlan {
+	pub repository: String,
+	pub issue_id: String,
+	pub issue_url: Option<String>,
+	pub body: String,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedIssueCommentOperation {
+	Created,
+	SkippedExisting,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostedIssueCommentOutcome {
+	pub repository: String,
+	pub issue_id: String,
+	pub operation: HostedIssueCommentOperation,
+	pub url: Option<String>,
+}
+
+pub trait HostedSourceAdapter: Sync {
+	fn provider(&self) -> SourceProvider;
+
+	fn features(&self) -> HostedSourceFeatures {
+		HostedSourceFeatures::default()
+	}
+
+	fn annotate_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	);
+
+	fn enrich_changeset_context(
+		&self,
+		source: &SourceConfiguration,
+		changesets: &mut [PreparedChangeset],
+	) {
+		self.annotate_changeset_context(source, changesets);
+	}
+
+	fn plan_released_issue_comments(
+		&self,
+		_source: &SourceConfiguration,
+		_manifest: &ReleaseManifest,
+	) -> Vec<HostedIssueCommentPlan> {
+		Vec::new()
+	}
+
+	fn comment_released_issues(
+		&self,
+		source: &SourceConfiguration,
+		manifest: &ReleaseManifest,
+	) -> MonochangeResult<Vec<HostedIssueCommentOutcome>> {
+		let plans = self.plan_released_issue_comments(source, manifest);
+		if plans.is_empty() {
+			return Ok(Vec::new());
+		}
+		Err(MonochangeError::Config(format!(
+			"released issue comments are not yet supported for {}",
+			self.provider()
+		)))
+	}
+
+	fn plan_retargeted_releases(
+		&self,
+		tag_results: &[RetargetTagResult],
+	) -> Vec<RetargetProviderResult> {
+		let provider = self.provider();
+		let supports_sync = self.features().release_retarget_sync;
+		tag_results
+			.iter()
+			.map(|update| {
+				RetargetProviderResult {
+					provider,
+					tag_name: update.tag_name.clone(),
+					target_commit: update.to_commit.clone(),
+					operation: if supports_sync {
+						RetargetProviderOperation::Planned
+					} else {
+						RetargetProviderOperation::Unsupported
+					},
+					url: None,
+					message: (!supports_sync).then_some(format!(
+						"provider sync is not yet supported for {provider} release retargeting"
+					)),
+				}
+			})
+			.collect()
+	}
+
+	fn sync_retargeted_releases(
+		&self,
+		source: &SourceConfiguration,
+		tag_results: &[RetargetTagResult],
+		dry_run: bool,
+	) -> MonochangeResult<Vec<RetargetProviderResult>> {
+		if dry_run {
+			return Ok(self.plan_retargeted_releases(tag_results));
+		}
+		Err(MonochangeError::Config(format!(
+			"provider sync is not yet supported for {} release retargeting",
+			source.provider
+		)))
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

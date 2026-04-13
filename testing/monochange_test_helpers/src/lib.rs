@@ -2,6 +2,7 @@ pub mod fs;
 pub mod git;
 pub mod insta;
 pub mod rmcp;
+pub mod workspace_ops;
 
 pub use fs::copy_directory;
 pub use fs::copy_directory_skip_git;

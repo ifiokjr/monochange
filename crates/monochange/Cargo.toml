@@ -16,22 +16,32 @@ description = "Manage versions and releases for your multiplatform, multilanguag
 name = "mc"
 path = "src/bin/mc.rs"
 
+[features]
+default = ["cargo", "npm", "deno", "dart", "github", "gitlab", "gitea"]
+cargo = ["monochange_cargo"]
+npm = ["monochange_npm"]
+deno = ["monochange_deno"]
+dart = ["monochange_dart"]
+github = ["monochange_github", "monochange_core/http"]
+gitlab = ["monochange_gitlab", "monochange_core/http"]
+gitea = ["monochange_gitea", "monochange_core/http"]
+
 [dependencies]
 chrono = { workspace = true, default-features = true }
 clap = { workspace = true, default-features = true }
 glob = { workspace = true, default-features = true }
 inquire = { workspace = true, default-features = true }
 minijinja = { workspace = true, default-features = true }
-monochange_cargo = { workspace = true }
+monochange_cargo = { workspace = true, optional = true }
 monochange_config = { workspace = true }
 monochange_core = { workspace = true }
-monochange_dart = { workspace = true }
-monochange_deno = { workspace = true }
-monochange_gitea = { workspace = true }
-monochange_github = { workspace = true }
-monochange_gitlab = { workspace = true }
+monochange_dart = { workspace = true, optional = true }
+monochange_deno = { workspace = true, optional = true }
+monochange_gitea = { workspace = true, optional = true }
+monochange_github = { workspace = true, optional = true }
+monochange_gitlab = { workspace = true, optional = true }
 monochange_graph = { workspace = true }
-monochange_npm = { workspace = true }
+monochange_npm = { workspace = true, optional = true }
 monochange_semver = { workspace = true }
 rayon = { workspace = true, default-features = true }
 regex = { workspace = true, default-features = true }
@@ -58,6 +68,7 @@ insta = { workspace = true, default-features = true }
 insta-cmd = { workspace = true, default-features = true }
 monochange_config = { workspace = true }
 monochange_test_helpers = { version = "0.0.0", path = "../../testing/monochange_test_helpers" }
+portable-pty = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 temp-env = { workspace = true, default-features = true }

@@ -27,7 +27,6 @@ use monochange_core::ShellConfig;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOutcome;
 use monochange_core::SourceConfiguration;
-use monochange_core::SourceProvider;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
 
@@ -35,6 +34,8 @@ use crate::cli::command_supports_release_diff_preview;
 use crate::cli_progress::CliProgressReporter;
 use crate::cli_progress::CommandStream;
 use crate::cli_progress::ProgressFormat;
+use crate::maybe_load_prepared_release_execution;
+use crate::save_prepared_release_execution;
 use crate::*;
 
 pub(crate) fn execute_matches(
@@ -69,6 +70,10 @@ pub(crate) fn execute_matches(
 			},
 			|value| parse_progress_format(value),
 		)?;
+	let prepared_release_path = command_supports_release_diff_preview(cli_command)
+		.then(|| cli_command_matches.get_one::<String>("prepared-release"))
+		.flatten()
+		.map(PathBuf::from);
 	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
 	if show_diff {
 		execute_cli_command_with_options(
@@ -80,18 +85,23 @@ pub(crate) fn execute_matches(
 				quiet,
 				show_diff: true,
 				inputs,
+				prepared_release_path,
 				progress_format,
 			},
 		)
 	} else {
-		execute_cli_command_quiet(
+		execute_cli_command_with_options(
 			root,
 			configuration,
 			cli_command,
-			dry_run,
-			quiet,
-			inputs,
-			progress_format,
+			ExecuteCliCommandOptions {
+				dry_run,
+				quiet,
+				show_diff: false,
+				inputs,
+				prepared_release_path,
+				progress_format,
+			},
 		)
 	}
 }
@@ -253,12 +263,15 @@ pub(crate) fn template_value_to_input_values(value: &serde_json::Value) -> Vec<S
 	}
 }
 
+const DEFAULT_RELEASE_MANIFEST_PATH: &str = ".monochange/release-manifest.json";
+
 pub(crate) fn write_release_manifest_file(
 	root: &Path,
 	path: &Path,
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let resolved_path = resolve_config_path(root, path);
+	ensure_monochange_artifact_ignored(root, &resolved_path)?;
 	let rendered = render_release_manifest_json(manifest)?;
 	let update = FileUpdate {
 		path: resolved_path.clone(),
@@ -268,13 +281,36 @@ pub(crate) fn write_release_manifest_file(
 	Ok(root_relative(root, &resolved_path))
 }
 
-fn resolve_release_manifest_path(
+fn write_default_release_manifest_file(
 	root: &Path,
-	path: Option<&Path>,
 	manifest: &ReleaseManifest,
-) -> MonochangeResult<Option<PathBuf>> {
-	path.map(|path| write_release_manifest_file(root, path, manifest))
-		.transpose()
+) -> MonochangeResult<PathBuf> {
+	write_release_manifest_file(root, Path::new(DEFAULT_RELEASE_MANIFEST_PATH), manifest)
+}
+
+fn ensure_prepared_release_for_consumer_step(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	context: &mut CliContext,
+	prepared_release_path: Option<&Path>,
+	dry_run: bool,
+	build_file_diffs: bool,
+	step_name: &str,
+) -> MonochangeResult<()> {
+	if context.prepared_release.is_some() {
+		return Ok(());
+	}
+	#[rustfmt::skip]
+	let loaded = maybe_load_prepared_release_execution(root, configuration, prepared_release_path, dry_run, build_file_diffs)?;
+	let Some(loaded) = loaded else {
+		return Err(MonochangeError::Config(format!(
+			"`{step_name}` requires a previous `PrepareRelease` step or a reusable prepared release artifact"
+		)));
+	};
+	context.command_logs.push(loaded.message);
+	context.prepared_file_diffs = loaded.execution.file_diffs;
+	context.prepared_release = Some(loaded.execution.prepared_release);
+	Ok(())
 }
 
 pub(crate) fn build_release_results(
@@ -354,8 +390,8 @@ fn build_release_request_result_for_source(
 
 pub(crate) fn build_issue_comment_results(
 	dry_run: bool,
-	plans: &[github_provider::GitHubIssueCommentPlan],
-	publish: impl FnOnce() -> MonochangeResult<Vec<github_provider::GitHubIssueCommentOutcome>>,
+	plans: &[HostedIssueCommentPlan],
+	publish: impl FnOnce() -> MonochangeResult<Vec<monochange_core::HostedIssueCommentOutcome>>,
 ) -> MonochangeResult<Vec<String>> {
 	if dry_run {
 		Ok(plans
@@ -371,8 +407,8 @@ pub(crate) fn build_issue_comment_results(
 					result.repository,
 					result.issue_id,
 					match result.operation {
-						monochange_github::GitHubIssueCommentOperation::Created => "created",
-						monochange_github::GitHubIssueCommentOperation::SkippedExisting => {
+						monochange_core::HostedIssueCommentOperation::Created => "created",
+						monochange_core::HostedIssueCommentOperation::SkippedExisting => {
 							"skipped_existing"
 						}
 					}
@@ -386,10 +422,11 @@ fn build_issue_comment_results_for_source(
 	dry_run: bool,
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
-	plans: &[github_provider::GitHubIssueCommentPlan],
+	plans: &[HostedIssueCommentPlan],
 ) -> MonochangeResult<Vec<String>> {
+	let adapter = hosted_sources::configured_hosted_source_adapter(source);
 	#[rustfmt::skip]
-	let result = build_issue_comment_results(dry_run, plans, || github_provider::comment_released_issues(source, manifest));
+	let result = build_issue_comment_results(dry_run, plans, || adapter.comment_released_issues(source, manifest));
 	result
 }
 
@@ -401,36 +438,17 @@ pub(crate) fn execute_cli_command(
 	dry_run: bool,
 	inputs: BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<String> {
-	execute_cli_command_quiet(
-		root,
-		configuration,
-		cli_command,
-		dry_run,
-		false,
-		inputs,
-		ProgressFormat::Auto,
-	)
-}
-
-fn execute_cli_command_quiet(
-	root: &Path,
-	configuration: &monochange_core::WorkspaceConfiguration,
-	cli_command: &CliCommandDefinition,
-	dry_run: bool,
-	quiet: bool,
-	inputs: BTreeMap<String, Vec<String>>,
-	progress_format: ProgressFormat,
-) -> MonochangeResult<String> {
 	execute_cli_command_with_options(
 		root,
 		configuration,
 		cli_command,
 		ExecuteCliCommandOptions {
 			dry_run,
-			quiet,
+			quiet: false,
 			show_diff: false,
 			inputs,
-			progress_format,
+			prepared_release_path: None,
+			progress_format: ProgressFormat::Auto,
 		},
 	)
 }
@@ -440,6 +458,7 @@ pub(crate) struct ExecuteCliCommandOptions {
 	quiet: bool,
 	show_diff: bool,
 	inputs: BTreeMap<String, Vec<String>>,
+	prepared_release_path: Option<PathBuf>,
 	progress_format: ProgressFormat,
 }
 
@@ -455,6 +474,7 @@ pub(crate) fn execute_cli_command_with_options(
 		quiet,
 		show_diff,
 		inputs,
+		prepared_release_path,
 		progress_format,
 	} = options;
 	let mut context = CliContext {
@@ -535,122 +555,43 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::CreateChangeFile { .. } => {
-					let is_interactive = step_inputs
-						.get("interactive")
-						.and_then(|values| values.first())
-						.is_some_and(|value| value == "true");
-
-					if is_interactive {
-						let options = interactive::InteractiveOptions {
-							reason: step_inputs
-								.get("reason")
-								.and_then(|values| values.first())
-								.cloned(),
-							details: step_inputs
-								.get("details")
-								.and_then(|values| values.first())
-								.cloned(),
-						};
-						let result = interactive::run_interactive_change(configuration, &options)?;
-						let output_path = step_inputs
-							.get("output")
-							.and_then(|values| values.first())
-							.map(PathBuf::from);
-						let path =
-							add_interactive_change_file(root, &result, output_path.as_deref())?;
-						output = Some(format!(
-							"wrote change file {}",
-							root_relative(root, &path).display()
-						));
-					} else {
-						let package_refs = step_inputs.get("package").cloned().unwrap_or_default();
-						if package_refs.is_empty() {
-							Err(MonochangeError::Config(
-							"command `change` requires at least one `--package` value or `--interactive` mode".to_string(),
-						))?;
-						}
-						let bump = if let Some(value) =
-							step_inputs.get("bump").and_then(|values| values.first())
-						{
-							parse_change_bump(value)?
-						} else if step_inputs
-							.get("type")
-							.and_then(|values| values.first())
-							.is_some()
-						{
-							ChangeBump::None
-						} else {
-							ChangeBump::Patch
-						};
-						let version = step_inputs
-							.get("version")
-							.and_then(|values| values.first())
-							.cloned();
-						let reason = step_inputs
-							.get("reason")
-							.and_then(|values| values.first())
-							.cloned()
-							.ok_or_else(|| {
-								MonochangeError::Config(
-									"command `change` requires a `--reason` value".to_string(),
-								)
-							})?;
-						let change_type = step_inputs
-							.get("type")
-							.and_then(|values| values.first())
-							.cloned();
-						let details = step_inputs
-							.get("details")
-							.and_then(|values| values.first())
-							.cloned();
-						let output_path = step_inputs
-							.get("output")
-							.and_then(|values| values.first())
-							.map(PathBuf::from);
-						let path = add_change_file(
-							root,
-							AddChangeFileRequest::builder()
-								.package_refs(&package_refs)
-								.bump(bump.into())
-								.reason(&reason)
-								.version(version.as_deref())
-								.change_type(change_type.as_deref())
-								.details(details.as_deref())
-								.output(output_path.as_deref())
-								.build(),
-						)?;
-						output = Some(format!(
-							"wrote change file {}",
-							root_relative(root, &path).display()
-						));
-					}
+					output = Some(execute_create_change_file_step(
+						root,
+						configuration,
+						&step_inputs,
+					)?);
 					Ok(())
 				}
 				CliStepDefinition::PrepareRelease { .. } => {
 					let build_file_diffs = context.show_diff
 						|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
-					let prepared_execution =
-						prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?;
+					let prepared_execution = if let Some(loaded) =
+						maybe_load_prepared_release_execution(
+							root,
+							configuration,
+							prepared_release_path.as_deref(),
+							dry_run,
+							build_file_diffs,
+						)? {
+						context.command_logs.push(loaded.message);
+						loaded.execution
+					} else {
+						prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?
+					};
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					context.prepared_file_diffs = prepared_execution.file_diffs;
 					context.prepared_release = Some(prepared_execution.prepared_release);
-					output = None;
-					Ok(())
-				}
-				CliStepDefinition::RenderReleaseManifest { path, .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`RenderReleaseManifest` requires a previous `PrepareRelease` step"
-								.to_string(),
-						)
-					})?;
+					let prepared_release = context
+						.prepared_release
+						.as_ref()
+						.expect("prepared release must be available after prepare step");
 					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,
 						&context.command_logs,
 					);
 					context.release_manifest_path =
-						resolve_release_manifest_path(root, path.as_deref(), &manifest)?;
+						Some(write_default_release_manifest_file(root, &manifest)?);
 					output = None;
 					Ok(())
 				}
@@ -679,11 +620,19 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::CommitRelease { .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`CommitRelease` requires a previous `PrepareRelease` step".to_string(),
-						)
-					})?;
+					ensure_prepared_release_for_consumer_step(
+						root,
+						configuration,
+						&mut context,
+						prepared_release_path.as_deref(),
+						dry_run,
+						false,
+						"CommitRelease",
+					)?;
+					let prepared_release = context
+						.prepared_release
+						.as_ref()
+						.expect("prepared release must be available before committing release");
 					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,
@@ -729,23 +678,25 @@ pub(crate) fn execute_cli_command_with_options(
 								.to_string(),
 						)
 					})?;
-					let source = configuration
-						.source
-						.clone()
-						.filter(|source| source.provider == SourceProvider::GitHub)
-						.ok_or_else(|| {
-							MonochangeError::Config(
-							"`CommentReleasedIssues` requires `[source].provider = \"github\"` configuration"
-								.to_string(),
+					let source = configuration.source.clone().ok_or_else(|| {
+						MonochangeError::Config(
+							"`CommentReleasedIssues` requires `[source]` configuration".to_string(),
 						)
-						})?;
+					})?;
+					let adapter = hosted_sources::configured_hosted_source_adapter(&source);
+					if !adapter.features().released_issue_comments {
+						return Err(MonochangeError::Config(format!(
+							"`CommentReleasedIssues` is not supported for `[source].provider = \"{}\"`",
+							source.provider
+						)));
+					}
 					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,
 						&context.command_logs,
 					);
 					context.issue_comment_plans =
-						github_provider::plan_released_issue_comments(&source, &manifest);
+						adapter.plan_released_issue_comments(&source, &manifest);
 					let dry_run = context.dry_run;
 					let plans = &context.issue_comment_plans;
 					let results =
@@ -755,29 +706,8 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::AffectedPackages { .. } => {
-					let since = step_inputs
-						.get("since")
-						.and_then(|values| values.first().cloned());
-					let explicit_paths = step_inputs
-						.get("changed_paths")
-						.cloned()
-						.unwrap_or_default();
-					let changed_paths = if let Some(rev) = &since {
-						if !context.quiet && !explicit_paths.is_empty() {
-							eprintln!(
-								"warning: --since takes priority; --changed-paths was ignored"
-							);
-						}
-						compute_changed_paths_since(root, rev)?
-					} else {
-						explicit_paths
-					};
-					let labels = step_inputs.get("label").cloned().unwrap_or_default();
-					let enforce = step_inputs
-						.get("verify")
-						.is_some_and(|values| values.iter().any(|v| v == "true"));
-					let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
-					evaluation.enforce = enforce;
+					let evaluation =
+						execute_affected_packages_step(root, &step_inputs, context.quiet)?;
 					context.changeset_policy_evaluation = Some(evaluation);
 					output = None;
 					Ok(())
@@ -858,6 +788,11 @@ pub(crate) fn execute_cli_command_with_options(
 					)?;
 					Ok(())
 				}
+				_ => {
+					Err(MonochangeError::Config(
+						"unsupported CLI step definition".to_string(),
+					))
+				}
 			}
 		})();
 		if let Err(error) = step_result {
@@ -879,91 +814,21 @@ pub(crate) fn execute_cli_command_with_options(
 
 	progress.command_finished(command_started_at.elapsed());
 
-	if let Some(prepared_release) = &context.prepared_release {
-		let format = cli_command_output_format(&context.last_step_inputs)?;
-		return match format {
-			OutputFormat::Json => {
-				let manifest =
-					build_release_manifest(cli_command, prepared_release, &context.command_logs);
-				render_release_cli_command_json(
-					&manifest,
-					&context.release_requests,
-					context.release_request.as_ref(),
-					&context.issue_comment_plans,
-					context.release_commit_report.as_ref(),
-					if context.show_diff {
-						&context.prepared_file_diffs
-					} else {
-						&[]
-					},
-				)
-			}
-			OutputFormat::Markdown => Ok(render_cli_command_markdown_result(cli_command, &context)),
-			OutputFormat::Text => Ok(render_cli_command_result(cli_command, &context)),
-		};
-	}
-	if let Some(evaluation) = &context.changeset_policy_evaluation {
-		let format = cli_command_output_format(&context.last_step_inputs)?;
-		let rendered = match format {
-			OutputFormat::Json => {
-				serde_json::to_string_pretty(evaluation).map_err(|error| {
-					MonochangeError::Config(format!(
-						"failed to render changeset policy evaluation as json: {error}"
-					))
-				})?
-			}
-			OutputFormat::Markdown | OutputFormat::Text => {
-				render_cli_command_result(cli_command, &context)
-			}
-		};
-		if evaluation.enforce && evaluation.status == ChangesetPolicyStatus::Failed {
-			if !context.quiet {
-				println!("{rendered}");
-			}
-			return Err(MonochangeError::Config(evaluation.summary.clone()));
+	if let Some(prepared_release) = &context.prepared_release
+		&& let Err(error) = save_prepared_release_execution(
+			root,
+			configuration,
+			prepared_release,
+			&context.prepared_file_diffs,
+			prepared_release_path.as_deref(),
+		) {
+		if prepared_release_path.is_some() {
+			return Err(error);
 		}
-		return Ok(rendered);
-	}
-	if let Some(report) = &context.changeset_diagnostics {
-		let format = context
-			.inputs
-			.get("format")
-			.and_then(|values| values.first())
-			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
-		let rendered = match format {
-			OutputFormat::Json => {
-				serde_json::to_string_pretty(report).map_err(|error| {
-					MonochangeError::Config(format!(
-						"failed to render changeset diagnostics as json: {error}"
-					))
-				})?
-			}
-			OutputFormat::Markdown | OutputFormat::Text => render_changeset_diagnostics(report),
-		};
-		return Ok(rendered);
-	}
-	if let Some(report) = &context.retarget_report {
-		let format = cli_command_output_format(&context.last_step_inputs)?;
-		let rendered = match format {
-			OutputFormat::Json => {
-				serde_json::to_string_pretty(report)
-					.unwrap_or_else(|error| panic!("retarget report serialization bug: {error}"))
-			}
-			OutputFormat::Markdown | OutputFormat::Text => render_retarget_release_report(report),
-		};
-		return Ok(rendered);
-	}
-	if !context.command_logs.is_empty() {
-		return Ok(render_cli_command_result(cli_command, &context));
+		tracing::warn!(%error, "failed to save prepared release artifact");
 	}
 
-	Ok(output.unwrap_or_else(|| {
-		format!(
-			"command `{}` completed{}",
-			cli_command.name,
-			if dry_run { " (dry-run)" } else { "" }
-		)
-	}))
+	resolve_command_output(cli_command, &context, dry_run, output)
 }
 
 pub(crate) fn should_execute_cli_step(
@@ -996,11 +861,6 @@ fn step_references_release_file_diffs(step: &CliStepDefinition) -> bool {
 		return true;
 	}
 	match step {
-		CliStepDefinition::RenderReleaseManifest { path, .. } => {
-			path.as_ref()
-				.and_then(|path| path.to_str())
-				.is_some_and(mentions_file_diffs)
-		}
 		CliStepDefinition::Command {
 			command,
 			dry_run_command,
@@ -1369,6 +1229,7 @@ fn progress_error_detail(error: &MonochangeError) -> &str {
 		| MonochangeError::Config(message)
 		| MonochangeError::Discovery(message)
 		| MonochangeError::Diagnostic(message) => message,
+		_ => "",
 	}
 }
 
@@ -2271,6 +2132,7 @@ fn cli_command_output_format(
 		.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))
 }
 
+#[must_use = "the output format result must be checked"]
 pub(crate) fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
 	match value {
 		"text" => Ok(OutputFormat::Text),
@@ -2284,6 +2146,7 @@ pub(crate) fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat>
 	}
 }
 
+#[must_use = "the change bump result must be checked"]
 pub(crate) fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 	match value {
 		"none" => Ok(ChangeBump::None),
@@ -2296,6 +2159,220 @@ pub(crate) fn parse_change_bump(value: &str) -> MonochangeResult<ChangeBump> {
 			)))
 		}
 	}
+}
+
+fn execute_create_change_file_step(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<String> {
+	let is_interactive = step_inputs
+		.get("interactive")
+		.and_then(|values| values.first())
+		.is_some_and(|value| value == "true");
+
+	if is_interactive {
+		let options = interactive::InteractiveOptions {
+			reason: step_inputs
+				.get("reason")
+				.and_then(|values| values.first())
+				.cloned(),
+			details: step_inputs
+				.get("details")
+				.and_then(|values| values.first())
+				.cloned(),
+		};
+		let result = interactive::run_interactive_change(configuration, &options)?;
+		let output_path = step_inputs
+			.get("output")
+			.and_then(|values| values.first())
+			.map(PathBuf::from);
+		let path = add_interactive_change_file(root, &result, output_path.as_deref())?;
+		Ok(format!(
+			"wrote change file {}",
+			root_relative(root, &path).display()
+		))
+	} else {
+		let package_refs = step_inputs.get("package").cloned().unwrap_or_default();
+		if package_refs.is_empty() {
+			return Err(MonochangeError::Config(
+				"command `change` requires at least one `--package` value or `--interactive` mode"
+					.to_string(),
+			));
+		}
+		let bump = if let Some(value) = step_inputs.get("bump").and_then(|values| values.first()) {
+			parse_change_bump(value)?
+		} else if step_inputs
+			.get("type")
+			.and_then(|values| values.first())
+			.is_some()
+		{
+			ChangeBump::None
+		} else {
+			ChangeBump::Patch
+		};
+		let version = step_inputs
+			.get("version")
+			.and_then(|values| values.first())
+			.cloned();
+		let reason = step_inputs
+			.get("reason")
+			.and_then(|values| values.first())
+			.cloned()
+			.ok_or_else(|| {
+				MonochangeError::Config("command `change` requires a `--reason` value".to_string())
+			})?;
+		let change_type = step_inputs
+			.get("type")
+			.and_then(|values| values.first())
+			.cloned();
+		let details = step_inputs
+			.get("details")
+			.and_then(|values| values.first())
+			.cloned();
+		let output_path = step_inputs
+			.get("output")
+			.and_then(|values| values.first())
+			.map(PathBuf::from);
+		let path = add_change_file(
+			root,
+			AddChangeFileRequest::builder()
+				.package_refs(&package_refs)
+				.bump(bump.into())
+				.reason(&reason)
+				.version(version.as_deref())
+				.change_type(change_type.as_deref())
+				.details(details.as_deref())
+				.output(output_path.as_deref())
+				.build(),
+		)?;
+		Ok(format!(
+			"wrote change file {}",
+			root_relative(root, &path).display()
+		))
+	}
+}
+
+fn execute_affected_packages_step(
+	root: &Path,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+	quiet: bool,
+) -> MonochangeResult<ChangesetPolicyEvaluation> {
+	let since = step_inputs
+		.get("since")
+		.and_then(|values| values.first().cloned());
+	let explicit_paths = step_inputs
+		.get("changed_paths")
+		.cloned()
+		.unwrap_or_default();
+	let changed_paths = if let Some(rev) = &since {
+		if !quiet && !explicit_paths.is_empty() {
+			eprintln!("warning: --since takes priority; --changed-paths was ignored");
+		}
+		compute_changed_paths_since(root, rev)?
+	} else {
+		explicit_paths
+	};
+	let labels = step_inputs.get("label").cloned().unwrap_or_default();
+	let enforce = step_inputs
+		.get("verify")
+		.is_some_and(|values| values.iter().any(|v| v == "true"));
+	let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
+	evaluation.enforce = enforce;
+	Ok(evaluation)
+}
+
+fn resolve_command_output(
+	cli_command: &CliCommandDefinition,
+	context: &CliContext,
+	dry_run: bool,
+	output: Option<String>,
+) -> MonochangeResult<String> {
+	if let Some(prepared_release) = &context.prepared_release {
+		let format = cli_command_output_format(&context.last_step_inputs)?;
+		return match format {
+			OutputFormat::Json => {
+				let manifest =
+					build_release_manifest(cli_command, prepared_release, &context.command_logs);
+				render_release_cli_command_json(
+					&manifest,
+					&context.release_requests,
+					context.release_request.as_ref(),
+					&context.issue_comment_plans,
+					context.release_commit_report.as_ref(),
+					if context.show_diff {
+						&context.prepared_file_diffs
+					} else {
+						&[]
+					},
+				)
+			}
+			OutputFormat::Markdown => Ok(render_cli_command_markdown_result(cli_command, context)),
+			OutputFormat::Text => Ok(render_cli_command_result(cli_command, context)),
+		};
+	}
+	if let Some(evaluation) = &context.changeset_policy_evaluation {
+		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let rendered = match format {
+			OutputFormat::Json => {
+				serde_json::to_string_pretty(evaluation).map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to render changeset policy evaluation as json: {error}"
+					))
+				})?
+			}
+			OutputFormat::Markdown | OutputFormat::Text => {
+				render_cli_command_result(cli_command, context)
+			}
+		};
+		if evaluation.enforce && evaluation.status == ChangesetPolicyStatus::Failed {
+			if !context.quiet {
+				println!("{rendered}");
+			}
+			return Err(MonochangeError::Config(evaluation.summary.clone()));
+		}
+		return Ok(rendered);
+	}
+	if let Some(report) = &context.changeset_diagnostics {
+		let format = context
+			.inputs
+			.get("format")
+			.and_then(|values| values.first())
+			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+		let rendered = match format {
+			OutputFormat::Json => {
+				serde_json::to_string_pretty(report).map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to render changeset diagnostics as json: {error}"
+					))
+				})?
+			}
+			OutputFormat::Markdown | OutputFormat::Text => render_changeset_diagnostics(report),
+		};
+		return Ok(rendered);
+	}
+	if let Some(report) = &context.retarget_report {
+		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let rendered = match format {
+			OutputFormat::Json => {
+				serde_json::to_string_pretty(report)
+					.unwrap_or_else(|error| panic!("retarget report serialization bug: {error}"))
+			}
+			OutputFormat::Markdown | OutputFormat::Text => render_retarget_release_report(report),
+		};
+		return Ok(rendered);
+	}
+	if !context.command_logs.is_empty() {
+		return Ok(render_cli_command_result(cli_command, context));
+	}
+
+	Ok(output.unwrap_or_else(|| {
+		format!(
+			"command `{}` completed{}",
+			cli_command.name,
+			if dry_run { " (dry-run)" } else { "" }
+		)
+	}))
 }
 
 #[cfg(test)]

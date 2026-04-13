@@ -144,6 +144,7 @@ pub fn update_dependency_fields(
 	}
 }
 
+#[must_use = "the manifest update result must be checked"]
 pub fn update_manifest_text(
 	contents: &str,
 	owner_version: Option<&str>,
@@ -379,6 +380,7 @@ impl EcosystemAdapter for DartAdapter {
 }
 
 #[tracing::instrument(skip_all)]
+#[must_use = "the discovery result must be checked"]
 pub fn discover_dart_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> {
 	let workspace_manifests = find_workspace_manifests(root);
 	let mut included_manifests = HashSet::new();
@@ -415,6 +417,7 @@ pub fn discover_dart_packages(root: &Path) -> MonochangeResult<AdapterDiscovery>
 }
 
 /// Load one explicitly configured Dart/Flutter package without walking the repo.
+#[must_use = "the package result must be checked"]
 pub fn load_configured_dart_package(
 	root: &Path,
 	package_path: &Path,
