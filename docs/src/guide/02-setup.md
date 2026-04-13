@@ -26,10 +26,6 @@ That appends any missing default command definitions to `monochange.toml` withou
 
 When you know which source provider you will use for release automation, include the `--provider` flag during initialization:
 
-```bash
-mc init --provider github
-```
-
 <!-- {=initProviderFeature} -->
 
 The `--provider` flag supports `github`, `gitlab`, and `gitea`. When provided, `mc init`:

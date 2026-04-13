@@ -5,6 +5,8 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 # monochange
 
+monochange is a cross-ecosystem release planner for monorepos that span more than one package ecosystem.
+
 ## Quick start
 
 1. Read `monochange.toml` first — it is the single source of truth.
@@ -14,14 +16,13 @@ description: Guides agents through monochange discovery, changesets, release pla
 5. Use `mc release --dry-run --format json` before mutating release state.
 6. Use `mc diagnostics --format json` to inspect changeset context and git provenance.
 
-## Working rules
+## Core principles
 
-- Treat `monochange.toml` as the source of truth for packages, groups, source providers, ecosystems, and `[cli.<command>]` entries.
-- Prefer configured package or group ids over guessing manifest names.
-- Use `.changeset/*.md` files for explicit release intent — each targets one or more package/group ids with a bump severity, optional `type`, optional explicit `version`, and a human-readable summary.
-- Run dry-run flows before real release commands.
-- Keep docs, templates, and changelog behavior aligned with config changes.
-- Use `mc diagnostics --format json` to audit changesets before release — it shows git provenance, linked PRs, related issues, and introduced/last-updated commits.
+- **monochange.toml is the source of truth** — packages, groups, source providers, ecosystems, and `[cli.<command>]` entries all live here
+- **Explicit change files** — use `.changeset/*.md` for release intent, not implicit commit messages
+- **Dry-run first** — always preview with `--dry-run` before applying changes
+- **Package ids over group ids** — most changes target packages; groups are for shared ownership
+- **Validate early and often** — `mc validate` catches issues before they become problems
 
 ## Recommended command flow
 
@@ -39,22 +40,32 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 ## CLI commands
 
-| Command              | Purpose                                                                |
-| -------------------- | ---------------------------------------------------------------------- |
-| `mc init`            | Generate a starter `monochange.toml` from detected packages            |
-| `mc populate`        | Append missing built-in CLI command definitions to config              |
-| `mc validate`        | Validate config and changeset targets                                  |
-| `mc discover`        | Discover packages across ecosystems                                    |
-| `mc change`          | Create a `.changeset/*.md` file                                        |
-| `mc release`         | Prepare a release plan from changesets and refresh the cached manifest |
-| `mc commit-release`  | Prepare a release and create a local commit                            |
-| `mc publish-release` | Create provider releases                                               |
-| `mc release-pr`      | Open or update a release pull request                                  |
-| `mc affected`        | Evaluate changeset policy from changed paths                           |
-| `mc diagnostics`     | Show changeset context with git and review metadata                    |
-| `mc repair-release`  | Repair a recent release by retargeting tags                            |
-| `mc assist`          | Print assistant install and MCP setup guidance                         |
-| `mc mcp`             | Start the stdio MCP server                                             |
+| Command              | Purpose                                                     | Key Flags                                                                 |
+| -------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `mc init`            | Generate a starter `monochange.toml` from detected packages | `--force`, `--provider <github                                            |
+| `mc populate`        | Append missing built-in CLI command definitions to config   | _none_                                                                    |
+| `mc validate`        | Validate config and changeset targets                       | _none_                                                                    |
+| `mc discover`        | Discover packages across ecosystems                         | `--format` (text\|json)                                                   |
+| `mc change`          | Create a `.changeset/*.md` file                             | `--interactive`, `--package`, `--bump`, `--reason`, `--type`, `--details` |
+| `mc release`         | Prepare a release plan from changesets                      | `--dry-run`, `--diff`, `--format` (markdown\|text\|json)                  |
+| `mc commit-release`  | Prepare a release and create a local commit                 | `--format`, `--dry-run`                                                   |
+| `mc publish-release` | Create provider releases                                    | `--format`, `--dry-run`                                                   |
+| `mc release-pr`      | Open or update a release pull request                       | `--format`, `--dry-run`                                                   |
+| `mc affected`        | Evaluate changeset policy from changed paths                | `--format`, `--changed-paths`, `--since`, `--verify`, `--label`           |
+| `mc diagnostics`     | Show changeset context with git and review metadata         | `--format`, `--changeset`                                                 |
+| `mc repair-release`  | Repair a recent release by retargeting tags                 | `--from`, `--target`, `--force`, `--sync-provider`                        |
+| `mc release-record`  | Inspect durable release record from tag or commit           | `--from`, `--format`                                                      |
+| `mc assist`          | Print assistant install and MCP setup guidance              | `<assistant>`, `--format`                                                 |
+| `mc mcp`             | Start the stdio MCP server                                  | _none_                                                                    |
+
+## Global flags
+
+All commands support:
+
+- `--log-level <FILTER>` — Set tracing filter (e.g., `debug`, `info`, `warn`)
+- `-q, --quiet` — Suppress output, enable dry-run behavior
+- `--progress-format <FORMAT>` — Control progress output (`auto`, `unicode`, `ascii`, `json`)
+- `--dry-run` — Preview changes without applying
 
 ## CLI step types
 
@@ -96,21 +107,79 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 <!-- {/mcpToolsList} -->
 
-## Key configuration concepts
+## Configuration reference
 
-### Versioned files
+### monochange.toml structure
 
-`versioned_files` update additional managed files beyond native manifests when versions change. Three forms:
+```toml
+[defaults]
+parent_bump = "patch"
+include_private = false
+warn_on_group_mismatch = true
+strict_version_conflicts = false
+package_type = "cargo"
 
-- **Package-scoped shorthand**: `versioned_files = ["Cargo.toml"]` — infers the package ecosystem
+[defaults.changelog]
+path = "{{ path }}/changelog.md"
+format = "keep_a_changelog"
+
+[release_notes]
+change_templates = [
+    "#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+]
+
+[package.<id>]
+path = "crates/<id>"
+type = "cargo"
+
+[group.<id>]
+packages = ["<id1>", "<id2>"]
+tag = true
+release = true
+
+[source]
+provider = "github"
+owner = "<owner>"
+repo = "<repo>"
+
+[cli.<command>]
+help_text = "..."
+
+[[cli.<command>.steps]]
+name = "..."
+type = "..."
+```
+
+### Key configuration concepts
+
+#### Versioned files
+
+`versioned_files` update additional managed files beyond native manifests:
+
+- **Package-scoped shorthand**: `versioned_files = ["Cargo.toml"]` — infers the ecosystem
 - **Explicit typed entries**: `versioned_files = [{ path = "group.toml", type = "cargo" }]`
-- **Regex entries**: `versioned_files = [{ path = "README.md", regex = 'v(?<version>\d+\.\d+\.\d+)' }]` — for plain-text files; must include a named `version` capture
+- **Regex entries**: `versioned_files = [{ path = "README.md", regex = 'v(?<version>\d+\.\d+\.\d+)' }]` — must include named `version` capture
 
-### Lockfile commands
+#### Lockfile commands
 
-Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, and Dart/Flutter. Explicit configuration overrides inference.
+Configure automatic lockfile refresh per ecosystem:
 
-### Release titles
+```toml
+[ecosystems.cargo]
+lockfile_commands = ["cargo update --workspace"]
+
+[ecosystems.npm]
+lockfile_commands = ["npm install --package-lock-only"]
+```
+
+**Defaults:**
+
+- Cargo: `cargo update --workspace`
+- npm: `npm install`
+- pnpm: `pnpm install`
+- Bun: `bun install`
+
+#### Release titles
 
 <!-- {=releaseTitleConfig} -->
 
@@ -134,14 +203,137 @@ release_title = "v{{ version }} — released {{ date }}"
 
 <!-- {/releaseTitleConfig} -->
 
-### Groups and changelog filtering
+#### Groups and changelog filtering
 
-Groups synchronize versions across packages. Group changelogs can filter included entries:
+Groups synchronize versions across packages. Group changelogs can filter entries:
 
 - `include = "all"` — all member changesets (default)
 - `include = "group-only"` — only direct group-targeted changesets
 - `include = ["package-id"]` — specific member changesets plus group-targeted ones
 
-## Guidance
+#### Source providers
 
-See [REFERENCE.md](REFERENCE.md) for install steps, changeset authoring, grouped release rules, input types, step composition, and assistant setup guidance.
+Configure `[source]` for provider automation:
+
+```toml
+[source]
+provider = "github" # or "gitlab", "gitea"
+owner = "<owner>"
+repo = "<repo>"
+
+[source.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+```
+
+## Template variables
+
+Template variables use Mustache/`{{ }}` syntax:
+
+**Release titles:**
+
+- `{{ version }}` — The new version being released
+- `{{ id }}` — Package or group ID
+- `{{ date }}` — Current date (YYYY-MM-DD)
+- `{{ time }}` — Current time (HH:MM:SS)
+- `{{ datetime }}` — Full datetime (ISO 8601)
+- `{{ changes_count }}` — Number of changes
+- `{{ tag_url }}` — URL to git tag
+- `{{ compare_url }}` — URL comparing versions
+
+**Changeset templates:**
+
+- `{{ summary }}` — The changeset summary
+- `{{ details }}` — Detailed description
+- `{{ context }}` — Full metadata context (preferred)
+
+**With source provider:**
+
+- `{{ change_owner_link }}` — Link to author
+- `{{ review_request_link }}` — Link to PR/MR
+- `{{ introduced_commit_link }}` — Link to first commit
+- `{{ closed_issue_links }}` — Links to closed issues
+- `{{ related_issue_links }}` — Links to related issues
+
+## Automated CI setup
+
+Use `--provider` flag during init for automated CI configuration:
+
+```bash
+mc init --provider github
+```
+
+This configures:
+
+1. `[source]` section with provider settings
+2. CLI commands for `commit-release` and `release-pr`
+3. GitHub Actions workflows (GitHub only)
+4. Auto-detected owner/repo from git remote
+
+**Supported providers:** `github`, `gitlab`, `gitea`
+
+## Working rules
+
+- Treat `monochange.toml` as the source of truth
+- Prefer configured package or group ids over guessing manifest names
+- Use `.changeset/*.md` files for explicit release intent
+- Run dry-run flows before real release commands
+- Keep docs, templates, and changelog behavior aligned with config changes
+- Use `mc diagnostics --format json` to audit changesets before release
+
+## Common workflows
+
+### Create a changeset
+
+```bash
+mc change --package <id> --bump patch --reason "fix: resolve memory leak in cache"
+```
+
+### Preview release
+
+```bash
+mc release --dry-run --format json
+mc release --dry-run --diff  # with unified diffs
+```
+
+### Apply release locally
+
+```bash
+mc release
+```
+
+### Create release PR
+
+```bash
+mc release-pr --dry-run --format json  # preview
+mc release-pr  # create/update PR
+```
+
+### Evaluate changeset policy
+
+```bash
+mc affected --format json --changed-paths src/main.rs
+```
+
+### Repair a release
+
+```bash
+mc repair-release --from v1.2.3 --target HEAD --dry-run
+mc repair-release --from v1.2.3 --target HEAD
+```
+
+## References
+
+- [REFERENCE.md](REFERENCE.md) — detailed install steps, changeset authoring, grouped release rules, input types, step composition
+- [docs/src/guide/](../../docs/src/guide/) — user guides for setup, configuration, and advanced workflows
+- [docs/src/reference/](../../docs/src/reference/) — CLI step reference and configuration details
