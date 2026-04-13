@@ -311,14 +311,9 @@ fn ensure_prepared_release_for_consumer_step(
 	if context.prepared_release.is_some() {
 		return Ok(());
 	}
-	let Some(loaded) = maybe_load_prepared_release_execution(
-		root,
-		configuration,
-		prepared_release_path,
-		dry_run,
-		build_file_diffs,
-	)?
-	else {
+	#[rustfmt::skip]
+	let loaded = maybe_load_prepared_release_execution(root, configuration, prepared_release_path, dry_run, build_file_diffs)?;
+	let Some(loaded) = loaded else {
 		return Err(MonochangeError::Config(format!(
 			"`{step_name}` requires a previous `PrepareRelease` step or a reusable prepared release artifact"
 		)));
@@ -747,9 +742,10 @@ pub(crate) fn execute_cli_command_with_options(
 						false,
 						"CommitRelease",
 					)?;
-					let prepared_release = context.prepared_release.as_ref().unwrap_or_else(|| {
-						panic!("prepared release must be available before committing release")
-					});
+					let prepared_release = context
+						.prepared_release
+						.as_ref()
+						.expect("prepared release must be available before committing release");
 					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,

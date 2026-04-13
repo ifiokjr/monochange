@@ -127,14 +127,16 @@ pub(crate) fn run_git_status(
 pub(crate) fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
 	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths)?;
 	if stageable_paths.is_empty() {
+		let skipped_count = tracked_paths.len();
 		tracing::debug!(
-			count = tracked_paths.len(),
+			count = skipped_count,
 			"no release commit paths required staging"
 		);
 		return Ok(());
 	}
+	let stageable_count = stageable_paths.len();
 	tracing::debug!(
-		count = stageable_paths.len(),
+		count = stageable_count,
 		?stageable_paths,
 		"staging release commit paths"
 	);
@@ -246,4 +248,141 @@ pub(crate) fn run_git_process(
 		return Err(MonochangeError::Discovery(detail));
 	}
 	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use std::fs;
+
+	use tempfile::tempdir;
+
+	use super::*;
+
+	fn git(root: &Path, args: &[&str]) {
+		let output = monochange_core::git::git_command(root)
+			.args(args)
+			.output()
+			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+		assert!(
+			output.status.success(),
+			"git {args:?} failed: {}{}",
+			String::from_utf8_lossy(&output.stdout),
+			String::from_utf8_lossy(&output.stderr)
+		);
+	}
+
+	fn git_output(root: &Path, args: &[&str]) -> String {
+		let output = monochange_core::git::git_command(root)
+			.args(args)
+			.output()
+			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+		assert!(
+			output.status.success(),
+			"git {args:?} failed: {}{}",
+			String::from_utf8_lossy(&output.stdout),
+			String::from_utf8_lossy(&output.stderr)
+		);
+		String::from_utf8(output.stdout)
+			.unwrap_or_else(|error| panic!("git stdout utf8: {error}"))
+			.trim()
+			.to_string()
+	}
+
+	fn init_git_repo(root: &Path) {
+		git(root, &["init", "-b", "main"]);
+		git(root, &["config", "user.name", "monochange tests"]);
+		git(root, &["config", "user.email", "monochange@example.com"]);
+		git(root, &["config", "commit.gpgsign", "false"]);
+	}
+
+	#[test]
+	fn git_stage_paths_returns_ok_when_all_paths_are_non_stageable() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::write(root.join(".gitignore"), ".monochange/\n")
+			.unwrap_or_else(|error| panic!("write .gitignore: {error}"));
+		fs::write(root.join("tracked.txt"), "tracked\n")
+			.unwrap_or_else(|error| panic!("write tracked file: {error}"));
+		init_git_repo(root);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "initial"]);
+		fs::create_dir_all(root.join(".monochange"))
+			.unwrap_or_else(|error| panic!("create .monochange: {error}"));
+		fs::write(root.join(".monochange/release-manifest.json"), "{}\n")
+			.unwrap_or_else(|error| panic!("write release manifest: {error}"));
+
+		git_stage_paths(
+			root,
+			&[
+				PathBuf::from(".monochange/release-manifest.json"),
+				PathBuf::from(".changeset/missing.md"),
+			],
+		)
+		.unwrap_or_else(|error| panic!("git stage paths: {error}"));
+
+		assert_eq!(git_output(root, &["diff", "--cached", "--name-only"]), "");
+	}
+
+	#[test]
+	fn git_path_is_tracked_reports_command_failures() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path().to_path_buf();
+		drop(tempdir);
+
+		let error = git_path_is_tracked(&root, Path::new("release.txt"))
+			.err()
+			.unwrap_or_else(|| panic!("expected tracked inspection failure"));
+		assert!(
+			error
+				.to_string()
+				.contains("failed to inspect tracked git path release.txt")
+		);
+	}
+
+	#[test]
+	fn git_path_is_ignored_reports_false_for_unignored_paths() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		init_git_repo(root);
+		fs::write(root.join("release.txt"), "release\n")
+			.unwrap_or_else(|error| panic!("write release file: {error}"));
+
+		assert!(
+			!git_path_is_ignored(root, Path::new("release.txt"))
+				.unwrap_or_else(|error| panic!("git path ignored: {error}"))
+		);
+	}
+
+	#[test]
+	fn git_path_is_ignored_reports_inspection_failures() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::write(root.join("release.txt"), "release\n")
+			.unwrap_or_else(|error| panic!("write release file: {error}"));
+
+		let error = git_path_is_ignored(root, Path::new("release.txt"))
+			.err()
+			.unwrap_or_else(|| panic!("expected ignored inspection failure"));
+		assert!(
+			error
+				.to_string()
+				.contains("failed to inspect ignored git path release.txt")
+		);
+	}
+
+	#[test]
+	fn git_path_is_ignored_reports_command_failures() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path().to_path_buf();
+		drop(tempdir);
+
+		let error = git_path_is_ignored(&root, Path::new("release.txt"))
+			.err()
+			.unwrap_or_else(|| panic!("expected ignored command failure"));
+		assert!(
+			error
+				.to_string()
+				.contains("failed to inspect ignored git path release.txt")
+		);
+	}
 }
