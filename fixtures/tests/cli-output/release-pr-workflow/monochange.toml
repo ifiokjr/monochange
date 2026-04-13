@@ -19,11 +19,12 @@ tag = true
 release = true
 version_format = "primary"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 branch_prefix = "monochange/release"
 base = "main"
 labels = ["release", "automated"]

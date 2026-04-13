@@ -60,9 +60,3 @@ include = ["sdk-cli"]
 ```
 
 Direct group-targeted changesets are always included. Member-targeted changesets are filtered only for the group changelog; package changelogs and release planning remain unchanged.
-
-<!-- {=versionGroupsCurrentStatus} -->
-
-Legacy `version_groups.strategy` is no longer the primary authoring model. The current implementation always derives synchronized release behavior from `[group.<id>]` declarations.
-
-<!-- {/versionGroupsCurrentStatus} -->

@@ -1297,7 +1297,7 @@ impl<'de> Deserialize<'de> for ShellConfig {
 ///
 /// See the CLI step reference in the book for full workflow guidance.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum CliStepDefinition {
 	/// Validate `monochange` configuration and changesets without preparing a
@@ -1352,7 +1352,6 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
-	#[serde(alias = "PublishGitHubRelease")]
 	/// Publish hosted releases from a prepared `monochange` release.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
@@ -1365,7 +1364,6 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
-	#[serde(alias = "OpenReleasePullRequest")]
 	/// Open or update a hosted release request from prepared release state.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
@@ -1390,7 +1388,6 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
-	#[serde(alias = "EnforceChangesetPolicy", alias = "VerifyChangesets")]
 	/// Evaluate affected packages and changeset coverage for changed files.
 	///
 	/// Standalone CI-oriented step.
@@ -1434,7 +1431,7 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		show_progress: Option<bool>,
 		command: String,
-		#[serde(default, alias = "dry_run")]
+		#[serde(default)]
 		dry_run_command: Option<String>,
 		#[serde(default)]
 		shell: ShellConfig,
@@ -1769,9 +1766,9 @@ pub enum HostingProviderKind {
 	#[default]
 	#[serde(rename = "generic_git")]
 	GenericGit,
-	#[serde(rename = "github", alias = "git_hub")]
+	#[serde(rename = "github")]
 	GitHub,
-	#[serde(rename = "gitlab", alias = "git_lab")]
+	#[serde(rename = "gitlab")]
 	GitLab,
 	#[serde(rename = "gitea")]
 	Gitea,
@@ -2584,24 +2581,12 @@ pub struct ChangesetPolicyEvaluation {
 	pub errors: Vec<String>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct GitHubConfiguration {
-	pub owner: String,
-	pub repo: String,
-	#[serde(default)]
-	pub releases: ProviderReleaseSettings,
-	#[serde(default)]
-	pub pull_requests: ProviderMergeRequestSettings,
-	#[serde(default)]
-	pub bot: ProviderBotSettings,
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum SourceProvider {
 	#[default]
-	#[serde(rename = "github", alias = "git_hub")]
+	#[serde(rename = "github")]
 	GitHub,
-	#[serde(rename = "gitlab", alias = "git_lab")]
+	#[serde(rename = "gitlab")]
 	GitLab,
 	#[serde(rename = "gitea")]
 	Gitea,

@@ -4,6 +4,7 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = ""

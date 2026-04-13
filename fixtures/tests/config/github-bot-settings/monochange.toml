@@ -4,11 +4,12 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.bot.changesets]
+[source.bot.changesets]
 enabled = true
 comment_on_failure = true
 skip_labels = ["no-changeset-required"]

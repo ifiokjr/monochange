@@ -12,11 +12,12 @@ path = "crates/core"
 tag = true
 release = true
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.releases]
+[source.releases]
 source = "monochange"
 
 [ecosystems.cargo]

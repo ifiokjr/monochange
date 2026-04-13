@@ -1396,9 +1396,6 @@ pub(crate) fn build_cli_template_context(
 	}
 
 	let input_context = cli_inputs_template_value(inputs);
-	for (input_name, input_value) in &input_context {
-		template_context.insert(input_name.clone(), input_value.clone());
-	}
 	template_context.insert(
 		"inputs".to_string(),
 		serde_json::Value::Object(input_context),

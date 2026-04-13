@@ -12,11 +12,12 @@ release = true
 path = "crates/app"
 release = true
 
-[github]
+[source]
+provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[github.pull_requests]
+[source.pull_requests]
 branch_prefix = "automation/release"
 base = "develop"
 auto_merge = true

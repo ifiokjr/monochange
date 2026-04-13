@@ -1425,32 +1425,45 @@ fn hosted_issue_relationship_kind_as_str_and_display() {
 }
 
 #[test]
-fn cli_step_definition_accepts_legacy_source_automation_step_aliases() {
-	let publish_release: CliStepDefinition = serde_json::from_value(json!({
-		"type": "PublishGitHubRelease"
-	}))
-	.unwrap_or_else(|error| panic!("deserialize publish alias: {error}"));
-	let open_release_request: CliStepDefinition = serde_json::from_value(json!({
-		"type": "OpenReleasePullRequest"
-	}))
-	.unwrap_or_else(|error| panic!("deserialize request alias: {error}"));
+fn cli_step_definition_rejects_legacy_source_automation_step_aliases() {
+	for legacy_type in [
+		"PublishGitHubRelease",
+		"OpenReleasePullRequest",
+		"EnforceChangesetPolicy",
+		"VerifyChangesets",
+	] {
+		let error = serde_json::from_value::<CliStepDefinition>(json!({
+			"type": legacy_type
+		}))
+		.expect_err("legacy step alias should be rejected");
+		assert!(
+			error.to_string().contains("unknown variant"),
+			"legacy type {legacy_type}: {error}"
+		);
+	}
+}
 
-	assert_eq!(
-		publish_release,
-		CliStepDefinition::PublishRelease {
-			name: None,
-			when: None,
-			inputs: BTreeMap::new(),
-		}
-	);
-	assert_eq!(
-		open_release_request,
-		CliStepDefinition::OpenReleaseRequest {
-			name: None,
-			when: None,
-			inputs: BTreeMap::new(),
-		}
-	);
+#[test]
+fn cli_step_definition_rejects_legacy_command_field_aliases() {
+	let error = serde_json::from_value::<CliStepDefinition>(json!({
+		"type": "Command",
+		"command": "echo hi",
+		"dry_run": "echo dry-run"
+	}))
+	.expect_err("legacy command field alias should be rejected");
+	assert!(error.to_string().contains("unknown field `dry_run`"));
+}
+
+#[test]
+fn source_provider_rejects_legacy_provider_aliases() {
+	for legacy_provider in ["git_hub", "git_lab"] {
+		let error = serde_json::from_value::<SourceProvider>(json!(legacy_provider))
+			.expect_err("legacy provider alias should be rejected");
+		assert!(
+			error.to_string().contains("unknown variant"),
+			"legacy provider {legacy_provider}: {error}"
+		);
+	}
 }
 
 #[test]

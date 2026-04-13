@@ -303,7 +303,7 @@ jobs:
 
 The monochange repository itself can dogfood this model by:
 
-- declaring `[github]`, `[github.releases]`, and `[github.pull_requests]` in `monochange.toml`
+- declaring `[source]`, `[source.releases]`, and `[source.pull_requests]` in `monochange.toml`
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`
 
 <!-- {/githubAutomationDogfoodNotes} -->
