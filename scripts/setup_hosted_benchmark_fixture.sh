@@ -59,7 +59,11 @@ run_git() {
 		-u GIT_OBJECT_DIRECTORY \
 		-u GIT_ALTERNATE_OBJECT_DIRECTORIES \
 		-u GIT_COMMON_DIR \
-		git -C "$root" "$@"
+		git -C "$root" \
+		-c core.hooksPath=/dev/null \
+		-c user.name=fixture \
+		-c user.email=fixture@example.com \
+		"$@"
 }
 
 remote_push_url() {
