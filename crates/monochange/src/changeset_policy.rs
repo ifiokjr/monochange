@@ -215,15 +215,16 @@ pub(crate) fn compute_changed_paths_since(
 	root: &Path,
 	since_rev: &str,
 ) -> MonochangeResult<Vec<String>> {
-	let diff_output = ProcessCommand::new("git")
+	let mut diff_command = ProcessCommand::new("git");
+	diff_command
 		.args(["diff", "--name-only", since_rev])
-		.current_dir(root)
-		.output()
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"failed to run git diff --name-only {since_rev}: {error}"
-			))
-		})?;
+		.current_dir(root);
+	clear_git_env(&mut diff_command);
+	let diff_output = diff_command.output().map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to run git diff --name-only {since_rev}: {error}"
+		))
+	})?;
 	if !diff_output.status.success() {
 		let stderr = String::from_utf8_lossy(&diff_output.stderr);
 		return Err(MonochangeError::Config(format!(
@@ -236,9 +237,12 @@ pub(crate) fn compute_changed_paths_since(
 		.filter(|line| !line.is_empty())
 		.collect();
 
-	let untracked_output = ProcessCommand::new("git")
+	let mut untracked_command = ProcessCommand::new("git");
+	untracked_command
 		.args(["ls-files", "--others", "--exclude-standard"])
-		.current_dir(root)
+		.current_dir(root);
+	clear_git_env(&mut untracked_command);
+	let untracked_output = untracked_command
 		.output()
 		.map_err(|error| MonochangeError::Config(format!("failed to run git ls-files: {error}")))?;
 	if untracked_output.status.success() {
@@ -302,6 +306,19 @@ fn matches_any_package_pattern(
 				|| relative_path.is_some_and(|relative_path| compiled.matches(relative_path))
 		})
 	})
+}
+
+fn clear_git_env(command: &mut ProcessCommand) {
+	for variable in [
+		"GIT_DIR",
+		"GIT_WORK_TREE",
+		"GIT_COMMON_DIR",
+		"GIT_INDEX_FILE",
+		"GIT_OBJECT_DIRECTORY",
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	] {
+		command.env_remove(variable);
+	}
 }
 
 fn render_changeset_verification_comment(
