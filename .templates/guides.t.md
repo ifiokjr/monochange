@@ -20,6 +20,90 @@
 
 <!-- {/discoveryKeyBehaviors} -->
 
+<!-- {@initProviderFeature} -->
+
+The `--provider` flag supports `github`, `gitlab`, and `gitea`. When provided, `mc init`:
+
+1. **Configures the `[source]` section** — adds provider-specific settings for releases and pull/merge requests
+2. **Generates provider CLI commands** — includes `commit-release` and `release-pr` commands in `monochange.toml`
+3. **Creates workflow files** (GitHub only) — writes `.github/workflows/release.yml` and `.github/workflows/changeset-policy.yml`
+4. **Auto-detects owner/repo** — parses `git remote get-url origin` to pre-populate `[source]`
+
+Example generated configuration with `--provider github`:
+
+```toml
+[source]
+provider = "github"
+owner = "ifiokjr" # auto-detected from git remote
+repo = "monochange" # auto-detected from git remote
+
+[source.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[cli.commit-release]
+help_text = "Prepare a release and create a release commit"
+
+[[cli.commit-release.steps]]
+type = "PrepareRelease"
+name = "plan release"
+
+[[cli.commit-release.steps]]
+type = "CommitRelease"
+name = "create release commit"
+
+[cli.release-pr]
+help_text = "Prepare a release and open a release pull request"
+
+[[cli.release-pr.steps]]
+type = "PrepareRelease"
+name = "plan release"
+
+[[cli.release-pr.steps]]
+type = "OpenReleaseRequest"
+name = "open release PR"
+```
+
+The GitHub Actions workflows enable:
+
+- **Release automation** — `release.yml` builds binaries and creates GitHub releases from tags
+- **Changeset policy enforcement** — `changeset-policy.yml` validates PRs have required changeset coverage
+
+For GitLab and Gitea, the `[source]` section is configured but workflows are not generated (use their respective CI configuration files).
+
+<!-- {/initProviderFeature} -->
+
+<!-- {@initProviderQuickStart} -->
+
+```bash
+# Initialize with GitHub automation pre-configured
+mc init --provider github
+
+# The generated monochange.toml includes:
+# - [source] section with GitHub releases and pull request settings
+# - CLI commands for commit-release and release-pr
+# - GitHub Actions workflows in .github/workflows/
+```
+
+This single command generates:
+
+1. **Complete source configuration** — `[source]`, `[source.releases]`, and `[source.pull_requests]` sections
+2. **Automation CLI commands** — `commit-release` and `release-pr` commands ready to use
+3. **GitHub Actions workflows** — `release.yml` and `changeset-policy.yml` for CI/CD
+4. **Auto-detected repository info** — parses your git remote to pre-fill owner and repo
+
+<!-- {/initProviderQuickStart} -->
+
 <!-- {@configurationDefaultsSnippet} -->
 
 ```toml

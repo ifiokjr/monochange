@@ -32,6 +32,14 @@ mc init
 
 `mc init` writes an annotated `monochange.toml`, so most first-time users can start with the generated file instead of hand-authoring config. If you later want editable copies of the built-in CLI commands, run `mc populate` to append any missing default command definitions to `monochange.toml`.
 
+For automated CI setup, include the `--provider` flag:
+
+```bash
+mc init --provider github
+```
+
+This configures the `[source]` section, generates CLI commands for `commit-release` and `release-pr`, and creates GitHub Actions workflows.
+
 Validate the workspace:
 
 ```bash

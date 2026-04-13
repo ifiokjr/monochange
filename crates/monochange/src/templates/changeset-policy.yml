@@ -1,0 +1,53 @@
+name: changeset-policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: changeset-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+
+      - name: install mc
+        run: cargo binstall monochange --no-confirm
+
+      - name: collect changed files
+        id: changed
+        uses: tj-actions/changed-files@v46
+
+      - name: check changeset policy
+        env:
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+        run: |
+          set -euo pipefail
+          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
+          args=(affected --format json --verify)
+          for path in $CHANGED_FILES; do
+            args+=(--changed-paths "$path")
+          done
+          for label in "${labels[@]}"; do
+            args+=(--label "$label")
+          done
+          mc "${args[@]}" | tee policy.raw
+          awk 'BEGIN{c=0}/^\{/{c=1}c{print}' policy.raw > policy.json
+          jq -e '.status != "failed"' policy.json >/dev/null
