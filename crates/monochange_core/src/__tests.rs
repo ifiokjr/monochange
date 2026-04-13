@@ -17,6 +17,7 @@ use crate::CliStepDefinition;
 use crate::DependencyKind;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
+use crate::ExtraChangelogSection;
 use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
 use crate::HostedIssueCommentPlan;
