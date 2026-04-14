@@ -383,6 +383,48 @@ Placeholder README content can come from:
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks the next built-in release publish until trust is configured
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues; use `mode = "external"` when your workflow needs custom scheduling
 
+### Lint rules
+
+Configure ecosystem-specific lint rules to enforce consistency across package manifests:
+
+```toml
+[ecosystems.cargo.lints]
+"cargo/dependency-field-order" = "error"
+"cargo/internal-dependency-workspace" = "error"
+"cargo/required-package-fields" = "error"
+"cargo/sorted-dependencies" = "error"
+"cargo/unlisted-package-private" = "warning"
+
+[ecosystems.npm.lints]
+"npm/workspace-protocol" = "error"
+"npm/sorted-dependencies" = "error"
+"npm/required-package-fields" = "error"
+"npm/root-no-prod-deps" = "error"
+"npm/no-duplicate-dependencies" = "error"
+"npm/unlisted-package-private" = "warning"
+```
+
+Rule configuration:
+- Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
+- Detailed config: `{ level = "error", fix = true, ...options }`
+
+Available Cargo lint rules:
+- `cargo/dependency-field-order` — Enforces consistent field ordering in dependency specifications
+- `cargo/internal-dependency-workspace` — Requires `workspace = true` for internal dependencies
+- `cargo/required-package-fields` — Enforces required `[package]` fields
+- `cargo/sorted-dependencies` — Requires alphabetically sorted dependency tables
+- `cargo/unlisted-package-private` — Packages not in monochange.toml must be private
+
+Available NPM lint rules:
+- `npm/workspace-protocol` — Requires `workspace:` protocol for internal dependencies
+- `npm/sorted-dependencies` — Requires alphabetically sorted dependencies
+- `npm/required-package-fields` — Enforces required fields in package.json
+- `npm/root-no-prod-deps` — Root package.json should only have devDependencies
+- `npm/no-duplicate-dependencies` — Prevents duplicate dependencies across sections
+- `npm/unlisted-package-private` — Packages not in monochange.toml must be private
+
+Run `mc check` to validate and lint. Use `mc check --fix` to auto-fix where possible.
+
 ### Groups
 
 Groups synchronize versions across packages:

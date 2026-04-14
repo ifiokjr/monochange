@@ -1,6 +1,6 @@
 ---
 name: monochange
-description: Guides agents through monochange discovery, changesets, release planning, and provider-aware release workflows. Use when working on `monochange.toml`, `.changeset/*.md`, release automation, grouped versions, cross-ecosystem monorepo releases, CLI step composition, or MCP tool interactions.
+description: Guides agents through monochange discovery, changesets, release planning, and provider-aware release workflows. Use when working on `monochange.toml`, `.changeset/*.md`, release automation, grouped versions, cross-ecosystem monorepo releases, CLI step composition, MCP tool interactions, or linting configuration.
 ---
 
 # monochange
@@ -13,10 +13,11 @@ description: Guides agents through monochange discovery, changesets, release pla
 4. Use `mc change` to write explicit release intent as `.changeset/*.md` files.
 5. Use `mc release --dry-run --format json` before mutating release state.
 6. Use `mc diagnostics --format json` to inspect changeset context and git provenance.
+7. Use `mc lint` to check package manifests for consistency and best practices.
 
 ## Working rules
 
-- Treat `monochange.toml` as the source of truth for packages, groups, source providers, ecosystems, and `[cli.<command>]` entries.
+- Treat `monochange.toml` as the source of truth for packages, groups, source providers, ecosystems, `[cli.<command>]` entries, and lint configuration.
 - Prefer configured package or group ids over guessing manifest names.
 - Use `.changeset/*.md` files for explicit release intent — each targets one or more package/group ids with a bump severity, optional `type`, optional explicit `version`, and a human-readable summary.
 - Use `caused_by` in changeset frontmatter when a dependent package is updating because of a dependency change — this provides context and replaces the automatic "dependency changed → patch" propagation.
@@ -26,6 +27,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 - Combine near-duplicate changesets when the outward change is the same across multiple related packages. Do not emit cloned compatibility notes that differ only by package name.
 - Breaking changes must always get their own dedicated changeset with a migration path instead of being bundled into a broader feature note.
 - Run dry-run flows before real release commands.
+- Run `mc lint` before releases to catch manifest inconsistencies early.
 - Keep docs, templates, and changelog behavior aligned with config changes.
 - Use `mc diagnostics --format json` to audit changesets before release — it shows git provenance, linked PRs, related issues, and introduced/last-updated commits.
 
@@ -50,6 +52,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 | `mc init`                | Generate a starter `monochange.toml` from detected packages            |
 | `mc populate`            | Append missing built-in CLI command definitions to config              |
 | `mc validate`            | Validate config and changeset targets                                  |
+| `mc check`                | Validate config and run lint rules against package manifests           |
 | `mc discover`            | Discover packages across ecosystems                                    |
 | `mc change`              | Create a `.changeset/*.md` file                                        |
 | `mc release`             | Prepare a release plan from changesets and refresh the cached manifest |
@@ -70,7 +73,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 **Standalone steps** (no prerequisites):
 
-- `Validate` — validate config and changeset targets
+- `Validate` — validate config, changeset targets, and run lint rules
 - `Discover` — discover packages across ecosystems
 - `CreateChangeFile` — write a `.changeset/*.md` file
 - `AffectedPackages` — evaluate changeset policy from CI-supplied paths and labels
@@ -191,6 +194,33 @@ Different package types have different user-facing boundaries. Libraries expose 
 Applications and websites should use the `ux` changelog section type for visual and interaction changes, with screenshots when configured.
 
 See [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) for per-type rules, templates, examples, and configuration.
+
+### Lint configuration
+
+Configure ecosystem-specific lint rules in `monochange.toml`:
+
+```toml
+[ecosystems.cargo.lints]
+"cargo/dependency-field-order" = "error"
+"cargo/internal-dependency-workspace" = "error"
+"cargo/required-package-fields" = "error"
+"cargo/sorted-dependencies" = "error"
+"cargo/unlisted-package-private" = "warning"
+
+[ecosystems.npm.lints]
+"npm/workspace-protocol" = "error"
+"npm/sorted-dependencies" = "error"
+"npm/required-package-fields" = "error"
+"npm/root-no-prod-deps" = "error"
+"npm/no-duplicate-dependencies" = "error"
+"npm/unlisted-package-private" = "warning"
+```
+
+Each rule can be configured as:
+- Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
+- Detailed config: `{ level = "error", ...rule_specific_options }`
+
+Use `mc check --fix` to auto-fix issues where possible.
 
 ## Guidance
 
