@@ -127,6 +127,8 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
 	assert!(output.contains("diagnostics"));
+	assert!(output.contains("placeholder-publish"));
+	assert!(output.contains("publish"));
 	assert!(output.contains("repair-release"));
 	assert!(output.contains("release-record"));
 }
@@ -352,8 +354,12 @@ fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	assert!(config.contains("[cli.discover]"));
 	assert!(config.contains("[cli.change]"));
 	assert!(config.contains("[cli.release]"));
+	assert!(config.contains("[cli.placeholder-publish]"));
+	assert!(config.contains("[cli.publish]"));
 	assert!(config.contains("type = \"Discover\""));
 	assert!(config.contains("type = \"CreateChangeFile\""));
+	assert!(config.contains("type = \"PlaceholderPublish\""));
+	assert!(config.contains("type = \"PublishPackages\""));
 }
 
 #[test]
@@ -383,12 +389,14 @@ fn populate_adds_all_missing_default_cli_commands_to_an_existing_configuration()
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 7 default CLI commands"));
+	assert!(output.contains("added 9 default CLI commands"));
 	for table in [
 		"[cli.validate]",
 		"[cli.discover]",
 		"[cli.change]",
 		"[cli.release]",
+		"[cli.placeholder-publish]",
+		"[cli.publish]",
 		"[cli.affected]",
 		"[cli.diagnostics]",
 		"[cli.repair-release]",
@@ -410,13 +418,15 @@ fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 6 default CLI commands"));
+	assert!(output.contains("added 8 default CLI commands"));
 	assert!(config.contains("help_text = \"Custom release pipeline\""));
 	assert_eq!(config.matches("[cli.release]").count(), 1);
 	for table in [
 		"[cli.validate]",
 		"[cli.discover]",
 		"[cli.change]",
+		"[cli.placeholder-publish]",
+		"[cli.publish]",
 		"[cli.affected]",
 		"[cli.diagnostics]",
 		"[cli.repair-release]",
@@ -523,7 +533,7 @@ fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 7 default CLI commands"));
+	assert!(output.contains("added 9 default CLI commands"));
 	assert!(config.starts_with("[cli.validate]"));
 }
 
@@ -2953,6 +2963,7 @@ fn cli_context_for_when_evaluation_tests() -> CliContext {
 		release_request: None,
 		release_request_result: None,
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3342,6 +3353,7 @@ fn sample_release_manifest_for_commit_message(
 		} else {
 			Vec::new()
 		},
+		package_publications: Vec::new(),
 		plan: monochange_core::ReleaseManifestPlan {
 			workspace_root: Path::new(".").to_path_buf(),
 			decisions: Vec::new(),
@@ -3398,6 +3410,7 @@ fn sample_release_record_for_discovery_text() -> monochange_core::ReleaseRecord 
 		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
 		updated_changelogs: vec![Path::new("crates/monochange/CHANGELOG.md").to_path_buf()],
 		deleted_changesets: vec![Path::new(".changeset/feature.md").to_path_buf()],
+		package_publications: Vec::new(),
 		provider: Some(monochange_core::ReleaseRecordProvider {
 			kind: monochange_core::SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),
@@ -3426,6 +3439,7 @@ fn text_release_record_discovery_omits_empty_sections() {
 			changed_files: Vec::new(),
 			updated_changelogs: Vec::new(),
 			deleted_changesets: Vec::new(),
+			package_publications: Vec::new(),
 			provider: None,
 		},
 	};
@@ -3665,6 +3679,7 @@ fn template_context_exposes_release_commit_namespace() {
 			dry_run: false,
 			status: "completed".to_string(),
 		}),
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3700,6 +3715,7 @@ fn template_context_exposes_retarget_namespace() {
 		release_request: None,
 		release_request_result: None,
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3715,6 +3731,78 @@ fn template_context_exposes_retarget_namespace() {
 			.and_then(|value| value.pointer("/status"))
 			.and_then(serde_json::Value::as_str),
 		Some("dry_run")
+	);
+}
+
+#[test]
+fn template_context_exposes_publish_namespace() {
+	let context = CliContext {
+		root: PathBuf::from("."),
+		dry_run: true,
+		quiet: false,
+		show_diff: false,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
+		release_manifest_path: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: None,
+		package_publish_report: Some(crate::package_publish::PackagePublishReport {
+			mode: crate::package_publish::PackagePublishRunMode::Release,
+			dry_run: true,
+			packages: vec![crate::package_publish::PackagePublishOutcome {
+				package: "@monochange/skill".to_string(),
+				ecosystem: Ecosystem::Npm,
+				registry: "npm".to_string(),
+				version: "1.2.3".to_string(),
+				status: crate::package_publish::PackagePublishStatus::Planned,
+				message: "would publish package".to_string(),
+				placeholder: false,
+				trusted_publishing: crate::package_publish::TrustedPublishingOutcome {
+					status: crate::package_publish::TrustedPublishingStatus::Planned,
+					repository: Some("ifiokjr/monochange".to_string()),
+					workflow: Some("publish.yml".to_string()),
+					environment: None,
+					setup_url: Some(
+						"https://docs.npmjs.com/cli/v11/commands/npm-trust".to_string(),
+					),
+					message: "would configure trusted publishing".to_string(),
+				},
+			}],
+		}),
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	assert_eq!(
+		template_context
+			.get("publish")
+			.and_then(|value| value.pointer("/mode"))
+			.and_then(serde_json::Value::as_str),
+		Some("release")
+	);
+	assert_eq!(
+		template_context
+			.get("publish")
+			.and_then(|value| value.pointer("/packages/0/package"))
+			.and_then(serde_json::Value::as_str),
+		Some("@monochange/skill")
+	);
+	assert_eq!(
+		template_context
+			.get("publish")
+			.and_then(|value| value.pointer("/packages/0/trustedPublishing/status"))
+			.and_then(serde_json::Value::as_str),
+		Some("planned")
 	);
 }
 
@@ -3743,6 +3831,7 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 		release_request: None,
 		release_request_result: None,
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: Some(monochange_core::ChangesetPolicyEvaluation {
@@ -3855,6 +3944,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 		release_request: None,
 		release_request_result: None,
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3893,6 +3983,7 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 			"dry-run org/repo monochange/release/release -> main via github".to_string(),
 		),
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: vec!["dry-run org/repo 123".to_string()],
 		changeset_policy_evaluation: None,
@@ -3936,6 +4027,7 @@ fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release
 		release_request: None,
 		release_request_result: None,
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3988,6 +4080,7 @@ fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
 			dry_run: false,
 			status: "completed".to_string(),
 		}),
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: vec!["commented on #123".to_string()],
 		changeset_policy_evaluation: None,
@@ -7407,6 +7500,7 @@ fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
 		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
 		updated_changelogs: Vec::new(),
 		deleted_changesets: Vec::new(),
+		package_publications: Vec::new(),
 		provider: Some(monochange_core::ReleaseRecordProvider {
 			kind: monochange_core::SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),
@@ -7707,6 +7801,7 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 			additional_paths: Vec::new(),
 			tag: true,
 			release: true,
+			publish: monochange_core::PublishSettings::default(),
 			version_format: VersionFormat::Primary,
 		}],
 		groups: vec![monochange_core::GroupDefinition {
@@ -7797,6 +7892,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 			additional_paths: Vec::new(),
 			tag: true,
 			release: true,
+			publish: monochange_core::PublishSettings::default(),
 			version_format: VersionFormat::Primary,
 		}],
 		groups: Vec::new(),
@@ -8690,6 +8786,7 @@ fn sample_prepared_release_for_cli_render() -> crate::PreparedRelease {
 		changelogs: Vec::new(),
 		updated_changelogs: Vec::new(),
 		deleted_changesets: Vec::new(),
+		package_publications: Vec::new(),
 		dry_run: true,
 	}
 }
@@ -8735,6 +8832,7 @@ fn tracked_release_pull_request_paths_include_manifest_path_and_deduplicate() {
 		release_request: None,
 		release_request_result: None,
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,

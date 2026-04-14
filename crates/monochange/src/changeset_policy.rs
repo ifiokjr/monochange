@@ -429,6 +429,7 @@ mod tests {
 			additional_paths: vec!["shared/**".to_string()],
 			tag: true,
 			release: true,
+			publish: monochange_core::PublishSettings::default(),
 			version_format: VersionFormat::Primary,
 		}
 	}

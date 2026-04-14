@@ -218,6 +218,7 @@ fn sample_release_record() -> ReleaseRecord {
 		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
 		updated_changelogs: vec![Path::new("crates/monochange/CHANGELOG.md").to_path_buf()],
 		deleted_changesets: vec![Path::new(".changeset/feature.md").to_path_buf()],
+		package_publications: Vec::new(),
 		provider: Some(ReleaseRecordProvider {
 			kind: SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),

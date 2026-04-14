@@ -1054,6 +1054,126 @@ pub struct ReleaseNotesSettings {
 	pub change_templates: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PublishMode {
+	#[default]
+	Builtin,
+	External,
+}
+
+impl PublishMode {
+	/// Return the canonical serialized name for the publish mode.
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Builtin => "builtin",
+			Self::External => "external",
+		}
+	}
+}
+
+impl fmt::Display for PublishMode {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum RegistryKind {
+	CratesIo,
+	Npm,
+	Jsr,
+	PubDev,
+}
+
+impl RegistryKind {
+	/// Return the canonical serialized name for the registry.
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::CratesIo => "crates_io",
+			Self::Npm => "npm",
+			Self::Jsr => "jsr",
+			Self::PubDev => "pub_dev",
+		}
+	}
+}
+
+impl fmt::Display for RegistryKind {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PublishRegistry {
+	Builtin(RegistryKind),
+	Custom(String),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct PlaceholderSettings {
+	#[serde(default)]
+	pub readme: Option<String>,
+	#[serde(default)]
+	pub readme_file: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TrustedPublishingSettings {
+	#[serde(default = "default_true")]
+	pub enabled: bool,
+	#[serde(default)]
+	pub repository: Option<String>,
+	#[serde(default)]
+	pub workflow: Option<String>,
+	#[serde(default)]
+	pub environment: Option<String>,
+}
+
+impl Default for TrustedPublishingSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			repository: None,
+			workflow: None,
+			environment: None,
+		}
+	}
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PublishSettings {
+	#[serde(default = "default_true")]
+	pub enabled: bool,
+	#[serde(default)]
+	pub mode: PublishMode,
+	#[serde(default)]
+	pub registry: Option<PublishRegistry>,
+	#[serde(default)]
+	pub trusted_publishing: TrustedPublishingSettings,
+	#[serde(default)]
+	pub placeholder: PlaceholderSettings,
+}
+
+impl Default for PublishSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			mode: PublishMode::default(),
+			registry: None,
+			trusted_publishing: TrustedPublishingSettings::default(),
+			placeholder: PlaceholderSettings::default(),
+		}
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PackageDefinition {
 	pub id: String,
@@ -1076,6 +1196,8 @@ pub struct PackageDefinition {
 	pub tag: bool,
 	pub release: bool,
 	pub version_format: VersionFormat,
+	#[serde(default)]
+	pub publish: PublishSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -1152,6 +1274,8 @@ pub struct EcosystemSettings {
 	pub versioned_files: Vec<VersionedFileDefinition>,
 	#[serde(default)]
 	pub lockfile_commands: Vec<LockfileCommandDefinition>,
+	#[serde(default)]
+	pub publish: PublishSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -1382,6 +1506,24 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+	/// Publish placeholder package versions for missing registry packages.
+	PlaceholderPublish {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	/// Publish package versions from durable monochange release state.
+	PublishPackages {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	/// Open or update a hosted release request from prepared release state.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
@@ -1484,6 +1626,8 @@ impl CliStepDefinition {
 			| Self::PrepareRelease { inputs, .. }
 			| Self::CommitRelease { inputs, .. }
 			| Self::PublishRelease { inputs, .. }
+			| Self::PlaceholderPublish { inputs, .. }
+			| Self::PublishPackages { inputs, .. }
 			| Self::OpenReleaseRequest { inputs, .. }
 			| Self::CommentReleasedIssues { inputs, .. }
 			| Self::AffectedPackages { inputs, .. }
@@ -1504,6 +1648,8 @@ impl CliStepDefinition {
 			| Self::PrepareRelease { name, .. }
 			| Self::CommitRelease { name, .. }
 			| Self::PublishRelease { name, .. }
+			| Self::PlaceholderPublish { name, .. }
+			| Self::PublishPackages { name, .. }
 			| Self::OpenReleaseRequest { name, .. }
 			| Self::CommentReleasedIssues { name, .. }
 			| Self::AffectedPackages { name, .. }
@@ -1530,6 +1676,8 @@ impl CliStepDefinition {
 			| Self::PrepareRelease { when, .. }
 			| Self::CommitRelease { when, .. }
 			| Self::PublishRelease { when, .. }
+			| Self::PlaceholderPublish { when, .. }
+			| Self::PublishPackages { when, .. }
 			| Self::OpenReleaseRequest { when, .. }
 			| Self::CommentReleasedIssues { when, .. }
 			| Self::AffectedPackages { when, .. }
@@ -1561,6 +1709,8 @@ impl CliStepDefinition {
 			Self::PrepareRelease { .. } => "PrepareRelease",
 			Self::CommitRelease { .. } => "CommitRelease",
 			Self::PublishRelease { .. } => "PublishRelease",
+			Self::PlaceholderPublish { .. } => "PlaceholderPublish",
+			Self::PublishPackages { .. } => "PublishPackages",
 			Self::OpenReleaseRequest { .. } => "OpenReleaseRequest",
 			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
 			Self::AffectedPackages { .. } => "AffectedPackages",
@@ -1583,6 +1733,8 @@ impl CliStepDefinition {
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
+			| Self::PlaceholderPublish { .. }
+			| Self::PublishPackages { .. }
 			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
 			Self::CreateChangeFile { .. } => {
@@ -1617,6 +1769,8 @@ impl CliStepDefinition {
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
+			| Self::PlaceholderPublish { .. }
+			| Self::PublishPackages { .. }
 			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => {
 				match name {
@@ -1807,6 +1961,20 @@ pub struct ReleaseManifestChangelog {
 	pub format: ChangelogFormat,
 	pub notes: ReleaseNotesDocument,
 	pub rendered: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackagePublicationTarget {
+	pub package: String,
+	pub ecosystem: Ecosystem,
+	#[serde(default)]
+	pub registry: Option<PublishRegistry>,
+	pub version: String,
+	#[serde(default)]
+	pub mode: PublishMode,
+	#[serde(default)]
+	pub trusted_publishing: TrustedPublishingSettings,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -2120,6 +2288,8 @@ pub struct ReleaseManifest {
 	pub changed_files: Vec<PathBuf>,
 	pub changelogs: Vec<ReleaseManifestChangelog>,
 	#[serde(default)]
+	pub package_publications: Vec<PackagePublicationTarget>,
+	#[serde(default)]
 	pub changesets: Vec<PreparedChangeset>,
 	#[serde(default)]
 	pub deleted_changesets: Vec<PathBuf>,
@@ -2205,6 +2375,8 @@ pub struct ReleaseRecord {
 	pub release_targets: Vec<ReleaseRecordTarget>,
 	pub released_packages: Vec<String>,
 	pub changed_files: Vec<PathBuf>,
+	#[serde(default)]
+	pub package_publications: Vec<PackagePublicationTarget>,
 	#[serde(default)]
 	pub updated_changelogs: Vec<PathBuf>,
 	#[serde(default)]
@@ -3117,6 +3289,56 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			}],
 			steps: vec![CliStepDefinition::PrepareRelease {
 				name: Some("prepare release".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		},
+		CliCommandDefinition {
+			name: "placeholder-publish".to_string(),
+			help_text: Some(
+				"Publish placeholder package versions for packages missing from their registries"
+					.to_string(),
+			),
+			inputs: vec![CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec![
+					"text".to_string(),
+					"markdown".to_string(),
+					"json".to_string(),
+				],
+				short: None,
+			}],
+			steps: vec![CliStepDefinition::PlaceholderPublish {
+				name: Some("publish placeholder packages".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		},
+		CliCommandDefinition {
+			name: "publish".to_string(),
+			help_text: Some(
+				"Publish package versions from monochange release state using built-in workflows"
+					.to_string(),
+			),
+			inputs: vec![CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec![
+					"text".to_string(),
+					"markdown".to_string(),
+					"json".to_string(),
+				],
+				short: None,
+			}],
+			steps: vec![CliStepDefinition::PublishPackages {
+				name: Some("publish packages".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],

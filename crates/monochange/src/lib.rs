@@ -169,6 +169,7 @@ use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PackagePublicationTarget;
 use monochange_core::PackageRecord;
 use monochange_core::PreparedChangeset;
 use monochange_core::PreparedChangesetTarget;
@@ -258,6 +259,7 @@ mod git_support;
 mod hosted_sources;
 mod interactive;
 mod mcp;
+mod package_publish;
 mod prepared_release_cache;
 mod release_artifacts;
 mod release_record;
@@ -364,6 +366,7 @@ pub struct PreparedRelease {
 	pub changeset_paths: Vec<PathBuf>,
 	pub changesets: Vec<PreparedChangeset>,
 	pub released_packages: Vec<String>,
+	pub package_publications: Vec<PackagePublicationTarget>,
 	pub version: Option<String>,
 	pub group_version: Option<String>,
 	pub release_targets: Vec<ReleaseTarget>,
@@ -534,6 +537,7 @@ struct CliContext {
 	release_request: Option<SourceChangeRequest>,
 	release_request_result: Option<String>,
 	release_commit_report: Option<CommitReleaseReport>,
+	package_publish_report: Option<package_publish::PackagePublishReport>,
 	issue_comment_plans: Vec<HostedIssueCommentPlan>,
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,

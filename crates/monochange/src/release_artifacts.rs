@@ -140,6 +140,45 @@ pub(crate) fn build_release_targets(
 	release_targets
 }
 
+pub(crate) fn build_package_publication_targets(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	plan: &ReleasePlan,
+) -> Vec<PackagePublicationTarget> {
+	let package_by_id = packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<BTreeMap<_, _>>();
+	let mut targets = plan
+		.decisions
+		.iter()
+		.filter(|decision| decision.recommended_bump.is_release())
+		.filter_map(|decision| {
+			let package = package_by_id.get(decision.package_id.as_str()).copied()?;
+			let version = decision.planned_version.as_ref()?;
+			let config_id = package
+				.metadata
+				.get("config_id")
+				.cloned()
+				.unwrap_or_else(|| package.name.clone());
+			let package_definition = configuration.package_by_id(&config_id)?;
+			if !package_definition.publish.enabled {
+				return None;
+			}
+			Some(PackagePublicationTarget {
+				package: config_id,
+				ecosystem: package.ecosystem,
+				registry: package_definition.publish.registry.clone(),
+				version: version.to_string(),
+				mode: package_definition.publish.mode,
+				trusted_publishing: package_definition.publish.trusted_publishing.clone(),
+			})
+		})
+		.collect::<Vec<_>>();
+	targets.sort_by(|left, right| left.package.cmp(&right.package));
+	targets
+}
+
 pub(crate) fn build_manifest_updates_parallel(
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
@@ -903,6 +942,7 @@ pub(crate) fn build_release_manifest(
 				}
 			})
 			.collect(),
+		package_publications: prepared_release.package_publications.clone(),
 		changesets: prepared_release.changesets.clone(),
 		deleted_changesets: prepared_release.deleted_changesets.clone(),
 		plan: ReleaseManifestPlan {
@@ -987,6 +1027,7 @@ pub(crate) fn build_release_record(
 			.collect(),
 		released_packages: manifest.released_packages.clone(),
 		changed_files: manifest.changed_files.clone(),
+		package_publications: manifest.package_publications.clone(),
 		updated_changelogs: manifest
 			.changelogs
 			.iter()
@@ -1179,12 +1220,14 @@ pub(crate) fn render_release_cli_command_json(
 	release_request: Option<&SourceChangeRequest>,
 	issue_comments: &[HostedIssueCommentPlan],
 	release_commit: Option<&CommitReleaseReport>,
+	package_publish: Option<&package_publish::PackagePublishReport>,
 	file_diffs: &[PreparedFileDiff],
 ) -> MonochangeResult<String> {
 	if releases.is_empty()
 		&& release_request.is_none()
 		&& issue_comments.is_empty()
 		&& release_commit.is_none()
+		&& package_publish.is_none()
 		&& file_diffs.is_empty()
 	{
 		return render_release_manifest_json(manifest);
@@ -1195,6 +1238,7 @@ pub(crate) fn render_release_cli_command_json(
 		"releases": releases,
 		"releaseRequest": release_request,
 		"issueComments": issue_comments,
+		"packagePublish": package_publish,
 	});
 	if !file_diffs.is_empty() {
 		value
@@ -1328,7 +1372,11 @@ mod tests {
 	use monochange_core::ProviderMergeRequestSettings;
 	use monochange_core::ProviderReleaseNotesSource;
 	use monochange_core::ProviderReleaseSettings;
+	use monochange_core::PublishMode;
+	use monochange_core::PublishRegistry;
+	use monochange_core::PublishSettings;
 	use monochange_core::PublishState;
+	use monochange_core::RegistryKind;
 	use monochange_core::ReleaseDecision;
 	use monochange_core::ReleaseManifest;
 	use monochange_core::ReleaseManifestChangelog;
@@ -1422,6 +1470,7 @@ mod tests {
 			}],
 			changesets: Vec::new(),
 			deleted_changesets: vec![PathBuf::from(".changeset/feature.md")],
+			package_publications: Vec::new(),
 			plan: ReleaseManifestPlan {
 				workspace_root: PathBuf::from("."),
 				decisions: vec![ReleaseManifestPlanDecision {
@@ -1508,6 +1557,7 @@ mod tests {
 			additional_paths: Vec::new(),
 			tag: true,
 			release: true,
+			publish: PublishSettings::default(),
 			version_format: VersionFormat::Namespaced,
 		}];
 		configuration.groups = vec![monochange_core::GroupDefinition {
@@ -1646,6 +1696,203 @@ mod tests {
 				.format("%Y-%m-%d")
 				.to_string()
 				.is_empty()
+		);
+	}
+
+	#[test]
+	fn build_package_publication_targets_filters_disabled_and_preserves_publish_metadata() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let mut configuration = empty_configuration(root);
+		configuration.packages = vec![
+			PackageDefinition {
+				id: "core".to_string(),
+				path: PathBuf::from("core"),
+				package_type: PackageType::Cargo,
+				changelog: None,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				publish: PublishSettings {
+					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+					..PublishSettings::default()
+				},
+				version_format: VersionFormat::Primary,
+			},
+			PackageDefinition {
+				id: "web".to_string(),
+				path: PathBuf::from("web"),
+				package_type: PackageType::Npm,
+				changelog: None,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				publish: PublishSettings {
+					mode: PublishMode::External,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+					..PublishSettings::default()
+				},
+				version_format: VersionFormat::Primary,
+			},
+			PackageDefinition {
+				id: "private".to_string(),
+				path: PathBuf::from("private"),
+				package_type: PackageType::Cargo,
+				changelog: None,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				publish: PublishSettings {
+					enabled: false,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+					..PublishSettings::default()
+				},
+				version_format: VersionFormat::Primary,
+			},
+		];
+
+		let packages = vec![
+			sample_package(root, "core", PackageType::Cargo),
+			sample_package(root, "web", PackageType::Npm),
+			sample_package(root, "private", PackageType::Cargo),
+		];
+		let plan = ReleasePlan {
+			workspace_root: root.to_path_buf(),
+			decisions: vec![
+				ReleaseDecision {
+					package_id: "cargo:core/manifest".to_string(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Minor,
+					planned_version: Some(Version::new(1, 2, 0)),
+					group_id: None,
+					reasons: vec!["feature".to_string()],
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+				ReleaseDecision {
+					package_id: "npm:web/manifest".to_string(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Patch,
+					planned_version: Some(Version::new(2, 0, 1)),
+					group_id: None,
+					reasons: vec!["fix".to_string()],
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+				ReleaseDecision {
+					package_id: "cargo:private/manifest".to_string(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Patch,
+					planned_version: Some(Version::new(1, 0, 1)),
+					group_id: None,
+					reasons: vec!["fix".to_string()],
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+				ReleaseDecision {
+					package_id: "cargo:core/manifest".to_string(),
+					trigger_type: "metadata".to_string(),
+					recommended_bump: BumpSeverity::None,
+					planned_version: Some(Version::new(9, 9, 9)),
+					group_id: None,
+					reasons: Vec::new(),
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+			],
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+
+		let targets = build_package_publication_targets(&configuration, &packages, &plan);
+		assert_eq!(
+			targets,
+			vec![
+				PackagePublicationTarget {
+					package: "core".to_string(),
+					ecosystem: Ecosystem::Cargo,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+					version: "1.2.0".to_string(),
+					mode: PublishMode::Builtin,
+					trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+				},
+				PackagePublicationTarget {
+					package: "web".to_string(),
+					ecosystem: Ecosystem::Npm,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+					version: "2.0.1".to_string(),
+					mode: PublishMode::External,
+					trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+				},
+			]
+		);
+	}
+
+	#[test]
+	fn build_release_manifest_copies_package_publications_from_prepared_release() {
+		let cli_command = CliCommandDefinition {
+			name: "release".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: Vec::new(),
+		};
+		let prepared_release = PreparedRelease {
+			plan: ReleasePlan {
+				workspace_root: PathBuf::from("."),
+				decisions: Vec::new(),
+				groups: Vec::new(),
+				warnings: Vec::new(),
+				unresolved_items: Vec::new(),
+				compatibility_evidence: Vec::new(),
+			},
+			changeset_paths: Vec::new(),
+			changesets: Vec::new(),
+			released_packages: vec!["core".to_string()],
+			version: Some("1.2.3".to_string()),
+			group_version: None,
+			release_targets: Vec::new(),
+			changed_files: Vec::new(),
+			changelogs: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			package_publications: vec![PackagePublicationTarget {
+				package: "core".to_string(),
+				ecosystem: Ecosystem::Cargo,
+				registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+				version: "1.2.3".to_string(),
+				mode: PublishMode::Builtin,
+				trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+			}],
+			dry_run: false,
+		};
+
+		let manifest = build_release_manifest(&cli_command, &prepared_release, &[]);
+		assert_eq!(
+			manifest.package_publications,
+			prepared_release.package_publications
 		);
 	}
 

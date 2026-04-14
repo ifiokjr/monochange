@@ -46,6 +46,7 @@ monochange_npm = { workspace = true, optional = true }
 monochange_semver = { workspace = true }
 rayon = { workspace = true, default-features = true }
 regex = { workspace = true, default-features = true }
+reqwest = { workspace = true, default-features = true, features = ["blocking"] }
 rmcp = { workspace = true, features = ["server", "transport-io", "macros"], default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
@@ -60,6 +61,7 @@ toml = { workspace = true, default-features = true }
 tracing = { workspace = true, default-features = true }
 tracing-subscriber = { workspace = true, default-features = true }
 typed-builder = { workspace = true, default-features = true }
+urlencoding = { workspace = true, default-features = true }
 
 [dev-dependencies]
 criterion = { workspace = true, default-features = true }

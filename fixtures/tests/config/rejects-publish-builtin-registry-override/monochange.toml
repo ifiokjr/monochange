@@ -1,0 +1,6 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.core.publish]
+registry = "https://example.com/api/v1/crates"

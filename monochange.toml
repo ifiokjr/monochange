@@ -158,6 +158,31 @@ change_templates = [
 #                             exclude from changeset verification
 #   additional_paths        — glob patterns for paths outside the package
 #                             directory that should trigger changeset verification
+#   publish                 — package publishing settings; package values
+#                             override inherited [ecosystems.<name>].publish
+#                             defaults
+#     enabled               — include this package in managed publishing
+#                             flows (default: true)
+#     mode                  — "builtin" for monochange-managed publishing to
+#                             the default public registry for the ecosystem, or
+#                             "external" when CI/scripts handle publishing
+#                             themselves (default: "builtin"). npm-family
+#                             workspaces use the detected workspace manager for
+#                             built-in publish commands, so pnpm workspaces
+#                             publish via `pnpm publish`.
+#     registry              — registry override. Built-in publishing only
+#                             supports the default public registry for each
+#                             ecosystem: "crates_io", "npm", "jsr", or
+#                             "pub_dev". Custom/private registries must use
+#                             mode = "external".
+#     trusted_publishing    — whether this package should use registry
+#                             trusted/OIDC publishing flows when available.
+#                             Set `trusted_publishing = true` for defaults, or
+#                             use a table with enabled/repository/workflow/
+#                             environment to override the GitHub trust context.
+#     placeholder.readme    — inline README text for placeholder publishing
+#     placeholder.readme_file — workspace-relative README source for
+#                             placeholder publishing
 #   tag                     — whether to create a git tag for this package (default: false)
 #   release                 — whether to create a provider release (default: false)
 #   version_format          — "namespaced" (default: "pkg/v1.0.0") or
@@ -391,6 +416,20 @@ comment_on_failure = true
 #                       release updates manifest versions; when set, inferred
 #                       defaults are disabled and these commands fully own
 #                       lockfile refresh for that ecosystem
+#   publish          — ecosystem-wide publishing defaults inherited by matching
+#                      packages unless the package overrides them
+#     enabled        — enable managed publishing for the ecosystem (default: true)
+#     mode           — "builtin" or "external" (default: "builtin")
+#     registry       — default public registry for this ecosystem. Built-in
+#                      publishing only supports the ecosystem's canonical public
+#                      registry.
+#     trusted_publishing — whether packages in this ecosystem should default to
+#                      trusted/OIDC publishing. Set `trusted_publishing = true`
+#                      for defaults, or use a table with
+#                      enabled/repository/workflow/environment to inherit trust
+#                      metadata into matching packages.
+#     placeholder.readme / placeholder.readme_file — default placeholder README
+#                      source inherited by packages during bootstrap publishing
 #
 # Note: roots and exclude are parsed but discovery currently scans all
 # supported ecosystems regardless of these settings.

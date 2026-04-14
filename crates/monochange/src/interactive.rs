@@ -361,6 +361,7 @@ mod __tests {
 	use monochange_core::MonochangeError;
 	use monochange_core::PackageDefinition;
 	use monochange_core::PackageType;
+	use monochange_core::PublishSettings;
 	use monochange_core::ReleaseNotesSettings;
 	use monochange_core::VersionFormat;
 	use monochange_core::WorkspaceConfiguration;
@@ -632,6 +633,7 @@ mod __tests {
 					additional_paths: Vec::new(),
 					tag: true,
 					release: true,
+					publish: PublishSettings::default(),
 					version_format: VersionFormat::Primary,
 				},
 				PackageDefinition {
@@ -649,6 +651,7 @@ mod __tests {
 					additional_paths: Vec::new(),
 					tag: true,
 					release: true,
+					publish: PublishSettings::default(),
 					version_format: VersionFormat::Primary,
 				},
 				PackageDefinition {
@@ -666,6 +669,7 @@ mod __tests {
 					additional_paths: Vec::new(),
 					tag: true,
 					release: true,
+					publish: PublishSettings::default(),
 					version_format: VersionFormat::Primary,
 				},
 			],
@@ -796,6 +800,7 @@ mod __tests {
 					additional_paths: Vec::new(),
 					tag: true,
 					release: true,
+					publish: PublishSettings::default(),
 					version_format: VersionFormat::Primary,
 				},
 				PackageDefinition {
@@ -813,6 +818,7 @@ mod __tests {
 					additional_paths: Vec::new(),
 					tag: true,
 					release: true,
+					publish: PublishSettings::default(),
 					version_format: VersionFormat::Primary,
 				},
 			],
@@ -910,6 +916,7 @@ mod __tests {
 				additional_paths: Vec::new(),
 				tag: true,
 				release: true,
+				publish: PublishSettings::default(),
 				version_format: VersionFormat::Primary,
 			}],
 			groups: Vec::new(),

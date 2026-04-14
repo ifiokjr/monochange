@@ -15,7 +15,10 @@ use monochange_core::Ecosystem;
 use monochange_core::EcosystemType;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PackageRecord;
+use monochange_core::PublishMode;
+use monochange_core::PublishRegistry;
 use monochange_core::PublishState;
+use monochange_core::RegistryKind;
 use monochange_core::ShellConfig;
 use monochange_core::SourceProvider;
 use monochange_test_helpers::current_test_name;
@@ -99,7 +102,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 7);
+	assert_eq!(configuration.cli.len(), 9);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -112,6 +115,8 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 			"discover",
 			"change",
 			"release",
+			"placeholder-publish",
+			"publish",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -158,6 +163,8 @@ fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_c
 			"discover",
 			"change",
 			"release",
+			"placeholder-publish",
+			"publish",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -1866,6 +1873,108 @@ fn load_workspace_configuration_rejects_publish_release_without_source_config() 
 }
 
 #[test]
+fn load_workspace_configuration_assigns_default_publish_registries_per_ecosystem() {
+	let root = fixture_path("config/publish-default-registries");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = configuration
+		.packages
+		.iter()
+		.map(|package| (package.id.as_str(), &package.publish))
+		.collect::<std::collections::BTreeMap<_, _>>();
+
+	assert_eq!(
+		packages
+			.get("core")
+			.and_then(|publish| publish.registry.as_ref()),
+		Some(&PublishRegistry::Builtin(RegistryKind::CratesIo))
+	);
+	assert_eq!(
+		packages
+			.get("web")
+			.and_then(|publish| publish.registry.as_ref()),
+		Some(&PublishRegistry::Builtin(RegistryKind::Npm))
+	);
+	assert_eq!(
+		packages
+			.get("jsr_pkg")
+			.and_then(|publish| publish.registry.as_ref()),
+		Some(&PublishRegistry::Builtin(RegistryKind::Jsr))
+	);
+	assert_eq!(
+		packages
+			.get("dart_pkg")
+			.and_then(|publish| publish.registry.as_ref()),
+		Some(&PublishRegistry::Builtin(RegistryKind::PubDev))
+	);
+	assert!(packages.values().all(|publish| publish.enabled));
+	assert!(
+		packages
+			.values()
+			.all(|publish| publish.mode == PublishMode::Builtin)
+	);
+	assert!(
+		packages
+			.values()
+			.all(|publish| publish.trusted_publishing.enabled)
+	);
+}
+
+#[test]
+fn load_workspace_configuration_allows_package_publish_placeholder_to_override_ecosystem_default() {
+	let root = fixture_path("config/publish-placeholder-package-override");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.package_by_id("web")
+		.unwrap_or_else(|| panic!("expected web package"));
+
+	assert_eq!(package.publish.placeholder.readme, None);
+	assert_eq!(
+		package.publish.placeholder.readme_file.as_deref(),
+		Some(Path::new("docs/web-placeholder.md"))
+	);
+}
+
+#[test]
+fn load_workspace_configuration_merges_trusted_publishing_details() {
+	let root = fixture_path("config/publish-trusted-publishing-overrides");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let package = configuration
+		.package_by_id("web")
+		.unwrap_or_else(|| panic!("expected web package"));
+
+	assert!(package.publish.trusted_publishing.enabled);
+	assert_eq!(
+		package.publish.trusted_publishing.repository.as_deref(),
+		Some("ifiokjr/monochange")
+	);
+	assert_eq!(
+		package.publish.trusted_publishing.workflow.as_deref(),
+		Some("publish.yml")
+	);
+	assert_eq!(
+		package.publish.trusted_publishing.environment.as_deref(),
+		Some("publisher")
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_builtin_publish_registry_override() {
+	let root = fixture_path("config/rejects-publish-builtin-registry-override");
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected builtin publish registry error"));
+	assert!(
+		error.to_string().contains(
+			"package `core` uses built-in publishing with an unsupported registry override"
+		)
+	);
+	assert!(error.to_string().contains("mode = \"external\""));
+}
+
+#[test]
 fn load_workspace_configuration_rejects_open_release_pull_request_without_source_config() {
 	let root = fixture_path("config/rejects-pr-no-github");
 	let error = load_workspace_configuration(&root)
@@ -2475,6 +2584,7 @@ fn package_definition(id: &str, path: &str) -> monochange_core::PackageDefinitio
 		tag: true,
 		release: true,
 		version_format: monochange_core::VersionFormat::Namespaced,
+		publish: monochange_core::PublishSettings::default(),
 	}
 }
 
@@ -3831,6 +3941,7 @@ fn matching_package_helpers_cover_references_and_definitions() {
 		tag: true,
 		release: true,
 		version_format: monochange_core::VersionFormat::Primary,
+		publish: monochange_core::PublishSettings::default(),
 	};
 	assert_eq!(
 		crate::find_matching_package_indices_for_definition(&packages, &root, &definition),

@@ -1,0 +1,15 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[package.jsr_pkg]
+path = "packages/jsr-pkg"
+type = "deno"
+
+[package.dart_pkg]
+path = "packages/dart-pkg"
+type = "dart"

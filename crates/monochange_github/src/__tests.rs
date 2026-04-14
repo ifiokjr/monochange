@@ -354,6 +354,7 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 			rendered_changelog_title: "test changelog title".to_string(),
 			members: vec!["cargo:crates/core/Cargo.toml".to_string()],
 		}],
+		package_publications: vec![],
 		released_packages: vec!["workflow-core".to_string()],
 		changed_files: Vec::new(),
 		changelogs: Vec::new(),
@@ -1942,6 +1943,7 @@ fn sample_manifest() -> ReleaseManifest {
 				"cargo:crates/app/Cargo.toml".to_string(),
 			],
 		}],
+		package_publications: vec![],
 		released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
 		changed_files: vec![PathBuf::from("Cargo.toml")],
 		changelogs: vec![ReleaseManifestChangelog {

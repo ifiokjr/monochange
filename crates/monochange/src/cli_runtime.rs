@@ -495,6 +495,7 @@ pub(crate) fn execute_cli_command_with_options(
 		release_request: None,
 		release_request_result: None,
 		release_commit_report: None,
+		package_publish_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -619,6 +620,27 @@ pub(crate) fn execute_cli_command_with_options(
 					#[rustfmt::skip]
 						let results = build_release_results_for_source(context.dry_run, &source, &context.release_requests)?;
 					context.release_results = results;
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::PlaceholderPublish { .. } => {
+					let report = package_publish::run_placeholder_publish(
+						root,
+						configuration,
+						context.dry_run,
+					)?;
+					context.package_publish_report = Some(report);
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::PublishPackages { .. } => {
+					let report = package_publish::run_publish_packages(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						context.dry_run,
+					)?;
+					context.package_publish_report = Some(report);
 					output = None;
 					Ok(())
 				}
@@ -1382,6 +1404,14 @@ pub(crate) fn build_cli_template_context(
 		);
 	}
 
+	// Structured publish.* namespace
+	if let Some(report) = &context.package_publish_report {
+		template_context.insert(
+			"publish".to_string(),
+			build_package_publish_template_value(report),
+		);
+	}
+
 	// Structured steps.<id>.* namespace from command step outputs
 	if !context.step_outputs.is_empty() {
 		let mut steps_map = serde_json::Map::new();
@@ -1548,6 +1578,12 @@ fn build_release_commit_template_value(report: &CommitReleaseReport) -> serde_js
 	serde_json::to_value(report).unwrap_or(serde_json::Value::Null)
 }
 
+fn build_package_publish_template_value(
+	report: &package_publish::PackagePublishReport,
+) -> serde_json::Value {
+	serde_json::to_value(report).unwrap_or(serde_json::Value::Null)
+}
+
 pub(crate) fn parse_boolean_step_input(
 	inputs: &BTreeMap<String, Vec<String>>,
 	name: &str,
@@ -1637,6 +1673,147 @@ fn render_release_commit_report(report: &CommitReleaseReport) -> Vec<String> {
 	lines.extend(report.tracked_paths.iter().map(|path| format!("    - {}", path.display())));
 	lines.push(format!("  status: {}", report.status.replace('_', "-")));
 	lines
+}
+
+fn render_package_publish_report(report: &package_publish::PackagePublishReport) -> Vec<String> {
+	let mut lines = vec![match report.mode {
+		package_publish::PackagePublishRunMode::Placeholder => {
+			"placeholder publishing:".to_string()
+		}
+		package_publish::PackagePublishRunMode::Release => "package publishing:".to_string(),
+	}];
+
+	if report.packages.is_empty() {
+		lines.push("- no packages matched the publishing criteria".to_string());
+		return lines;
+	}
+
+	for package in &report.packages {
+		lines.push(format!(
+			"- {} {} via {} -> {}",
+			package.package,
+			package.version,
+			package.registry,
+			package_publish_status_label(package.status),
+		));
+		lines.push(format!("  ecosystem: {}", package.ecosystem));
+		lines.push(format!("  placeholder: {}", yes_no(package.placeholder)));
+		lines.push(format!("  publish: {}", package.message));
+		lines.push(format!(
+			"  trusted publishing: {}",
+			trusted_publishing_status_label(package.trusted_publishing.status)
+		));
+		lines.push(format!(
+			"  trust message: {}",
+			package.trusted_publishing.message
+		));
+		if let Some(repository) = &package.trusted_publishing.repository {
+			lines.push(format!("  repository: {repository}"));
+		}
+		if let Some(workflow) = &package.trusted_publishing.workflow {
+			lines.push(format!("  workflow: {workflow}"));
+		}
+		if let Some(environment) = &package.trusted_publishing.environment {
+			lines.push(format!("  environment: {environment}"));
+		}
+		if let Some(setup_url) = &package.trusted_publishing.setup_url {
+			lines.push(format!("  setup: {setup_url}"));
+		}
+	}
+
+	lines
+}
+
+fn render_package_publish_report_markdown(
+	report: &package_publish::PackagePublishReport,
+	color: bool,
+) -> Vec<String> {
+	if report.packages.is_empty() {
+		return vec!["- no packages matched the publishing criteria".to_string()];
+	}
+
+	let mut lines = Vec::new();
+	for package in &report.packages {
+		lines.push(format!(
+			"- **{}** {} via {} → {}",
+			paint_markdown_inline(
+				&format!("`{}`", package.package),
+				MarkdownStyle::Code,
+				color,
+			),
+			paint_markdown_inline(
+				&format!("`{}`", package.version),
+				MarkdownStyle::Code,
+				color,
+			),
+			paint_markdown_inline(
+				&format!("`{}`", package.registry),
+				MarkdownStyle::Code,
+				color,
+			),
+			package_publish_status_label(package.status),
+		));
+		lines.push(format!("- **Ecosystem:** {}", package.ecosystem));
+		lines.push(format!(
+			"- **Placeholder:** {}",
+			yes_no(package.placeholder)
+		));
+		lines.push(format!("- **Publish:** {}", package.message));
+		lines.push(format!(
+			"- **Trusted publishing:** {}",
+			trusted_publishing_status_label(package.trusted_publishing.status)
+		));
+		lines.push(format!(
+			"- **Trust message:** {}",
+			package.trusted_publishing.message
+		));
+		if let Some(repository) = &package.trusted_publishing.repository {
+			lines.push(format!(
+				"- **Repository:** {}",
+				paint_markdown_inline(&format!("`{repository}`"), MarkdownStyle::Code, color,)
+			));
+		}
+		if let Some(workflow) = &package.trusted_publishing.workflow {
+			lines.push(format!(
+				"- **Workflow:** {}",
+				paint_markdown_inline(&format!("`{workflow}`"), MarkdownStyle::Code, color,)
+			));
+		}
+		if let Some(environment) = &package.trusted_publishing.environment {
+			lines.push(format!(
+				"- **Environment:** {}",
+				paint_markdown_inline(&format!("`{environment}`"), MarkdownStyle::Code, color,)
+			));
+		}
+		if let Some(setup_url) = &package.trusted_publishing.setup_url {
+			lines.push(format!(
+				"- **Setup:** {}",
+				paint_markdown_inline(&format!("`{setup_url}`"), MarkdownStyle::Code, color,)
+			));
+		}
+	}
+
+	lines
+}
+
+fn package_publish_status_label(status: package_publish::PackagePublishStatus) -> &'static str {
+	match status {
+		package_publish::PackagePublishStatus::Planned => "planned",
+		package_publish::PackagePublishStatus::Published => "published",
+		package_publish::PackagePublishStatus::SkippedExisting => "skipped-existing",
+		package_publish::PackagePublishStatus::SkippedExternal => "skipped-external",
+	}
+}
+
+fn trusted_publishing_status_label(
+	status: package_publish::TrustedPublishingStatus,
+) -> &'static str {
+	match status {
+		package_publish::TrustedPublishingStatus::Disabled => "disabled",
+		package_publish::TrustedPublishingStatus::Planned => "planned",
+		package_publish::TrustedPublishingStatus::Configured => "configured",
+		package_publish::TrustedPublishingStatus::ManualActionRequired => "manual-action-required",
+	}
 }
 
 pub(crate) fn render_retarget_release_report(report: &RetargetReleaseReport) -> String {
@@ -1838,6 +2015,9 @@ pub(crate) fn render_cli_command_result(
 			}
 		}
 	}
+	if let Some(report) = &context.package_publish_report {
+		lines.extend(render_package_publish_report(report));
+	}
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
 		lines.push(format!("changeset policy: {}", evaluation.status));
 		lines.push(evaluation.summary.clone());
@@ -1879,7 +2059,7 @@ pub(crate) fn render_cli_command_markdown_result(
 	cli_command: &CliCommandDefinition,
 	context: &CliContext,
 ) -> String {
-	if context.prepared_release.is_none() {
+	if context.prepared_release.is_none() && context.package_publish_report.is_none() {
 		return render_cli_command_result(cli_command, context);
 	}
 
@@ -2045,6 +2225,17 @@ pub(crate) fn render_cli_command_markdown_result(
 				.collect::<Vec<_>>();
 			sections.push(render_markdown_section("Deleted changesets", &lines, color));
 		}
+	}
+	if let Some(report) = &context.package_publish_report {
+		let title = match report.mode {
+			package_publish::PackagePublishRunMode::Placeholder => "Placeholder publishing",
+			package_publish::PackagePublishRunMode::Release => "Package publishing",
+		};
+		sections.push(render_markdown_section(
+			title,
+			&render_package_publish_report_markdown(report, color),
+			color,
+		));
 	}
 	if !context.command_logs.is_empty() {
 		let lines = context
@@ -2304,6 +2495,7 @@ fn resolve_command_output(
 					context.release_request.as_ref(),
 					&context.issue_comment_plans,
 					context.release_commit_report.as_ref(),
+					context.package_publish_report.as_ref(),
 					if context.show_diff {
 						&context.prepared_file_diffs
 					} else {
@@ -2366,6 +2558,21 @@ fn resolve_command_output(
 		};
 		return Ok(rendered);
 	}
+	if let Some(report) = &context.package_publish_report {
+		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let rendered = match format {
+			OutputFormat::Json => {
+				serde_json::to_string_pretty(report).map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to render package publish report as json: {error}"
+					))
+				})?
+			}
+			OutputFormat::Markdown => render_cli_command_markdown_result(cli_command, context),
+			OutputFormat::Text => render_cli_command_result(cli_command, context),
+		};
+		return Ok(rendered);
+	}
 	if !context.command_logs.is_empty() {
 		return Ok(render_cli_command_result(cli_command, context));
 	}
@@ -2415,6 +2622,7 @@ mod tests {
 			release_request: None,
 			release_request_result: None,
 			release_commit_report: None,
+			package_publish_report: None,
 			issue_comment_plans: Vec::new(),
 			issue_comment_results: Vec::new(),
 			changeset_policy_evaluation: None,
@@ -2578,6 +2786,7 @@ mod tests {
 			changelogs: Vec::new(),
 			updated_changelogs: Vec::new(),
 			deleted_changesets: vec![PathBuf::from(".changeset/feature.md")],
+			package_publications: Vec::new(),
 			dry_run: true,
 		});
 		context.prepared_file_diffs = vec![PreparedFileDiff {
@@ -2625,6 +2834,131 @@ mod tests {
 		assert!(markdown.contains("## File diffs"));
 		assert!(markdown.contains("## Deleted changesets"));
 		assert!(markdown.contains("## Commands"));
+	}
+
+	#[test]
+	fn render_cli_command_results_include_package_publish_reports() {
+		let cli_command = CliCommandDefinition {
+			name: "publish".to_string(),
+			help_text: Some("publish packages".to_string()),
+			inputs: vec![monochange_core::CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec![
+					"text".to_string(),
+					"markdown".to_string(),
+					"json".to_string(),
+				],
+				short: None,
+			}],
+			steps: vec![CliStepDefinition::PublishPackages {
+				name: Some("publish packages".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		};
+		let mut context = cli_context();
+		context.package_publish_report = Some(package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![package_publish::PackagePublishOutcome {
+				package: "@scope/pkg".to_string(),
+				ecosystem: Ecosystem::Npm,
+				registry: "npm".to_string(),
+				version: "1.2.3".to_string(),
+				status: package_publish::PackagePublishStatus::Published,
+				message: "published package to npm".to_string(),
+				placeholder: false,
+				trusted_publishing: package_publish::TrustedPublishingOutcome {
+					status: package_publish::TrustedPublishingStatus::Configured,
+					repository: Some("ifiokjr/monochange".to_string()),
+					workflow: Some("publish.yml".to_string()),
+					environment: Some("release".to_string()),
+					setup_url: None,
+					message: "trusted publishing already configured".to_string(),
+				},
+			}],
+		});
+		context.command_logs = vec!["ran npm trust".to_string()];
+
+		let text = render_cli_command_result(&cli_command, &context);
+		assert!(text.contains("package publishing:"));
+		assert!(text.contains("@scope/pkg"));
+		assert!(text.contains("trusted publishing: configured"));
+		assert!(text.contains("repository: ifiokjr/monochange"));
+		assert!(text.contains("commands:"));
+
+		let markdown = render_cli_command_markdown_result(&cli_command, &context);
+		assert!(markdown.contains("## Package publishing"));
+		assert!(markdown.contains("**Trusted publishing:** configured"));
+		assert!(markdown.contains("**Workflow:** `publish.yml`"));
+		assert!(markdown.contains("## Commands"));
+	}
+
+	#[test]
+	fn resolve_command_output_supports_package_publish_json_without_release_state() {
+		let cli_command = CliCommandDefinition {
+			name: "placeholder-publish".to_string(),
+			help_text: Some("publish placeholders".to_string()),
+			inputs: vec![monochange_core::CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec![
+					"text".to_string(),
+					"markdown".to_string(),
+					"json".to_string(),
+				],
+				short: None,
+			}],
+			steps: vec![CliStepDefinition::PlaceholderPublish {
+				name: Some("publish placeholder packages".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		};
+		let mut context = cli_context();
+		context.last_step_inputs =
+			BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
+		context.package_publish_report = Some(package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Placeholder,
+			dry_run: true,
+			packages: vec![package_publish::PackagePublishOutcome {
+				package: "core".to_string(),
+				ecosystem: Ecosystem::Cargo,
+				registry: "crates_io".to_string(),
+				version: "0.0.0".to_string(),
+				status: package_publish::PackagePublishStatus::Planned,
+				message: "would publish placeholder package".to_string(),
+				placeholder: true,
+				trusted_publishing: package_publish::TrustedPublishingOutcome {
+					status: package_publish::TrustedPublishingStatus::ManualActionRequired,
+					repository: None,
+					workflow: None,
+					environment: None,
+					setup_url: Some("https://crates.io/docs/trusted-publishing".to_string()),
+					message: "configure trusted publishing manually after the placeholder release"
+						.to_string(),
+				},
+			}],
+		});
+
+		let rendered = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("package publish json output: {error}"));
+		let parsed: serde_json::Value = serde_json::from_str(&rendered)
+			.unwrap_or_else(|error| panic!("parse package publish json output: {error}"));
+		assert_eq!(parsed["mode"], serde_json::json!("placeholder"));
+		assert_eq!(parsed["dryRun"], serde_json::json!(true));
+		assert_eq!(parsed["packages"][0]["package"], serde_json::json!("core"));
+		assert_eq!(
+			parsed["packages"][0]["trustedPublishing"]["status"],
+			serde_json::json!("manual_action_required")
+		);
 	}
 
 	#[test]
@@ -2919,6 +3253,7 @@ mod tests {
 			changelogs: Vec::new(),
 			updated_changelogs: Vec::new(),
 			deleted_changesets: Vec::new(),
+			package_publications: Vec::new(),
 			dry_run: true,
 		});
 		context.prepared_file_diffs = vec![PreparedFileDiff {
@@ -3036,6 +3371,7 @@ mod tests {
 			changelogs: Vec::new(),
 			updated_changelogs: Vec::new(),
 			deleted_changesets: Vec::new(),
+			package_publications: Vec::new(),
 			dry_run: true,
 		});
 		context.changeset_policy_evaluation = Some(ChangesetPolicyEvaluation {

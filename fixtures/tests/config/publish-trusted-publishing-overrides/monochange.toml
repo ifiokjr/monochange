@@ -1,0 +1,13 @@
+[ecosystems.npm.publish]
+
+[ecosystems.npm.publish.trusted_publishing]
+enabled = true
+repository = "ifiokjr/monochange"
+workflow = "publish.yml"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[package.web.publish.trusted_publishing]
+environment = "publisher"

@@ -941,6 +941,7 @@ fn sample_manifest() -> ReleaseManifest {
 			rendered_changelog_title: "test changelog title".to_string(),
 			members: vec!["core".to_string(), "app".to_string()],
 		}],
+		package_publications: vec![],
 		released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
 		changed_files: vec![PathBuf::from("Cargo.toml")],
 		changesets: Vec::new(),

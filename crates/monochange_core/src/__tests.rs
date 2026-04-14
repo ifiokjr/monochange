@@ -32,6 +32,7 @@ use crate::PackageType;
 use crate::ProviderBotSettings;
 use crate::ProviderMergeRequestSettings;
 use crate::ProviderReleaseSettings;
+use crate::PublishSettings;
 use crate::PublishState;
 use crate::RELEASE_RECORD_END_MARKER;
 use crate::RELEASE_RECORD_HEADING;
@@ -160,6 +161,7 @@ fn test_release_manifest() -> ReleaseManifest {
 		released_packages: Vec::new(),
 		changed_files: Vec::new(),
 		changelogs: Vec::new(),
+		package_publications: Vec::new(),
 		changesets: Vec::new(),
 		deleted_changesets: Vec::new(),
 		plan: ReleaseManifestPlan {
@@ -854,7 +856,7 @@ fn changeset_verification_settings_default_to_enabled_enforcement() {
 }
 
 #[test]
-fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
+fn default_cli_commands_expose_publish_flows_alongside_release_planning() {
 	let cli = default_cli_commands();
 	let cli_command_names = cli
 		.iter()
@@ -867,6 +869,8 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 			"discover",
 			"change",
 			"release",
+			"placeholder-publish",
+			"publish",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -879,6 +883,32 @@ fn default_cli_commands_expose_validate_discover_change_release_and_affected() {
 		validate_cli_command.steps,
 		vec![CliStepDefinition::Validate {
 			name: Some("validate workspace".to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		}]
+	);
+
+	let placeholder_publish = cli
+		.iter()
+		.find(|command| command.name == "placeholder-publish")
+		.unwrap_or_else(|| panic!("expected placeholder-publish cli command"));
+	assert_eq!(
+		placeholder_publish.steps,
+		vec![CliStepDefinition::PlaceholderPublish {
+			name: Some("publish placeholder packages".to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		}]
+	);
+
+	let publish = cli
+		.iter()
+		.find(|command| command.name == "publish")
+		.unwrap_or_else(|| panic!("expected publish cli command"));
+	assert_eq!(
+		publish.steps,
+		vec![CliStepDefinition::PublishPackages {
+			name: Some("publish packages".to_string()),
 			when: None,
 			inputs: BTreeMap::new(),
 		}]
@@ -1559,6 +1589,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				tag: false,
 				release: false,
 				version_format: VersionFormat::Namespaced,
+				publish: PublishSettings::default(),
 			},
 			PackageDefinition {
 				id: "monochange_core".to_string(),
@@ -1579,6 +1610,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				tag: false,
 				release: false,
 				version_format: VersionFormat::Namespaced,
+				publish: PublishSettings::default(),
 			},
 			PackageDefinition {
 				id: "monochange_graph".to_string(),
@@ -1596,6 +1628,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				tag: false,
 				release: false,
 				version_format: VersionFormat::Namespaced,
+				publish: PublishSettings::default(),
 			},
 		],
 		groups: vec![GroupDefinition {
@@ -1909,6 +1942,7 @@ fn sample_release_record() -> ReleaseRecord {
 			PathBuf::from("Cargo.lock"),
 			PathBuf::from("crates/monochange/Cargo.toml"),
 		],
+		package_publications: Vec::new(),
 		updated_changelogs: vec![PathBuf::from("crates/monochange/CHANGELOG.md")],
 		deleted_changesets: vec![PathBuf::from(".changeset/032-step-outputs.md")],
 		provider: Some(ReleaseRecordProvider {

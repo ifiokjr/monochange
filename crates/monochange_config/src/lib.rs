@@ -115,9 +115,14 @@ use monochange_core::PackageType;
 use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseSettings;
+use monochange_core::PublishMode;
+use monochange_core::PublishRegistry;
+use monochange_core::PublishSettings;
+use monochange_core::RegistryKind;
 use monochange_core::ReleaseNotesSettings;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
+use monochange_core::TrustedPublishingSettings;
 use monochange_core::VersionFormat;
 use monochange_core::VersionGroup;
 use monochange_core::VersionedFileDefinition;
@@ -280,6 +285,8 @@ struct RawPackageDefinition {
 	release: bool,
 	#[serde(default)]
 	version_format: VersionFormat,
+	#[serde(default)]
+	publish: RawPublishSettings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -341,6 +348,49 @@ struct RawEcosystemSettings {
 	versioned_files: Vec<RawVersionedFileDefinition>,
 	#[serde(default)]
 	lockfile_commands: Vec<LockfileCommandDefinition>,
+	#[serde(default)]
+	publish: RawPublishSettings,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawPlaceholderSettings {
+	#[serde(default)]
+	readme: Option<String>,
+	#[serde(default)]
+	readme_file: Option<PathBuf>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawPublishSettings {
+	#[serde(default)]
+	enabled: Option<bool>,
+	#[serde(default)]
+	mode: Option<PublishMode>,
+	#[serde(default)]
+	registry: Option<PublishRegistry>,
+	#[serde(default)]
+	trusted_publishing: Option<RawTrustedPublishingSettings>,
+	#[serde(default)]
+	placeholder: RawPlaceholderSettings,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum RawTrustedPublishingSettings {
+	Enabled(bool),
+	Detailed(RawTrustedPublishingDetails),
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawTrustedPublishingDetails {
+	#[serde(default)]
+	enabled: Option<bool>,
+	#[serde(default)]
+	repository: Option<String>,
+	#[serde(default)]
+	workflow: Option<String>,
+	#[serde(default)]
+	environment: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -730,7 +780,134 @@ fn normalize_ecosystem_settings(
 			true,
 		)?,
 		lockfile_commands: raw.lockfile_commands,
+		publish: normalize_publish_settings(
+			contents,
+			None,
+			raw.publish,
+			"ecosystems",
+			owner_id,
+			inferred_ecosystem_type,
+		)?,
 	})
+}
+
+fn default_publish_registry_for_ecosystem(
+	inferred_ecosystem_type: EcosystemType,
+) -> Option<PublishRegistry> {
+	match inferred_ecosystem_type {
+		EcosystemType::Cargo => Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+		EcosystemType::Npm => Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+		EcosystemType::Deno => Some(PublishRegistry::Builtin(RegistryKind::Jsr)),
+		EcosystemType::Dart => Some(PublishRegistry::Builtin(RegistryKind::PubDev)),
+		_ => None,
+	}
+}
+
+fn normalize_trusted_publishing_settings(
+	base: Option<&TrustedPublishingSettings>,
+	raw: Option<RawTrustedPublishingSettings>,
+) -> TrustedPublishingSettings {
+	let mut settings = base.cloned().unwrap_or_default();
+
+	match raw {
+		Some(RawTrustedPublishingSettings::Enabled(enabled)) => {
+			settings.enabled = enabled;
+		}
+		Some(RawTrustedPublishingSettings::Detailed(details)) => {
+			if let Some(enabled) = details.enabled {
+				settings.enabled = enabled;
+			}
+			if let Some(repository) = details.repository {
+				settings.repository = Some(repository);
+			}
+			if let Some(workflow) = details.workflow {
+				settings.workflow = Some(workflow);
+			}
+			if let Some(environment) = details.environment {
+				settings.environment = Some(environment);
+			}
+		}
+		None => {}
+	}
+
+	settings
+}
+
+fn normalize_publish_settings(
+	contents: &str,
+	base: Option<&PublishSettings>,
+	raw: RawPublishSettings,
+	owner_kind: &str,
+	owner_id: &str,
+	inferred_ecosystem_type: EcosystemType,
+) -> MonochangeResult<PublishSettings> {
+	let mut settings = base.cloned().unwrap_or_else(|| {
+		PublishSettings {
+			registry: default_publish_registry_for_ecosystem(inferred_ecosystem_type),
+			..PublishSettings::default()
+		}
+	});
+
+	if let Some(enabled) = raw.enabled {
+		settings.enabled = enabled;
+	}
+	if let Some(mode) = raw.mode {
+		settings.mode = mode;
+	}
+	if let Some(registry) = raw.registry {
+		settings.registry = Some(registry);
+	}
+	settings.trusted_publishing = normalize_trusted_publishing_settings(
+		base.map(|settings| &settings.trusted_publishing),
+		raw.trusted_publishing,
+	);
+	if raw.placeholder.readme.is_some() {
+		settings.placeholder.readme_file = None;
+		settings.placeholder.readme = raw.placeholder.readme;
+	}
+	if raw.placeholder.readme_file.is_some() {
+		settings.placeholder.readme = None;
+		settings.placeholder.readme_file = raw.placeholder.readme_file;
+	}
+
+	if settings.placeholder.readme.is_some() && settings.placeholder.readme_file.is_some() {
+		return Err(config_diagnostic(
+			contents,
+			format!(
+				"{owner_kind} `{owner_id}` publish.placeholder cannot set both `readme` and `readme_file`"
+			),
+			vec![config_section_label(
+				contents,
+				owner_kind,
+				owner_id,
+				"publish placeholder readme conflict",
+			)],
+			Some("set either inline `readme` text or `readme_file`, but not both".to_string()),
+		));
+	}
+
+	if settings.mode == PublishMode::Builtin {
+		let default_registry = default_publish_registry_for_ecosystem(inferred_ecosystem_type);
+		if settings.registry != default_registry {
+			return Err(config_diagnostic(
+				contents,
+				format!(
+					"{owner_kind} `{owner_id}` uses built-in publishing with an unsupported registry override"
+				),
+				vec![config_section_label(
+					contents,
+					owner_kind,
+					owner_id,
+					"unsupported built-in publish registry",
+				)],
+				Some(
+					"remove the registry override to use the default public registry for that ecosystem, or set `mode = \"external\"` for custom/private registries".to_string(),
+				),
+			));
+		}
+	}
+
+	Ok(settings)
 }
 
 fn load_raw_configuration(root: &Path) -> MonochangeResult<(String, RawWorkspaceConfiguration)> {
@@ -825,7 +1002,7 @@ fn build_package_definitions(
 				true,
 			)?);
 			Ok::<_, MonochangeError>(PackageDefinition {
-				id,
+				id: id.clone(),
 				path: package.path,
 				package_type,
 				changelog,
@@ -843,6 +1020,20 @@ fn build_package_definitions(
 				tag: package.tag,
 				release: package.release,
 				version_format: package.version_format,
+				publish: normalize_publish_settings(
+					contents,
+					Some(match inferred_ecosystem_type {
+						EcosystemType::Cargo => &cargo_ecosystem.publish,
+						EcosystemType::Npm => &npm_ecosystem.publish,
+						EcosystemType::Deno => &deno_ecosystem.publish,
+						EcosystemType::Dart => &dart_ecosystem.publish,
+						_ => unreachable!("unsupported ecosystem type for package publish"),
+					}),
+					package.publish,
+					"package",
+					&id,
+					inferred_ecosystem_type,
+				)?,
 			})
 		})
 		.collect::<Result<Vec<_>, _>>()

@@ -1613,6 +1613,8 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 	let versioned_file_updates = versioned_file_updates_result.0?;
 	let release_targets = release_targets_result.0?;
 	let lockfile_commands = lockfile_commands_result.0?;
+	let package_publications =
+		build_package_publication_targets(&configuration, &discovery.packages, &plan);
 	let changesets = if let Some(handle) = background_changeset_context {
 		join_source_changeset_context_task(&mut phase_timings, handle)?
 	} else {
@@ -1728,6 +1730,7 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 			changeset_paths,
 			changesets,
 			released_packages,
+			package_publications,
 			version,
 			group_version,
 			release_targets,
@@ -2172,6 +2175,7 @@ mod workspace_ops_tests {
 				additional_paths: Vec::new(),
 				tag: true,
 				release: true,
+				publish: monochange_core::PublishSettings::default(),
 				version_format: VersionFormat::Primary,
 			}],
 			..configuration
@@ -2210,6 +2214,7 @@ mod workspace_ops_tests {
 				additional_paths: Vec::new(),
 				tag: true,
 				release: true,
+				publish: monochange_core::PublishSettings::default(),
 				version_format: VersionFormat::Primary,
 			}],
 			groups: Vec::new(),
@@ -2257,6 +2262,7 @@ mod workspace_ops_tests {
 				additional_paths: Vec::new(),
 				tag: true,
 				release: true,
+				publish: monochange_core::PublishSettings::default(),
 				version_format: VersionFormat::Primary,
 			}],
 			groups: Vec::new(),

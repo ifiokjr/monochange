@@ -231,6 +231,35 @@ warn_on_group_mismatch = true
 #                             exclude from changeset verification
 #   additional_paths        — glob patterns for paths outside the package
 #                             directory that should trigger changeset verification
+#   publish                 — package publishing settings; package values
+#                             override inherited [ecosystems.<name>].publish
+#                             defaults
+#     enabled               — include this package in managed publishing
+#                             flows (default: true)
+#     mode                  — "builtin" for monochange-managed publishing to
+#                             the default public registry for the ecosystem, or
+#                             "external" when your CI or scripts handle
+#                             publishing themselves (default: "builtin").
+#                             npm-family workspaces use the detected workspace
+#                             manager for built-in publish commands, so pnpm
+#                             workspaces publish via `pnpm publish`.
+#     registry              — registry override. Built-in publishing only
+#                             supports the default public registry for each
+#                             ecosystem: "crates_io", "npm", "jsr", or
+#                             "pub_dev". Custom/private registries must use
+#                             mode = "external".
+#     trusted_publishing    — whether this package is expected to use registry
+#                             trusted/OIDC publishing flows when available.
+#                             Set `trusted_publishing = true` for defaults, or
+#                             use a table to override GitHub trust metadata:
+#                             enabled, repository, workflow, environment
+#                             (default: enabled)
+#     placeholder.readme    — inline README text to use when publishing a
+#                             placeholder package for the first bootstrap
+#                             release
+#     placeholder.readme_file — workspace-relative path to a README file used
+#                             for placeholder publishing. Set either
+#                             placeholder.readme or placeholder.readme_file.
 #   tag                     — whether to create a git tag for this package (default: false)
 #   release                 — whether to create a provider release (default: false)
 #   version_format          — "namespaced" (default: "pkg/v1.0.0") or
@@ -244,6 +273,20 @@ type = "{{ pkg.type }}"
 {% if pkg.changelog %}
 changelog = "{{ pkg.changelog }}"
 {% endif %}
+# [package.{{ pkg.id }}.publish]
+# enabled = true
+# mode = "builtin"
+# trusted_publishing = true
+# [package.{{ pkg.id }}.publish.trusted_publishing]
+# enabled = true
+# repository = "owner/repo"
+# workflow = "publish.yml"
+# environment = "release"
+# registry = "{{ pkg.type == "cargo" and "crates_io" or pkg.type == "npm" and "npm" or pkg.type == "deno" and "jsr" or "pub_dev" }}"
+
+# [package.{{ pkg.id }}.publish.placeholder]
+# readme = "This package is a placeholder published by monochange until the first real release."
+# readme_file = "docs/{{ pkg.id }}-placeholder.md"
 
 {% endfor %}
 # =============================================================================
@@ -351,6 +394,20 @@ version_format = "primary"
 #                       so incomplete Cargo.lock files should be refreshed with
 #                       explicit commands here or manually afterwards. When set,
 #                       these commands fully own lockfile refresh for that ecosystem.
+#   publish          — ecosystem-wide publishing defaults inherited by matching
+#                      packages unless the package overrides them
+#     enabled        — enable managed publishing for the ecosystem (default: true)
+#     mode           — "builtin" or "external" (default: "builtin")
+#     registry       — default public registry for this ecosystem. Built-in
+#                      publishing only supports the ecosystem’s canonical public
+#                      registry.
+#     trusted_publishing — whether packages in this ecosystem should default to
+#                      trusted/OIDC publishing flows when available. Set
+#                      `trusted_publishing = true` for defaults, or use a table
+#                      with enabled/repository/workflow/environment to inherit
+#                      trust metadata into matching packages (default: enabled)
+#     placeholder.readme / placeholder.readme_file — default placeholder README
+#                      source inherited by packages during bootstrap publishing
 
 {% if has_cargo %}
 [ecosystems.cargo]
@@ -359,6 +416,14 @@ enabled = true
 # [ecosystems.cargo]
 # enabled = true
 {% endif %}
+# [ecosystems.cargo.publish]
+# enabled = true
+# mode = "builtin"
+# trusted_publishing = true
+# [ecosystems.cargo.publish.trusted_publishing]
+# enabled = true
+# workflow = "publish.yml"
+# registry = "crates_io"
 
 {% if has_npm %}
 [ecosystems.npm]
@@ -367,6 +432,14 @@ enabled = true
 # [ecosystems.npm]
 # enabled = true
 {% endif %}
+# [ecosystems.npm.publish]
+# enabled = true
+# mode = "builtin"
+# trusted_publishing = true
+# [ecosystems.npm.publish.trusted_publishing]
+# enabled = true
+# workflow = "publish.yml"
+# registry = "npm"
 
 {% if has_deno %}
 [ecosystems.deno]
@@ -375,6 +448,14 @@ enabled = true
 # [ecosystems.deno]
 # enabled = true
 {% endif %}
+# [ecosystems.deno.publish]
+# enabled = true
+# mode = "builtin"
+# trusted_publishing = true
+# [ecosystems.deno.publish.trusted_publishing]
+# enabled = true
+# workflow = "publish.yml"
+# registry = "jsr"
 
 {% if has_dart %}
 [ecosystems.dart]
@@ -383,6 +464,14 @@ enabled = true
 # [ecosystems.dart]
 # enabled = true
 {% endif %}
+# [ecosystems.dart.publish]
+# enabled = true
+# mode = "builtin"
+# trusted_publishing = true
+# [ecosystems.dart.publish.trusted_publishing]
+# enabled = true
+# workflow = "publish.yml"
+# registry = "pub_dev"
 
 # =============================================================================
 # [source] — source-control provider configuration
@@ -650,6 +739,20 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
 ]
 steps = [{ name = "prepare release", type = "PrepareRelease" }]
+
+[cli.placeholder-publish]
+help_text = "Publish placeholder package versions for missing registry packages"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+]
+steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
+
+[cli.publish]
+help_text = "Publish package versions from monochange release state using built-in workflows"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+]
+steps = [{ name = "publish packages", type = "PublishPackages" }]
 
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"

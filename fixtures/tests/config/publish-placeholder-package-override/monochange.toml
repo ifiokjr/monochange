@@ -1,0 +1,9 @@
+[ecosystems.npm.publish.placeholder]
+readme = "ecosystem placeholder"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[package.web.publish.placeholder]
+readme_file = "docs/web-placeholder.md"

@@ -6,6 +6,10 @@
 
 [cli.release]
 
+[cli.placeholder-publish]
+
+[cli.publish]
+
 [cli.affected]
 
 [cli.diagnostics]
