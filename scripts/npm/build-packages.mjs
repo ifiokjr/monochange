@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process";
+import { spawnSync as nodeSpawnSync } from "node:child_process";
 import {
 	chmodSync,
 	copyFileSync,
 	existsSync,
 	mkdirSync,
 	readdirSync,
-	writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +14,17 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
 
-const platforms = [
+let _spawnSync = nodeSpawnSync;
+
+export function _setSpawnSync(fn) {
+	_spawnSync = fn;
+}
+
+export function _resetSpawnSync() {
+	_spawnSync = nodeSpawnSync;
+}
+
+export const platforms = [
 	{
 		archiveExt: "tar.gz",
 		binaryName: "monochange",
@@ -94,7 +103,7 @@ const platforms = [
 	},
 ];
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
 	const args = {};
 	for (let index = 0; index < argv.length; index += 1) {
 		const key = argv[index];
@@ -108,12 +117,12 @@ function parseArgs(argv) {
 	return args;
 }
 
-function ensureDirectory(path) {
+export function ensureDirectory(path) {
 	mkdirSync(path, { recursive: true });
 }
 
-function run(command, args, options = {}) {
-	const result = spawnSync(command, args, {
+export function run(command, args, options = {}) {
+	const result = _spawnSync(command, args, {
 		encoding: "utf8",
 		stdio: options.stdio ?? "pipe",
 		cwd: options.cwd,
@@ -126,7 +135,7 @@ function run(command, args, options = {}) {
 	return result;
 }
 
-function findArchive(assetsDir, target, releaseTag, archiveExt) {
+export function findArchive(assetsDir, target, releaseTag, archiveExt) {
 	const archiveName = `monochange-${target}-${releaseTag}.${archiveExt}`;
 	const archivePath = join(assetsDir, archiveName);
 	if (!existsSync(archivePath)) {
@@ -135,7 +144,7 @@ function findArchive(assetsDir, target, releaseTag, archiveExt) {
 	return archivePath;
 }
 
-function* walk(dir) {
+export function* walk(dir) {
 	const entries = readdirSync(dir, { withFileTypes: true });
 	for (const entry of entries) {
 		const entryPath = join(dir, entry.name);
@@ -147,7 +156,7 @@ function* walk(dir) {
 	}
 }
 
-function extractArchive(archivePath, destinationDir) {
+export function extractArchive(archivePath, destinationDir) {
 	ensureDirectory(destinationDir);
 	if (archivePath.endsWith(".zip")) {
 		run("unzip", ["-q", archivePath, "-d", destinationDir]);
@@ -160,7 +169,7 @@ function extractArchive(archivePath, destinationDir) {
 	throw new Error(`unsupported archive: ${basename(archivePath)}`);
 }
 
-function findBinary(extractedDir, binaryName) {
+export function findBinary(extractedDir, binaryName) {
 	for (const filePath of walk(extractedDir)) {
 		if (basename(filePath) === binaryName) {
 			return filePath;
@@ -169,12 +178,12 @@ function findBinary(extractedDir, binaryName) {
 	throw new Error(`could not find ${binaryName} in ${extractedDir}`);
 }
 
-function writeJson(path, value) {
-	writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+export function packageNameToDirName(packageName) {
+	return packageName.replace("@", "").replace("/", "__");
 }
 
-function createPlatformPackage(
-	{ outDir, spec, version, releaseTag, assetsDir },
+export function populatePlatformPackage(
+	{ packagesDir, spec, releaseTag, assetsDir, tmpDir },
 ) {
 	const archivePath = findArchive(
 		assetsDir,
@@ -182,12 +191,8 @@ function createPlatformPackage(
 		releaseTag,
 		spec.archiveExt,
 	);
-	const extractedDir = join(outDir, ".tmp", spec.target);
-	const packageDir = join(
-		outDir,
-		"platform",
-		spec.packageName.replace("/", "__"),
-	);
+	const extractedDir = join(tmpDir, spec.target);
+	const packageDir = join(packagesDir, packageNameToDirName(spec.packageName));
 	const binDir = join(packageDir, "bin");
 
 	extractArchive(archivePath, extractedDir);
@@ -198,119 +203,40 @@ function createPlatformPackage(
 	if (spec.binaryName === "monochange") {
 		chmodSync(join(binDir, spec.binaryName), 0o755);
 	}
-	copyFileSync(join(repoRoot, "license"), join(packageDir, "LICENSE"));
-
-	const packageJson = {
-		name: spec.packageName,
-		version,
-		description: `Prebuilt monochange binary for ${spec.label}`,
-		license: "Unlicense",
-		repository: {
-			type: "git",
-			url: "git+https://github.com/ifiokjr/monochange.git",
-		},
-		homepage: "https://github.com/ifiokjr/monochange",
-		bugs: {
-			url: "https://github.com/ifiokjr/monochange/issues",
-		},
-		os: [spec.os],
-		cpu: [spec.cpu],
-		files: ["bin", "LICENSE"],
-		publishConfig: {
-			access: "public",
-			provenance: true,
-		},
-	};
-	if (spec.libc) {
-		packageJson.libc = [spec.libc];
-	}
-
-	writeJson(join(packageDir, "package.json"), packageJson);
 }
 
-function createRootPackage({ outDir, version }) {
-	const packageDir = join(outDir, "root");
-	const binDir = join(packageDir, "bin");
-	ensureDirectory(binDir);
-	copyFileSync(
-		join(repoRoot, "npm/bin/monochange.js"),
-		join(binDir, "monochange.js"),
-	);
-	chmodSync(join(binDir, "monochange.js"), 0o755);
-	copyFileSync(join(repoRoot, "readme.md"), join(packageDir, "README.md"));
-	copyFileSync(join(repoRoot, "license"), join(packageDir, "LICENSE"));
-
-	const optionalDependencies = Object.fromEntries(
-		platforms.map((spec) => [spec.packageName, version]),
-	);
-
-	writeJson(join(packageDir, "package.json"), {
-		name: "@monochange/cli",
-		version,
-		description:
-			"CLI for cross-ecosystem monorepo release planning with monochange",
-		license: "Unlicense",
-		repository: {
-			type: "git",
-			url: "git+https://github.com/ifiokjr/monochange.git",
-		},
-		homepage: "https://github.com/ifiokjr/monochange",
-		bugs: {
-			url: "https://github.com/ifiokjr/monochange/issues",
-		},
-		keywords: [
-			"monochange",
-			"releases",
-			"changesets",
-			"cli",
-			"mcp",
-			"monorepo",
-		],
-		engines: {
-			node: ">=18",
-		},
-		bin: {
-			monochange: "bin/monochange.js",
-			mc: "bin/monochange.js",
-		},
-		files: ["bin", "README.md", "LICENSE"],
-		optionalDependencies,
-		publishConfig: {
-			access: "public",
-			provenance: true,
-		},
-	});
-}
-
-function main() {
-	const args = parseArgs(process.argv.slice(2));
-	const version = args.version;
+export function main(argv = process.argv.slice(2)) {
+	const args = parseArgs(argv);
 	const releaseTag = args["release-tag"];
 	const assetsDir = resolve(args["assets-dir"] ?? "");
-	const outDir = resolve(args["out-dir"] ?? "");
 
-	if (!version || !releaseTag || !args["assets-dir"] || !args["out-dir"]) {
+	if (!releaseTag || !args["assets-dir"]) {
 		throw new Error(
-			"usage: build-packages.mjs --version <x.y.z> --release-tag <vX.Y.Z> --assets-dir <dir> --out-dir <dir>",
+			"usage: build-packages.mjs --release-tag <vX.Y.Z> --assets-dir <dir>",
 		);
 	}
 
-	ensureDirectory(outDir);
-	for (const spec of platforms) {
-		createPlatformPackage({ outDir, spec, version, releaseTag, assetsDir });
-	}
-	createRootPackage({ outDir, version });
+	const packagesDir = join(repoRoot, "packages");
+	const tmpDir = join(packagesDir, ".tmp");
 
-	const summary = {
-		platformPackages: platforms.map((spec) => spec.packageName),
-		rootPackage: "@monochange/cli",
-		version,
-	};
-	writeFileSync(
-		join(outDir, "summary.json"),
-		`${JSON.stringify(summary, null, 2)}\n`,
+	for (const spec of platforms) {
+		populatePlatformPackage({
+			packagesDir,
+			spec,
+			releaseTag,
+			assetsDir,
+			tmpDir,
+		});
+	}
+
+	console.log(
+		`Populated platform binaries in ${packagesDir} for ${releaseTag}`,
 	);
-	console.log(`Generated npm packages for ${version} in ${outDir}`);
 }
 
-main();
+if (
+	process.argv[1] &&
+	resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+) {
+	main();
+}

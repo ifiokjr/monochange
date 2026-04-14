@@ -8,4 +8,47 @@ importers:
 
   .: {}
 
-  npm/skill: {}
+  packages/monochange__cli:
+    optionalDependencies:
+      '@monochange/cli-darwin-arm64':
+        specifier: workspace:^
+        version: link:../monochange__cli-darwin-arm64
+      '@monochange/cli-darwin-x64':
+        specifier: workspace:^
+        version: link:../monochange__cli-darwin-x64
+      '@monochange/cli-linux-arm64-gnu':
+        specifier: workspace:^
+        version: link:../monochange__cli-linux-arm64-gnu
+      '@monochange/cli-linux-arm64-musl':
+        specifier: workspace:^
+        version: link:../monochange__cli-linux-arm64-musl
+      '@monochange/cli-linux-x64-gnu':
+        specifier: workspace:^
+        version: link:../monochange__cli-linux-x64-gnu
+      '@monochange/cli-linux-x64-musl':
+        specifier: workspace:^
+        version: link:../monochange__cli-linux-x64-musl
+      '@monochange/cli-win32-arm64-msvc':
+        specifier: workspace:^
+        version: link:../monochange__cli-win32-arm64-msvc
+      '@monochange/cli-win32-x64-msvc':
+        specifier: workspace:^
+        version: link:../monochange__cli-win32-x64-msvc
+
+  packages/monochange__cli-darwin-arm64: {}
+
+  packages/monochange__cli-darwin-x64: {}
+
+  packages/monochange__cli-linux-arm64-gnu: {}
+
+  packages/monochange__cli-linux-arm64-musl: {}
+
+  packages/monochange__cli-linux-x64-gnu: {}
+
+  packages/monochange__cli-linux-x64-musl: {}
+
+  packages/monochange__cli-win32-arm64-msvc: {}
+
+  packages/monochange__cli-win32-x64-msvc: {}
+
+  packages/monochange__skill: {}

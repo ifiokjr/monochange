@@ -210,10 +210,48 @@ release = false
 changelog = false
 
 [package."@monochange/skill"]
-path = "npm/skill"
+path = "packages/monochange__skill"
 type = "npm"
 tag = true
 release = true
+
+[package."@monochange/cli"]
+path = "packages/monochange__cli"
+type = "npm"
+tag = true
+release = true
+
+[package."@monochange/cli-darwin-arm64"]
+path = "packages/monochange__cli-darwin-arm64"
+type = "npm"
+
+[package."@monochange/cli-darwin-x64"]
+path = "packages/monochange__cli-darwin-x64"
+type = "npm"
+
+[package."@monochange/cli-linux-arm64-gnu"]
+path = "packages/monochange__cli-linux-arm64-gnu"
+type = "npm"
+
+[package."@monochange/cli-linux-arm64-musl"]
+path = "packages/monochange__cli-linux-arm64-musl"
+type = "npm"
+
+[package."@monochange/cli-linux-x64-gnu"]
+path = "packages/monochange__cli-linux-x64-gnu"
+type = "npm"
+
+[package."@monochange/cli-linux-x64-musl"]
+path = "packages/monochange__cli-linux-x64-musl"
+type = "npm"
+
+[package."@monochange/cli-win32-x64-msvc"]
+path = "packages/monochange__cli-win32-x64-msvc"
+type = "npm"
+
+[package."@monochange/cli-win32-arm64-msvc"]
+path = "packages/monochange__cli-win32-arm64-msvc"
+type = "npm"
 
 # =============================================================================
 # [group.*] — version groups that share a single release identity
@@ -270,6 +308,15 @@ packages = [
 	"monochange_gitlab",
 	"monochange_gitea",
 	"monochange_hosting",
+	"@monochange/cli",
+	"@monochange/cli-darwin-arm64",
+	"@monochange/cli-darwin-x64",
+	"@monochange/cli-linux-arm64-gnu",
+	"@monochange/cli-linux-arm64-musl",
+	"@monochange/cli-linux-x64-gnu",
+	"@monochange/cli-linux-x64-musl",
+	"@monochange/cli-win32-x64-msvc",
+	"@monochange/cli-win32-arm64-msvc",
 ]
 extra_changelog_sections = [
 	{ name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" },

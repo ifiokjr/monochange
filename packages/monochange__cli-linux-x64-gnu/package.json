@@ -1,0 +1,30 @@
+{
+	"name": "@monochange/cli-linux-x64-gnu",
+	"version": "0.1.0",
+	"description": "Prebuilt monochange binary for Linux x64 (glibc)",
+	"license": "Unlicense",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ifiokjr/monochange.git"
+	},
+	"homepage": "https://github.com/ifiokjr/monochange",
+	"bugs": {
+		"url": "https://github.com/ifiokjr/monochange/issues"
+	},
+	"os": [
+		"linux"
+	],
+	"cpu": [
+		"x64"
+	],
+	"libc": [
+		"glibc"
+	],
+	"files": [
+		"bin"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

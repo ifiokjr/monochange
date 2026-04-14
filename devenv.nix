@@ -239,7 +239,7 @@ in
     "test:node" = {
       exec = ''
         set -e
-        node --test npm/tests/*.test.mjs
+        node --test npm/tests/*.test.mjs scripts/npm/tests/*.test.mjs
       '';
       description = "Run npm helper and launcher tests with the built-in Node test runner.";
       binary = "bash";
