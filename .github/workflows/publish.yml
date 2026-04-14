@@ -1,6 +1,9 @@
-name: "npm-publish"
+name: "publish"
 
 on:
+  push:
+    tags:
+      - "@monochange/skill/**"
   workflow_run:
     workflows: ["release"]
     types: [completed]
@@ -16,7 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish_npm:
+  publish:
+    environment: publisher
     permissions:
       actions: read
       contents: read
@@ -38,6 +42,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG='${{ inputs.tag }}'
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG='${{ github.ref_name }}'
           else
             mkdir -p "$RUNNER_TEMP/release-metadata"
             gh run download "$WORKFLOW_RUN_ID" \
@@ -47,14 +53,6 @@ jobs:
             TAG=$(cat "$RUNNER_TEMP/release-metadata/release-tag.txt")
           fi
 
-          case "$TAG" in
-            v*) ;;
-            *)
-              echo "expected a v-prefixed tag, got: $TAG" >&2
-              exit 1
-              ;;
-          esac
-
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Resolved release tag: $TAG"
 
@@ -63,14 +61,13 @@ jobs:
         with:
           ref: ${{ steps.release_tag.outputs.tag }}
 
-      - name: setup node
-        uses: actions/setup-node@v4
+      - name: setup
+        uses: ./.github/actions/devenv
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-          scope: "@monochange"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: download release assets
+        if: startsWith( steps.release_tag.outputs.tag , 'v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
@@ -82,7 +79,18 @@ jobs:
             --pattern "monochange-*-${RELEASE_TAG}.zip" \
             --dir "$RUNNER_TEMP/release-assets"
 
+      - name: get crates oidc auth token
+        uses: rust-lang/crates-io-auth-action@v1
+        id: crates-oidc
+
+      - name: publish unreleased packages
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+        run: mc publish
+        shell: devenv shell -- bash -e {0}
+
       - name: build cli npm packages
+        if: startsWith( steps.release_tag.outputs.tag , 'v')
         env:
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
         run: |
@@ -92,26 +100,13 @@ jobs:
             --release-tag "$RELEASE_TAG" \
             --assets-dir "$RUNNER_TEMP/release-assets" \
             --out-dir "$RUNNER_TEMP/npm-packages"
-
-      - name: prepare skill package
-        env:
-          RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
-        run: |
-          VERSION="${RELEASE_TAG#v}"
-          node scripts/npm/prepare-skill-package.mjs \
-            --version "$VERSION" \
-            --out-dir "$RUNNER_TEMP/monochange-skill"
+        shell: devenv shell -- bash -e {0}
 
       - name: publish cli npm packages
+        if: startsWith( steps.release_tag.outputs.tag , 'v')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/npm/publish-packages.mjs \
             --packages-dir "$RUNNER_TEMP/npm-packages"
-
-      - name: publish skill package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          node scripts/npm/publish-skill.mjs \
-            --package-dir "$RUNNER_TEMP/monochange-skill"
+        shell: devenv shell -- bash -e {0}

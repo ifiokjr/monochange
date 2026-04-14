@@ -9,6 +9,10 @@ on:
         description: "Release tag (e.g. v0.1.0). Must start with `v` and have a matching GitHub release."
         required: true
         type: string
+      checkout_ref:
+        description: "When true, will release the assets from the provided ref rather than the tag. Use with care."
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.tag || github.event.release.tag_name }}
@@ -52,7 +56,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.checkout_ref && github.ref_name || env.RELEASE_TAG }}
 
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@stable

@@ -146,7 +146,6 @@ If you are working on the monochange repository, run the full local validation s
 <!-- {=projectValidationCommands} -->
 
 ```bash
-docs:verify
 lint:all
 test:all
 build:all

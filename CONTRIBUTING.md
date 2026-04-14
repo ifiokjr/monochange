@@ -50,8 +50,6 @@ monochange --help
 mc --help
 docs:check
 docs:update
-docs:verify
-docs:doctor
 mc validate
 mc change --package monochange --bump patch --reason "describe the change"
 lint:all

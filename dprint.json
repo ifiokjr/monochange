@@ -45,6 +45,7 @@
 		"**/snapshots",
 		"**/target",
 		"**/node_modules",
+		"**/pnpm-lock.yaml",
 		".bin/",
 		"**/*.init.toml"
 	],

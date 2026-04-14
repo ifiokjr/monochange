@@ -516,12 +516,10 @@ inputs = [
 ]
 steps = [
 	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "Command", name = "generate cargo lockfile", command = "cargo generate-lockfile" },
+	{ type = "Command", name = "generate pnpm lockfile", command = "pnpm install --lockfile-only" },
 	{ type = "Command", name = "format changed files", command = "dprint fmt {{ changed_files }}" },
-	# Keep local `mc release` runs fast. The generated files are stable enough to
-	# inspect immediately, so we only pay for clippy/docs/validation right before
-	# creating and publishing the release commit.
 	{ type = "Command", name = "refresh shared markdown", command = "mdt update", when = "{{ inputs.commit }}" },
-	# { type = "Command", name = "stage release changes", command = "git add --all", when = "{{ inputs.commit }}" },
 	{ type = "CommitRelease", name = "create release commit", when = "{{ inputs.commit }}" },
 	{ type = "Command", name = "push release commit", command = "git push --no-verify", when = "{{ inputs.commit }}" },
 	{ type = "PublishRelease", name = "publish hosted releases", when = "{{ inputs.commit }}" },
@@ -531,6 +529,6 @@ steps = [
 [cli.publish]
 help_text = "Publish all packages after a release"
 steps = [
-	{ type = "Command", command = "pnpm -r publish --access public --no-git-checks", name = "publish npm packages" },
 	{ type = "Command", command = "cargo workspaces publish --from-git --allow-dirty --yes", name = "publish cargo workspace crates" },
+	{ type = "Command", command = "pnpm -r publish --access public --no-git-checks", name = "publish npm packages" },
 ]

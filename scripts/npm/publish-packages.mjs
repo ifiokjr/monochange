@@ -6,15 +6,19 @@ import { join, resolve } from "node:path";
 
 function parseArgs(argv) {
 	const args = {};
+
 	for (let index = 0; index < argv.length; index += 1) {
 		const key = argv[index];
 		const value = argv[index + 1];
+
 		if (!key.startsWith("--") || value === undefined) {
 			continue;
 		}
+
 		args[key.slice(2)] = value;
 		index += 1;
 	}
+
 	return args;
 }
 
@@ -24,11 +28,13 @@ function run(command, args, options = {}) {
 		stdio: options.stdio ?? "pipe",
 		cwd: options.cwd,
 	});
+
 	if (result.status !== 0) {
 		const detail = result.stderr || result.stdout ||
 			`exit code ${result.status ?? "unknown"}`;
 		throw new Error(`${command} ${args.join(" ")} failed: ${detail}`);
 	}
+
 	return result;
 }
 
@@ -66,7 +72,8 @@ function publishPackage(dir) {
 function main() {
 	const args = parseArgs(process.argv.slice(2));
 	const packagesDir = resolve(args["packages-dir"] ?? "");
-	if (!args["packages-dir"]) {
+
+	if (packagesDir) {
 		throw new Error("usage: publish-packages.mjs --packages-dir <dir>");
 	}
 
@@ -78,6 +85,7 @@ function main() {
 	for (const packageDir of platformPackages) {
 		publishPackage(packageDir);
 	}
+
 	publishPackage(join(packagesDir, "root"));
 }
 

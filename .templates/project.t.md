@@ -105,8 +105,6 @@ monochange --help
 mc --help
 docs:check
 docs:update
-docs:verify
-docs:doctor
 mc validate
 lint:all
 test:all
@@ -124,8 +122,6 @@ monochange --help
 mc --help
 docs:check
 docs:update
-docs:verify
-docs:doctor
 mc validate
 mc change --package monochange --bump patch --reason "describe the change"
 lint:all
@@ -398,7 +394,6 @@ mc release
 <!-- {@projectValidationCommands} -->
 
 ```bash
-docs:verify
 lint:all
 test:all
 build:all

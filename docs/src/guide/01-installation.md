@@ -72,8 +72,6 @@ monochange --help
 mc --help
 docs:check
 docs:update
-docs:verify
-docs:doctor
 mc validate
 lint:all
 test:all

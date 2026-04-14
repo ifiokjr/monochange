@@ -25,8 +25,6 @@
 
 - `docs:check`
 - `docs:update`
-- `docs:verify`
-- `docs:doctor`
 
 ### Snapshots
 
