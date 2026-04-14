@@ -114,6 +114,97 @@ No user-facing changes. Dependency version updated to match the group release.
 
 CLI flag: `mc change --package <id> --bump patch --caused-by monochange_core --reason "update dependency"`
 
+### Granularity and lifecycle rules
+
+Agent-authored changesets should follow package-centric granularity:
+
+- review existing `.changeset/*.md` files before writing a new one
+- choose the right lifecycle action for each note: create, update, replace, or remove
+- keep related work together, but split unrelated features apart even when they land in the same package
+- combine near-duplicate notes when multiple related packages changed for the same outward reason
+- use `caused_by` when a package is only changing because of dependency propagation, and prefer `bump: none` when there is no real user-facing change
+- treat breaking changes as separate, dedicated changesets with their own migration guides
+- avoid cloned compatibility notes; if only the package ids change and the user-facing message stays the same, write one multi-package changeset
+
+Use these decision rules:
+
+- **Create new** when the feature is genuinely new or distinct from existing release notes
+- **Update existing** only when the same feature expanded in scope
+- **Replace** when the implementation changed enough that the old note is misleading
+- **Remove** when the feature was reverted or replaced before release
+
+Examples:
+
+```markdown
+# Good: separate changesets for distinct features in the same package
+
+---
+core: minor
+---
+
+#### add file diff preview
+
+...
+
+---
+core: minor
+---
+
+#### add changelog format detection
+
+...
+```
+
+```markdown
+# Good: combine similar package notes into one related multi-package changeset
+
+---
+github: patch
+gitlab: none
+gitea: none
+hosting: none
+---
+
+#### align provider manifests with package publication metadata
+
+...
+```
+
+```markdown
+# Good: update an existing changeset when the same feature grows
+
+---
+cli: minor
+---
+
+#### add --verbose and --debug flags
+
+Adds two related debugging flags:
+
+- `--verbose` for progress detail
+- `--debug` for internal timing and state output
+```
+
+```markdown
+# Good: dedicate a separate changeset to a breaking change
+
+---
+config: major
+---
+
+#### rename `WorkflowDefinition` to `CliCommandDefinition`
+
+> **Breaking change** — update imports and config references from `workflows` to `cli`.
+```
+
+Changeset content still needs the full user-facing quality bar:
+
+- a clear headline
+- an impact summary explaining why the change matters
+- concrete before/after examples or realistic usage snippets
+
+Use `mc diagnostics --format json` when you need changeset provenance and review context before deciding whether a note should be created, updated, or removed.
+
 ## CLI step types and composition
 
 `monochange.toml` defines top-level CLI commands with `[cli.<command>]` entries. Each command has `help_text`, optional `inputs`, and ordered `steps`.

@@ -21,6 +21,10 @@ description: Guides agents through monochange discovery, changesets, release pla
 - Use `.changeset/*.md` files for explicit release intent — each targets one or more package/group ids with a bump severity, optional `type`, optional explicit `version`, and a human-readable summary.
 - Use `caused_by` in changeset frontmatter when a dependent package is updating because of a dependency change — this provides context and replaces the automatic "dependency changed → patch" propagation.
 - When `mc affected` flags a package that has no meaningful change, create a changeset with `bump: none` and `caused_by` listing the root cause package(s).
+- Review existing `.changeset/*.md` files before creating a new one so you can decide whether the right lifecycle action is create, update, replace, or remove.
+- Keep changesets package-centric and granular. Distinct features should get distinct changesets even when they land in the same package; only expand an existing changeset when the new work is clearly the same feature growing in scope.
+- Combine near-duplicate changesets when the outward change is the same across multiple related packages. Do not emit cloned compatibility notes that differ only by package name.
+- Breaking changes must always get their own dedicated changeset with a migration path instead of being bundled into a broader feature note.
 - Run dry-run flows before real release commands.
 - Keep docs, templates, and changelog behavior aligned with config changes.
 - Use `mc diagnostics --format json` to audit changesets before release — it shows git provenance, linked PRs, related issues, and introduced/last-updated commits.
@@ -101,6 +105,18 @@ description: Guides agents through monochange discovery, changesets, release pla
 <!-- {/mcpToolsList} -->
 
 ## Key configuration concepts
+
+### Changeset generation
+
+- Start by checking existing `.changeset/*.md` files and the current diff before you write anything new.
+- Prefer one package per changeset unless a configured group is the real outward release boundary.
+- Keep related changes together, but split unrelated features apart even if they touch the same package.
+- If a package is only changing because of dependency propagation, prefer `caused_by` frontmatter and use `bump: none` when there is no real user-facing change.
+- If multiple packages changed for the same reason and the release note would otherwise be nearly identical, combine them into one multi-package changeset instead of cloning the same body four times.
+- Update an existing changeset only when the new work is clearly the same feature expanding in scope.
+- Remove stale changesets when the feature was reverted or replaced before release.
+- Breaking changes always get their own dedicated changeset with a migration guide.
+- Changeset bodies still need the user-facing quality bar: headline, impact summary, and concrete before/after or usage examples.
 
 ### Versioned files
 
