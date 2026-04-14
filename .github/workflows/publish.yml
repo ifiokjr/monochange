@@ -79,9 +79,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
         run: |
-          VERSION="${RELEASE_TAG#v}"
           node scripts/npm/build-packages.mjs \
-            --version "$VERSION" \
             --release-tag "$RELEASE_TAG" \
             --assets-dir "$RUNNER_TEMP/release-assets"
         shell: devenv shell -- bash -e {0}

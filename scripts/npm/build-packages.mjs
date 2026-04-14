@@ -7,8 +7,6 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
-	readFileSync,
-	writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -180,16 +178,12 @@ export function findBinary(extractedDir, binaryName) {
 	throw new Error(`could not find ${binaryName} in ${extractedDir}`);
 }
 
-export function writeJson(path, value) {
-	writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
-}
-
 export function packageNameToDirName(packageName) {
 	return packageName.replace("@", "").replace("/", "__");
 }
 
 export function populatePlatformPackage(
-	{ packagesDir, spec, version, releaseTag, assetsDir, tmpDir },
+	{ packagesDir, spec, releaseTag, assetsDir, tmpDir },
 ) {
 	const archivePath = findArchive(
 		assetsDir,
@@ -209,37 +203,16 @@ export function populatePlatformPackage(
 	if (spec.binaryName === "monochange") {
 		chmodSync(join(binDir, spec.binaryName), 0o755);
 	}
-
-	const packageJsonPath = join(packageDir, "package.json");
-	const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
-	packageJson.version = version;
-	writeJson(packageJsonPath, packageJson);
-}
-
-export function populateRootPackage({ packagesDir, version }) {
-	const packageDir = join(packagesDir, packageNameToDirName("@monochange/cli"));
-
-	const packageJsonPath = join(packageDir, "package.json");
-	const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
-	packageJson.version = version;
-
-	const optionalDependencies = Object.fromEntries(
-		platforms.map((spec) => [spec.packageName, version]),
-	);
-	packageJson.optionalDependencies = optionalDependencies;
-
-	writeJson(packageJsonPath, packageJson);
 }
 
 export function main(argv = process.argv.slice(2)) {
 	const args = parseArgs(argv);
-	const version = args.version;
 	const releaseTag = args["release-tag"];
 	const assetsDir = resolve(args["assets-dir"] ?? "");
 
-	if (!version || !releaseTag || !args["assets-dir"]) {
+	if (!releaseTag || !args["assets-dir"]) {
 		throw new Error(
-			"usage: build-packages.mjs --version <x.y.z> --release-tag <vX.Y.Z> --assets-dir <dir>",
+			"usage: build-packages.mjs --release-tag <vX.Y.Z> --assets-dir <dir>",
 		);
 	}
 
@@ -250,15 +223,15 @@ export function main(argv = process.argv.slice(2)) {
 		populatePlatformPackage({
 			packagesDir,
 			spec,
-			version,
 			releaseTag,
 			assetsDir,
 			tmpDir,
 		});
 	}
-	populateRootPackage({ packagesDir, version });
 
-	console.log(`Populated npm packages in ${packagesDir} for ${version}`);
+	console.log(
+		`Populated platform binaries in ${packagesDir} for ${releaseTag}`,
+	);
 }
 
 if (

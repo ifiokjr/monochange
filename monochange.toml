@@ -308,6 +308,15 @@ packages = [
 	"monochange_gitlab",
 	"monochange_gitea",
 	"monochange_hosting",
+	"@monochange/cli",
+	"@monochange/cli-darwin-arm64",
+	"@monochange/cli-darwin-x64",
+	"@monochange/cli-linux-arm64-gnu",
+	"@monochange/cli-linux-arm64-musl",
+	"@monochange/cli-linux-x64-gnu",
+	"@monochange/cli-linux-x64-musl",
+	"@monochange/cli-win32-x64-msvc",
+	"@monochange/cli-win32-arm64-msvc",
 ]
 extra_changelog_sections = [
 	{ name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" },

@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
-import {
-	chmodSync,
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test, { afterEach, describe } from "node:test";
 import {
@@ -19,12 +13,9 @@ import {
 	main as buildMain,
 	packageNameToDirName,
 	parseArgs,
-	platforms,
 	populatePlatformPackage,
-	populateRootPackage,
 	run,
 	walk,
-	writeJson,
 } from "../build-packages.mjs";
 
 function makeSandbox() {
@@ -42,18 +33,23 @@ afterEach(() => {
 });
 
 describe("parseArgs", () => {
-	test("parses --key value pairs", () => {
-		const result = parseArgs(["--version", "1.0.0", "--release-tag", "v1.0.0"]);
-		assert.deepEqual(result, { version: "1.0.0", "release-tag": "v1.0.0" });
+	test("parses --release-tag and --assets-dir", () => {
+		const result = parseArgs([
+			"--release-tag",
+			"v1.0.0",
+			"--assets-dir",
+			"/tmp",
+		]);
+		assert.deepEqual(result, { "release-tag": "v1.0.0", "assets-dir": "/tmp" });
 	});
 
 	test("skips non-flag arguments", () => {
-		const result = parseArgs(["positional", "--version", "1.0.0"]);
-		assert.deepEqual(result, { version: "1.0.0" });
+		const result = parseArgs(["positional", "--release-tag", "v1.0.0"]);
+		assert.deepEqual(result, { "release-tag": "v1.0.0" });
 	});
 
 	test("skips flags without values", () => {
-		const result = parseArgs(["--version"]);
+		const result = parseArgs(["--release-tag"]);
 		assert.deepEqual(result, {});
 	});
 
@@ -63,8 +59,8 @@ describe("parseArgs", () => {
 	});
 
 	test("takes next flag as value for previous flag", () => {
-		const result = parseArgs(["--version", "--release-tag", "v1.0.0"]);
-		assert.deepEqual(result, { version: "--release-tag" });
+		const result = parseArgs(["--release-tag", "--assets-dir", "/tmp"]);
+		assert.deepEqual(result, { "release-tag": "--assets-dir" });
 	});
 });
 
@@ -233,19 +229,6 @@ describe("findBinary", () => {
 	});
 });
 
-describe("writeJson", () => {
-	test("writes JSON with trailing newline", () => {
-		const sandbox = makeSandbox();
-		const filePath = join(sandbox, "test.json");
-		writeJson(filePath, { name: "test", version: "1.0.0" });
-		const content = readFileSync(filePath, "utf8");
-		assert.equal(
-			content,
-			JSON.stringify({ name: "test", version: "1.0.0" }, null, 2) + "\n",
-		);
-	});
-});
-
 describe("packageNameToDirName", () => {
 	test("converts scoped package name to directory name", () => {
 		assert.equal(packageNameToDirName("@monochange/cli"), "monochange__cli");
@@ -263,41 +246,8 @@ describe("packageNameToDirName", () => {
 	});
 });
 
-describe("populateRootPackage", () => {
-	test("updates version and optionalDependencies in package.json", () => {
-		const sandbox = makeSandbox();
-		const cliDir = join(sandbox, "monochange__cli");
-		mkdirSync(cliDir, { recursive: true });
-		writeFileSync(
-			join(cliDir, "package.json"),
-			JSON.stringify({
-				name: "@monochange/cli",
-				version: "0.0.0",
-				optionalDependencies: {},
-			}),
-		);
-
-		populateRootPackage({ packagesDir: sandbox, version: "2.0.0" });
-
-		const pkg = JSON.parse(readFileSync(join(cliDir, "package.json"), "utf8"));
-		assert.equal(pkg.version, "2.0.0");
-		assert.equal(
-			pkg.optionalDependencies["@monochange/cli-darwin-arm64"],
-			"2.0.0",
-		);
-		assert.equal(
-			pkg.optionalDependencies["@monochange/cli-win32-x64-msvc"],
-			"2.0.0",
-		);
-		assert.equal(
-			Object.keys(pkg.optionalDependencies).length,
-			platforms.length,
-		);
-	});
-});
-
 describe("populatePlatformPackage", () => {
-	test("populates binary and updates version for a .tar.gz platform", () => {
+	test("populates binary for a .tar.gz platform without modifying package.json", () => {
 		const sandbox = makeSandbox();
 		const pkgDir = join(sandbox, "monochange__cli-darwin-arm64");
 		mkdirSync(join(pkgDir, "bin"), { recursive: true });
@@ -329,15 +279,12 @@ describe("populatePlatformPackage", () => {
 				packageName: "@monochange/cli-darwin-arm64",
 				target: "aarch64-apple-darwin",
 			},
-			version: "1.2.3",
 			releaseTag: "v1.2.3",
 			assetsDir,
 			tmpDir: join(sandbox, ".tmp"),
 		});
 
 		assert.ok(existsSync(join(pkgDir, "bin", "monochange")));
-		const pkg = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8"));
-		assert.equal(pkg.version, "1.2.3");
 	});
 
 	test("populates .exe binary for windows platform", () => {
@@ -369,15 +316,12 @@ describe("populatePlatformPackage", () => {
 				packageName: "@monochange/cli-win32-x64-msvc",
 				target: "x86_64-pc-windows-msvc",
 			},
-			version: "2.0.0",
 			releaseTag: "v2.0.0",
 			assetsDir,
 			tmpDir: join(sandbox, ".tmp"),
 		});
 
 		assert.ok(existsSync(join(pkgDir, "bin", "monochange.exe")));
-		const pkg = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8"));
-		assert.equal(pkg.version, "2.0.0");
 	});
 });
 
@@ -391,21 +335,14 @@ describe("main", () => {
 
 	test("throws when --assets-dir is missing", () => {
 		assert.throws(
-			() => buildMain(["--version", "1.0.0", "--release-tag", "v1.0.0"]),
+			() => buildMain(["--release-tag", "v1.0.0"]),
 			{ message: /usage:/ },
 		);
 	});
 
 	test("throws when --release-tag is missing", () => {
 		assert.throws(
-			() => buildMain(["--version", "1.0.0", "--assets-dir", "/tmp"]),
-			{ message: /usage:/ },
-		);
-	});
-
-	test("throws when --version is missing", () => {
-		assert.throws(
-			() => buildMain(["--release-tag", "v1.0.0", "--assets-dir", "/tmp"]),
+			() => buildMain(["--assets-dir", "/tmp"]),
 			{ message: /usage:/ },
 		);
 	});

@@ -32,14 +32,14 @@
 		"LICENSE"
 	],
 	"optionalDependencies": {
-		"@monochange/cli-darwin-arm64": "0.1.0",
-		"@monochange/cli-darwin-x64": "0.1.0",
-		"@monochange/cli-linux-arm64-gnu": "0.1.0",
-		"@monochange/cli-linux-arm64-musl": "0.1.0",
-		"@monochange/cli-linux-x64-gnu": "0.1.0",
-		"@monochange/cli-linux-x64-musl": "0.1.0",
-		"@monochange/cli-win32-x64-msvc": "0.1.0",
-		"@monochange/cli-win32-arm64-msvc": "0.1.0"
+		"@monochange/cli-darwin-arm64": "workspace:^",
+		"@monochange/cli-darwin-x64": "workspace:^",
+		"@monochange/cli-linux-arm64-gnu": "workspace:^",
+		"@monochange/cli-linux-arm64-musl": "workspace:^",
+		"@monochange/cli-linux-x64-gnu": "workspace:^",
+		"@monochange/cli-linux-x64-musl": "workspace:^",
+		"@monochange/cli-win32-x64-msvc": "workspace:^",
+		"@monochange/cli-win32-arm64-msvc": "workspace:^"
 	},
 	"publishConfig": {
 		"access": "public",
