@@ -3335,9 +3335,9 @@ jobs:
 		let mut executor = ProcessCommandExecutor;
 		let success = executor
 			.run(&CommandSpec {
-				program: "zsh".to_string(),
+				program: "sh".to_string(),
 				args: vec![
-					"-lc".to_string(),
+					"-c".to_string(),
 					"printf stdout; printf stderr >&2".to_string(),
 				],
 				cwd: tempdir.path().to_path_buf(),
