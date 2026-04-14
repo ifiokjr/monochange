@@ -91,7 +91,7 @@ fn extract_library_changes(
 		let file_changes = match detection_level {
 			DetectionLevel::Basic => extract_library_basic(file, repo_root),
 			DetectionLevel::Signature => extract_library_signatures(file, repo_root)?,
-			DetectionLevel::Semantic => extract_library_semantic(file, repo_root)?,
+			DetectionLevel::Semantic => extract_library_semantic(file, repo_root),
 		};
 
 		changes.extend(file_changes);
@@ -200,6 +200,11 @@ fn parse_added_item(
 		_ => return None,
 	};
 
+	// Skip if name is empty
+	if name.is_empty() {
+		return None;
+	}
+
 	let signature = if *kind == "fn" {
 		// Extract function signature
 		let sig_start = rest.find("fn")?;
@@ -294,20 +299,16 @@ fn parse_hunk_header(line: &str) -> Option<usize> {
 }
 
 /// Semantic level: Full AST parsing (placeholder for future implementation).
-#[allow(clippy::unnecessary_wraps)]
-fn extract_library_semantic(
-	file: &Path,
-	_repo_root: &Path,
-) -> MonochangeResult<Vec<SemanticChange>> {
+fn extract_library_semantic(file: &Path, _repo_root: &Path) -> Vec<SemanticChange> {
 	// Full AST parsing would require syn crate
 	// For now, fall back to signature level
-	Ok(vec![SemanticChange::Unknown {
+	vec![SemanticChange::Unknown {
 		path: file.to_path_buf(),
 		description: format!(
 			"semantic analysis for {} (not yet implemented)",
 			file.display()
 		),
-	}])
+	}]
 }
 
 /// Extract changes for application artifacts.
@@ -332,7 +333,7 @@ fn extract_application_changes(
 		let file_changes = match detection_level {
 			DetectionLevel::Basic => extract_app_basic(file, category),
 			DetectionLevel::Signature => extract_app_signatures(file, category, repo_root)?,
-			DetectionLevel::Semantic => extract_app_semantic(file, category, repo_root)?,
+			DetectionLevel::Semantic => extract_app_semantic(file, category, repo_root),
 		};
 
 		changes.extend(file_changes);
@@ -470,16 +471,16 @@ fn extract_app_semantic(
 	file: &Path,
 	_category: AppFileCategory,
 	_repo_root: &Path,
-) -> MonochangeResult<Vec<SemanticChange>> {
+) -> Vec<SemanticChange> {
 	// Full parsing would require TypeScript/JavaScript AST
 	// For now, use signature level
-	Ok(vec![SemanticChange::Unknown {
+	vec![SemanticChange::Unknown {
 		path: file.to_path_buf(),
 		description: format!(
 			"semantic analysis for {} (not yet implemented)",
 			file.display()
 		),
-	}])
+	}]
 }
 
 /// Helper to extract route from file path.
@@ -550,7 +551,7 @@ fn extract_cli_changes(
 		let file_changes = match detection_level {
 			DetectionLevel::Basic => extract_cli_basic(file),
 			DetectionLevel::Signature => extract_cli_signatures(file, repo_root)?,
-			DetectionLevel::Semantic => extract_cli_semantic(file, repo_root)?,
+			DetectionLevel::Semantic => extract_cli_semantic(file, repo_root),
 		};
 
 		changes.extend(file_changes);
@@ -652,14 +653,14 @@ fn extract_flag_name(diff: &str) -> Option<String> {
 }
 
 /// Semantic extraction for CLI tools.
-fn extract_cli_semantic(file: &Path, _repo_root: &Path) -> MonochangeResult<Vec<SemanticChange>> {
-	Ok(vec![SemanticChange::Unknown {
+fn extract_cli_semantic(file: &Path, _repo_root: &Path) -> Vec<SemanticChange> {
+	vec![SemanticChange::Unknown {
 		path: file.to_path_buf(),
 		description: format!(
 			"semantic analysis for {} (not yet implemented)",
 			file.display()
 		),
-	}])
+	}]
 }
 
 /// Extract changes for mixed artifacts.

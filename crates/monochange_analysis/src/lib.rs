@@ -551,7 +551,7 @@ pub fn group_changes(
 	}
 
 	// Group non-breaking changes
-	let grouped = apply_grouping_logic(non_breaking, artifact_type, &thresholds)?;
+	let grouped = apply_grouping_logic(non_breaking, artifact_type, &thresholds);
 	groups.extend(grouped);
 
 	Ok(groups)
@@ -574,8 +574,8 @@ fn describe_change(change: &SemanticChange) -> String {
 fn apply_grouping_logic(
 	changes: Vec<SemanticChange>,
 	artifact_type: ArtifactType,
-	thresholds: &GroupingThresholds,
-) -> MonochangeResult<Vec<ChangeGroup>> {
+	_thresholds: &GroupingThresholds,
+) -> Vec<ChangeGroup> {
 	// Placeholder implementation
 	// Full implementation would:
 	// 1. Categorize changes by type and proximity
@@ -583,10 +583,7 @@ fn apply_grouping_logic(
 	// 3. Apply thresholds to decide group vs. separate
 	// 4. Generate appropriate summaries
 
-	let _ = thresholds;
-	let _ = artifact_type;
-
-	let groups: Vec<ChangeGroup> = changes
+	changes
 		.into_iter()
 		.map(|change| {
 			ChangeGroup {
@@ -600,9 +597,7 @@ fn apply_grouping_logic(
 				confidence: 0.8,
 			}
 		})
-		.collect();
-
-	Ok(groups)
+		.collect()
 }
 
 #[cfg(test)]

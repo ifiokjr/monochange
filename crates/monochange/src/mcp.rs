@@ -15,6 +15,7 @@ use rmcp::tool;
 use rmcp::tool_handler;
 use rmcp::tool_router;
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json::json;
 
 use crate::ChangeBump;
@@ -78,7 +79,7 @@ pub struct ValidationIssue {
 	pub suggestion: Option<String>,
 }
 
-/// Parse a frame string into a ChangeFrame.
+/// Parse a frame string into a `ChangeFrame`.
 fn parse_frame(frame_str: &str) -> monochange_analysis::ChangeFrame {
 	use monochange_analysis::ChangeFrame;
 
@@ -102,8 +103,8 @@ fn parse_frame(frame_str: &str) -> monochange_analysis::ChangeFrame {
 	}
 
 	// Try parsing as PR format: "pr:target,source"
-	if frame_str.starts_with("pr:") {
-		let parts: Vec<&str> = frame_str[3..].split(',').collect();
+	if let Some(stripped) = frame_str.strip_prefix("pr:") {
+		let parts: Vec<&str> = stripped.split(',').collect();
 		if parts.len() == 2 {
 			return ChangeFrame::PullRequest {
 				target: parts[0].to_string(),
@@ -458,7 +459,6 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		use monochange_analysis::AnalysisConfig;
 		use monochange_analysis::ChangeFrame;
-		use monochange_analysis::DetectionLevel;
 
 		let root = resolve_root(params.path.as_deref());
 
@@ -482,12 +482,14 @@ impl MonochangeMcpServer {
 		};
 
 		// Configure analysis
+		// Configure analysis
+		let detection_level = params.detection_level.as_deref().map(parse_detection_level);
 		let config = AnalysisConfig {
-			detection_level: params
-				.detection_level
-				.map(parse_detection_level)
-				.unwrap_or_default(),
-			thresholds: Default::default(),
+			detection_level: detection_level.unwrap_or_else(|| {
+				use monochange_analysis::DetectionLevel;
+				DetectionLevel::Signature
+			}),
+			thresholds: monochange_analysis::GroupingThresholds::default(),
 			max_suggestions: params.max_suggestions.unwrap_or(10),
 		};
 
