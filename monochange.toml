@@ -209,6 +209,9 @@ tag = false
 release = false
 changelog = false
 
+[package.monochange_analysis]
+path = "crates/monochange_analysis"
+
 [package."@monochange/skill"]
 path = "packages/monochange__skill"
 type = "npm"
