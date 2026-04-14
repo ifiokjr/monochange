@@ -991,8 +991,27 @@ fn build_package_definitions(
 				&id,
 				true,
 			)?);
+
+			let publish = normalize_publish_settings(
+				contents,
+				Some({
+					#[rustfmt::skip]
+					let publish = match inferred_ecosystem_type {
+						EcosystemType::Cargo => &cargo_ecosystem.publish,
+						EcosystemType::Npm => &npm_ecosystem.publish,
+						EcosystemType::Deno => &deno_ecosystem.publish,
+						EcosystemType::Dart => &dart_ecosystem.publish, _ => unreachable!("unsupported ecosystem type for package publish"),
+					};
+					publish
+				}),
+				package.publish,
+				"package",
+				&id,
+				inferred_ecosystem_type,
+			)?;
+
 			Ok::<_, MonochangeError>(PackageDefinition {
-				id: id.clone(),
+				id,
 				path: package.path,
 				package_type,
 				changelog,
@@ -1010,23 +1029,7 @@ fn build_package_definitions(
 				tag: package.tag,
 				release: package.release,
 				version_format: package.version_format,
-					publish: normalize_publish_settings(
-						contents,
-						Some({
-							#[rustfmt::skip]
-							let publish = match inferred_ecosystem_type {
-								EcosystemType::Cargo => &cargo_ecosystem.publish,
-								EcosystemType::Npm => &npm_ecosystem.publish,
-								EcosystemType::Deno => &deno_ecosystem.publish,
-								EcosystemType::Dart => &dart_ecosystem.publish, _ => unreachable!("unsupported ecosystem type for package publish"),
-							};
-							publish
-						}),
-					package.publish,
-					"package",
-					&id,
-					inferred_ecosystem_type,
-				)?,
+				publish,
 			})
 		})
 		.collect::<Result<Vec<_>, _>>()

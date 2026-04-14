@@ -29,6 +29,7 @@ use monochange_core::SourceChangeRequestOutcome;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
+use serde::Serialize;
 
 use crate::cli::command_supports_release_diff_preview;
 use crate::cli_progress::CliProgressReporter;
@@ -1577,6 +1578,15 @@ fn build_package_publish_template_value(
 	serde_json::to_value(report).unwrap_or(serde_json::Value::Null)
 }
 
+fn render_json_output<T>(value: &T, context: &str) -> MonochangeResult<String>
+where
+	T: Serialize,
+{
+	serde_json::to_string_pretty(value).map_err(|error| {
+		MonochangeError::Config(format!("failed to render {context} as json: {error}"))
+	})
+}
+
 pub(crate) fn parse_boolean_step_input(
 	inputs: &BTreeMap<String, Vec<String>>,
 	name: &str,
@@ -1658,9 +1668,12 @@ pub(crate) fn build_retarget_release_report(
 fn render_release_commit_report(report: &CommitReleaseReport) -> Vec<String> {
 	let mut lines = vec!["release commit:".to_string()];
 	lines.push(format!("  subject: {}", report.subject));
-	if let Some(commit) = &report.commit {
-		lines.push(format!("  commit: {}", short_commit_sha(commit)));
-	}
+	lines.extend(
+		report
+			.commit
+			.as_ref()
+			.map(|commit| format!("  commit: {}", short_commit_sha(commit))),
+	);
 	lines.extend((!report.tracked_paths.is_empty()).then_some("  tracked paths:".to_string()));
 	#[rustfmt::skip]
 	lines.extend(report.tracked_paths.iter().map(|path| format!("    - {}", path.display())));
@@ -1760,21 +1773,25 @@ fn render_package_publish_report_markdown(
 			"- **Trust message:** {}",
 			package.trusted_publishing.message
 		));
-		#[rustfmt::skip]
-		let repository_line = package.trusted_publishing.repository.as_ref().map(|repository| format!("- **Repository:** {}", paint_markdown_inline(&format!("`{repository}`"), MarkdownStyle::Code, color,)));
-		if let Some(repository_line) = repository_line {
-			lines.push(repository_line);
-		}
-		#[rustfmt::skip]
-		let workflow_line = package.trusted_publishing.workflow.as_ref().map(|workflow| format!("- **Workflow:** {}", paint_markdown_inline(&format!("`{workflow}`"), MarkdownStyle::Code, color,)));
-		if let Some(workflow_line) = workflow_line {
-			lines.push(workflow_line);
-		}
-		#[rustfmt::skip]
-		let environment_line = package.trusted_publishing.environment.as_ref().map(|environment| format!("- **Environment:** {}", paint_markdown_inline(&format!("`{environment}`"), MarkdownStyle::Code, color,)));
-		if let Some(environment_line) = environment_line {
-			lines.push(environment_line);
-		}
+
+		push_optional_markdown_code_detail(
+			&mut lines,
+			"Repository",
+			package.trusted_publishing.repository.as_deref(),
+			color,
+		);
+		push_optional_markdown_code_detail(
+			&mut lines,
+			"Workflow",
+			package.trusted_publishing.workflow.as_deref(),
+			color,
+		);
+		push_optional_markdown_code_detail(
+			&mut lines,
+			"Environment",
+			package.trusted_publishing.environment.as_deref(),
+			color,
+		);
 		if let Some(setup_url) = &package.trusted_publishing.setup_url {
 			lines.push(format!(
 				"- **Setup:** {}",
@@ -1853,6 +1870,20 @@ pub(crate) fn render_retarget_release_report(report: &RetargetReleaseReport) -> 
 	));
 	lines.push(format!("  status: {}", report.status.replace('_', "-")));
 	lines.join("\n")
+}
+
+fn push_optional_markdown_code_detail(
+	lines: &mut Vec<String>,
+	label: &str,
+	value: Option<&str>,
+	color: bool,
+) {
+	lines.extend(value.map(|value| {
+		format!(
+			"- **{label}:** {}",
+			paint_markdown_inline(&format!("`{value}`"), MarkdownStyle::Code, color,)
+		)
+	}));
 }
 
 pub(crate) fn retarget_operation_label(operation: RetargetOperation) -> &'static str {
@@ -2011,11 +2042,12 @@ pub(crate) fn render_cli_command_result(
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
 		lines.push(format!("changeset policy: {}", evaluation.status));
 		lines.push(evaluation.summary.clone());
-		#[rustfmt::skip]
-			let matched_skip_labels_line = (!evaluation.matched_skip_labels.is_empty()).then(|| format!("matched skip labels: {}", evaluation.matched_skip_labels.join(", ")));
-		if let Some(matched_skip_labels_line) = matched_skip_labels_line {
-			lines.push(matched_skip_labels_line);
-		}
+		lines.extend((!evaluation.matched_skip_labels.is_empty()).then(|| {
+			format!(
+				"matched skip labels: {}",
+				evaluation.matched_skip_labels.join(", ")
+			)
+		}));
 		if !evaluation.matched_paths.is_empty() {
 			lines.push("matched paths:".to_string());
 			for path in &evaluation.matched_paths {
@@ -2499,8 +2531,7 @@ fn resolve_command_output(
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
-			#[rustfmt::skip]
-			OutputFormat::Json => serde_json::to_string_pretty(evaluation).map_err(|error| MonochangeError::Config(format!("failed to render changeset policy evaluation as json: {error}")))?,
+			OutputFormat::Json => render_json_output(evaluation, "changeset policy evaluation")?,
 			OutputFormat::Markdown | OutputFormat::Text => {
 				render_cli_command_result(cli_command, context)
 			}
@@ -2520,13 +2551,7 @@ fn resolve_command_output(
 			.and_then(|values| values.first())
 			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 		let rendered = match format {
-			OutputFormat::Json => {
-				serde_json::to_string_pretty(report).map_err(|error| {
-					MonochangeError::Config(format!(
-						"failed to render changeset diagnostics as json: {error}"
-					))
-				})?
-			}
+			OutputFormat::Json => render_json_output(report, "changeset diagnostics")?,
 			OutputFormat::Markdown | OutputFormat::Text => render_changeset_diagnostics(report),
 		};
 		return Ok(rendered);
@@ -2545,8 +2570,7 @@ fn resolve_command_output(
 	if let Some(report) = &context.package_publish_report {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
-			#[rustfmt::skip]
-				OutputFormat::Json => serde_json::to_string_pretty(report).map_err(|error| MonochangeError::Config(format!("failed to render package publish report as json: {error}")))?,
+			OutputFormat::Json => render_json_output(report, "package publish report")?,
 			OutputFormat::Markdown => render_cli_command_markdown_result(cli_command, context),
 			OutputFormat::Text => render_cli_command_result(cli_command, context),
 		};
@@ -2568,7 +2592,9 @@ fn resolve_command_output(
 #[cfg(test)]
 mod tests {
 	use std::collections::BTreeMap;
+	use std::fs;
 	use std::io;
+	use std::path::Path;
 	use std::path::PathBuf;
 	use std::sync::mpsc;
 
@@ -2581,6 +2607,7 @@ mod tests {
 	use monochange_core::ReleasePlan;
 	use monochange_core::ShellConfig;
 	use monochange_core::VersionFormat;
+	use serde::Serialize;
 	use tempfile::tempdir;
 
 	use super::*;
@@ -2651,6 +2678,15 @@ mod tests {
 				message: "trusted publishing already configured".to_string(),
 			},
 		}
+	}
+
+	fn git_in_dir(root: &Path, args: &[&str]) {
+		let status = std::process::Command::new("git")
+			.current_dir(root)
+			.args(args)
+			.status()
+			.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+		assert!(status.success(), "git {args:?} failed");
 	}
 
 	#[test]
@@ -2739,6 +2775,91 @@ mod tests {
 		);
 		assert!(paint_markdown_inline("code", MarkdownStyle::Code, true).contains("\u{1b}[35m"));
 		assert!(render_markdown_section("Empty", &[], false).starts_with("## Empty"));
+	}
+
+	#[derive(Debug)]
+	struct BrokenSerialize;
+
+	impl Serialize for BrokenSerialize {
+		fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+		where
+			S: serde::Serializer,
+		{
+			Err(serde::ser::Error::custom("broken serialize"))
+		}
+	}
+
+	#[test]
+	fn render_json_output_reports_context_on_serialization_failure() {
+		let error = render_json_output(&BrokenSerialize, "changeset diagnostics")
+			.unwrap_err()
+			.to_string();
+		assert!(error.contains("failed to render changeset diagnostics as json"));
+		assert!(error.contains("broken serialize"));
+	}
+
+	#[test]
+	fn execute_affected_packages_step_supports_since_git_input() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("crates/core/src"))
+			.unwrap_or_else(|error| panic!("create workspace directories: {error}"));
+		fs::write(
+			root.join("monochange.toml"),
+			r#"[defaults]
+package_type = "cargo"
+
+[changesets.verify]
+enabled = true
+required = true
+
+[package.core]
+path = "crates/core"
+"#,
+		)
+		.unwrap_or_else(|error| panic!("write monochange config: {error}"));
+		fs::write(
+			root.join("Cargo.toml"),
+			"[workspace]\nmembers = [\"crates/core\"]\n",
+		)
+		.unwrap_or_else(|error| panic!("write workspace Cargo.toml: {error}"));
+		fs::write(
+			root.join("crates/core/Cargo.toml"),
+			"[package]\nname = \"core\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+		)
+		.unwrap_or_else(|error| panic!("write package Cargo.toml: {error}"));
+		fs::write(
+			root.join("crates/core/src/lib.rs"),
+			"pub fn version() -> &'static str { \"v1\" }\n",
+		)
+		.unwrap_or_else(|error| panic!("write initial source file: {error}"));
+
+		git_in_dir(root, &["init", "-b", "main"]);
+		git_in_dir(root, &["config", "user.name", "monochange Tests"]);
+		git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+		git_in_dir(root, &["add", "."]);
+		git_in_dir(root, &["commit", "-m", "initial"]);
+
+		fs::write(
+			root.join("crates/core/src/lib.rs"),
+			"pub fn version() -> &'static str { \"v2\" }\n",
+		)
+		.unwrap_or_else(|error| panic!("update source file: {error}"));
+
+		let evaluation = execute_affected_packages_step(
+			root,
+			&BTreeMap::from([("since".to_string(), vec!["HEAD".to_string()])]),
+			true,
+		)
+		.unwrap_or_else(|error| panic!("execute affected packages step: {error}"));
+
+		assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);
+		assert_eq!(
+			evaluation.changed_paths,
+			vec!["crates/core/src/lib.rs".to_string()]
+		);
+		assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
+		assert_eq!(evaluation.uncovered_package_ids, vec!["core".to_string()]);
 	}
 
 	#[test]
