@@ -554,4 +554,149 @@ mod tests {
 			.includes_staged()
 		);
 	}
+
+	#[test]
+	fn test_base_revision() {
+		assert_eq!(ChangeFrame::WorkingDirectory.base_revision(), Some("HEAD"));
+		assert_eq!(
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			}
+			.base_revision(),
+			Some("main")
+		);
+		assert_eq!(
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			}
+			.base_revision(),
+			Some("main")
+		);
+		assert_eq!(
+			ChangeFrame::CustomRange {
+				base: "v1.0.0".to_string(),
+				head: "v2.0.0".to_string(),
+			}
+			.base_revision(),
+			Some("v1.0.0")
+		);
+		assert_eq!(ChangeFrame::StagedOnly.base_revision(), Some("HEAD"));
+	}
+
+	#[test]
+	fn test_head_revision() {
+		assert_eq!(ChangeFrame::WorkingDirectory.head_revision(), None);
+		assert_eq!(
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			}
+			.head_revision(),
+			Some("feature")
+		);
+		assert_eq!(
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			}
+			.head_revision(),
+			Some("feature")
+		);
+		assert_eq!(
+			ChangeFrame::CustomRange {
+				base: "v1.0.0".to_string(),
+				head: "v2.0.0".to_string(),
+			}
+			.head_revision(),
+			Some("v2.0.0")
+		);
+		assert_eq!(ChangeFrame::StagedOnly.head_revision(), Some("HEAD"));
+	}
+
+	#[test]
+	fn test_pull_request_includes_staged() {
+		// PullRequest frame does NOT include staged changes
+		assert!(
+			!ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			}
+			.includes_staged()
+		);
+	}
+
+	#[test]
+	fn test_custom_range_display() {
+		assert_eq!(
+			ChangeFrame::CustomRange {
+				base: "v1.0.0".to_string(),
+				head: "v2.0.0".to_string(),
+			}
+			.to_string(),
+			"v1.0.0...v2.0.0"
+		);
+	}
+
+	#[test]
+	fn test_staged_only_revision_range() {
+		assert_eq!(ChangeFrame::StagedOnly.revision_range(), "--staged");
+	}
+
+	#[test]
+	fn test_custom_range_revision_range() {
+		assert_eq!(
+			ChangeFrame::CustomRange {
+				base: "v1.0.0".to_string(),
+				head: "v2.0.0".to_string(),
+			}
+			.revision_range(),
+			"v1.0.0...v2.0.0"
+		);
+	}
+
+	#[test]
+	fn test_pull_request_includes_unstaged() {
+		assert!(
+			!ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			}
+			.includes_unstaged()
+		);
+	}
+
+	#[test]
+	fn test_custom_range_includes_unstaged() {
+		assert!(
+			!ChangeFrame::CustomRange {
+				base: "v1.0.0".to_string(),
+				head: "v2.0.0".to_string(),
+			}
+			.includes_unstaged()
+		);
+	}
+
+	#[test]
+	fn test_frame_error_conversions() {
+		let frame_error = FrameError::Git("test error".to_string());
+		let monochange_error: MonochangeError = frame_error.into();
+		assert!(matches!(monochange_error, MonochangeError::Discovery(_)));
+	}
+
+	#[test]
+	fn test_pr_environment_display_debug() {
+		let pr_env = PrEnvironment {
+			source_branch: "feature".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: Some("42".to_string()),
+			provider: "github".to_string(),
+		};
+		// Test that debug formatting works
+		let debug_str = format!("{:?}", pr_env);
+		assert!(debug_str.contains("PrEnvironment"));
+		assert!(debug_str.contains("feature"));
+		assert!(debug_str.contains("main"));
+	}
 }

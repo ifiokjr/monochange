@@ -823,6 +823,14 @@ mod tests {
 			AppFileCategory::Route
 		);
 		assert_eq!(
+			categorize_app_file(Path::new("src/routes/dashboard/index.tsx")),
+			AppFileCategory::Route
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/pages/home.tsx")),
+			AppFileCategory::Route
+		);
+		assert_eq!(
 			categorize_app_file(Path::new("src/components/Button.tsx")),
 			AppFileCategory::Component
 		);
@@ -830,5 +838,297 @@ mod tests {
 			categorize_app_file(Path::new("src/store/auth.ts")),
 			AppFileCategory::State
 		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/redux/store.ts")),
+			AppFileCategory::State
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/api/users.ts")),
+			AppFileCategory::Api
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/endpoints/api.ts")),
+			AppFileCategory::Api
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/styles/main.css")),
+			AppFileCategory::Style
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/styles/theme.scss")),
+			AppFileCategory::Style
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("config.ts")),
+			AppFileCategory::Config
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/utils/helpers.ts")),
+			AppFileCategory::Ignored
+		);
+	}
+
+	#[test]
+	fn test_parse_visibility_restricted() {
+		assert_eq!(
+			parse_visibility("pub(in crate::foo) fn bar()"),
+			Some((Visibility::Restricted, "fn bar()"))
+		);
+	}
+
+	#[test]
+	fn test_parse_added_item_private_visibility() {
+		// Private items should be skipped
+		assert!(parse_added_item("+fn private()", Path::new("src/lib.rs"), Some(1)).is_none());
+		assert!(parse_added_item("+struct Private {}", Path::new("src/lib.rs"), Some(1)).is_none());
+	}
+
+	#[test]
+	fn test_parse_added_item_crate_visibility() {
+		// Crate visibility items should be skipped (only Public is tracked for added items)
+		assert!(
+			parse_added_item(
+				"+pub(crate) fn internal()",
+				Path::new("src/lib.rs"),
+				Some(1)
+			)
+			.is_none()
+		);
+	}
+
+	#[test]
+	fn test_parse_added_item_unknown_kind() {
+		// Unknown item kinds should be skipped
+		assert!(parse_added_item("+pub unknown_item", Path::new("src/lib.rs"), Some(1)).is_none());
+	}
+
+	#[test]
+	fn test_parse_removed_item_crate_visibility() {
+		// Crate visibility should be skipped (only Public removals are breaking)
+		assert!(
+			parse_removed_item(
+				"-pub(crate) fn internal()",
+				Path::new("src/lib.rs"),
+				Some(1)
+			)
+			.is_none()
+		);
+	}
+
+	#[test]
+	fn test_parse_removed_item_private_visibility() {
+		// Private items should be skipped
+		assert!(parse_removed_item("-fn private()", Path::new("src/lib.rs"), Some(1)).is_none());
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_empty_diff() {
+		let changes = parse_rust_signatures("", Path::new("src/lib.rs"));
+		assert!(changes.is_empty());
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_no_public_items() {
+		let diff = r#"@@ -10,5 +10,7 @@
+ fn private() {}
+- fn removed() {}
++ fn added() {}
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert!(changes.is_empty());
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_public_function_added() {
+		let diff = r#"@@ -10,5 +10,7 @@
++pub fn new_function {}
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			assert_eq!(api.kind, ApiChangeKind::FunctionAdded);
+			assert_eq!(api.name, "new_function");
+			assert!(!api.is_breaking);
+		} else {
+			panic!("Expected API change");
+		}
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_public_function_removed() {
+		let diff = r#"@@ -10,5 +10,7 @@
+-pub fn old_function {}
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			assert_eq!(api.kind, ApiChangeKind::FunctionRemoved);
+			assert_eq!(api.name, "old_function");
+			assert!(api.is_breaking);
+		} else {
+			panic!("Expected API change");
+		}
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_struct_added() {
+		let diff = r#"@@ -10,5 +10,7 @@
++pub struct NewStruct;
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			assert_eq!(api.kind, ApiChangeKind::TypeAdded);
+			assert_eq!(api.name, "NewStruct");
+		} else {
+			panic!("Expected API change");
+		}
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_enum_removed() {
+		let diff = r#"@@ -10,5 +10,7 @@
+-pub enum OldEnum;
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			assert_eq!(api.kind, ApiChangeKind::TypeRemoved);
+			assert_eq!(api.name, "OldEnum");
+			assert!(api.is_breaking);
+		} else {
+			panic!("Expected API change");
+		}
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_trait_added() {
+		let diff = r#"@@ -10,5 +10,7 @@
++pub trait NewTrait {}
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			assert_eq!(api.kind, ApiChangeKind::TraitAdded);
+			assert_eq!(api.name, "NewTrait");
+		} else {
+			panic!("Expected API change");
+		}
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_const_added() {
+		let diff = r#"@@ -10,5 +10,7 @@
++pub const NEW_CONST {}
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			assert_eq!(api.kind, ApiChangeKind::ConstantAdded);
+			assert_eq!(api.name, "NEW_CONST");
+		} else {
+			panic!("Expected API change");
+		}
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_static_removed() {
+		let diff = r#"@@ -10,5 +10,7 @@
+-pub static OLD_STATIC {}
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			assert_eq!(api.kind, ApiChangeKind::ConstantRemoved);
+			assert_eq!(api.name, "OLD_STATIC");
+			assert!(api.is_breaking);
+		} else {
+			panic!("Expected API change");
+		}
+	}
+
+	#[test]
+	fn test_extract_route_from_path_pages() {
+		assert_eq!(
+			extract_route_from_path(Path::new("src/pages/index.tsx")),
+			Some("/index".to_string()) // "index" becomes "/index", not just "/"
+		);
+		assert_eq!(
+			extract_route_from_path(Path::new("src/pages/about.tsx")),
+			Some("/about".to_string())
+		);
+		assert_eq!(
+			extract_route_from_path(Path::new("src/pages/blog/index.tsx")),
+			Some("/blog".to_string()) // "/blog/index" -> "/blog"
+		);
+	}
+
+	#[test]
+	fn test_extract_route_from_path_jsx() {
+		assert_eq!(
+			extract_route_from_path(Path::new("src/routes/home.jsx")),
+			Some("/home".to_string())
+		);
+	}
+
+	#[test]
+	fn test_extract_route_from_path_js() {
+		assert_eq!(
+			extract_route_from_path(Path::new("src/routes/api.js")),
+			Some("/api".to_string())
+		);
+	}
+
+	#[test]
+	fn test_extract_route_from_path_no_match() {
+		assert_eq!(
+			extract_route_from_path(Path::new("src/utils/helpers.ts")),
+			None
+		);
+	}
+
+	#[test]
+	fn test_extract_component_name() {
+		assert_eq!(
+			extract_component_name(Path::new("src/components/Button.tsx")),
+			Some("Button".to_string())
+		);
+		assert_eq!(
+			extract_component_name(Path::new("src/utils/helpers.ts")),
+			Some("helpers".to_string())
+		);
+	}
+
+	#[test]
+	fn test_extract_command_name_found() {
+		let diff = r#"name = "my-command""#;
+		assert_eq!(extract_command_name(diff), Some("my-command".to_string()));
+	}
+
+	#[test]
+	fn test_extract_command_name_not_found() {
+		let diff = r#"some other content"#;
+		assert_eq!(extract_command_name(diff), None);
+	}
+
+	#[test]
+	fn test_extract_flag_name_found() {
+		let diff = r#"long = "verbose""#;
+		assert_eq!(extract_flag_name(diff), Some("verbose".to_string()));
+	}
+
+	#[test]
+	fn test_extract_flag_name_not_found() {
+		let diff = r#"some other content"#;
+		assert_eq!(extract_flag_name(diff), None);
+	}
+
+	#[test]
+	fn test_is_test_file_patterns() {
+		assert!(is_test_file(Path::new("tests/integration_test.rs")));
+		assert!(is_test_file(Path::new("src/__tests__/unit.test.ts")));
+		assert!(!is_test_file(Path::new("lib.spec.js")));
+		assert!(!is_test_file(Path::new("src/main.rs")));
+		assert!(!is_test_file(Path::new("src/lib.rs")));
 	}
 }

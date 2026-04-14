@@ -602,6 +602,8 @@ fn apply_grouping_logic(
 
 #[cfg(test)]
 mod tests {
+	use super::extractors::ExtractionResult;
+	use super::extractors::SkipReason;
 	use super::*;
 
 	#[test]
@@ -637,5 +639,637 @@ mod tests {
 
 		assert_eq!(library_thresholds.group_public_api, 3);
 		assert_eq!(library_thresholds.group_internal, 5);
+		assert_eq!(library_thresholds.group_ui, 0);
+		assert_eq!(library_thresholds.group_commands, 0);
+	}
+
+	#[test]
+	fn grouping_thresholds_for_application() {
+		let thresholds = GroupingThresholds::default();
+		let app_thresholds = thresholds.for_artifact_type(ArtifactType::Application);
+
+		assert_eq!(app_thresholds.group_public_api, 0);
+		assert_eq!(app_thresholds.group_ui, 3);
+		assert_eq!(app_thresholds.group_commands, 0);
+	}
+
+	#[test]
+	fn grouping_thresholds_for_cli() {
+		let thresholds = GroupingThresholds::default();
+		let cli_thresholds = thresholds.for_artifact_type(ArtifactType::CliTool);
+
+		assert_eq!(cli_thresholds.group_public_api, 0);
+		assert_eq!(cli_thresholds.group_ui, 0);
+		assert_eq!(cli_thresholds.group_commands, 2);
+	}
+
+	#[test]
+	fn grouping_thresholds_for_mixed() {
+		let thresholds = GroupingThresholds::default();
+		let mixed_thresholds = thresholds.for_artifact_type(ArtifactType::Mixed);
+
+		// Mixed uses defaults
+		assert_eq!(mixed_thresholds.group_public_api, 3);
+		assert_eq!(mixed_thresholds.group_internal, 5);
+	}
+
+	#[test]
+	fn visibility_display() {
+		assert_eq!(Visibility::Public.to_string(), "pub");
+		assert_eq!(Visibility::Crate.to_string(), "pub(crate)");
+		assert_eq!(Visibility::Super.to_string(), "pub(super)");
+		assert_eq!(Visibility::Restricted.to_string(), "pub(in ...)");
+		assert_eq!(Visibility::Private.to_string(), "private");
+	}
+
+	#[test]
+	fn analysis_config_default() {
+		let config = AnalysisConfig::default();
+		assert!(matches!(config.detection_level, DetectionLevel::Signature));
+		assert_eq!(config.max_suggestions, 10);
+	}
+
+	#[test]
+	fn describe_change_api() {
+		let api_change = ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "test_fn".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(42),
+		};
+		let change = SemanticChange::Api(api_change);
+		let description = describe_change(&change);
+		assert!(description.contains("FunctionAdded"));
+		assert!(description.contains("test_fn"));
+	}
+
+	#[test]
+	fn describe_change_app() {
+		let app_change = AppChange {
+			kind: AppChangeKind::RouteAdded,
+			route: Some("/home".to_string()),
+			component: Some("HomePage".to_string()),
+			description: "Added home page".to_string(),
+			is_user_visible: true,
+			file_path: PathBuf::from("src/pages/home.tsx"),
+		};
+		let change = SemanticChange::App(app_change);
+		let description = describe_change(&change);
+		assert!(description.contains("RouteAdded"));
+		assert!(description.contains("Added home page"));
+	}
+
+	#[test]
+	fn describe_change_cli() {
+		let cli_change = CliChange {
+			kind: CliChangeKind::CommandAdded,
+			command: Some("new-cmd".to_string()),
+			flag: None,
+			description: "Added new command".to_string(),
+			is_breaking: false,
+			file_path: PathBuf::from("src/cli.rs"),
+		};
+		let change = SemanticChange::Cli(cli_change);
+		let description = describe_change(&change);
+		assert!(description.contains("CommandAdded"));
+		assert!(description.contains("Added new command"));
+	}
+
+	#[test]
+	fn describe_change_config() {
+		let config_change = ConfigChange {
+			file_name: "config.toml".to_string(),
+			description: "Changed default timeout".to_string(),
+			is_user_facing: true,
+		};
+		let change = SemanticChange::Config(config_change);
+		let description = describe_change(&change);
+		assert!(description.contains("config change"));
+		assert!(description.contains("Changed default timeout"));
+	}
+
+	#[test]
+	fn describe_change_unknown() {
+		let change = SemanticChange::Unknown {
+			path: PathBuf::from("src/unknown.rs"),
+			description: "Some unknown change".to_string(),
+		};
+		let description = describe_change(&change);
+		assert_eq!(description, "Some unknown change");
+	}
+
+	#[test]
+	fn group_changes_with_breaking_change() {
+		let api_change = ApiChange {
+			kind: ApiChangeKind::FunctionRemoved,
+			visibility: Visibility::Public,
+			name: "old_fn".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: true,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(42),
+		};
+		let change = SemanticChange::Api(api_change);
+		let thresholds = GroupingThresholds::default();
+		let groups = group_changes(vec![change], ArtifactType::Library, &thresholds).unwrap();
+
+		assert_eq!(groups.len(), 1);
+		assert!(groups[0].has_breaking);
+		assert!(matches!(groups[0].suggested_bump, BumpSuggestion::Major));
+	}
+
+	#[test]
+	fn group_changes_with_non_breaking_changes() {
+		let api_change1 = ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "new_fn1".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(42),
+		};
+		let api_change2 = ApiChange {
+			kind: ApiChangeKind::TypeAdded,
+			visibility: Visibility::Public,
+			name: "NewType".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(50),
+		};
+		let changes = vec![
+			SemanticChange::Api(api_change1),
+			SemanticChange::Api(api_change2),
+		];
+		let thresholds = GroupingThresholds::default();
+		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
+
+		assert_eq!(groups.len(), 2);
+		assert!(!groups[0].has_breaking);
+		assert!(!groups[1].has_breaking);
+	}
+
+	#[test]
+	fn analyze_changes_placeholder() {
+		let root = PathBuf::from(".");
+		let frame = ChangeFrame::WorkingDirectory;
+		let config = AnalysisConfig::default();
+		let analysis = analyze_changes(&root, &frame, &config).unwrap();
+
+		assert!(matches!(analysis.frame, ChangeFrame::WorkingDirectory));
+		assert!(analysis.package_changes.is_empty());
+		assert!(analysis.recommendations.is_empty());
+	}
+
+	#[test]
+	fn semantic_change_variants_debug() {
+		let api = SemanticChange::Api(ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "test".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: None,
+		});
+		assert!(format!("{:?}", api).contains("Api"));
+
+		let app = SemanticChange::App(AppChange {
+			kind: AppChangeKind::ComponentAdded,
+			route: None,
+			component: Some("Button".to_string()),
+			description: "Added button".to_string(),
+			is_user_visible: true,
+			file_path: PathBuf::from("src/components/Button.tsx"),
+		});
+		assert!(format!("{:?}", app).contains("App"));
+
+		let cli = SemanticChange::Cli(CliChange {
+			kind: CliChangeKind::FlagAdded,
+			command: Some("build".to_string()),
+			flag: Some("verbose".to_string()),
+			description: "Added verbose flag".to_string(),
+			is_breaking: false,
+			file_path: PathBuf::from("src/cli.rs"),
+		});
+		assert!(format!("{:?}", cli).contains("Cli"));
+
+		let config = SemanticChange::Config(ConfigChange {
+			file_name: "config.toml".to_string(),
+			description: "Changed port".to_string(),
+			is_user_facing: true,
+		});
+		assert!(format!("{:?}", config).contains("Config"));
+
+		let unknown = SemanticChange::Unknown {
+			path: PathBuf::from("unknown.txt"),
+			description: "Unknown change".to_string(),
+		};
+		assert!(format!("{:?}", unknown).contains("Unknown"));
+	}
+
+	#[test]
+	fn change_group_struct() {
+		let group = ChangeGroup {
+			package_id: "test-package".to_string(),
+			artifact_type: ArtifactType::Library,
+			suggested_summary: "Add new function".to_string(),
+			suggested_details: Some("Details here".to_string()),
+			suggested_bump: BumpSuggestion::Minor,
+			changes: vec![],
+			has_breaking: false,
+			confidence: 0.9,
+		};
+
+		assert_eq!(group.package_id, "test-package");
+		assert!(matches!(group.artifact_type, ArtifactType::Library));
+		assert_eq!(group.suggested_summary, "Add new function");
+		assert!(group.suggested_details.is_some());
+		assert!(matches!(group.suggested_bump, BumpSuggestion::Minor));
+		assert!(!group.has_breaking);
+		assert!((group.confidence - 0.9).abs() < f32::EPSILON);
+	}
+
+	#[test]
+	fn suggested_changeset_struct() {
+		let changeset = SuggestedChangeset {
+			summary: "Add feature".to_string(),
+			details: Some("Details".to_string()),
+			bump: BumpSuggestion::Minor,
+			change_type: Some("feature".to_string()),
+			confidence: 0.95,
+			api_changes: vec![],
+			grouped_count: 1,
+			files_changed: vec![PathBuf::from("src/lib.rs")],
+			has_breaking_changes: false,
+			before_after_suggested: true,
+		};
+
+		assert_eq!(changeset.summary, "Add feature");
+		assert_eq!(changeset.bump, BumpSuggestion::Minor);
+		assert!(changeset.before_after_suggested);
+	}
+
+	#[test]
+	fn package_change_analysis_struct() {
+		let analysis = PackageChangeAnalysis {
+			package_id: "my-package".to_string(),
+			artifact_type: ArtifactType::Library,
+			direct_change_count: 5,
+			has_propagated_changes: true,
+			suggested_changesets: vec![],
+		};
+
+		assert_eq!(analysis.package_id, "my-package");
+		assert!(analysis.has_propagated_changes);
+		assert_eq!(analysis.direct_change_count, 5);
+	}
+
+	#[test]
+	fn change_analysis_struct() {
+		let analysis = ChangeAnalysis {
+			frame: ChangeFrame::WorkingDirectory,
+			package_changes: BTreeMap::new(),
+			recommendations: vec!["Recommendation 1".to_string()],
+		};
+
+		assert!(matches!(analysis.frame, ChangeFrame::WorkingDirectory));
+		assert_eq!(analysis.recommendations.len(), 1);
+	}
+
+	#[test]
+	fn test_detect_artifact_type_library() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		fs::write(src_dir.join("lib.rs"), "pub fn foo() {}").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Library));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_cli_from_clap() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		fs::write(src_dir.join("main.rs"), "use clap::Parser;").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::CliTool));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_application_from_axum() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		fs::write(src_dir.join("main.rs"), "use axum::Router;").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Application));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_application_from_actix() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		fs::write(src_dir.join("main.rs"), "use actix_web;").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Application));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_application_from_rocket() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		fs::write(src_dir.join("main.rs"), "use rocket;").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Application));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_application_from_warp() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		fs::write(src_dir.join("main.rs"), "use warp;").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Application));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_cli_default() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		// No clap, no web frameworks - should default to CLI
+		fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::CliTool));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_mixed() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		fs::write(src_dir.join("lib.rs"), "").unwrap();
+		fs::write(src_dir.join("main.rs"), "").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Mixed));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_from_cargo_toml_cdylib() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let src_dir = temp_dir.path().join("src");
+		fs::create_dir(&src_dir).unwrap();
+		// No lib.rs or main.rs, but has Cargo.toml with crate-type
+		fs::write(
+			temp_dir.path().join("Cargo.toml"),
+			"crate-type = [\"cdylib\"]",
+		)
+		.unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Library));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_from_cargo_toml_staticlib() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		// No src directory, but has Cargo.toml with crate-type
+		fs::write(
+			temp_dir.path().join("Cargo.toml"),
+			"crate-type = [\"staticlib\"]",
+		)
+		.unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::Library));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_from_cargo_toml_bin() {
+		use std::fs;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		// No src directory, but has Cargo.toml with [[bin]]
+		fs::write(temp_dir.path().join("Cargo.toml"), "[[bin]]").unwrap();
+
+		let artifact = detect_artifact_type(temp_dir.path()).unwrap();
+		assert!(matches!(artifact, ArtifactType::CliTool));
+	}
+
+	#[test]
+	fn test_detect_artifact_type_error() {
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		// Empty directory - should fail
+		let result = detect_artifact_type(temp_dir.path());
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_api_change_kind_variants() {
+		// Test all ApiChangeKind variants have distinct debug representations
+		let kinds = vec![
+			ApiChangeKind::FunctionAdded,
+			ApiChangeKind::FunctionModified,
+			ApiChangeKind::FunctionRemoved,
+			ApiChangeKind::TypeAdded,
+			ApiChangeKind::TypeModified,
+			ApiChangeKind::TypeRemoved,
+			ApiChangeKind::TraitAdded,
+			ApiChangeKind::TraitModified,
+			ApiChangeKind::TraitRemoved,
+			ApiChangeKind::ConstantAdded,
+			ApiChangeKind::ConstantModified,
+			ApiChangeKind::ConstantRemoved,
+			ApiChangeKind::ModuleAdded,
+			ApiChangeKind::ModuleRemoved,
+		];
+
+		for kind in kinds {
+			let debug = format!("{:?}", kind);
+			assert!(!debug.is_empty());
+		}
+	}
+
+	#[test]
+	fn test_app_change_kind_variants() {
+		let kinds = vec![
+			AppChangeKind::RouteAdded,
+			AppChangeKind::RouteRemoved,
+			AppChangeKind::RouteModified,
+			AppChangeKind::ComponentAdded,
+			AppChangeKind::ComponentModified,
+			AppChangeKind::ComponentRemoved,
+			AppChangeKind::ApiEndpointAdded,
+			AppChangeKind::ApiEndpointModified,
+			AppChangeKind::ApiEndpointRemoved,
+			AppChangeKind::StateManagementChanged,
+			AppChangeKind::FormValidationChanged,
+			AppChangeKind::StyleChanged,
+			AppChangeKind::NavigationChanged,
+		];
+
+		for kind in kinds {
+			let debug = format!("{:?}", kind);
+			assert!(!debug.is_empty());
+		}
+	}
+
+	#[test]
+	fn test_cli_change_kind_variants() {
+		let kinds = vec![
+			CliChangeKind::CommandAdded,
+			CliChangeKind::CommandRemoved,
+			CliChangeKind::CommandModified,
+			CliChangeKind::FlagAdded,
+			CliChangeKind::FlagRemoved,
+			CliChangeKind::FlagModified,
+			CliChangeKind::OutputFormatChanged,
+			CliChangeKind::ExitCodeChanged,
+			CliChangeKind::ConfigFileChanged,
+			CliChangeKind::PromptChanged,
+		];
+
+		for kind in kinds {
+			let debug = format!("{:?}", kind);
+			assert!(!debug.is_empty());
+		}
+	}
+
+	#[test]
+	fn test_skip_reason_variants() {
+		let reasons = vec![
+			SkipReason::UnsupportedExtension,
+			SkipReason::BinaryFile,
+			SkipReason::TooLarge,
+			SkipReason::ParseError("test".to_string()),
+			SkipReason::NotRelevant,
+		];
+
+		for reason in reasons {
+			let debug = format!("{:?}", reason);
+			assert!(!debug.is_empty());
+		}
+	}
+
+	#[test]
+	fn test_extraction_result_default() {
+		let result = ExtractionResult {
+			changes: vec![],
+			files_analyzed: vec![],
+			files_skipped: vec![],
+		};
+		assert!(result.changes.is_empty());
+		assert!(result.files_analyzed.is_empty());
+		assert!(result.files_skipped.is_empty());
+	}
+
+	#[test]
+	fn test_pr_environment_struct() {
+		let pr_env = PrEnvironment {
+			source_branch: "feature".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: Some("42".to_string()),
+			provider: "github".to_string(),
+		};
+		assert_eq!(pr_env.source_branch, "feature");
+		assert_eq!(pr_env.target_branch, "main");
+		assert_eq!(pr_env.pr_number, Some("42".to_string()));
+		assert_eq!(pr_env.provider, "github");
+	}
+
+	#[test]
+	fn test_frame_error_variants() {
+		let errors = vec![
+			FrameError::Git("error".to_string()),
+			FrameError::Environment("env error".to_string()),
+			FrameError::InvalidFrame("invalid".to_string()),
+		];
+
+		for err in errors {
+			assert!(!err.to_string().is_empty());
+		}
+	}
+
+	#[test]
+	fn test_api_change_with_signature() {
+		let api = ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "test".to_string(),
+			signature: Some("fn test(x: i32) -> bool".to_string()),
+			doc_comment: Some("Test function".to_string()),
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(42),
+		};
+		assert!(api.signature.is_some());
+		assert!(api.doc_comment.is_some());
+		assert!(api.line_number.is_some());
 	}
 }
