@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 149
 info:
   program: mc
   args:
@@ -11,6 +10,7 @@ info:
   env:
     MONOCHANGE_RELEASE_DATE: 2026-04-06
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: true
 exit_code: 0
@@ -91,6 +91,34 @@ exit_code: 0
         ]
       },
       "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add feature"
+    }
+  ],
+  "packagePublications": [
+    {
+      "package": "app",
+      "ecosystem": "cargo",
+      "registry": "crates_io",
+      "version": "1.1.0",
+      "mode": "builtin",
+      "trustedPublishing": {
+        "enabled": true,
+        "repository": null,
+        "workflow": null,
+        "environment": null
+      }
+    },
+    {
+      "package": "core",
+      "ecosystem": "cargo",
+      "registry": "crates_io",
+      "version": "1.1.0",
+      "mode": "builtin",
+      "trustedPublishing": {
+        "enabled": true,
+        "repository": null,
+        "workflow": null,
+        "environment": null
+      }
     }
   ],
   "changesets": [

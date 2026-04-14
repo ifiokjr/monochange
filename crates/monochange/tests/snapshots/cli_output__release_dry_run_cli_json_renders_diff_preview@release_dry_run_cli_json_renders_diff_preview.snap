@@ -11,6 +11,7 @@ info:
   env:
     MONOCHANGE_RELEASE_DATE: 2026-04-06
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: true
 exit_code: 0
@@ -123,6 +124,34 @@ exit_code: 0
     "deletedChangesets": [],
     "dryRun": true,
     "groupVersion": "1.1.0",
+    "packagePublications": [
+      {
+        "ecosystem": "cargo",
+        "mode": "builtin",
+        "package": "app",
+        "registry": "crates_io",
+        "trustedPublishing": {
+          "enabled": true,
+          "environment": null,
+          "repository": null,
+          "workflow": null
+        },
+        "version": "1.1.0"
+      },
+      {
+        "ecosystem": "cargo",
+        "mode": "builtin",
+        "package": "core",
+        "registry": "crates_io",
+        "trustedPublishing": {
+          "enabled": true,
+          "environment": null,
+          "repository": null,
+          "workflow": null
+        },
+        "version": "1.1.0"
+      }
+    ],
     "plan": {
       "compatibilityEvidence": [],
       "decisions": [
@@ -191,6 +220,7 @@ exit_code: 0
     ],
     "version": "1.1.0"
   },
+  "packagePublish": null,
   "releaseCommit": null,
   "releaseRequest": null,
   "releases": []

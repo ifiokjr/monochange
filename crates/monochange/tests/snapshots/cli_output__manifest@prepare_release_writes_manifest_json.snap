@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 265
 expression: manifest
 ---
 {
@@ -79,6 +78,34 @@ expression: manifest
         ]
       },
       "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add feature"
+    }
+  ],
+  "packagePublications": [
+    {
+      "package": "app",
+      "ecosystem": "cargo",
+      "registry": "crates_io",
+      "version": "1.1.0",
+      "mode": "builtin",
+      "trustedPublishing": {
+        "enabled": true,
+        "repository": null,
+        "workflow": null,
+        "environment": null
+      }
+    },
+    {
+      "package": "core",
+      "ecosystem": "cargo",
+      "registry": "crates_io",
+      "version": "1.1.0",
+      "mode": "builtin",
+      "trustedPublishing": {
+        "enabled": true,
+        "repository": null,
+        "workflow": null,
+        "environment": null
+      }
     }
   ],
   "changesets": [
