@@ -77,6 +77,10 @@ jobs:
         run: build:all
         shell: devenv shell -- bash -e {0}
 
+      - name: check publish builds
+        run: publish:check
+        shell: devenv shell -- bash -e {0}
+
       - name: build book
         run: build:book
         shell: devenv shell -- bash -e {0}

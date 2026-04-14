@@ -15,6 +15,7 @@ in
     [
       cargo-binstall
       cargo-run-bin
+      cacert
       deno
       dprint
       extra.mdt
@@ -193,6 +194,14 @@ in
       description = "Build the mdbook documentation.";
       binary = "bash";
     };
+    "publish:check" = {
+      exec = ''
+        set -e
+        cargo workspaces publish --from-git --allow-dirty --yes --dry-run
+      '';
+      description = "Check that publication is valid for this project";
+      binary = "bash";
+    };
     "test:all" = {
       exec = ''
         set -e
@@ -254,6 +263,7 @@ in
         docs:update # runs `mdt update`
         fix:format
         mc validate
+        publish:check
       '';
       description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
       binary = "bash";
@@ -290,6 +300,7 @@ in
         deny:check
         docs:check
         mc validate
+        publish:check
       '';
       description = "Run all checks.";
       binary = "bash";
