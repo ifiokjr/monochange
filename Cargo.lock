@@ -1925,6 +1925,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "monochange_analysis"
+version = "0.1.0"
+dependencies = [
+ "monochange_core",
+ "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "monochange_book"
 version = "0.1.0"
 dependencies = [

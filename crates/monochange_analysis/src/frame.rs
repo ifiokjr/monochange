@@ -1,0 +1,558 @@
+//! Change frame detection and management.
+//!
+//! A "change frame" defines the boundaries of what changes to analyze:
+//! working directory vs last commit, branch vs main, PR vs target, etc.
+
+use std::env;
+use std::fmt;
+use std::path::Path;
+use std::process::Command;
+
+use monochange_core::MonochangeError;
+use serde::Deserialize;
+use serde::Serialize;
+
+/// Error type for frame detection failures.
+#[derive(Debug, thiserror::Error)]
+pub enum FrameError {
+	/// Git operation failed
+	#[error("git error: {0}")]
+	Git(String),
+
+	/// Environment detection failed
+	#[error("environment error: {0}")]
+	Environment(String),
+
+	/// Invalid frame specification
+	#[error("invalid frame: {0}")]
+	InvalidFrame(String),
+}
+
+impl From<FrameError> for MonochangeError {
+	fn from(e: FrameError) -> Self {
+		MonochangeError::Discovery(e.to_string())
+	}
+}
+
+/// The context for analyzing changes.
+///
+/// Determines what "base" and "head" mean for diff analysis.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ChangeFrame {
+	/// Working directory changes vs HEAD.
+	///
+	/// Includes both staged and unstaged changes.
+	WorkingDirectory,
+
+	/// Branch comparison: base..head
+	BranchRange {
+		/// Base branch (e.g., "main")
+		base: String,
+		/// Head branch (e.g., "feature-branch")
+		head: String,
+	},
+
+	/// PR comparison: target..pr_branch
+	PullRequest {
+		/// Target branch (e.g., "main")
+		target: String,
+		/// PR source branch
+		pr_branch: String,
+	},
+
+	/// Staged changes only (for pre-commit hooks).
+	StagedOnly,
+
+	/// Custom revision range.
+	CustomRange {
+		/// Base revision
+		base: String,
+		/// Head revision
+		head: String,
+	},
+}
+
+impl fmt::Display for ChangeFrame {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::WorkingDirectory => write!(f, "working directory"),
+			Self::BranchRange { base, head } => write!(f, "{}...{}", base, head),
+			Self::PullRequest { target, pr_branch } => {
+				write!(f, "PR: {} <- {}", target, pr_branch)
+			}
+			Self::StagedOnly => write!(f, "staged only"),
+			Self::CustomRange { base, head } => write!(f, "{}...{}", base, head),
+		}
+	}
+}
+
+impl ChangeFrame {
+	/// Detect the appropriate frame based on git state and environment.
+	///
+	/// Detection priority:
+	/// 1. CI/CD environment variables (PR detection)
+	/// 2. Branch vs default branch
+	/// 3. Working directory changes
+	///
+	/// # Errors
+	///
+	/// Returns an error if git state cannot be determined.
+	pub fn detect(repo_root: &Path) -> Result<Self, FrameError> {
+		// Check for PR environment variables first
+		if let Some(pr_info) = detect_pr_environment() {
+			return Ok(Self::PullRequest {
+				target: pr_info.target_branch,
+				pr_branch: pr_info.source_branch,
+			});
+		}
+
+		// Get current branch
+		let current = get_current_branch(repo_root)?;
+		let default = get_default_branch(repo_root).unwrap_or_else(|_| "main".to_string());
+
+		// If we're not on the default branch, compare against it
+		if current != default {
+			// Find merge base for accurate comparison
+			let merge_base = get_merge_base(repo_root, &default, &current)?;
+
+			return Ok(Self::BranchRange {
+				base: merge_base,
+				head: current,
+			});
+		}
+
+		// Default to working directory
+		Ok(Self::WorkingDirectory)
+	}
+
+	/// Get the git revision range for diff commands.
+	///
+	/// Returns a string suitable for `git diff` or `git log` commands.
+	#[must_use]
+	pub fn revision_range(&self) -> String {
+		match self {
+			Self::WorkingDirectory => "HEAD".to_string(),
+			Self::BranchRange { base, head } => format!("{}...{}", base, head),
+			Self::PullRequest { target, pr_branch } => format!("{}...{}", target, pr_branch),
+			Self::StagedOnly => "--staged".to_string(),
+			Self::CustomRange { base, head } => format!("{}...{}", base, head),
+		}
+	}
+
+	/// Get the base revision for comparison.
+	#[must_use]
+	pub fn base_revision(&self) -> Option<&str> {
+		match self {
+			Self::WorkingDirectory => Some("HEAD"),
+			Self::BranchRange { base, .. } => Some(base.as_str()),
+			Self::PullRequest { target, .. } => Some(target.as_str()),
+			Self::StagedOnly => Some("HEAD"),
+			Self::CustomRange { base, .. } => Some(base.as_str()),
+		}
+	}
+
+	/// Get the head revision for comparison.
+	#[must_use]
+	pub fn head_revision(&self) -> Option<&str> {
+		match self {
+			Self::WorkingDirectory => None, // Working directory has no revision
+			Self::BranchRange { head, .. } => Some(head.as_str()),
+			Self::PullRequest { pr_branch, .. } => Some(pr_branch.as_str()),
+			Self::StagedOnly => Some("HEAD"),
+			Self::CustomRange { head, .. } => Some(head.as_str()),
+		}
+	}
+
+	/// Check if this frame includes unstaged changes.
+	#[must_use]
+	pub fn includes_unstaged(&self) -> bool {
+		matches!(self, Self::WorkingDirectory | Self::BranchRange { .. })
+	}
+
+	/// Check if this frame includes staged changes.
+	#[must_use]
+	pub fn includes_staged(&self) -> bool {
+		matches!(
+			self,
+			Self::WorkingDirectory | Self::StagedOnly | Self::BranchRange { .. }
+		)
+	}
+
+	/// Get the list of changed files for this frame.
+	///
+	/// # Errors
+	///
+	/// Returns an error if git commands fail.
+	pub fn changed_files(&self, repo_root: &Path) -> Result<Vec<std::path::PathBuf>, FrameError> {
+		let output = match self {
+			Self::WorkingDirectory => {
+				// Get both staged and unstaged
+				let mut staged =
+					run_git_diff_name_only(repo_root, &["--staged", "--diff-filter=ACMRT"])?;
+				let unstaged = run_git_diff_name_only(repo_root, &["HEAD", "--diff-filter=ACMRT"])?;
+
+				staged.extend(unstaged);
+				staged.sort();
+				staged.dedup();
+				return Ok(staged);
+			}
+			Self::StagedOnly => {
+				run_git_diff_name_only(repo_root, &["--staged", "--diff-filter=ACMRT"])?
+			}
+			_ => {
+				let range = self.revision_range();
+				run_git_diff_name_only(repo_root, &[&range, "--diff-filter=ACMRT"])?
+			}
+		};
+
+		Ok(output)
+	}
+}
+
+/// Information about a PR environment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrEnvironment {
+	/// Source branch of the PR
+	pub source_branch: String,
+	/// Target branch of the PR
+	pub target_branch: String,
+	/// PR number if available
+	pub pr_number: Option<String>,
+	/// Provider (GitHub, GitLab, etc.)
+	pub provider: String,
+}
+
+/// Detect PR environment from common CI/CD variables.
+fn detect_pr_environment() -> Option<PrEnvironment> {
+	// GitHub Actions
+	if let Ok(event_name) = env::var("GITHUB_EVENT_NAME") {
+		if event_name == "pull_request" || event_name == "pull_request_target" {
+			return Some(PrEnvironment {
+				source_branch: env::var("GITHUB_HEAD_REF").ok()?,
+				target_branch: env::var("GITHUB_BASE_REF").ok()?,
+				pr_number: env::var("GITHUB_EVENT_NUMBER").ok(),
+				provider: "github".to_string(),
+			});
+		}
+	}
+
+	// GitLab CI
+	if env::var("GITLAB_CI").is_ok() {
+		let source = env::var("CI_MERGE_REQUEST_SOURCE_BRANCH_NAME")
+			.or_else(|_| env::var("CI_COMMIT_REF_NAME"))
+			.ok()?;
+		let target = env::var("CI_MERGE_REQUEST_TARGET_BRANCH_NAME")
+			.or_else(|_| env::var("CI_DEFAULT_BRANCH"))
+			.ok()?;
+
+		return Some(PrEnvironment {
+			source_branch: source,
+			target_branch: target,
+			pr_number: env::var("CI_MERGE_REQUEST_IID").ok(),
+			provider: "gitlab".to_string(),
+		});
+	}
+
+	// CircleCI
+	if env::var("CIRCLECI").is_ok() {
+		return Some(PrEnvironment {
+			source_branch: env::var("CIRCLE_BRANCH").ok()?,
+			target_branch: env::var("CIRCLE_TARGET_BRANCH")
+				.or_else(|_| env::var("CIRCLE_DEFAULT_BRANCH"))
+				.unwrap_or_else(|_| "main".to_string()),
+			pr_number: env::var("CIRCLE_PR_NUMBER").ok(),
+			provider: "circleci".to_string(),
+		});
+	}
+
+	// Travis CI
+	if env::var("TRAVIS").is_ok() {
+		let pr = env::var("TRAVIS_PULL_REQUEST").ok();
+		let is_pr = pr.as_deref() != Some("false");
+
+		if is_pr {
+			return Some(PrEnvironment {
+				source_branch: env::var("TRAVIS_PULL_REQUEST_BRANCH").ok()?,
+				target_branch: env::var("TRAVIS_BRANCH").ok()?,
+				pr_number: pr,
+				provider: "travis".to_string(),
+			});
+		}
+	}
+
+	// Azure Pipelines
+	if env::var("TF_BUILD").is_ok() {
+		let reason = env::var("BUILD_REASON").ok()?;
+		if reason == "PullRequest" {
+			return Some(PrEnvironment {
+				source_branch: env::var("SYSTEM_PULLREQUEST_SOURCEBRANCH")
+					.ok()?
+					.trim_start_matches("refs/heads/")
+					.to_string(),
+				target_branch: env::var("SYSTEM_PULLREQUEST_TARGETBRANCH")
+					.ok()?
+					.trim_start_matches("refs/heads/")
+					.to_string(),
+				pr_number: env::var("SYSTEM_PULLREQUEST_PULLREQUESTNUMBER").ok(),
+				provider: "azure".to_string(),
+			});
+		}
+	}
+
+	// Buildkite
+	if env::var("BUILDKITE").is_ok() {
+		return Some(PrEnvironment {
+			source_branch: env::var("BUILDKITE_BRANCH").ok()?,
+			target_branch: env::var("BUILDKITE_PULL_REQUEST_BASE_BRANCH")
+				.or_else(|_| env::var("BUILDKITE_DEFAULT_BRANCH"))
+				.unwrap_or_else(|_| "main".to_string()),
+			pr_number: env::var("BUILDKITE_PULL_REQUEST").ok(),
+			provider: "buildkite".to_string(),
+		});
+	}
+
+	None
+}
+
+/// Get the current git branch name.
+fn get_current_branch(repo_root: &Path) -> Result<String, FrameError> {
+	let output = Command::new("git")
+		.current_dir(repo_root)
+		.args(["branch", "--show-current"])
+		.output()
+		.map_err(|e| FrameError::Git(format!("failed to run git branch: {e}")))?;
+
+	if !output.status.success() {
+		return Err(FrameError::Git("git branch command failed".to_string()));
+	}
+
+	let branch = String::from_utf8(output.stdout)
+		.map_err(|e| FrameError::Git(format!("invalid utf-8: {e}")))?
+		.trim()
+		.to_string();
+
+	if branch.is_empty() {
+		// Detached HEAD - try to get from env or use short sha
+		return get_branch_from_env().or_else(|_| get_short_sha(repo_root));
+	}
+
+	Ok(branch)
+}
+
+/// Get the default branch (usually "main" or "master").
+fn get_default_branch(repo_root: &Path) -> Result<String, FrameError> {
+	// Try to get from git config
+	let output = Command::new("git")
+		.current_dir(repo_root)
+		.args(["rev-parse", "--abbrev-ref", "origin/HEAD"])
+		.output();
+
+	if let Ok(output) = output {
+		if output.status.success() {
+			let branch = String::from_utf8(output.stdout)
+				.map_err(|e| FrameError::Git(format!("invalid utf-8: {e}")))?
+				.trim()
+				.trim_start_matches("origin/")
+				.to_string();
+
+			if !branch.is_empty() {
+				return Ok(branch);
+			}
+		}
+	}
+
+	// Fallback: check common branch names
+	for branch in ["main", "master"] {
+		let output = Command::new("git")
+			.current_dir(repo_root)
+			.args(["rev-parse", "--verify", branch])
+			.output();
+
+		if let Ok(output) = output {
+			if output.status.success() {
+				return Ok(branch.to_string());
+			}
+		}
+	}
+
+	Err(FrameError::Git(
+		"could not determine default branch".to_string(),
+	))
+}
+
+/// Get the merge base between two branches.
+fn get_merge_base(repo_root: &Path, base: &str, head: &str) -> Result<String, FrameError> {
+	let output = Command::new("git")
+		.current_dir(repo_root)
+		.args(["merge-base", base, head])
+		.output()
+		.map_err(|e| FrameError::Git(format!("failed to run git merge-base: {e}")))?;
+
+	if !output.status.success() {
+		// If merge-base fails, just use the base branch
+		return Ok(base.to_string());
+	}
+
+	let sha = String::from_utf8(output.stdout)
+		.map_err(|e| FrameError::Git(format!("invalid utf-8: {e}")))?
+		.trim()
+		.to_string();
+
+	Ok(sha)
+}
+
+/// Get branch name from environment variables.
+fn get_branch_from_env() -> Result<String, FrameError> {
+	// Try common env vars
+	for var in [
+		"GITHUB_REF_NAME",
+		"CI_COMMIT_REF_NAME",
+		"CIRCLE_BRANCH",
+		"TRAVIS_BRANCH",
+		"BUILDKITE_BRANCH",
+		"BITBUCKET_BRANCH",
+	] {
+		if let Ok(branch) = env::var(var) {
+			return Ok(branch);
+		}
+	}
+
+	Err(FrameError::Environment(
+		"could not determine branch from environment".to_string(),
+	))
+}
+
+/// Get short SHA as fallback for detached HEAD.
+fn get_short_sha(repo_root: &Path) -> Result<String, FrameError> {
+	let output = Command::new("git")
+		.current_dir(repo_root)
+		.args(["rev-parse", "--short", "HEAD"])
+		.output()
+		.map_err(|e| FrameError::Git(format!("failed to run git rev-parse: {e}")))?;
+
+	if !output.status.success() {
+		return Err(FrameError::Git("git rev-parse command failed".to_string()));
+	}
+
+	let sha = String::from_utf8(output.stdout)
+		.map_err(|e| FrameError::Git(format!("invalid utf-8: {e}")))?
+		.trim()
+		.to_string();
+
+	Ok(sha)
+}
+
+/// Run git diff --name-only and return list of files.
+fn run_git_diff_name_only(
+	repo_root: &Path,
+	args: &[&str],
+) -> Result<Vec<std::path::PathBuf>, FrameError> {
+	let mut cmd = Command::new("git");
+	cmd.current_dir(repo_root).arg("diff").arg("--name-only");
+	cmd.args(args);
+
+	let output = cmd
+		.output()
+		.map_err(|e| FrameError::Git(format!("failed to run git diff: {e}")))?;
+
+	if !output.status.success() {
+		return Err(FrameError::Git("git diff command failed".to_string()));
+	}
+
+	let stdout = String::from_utf8(output.stdout)
+		.map_err(|e| FrameError::Git(format!("invalid utf-8: {e}")))?;
+
+	let files: Vec<std::path::PathBuf> = stdout
+		.lines()
+		.filter(|line| !line.is_empty())
+		.map(std::path::PathBuf::from)
+		.collect();
+
+	Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn change_frame_display() {
+		assert_eq!(
+			ChangeFrame::WorkingDirectory.to_string(),
+			"working directory"
+		);
+
+		assert_eq!(
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			}
+			.to_string(),
+			"main...feature"
+		);
+
+		assert_eq!(
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			}
+			.to_string(),
+			"PR: main <- feature"
+		);
+	}
+
+	#[test]
+	fn revision_ranges() {
+		assert_eq!(ChangeFrame::WorkingDirectory.revision_range(), "HEAD");
+		assert_eq!(
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			}
+			.revision_range(),
+			"main...feature"
+		);
+		assert_eq!(
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			}
+			.revision_range(),
+			"main...feature"
+		);
+		assert_eq!(ChangeFrame::StagedOnly.revision_range(), "--staged");
+	}
+
+	#[test]
+	fn includes_unstaged() {
+		assert!(ChangeFrame::WorkingDirectory.includes_unstaged());
+		assert!(
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			}
+			.includes_unstaged()
+		);
+		assert!(!ChangeFrame::StagedOnly.includes_unstaged());
+	}
+
+	#[test]
+	fn includes_staged() {
+		assert!(ChangeFrame::WorkingDirectory.includes_staged());
+		assert!(ChangeFrame::StagedOnly.includes_staged());
+		assert!(
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			}
+			.includes_staged()
+		);
+		assert!(
+			!ChangeFrame::CustomRange {
+				base: "v1.0.0".to_string(),
+				head: "v2.0.0".to_string(),
+			}
+			.includes_staged()
+		);
+	}
+}
