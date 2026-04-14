@@ -1,5 +1,6 @@
 ---
 monochange: minor
+monochange_core: minor
 ---
 
 #### add MCP tools for change analysis and validation
