@@ -258,6 +258,7 @@ mod cli_runtime;
 mod git_support;
 mod hosted_sources;
 mod interactive;
+mod lint;
 mod mcp;
 mod package_publish;
 mod prepared_release_cache;
@@ -711,6 +712,25 @@ where
 				OutputFormat::Text
 			};
 			render_release_record_discovery(root, from, format)
+		}
+		Some(("lint", lint_matches)) => {
+			if quiet {
+				return Ok(String::new());
+			}
+			let fix = lint_matches.get_flag("fix");
+			let format = if lint_matches
+				.get_one::<String>("format")
+				.is_some_and(|value| value == "json")
+			{
+				OutputFormat::Json
+			} else {
+				OutputFormat::Text
+			};
+			let ecosystems: Vec<String> = lint_matches
+				.get_many::<String>("ecosystem")
+				.map(|values| values.map(String::as_str).map(String::from).collect())
+				.unwrap_or_default();
+			run_lint_command(root, fix, &ecosystems, format)
 		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;

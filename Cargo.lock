@@ -2141,6 +2141,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "monochange_lint"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "monochange_core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "toml_edit",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
 name = "monochange_npm"
 version = "0.1.0"
 dependencies = [

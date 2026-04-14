@@ -194,7 +194,8 @@ When provided, the generated config includes:\n\
 			.subcommand(build_release_record_subcommand())
 			.subcommand(Command::new("mcp").about(
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
-			));
+			))
+			.subcommand(build_lint_subcommand());
 
 	for cli_command in cli {
 		command = command.subcommand(build_cli_command_subcommand(cli_command));
@@ -240,6 +241,46 @@ Inspection notes:
 				.required(true)
 				.value_name("REF")
 				.help("Tag or commit-ish used to locate the release record"),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format")
+				.default_value("text")
+				.value_parser(["text", "json"]),
+		)
+}
+
+pub(crate) fn build_lint_subcommand() -> Command {
+	Command::new("lint")
+		.about("Run lint rules against package manifests")
+		.after_help(
+			r"Examples:
+  mc lint
+  mc lint --fix
+  mc lint --ecosystem cargo,npm
+
+Lint rules are configured per ecosystem in monochange.toml:
+
+  [ecosystem.cargo.lints]
+  dependency-field-order = "error"
+  internal-dependency-workspace = { level = "error", fix = true }
+",
+		)
+		.arg(
+			Arg::new("fix")
+				.long("fix")
+				.short('f')
+				.help("Automatically fix issues where possible")
+				.action(ArgAction::SetTrue),
+		)
+		.arg(
+			Arg::new("ecosystem")
+				.long("ecosystem")
+				.short('e')
+				.help("Limit linting to specific ecosystems")
+				.value_name("ECOSYSTEMS")
+				.value_delimiter(','),
 		)
 		.arg(
 			Arg::new("format")

@@ -61,6 +61,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 pub mod git;
+pub mod lint;
 
 use ignore::gitignore::Gitignore;
 use ignore::gitignore::GitignoreBuilder;
@@ -1276,6 +1277,8 @@ pub struct EcosystemSettings {
 	pub lockfile_commands: Vec<LockfileCommandDefinition>,
 	#[serde(default)]
 	pub publish: PublishSettings,
+	#[serde(default)]
+	pub lints: BTreeMap<String, lint::LintRuleConfig>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

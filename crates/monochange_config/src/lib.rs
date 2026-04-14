@@ -129,6 +129,7 @@ use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
 use monochange_core::default_cli_commands;
+use monochange_core::lint::LintRuleConfig;
 use monochange_core::relative_to_root;
 use regex::Regex;
 use semver::Version;
@@ -350,6 +351,8 @@ struct RawEcosystemSettings {
 	lockfile_commands: Vec<LockfileCommandDefinition>,
 	#[serde(default)]
 	publish: RawPublishSettings,
+	#[serde(default)]
+	lints: BTreeMap<String, LintRuleConfig>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -391,7 +394,6 @@ struct RawTrustedPublishingDetails {
 	workflow: Option<String>,
 	#[serde(default)]
 	environment: Option<String>,
-}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
@@ -779,6 +781,7 @@ fn normalize_ecosystem_settings(
 		versioned_files,
 		lockfile_commands: raw.lockfile_commands,
 		publish,
+		lints: raw.lints,
 	})
 }
 
