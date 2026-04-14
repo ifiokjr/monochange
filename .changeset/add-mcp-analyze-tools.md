@@ -12,14 +12,15 @@ Analyzes git diffs and suggests granular changeset structure. Supports multiple 
 
 ```json
 {
-  "path": "/path/to/repo",
-  "frame": "main...feature-branch",
-  "detection_level": "signature",
-  "max_suggestions": 10
+	"path": "/path/to/repo",
+	"frame": "main...feature-branch",
+	"detection_level": "signature",
+	"max_suggestions": 10
 }
 ```
 
 The tool automatically detects:
+
 - Which packages have changes
 - What type of artifact each package is (library, app, CLI)
 - Semantic changes (new functions, modified components, etc.)
@@ -31,12 +32,13 @@ Validates that a changeset accurately describes the actual code changes:
 
 ```json
 {
-  "path": "/path/to/repo",
-  "changeset_path": ".changeset/feature.md"
+	"path": "/path/to/repo",
+	"changeset_path": ".changeset/feature.md"
 }
 ```
 
 Checks:
+
 - Does the summary match the actual diff content?
 - Is the bump level appropriate for the change type?
 - Are there undocumented API changes?

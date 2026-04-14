@@ -8,11 +8,11 @@ Agent rules for creating granular, well-composed changesets that accurately desc
 
 Different artifact types have different "user-facing" boundaries:
 
-| Artifact Type | User-Facing Changes | Internal Changes |
-|---------------|---------------------|------------------|
-| **Library** | Public API signatures, types, traits | Private functions, internal refactoring |
-| **Application** | UI behavior, user workflows, navigation | Internal state management, component structure |
-| **CLI tool** | Commands, flags, output format, exit codes | Internal command dispatch, error handling |
+| Artifact Type   | User-Facing Changes                        | Internal Changes                               |
+| --------------- | ------------------------------------------ | ---------------------------------------------- |
+| **Library**     | Public API signatures, types, traits       | Private functions, internal refactoring        |
+| **Application** | UI behavior, user workflows, navigation    | Internal state management, component structure |
+| **CLI tool**    | Commands, flags, output format, exit codes | Internal command dispatch, error handling      |
 
 The agent must adapt its analysis based on what type of package it is examining.
 
@@ -88,13 +88,13 @@ As features are added and removed, changesets must be actively managed throughou
 
 #### Decision matrix
 
-| Scenario | Action | Rationale |
-|----------|--------|-----------|
-| New feature added | **Create new** | Granular tracking of distinct changes |
-| Existing feature expanded | **Update existing** | Keep related changes together |
-| Feature removed/reverted | **Remove changeset** | Don't release notes for removed features |
-| Same change, different approach | **Replace changeset** | Document the actual implementation |
-| Multiple small related changes | **Create new** (grouped) | Summarize when exceeding threshold |
+| Scenario                        | Action                   | Rationale                                |
+| ------------------------------- | ------------------------ | ---------------------------------------- |
+| New feature added               | **Create new**           | Granular tracking of distinct changes    |
+| Existing feature expanded       | **Update existing**      | Keep related changes together            |
+| Feature removed/reverted        | **Remove changeset**     | Don't release notes for removed features |
+| Same change, different approach | **Replace changeset**    | Document the actual implementation       |
+| Multiple small related changes  | **Create new** (grouped) | Summarize when exceeding threshold       |
 
 **Golden rule:** Err on the side of creating a new changeset. It's easier to consolidate later than to split apart.
 
@@ -104,6 +104,7 @@ As features are added and removed, changesets must be actively managed throughou
 
 ```markdown
 # Initial changeset
+
 ---
 "@monochange/core": minor
 ---
@@ -117,6 +118,7 @@ Later, validation expands to include schema checking:
 
 ```markdown
 # ✅ Update existing (same feature, expanded scope)
+
 ---
 "@monochange/core": minor
 ---
@@ -124,6 +126,7 @@ Later, validation expands to include schema checking:
 #### add config validation with schema checking
 
 Adds validation for monochange.toml files including:
+
 - Basic syntax validation
 - Schema conformance checking
 - Helpful error messages for common mistakes
@@ -142,6 +145,7 @@ rm .changeset/config-validation.md
 
 ```markdown
 # ✅ Create new changeset (don't update existing)
+
 ---
 "@monochange/core": minor
 ---
@@ -168,30 +172,30 @@ The `monochange_analyze_changes` tool should:
 
 ```json
 {
-  "ok": true,
-  "lifecycle_analysis": {
-    "existing_changesets": [
-      {
-        "path": ".changeset/config-validation.md",
-        "status": "stale",
-        "reason": "Referenced code was removed in commit abc123",
-        "suggestion": "Remove this changeset"
-      },
-      {
-        "path": ".changeset/cli-flags.md",
-        "status": "update_candidate",
-        "reason": "New changes expand the scope of this feature",
-        "suggestion": "Update to include new --verbose flag"
-      }
-    ],
-    "new_changes": [
-      {
-        "package": "@monochange/core",
-        "suggestion": "create_new",
-        "summary": "add lockfile validation"
-      }
-    ]
-  }
+	"ok": true,
+	"lifecycle_analysis": {
+		"existing_changesets": [
+			{
+				"path": ".changeset/config-validation.md",
+				"status": "stale",
+				"reason": "Referenced code was removed in commit abc123",
+				"suggestion": "Remove this changeset"
+			},
+			{
+				"path": ".changeset/cli-flags.md",
+				"status": "update_candidate",
+				"reason": "New changes expand the scope of this feature",
+				"suggestion": "Update to include new --verbose flag"
+			}
+		],
+		"new_changes": [
+			{
+				"package": "@monochange/core",
+				"suggestion": "create_new",
+				"summary": "add lockfile validation"
+			}
+		]
+	}
 }
 ```
 
@@ -245,8 +249,7 @@ Use context-aware thresholds to decide when to group vs. split:
 | **New routes/pages**       | N/A               | 2+ → summarize    | N/A               |
 | **Documentation-only**     | 10+ → summarize   | 10+ → summarize   | 10+ → summarize   |
 
-**Summarize** = Create a single changeset with a grouped description
-**Separate** = Create individual changesets (or mark as breaking)
+**Summarize** = Create a single changeset with a grouped description **Separate** = Create individual changesets (or mark as breaking)
 
 ### Before and after examples
 
@@ -262,12 +265,12 @@ See examples section below for detailed templates.
 
 Changes must be analyzed within a specific contextual frame depending on the workflow:
 
-| Workflow | Change Frame | Base | Head |
-|------------|--------------|------|------|
-| **Unstaged work** | Working directory vs last commit | `HEAD` | Working directory (unstaged + staged) |
-| **Local branch** | Branch vs main | `main` (or default) | Current branch + unstaged |
-| **PR/MR review** | PR vs target | Target branch (e.g., `main`) | PR branch |
-| **Pre-commit** | Staged only | `HEAD` | Staged changes only |
+| Workflow          | Change Frame                     | Base                         | Head                                  |
+| ----------------- | -------------------------------- | ---------------------------- | ------------------------------------- |
+| **Unstaged work** | Working directory vs last commit | `HEAD`                       | Working directory (unstaged + staged) |
+| **Local branch**  | Branch vs main                   | `main` (or default)          | Current branch + unstaged             |
+| **PR/MR review**  | PR vs target                     | Target branch (e.g., `main`) | PR branch                             |
+| **Pre-commit**    | Staged only                      | `HEAD`                       | Staged changes only                   |
 
 The analysis must respect the frame boundaries:
 
@@ -279,51 +282,54 @@ The analysis must respect the frame boundaries:
 
 ```rust
 pub enum ChangeFrame {
-    /// Working directory changes vs HEAD
-    WorkingDirectory,
-    /// Branch comparison: main..feature-branch
-    BranchRange { base: String, head: String },
-    /// PR comparison: target..pr-branch
-    PullRequest { target: String, pr_branch: String },
-    /// Staged changes only
-    StagedOnly,
-    /// Custom revision range
-    CustomRange { base: String, head: String },
+	/// Working directory changes vs HEAD
+	WorkingDirectory,
+	/// Branch comparison: main..feature-branch
+	BranchRange { base: String, head: String },
+	/// PR comparison: target..pr-branch
+	PullRequest { target: String, pr_branch: String },
+	/// Staged changes only
+	StagedOnly,
+	/// Custom revision range
+	CustomRange { base: String, head: String },
 }
 
 impl ChangeFrame {
-    /// Detect the appropriate frame based on git state
-    pub fn detect(repo: &Repository) -> Result<Self, FrameError> {
-        // Check for PR environment variables first
-        if let Some(pr_info) = detect_pr_environment() {
-            return Ok(Self::PullRequest {
-                target: pr_info.target_branch,
-                pr_branch: pr_info.source_branch,
-            });
-        }
+	/// Detect the appropriate frame based on git state
+	pub fn detect(repo: &Repository) -> Result<Self, FrameError> {
+		// Check for PR environment variables first
+		if let Some(pr_info) = detect_pr_environment() {
+			return Ok(Self::PullRequest {
+				target: pr_info.target_branch,
+				pr_branch: pr_info.source_branch,
+			});
+		}
 
-        // Check if we're on a feature branch
-        let current = repo.current_branch()?;
-        let default = repo.default_branch()?;
+		// Check if we're on a feature branch
+		let current = repo.current_branch()?;
+		let default = repo.default_branch()?;
 
-        if current != default {
-            return Ok(Self::BranchRange { base: default, head: current });
-        }
+		if current != default {
+			return Ok(Self::BranchRange {
+				base: default,
+				head: current,
+			});
+		}
 
-        // Default to working directory
-        Ok(Self::WorkingDirectory)
-    }
+		// Default to working directory
+		Ok(Self::WorkingDirectory)
+	}
 
-    /// Get the git revision range for diff commands
-    pub fn revision_range(&self) -> String {
-        match self {
-            Self::WorkingDirectory => "HEAD".to_string(),
-            Self::BranchRange { base, head } => format!("{}...{}", base, head),
-            Self::PullRequest { target, pr_branch } => format!("{}...{}", target, pr_branch),
-            Self::StagedOnly => "--staged".to_string(),
-            Self::CustomRange { base, head } => format!("{}...{}", base, head),
-        }
-    }
+	/// Get the git revision range for diff commands
+	pub fn revision_range(&self) -> String {
+		match self {
+			Self::WorkingDirectory => "HEAD".to_string(),
+			Self::BranchRange { base, head } => format!("{}...{}", base, head),
+			Self::PullRequest { target, pr_branch } => format!("{}...{}", target, pr_branch),
+			Self::StagedOnly => "--staged".to_string(),
+			Self::CustomRange { base, head } => format!("{}...{}", base, head),
+		}
+	}
 }
 ```
 
@@ -361,19 +367,27 @@ Parse the diff to extract:
 
 ```rust
 pub struct ApiChange {
-    pub kind: ApiChangeKind,
-    pub visibility: Visibility,
-    pub name: String,
-    pub signature: Option<String>,
-    pub doc_comment: Option<String>,
-    pub is_breaking: bool,
+	pub kind: ApiChangeKind,
+	pub visibility: Visibility,
+	pub name: String,
+	pub signature: Option<String>,
+	pub doc_comment: Option<String>,
+	pub is_breaking: bool,
 }
 
 pub enum ApiChangeKind {
-    FunctionAdded, FunctionModified, FunctionRemoved,
-    TypeAdded, TypeModified, TypeRemoved,
-    TraitAdded, TraitModified, TraitRemoved,
-    ConstantAdded, ConstantModified, ConstantRemoved,
+	FunctionAdded,
+	FunctionModified,
+	FunctionRemoved,
+	TypeAdded,
+	TypeModified,
+	TypeRemoved,
+	TraitAdded,
+	TraitModified,
+	TraitRemoved,
+	ConstantAdded,
+	ConstantModified,
+	ConstantRemoved,
 }
 ```
 
@@ -383,18 +397,25 @@ Analyze file paths and content patterns:
 
 ```rust
 pub struct AppChange {
-    pub kind: AppChangeKind,
-    pub route: Option<String>,
-    pub component: Option<String>,
-    pub description: String,
-    pub is_user_visible: bool,
+	pub kind: AppChangeKind,
+	pub route: Option<String>,
+	pub component: Option<String>,
+	pub description: String,
+	pub is_user_visible: bool,
 }
 
 pub enum AppChangeKind {
-    RouteAdded, RouteRemoved, RouteModified,
-    ComponentAdded, ComponentModified, ComponentRemoved,
-    ApiEndpointAdded, ApiEndpointModified, ApiEndpointRemoved,
-    StateManagementChanged, FormValidationChanged,
+	RouteAdded,
+	RouteRemoved,
+	RouteModified,
+	ComponentAdded,
+	ComponentModified,
+	ComponentRemoved,
+	ApiEndpointAdded,
+	ApiEndpointModified,
+	ApiEndpointRemoved,
+	StateManagementChanged,
+	FormValidationChanged,
 }
 ```
 
@@ -411,17 +432,23 @@ Parse command definitions and flag structures:
 
 ```rust
 pub struct CliChange {
-    pub kind: CliChangeKind,
-    pub command: Option<String>,
-    pub flag: Option<String>,
-    pub description: String,
-    pub is_breaking: bool,
+	pub kind: CliChangeKind,
+	pub command: Option<String>,
+	pub flag: Option<String>,
+	pub description: String,
+	pub is_breaking: bool,
 }
 
 pub enum CliChangeKind {
-    CommandAdded, CommandRemoved, CommandModified,
-    FlagAdded, FlagRemoved, FlagModified,
-    OutputFormatChanged, ExitCodeChanged, ConfigFileChanged,
+	CommandAdded,
+	CommandRemoved,
+	CommandModified,
+	FlagAdded,
+	FlagRemoved,
+	FlagModified,
+	OutputFormatChanged,
+	ExitCodeChanged,
+	ConfigFileChanged,
 }
 ```
 
@@ -438,12 +465,12 @@ Apply the adaptive granularity rules:
 
 ```rust
 pub fn group_changes(
-    changes: Vec<SemanticChange>,
-    artifact_type: ArtifactType,
+	changes: Vec<SemanticChange>,
+	artifact_type: ArtifactType,
 ) -> Vec<ChangeGroup> {
-    // Group by proximity (same module/file) and kind
-    // Apply thresholds to decide summarize vs. separate
-    // Mark breaking changes for separate handling
+	// Group by proximity (same module/file) and kind
+	// Apply thresholds to decide summarize vs. separate
+	// Mark breaking changes for separate handling
 }
 ```
 
@@ -487,12 +514,12 @@ Analyzes git diff and suggests changeset structure with lifecycle awareness.
 
 ```json
 {
-    "path": "/path/to/repo",
-    "base_ref": "main",
-    "head_ref": "HEAD",
-    "detection_level": "signature",
-    "max_suggestions": 10,
-    "check_existing": true
+	"path": "/path/to/repo",
+	"base_ref": "main",
+	"head_ref": "HEAD",
+	"detection_level": "signature",
+	"max_suggestions": 10,
+	"check_existing": true
 }
 ```
 
@@ -555,13 +582,13 @@ Add `auto_analyze` parameter:
 
 ```json
 {
-    "path": "/path/to/repo",
-    "package": ["@monochange/core"],
-    "bump": "minor",
-    "reason": "add ChangelogFormat enum",
-    "auto_analyze": true,
-    "analyzed_changes": null,
-    "lifecycle_action": "create" // Options: "create", "update", "remove"
+	"path": "/path/to/repo",
+	"package": ["@monochange/core"],
+	"bump": "minor",
+	"reason": "add ChangelogFormat enum",
+	"auto_analyze": true,
+	"analyzed_changes": null,
+	"lifecycle_action": "create" // Options: "create", "update", "remove"
 }
 ```
 
@@ -581,8 +608,8 @@ Validates that a changeset matches actual code changes.
 
 ```json
 {
-    "path": "/path/to/repo",
-    "changeset_path": ".changeset/feature.md"
+	"path": "/path/to/repo",
+	"changeset_path": ".changeset/feature.md"
 }
 ```
 
@@ -600,26 +627,26 @@ Validates that a changeset matches actual code changes.
 
 ```json
 {
-    "ok": true,
-    "valid": false,
-    "issues": [
-        {
-            "severity": "warning",
-            "message": "Changeset mentions `ChangelogFormat` but also adds `ChangelogParser` which is not documented",
-            "suggestion": "Add documentation for `ChangelogParser` or create separate changeset"
-        },
-        {
-            "severity": "error",
-            "message": "Bump level 'patch' but changes include new public type (usually 'minor')",
-            "suggestion": "Change bump to 'minor' or mark as internal change"
-        },
-        {
-            "severity": "error",
-            "message": "Changeset references `ConfigValidator` which was removed",
-            "suggestion": "Remove this stale changeset"
-        }
-    ],
-    "lifecycle_status": "stale"
+	"ok": true,
+	"valid": false,
+	"issues": [
+		{
+			"severity": "warning",
+			"message": "Changeset mentions `ChangelogFormat` but also adds `ChangelogParser` which is not documented",
+			"suggestion": "Add documentation for `ChangelogParser` or create separate changeset"
+		},
+		{
+			"severity": "error",
+			"message": "Bump level 'patch' but changes include new public type (usually 'minor')",
+			"suggestion": "Change bump to 'minor' or mark as internal change"
+		},
+		{
+			"severity": "error",
+			"message": "Changeset references `ConfigValidator` which was removed",
+			"suggestion": "Remove this stale changeset"
+		}
+	],
+	"lifecycle_status": "stale"
 }
 ```
 
@@ -733,8 +760,7 @@ let fmt = ChangelogFormat::KeepAChangelog;
 
 **Migration:** No action required. Existing behavior is preserved with `ChangelogFormat::KeepAChangelog` as the default.
 
-````
-
+`````
 ### Example 2: Lifecycle - Feature removed
 
 **Scenario:** A changeset exists for a feature that was later reverted.
@@ -847,7 +873,7 @@ use monochange_config::WorkflowDefinition;
 let cmd: WorkflowDefinition = config.workflows[0].clone();
 for step in &cmd.steps { ... }
 ```
-````
+`````
 
 **After:**
 
@@ -865,8 +891,7 @@ for input in &cmd.inputs { ... }  // New: input definitions
 2. Update config file references from `workflows` to `cli`
 3. Review step definitions — some fields may have changed
 
-````
-
+`````
 ## Edge cases
 
 ### Mixed artifact types in one package
@@ -939,7 +964,7 @@ format = "keep_a_changelog"
 [package.core.changelog]
 format = "monochange" # Override for this package only
 ```
-````
+`````
 
 ### Multiple features in one PR
 
@@ -957,6 +982,7 @@ When a PR contains multiple unrelated features:
 ---
 
 #### add file diff preview
+
 ...
 
 ---
@@ -964,6 +990,7 @@ When a PR contains multiple unrelated features:
 ---
 
 #### add changelog format detection
+
 ...
 
 ---
@@ -971,6 +998,7 @@ When a PR contains multiple unrelated features:
 ---
 
 #### improve error messages
+
 ...
 ```
 
