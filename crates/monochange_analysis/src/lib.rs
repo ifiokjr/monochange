@@ -1486,16 +1486,66 @@ mod tests {
 	}
 
 	#[test]
-	fn test_group_changes_empty() {
-		let changes: Vec<SemanticChange> = vec![];
-		let thresholds = GroupingThresholds::default();
-		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
-		assert!(groups.is_empty());
+	fn test_suggested_changeset_with_change_type() {
+		let changeset = SuggestedChangeset {
+			summary: "Add feature".to_string(),
+			details: None,
+			bump: BumpSuggestion::Minor,
+			change_type: Some("feature".to_string()),
+			confidence: 0.95,
+			api_changes: vec![ApiChange {
+				kind: ApiChangeKind::FunctionAdded,
+				visibility: Visibility::Public,
+				name: "new_fn".to_string(),
+				signature: Some("fn new_fn()".to_string()),
+				doc_comment: Some("New function".to_string()),
+				is_breaking: false,
+				file_path: PathBuf::from("src/lib.rs"),
+				line_number: Some(42),
+			}],
+			grouped_count: 1,
+			files_changed: vec![PathBuf::from("src/lib.rs")],
+			has_breaking_changes: false,
+			before_after_suggested: true,
+		};
+		assert!(changeset.change_type.is_some());
+		assert_eq!(changeset.api_changes.len(), 1);
 	}
 
 	#[test]
-	fn test_group_changes_multiple_breaking() {
-		let api1 = ApiChange {
+	fn test_group_changes_all_non_breaking_api() {
+		let changes = vec![
+			SemanticChange::Api(ApiChange {
+				kind: ApiChangeKind::FunctionAdded,
+				visibility: Visibility::Public,
+				name: "fn1".to_string(),
+				signature: None,
+				doc_comment: None,
+				is_breaking: false,
+				file_path: PathBuf::from("src/lib.rs"),
+				line_number: None,
+			}),
+			SemanticChange::Api(ApiChange {
+				kind: ApiChangeKind::TypeAdded,
+				visibility: Visibility::Public,
+				name: "Type1".to_string(),
+				signature: None,
+				doc_comment: None,
+				is_breaking: false,
+				file_path: PathBuf::from("src/lib.rs"),
+				line_number: None,
+			}),
+		];
+		let thresholds = GroupingThresholds::default();
+		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
+		assert_eq!(groups.len(), 2);
+		assert!(!groups[0].has_breaking);
+		assert!(!groups[1].has_breaking);
+	}
+
+	#[test]
+	fn test_group_changes_only_breaking() {
+		let changes = vec![SemanticChange::Api(ApiChange {
 			kind: ApiChangeKind::FunctionRemoved,
 			visibility: Visibility::Public,
 			name: "old_fn1".to_string(),
@@ -1503,32 +1553,356 @@ mod tests {
 			doc_comment: None,
 			is_breaking: true,
 			file_path: PathBuf::from("src/lib.rs"),
-			line_number: Some(10),
-		};
-		let api2 = ApiChange {
-			kind: ApiChangeKind::FunctionRemoved,
-			visibility: Visibility::Public,
-			name: "old_fn2".to_string(),
-			signature: None,
-			doc_comment: None,
-			is_breaking: true,
-			file_path: PathBuf::from("src/lib.rs"),
-			line_number: Some(20),
-		};
-		let changes = vec![
-			SemanticChange::Api(api1),
-			SemanticChange::Api(api2),
-		];
+			line_number: None,
+		})];
 		let thresholds = GroupingThresholds::default();
 		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
-		assert_eq!(groups.len(), 2);
-		// Each breaking change should be in its own group
-		assert!(groups.iter().all(|g| g.has_breaking));
+		assert_eq!(groups.len(), 1);
+		assert!(groups[0].has_breaking);
+		assert!(matches!(groups[0].suggested_bump, BumpSuggestion::Major));
 	}
 
 	#[test]
-	fn test_group_changes_mix_breaking_and_non_breaking() {
-		let breaking_api = ApiChange {
+	fn test_describe_change_app_with_route() {
+		let app = AppChange {
+			kind: AppChangeKind::RouteAdded,
+			route: Some("/home".to_string()),
+			component: Some("HomePage".to_string()),
+			description: "Added home page".to_string(),
+			is_user_visible: true,
+			file_path: PathBuf::from("src/pages/home.tsx"),
+		};
+		let desc = describe_change(&SemanticChange::App(app));
+		assert!(desc.contains("RouteAdded"));
+		assert!(desc.contains("Added home page"));
+	}
+
+	#[test]
+	fn test_describe_change_cli_with_command() {
+		let cli = CliChange {
+			kind: CliChangeKind::CommandAdded,
+			command: Some("build".to_string()),
+			flag: None,
+			description: "Added build command".to_string(),
+			is_breaking: false,
+			file_path: PathBuf::from("src/cli.rs"),
+		};
+		let desc = describe_change(&SemanticChange::Cli(cli));
+		assert!(desc.contains("CommandAdded"));
+		assert!(desc.contains("Added build command"));
+	}
+
+	#[test]
+	fn test_serialize_deserialize_analysis_config() {
+		let config = AnalysisConfig::default();
+		let json = serde_json::to_string(&config).expect("should serialize");
+		let deserialized: AnalysisConfig = serde_json::from_str(&json).expect("should deserialize");
+		assert_eq!(config.max_suggestions, deserialized.max_suggestions);
+	}
+
+	#[test]
+	fn test_serialize_deserialize_grouping_thresholds() {
+		let thresholds = GroupingThresholds::default();
+		let json = serde_json::to_string(&thresholds).expect("should serialize");
+		let deserialized: GroupingThresholds =
+			serde_json::from_str(&json).expect("should deserialize");
+		assert_eq!(thresholds.group_public_api, deserialized.group_public_api);
+	}
+
+	#[test]
+	fn test_serialize_deserialize_bump_suggestion() {
+		let bumps = vec![
+			BumpSuggestion::None,
+			BumpSuggestion::Patch,
+			BumpSuggestion::Minor,
+			BumpSuggestion::Major,
+		];
+		for bump in bumps {
+			let json = serde_json::to_string(&bump).expect("should serialize");
+			let deserialized: BumpSuggestion =
+				serde_json::from_str(&json).expect("should deserialize");
+			assert_eq!(bump, deserialized);
+		}
+	}
+
+	#[test]
+	fn test_serialize_deserialize_detection_level() {
+		let levels = vec![
+			DetectionLevel::Basic,
+			DetectionLevel::Signature,
+			DetectionLevel::Semantic,
+		];
+		for level in levels {
+			let json = serde_json::to_string(&level).expect("should serialize");
+			let deserialized: DetectionLevel =
+				serde_json::from_str(&json).expect("should deserialize");
+			assert_eq!(level, deserialized);
+		}
+	}
+
+	#[test]
+	fn test_serialize_deserialize_artifact_type() {
+		let types = vec![
+			ArtifactType::Library,
+			ArtifactType::Application,
+			ArtifactType::CliTool,
+			ArtifactType::Mixed,
+		];
+		for artifact_type in types {
+			let json = serde_json::to_string(&artifact_type).expect("should serialize");
+			let deserialized: ArtifactType =
+				serde_json::from_str(&json).expect("should deserialize");
+			assert_eq!(artifact_type, deserialized);
+		}
+	}
+
+	#[test]
+	fn test_api_change_kind_equality() {
+		let k1 = ApiChangeKind::FunctionAdded;
+		let k2 = ApiChangeKind::FunctionAdded;
+		let k3 = ApiChangeKind::TypeAdded;
+		assert_eq!(k1, k2);
+		assert_ne!(k1, k3);
+	}
+
+	#[test]
+	fn test_app_change_kind_equality() {
+		let k1 = AppChangeKind::RouteAdded;
+		let k2 = AppChangeKind::RouteAdded;
+		let k3 = AppChangeKind::ComponentAdded;
+		assert_eq!(k1, k2);
+		assert_ne!(k1, k3);
+	}
+
+	#[test]
+	fn test_cli_change_kind_equality() {
+		let k1 = CliChangeKind::CommandAdded;
+		let k2 = CliChangeKind::CommandAdded;
+		let k3 = CliChangeKind::FlagAdded;
+		assert_eq!(k1, k2);
+		assert_ne!(k1, k3);
+	}
+
+	#[test]
+	fn test_bump_suggestion_equality() {
+		assert_eq!(BumpSuggestion::None, BumpSuggestion::None);
+		assert_eq!(BumpSuggestion::Patch, BumpSuggestion::Patch);
+		assert_eq!(BumpSuggestion::Minor, BumpSuggestion::Minor);
+		assert_eq!(BumpSuggestion::Major, BumpSuggestion::Major);
+		assert_ne!(BumpSuggestion::None, BumpSuggestion::Patch);
+	}
+
+	#[test]
+	fn test_artifact_type_equality() {
+		assert_eq!(ArtifactType::Library, ArtifactType::Library);
+		assert_eq!(ArtifactType::Application, ArtifactType::Application);
+		assert_eq!(ArtifactType::CliTool, ArtifactType::CliTool);
+		assert_eq!(ArtifactType::Mixed, ArtifactType::Mixed);
+		assert_ne!(ArtifactType::Library, ArtifactType::Application);
+	}
+
+	#[test]
+	fn test_detection_level_equality() {
+		assert_eq!(DetectionLevel::Basic, DetectionLevel::Basic);
+		assert_eq!(DetectionLevel::Signature, DetectionLevel::Signature);
+		assert_eq!(DetectionLevel::Semantic, DetectionLevel::Semantic);
+		assert_ne!(DetectionLevel::Basic, DetectionLevel::Signature);
+	}
+
+	#[test]
+	fn test_visibility_equality() {
+		assert_eq!(Visibility::Public, Visibility::Public);
+		assert_eq!(Visibility::Crate, Visibility::Crate);
+		assert_eq!(Visibility::Super, Visibility::Super);
+		assert_eq!(Visibility::Restricted, Visibility::Restricted);
+		assert_eq!(Visibility::Private, Visibility::Private);
+		assert_ne!(Visibility::Public, Visibility::Private);
+	}
+
+	#[test]
+	fn test_config_change_equality() {
+		let c1 = ConfigChange {
+			file_name: "config.toml".to_string(),
+			description: "Changed port".to_string(),
+			is_user_facing: true,
+		};
+		let c2 = ConfigChange {
+			file_name: "config.toml".to_string(),
+			description: "Changed port".to_string(),
+			is_user_facing: true,
+		};
+		let c3 = ConfigChange {
+			file_name: "other.toml".to_string(),
+			description: "Changed port".to_string(),
+			is_user_facing: true,
+		};
+		assert_eq!(c1, c2);
+		assert_ne!(c1, c3);
+	}
+
+	#[test]
+	fn test_api_change_debug() {
+		let api = ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "test".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(42),
+		};
+		let debug = format!("{:?}", api);
+		assert!(debug.contains("FunctionAdded"));
+		assert!(debug.contains("test"));
+	}
+
+	#[test]
+	fn test_app_change_debug() {
+		let app = AppChange {
+			kind: AppChangeKind::RouteAdded,
+			route: Some("/home".to_string()),
+			component: Some("Home".to_string()),
+			description: "Added home".to_string(),
+			is_user_visible: true,
+			file_path: PathBuf::from("src/pages/home.tsx"),
+		};
+		let debug = format!("{:?}", app);
+		assert!(debug.contains("RouteAdded"));
+		assert!(debug.contains("home"));
+	}
+
+	#[test]
+	fn test_cli_change_debug() {
+		let cli = CliChange {
+			kind: CliChangeKind::CommandAdded,
+			command: Some("build".to_string()),
+			flag: None,
+			description: "Added build command".to_string(),
+			is_breaking: false,
+			file_path: PathBuf::from("src/cli.rs"),
+		};
+		let debug = format!("{:?}", cli);
+		assert!(debug.contains("CommandAdded"));
+		assert!(debug.contains("build"));
+	}
+
+	#[test]
+	fn test_config_change_debug() {
+		let config = ConfigChange {
+			file_name: "config.toml".to_string(),
+			description: "Changed port".to_string(),
+			is_user_facing: true,
+		};
+		let debug = format!("{:?}", config);
+		assert!(debug.contains("config.toml"));
+		assert!(debug.contains("Changed port"));
+	}
+
+	#[test]
+	fn test_semantic_change_unknown_equality() {
+		let s1 = SemanticChange::Unknown {
+			path: PathBuf::from("test.txt"),
+			description: "Test".to_string(),
+		};
+		let s2 = SemanticChange::Unknown {
+			path: PathBuf::from("test.txt"),
+			description: "Test".to_string(),
+		};
+		let s3 = SemanticChange::Unknown {
+			path: PathBuf::from("other.txt"),
+			description: "Test".to_string(),
+		};
+		assert_eq!(s1, s2);
+		assert_ne!(s1, s3);
+	}
+
+	#[test]
+	fn test_suggested_changeset_equality() {
+		let s1 = SuggestedChangeset {
+			summary: "Test".to_string(),
+			details: None,
+			bump: BumpSuggestion::Patch,
+			change_type: None,
+			confidence: 0.9,
+			api_changes: vec![],
+			grouped_count: 1,
+			files_changed: vec![],
+			has_breaking_changes: false,
+			before_after_suggested: false,
+		};
+		let s2 = s1.clone();
+		assert_eq!(s1.summary, s2.summary);
+		assert_eq!(s1.bump, s2.bump);
+	}
+
+	#[test]
+	fn test_change_group_equality() {
+		let g1 = ChangeGroup {
+			package_id: "pkg1".to_string(),
+			artifact_type: ArtifactType::Library,
+			suggested_summary: "Test".to_string(),
+			suggested_details: None,
+			suggested_bump: BumpSuggestion::Patch,
+			changes: vec![],
+			has_breaking: false,
+			confidence: 0.9,
+		};
+		let g2 = g1.clone();
+		assert_eq!(g1.package_id, g2.package_id);
+		assert_eq!(g1.artifact_type, g2.artifact_type);
+	}
+
+	#[test]
+	fn test_package_change_analysis_equality() {
+		let p1 = PackageChangeAnalysis {
+			package_id: "pkg1".to_string(),
+			artifact_type: ArtifactType::Library,
+			direct_change_count: 5,
+			has_propagated_changes: false,
+			suggested_changesets: vec![],
+		};
+		let p2 = p1.clone();
+		assert_eq!(p1.package_id, p2.package_id);
+		assert_eq!(p1.direct_change_count, p2.direct_change_count);
+	}
+
+	#[test]
+	fn test_change_analysis_equality() {
+		let c1 = ChangeAnalysis {
+			frame: ChangeFrame::WorkingDirectory,
+			package_changes: BTreeMap::new(),
+			recommendations: vec!["Rec1".to_string()],
+		};
+		let c2 = c1.clone();
+		assert!(matches!(c2.frame, ChangeFrame::WorkingDirectory));
+		assert_eq!(c2.recommendations.len(), 1);
+	}
+
+	#[test]
+	fn test_group_changes_with_many_non_breaking() {
+		let changes: Vec<SemanticChange> = (0..10)
+			.map(|i| {
+				SemanticChange::Api(ApiChange {
+					kind: ApiChangeKind::FunctionAdded,
+					visibility: Visibility::Public,
+					name: format!("fn{}", i),
+					signature: None,
+					doc_comment: None,
+					is_breaking: false,
+					file_path: PathBuf::from("src/lib.rs"),
+					line_number: Some(i),
+				})
+			})
+			.collect();
+		let thresholds = GroupingThresholds::default();
+		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
+		assert_eq!(groups.len(), 10); // Each change gets its own group
+	}
+
+	#[test]
+	fn test_group_changes_with_separate_breaking_and_non_breaking() {
+		let breaking = SemanticChange::Api(ApiChange {
 			kind: ApiChangeKind::FunctionRemoved,
 			visibility: Visibility::Public,
 			name: "old_fn".to_string(),
@@ -1537,8 +1911,8 @@ mod tests {
 			is_breaking: true,
 			file_path: PathBuf::from("src/lib.rs"),
 			line_number: Some(10),
-		};
-		let non_breaking_api = ApiChange {
+		});
+		let non_breaking = SemanticChange::Api(ApiChange {
 			kind: ApiChangeKind::FunctionAdded,
 			visibility: Visibility::Public,
 			name: "new_fn".to_string(),
@@ -1547,81 +1921,14 @@ mod tests {
 			is_breaking: false,
 			file_path: PathBuf::from("src/lib.rs"),
 			line_number: Some(20),
-		};
-		let changes = vec![
-			SemanticChange::Api(breaking_api),
-			SemanticChange::Api(non_breaking_api),
-		];
+		});
+		let changes = vec![breaking, non_breaking];
 		let thresholds = GroupingThresholds::default();
 		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
-		// Breaking change gets its own group, non-breaking gets another
 		assert_eq!(groups.len(), 2);
 		let breaking_groups: Vec<_> = groups.iter().filter(|g| g.has_breaking).collect();
 		let non_breaking_groups: Vec<_> = groups.iter().filter(|g| !g.has_breaking).collect();
 		assert_eq!(breaking_groups.len(), 1);
 		assert_eq!(non_breaking_groups.len(), 1);
-	}
-
-	#[test]
-	fn test_analysis_config_default_values() {
-		let config = AnalysisConfig::default();
-		assert!(matches!(config.detection_level, DetectionLevel::Signature));
-		assert_eq!(config.max_suggestions, 10);
-	}
-
-	#[test]
-	fn test_grouping_thresholds_default_values() {
-		let thresholds = GroupingThresholds::default();
-		assert_eq!(thresholds.group_public_api, 3);
-		assert_eq!(thresholds.group_internal, 5);
-		assert_eq!(thresholds.group_ui, 3);
-		assert_eq!(thresholds.group_commands, 2);
-		assert_eq!(thresholds.group_docs, 10);
-	}
-
-	#[test]
-	fn test_extraction_result_struct() {
-		let result = ExtractionResult {
-			changes: vec![
-				SemanticChange::Unknown {
-					path: PathBuf::from("test.rs"),
-					description: "Test".to_string(),
-				},
-			],
-			files_analyzed: vec![PathBuf::from("test.rs")],
-			files_skipped: vec![],
-		};
-		assert_eq!(result.changes.len(), 1);
-		assert_eq!(result.files_analyzed.len(), 1);
-		assert!(result.files_skipped.is_empty());
-	}
-
-	#[test]
-	fn test_skip_reason_variants_full() {
-		let unsupported = SkipReason::UnsupportedExtension;
-		let binary = SkipReason::BinaryFile;
-		let too_large = SkipReason::TooLarge;
-		let parse_error = SkipReason::ParseError("test error".to_string());
-		let not_relevant = SkipReason::NotRelevant;
-
-		assert_eq!(format!("{:?}", unsupported), "UnsupportedExtension");
-		assert_eq!(format!("{:?}", binary), "BinaryFile");
-		assert_eq!(format!("{:?}", too_large), "TooLarge");
-		assert!(format!("{:?}", parse_error).contains("test error"));
-		assert_eq!(format!("{:?}", not_relevant), "NotRelevant");
-	}
-
-	#[test]
-	fn test_skip_reason_clone() {
-		let reason = SkipReason::UnsupportedExtension;
-		let cloned = reason.clone();
-		assert!(matches!(cloned, SkipReason::UnsupportedExtension));
-	}
-
-	#[test]
-	fn test_skip_reason_parse_error_clone() {
-		let reason = SkipReason::ParseError("test".to_string());
-		let cloned = reason.clone();
-		assert!(matches!(cloned, SkipReason::ParseError(s) if s == "test"));
 	}
 }

@@ -8,11 +8,11 @@ Agent rules for creating granular, well-composed changesets that accurately desc
 
 Different artifact types have different "user-facing" boundaries:
 
-| Artifact Type   | User-Facing Changes                        | Internal Changes                               |
-| --------------- | ------------------------------------------ | ---------------------------------------------- |
-| **Library**     | Public API signatures, types, traits       | Private functions, internal refactoring        |
-| **Application** | UI behavior, user workflows, navigation    | Internal state management, component structure |
-| **CLI tool**    | Commands, flags, output format, exit codes | Internal command dispatch, error handling      |
+| Artifact Type | User-Facing Changes | Internal Changes |
+|---------------|---------------------|------------------|
+| **Library** | Public API signatures, types, traits | Private functions, internal refactoring |
+| **Application** | UI behavior, user workflows, navigation | Internal state management, component structure |
+| **CLI tool** | Commands, flags, output format, exit codes | Internal command dispatch, error handling |
 
 The agent must adapt its analysis based on what type of package it is examining.
 
@@ -76,6 +76,125 @@ Introduces unified diff output for dry-run releases.
 #### various updates
 ```
 
+### Changeset lifecycle management
+
+As features are added and removed, changesets must be actively managed throughout the development lifecycle. The agent must:
+
+1. **Analyze existing changesets** before creating new ones
+2. **Determine the appropriate action** for each change:
+   - **Create new** — For genuinely new changes (preferred)
+   - **Update existing** — When the changeset describes the same feature
+   - **Remove obsolete** — When the change is no longer relevant
+
+#### Decision matrix
+
+| Scenario | Action | Rationale |
+|----------|--------|-----------|
+| New feature added | **Create new** | Granular tracking of distinct changes |
+| Existing feature expanded | **Update existing** | Keep related changes together |
+| Feature removed/reverted | **Remove changeset** | Don't release notes for removed features |
+| Same change, different approach | **Replace changeset** | Document the actual implementation |
+| Multiple small related changes | **Create new** (grouped) | Summarize when exceeding threshold |
+
+**Golden rule:** Err on the side of creating a new changeset. It's easier to consolidate later than to split apart.
+
+#### Example workflow
+
+**Scenario 1: Feature evolves during development**
+
+```markdown
+# Initial changeset
+---
+"@monochange/core": minor
+---
+
+#### add config validation
+
+Adds basic validation for monochange.toml files.
+```
+
+Later, validation expands to include schema checking:
+
+```markdown
+# ✅ Update existing (same feature, expanded scope)
+---
+"@monochange/core": minor
+---
+
+#### add config validation with schema checking
+
+Adds validation for monochange.toml files including:
+- Basic syntax validation
+- Schema conformance checking
+- Helpful error messages for common mistakes
+```
+
+**Scenario 2: Feature is removed**
+
+If the config validation feature is removed before release:
+
+```bash
+# ✅ Remove the obsolete changeset
+rm .changeset/config-validation.md
+```
+
+**Scenario 3: Similar but distinct feature**
+
+```markdown
+# ✅ Create new changeset (don't update existing)
+---
+"@monochange/core": minor
+---
+
+#### add lockfile validation
+
+Validates Cargo.lock and package-lock.json consistency.
+```
+
+Even though both are "validation" features, they target different files and should be tracked separately.
+
+#### MCP tool integration for lifecycle management
+
+The `monochange_analyze_changes` tool should:
+
+1. **Scan existing changesets** in `.changeset/` directory
+2. **Compare with current code changes**
+3. **Suggest actions** for each changeset:
+   - "This changeset references `ConfigValidator` which no longer exists — suggest removal"
+   - "New changes to config validation — suggest updating existing changeset"
+   - "New lockfile validation feature — suggest creating new changeset"
+
+**Output format:**
+
+```json
+{
+  "ok": true,
+  "lifecycle_analysis": {
+    "existing_changesets": [
+      {
+        "path": ".changeset/config-validation.md",
+        "status": "stale",
+        "reason": "Referenced code was removed in commit abc123",
+        "suggestion": "Remove this changeset"
+      },
+      {
+        "path": ".changeset/cli-flags.md",
+        "status": "update_candidate",
+        "reason": "New changes expand the scope of this feature",
+        "suggestion": "Update to include new --verbose flag"
+      }
+    ],
+    "new_changes": [
+      {
+        "package": "@monochange/core",
+        "suggestion": "create_new",
+        "summary": "add lockfile validation"
+      }
+    ]
+  }
+}
+```
+
 ### Artifact-aware detection
 
 The agent must detect the artifact type and apply appropriate analysis:
@@ -126,7 +245,8 @@ Use context-aware thresholds to decide when to group vs. split:
 | **New routes/pages**       | N/A               | 2+ → summarize    | N/A               |
 | **Documentation-only**     | 10+ → summarize   | 10+ → summarize   | 10+ → summarize   |
 
-**Summarize** = Create a single changeset with a grouped description **Separate** = Create individual changesets (or mark as breaking)
+**Summarize** = Create a single changeset with a grouped description
+**Separate** = Create individual changesets (or mark as breaking)
 
 ### Before and after examples
 
@@ -136,69 +256,8 @@ Every user-facing changeset must include:
 2. **Why it matters** — Impact on users
 3. **Before/after examples** — Concrete migration path
 
-**Library example:**
+See examples section below for detailed templates.
 
-````markdown
-#### rename `WorkflowDefinition` to `CliCommandDefinition`
-
-**Before:**
-
-```rust
-use monochange_config::WorkflowDefinition;
-let cmd: WorkflowDefinition = config.workflows[0].clone();
-```
-````
-
-**After:**
-
-```rust
-use monochange_config::CliCommandDefinition;
-let cmd: CliCommandDefinition = config.cli[0].clone();
-```
-
-````
-**Application example:**
-
-```markdown
-#### add dark mode toggle to settings page
-
-A new **Appearance** section in Settings allows users to choose between
-Light, Dark, and System theme modes.
-
-**Before:**
-
-No theme selection available; always followed system preference.
-
-**After:**
-
-1. Navigate to **Settings → Appearance**
-2. Select **Dark** to enable dark mode
-3. Theme persists across sessions
-````
-
-**CLI example:**
-
-````markdown
-#### rename `--changed-path` to `--changed-paths`
-
-Supports multiple paths in a single flag instead of repeated flags.
-
-**Before:**
-
-```bash
-mc verify --changed-path src/lib.rs --changed-path crates/core/src/main.rs
-```
-````
-
-**After:**
-
-```bash
-mc verify --changed-paths src/lib.rs crates/core/src/main.rs
-```
-
-`--changed-path` is kept as a hidden alias for one release cycle.
-
-````
 ## Change frames
 
 Changes must be analyzed within a specific contextual frame depending on the workflow:
@@ -223,22 +282,13 @@ pub enum ChangeFrame {
     /// Working directory changes vs HEAD
     WorkingDirectory,
     /// Branch comparison: main..feature-branch
-    BranchRange {
-        base: String,
-        head: String,
-    },
+    BranchRange { base: String, head: String },
     /// PR comparison: target..pr-branch
-    PullRequest {
-        target: String,
-        pr_branch: String,
-    },
+    PullRequest { target: String, pr_branch: String },
     /// Staged changes only
     StagedOnly,
     /// Custom revision range
-    CustomRange {
-        base: String,
-        head: String,
-    },
+    CustomRange { base: String, head: String },
 }
 
 impl ChangeFrame {
@@ -257,10 +307,7 @@ impl ChangeFrame {
         let default = repo.default_branch()?;
 
         if current != default {
-            return Ok(Self::BranchRange {
-                base: default,
-                head: current,
-            });
+            return Ok(Self::BranchRange { base: default, head: current });
         }
 
         // Default to working directory
@@ -278,7 +325,7 @@ impl ChangeFrame {
         }
     }
 }
-````
+```
 
 ## Analysis pipeline
 
@@ -314,27 +361,19 @@ Parse the diff to extract:
 
 ```rust
 pub struct ApiChange {
-	pub kind: ApiChangeKind,
-	pub visibility: Visibility,
-	pub name: String,
-	pub signature: Option<String>,
-	pub doc_comment: Option<String>,
-	pub is_breaking: bool,
+    pub kind: ApiChangeKind,
+    pub visibility: Visibility,
+    pub name: String,
+    pub signature: Option<String>,
+    pub doc_comment: Option<String>,
+    pub is_breaking: bool,
 }
 
 pub enum ApiChangeKind {
-	FunctionAdded,
-	FunctionModified,
-	FunctionRemoved,
-	TypeAdded,
-	TypeModified,
-	TypeRemoved,
-	TraitAdded,
-	TraitModified,
-	TraitRemoved,
-	ConstantAdded,
-	ConstantModified,
-	ConstantRemoved,
+    FunctionAdded, FunctionModified, FunctionRemoved,
+    TypeAdded, TypeModified, TypeRemoved,
+    TraitAdded, TraitModified, TraitRemoved,
+    ConstantAdded, ConstantModified, ConstantRemoved,
 }
 ```
 
@@ -344,25 +383,18 @@ Analyze file paths and content patterns:
 
 ```rust
 pub struct AppChange {
-	pub kind: AppChangeKind,
-	pub route: Option<String>,
-	pub component: Option<String>,
-	pub description: String,
-	pub is_user_visible: bool,
+    pub kind: AppChangeKind,
+    pub route: Option<String>,
+    pub component: Option<String>,
+    pub description: String,
+    pub is_user_visible: bool,
 }
 
 pub enum AppChangeKind {
-	RouteAdded,
-	RouteRemoved,
-	RouteModified,
-	ComponentAdded,
-	ComponentModified,
-	ComponentRemoved,
-	ApiEndpointAdded,
-	ApiEndpointModified,
-	ApiEndpointRemoved,
-	StateManagementChanged,
-	FormValidationChanged,
+    RouteAdded, RouteRemoved, RouteModified,
+    ComponentAdded, ComponentModified, ComponentRemoved,
+    ApiEndpointAdded, ApiEndpointModified, ApiEndpointRemoved,
+    StateManagementChanged, FormValidationChanged,
 }
 ```
 
@@ -379,23 +411,17 @@ Parse command definitions and flag structures:
 
 ```rust
 pub struct CliChange {
-	pub kind: CliChangeKind,
-	pub command: Option<String>,
-	pub flag: Option<String>,
-	pub description: String,
-	pub is_breaking: bool,
+    pub kind: CliChangeKind,
+    pub command: Option<String>,
+    pub flag: Option<String>,
+    pub description: String,
+    pub is_breaking: bool,
 }
 
 pub enum CliChangeKind {
-	CommandAdded,
-	CommandRemoved,
-	CommandModified,
-	FlagAdded,
-	FlagRemoved,
-	FlagModified,
-	OutputFormatChanged,
-	ExitCodeChanged,
-	ConfigFileChanged,
+    CommandAdded, CommandRemoved, CommandModified,
+    FlagAdded, FlagRemoved, FlagModified,
+    OutputFormatChanged, ExitCodeChanged, ConfigFileChanged,
 }
 ```
 
@@ -412,12 +438,12 @@ Apply the adaptive granularity rules:
 
 ```rust
 pub fn group_changes(
-	changes: Vec<SemanticChange>,
-	artifact_type: ArtifactType,
+    changes: Vec<SemanticChange>,
+    artifact_type: ArtifactType,
 ) -> Vec<ChangeGroup> {
-	// Group by proximity (same module/file) and kind
-	// Apply thresholds to decide summarize vs. separate
-	// Mark breaking changes for separate handling
+    // Group by proximity (same module/file) and kind
+    // Apply thresholds to decide summarize vs. separate
+    // Mark breaking changes for separate handling
 }
 ```
 
@@ -455,17 +481,18 @@ group_ui_components = 4 # More granular UI tracking
 
 ### Tool: `monochange_analyze_changes`
 
-Analyzes git diff and suggests changeset structure.
+Analyzes git diff and suggests changeset structure with lifecycle awareness.
 
 **Input:**
 
 ```json
 {
-	"path": "/path/to/repo",
-	"base_ref": "main",
-	"head_ref": "HEAD",
-	"detection_level": "signature",
-	"max_suggestions": 10
+    "path": "/path/to/repo",
+    "base_ref": "main",
+    "head_ref": "HEAD",
+    "detection_level": "signature",
+    "max_suggestions": 10,
+    "check_existing": true
 }
 ```
 
@@ -473,50 +500,52 @@ Analyzes git diff and suggests changeset structure.
 
 ```json
 {
-	"ok": true,
-	"analysis": {
-		"changed_packages": [
-			{
-				"package_id": "@monochange/core",
-				"artifact_type": "library",
-				"direct_changes": 5,
-				"propagated_changes": false,
-				"suggested_changesets": [
-					{
-						"summary": "add `ChangelogFormat` enum",
-						"details": "Adds new enum for changelog format variants...",
-						"bump": "minor",
-						"change_type": "feature",
-						"confidence": 0.92,
-						"api_changes": [
-							{
-								"kind": "type_added",
-								"name": "ChangelogFormat",
-								"visibility": "public"
-							}
-						],
-						"files_changed": ["crates/monochange_core/src/lib.rs"],
-						"has_breaking_changes": false,
-						"before_after_suggested": true
-					},
-					{
-						"summary": "add helper functions for version parsing",
-						"details": "Adds 4 new internal helper functions for version string parsing...",
-						"bump": "patch",
-						"change_type": "internal",
-						"confidence": 0.85,
-						"grouped_count": 4,
-						"files_changed": ["crates/monochange_core/src/version.rs"]
-					}
-				]
-			}
-		],
-		"recommendations": [
-			"Create separate changeset for the new public type `ChangelogFormat`",
-			"Group the 4 new internal helper functions into a single changeset",
-			"Consider adding before/after example for the new enum"
-		]
-	}
+    "ok": true,
+    "analysis": {
+        "changed_packages": [
+            {
+                "package_id": "@monochange/core",
+                "artifact_type": "library",
+                "direct_changes": 5,
+                "propagated_changes": false,
+                "suggested_changesets": [
+                    {
+                        "summary": "add `ChangelogFormat` enum",
+                        "details": "Adds new enum for changelog format variants...",
+                        "bump": "minor",
+                        "change_type": "feature",
+                        "confidence": 0.92,
+                        "api_changes": [...],
+                        "files_changed": [...],
+                        "has_breaking_changes": false,
+                        "before_after_suggested": true
+                    }
+                ]
+            }
+        ],
+        "lifecycle_actions": [
+            {
+                "action": "remove",
+                "path": ".changeset/stale-feature.md",
+                "reason": "Feature was removed in commit abc123"
+            },
+            {
+                "action": "update",
+                "path": ".changeset/existing.md",
+                "additions": ["new flag --verbose"]
+            },
+            {
+                "action": "create",
+                "suggested_path": ".changeset/add-changelog-format.md",
+                "content": {...}
+            }
+        ],
+        "recommendations": [
+            "Create separate changeset for the new public type `ChangelogFormat`",
+            "Update existing changeset to include new --verbose flag",
+            "Remove stale changeset for reverted feature"
+        ]
+    }
 }
 ```
 
@@ -526,21 +555,23 @@ Add `auto_analyze` parameter:
 
 ```json
 {
-	"path": "/path/to/repo",
-	"package": ["@monochange/core"],
-	"bump": "minor",
-	"reason": "add ChangelogFormat enum",
-	"auto_analyze": true,
-	"analyzed_changes": null
+    "path": "/path/to/repo",
+    "package": ["@monochange/core"],
+    "bump": "minor",
+    "reason": "add ChangelogFormat enum",
+    "auto_analyze": true,
+    "analyzed_changes": null,
+    "lifecycle_action": "create" // Options: "create", "update", "remove"
 }
 ```
 
 When `auto_analyze: true`:
 
 1. Run analysis on current git state
-2. Return suggested changesets to agent
-3. Agent reviews and approves/modifies
-4. Create changesets based on approved suggestions
+2. Check existing changesets for lifecycle conflicts
+3. Suggest actions (create/update/remove) for each changeset
+4. Agent reviews and approves/modifies
+5. Execute lifecycle actions based on approved suggestions
 
 ### Tool: `monochange_validate_changeset`
 
@@ -550,8 +581,8 @@ Validates that a changeset matches actual code changes.
 
 ```json
 {
-	"path": "/path/to/repo",
-	"changeset_path": ".changeset/feature.md"
+    "path": "/path/to/repo",
+    "changeset_path": ".changeset/feature.md"
 }
 ```
 
@@ -562,25 +593,33 @@ Validates that a changeset matches actual code changes.
 - Is the bump level appropriate for the change type?
 - Are there undocumented API changes?
 - Is the artifact type correctly identified?
+- **Does the changeset reference code that still exists?**
+- **Should this changeset be updated based on new changes?**
 
 **Output:**
 
 ```json
 {
-	"ok": true,
-	"valid": false,
-	"issues": [
-		{
-			"severity": "warning",
-			"message": "Changeset mentions `ChangelogFormat` but also adds `ChangelogParser` which is not documented",
-			"suggestion": "Add documentation for `ChangelogParser` or create separate changeset"
-		},
-		{
-			"severity": "error",
-			"message": "Bump level 'patch' but changes include new public type (usually 'minor')",
-			"suggestion": "Change bump to 'minor' or mark as internal change"
-		}
-	]
+    "ok": true,
+    "valid": false,
+    "issues": [
+        {
+            "severity": "warning",
+            "message": "Changeset mentions `ChangelogFormat` but also adds `ChangelogParser` which is not documented",
+            "suggestion": "Add documentation for `ChangelogParser` or create separate changeset"
+        },
+        {
+            "severity": "error",
+            "message": "Bump level 'patch' but changes include new public type (usually 'minor')",
+            "suggestion": "Change bump to 'minor' or mark as internal change"
+        },
+        {
+            "severity": "error",
+            "message": "Changeset references `ConfigValidator` which was removed",
+            "suggestion": "Remove this stale changeset"
+        }
+    ],
+    "lifecycle_status": "stale"
 }
 ```
 
@@ -599,33 +638,47 @@ Agent detects code changes (via PR, commit, or manual trigger)
               │
               ▼
     ┌───────────────────┐
-    │ 2. Apply          │
+    │ 2. Check existing │◄──── Scan .changeset/ directory
+    │    changesets     │
+    └─────────┬─────────┘
+              │
+              ▼
+    ┌───────────────────┐
+    │ 3. Determine      │
+    │    lifecycle      │
+    │    actions        │
+    └─────────┬─────────┘
+              │
+              ▼
+    ┌───────────────────┐
+    │ 4. Apply          │
     │    granularity    │
     │    rules          │
     └─────────┬─────────┘
               │
               ▼
     ┌───────────────────┐
-    │ 3. Generate       │
+    │ 5. Generate       │
     │    suggested      │
     │    changesets     │
     └─────────┬─────────┘
               │
               ▼
     ┌───────────────────┐
-    │ 4. Agent reviews  │
+    │ 6. Agent reviews  │
     │    and refines    │
     └─────────┬─────────┘
               │
               ▼
     ┌───────────────────┐
-    │ 5. Create/update  │◄──── monochange_change
-    │    changesets     │    (auto_analyze)
+    │ 7. Execute        │◄──── monochange_change
+    │    lifecycle      │    (create/update/remove)
+    │    actions        │
     └─────────┬─────────┘
               │
               ▼
     ┌───────────────────┐
-    │ 6. Validate       │◄──── monochange_validate_changeset
+    │ 8. Validate       │◄──── monochange_validate_changeset
     │    (optional)     │
     └───────────────────┘
 ```
@@ -681,120 +734,82 @@ let fmt = ChangelogFormat::KeepAChangelog;
 **Migration:** No action required. Existing behavior is preserved with `ChangelogFormat::KeepAChangelog` as the default.
 
 ````
-### Example 2: Application UI change
 
-**Diff:**
+### Example 2: Lifecycle - Feature removed
 
-```diff
-// routes/settings/appearance.tsx (new file)
-+ export default function AppearanceSettings() {
-+   const [theme, setTheme] = useState('system');
-+   return (
-+     <SettingsSection title="Appearance">
-+       <ThemeSelector value={theme} onChange={setTheme} />
-+     </SettingsSection>
-+   );
-+ }
+**Scenario:** A changeset exists for a feature that was later reverted.
 
-// routes/settings/index.tsx
-+ { id: 'appearance', title: 'Appearance', component: AppearanceSettings }
-````
+```bash
+# Check existing changesets
+$ ls .changeset/
+feature-x.md  config-update.md
 
-**Generated changeset:**
+# Analyze current state
+$ monochange analyze --check-existing
+# Output: "feature-x.md references code removed in commit abc123"
+
+# ✅ Remove stale changeset
+$ rm .changeset/feature-x.md
+```
+
+### Example 3: Lifecycle - Feature expanded
+
+**Initial changeset:**
 
 ```markdown
----
-"my-web-app": minor
----
-
-#### add dark mode toggle to settings
-
-A new **Appearance** section in Settings allows users to choose between Light, Dark, and System theme modes. Theme preference persists across sessions.
-
-**Before:**
-
-No theme selection available; always followed system preference.
-
-**After:**
-
-1. Navigate to **Settings → Appearance**
-2. Select your preferred theme:
-   - **Light** — Always use light mode
-   - **Dark** — Always use dark mode
-   - **System** — Follow OS preference (default)
-3. Changes apply immediately and persist on reload
-```
-
-### Example 3: CLI flag change
-
-**Diff:**
-
-```diff
-#[derive(Parser)]
-struct VerifyArgs {
--   #[arg(long = "changed-path")]
--   changed_path: Vec<PathBuf>,
-+   #[arg(long = "changed-paths", value_delimiter = ' ')]
-+   changed_paths: Vec<PathBuf>,
-}
-```
-
-**Generated changeset:**
-
-````markdown
 ---
 "@monochange/cli": minor
 ---
 
-#### rename `--changed-path` to `--changed-paths`
+#### add --verbose flag
 
-The flag for specifying changed files has been renamed and now accepts multiple paths in a single invocation.
-
-**Before:**
-
-```bash
-mc verify --changed-path src/lib.rs --changed-path crates/core/src/main.rs
-```
-````
-
-**After:**
-
-```bash
-mc verify --changed-paths src/lib.rs crates/core/src/main.rs
+Adds verbose output for debugging.
 ```
 
-`--changed-path` is kept as a hidden alias for one release cycle to allow migration time. Update your CI scripts and local workflows to use the new plural form.
-
-````
-### Example 4: Grouping related changes
-
-**Diff:** 5 new internal helper functions in `monochange_core/src/parse.rs`
-
-**Analysis:**
-
-- All in same module
-- All internal visibility (`fn`, not `pub fn`)
-- Related functionality (parsing utilities)
-- Count: 5 → meets threshold for grouping
-
-**Generated changeset:**
+**New changes add --debug flag:**
 
 ```markdown
+# ✅ Update existing (same feature area)
 ---
-"@monochange/core": patch
+"@monochange/cli": minor
 ---
 
-#### add utility functions for path parsing
+#### add --verbose and --debug flags
 
-Adds 5 internal helper functions for normalized path handling:
-`normalize_path`, `relative_to_root`, `strip_prefix_or_clone`,
-`is_changeset_path`, and `resolve_config_path`.
+Adds verbose and debug output options:
+- `--verbose` — Show detailed progress information
+- `--debug` — Show internal state and timing data
+```
 
-These utilities consolidate repetitive path manipulation logic and
-improve error handling consistency across the codebase.
+### Example 4: Lifecycle - Distinct features
 
-No public API changes.
-````
+**Scenario:** Two validation features in the same package.
+
+```markdown
+# Existing changeset
+---
+"@monochange/core": minor
+---
+
+#### add config validation
+
+Validates monochange.toml syntax.
+```
+
+**New lockfile validation feature:**
+
+```markdown
+# ✅ Create NEW changeset (don't update existing)
+---
+"@monochange/core": minor
+---
+
+#### add lockfile validation
+
+Validates Cargo.lock and package-lock.json consistency.
+```
+
+Even though both are "validation", they target different files and should be tracked separately for granular release notes.
 
 ### Example 5: Breaking change (separate changeset)
 
@@ -851,6 +866,7 @@ for input in &cmd.inputs { ... }  // New: input definitions
 3. Review step definitions — some fields may have changed
 
 ````
+
 ## Edge cases
 
 ### Mixed artifact types in one package
@@ -878,7 +894,7 @@ Create separate changesets for lib vs. bin changes if both exist:
 #### improve error message for missing config file
 
 ...
-````
+```
 
 ### Propagated changes
 
@@ -925,7 +941,39 @@ format = "monochange" # Override for this package only
 ```
 ````
 
+### Multiple features in one PR
+
+When a PR contains multiple unrelated features:
+
+1. Analyze each feature separately
+2. Create distinct changesets for each
+3. Avoid grouping unrelated changes
+
+```markdown
+# ✅ Good: Separate changesets for separate features
+
+---
+"@monochange/core": minor
+---
+
+#### add file diff preview
+...
+
+---
+"@monochange/core": minor
+---
+
+#### add changelog format detection
+...
+
+---
+"@monochange/cli": patch
+---
+
+#### improve error messages
+...
 ```
+
 ## Validation checklist
 
 Before finalizing changesets, verify:
@@ -939,6 +987,9 @@ Before finalizing changesets, verify:
 - [ ] Grouped changes are truly related (same feature/area)
 - [ ] No unrelated changes are bundled together
 - [ ] Propagated changes are appropriately marked or skipped
+- [ ] **Existing changesets were reviewed for staleness**
+- [ ] **Lifecycle actions (create/update/remove) are appropriate**
+- [ ] **Granular approach: err on the side of creating new changesets**
 
 ## Integration with existing rules
 
@@ -949,4 +1000,13 @@ This document extends and works alongside:
 - **[coding-style.md](coding-style.md)** — Code formatting and structure
 
 Always cross-reference when generating changesets to ensure quality.
-```
+
+## Key lifecycle principles
+
+1. **Err on the side of creating new changesets** — It's easier to consolidate than split
+2. **Remove stale changesets promptly** — Don't release notes for removed features
+3. **Update existing only for same feature expansion** — Keep related changes together
+4. **Create separate for distinct features** — Even if they touch the same package
+5. **Review existing changesets before creating new ones** — Always check for conflicts
+
+Remember: **Granularity is preferred. When in doubt, create a new changeset.**

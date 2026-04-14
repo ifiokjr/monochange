@@ -1295,4 +1295,286 @@ mod tests {
 		);
 		assert!(result.is_ok());
 	}
+
+	#[test]
+	fn test_extract_library_changes_with_signature_level() {
+		// Create a temporary git repo
+		use std::process::Command;
+
+		use tempfile::TempDir;
+
+		let temp_dir = TempDir::new().unwrap();
+		let repo_path = temp_dir.path();
+
+		// Initialize git repo
+		Command::new("git")
+			.current_dir(repo_path)
+			.args(["init"])
+			.output()
+			.expect("Failed to init git");
+
+		// Configure git user
+		Command::new("git")
+			.current_dir(repo_path)
+			.args(["config", "user.email", "test@test.com"])
+			.output()
+			.expect("Failed to config email");
+
+		Command::new("git")
+			.current_dir(repo_path)
+			.args(["config", "user.name", "Test User"])
+			.output()
+			.expect("Failed to config name");
+
+		// Create src directory and lib.rs
+		let src_dir = repo_path.join("src");
+		std::fs::create_dir(&src_dir).unwrap();
+
+		// Create initial file and commit
+		std::fs::write(src_dir.join("lib.rs"), "pub fn existing() {}").unwrap();
+		Command::new("git")
+			.current_dir(repo_path)
+			.args(["add", "."])
+			.output()
+			.expect("Failed to add");
+
+		Command::new("git")
+			.current_dir(repo_path)
+			.args(["commit", "-m", "Initial"])
+			.output()
+			.expect("Failed to commit");
+
+		// Make a change
+		std::fs::write(
+			src_dir.join("lib.rs"),
+			"pub fn existing() {}\npub fn new_fn() {}",
+		)
+		.unwrap();
+
+		let files = vec![PathBuf::from("src/lib.rs")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Library,
+			DetectionLevel::Signature,
+			repo_path,
+		);
+
+		// Should succeed - may not find changes since it's not staged/committed
+		assert!(result.is_ok());
+	}
+
+	#[test]
+	fn test_extract_library_changes_with_semantic_level() {
+		let files = vec![PathBuf::from("src/lib.rs")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Library,
+			DetectionLevel::Semantic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.changes.len(), 1);
+		// Semantic level returns Unknown changes (placeholder)
+		if let SemanticChange::Unknown { description, .. } = &extraction.changes[0] {
+			assert!(description.contains("semantic analysis"));
+		} else {
+			panic!("Expected Unknown change");
+		}
+	}
+
+	#[test]
+	fn test_parse_added_item_with_single_line() {
+		// Test parsing added item that doesn't span multiple lines
+		let line = "+pub fn simple_fn() {};";
+		let result = parse_added_item(line, Path::new("src/lib.rs"), Some(1));
+		assert!(result.is_some());
+		if let Some(SemanticChange::Api(api)) = result {
+			assert_eq!(api.name, "simple_fn()");
+		}
+	}
+
+	#[test]
+	fn test_parse_removed_item_with_single_line() {
+		let line = "-pub fn old_fn() {};";
+		let result = parse_removed_item(line, Path::new("src/lib.rs"), Some(1));
+		assert!(result.is_some());
+		if let Some(SemanticChange::Api(api)) = result {
+			assert_eq!(api.name, "old_fn()");
+			assert!(api.is_breaking);
+		}
+	}
+
+	#[test]
+	fn test_parse_added_item_with_struct() {
+		let line = "+pub struct MyStruct { field: i32 }";
+		let result = parse_added_item(line, Path::new("src/lib.rs"), Some(1));
+		assert!(result.is_some());
+		if let Some(SemanticChange::Api(api)) = result {
+			assert_eq!(api.kind, ApiChangeKind::TypeAdded);
+			assert_eq!(api.name, "MyStruct");
+		}
+	}
+
+	#[test]
+	fn test_parse_added_item_with_trait() {
+		let line = "+pub trait MyTrait { fn method(); }";
+		let result = parse_added_item(line, Path::new("src/lib.rs"), Some(1));
+		assert!(result.is_some());
+		if let Some(SemanticChange::Api(api)) = result {
+			assert_eq!(api.kind, ApiChangeKind::TraitAdded);
+			assert_eq!(api.name, "MyTrait");
+		}
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_multiple_changes() {
+		let diff = r#"@@ -10,5 +10,10 @@
+ pub fn existing() {}
++pub fn new_fn1() {}
++pub fn new_fn2() {}
+-pub fn removed_fn() {}
++pub struct NewStruct;
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		// Should find added functions, removed function, and added struct
+		assert_eq!(changes.len(), 4);
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_increments_line_numbers() {
+		let diff = r#"@@ -1,3 +1,5 @@
+ line1
++pub fn added() {}
+ line2
+ line3
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 1);
+		if let SemanticChange::Api(api) = &changes[0] {
+			// Line number should be tracked
+			assert!(api.line_number.is_some());
+		}
+	}
+
+	#[test]
+	fn test_extract_component_name_no_stem() {
+		// Path with no file stem
+		let path = Path::new("/");
+		assert_eq!(extract_component_name(path), None);
+	}
+
+	#[test]
+	fn test_extract_command_name_with_single_quotes() {
+		let diff = r#"name = 'cmd'"#;
+		assert_eq!(extract_command_name(diff), Some("cmd".to_string()));
+	}
+
+	#[test]
+	fn test_extract_flag_name_with_single_quotes() {
+		let diff = r#"long = 'verbose'"#;
+		assert_eq!(extract_flag_name(diff), Some("verbose".to_string()));
+	}
+
+	#[test]
+	fn test_parse_visibility_in_path() {
+		let content = "pub(in crate::foo) fn bar()";
+		let result = parse_visibility(content);
+		assert!(result.is_some());
+		if let Some((vis, rest)) = result {
+			assert!(matches!(vis, Visibility::Restricted));
+			assert_eq!(rest, "fn bar()");
+		}
+	}
+
+	#[test]
+	fn test_parse_visibility_in_path_missing_paren() {
+		let content = "pub(in crate::foo fn bar"; // No closing paren at all
+		let result = parse_visibility(content);
+		assert!(result.is_none());
+	}
+
+	#[test]
+	fn test_hunk_header_without_comma() {
+		let line = "@@ -1 +1 @@";
+		assert_eq!(parse_hunk_header(line), Some(1));
+	}
+
+	#[test]
+	fn test_hunk_header_only_minus() {
+		let line = "@@ -1,5 +20,7 @@";
+		// This has +20, should extract 20
+		assert_eq!(parse_hunk_header(line), Some(20));
+	}
+
+	#[test]
+	fn test_parse_rust_signatures_with_removed_only() {
+		let diff = r#"@@ -10,3 +10,2 @@
+-pub fn removed1() {}
+-pub fn removed2() {}
+"#;
+		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
+		assert_eq!(changes.len(), 2);
+		for change in &changes {
+			if let SemanticChange::Api(api) = change {
+				assert!(api.is_breaking);
+			}
+		}
+	}
+
+	#[test]
+	fn test_app_file_categorization_api() {
+		assert_eq!(
+			categorize_app_file(Path::new("src/api/users.ts")),
+			AppFileCategory::Api
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/endpoints/api.ts")),
+			AppFileCategory::Api
+		);
+	}
+
+	#[test]
+	fn test_app_file_categorization_style() {
+		assert_eq!(
+			categorize_app_file(Path::new("src/styles/main.css")),
+			AppFileCategory::Style
+		);
+		assert_eq!(
+			categorize_app_file(Path::new("src/styles/theme.scss")),
+			AppFileCategory::Style
+		);
+	}
+
+	#[test]
+	fn test_app_file_categorization_config() {
+		assert_eq!(
+			categorize_app_file(Path::new("config.ts")),
+			AppFileCategory::Config
+		);
+	}
+
+	#[test]
+	fn test_app_file_categorization_ignored() {
+		assert_eq!(
+			categorize_app_file(Path::new("src/utils/helpers.ts")),
+			AppFileCategory::Ignored
+		);
+	}
+
+	#[test]
+	fn test_extract_application_changes_ignored_category() {
+		let files = vec![PathBuf::from("src/utils/helpers.ts")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Application,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		// Ignored files should be skipped
+		assert_eq!(extraction.files_analyzed.len(), 0);
+		assert_eq!(extraction.files_skipped.len(), 1);
+	}
 }

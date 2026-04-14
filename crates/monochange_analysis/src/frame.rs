@@ -831,4 +831,134 @@ mod tests {
 		assert_eq!(cloned.source_branch, "feature");
 		assert_eq!(cloned.pr_number, Some("42".to_string()));
 	}
+
+	#[test]
+	fn test_frame_error_display() {
+		let git_error = FrameError::Git("test error".to_string());
+		assert_eq!(git_error.to_string(), "git error: test error");
+
+		let env_error = FrameError::Environment("env error".to_string());
+		assert_eq!(env_error.to_string(), "environment error: env error");
+
+		let invalid_error = FrameError::InvalidFrame("invalid".to_string());
+		assert_eq!(invalid_error.to_string(), "invalid frame: invalid");
+	}
+
+	#[test]
+	fn test_frame_error_source() {
+		// Test that FrameError implements Error trait
+		let error = FrameError::Git("test".to_string());
+		let _ = std::error::Error::source(&error);
+	}
+
+	#[test]
+	fn test_pr_environment_eq() {
+		let pr1 = PrEnvironment {
+			source_branch: "feature".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: Some("42".to_string()),
+			provider: "github".to_string(),
+		};
+		let pr2 = PrEnvironment {
+			source_branch: "feature".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: Some("42".to_string()),
+			provider: "github".to_string(),
+		};
+		let pr3 = PrEnvironment {
+			source_branch: "other".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: Some("42".to_string()),
+			provider: "github".to_string(),
+		};
+		assert_eq!(pr1, pr2);
+		assert_ne!(pr1, pr3);
+	}
+
+	#[test]
+	fn test_change_frame_staged_only_display() {
+		let frame = ChangeFrame::StagedOnly;
+		assert_eq!(frame.to_string(), "staged only");
+	}
+
+	#[test]
+	fn test_change_frame_equality() {
+		let frame1 = ChangeFrame::WorkingDirectory;
+		let frame2 = ChangeFrame::WorkingDirectory;
+		let frame3 = ChangeFrame::StagedOnly;
+		assert_eq!(frame1, frame2);
+		assert_ne!(frame1, frame3);
+	}
+
+	#[test]
+	fn test_change_frame_branch_range_equality() {
+		let frame1 = ChangeFrame::BranchRange {
+			base: "main".to_string(),
+			head: "feature".to_string(),
+		};
+		let frame2 = ChangeFrame::BranchRange {
+			base: "main".to_string(),
+			head: "feature".to_string(),
+		};
+		let frame3 = ChangeFrame::BranchRange {
+			base: "main".to_string(),
+			head: "other".to_string(),
+		};
+		assert_eq!(frame1, frame2);
+		assert_ne!(frame1, frame3);
+	}
+
+	#[test]
+	fn test_change_frame_serialize_roundtrip() {
+		let frames = vec![
+			ChangeFrame::WorkingDirectory,
+			ChangeFrame::StagedOnly,
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			},
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			},
+			ChangeFrame::CustomRange {
+				base: "v1.0.0".to_string(),
+				head: "v2.0.0".to_string(),
+			},
+		];
+
+		for frame in frames {
+			let json = serde_json::to_string(&frame).expect("should serialize");
+			let deserialized: ChangeFrame =
+				serde_json::from_str(&json).expect("should deserialize");
+			assert_eq!(frame.to_string(), deserialized.to_string());
+		}
+	}
+
+	#[test]
+	fn test_pr_environment_debug() {
+		let pr_env = PrEnvironment {
+			source_branch: "feature".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: Some("42".to_string()),
+			provider: "github".to_string(),
+		};
+		let debug = format!("{:?}", pr_env);
+		assert!(debug.contains("PrEnvironment"));
+		assert!(debug.contains("feature"));
+		assert!(debug.contains("main"));
+		assert!(debug.contains("github"));
+	}
+
+	#[test]
+	fn test_change_frame_debug() {
+		let frame = ChangeFrame::BranchRange {
+			base: "main".to_string(),
+			head: "feature".to_string(),
+		};
+		let debug = format!("{:?}", frame);
+		assert!(debug.contains("BranchRange"));
+		assert!(debug.contains("main"));
+		assert!(debug.contains("feature"));
+	}
 }
