@@ -1955,9 +1955,9 @@ fn normalize_trusted_publishing_settings_supports_boolean_shorthand() {
 #[test]
 fn normalize_publish_settings_rejects_conflicting_placeholder_sources() {
 	let error = crate::normalize_publish_settings(
-		r#"
+		r"
 [package.core.publish.placeholder]
-"#,
+",
 		Some(&monochange_core::PublishSettings {
 			registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
 			placeholder: monochange_core::PlaceholderSettings {
