@@ -1272,4 +1272,356 @@ mod tests {
 		assert!(api.doc_comment.is_some());
 		assert!(api.line_number.is_some());
 	}
+
+	#[test]
+	fn test_analysis_config_clone() {
+		let config = AnalysisConfig::default();
+		let cloned = config.clone();
+		assert_eq!(config.max_suggestions, cloned.max_suggestions);
+	}
+
+	#[test]
+	fn test_grouping_thresholds_clone() {
+		let thresholds = GroupingThresholds::default();
+		let cloned = thresholds.clone();
+		assert_eq!(thresholds.group_public_api, cloned.group_public_api);
+	}
+
+	#[test]
+	fn test_change_group_clone() {
+		let group = ChangeGroup {
+			package_id: "test".to_string(),
+			artifact_type: ArtifactType::Library,
+			suggested_summary: "Test".to_string(),
+			suggested_details: None,
+			suggested_bump: BumpSuggestion::Patch,
+			changes: vec![],
+			has_breaking: false,
+			confidence: 0.9,
+		};
+		let cloned = group.clone();
+		assert_eq!(cloned.package_id, "test");
+	}
+
+	#[test]
+	fn test_suggested_changeset_clone() {
+		let changeset = SuggestedChangeset {
+			summary: "Test".to_string(),
+			details: None,
+			bump: BumpSuggestion::Minor,
+			change_type: None,
+			confidence: 0.95,
+			api_changes: vec![],
+			grouped_count: 1,
+			files_changed: vec![],
+			has_breaking_changes: false,
+			before_after_suggested: false,
+		};
+		let cloned = changeset.clone();
+		assert_eq!(cloned.summary, "Test");
+	}
+
+	#[test]
+	fn test_package_change_analysis_clone() {
+		let analysis = PackageChangeAnalysis {
+			package_id: "test".to_string(),
+			artifact_type: ArtifactType::Library,
+			direct_change_count: 5,
+			has_propagated_changes: false,
+			suggested_changesets: vec![],
+		};
+		let cloned = analysis.clone();
+		assert_eq!(cloned.direct_change_count, 5);
+	}
+
+	#[test]
+	fn test_change_analysis_clone() {
+		let analysis = ChangeAnalysis {
+			frame: ChangeFrame::WorkingDirectory,
+			package_changes: BTreeMap::new(),
+			recommendations: vec![],
+		};
+		let cloned = analysis.clone();
+		assert!(matches!(cloned.frame, ChangeFrame::WorkingDirectory));
+	}
+
+	#[test]
+	fn test_semantic_change_clone() {
+		let api = ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "test".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: None,
+		};
+		let change = SemanticChange::Api(api);
+		let cloned = change.clone();
+		assert!(matches!(cloned, SemanticChange::Api(_)));
+	}
+
+	#[test]
+	fn test_api_change_kind_clone() {
+		let kind = ApiChangeKind::FunctionAdded;
+		let cloned = kind.clone();
+		assert_eq!(kind, cloned);
+	}
+
+	#[test]
+	fn test_app_change_kind_clone() {
+		let kind = AppChangeKind::RouteAdded;
+		let cloned = kind.clone();
+		assert_eq!(kind, cloned);
+	}
+
+	#[test]
+	fn test_cli_change_kind_clone() {
+		let kind = CliChangeKind::CommandAdded;
+		let cloned = kind.clone();
+		assert_eq!(kind, cloned);
+	}
+
+	#[test]
+	fn test_bump_suggestion_clone() {
+		let bump = BumpSuggestion::Minor;
+		let cloned = bump.clone();
+		assert_eq!(bump, cloned);
+	}
+
+	#[test]
+	fn test_artifact_type_clone() {
+		let artifact = ArtifactType::Library;
+		let cloned = artifact.clone();
+		assert_eq!(artifact, cloned);
+	}
+
+	#[test]
+	fn test_detection_level_clone() {
+		let level = DetectionLevel::Signature;
+		let cloned = level.clone();
+		assert_eq!(level, cloned);
+	}
+
+	#[test]
+	fn test_visibility_clone() {
+		let vis = Visibility::Public;
+		let cloned = vis.clone();
+		assert_eq!(vis, cloned);
+	}
+
+	#[test]
+	fn test_config_change_clone() {
+		let config = ConfigChange {
+			file_name: "config.toml".to_string(),
+			description: "Changed port".to_string(),
+			is_user_facing: true,
+		};
+		let cloned = config.clone();
+		assert_eq!(cloned.file_name, "config.toml");
+	}
+
+	#[test]
+	fn test_app_change_clone() {
+		let app = AppChange {
+			kind: AppChangeKind::ComponentAdded,
+			route: Some("/home".to_string()),
+			component: Some("Home".to_string()),
+			description: "Added home".to_string(),
+			is_user_visible: true,
+			file_path: PathBuf::from("src/pages/home.tsx"),
+		};
+		let cloned = app.clone();
+		assert_eq!(cloned.description, "Added home");
+	}
+
+	#[test]
+	fn test_cli_change_clone() {
+		let cli = CliChange {
+			kind: CliChangeKind::FlagAdded,
+			command: Some("build".to_string()),
+			flag: Some("verbose".to_string()),
+			description: "Added verbose flag".to_string(),
+			is_breaking: false,
+			file_path: PathBuf::from("src/cli.rs"),
+		};
+		let cloned = cli.clone();
+		assert_eq!(cloned.description, "Added verbose flag");
+	}
+
+	#[test]
+	fn test_serialize_deserialize_semantic_change() {
+		let api = ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "test_fn".to_string(),
+			signature: Some("fn test()".to_string()),
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(10),
+		};
+		let change = SemanticChange::Api(api);
+		let json = serde_json::to_string(&change).expect("should serialize");
+		let deserialized: SemanticChange = serde_json::from_str(&json).expect("should deserialize");
+		assert!(matches!(deserialized, SemanticChange::Api(_)));
+	}
+
+	#[test]
+	fn test_serialize_deserialize_change_group() {
+		let group = ChangeGroup {
+			package_id: "test".to_string(),
+			artifact_type: ArtifactType::Library,
+			suggested_summary: "Test".to_string(),
+			suggested_details: None,
+			suggested_bump: BumpSuggestion::Patch,
+			changes: vec![],
+			has_breaking: false,
+			confidence: 0.9,
+		};
+		let json = serde_json::to_string(&group).expect("should serialize");
+		let deserialized: ChangeGroup = serde_json::from_str(&json).expect("should deserialize");
+		assert_eq!(deserialized.package_id, "test");
+	}
+
+	#[test]
+	fn test_group_changes_empty() {
+		let changes: Vec<SemanticChange> = vec![];
+		let thresholds = GroupingThresholds::default();
+		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
+		assert!(groups.is_empty());
+	}
+
+	#[test]
+	fn test_group_changes_multiple_breaking() {
+		let api1 = ApiChange {
+			kind: ApiChangeKind::FunctionRemoved,
+			visibility: Visibility::Public,
+			name: "old_fn1".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: true,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(10),
+		};
+		let api2 = ApiChange {
+			kind: ApiChangeKind::FunctionRemoved,
+			visibility: Visibility::Public,
+			name: "old_fn2".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: true,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(20),
+		};
+		let changes = vec![
+			SemanticChange::Api(api1),
+			SemanticChange::Api(api2),
+		];
+		let thresholds = GroupingThresholds::default();
+		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
+		assert_eq!(groups.len(), 2);
+		// Each breaking change should be in its own group
+		assert!(groups.iter().all(|g| g.has_breaking));
+	}
+
+	#[test]
+	fn test_group_changes_mix_breaking_and_non_breaking() {
+		let breaking_api = ApiChange {
+			kind: ApiChangeKind::FunctionRemoved,
+			visibility: Visibility::Public,
+			name: "old_fn".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: true,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(10),
+		};
+		let non_breaking_api = ApiChange {
+			kind: ApiChangeKind::FunctionAdded,
+			visibility: Visibility::Public,
+			name: "new_fn".to_string(),
+			signature: None,
+			doc_comment: None,
+			is_breaking: false,
+			file_path: PathBuf::from("src/lib.rs"),
+			line_number: Some(20),
+		};
+		let changes = vec![
+			SemanticChange::Api(breaking_api),
+			SemanticChange::Api(non_breaking_api),
+		];
+		let thresholds = GroupingThresholds::default();
+		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
+		// Breaking change gets its own group, non-breaking gets another
+		assert_eq!(groups.len(), 2);
+		let breaking_groups: Vec<_> = groups.iter().filter(|g| g.has_breaking).collect();
+		let non_breaking_groups: Vec<_> = groups.iter().filter(|g| !g.has_breaking).collect();
+		assert_eq!(breaking_groups.len(), 1);
+		assert_eq!(non_breaking_groups.len(), 1);
+	}
+
+	#[test]
+	fn test_analysis_config_default_values() {
+		let config = AnalysisConfig::default();
+		assert!(matches!(config.detection_level, DetectionLevel::Signature));
+		assert_eq!(config.max_suggestions, 10);
+	}
+
+	#[test]
+	fn test_grouping_thresholds_default_values() {
+		let thresholds = GroupingThresholds::default();
+		assert_eq!(thresholds.group_public_api, 3);
+		assert_eq!(thresholds.group_internal, 5);
+		assert_eq!(thresholds.group_ui, 3);
+		assert_eq!(thresholds.group_commands, 2);
+		assert_eq!(thresholds.group_docs, 10);
+	}
+
+	#[test]
+	fn test_extraction_result_struct() {
+		let result = ExtractionResult {
+			changes: vec![
+				SemanticChange::Unknown {
+					path: PathBuf::from("test.rs"),
+					description: "Test".to_string(),
+				},
+			],
+			files_analyzed: vec![PathBuf::from("test.rs")],
+			files_skipped: vec![],
+		};
+		assert_eq!(result.changes.len(), 1);
+		assert_eq!(result.files_analyzed.len(), 1);
+		assert!(result.files_skipped.is_empty());
+	}
+
+	#[test]
+	fn test_skip_reason_variants_full() {
+		let unsupported = SkipReason::UnsupportedExtension;
+		let binary = SkipReason::BinaryFile;
+		let too_large = SkipReason::TooLarge;
+		let parse_error = SkipReason::ParseError("test error".to_string());
+		let not_relevant = SkipReason::NotRelevant;
+
+		assert_eq!(format!("{:?}", unsupported), "UnsupportedExtension");
+		assert_eq!(format!("{:?}", binary), "BinaryFile");
+		assert_eq!(format!("{:?}", too_large), "TooLarge");
+		assert!(format!("{:?}", parse_error).contains("test error"));
+		assert_eq!(format!("{:?}", not_relevant), "NotRelevant");
+	}
+
+	#[test]
+	fn test_skip_reason_clone() {
+		let reason = SkipReason::UnsupportedExtension;
+		let cloned = reason.clone();
+		assert!(matches!(cloned, SkipReason::UnsupportedExtension));
+	}
+
+	#[test]
+	fn test_skip_reason_parse_error_clone() {
+		let reason = SkipReason::ParseError("test".to_string());
+		let cloned = reason.clone();
+		assert!(matches!(cloned, SkipReason::ParseError(s) if s == "test"));
+	}
 }

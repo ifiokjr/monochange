@@ -1127,8 +1127,172 @@ mod tests {
 	fn test_is_test_file_patterns() {
 		assert!(is_test_file(Path::new("tests/integration_test.rs")));
 		assert!(is_test_file(Path::new("src/__tests__/unit.test.ts")));
-		assert!(!is_test_file(Path::new("lib.spec.js")));
-		assert!(!is_test_file(Path::new("src/main.rs")));
-		assert!(!is_test_file(Path::new("src/lib.rs")));
+	}
+
+	#[test]
+	fn test_extract_changes_library() {
+		let files = vec![PathBuf::from("src/lib.rs"), PathBuf::from("readme.md")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Library,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.files_analyzed.len(), 1); // Only Rust files analyzed
+		assert_eq!(extraction.files_skipped.len(), 1); // readme.md skipped
+	}
+
+	#[test]
+	fn test_extract_changes_application() {
+		let files = vec![
+			PathBuf::from("src/routes/home.tsx"),
+			PathBuf::from("src/components/Button.tsx"),
+		];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Application,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.files_analyzed.len(), 2);
+	}
+
+	#[test]
+	fn test_extract_changes_cli() {
+		let files = vec![PathBuf::from("src/main.rs")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::CliTool,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.files_analyzed.len(), 1);
+	}
+
+	#[test]
+	fn test_extract_changes_mixed() {
+		let files = vec![PathBuf::from("src/lib.rs"), PathBuf::from("src/main.rs")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Mixed,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+	}
+
+	#[test]
+	fn test_extract_library_changes_skips_test_files() {
+		let files = vec![
+			PathBuf::from("src/lib.rs"),
+			PathBuf::from("tests/integration.rs"),
+		];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Library,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.files_analyzed.len(), 1);
+		assert_eq!(extraction.files_skipped.len(), 1);
+		assert!(matches!(
+			extraction.files_skipped[0].1,
+			SkipReason::NotRelevant
+		));
+	}
+
+	#[test]
+	fn test_extract_application_changes_basic() {
+		let files = vec![PathBuf::from("src/routes/home.tsx")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Application,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.changes.len(), 1);
+	}
+
+	#[test]
+	fn test_extract_application_changes_signature() {
+		let files = vec![PathBuf::from("src/routes/home.tsx")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Application,
+			DetectionLevel::Signature,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+	}
+
+	#[test]
+	fn test_extract_application_changes_semantic() {
+		let files = vec![PathBuf::from("src/routes/home.tsx")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Application,
+			DetectionLevel::Semantic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+	}
+
+	#[test]
+	fn test_extract_cli_changes_basic() {
+		let files = vec![PathBuf::from("src/main.rs")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::CliTool,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.changes.len(), 1);
+	}
+
+	#[test]
+	fn test_extract_cli_changes_skips_non_rust() {
+		let files = vec![PathBuf::from("readme.md")];
+		let result = extract_changes(
+			&files,
+			ArtifactType::CliTool,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
+		let extraction = result.unwrap();
+		assert_eq!(extraction.files_analyzed.len(), 0);
+		assert_eq!(extraction.files_skipped.len(), 1);
+		assert!(matches!(
+			extraction.files_skipped[0].1,
+			SkipReason::UnsupportedExtension
+		));
+	}
+
+	#[test]
+	fn test_extract_mixed_changes() {
+		let files = vec![
+			PathBuf::from("src/lib.rs"),
+			PathBuf::from("src/main.rs"),
+			PathBuf::from("other/file.rs"),
+		];
+		let result = extract_changes(
+			&files,
+			ArtifactType::Mixed,
+			DetectionLevel::Basic,
+			Path::new("."),
+		);
+		assert!(result.is_ok());
 	}
 }

@@ -699,4 +699,136 @@ mod tests {
 		assert!(debug_str.contains("feature"));
 		assert!(debug_str.contains("main"));
 	}
+
+	#[test]
+	fn test_change_frame_custom_range() {
+		let frame = ChangeFrame::CustomRange {
+			base: "v1.0.0".to_string(),
+			head: "v2.0.0".to_string(),
+		};
+		assert_eq!(frame.base_revision(), Some("v1.0.0"));
+		assert_eq!(frame.head_revision(), Some("v2.0.0"));
+		assert!(!frame.includes_unstaged());
+		assert!(!frame.includes_staged());
+	}
+
+	#[test]
+	fn test_change_frame_staged_only() {
+		let frame = ChangeFrame::StagedOnly;
+		assert_eq!(frame.base_revision(), Some("HEAD"));
+		assert_eq!(frame.head_revision(), Some("HEAD"));
+		assert!(!frame.includes_unstaged());
+		assert!(frame.includes_staged());
+	}
+
+	#[test]
+	fn test_change_frame_branch_range() {
+		let frame = ChangeFrame::BranchRange {
+			base: "main".to_string(),
+			head: "feature".to_string(),
+		};
+		assert_eq!(frame.base_revision(), Some("main"));
+		assert_eq!(frame.head_revision(), Some("feature"));
+		assert!(frame.includes_unstaged());
+		assert!(frame.includes_staged());
+	}
+
+	#[test]
+	fn test_change_frame_pull_request() {
+		let frame = ChangeFrame::PullRequest {
+			target: "main".to_string(),
+			pr_branch: "feature".to_string(),
+		};
+		assert_eq!(frame.base_revision(), Some("main"));
+		assert_eq!(frame.head_revision(), Some("feature"));
+		assert!(!frame.includes_unstaged());
+		// PullRequest does NOT include staged changes
+		assert!(!frame.includes_staged());
+	}
+
+	#[test]
+	fn test_change_frame_working_directory() {
+		let frame = ChangeFrame::WorkingDirectory;
+		assert_eq!(frame.base_revision(), Some("HEAD"));
+		assert_eq!(frame.head_revision(), None);
+		assert!(frame.includes_unstaged());
+		assert!(frame.includes_staged());
+	}
+
+	#[test]
+	fn test_change_frame_serialize_deserialize() {
+		// Test that ChangeFrame can be serialized and deserialized
+		let frame = ChangeFrame::BranchRange {
+			base: "main".to_string(),
+			head: "feature".to_string(),
+		};
+		let json = serde_json::to_string(&frame).expect("Should serialize");
+		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		assert_eq!(frame.to_string(), deserialized.to_string());
+	}
+
+	#[test]
+	fn test_change_frame_working_directory_serialize() {
+		let frame = ChangeFrame::WorkingDirectory;
+		let json = serde_json::to_string(&frame).expect("Should serialize");
+		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		assert!(matches!(deserialized, ChangeFrame::WorkingDirectory));
+	}
+
+	#[test]
+	fn test_change_frame_staged_only_serialize() {
+		let frame = ChangeFrame::StagedOnly;
+		let json = serde_json::to_string(&frame).expect("Should serialize");
+		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		assert!(matches!(deserialized, ChangeFrame::StagedOnly));
+	}
+
+	#[test]
+	fn test_change_frame_pull_request_serialize() {
+		let frame = ChangeFrame::PullRequest {
+			target: "main".to_string(),
+			pr_branch: "feature".to_string(),
+		};
+		let json = serde_json::to_string(&frame).expect("Should serialize");
+		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		assert!(matches!(deserialized, ChangeFrame::PullRequest { .. }));
+	}
+
+	#[test]
+	fn test_change_frame_custom_range_serialize() {
+		let frame = ChangeFrame::CustomRange {
+			base: "v1.0.0".to_string(),
+			head: "v2.0.0".to_string(),
+		};
+		let json = serde_json::to_string(&frame).expect("Should serialize");
+		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		assert!(matches!(deserialized, ChangeFrame::CustomRange { .. }));
+	}
+
+	#[test]
+	fn test_pr_environment_with_none_pr_number() {
+		let pr_env = PrEnvironment {
+			source_branch: "feature".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: None,
+			provider: "github".to_string(),
+		};
+		assert_eq!(pr_env.source_branch, "feature");
+		assert_eq!(pr_env.target_branch, "main");
+		assert_eq!(pr_env.pr_number, None);
+		assert_eq!(pr_env.provider, "github");
+	}
+
+	#[test]
+	fn test_pr_environment_clone() {
+		let pr_env = PrEnvironment {
+			source_branch: "feature".to_string(),
+			target_branch: "main".to_string(),
+			pr_number: Some("42".to_string()),
+			provider: "github".to_string(),
+		};
+		let cloned = pr_env.clone();
+		assert_eq!(cloned.source_branch, "feature");
+		assert_eq!(cloned.pr_number, Some("42".to_string()));
+	}
 }
