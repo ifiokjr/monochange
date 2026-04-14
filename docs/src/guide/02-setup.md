@@ -142,6 +142,12 @@ This is the right stopping point for a first-time user.
 
 You get a concrete preview of the release plan without publishing anything or opening provider requests.
 
+When you are ready to move beyond planning:
+
+- use `mc placeholder-publish --dry-run --format json` if some packages still need a bootstrap `0.0.0` release so they exist in their registries first
+- use `mc publish --dry-run --format json` to preview built-in package publication to `crates.io`, `npm`, `jsr`, or `pub.dev`
+- use `mc publish-release --dry-run --format json` only for hosted/provider releases such as GitHub releases
+
 ## Package ids vs. group ids
 
 Use this rule of thumb:

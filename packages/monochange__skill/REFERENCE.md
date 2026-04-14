@@ -253,6 +253,45 @@ lockfile_commands = [
 ]
 ```
 
+### Package publishing and trusted publishing
+
+Package publishing is separate from provider release publishing:
+
+- `mc placeholder-publish` bootstraps missing registry packages with placeholder `0.0.0` releases
+- `mc publish` runs built-in package-registry publishing for prepared release state
+- `mc publish-release` publishes hosted/provider releases such as GitHub releases
+
+Built-in package publishing currently supports only the canonical public registries:
+
+- Cargo → `crates.io`
+- npm packages → `npm`
+- Deno packages → `jsr`
+- Dart / Flutter packages → `pub.dev`
+
+If a workspace uses `pnpm`, monochange uses `pnpm publish` and `pnpm exec npm trust ...` instead of raw `npm` commands so workspace protocol and catalog dependency handling stays aligned with the workspace manager.
+
+Publishing is configured through `publish` on packages and ecosystems:
+
+```toml
+[ecosystems.npm.publish]
+mode = "builtin"
+trusted_publishing = true
+
+[package.web.publish.placeholder]
+readme_file = "docs/web-placeholder.md"
+```
+
+Placeholder README content can come from:
+
+- `publish.placeholder.readme`
+- `publish.placeholder.readme_file`
+
+`trusted_publishing = true` tells monochange to manage or verify trusted publishing when supported.
+
+- npm trusted publishing can be configured automatically from GitHub Actions context
+- Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks the next built-in release publish until trust is configured
+- Built-in publishing does not yet manage registry rate-limit retries or delayed requeues; use `mode = "external"` when your workflow needs custom scheduling
+
 ### Groups
 
 Groups synchronize versions across packages:
@@ -287,6 +326,7 @@ comment_on_failure = true
 - Changesets should reference configured package ids or group ids.
 - Prefer package ids over group ids when the change is package-specific — monochange propagates to dependents and groups automatically.
 - Source-provider release publishing is downstream from prepared release data, not a substitute for planning.
+- Built-in package publishing currently supports public registries only. Use `mode = "external"` for private or custom registries.
 - Changelog version headings now include the release date by default. Set `changelog_version_title = "{{ version }}"` to restore the previous format.
 
 ## MCP server

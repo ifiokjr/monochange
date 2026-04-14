@@ -70,6 +70,7 @@ Optional package fields:
 - `type`, when `[defaults].package_type` is set
 - `changelog`
 - `empty_update_message`
+- `publish`
 - `versioned_files`
 - `tag`
 - `release`
@@ -128,6 +129,97 @@ Fallback order:
 The built-in grouped-package fallback reads:
 
 > No package-specific changes were recorded; `{{ package }}` was updated to {{ version }} as part of group `{{ group }}`.
+
+## Package publishing
+
+Built-in package publishing is configured through `publish` on packages and ecosystems.
+
+```toml
+[ecosystems.npm.publish]
+enabled = true
+mode = "builtin"
+registry = "npm"
+trusted_publishing = true
+
+[package.web.publish]
+mode = "builtin"
+
+[package.web.publish.placeholder]
+readme_file = "docs/web-placeholder.md"
+```
+
+Supported fields:
+
+- `enabled` — include this package in managed publishing
+- `mode` — `builtin` or `external`
+- `registry` — public registry override for the package ecosystem
+- `trusted_publishing` — `true`/`false` or a table with `enabled`, `repository`, `workflow`, and `environment`
+- `placeholder.readme` — inline placeholder README content
+- `placeholder.readme_file` — workspace-relative file to use as placeholder README content
+
+Inheritance flows from `[ecosystems.<name>.publish]` to matching packages, and package-level values override the inherited defaults.
+
+Built-in publishing currently targets only the canonical public registry for each supported ecosystem:
+
+- Cargo → `crates.io`
+- npm packages → `npm`
+- Deno packages → `jsr`
+- Dart / Flutter packages → `pub.dev`
+
+If you need a private or custom registry, set `mode = "external"` and handle publication outside monochange.
+
+### Placeholder publishing
+
+`mc placeholder-publish` exists for the bootstrap case where a package must already exist in the registry before you can finish automation setup such as trusted publishing.
+
+For each managed package with built-in publishing enabled, monochange:
+
+- checks whether the package already exists in its configured public registry
+- skips packages that already exist
+- publishes a placeholder package only for packages that are missing
+- uses version `0.0.0`
+- renders a default placeholder README unless `placeholder.readme` or `placeholder.readme_file` overrides it
+
+`placeholder.readme` and `placeholder.readme_file` are mutually exclusive. If both are set, config validation fails.
+
+### Trusted publishing
+
+`trusted_publishing` lets you tell monochange that package publication is expected to come from a verified GitHub Actions context.
+
+```toml
+[ecosystems.npm.publish]
+trusted_publishing = true
+
+[package.cli.publish.trusted_publishing]
+enabled = true
+repository = "owner/repo"
+workflow = "publish.yml"
+environment = "publisher"
+```
+
+When `trusted_publishing` is enabled:
+
+- npm packages can be configured automatically with `npm trust github ...`
+- pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, so workspace protocol and catalog dependency handling stays aligned with the workspace manager
+- Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks built-in release publishing until trust is configured
+
+monochange resolves the GitHub trust context from:
+
+- explicit `repository`, `workflow`, and `environment` values in config
+- otherwise `[source]` plus GitHub Actions environment such as `GITHUB_WORKFLOW_REF` and `GITHUB_JOB`
+- and, when possible, the workflow job environment declared in `.github/workflows/<file>.yml`
+
+If monochange cannot determine the GitHub repository or workflow for an npm package, automatic trust setup cannot proceed.
+
+### Current implementation limits
+
+The built-in package publishing flow is intentionally narrow for now:
+
+- no private or custom registry support in `mode = "builtin"`
+- no built-in retry scheduler or delayed requeue for registry rate limits yet
+- manual trusted-publishing setup is still required for `crates.io`, `jsr`, and `pub.dev`
+
+If your workflow needs any of those today, keep the package on `mode = "external"` and let your own CI or scripts own publication.
 
 ## Groups
 

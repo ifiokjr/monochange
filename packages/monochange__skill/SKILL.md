@@ -41,22 +41,24 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 ## CLI commands
 
-| Command              | Purpose                                                                |
-| -------------------- | ---------------------------------------------------------------------- |
-| `mc init`            | Generate a starter `monochange.toml` from detected packages            |
-| `mc populate`        | Append missing built-in CLI command definitions to config              |
-| `mc validate`        | Validate config and changeset targets                                  |
-| `mc discover`        | Discover packages across ecosystems                                    |
-| `mc change`          | Create a `.changeset/*.md` file                                        |
-| `mc release`         | Prepare a release plan from changesets and refresh the cached manifest |
-| `mc commit-release`  | Prepare a release and create a local commit                            |
-| `mc publish-release` | Create provider releases                                               |
-| `mc release-pr`      | Open or update a release pull request                                  |
-| `mc affected`        | Evaluate changeset policy from changed paths                           |
-| `mc diagnostics`     | Show changeset context with git and review metadata                    |
-| `mc repair-release`  | Repair a recent release by retargeting tags                            |
-| `mc assist`          | Print assistant install and MCP setup guidance                         |
-| `mc mcp`             | Start the stdio MCP server                                             |
+| Command                  | Purpose                                                                |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `mc init`                | Generate a starter `monochange.toml` from detected packages            |
+| `mc populate`            | Append missing built-in CLI command definitions to config              |
+| `mc validate`            | Validate config and changeset targets                                  |
+| `mc discover`            | Discover packages across ecosystems                                    |
+| `mc change`              | Create a `.changeset/*.md` file                                        |
+| `mc release`             | Prepare a release plan from changesets and refresh the cached manifest |
+| `mc placeholder-publish` | Publish placeholder versions for packages missing from registries      |
+| `mc publish`             | Publish package artifacts using built-in registry workflows            |
+| `mc commit-release`      | Prepare a release and create a local commit                            |
+| `mc publish-release`     | Create provider releases                                               |
+| `mc release-pr`          | Open or update a release pull request                                  |
+| `mc affected`            | Evaluate changeset policy from changed paths                           |
+| `mc diagnostics`         | Show changeset context with git and review metadata                    |
+| `mc repair-release`      | Repair a recent release by retargeting tags                            |
+| `mc assist`              | Print assistant install and MCP setup guidance                         |
+| `mc mcp`                 | Start the stdio MCP server                                             |
 
 ## CLI step types
 
@@ -111,6 +113,17 @@ description: Guides agents through monochange discovery, changesets, release pla
 ### Lockfile commands
 
 Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, and Dart/Flutter. Explicit configuration overrides inference.
+
+### Publishing and trust
+
+- Package publishing is configured through `publish` on packages and ecosystems.
+- Built-in publishing currently supports only the canonical public registries: `crates.io`, `npm`, `jsr`, and `pub.dev`.
+- `mc placeholder-publish` exists for first-release bootstrap. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
+- Placeholder README content can come from `publish.placeholder.readme` or `publish.placeholder.readme_file`.
+- `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.
+- npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`.
+- Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
+- Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
 
 ### Release titles
 

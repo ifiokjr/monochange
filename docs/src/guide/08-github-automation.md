@@ -72,6 +72,22 @@ Use `--dry-run` first for `repair-release`. It is a destructive workflow because
 
 If immutable registry artifacts have already been published, prefer cutting a new patch release instead of retargeting the source release.
 
+## Package publishing and trusted publishing
+
+Package publishing is separate from provider release publishing:
+
+- `mc publish` handles package registries such as `crates.io`, `npm`, `jsr`, and `pub.dev`
+- `mc publish-release` handles hosted source-provider releases such as GitHub releases
+
+When `publish.trusted_publishing` is enabled, monochange can derive GitHub trust metadata from the workflow runtime and the configured `[source]` block. npm packages are the only ecosystem with built-in bulk trust automation today:
+
+- monochange checks the existing trust configuration first
+- if trust is missing, it runs `npm trust github ...`
+- pnpm workspaces run the trust command through `pnpm exec npm trust ...`
+- monochange verifies the result after running the trust command instead of assuming success
+
+For `crates.io`, `jsr`, and `pub.dev`, monochange reports the setup URL for the package and requires manual trusted-publishing setup before the next built-in release publish. Placeholder publishing can still proceed so the package exists before that manual step.
+
 ## Release notes, GitHub releases, and release PRs
 
 <!-- {=githubAutomationReleaseConfigExample} -->

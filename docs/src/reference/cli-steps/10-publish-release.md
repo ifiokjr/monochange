@@ -6,6 +6,8 @@
 
 For example, with a configured source provider it can create or update the outward release objects that correspond to monochange's prepared release targets.
 
+It does not publish package artifacts to registries. Package publishing lives in the built-in top-level `mc publish` and `mc placeholder-publish` commands.
+
 ## Why use it
 
 Use `PublishRelease` when you want monochange to handle provider-aware publication rather than stitching together release API calls manually.
@@ -16,6 +18,8 @@ That gives you:
 - dry-run previews that stay aligned with the prepared release state
 - a typed boundary between planning and provider mutation
 - source-provider integration driven by the same manifest and release target model as the rest of monochange
+
+Use `mc publish` instead when you want monochange to run `cargo publish`, `pnpm publish`, `dart pub publish`, `flutter pub publish`, or `deno publish` style package-registry commands.
 
 ## Inputs
 
@@ -119,4 +123,4 @@ Because `PublishRelease` understands monochange release targets, provider settin
 
 ## Common mistake
 
-Do not treat `PublishRelease` as a planning step. It is the mutation step after planning is already complete.
+Do not treat `PublishRelease` as either a planning step or a package-registry publish step. It is the hosted/provider mutation step after planning is already complete.
