@@ -4,9 +4,6 @@ on:
   push:
     tags:
       - "@monochange/skill/**"
-  workflow_run:
-    workflows: ["release"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
@@ -15,7 +12,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.tag || github.event.workflow_run.id || github.run_id }}
+  group: ${{ github.workflow }}-${{ inputs.tag || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -26,11 +23,7 @@ jobs:
       contents: read
       id-token: write
     if: >-
-      github.repository_owner == 'ifiokjr' &&
-      (
-        github.event_name != 'workflow_run' ||
-        github.event.workflow_run.conclusion == 'success'
-      )
+      github.repository_owner == 'ifiokjr'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -38,19 +31,11 @@ jobs:
         id: release_tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG='${{ inputs.tag }}'
           elif [ "${{ github.event_name }}" = "push" ]; then
             TAG='${{ github.ref_name }}'
-          else
-            mkdir -p "$RUNNER_TEMP/release-metadata"
-            gh run download "$WORKFLOW_RUN_ID" \
-              --repo "$GITHUB_REPOSITORY" \
-              --name npm-publish-metadata \
-              --dir "$RUNNER_TEMP/release-metadata"
-            TAG=$(cat "$RUNNER_TEMP/release-metadata/release-tag.txt")
           fi
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
