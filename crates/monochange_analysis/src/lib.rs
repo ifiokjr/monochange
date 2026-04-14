@@ -30,7 +30,7 @@ pub use frame::PrEnvironment;
 /// Different artifact types have different "user-facing" boundaries:
 /// - Libraries: public API signatures
 /// - Applications: UI behavior, user workflows
-/// - CliTools: commands, flags, output format
+/// - `CliTools`: commands, flags, output format
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ArtifactType {

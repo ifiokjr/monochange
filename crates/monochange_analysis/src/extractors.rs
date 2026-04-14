@@ -89,7 +89,7 @@ fn extract_library_changes(
 		}
 
 		let file_changes = match detection_level {
-			DetectionLevel::Basic => extract_library_basic(file, repo_root)?,
+			DetectionLevel::Basic => extract_library_basic(file, repo_root),
 			DetectionLevel::Signature => extract_library_signatures(file, repo_root)?,
 			DetectionLevel::Semantic => extract_library_semantic(file, repo_root)?,
 		};
@@ -106,14 +106,14 @@ fn extract_library_changes(
 }
 
 /// Basic level: Just detect file-level changes for libraries.
-fn extract_library_basic(file: &Path, _repo_root: &Path) -> MonochangeResult<Vec<SemanticChange>> {
+fn extract_library_basic(file: &Path, _repo_root: &Path) -> Vec<SemanticChange> {
 	// At basic level, we just note that a file changed
 	let description = format!("changes in {}", file.display());
 
-	Ok(vec![SemanticChange::Unknown {
+	vec![SemanticChange::Unknown {
 		path: file.to_path_buf(),
 		description,
-	}])
+	}]
 }
 
 /// Signature level: Extract function/type signatures for libraries.
@@ -127,14 +127,14 @@ fn extract_library_signatures(
 	let diff_output = get_file_diff(repo_root, file)?;
 
 	// Parse the diff for signature changes
-	let parsed_changes = parse_rust_signatures(&diff_output, file)?;
+	let parsed_changes = parse_rust_signatures(&diff_output, file);
 	changes.extend(parsed_changes);
 
 	Ok(changes)
 }
 
 /// Parse Rust signatures from diff output.
-fn parse_rust_signatures(diff: &str, file_path: &Path) -> MonochangeResult<Vec<SemanticChange>> {
+fn parse_rust_signatures(diff: &str, file_path: &Path) -> Vec<SemanticChange> {
 	let mut changes = Vec::new();
 	let mut line_number: Option<usize> = None;
 
@@ -146,28 +146,29 @@ fn parse_rust_signatures(diff: &str, file_path: &Path) -> MonochangeResult<Vec<S
 		}
 
 		// Look for added public items
-		if line.starts_with("+pub ") || line.starts_with("+pub(") {
-			if let Some(change) = parse_added_item(line, file_path, line_number) {
-				changes.push(change);
-			}
+		if (line.starts_with("+pub ") || line.starts_with("+pub("))
+			&& let Some(change) = parse_added_item(line, file_path, line_number)
+		{
+			changes.push(change);
 		}
 
 		// Look for removed public items (breaking changes)
-		if line.starts_with("-pub ") || line.starts_with("-pub(") {
-			if let Some(change) = parse_removed_item(line, file_path, line_number) {
-				changes.push(change);
-			}
+		if (line.starts_with("-pub ") || line.starts_with("-pub("))
+			&& let Some(change) = parse_removed_item(line, file_path, line_number)
+		{
+			changes.push(change);
 		}
 
 		// Increment line number for added lines
-		if !line.starts_with('-') && !line.starts_with("@@") {
-			if let Some(ref mut num) = line_number {
-				*num += 1;
-			}
+		if !line.starts_with('-')
+			&& !line.starts_with("@@")
+			&& let Some(ref mut num) = line_number
+		{
+			*num += 1;
 		}
 	}
 
-	Ok(changes)
+	changes
 }
 
 /// Parse a line with an added public item.
@@ -188,25 +189,18 @@ fn parse_added_item(
 
 	// Parse item kind
 	let tokens: Vec<&str> = rest.split_whitespace().collect();
-	if tokens.is_empty() {
-		return None;
-	}
-
-	let kind = tokens[0];
+	let kind = tokens.first()?;
 	let name = tokens.get(1)?.trim_end_matches('{').trim_end_matches(';');
 
-	let api_kind = match kind {
+	let api_kind = match *kind {
 		"fn" => ApiChangeKind::FunctionAdded,
-		"struct" => ApiChangeKind::TypeAdded,
-		"enum" => ApiChangeKind::TypeAdded,
+		"struct" | "enum" | "type" => ApiChangeKind::TypeAdded,
 		"trait" => ApiChangeKind::TraitAdded,
-		"type" => ApiChangeKind::TypeAdded,
-		"const" => ApiChangeKind::ConstantAdded,
-		"static" => ApiChangeKind::ConstantAdded,
+		"const" | "static" => ApiChangeKind::ConstantAdded,
 		_ => return None,
 	};
 
-	let signature = if kind == "fn" {
+	let signature = if *kind == "fn" {
 		// Extract function signature
 		let sig_start = rest.find("fn")?;
 		Some(rest[sig_start..].to_string())
@@ -244,21 +238,14 @@ fn parse_removed_item(
 
 	// Parse item kind
 	let tokens: Vec<&str> = rest.split_whitespace().collect();
-	if tokens.is_empty() {
-		return None;
-	}
-
-	let kind = tokens[0];
+	let kind = tokens.first()?;
 	let name = tokens.get(1)?.trim_end_matches('{').trim_end_matches(';');
 
-	let api_kind = match kind {
+	let api_kind = match *kind {
 		"fn" => ApiChangeKind::FunctionRemoved,
-		"struct" => ApiChangeKind::TypeRemoved,
-		"enum" => ApiChangeKind::TypeRemoved,
+		"struct" | "enum" | "type" => ApiChangeKind::TypeRemoved,
 		"trait" => ApiChangeKind::TraitRemoved,
-		"type" => ApiChangeKind::TypeRemoved,
-		"const" => ApiChangeKind::ConstantRemoved,
-		"static" => ApiChangeKind::ConstantRemoved,
+		"const" | "static" => ApiChangeKind::ConstantRemoved,
 		_ => return None,
 	};
 
@@ -276,16 +263,16 @@ fn parse_removed_item(
 
 /// Parse visibility modifier.
 fn parse_visibility(content: &str) -> Option<(Visibility, &str)> {
-	if content.starts_with("pub(crate)") {
-		Some((Visibility::Crate, &content[10..].trim_start()))
-	} else if content.starts_with("pub(super)") {
-		Some((Visibility::Super, &content[10..].trim_start()))
+	if let Some(stripped) = content.strip_prefix("pub(crate)") {
+		Some((Visibility::Crate, stripped.trim_start()))
+	} else if let Some(stripped) = content.strip_prefix("pub(super)") {
+		Some((Visibility::Super, stripped.trim_start()))
 	} else if content.starts_with("pub(in ") {
 		// Find closing paren
 		let end = content.find(')')?;
-		Some((Visibility::Restricted, &content[end + 1..].trim_start()))
-	} else if content.starts_with("pub ") {
-		Some((Visibility::Public, &content[4..].trim_start()))
+		Some((Visibility::Restricted, content.get(end + 1..)?.trim_start()))
+	} else if let Some(stripped) = content.strip_prefix("pub ") {
+		Some((Visibility::Public, stripped.trim_start()))
 	} else {
 		Some((Visibility::Private, content))
 	}
@@ -307,6 +294,7 @@ fn parse_hunk_header(line: &str) -> Option<usize> {
 }
 
 /// Semantic level: Full AST parsing (placeholder for future implementation).
+#[allow(clippy::unnecessary_wraps)]
 fn extract_library_semantic(
 	file: &Path,
 	_repo_root: &Path,
@@ -448,7 +436,6 @@ fn extract_app_signatures(
 		changes.push(SemanticChange::App(AppChange {
 			kind: match category {
 				AppFileCategory::Route => AppChangeKind::RouteAdded,
-				AppFileCategory::Component => AppChangeKind::ComponentAdded,
 				_ => AppChangeKind::ComponentAdded,
 			},
 			route: extract_route_from_path(file),
@@ -527,7 +514,7 @@ fn extract_route_from_path(file: &Path) -> Option<String> {
 fn extract_component_name(file: &Path) -> Option<String> {
 	file.file_stem()
 		.and_then(|s| s.to_str())
-		.map(|s| s.to_string())
+		.map(ToString::to_string)
 }
 
 /// Get category name.

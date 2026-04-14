@@ -1890,6 +1890,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "minijinja",
+ "monochange_analysis",
  "monochange_cargo",
  "monochange_config",
  "monochange_core",

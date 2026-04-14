@@ -52,7 +52,7 @@ pub enum ChangeFrame {
 		head: String,
 	},
 
-	/// PR comparison: target..pr_branch
+	/// PR comparison: `target..pr_branch`
 	PullRequest {
 		/// Target branch (e.g., "main")
 		target: String,
@@ -76,12 +76,13 @@ impl fmt::Display for ChangeFrame {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::WorkingDirectory => write!(f, "working directory"),
-			Self::BranchRange { base, head } => write!(f, "{}...{}", base, head),
+			Self::BranchRange { base, head } | Self::CustomRange { base, head } => {
+				write!(f, "{base}...{head}")
+			}
 			Self::PullRequest { target, pr_branch } => {
-				write!(f, "PR: {} <- {}", target, pr_branch)
+				write!(f, "PR: {target} <- {pr_branch}")
 			}
 			Self::StagedOnly => write!(f, "staged only"),
-			Self::CustomRange { base, head } => write!(f, "{}...{}", base, head),
 		}
 	}
 }
@@ -132,10 +133,11 @@ impl ChangeFrame {
 	pub fn revision_range(&self) -> String {
 		match self {
 			Self::WorkingDirectory => "HEAD".to_string(),
-			Self::BranchRange { base, head } => format!("{}...{}", base, head),
-			Self::PullRequest { target, pr_branch } => format!("{}...{}", target, pr_branch),
+			Self::BranchRange { base, head } | Self::CustomRange { base, head } => {
+				format!("{base}...{head}")
+			}
+			Self::PullRequest { target, pr_branch } => format!("{target}...{pr_branch}"),
 			Self::StagedOnly => "--staged".to_string(),
-			Self::CustomRange { base, head } => format!("{}...{}", base, head),
 		}
 	}
 
@@ -143,11 +145,9 @@ impl ChangeFrame {
 	#[must_use]
 	pub fn base_revision(&self) -> Option<&str> {
 		match self {
-			Self::WorkingDirectory => Some("HEAD"),
-			Self::BranchRange { base, .. } => Some(base.as_str()),
+			Self::WorkingDirectory | Self::StagedOnly => Some("HEAD"),
+			Self::BranchRange { base, .. } | Self::CustomRange { base, .. } => Some(base.as_str()),
 			Self::PullRequest { target, .. } => Some(target.as_str()),
-			Self::StagedOnly => Some("HEAD"),
-			Self::CustomRange { base, .. } => Some(base.as_str()),
 		}
 	}
 
@@ -156,10 +156,9 @@ impl ChangeFrame {
 	pub fn head_revision(&self) -> Option<&str> {
 		match self {
 			Self::WorkingDirectory => None, // Working directory has no revision
-			Self::BranchRange { head, .. } => Some(head.as_str()),
+			Self::BranchRange { head, .. } | Self::CustomRange { head, .. } => Some(head.as_str()),
 			Self::PullRequest { pr_branch, .. } => Some(pr_branch.as_str()),
 			Self::StagedOnly => Some("HEAD"),
-			Self::CustomRange { head, .. } => Some(head.as_str()),
 		}
 	}
 
@@ -225,15 +224,15 @@ pub struct PrEnvironment {
 /// Detect PR environment from common CI/CD variables.
 fn detect_pr_environment() -> Option<PrEnvironment> {
 	// GitHub Actions
-	if let Ok(event_name) = env::var("GITHUB_EVENT_NAME") {
-		if event_name == "pull_request" || event_name == "pull_request_target" {
-			return Some(PrEnvironment {
-				source_branch: env::var("GITHUB_HEAD_REF").ok()?,
-				target_branch: env::var("GITHUB_BASE_REF").ok()?,
-				pr_number: env::var("GITHUB_EVENT_NUMBER").ok(),
-				provider: "github".to_string(),
-			});
-		}
+	if let Ok(event_name) = env::var("GITHUB_EVENT_NAME")
+		&& (event_name == "pull_request" || event_name == "pull_request_target")
+	{
+		return Some(PrEnvironment {
+			source_branch: env::var("GITHUB_HEAD_REF").ok()?,
+			target_branch: env::var("GITHUB_BASE_REF").ok()?,
+			pr_number: env::var("GITHUB_EVENT_NUMBER").ok(),
+			provider: "github".to_string(),
+		});
 	}
 
 	// GitLab CI
@@ -347,17 +346,17 @@ fn get_default_branch(repo_root: &Path) -> Result<String, FrameError> {
 		.args(["rev-parse", "--abbrev-ref", "origin/HEAD"])
 		.output();
 
-	if let Ok(output) = output {
-		if output.status.success() {
-			let branch = String::from_utf8(output.stdout)
-				.map_err(|e| FrameError::Git(format!("invalid utf-8: {e}")))?
-				.trim()
-				.trim_start_matches("origin/")
-				.to_string();
+	if let Ok(output) = output
+		&& output.status.success()
+	{
+		let branch = String::from_utf8(output.stdout)
+			.map_err(|e| FrameError::Git(format!("invalid utf-8: {e}")))?
+			.trim()
+			.trim_start_matches("origin/")
+			.to_string();
 
-			if !branch.is_empty() {
-				return Ok(branch);
-			}
+		if !branch.is_empty() {
+			return Ok(branch);
 		}
 	}
 
@@ -368,10 +367,10 @@ fn get_default_branch(repo_root: &Path) -> Result<String, FrameError> {
 			.args(["rev-parse", "--verify", branch])
 			.output();
 
-		if let Ok(output) = output {
-			if output.status.success() {
-				return Ok(branch.to_string());
-			}
+		if let Ok(output) = output
+			&& output.status.success()
+		{
+			return Ok(branch.to_string());
 		}
 	}
 
