@@ -23,6 +23,9 @@ use monochange_core::lint::LintSeverity;
 mod cargo;
 mod npm;
 
+#[cfg(test)]
+mod snapshots;
+
 pub use cargo::CargoLintRules;
 pub use npm::NpmLintRules;
 

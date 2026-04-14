@@ -2,8 +2,6 @@
 
 //! Cargo-specific lint rules.
 
-use std::collections::BTreeSet;
-
 use monochange_core::lint::LintCategory;
 use monochange_core::lint::LintContext;
 use monochange_core::lint::LintFix;
@@ -12,10 +10,8 @@ use monochange_core::lint::LintResult;
 use monochange_core::lint::LintRule;
 use monochange_core::lint::LintRuleConfig;
 use monochange_core::lint::LintRuleRunner;
-use monochange_core::lint::LintSeverity;
 use toml_edit::DocumentMut;
 use toml_edit::Item;
-use toml_edit::Value;
 
 /// Cargo lint rules.
 pub struct CargoLintRules;
@@ -259,9 +255,13 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 
 					if !has_workspace {
 						// Find the position for the error
-						let span = value.span();
-						let location = LintLocation::new(ctx.manifest_path, 1, 1)
-							.with_span(span.start, span.end);
+						let span_range = value.span();
+						let location = LintLocation::new(ctx.manifest_path, 1, 1);
+						let location = if let Some(ref span) = span_range {
+							location.with_span(span.start, span.end)
+						} else {
+							location
+						};
 
 						let message = format!(
 							"Internal dependency '{}' should use 'workspace = true'",
@@ -282,14 +282,15 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 								new_table["workspace"] = toml_edit::value(true);
 								// Remove version if present since workspace provides it
 								new_table.remove("version");
-								format!("{} = {}", dep_name, new_table)
+								format!("{} = {}", dep_name, new_table.to_string().trim())
 							} else {
 								format!("{} = {{ workspace = true }}", dep_name)
 							};
 
+							let span = span_range.map(|s| (s.start, s.end)).unwrap_or((0, 0));
 							result = result.with_fix(LintFix::single(
 								"Add workspace = true",
-								(span.start, span.end),
+								span,
 								replacement,
 							));
 						}
@@ -457,7 +458,7 @@ impl LintRuleRunner for SortedDependenciesRule {
 							new_table[key] = value.clone();
 						}
 					}
-					let replacement = format!("[{}]\n{}", section, new_table);
+					let replacement = format!("[{}]\n{}", section, new_table.to_string().trim());
 
 					result = result.with_fix(LintFix::single(
 						"Sort dependencies alphabetically",
@@ -605,10 +606,11 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 
 		if config.bool_option("fix", true) {
 			// Add `publish = false` to [package]
-			let span = package.span();
+			let span_range = package.span();
+			let span = span_range.map(|s| (s.end, s.end)).unwrap_or((0, 0));
 			result = result.with_fix(LintFix::single(
 				"Add `publish = false` to [package]",
-				(span.end, span.end),
+				span,
 				"\npublish = false".to_string(),
 			));
 		}
