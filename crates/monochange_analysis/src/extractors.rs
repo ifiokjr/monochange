@@ -778,6 +778,7 @@ fn is_test_file(file: &Path) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_raw_string_hashes)]
 mod tests {
 	use super::*;
 
@@ -945,13 +946,12 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			assert_eq!(api.kind, ApiChangeKind::FunctionAdded);
-			assert_eq!(api.name, "new_function");
-			assert!(!api.is_breaking);
-		} else {
+		let Some(SemanticChange::Api(api)) = changes.first() else {
 			panic!("Expected API change");
-		}
+		};
+		assert_eq!(api.kind, ApiChangeKind::FunctionAdded);
+		assert_eq!(api.name, "new_function");
+		assert!(!api.is_breaking);
 	}
 
 	#[test]
@@ -961,13 +961,12 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			assert_eq!(api.kind, ApiChangeKind::FunctionRemoved);
-			assert_eq!(api.name, "old_function");
-			assert!(api.is_breaking);
-		} else {
+		let Some(SemanticChange::Api(api)) = changes.first() else {
 			panic!("Expected API change");
-		}
+		};
+		assert_eq!(api.kind, ApiChangeKind::FunctionRemoved);
+		assert_eq!(api.name, "old_function");
+		assert!(api.is_breaking);
 	}
 
 	#[test]
@@ -977,12 +976,11 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			assert_eq!(api.kind, ApiChangeKind::TypeAdded);
-			assert_eq!(api.name, "NewStruct");
-		} else {
+		let Some(SemanticChange::Api(api)) = changes.first() else {
 			panic!("Expected API change");
-		}
+		};
+		assert_eq!(api.kind, ApiChangeKind::TypeAdded);
+		assert_eq!(api.name, "NewStruct");
 	}
 
 	#[test]
@@ -992,13 +990,12 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			assert_eq!(api.kind, ApiChangeKind::TypeRemoved);
-			assert_eq!(api.name, "OldEnum");
-			assert!(api.is_breaking);
-		} else {
+		let Some(SemanticChange::Api(api)) = changes.first() else {
 			panic!("Expected API change");
-		}
+		};
+		assert_eq!(api.kind, ApiChangeKind::TypeRemoved);
+		assert_eq!(api.name, "OldEnum");
+		assert!(api.is_breaking);
 	}
 
 	#[test]
@@ -1008,12 +1005,11 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			assert_eq!(api.kind, ApiChangeKind::TraitAdded);
-			assert_eq!(api.name, "NewTrait");
-		} else {
+		let Some(SemanticChange::Api(api)) = changes.first() else {
 			panic!("Expected API change");
-		}
+		};
+		assert_eq!(api.kind, ApiChangeKind::TraitAdded);
+		assert_eq!(api.name, "NewTrait");
 	}
 
 	#[test]
@@ -1023,12 +1019,11 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			assert_eq!(api.kind, ApiChangeKind::ConstantAdded);
-			assert_eq!(api.name, "NEW_CONST");
-		} else {
+		let Some(SemanticChange::Api(api)) = changes.first() else {
 			panic!("Expected API change");
-		}
+		};
+		assert_eq!(api.kind, ApiChangeKind::ConstantAdded);
+		assert_eq!(api.name, "NEW_CONST");
 	}
 
 	#[test]
@@ -1038,13 +1033,12 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			assert_eq!(api.kind, ApiChangeKind::ConstantRemoved);
-			assert_eq!(api.name, "OLD_STATIC");
-			assert!(api.is_breaking);
-		} else {
+		let Some(SemanticChange::Api(api)) = changes.first() else {
 			panic!("Expected API change");
-		}
+		};
+		assert_eq!(api.kind, ApiChangeKind::ConstantRemoved);
+		assert_eq!(api.name, "OLD_STATIC");
+		assert!(api.is_breaking);
 	}
 
 	#[test]
@@ -1107,7 +1101,7 @@ mod tests {
 
 	#[test]
 	fn test_extract_command_name_not_found() {
-		let diff = r#"some other content"#;
+		let diff = r"some other content";
 		assert_eq!(extract_command_name(diff), None);
 	}
 
@@ -1119,7 +1113,7 @@ mod tests {
 
 	#[test]
 	fn test_extract_flag_name_not_found() {
-		let diff = r#"some other content"#;
+		let diff = r"some other content";
 		assert_eq!(extract_flag_name(diff), None);
 	}
 
@@ -1204,7 +1198,11 @@ mod tests {
 		assert_eq!(extraction.files_analyzed.len(), 1);
 		assert_eq!(extraction.files_skipped.len(), 1);
 		assert!(matches!(
-			extraction.files_skipped[0].1,
+			extraction
+				.files_skipped
+				.first()
+				.unwrap_or_else(|| panic!("Expected at least one skipped file"))
+				.1,
 			SkipReason::NotRelevant
 		));
 	}
@@ -1275,7 +1273,11 @@ mod tests {
 		assert_eq!(extraction.files_analyzed.len(), 0);
 		assert_eq!(extraction.files_skipped.len(), 1);
 		assert!(matches!(
-			extraction.files_skipped[0].1,
+			extraction
+				.files_skipped
+				.first()
+				.unwrap_or_else(|| panic!("Expected at least one skipped file"))
+				.1,
 			SkipReason::UnsupportedExtension
 		));
 	}
@@ -1307,24 +1309,24 @@ mod tests {
 		let repo_path = temp_dir.path();
 
 		// Initialize git repo
-		Command::new("git")
+		let output = Command::new("git")
 			.current_dir(repo_path)
 			.args(["init"])
-			.output()
-			.expect("Failed to init git");
+			.output();
+		assert!(output.is_ok(), "Failed to init git");
 
 		// Configure git user
-		Command::new("git")
+		let output = Command::new("git")
 			.current_dir(repo_path)
 			.args(["config", "user.email", "test@test.com"])
-			.output()
-			.expect("Failed to config email");
+			.output();
+		assert!(output.is_ok(), "Failed to config email");
 
-		Command::new("git")
+		let output = Command::new("git")
 			.current_dir(repo_path)
 			.args(["config", "user.name", "Test User"])
-			.output()
-			.expect("Failed to config name");
+			.output();
+		assert!(output.is_ok(), "Failed to config name");
 
 		// Create src directory and lib.rs
 		let src_dir = repo_path.join("src");
@@ -1332,17 +1334,17 @@ mod tests {
 
 		// Create initial file and commit
 		std::fs::write(src_dir.join("lib.rs"), "pub fn existing() {}").unwrap();
-		Command::new("git")
+		let output = Command::new("git")
 			.current_dir(repo_path)
 			.args(["add", "."])
-			.output()
-			.expect("Failed to add");
+			.output();
+		assert!(output.is_ok(), "Failed to add");
 
-		Command::new("git")
+		let output = Command::new("git")
 			.current_dir(repo_path)
 			.args(["commit", "-m", "Initial"])
-			.output()
-			.expect("Failed to commit");
+			.output();
+		assert!(output.is_ok(), "Failed to commit");
 
 		// Make a change
 		std::fs::write(
@@ -1376,7 +1378,11 @@ mod tests {
 		let extraction = result.unwrap();
 		assert_eq!(extraction.changes.len(), 1);
 		// Semantic level returns Unknown changes (placeholder)
-		if let SemanticChange::Unknown { description, .. } = &extraction.changes[0] {
+		if let SemanticChange::Unknown { description, .. } = extraction
+			.changes
+			.first()
+			.unwrap_or_else(|| panic!("Expected at least one change"))
+		{
 			assert!(description.contains("semantic analysis"));
 		} else {
 			panic!("Expected Unknown change");
@@ -1451,8 +1457,7 @@ mod tests {
 "#;
 		let changes = parse_rust_signatures(diff, Path::new("src/lib.rs"));
 		assert_eq!(changes.len(), 1);
-		if let SemanticChange::Api(api) = &changes[0] {
-			// Line number should be tracked
+		if let Some(SemanticChange::Api(api)) = changes.first() {
 			assert!(api.line_number.is_some());
 		}
 	}
@@ -1466,13 +1471,13 @@ mod tests {
 
 	#[test]
 	fn test_extract_command_name_with_single_quotes() {
-		let diff = r#"name = 'cmd'"#;
+		let diff = r"name = 'cmd'";
 		assert_eq!(extract_command_name(diff), Some("cmd".to_string()));
 	}
 
 	#[test]
 	fn test_extract_flag_name_with_single_quotes() {
-		let diff = r#"long = 'verbose'"#;
+		let diff = r"long = 'verbose'";
 		assert_eq!(extract_flag_name(diff), Some("verbose".to_string()));
 	}
 

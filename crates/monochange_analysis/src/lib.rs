@@ -779,8 +779,19 @@ mod tests {
 		let groups = group_changes(vec![change], ArtifactType::Library, &thresholds).unwrap();
 
 		assert_eq!(groups.len(), 1);
-		assert!(groups[0].has_breaking);
-		assert!(matches!(groups[0].suggested_bump, BumpSuggestion::Major));
+		assert!(
+			groups
+				.first()
+				.unwrap_or_else(|| panic!("expected at least 1 group"))
+				.has_breaking
+		);
+		assert!(matches!(
+			groups
+				.first()
+				.unwrap_or_else(|| panic!("expected at least 1 group"))
+				.suggested_bump,
+			BumpSuggestion::Major
+		));
 	}
 
 	#[test]
@@ -813,8 +824,18 @@ mod tests {
 		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
 
 		assert_eq!(groups.len(), 2);
-		assert!(!groups[0].has_breaking);
-		assert!(!groups[1].has_breaking);
+		assert!(
+			!groups
+				.first()
+				.unwrap_or_else(|| panic!("expected at least 1 group"))
+				.has_breaking
+		);
+		assert!(
+			!groups
+				.get(1)
+				.unwrap_or_else(|| panic!("expected at least 2 groups"))
+				.has_breaking
+		);
 	}
 
 	#[test]
@@ -841,7 +862,7 @@ mod tests {
 			file_path: PathBuf::from("src/lib.rs"),
 			line_number: None,
 		});
-		assert!(format!("{:?}", api).contains("Api"));
+		assert!(format!("{api:?}").contains("Api"));
 
 		let app = SemanticChange::App(AppChange {
 			kind: AppChangeKind::ComponentAdded,
@@ -851,7 +872,7 @@ mod tests {
 			is_user_visible: true,
 			file_path: PathBuf::from("src/components/Button.tsx"),
 		});
-		assert!(format!("{:?}", app).contains("App"));
+		assert!(format!("{app:?}").contains("App"));
 
 		let cli = SemanticChange::Cli(CliChange {
 			kind: CliChangeKind::FlagAdded,
@@ -861,20 +882,20 @@ mod tests {
 			is_breaking: false,
 			file_path: PathBuf::from("src/cli.rs"),
 		});
-		assert!(format!("{:?}", cli).contains("Cli"));
+		assert!(format!("{cli:?}").contains("Cli"));
 
 		let config = SemanticChange::Config(ConfigChange {
 			file_name: "config.toml".to_string(),
 			description: "Changed port".to_string(),
 			is_user_facing: true,
 		});
-		assert!(format!("{:?}", config).contains("Config"));
+		assert!(format!("{config:?}").contains("Config"));
 
 		let unknown = SemanticChange::Unknown {
 			path: PathBuf::from("unknown.txt"),
 			description: "Unknown change".to_string(),
 		};
-		assert!(format!("{:?}", unknown).contains("Unknown"));
+		assert!(format!("{unknown:?}").contains("Unknown"));
 	}
 
 	#[test]
@@ -1151,7 +1172,7 @@ mod tests {
 		];
 
 		for kind in kinds {
-			let debug = format!("{:?}", kind);
+			let debug = format!("{kind:?}");
 			assert!(!debug.is_empty());
 		}
 	}
@@ -1175,7 +1196,7 @@ mod tests {
 		];
 
 		for kind in kinds {
-			let debug = format!("{:?}", kind);
+			let debug = format!("{kind:?}");
 			assert!(!debug.is_empty());
 		}
 	}
@@ -1196,7 +1217,7 @@ mod tests {
 		];
 
 		for kind in kinds {
-			let debug = format!("{:?}", kind);
+			let debug = format!("{kind:?}");
 			assert!(!debug.is_empty());
 		}
 	}
@@ -1212,7 +1233,7 @@ mod tests {
 		];
 
 		for reason in reasons {
-			let debug = format!("{:?}", reason);
+			let debug = format!("{reason:?}");
 			assert!(!debug.is_empty());
 		}
 	}
@@ -1283,7 +1304,7 @@ mod tests {
 	#[test]
 	fn test_grouping_thresholds_clone() {
 		let thresholds = GroupingThresholds::default();
-		let cloned = thresholds.clone();
+		let cloned = thresholds;
 		assert_eq!(thresholds.group_public_api, cloned.group_public_api);
 	}
 
@@ -1365,49 +1386,49 @@ mod tests {
 	#[test]
 	fn test_api_change_kind_clone() {
 		let kind = ApiChangeKind::FunctionAdded;
-		let cloned = kind.clone();
+		let cloned = kind;
 		assert_eq!(kind, cloned);
 	}
 
 	#[test]
 	fn test_app_change_kind_clone() {
 		let kind = AppChangeKind::RouteAdded;
-		let cloned = kind.clone();
+		let cloned = kind;
 		assert_eq!(kind, cloned);
 	}
 
 	#[test]
 	fn test_cli_change_kind_clone() {
 		let kind = CliChangeKind::CommandAdded;
-		let cloned = kind.clone();
+		let cloned = kind;
 		assert_eq!(kind, cloned);
 	}
 
 	#[test]
 	fn test_bump_suggestion_clone() {
 		let bump = BumpSuggestion::Minor;
-		let cloned = bump.clone();
+		let cloned = bump;
 		assert_eq!(bump, cloned);
 	}
 
 	#[test]
 	fn test_artifact_type_clone() {
 		let artifact = ArtifactType::Library;
-		let cloned = artifact.clone();
+		let cloned = artifact;
 		assert_eq!(artifact, cloned);
 	}
 
 	#[test]
 	fn test_detection_level_clone() {
 		let level = DetectionLevel::Signature;
-		let cloned = level.clone();
+		let cloned = level;
 		assert_eq!(level, cloned);
 	}
 
 	#[test]
 	fn test_visibility_clone() {
 		let vis = Visibility::Public;
-		let cloned = vis.clone();
+		let cloned = vis;
 		assert_eq!(vis, cloned);
 	}
 
@@ -1463,8 +1484,10 @@ mod tests {
 			line_number: Some(10),
 		};
 		let change = SemanticChange::Api(api);
-		let json = serde_json::to_string(&change).expect("should serialize");
-		let deserialized: SemanticChange = serde_json::from_str(&json).expect("should deserialize");
+		let json =
+			serde_json::to_string(&change).unwrap_or_else(|e| panic!("should serialize: {e}"));
+		let deserialized: SemanticChange =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 		assert!(matches!(deserialized, SemanticChange::Api(_)));
 	}
 
@@ -1480,8 +1503,10 @@ mod tests {
 			has_breaking: false,
 			confidence: 0.9,
 		};
-		let json = serde_json::to_string(&group).expect("should serialize");
-		let deserialized: ChangeGroup = serde_json::from_str(&json).expect("should deserialize");
+		let json =
+			serde_json::to_string(&group).unwrap_or_else(|e| panic!("should serialize: {e}"));
+		let deserialized: ChangeGroup =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 		assert_eq!(deserialized.package_id, "test");
 	}
 
@@ -1539,8 +1564,18 @@ mod tests {
 		let thresholds = GroupingThresholds::default();
 		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
 		assert_eq!(groups.len(), 2);
-		assert!(!groups[0].has_breaking);
-		assert!(!groups[1].has_breaking);
+		assert!(
+			!groups
+				.first()
+				.unwrap_or_else(|| panic!("expected at least 1 group"))
+				.has_breaking
+		);
+		assert!(
+			!groups
+				.get(1)
+				.unwrap_or_else(|| panic!("expected at least 2 groups"))
+				.has_breaking
+		);
 	}
 
 	#[test]
@@ -1558,8 +1593,19 @@ mod tests {
 		let thresholds = GroupingThresholds::default();
 		let groups = group_changes(changes, ArtifactType::Library, &thresholds).unwrap();
 		assert_eq!(groups.len(), 1);
-		assert!(groups[0].has_breaking);
-		assert!(matches!(groups[0].suggested_bump, BumpSuggestion::Major));
+		assert!(
+			groups
+				.first()
+				.unwrap_or_else(|| panic!("expected at least 1 group"))
+				.has_breaking
+		);
+		assert!(matches!(
+			groups
+				.first()
+				.unwrap_or_else(|| panic!("expected at least 1 group"))
+				.suggested_bump,
+			BumpSuggestion::Major
+		));
 	}
 
 	#[test]
@@ -1595,17 +1641,20 @@ mod tests {
 	#[test]
 	fn test_serialize_deserialize_analysis_config() {
 		let config = AnalysisConfig::default();
-		let json = serde_json::to_string(&config).expect("should serialize");
-		let deserialized: AnalysisConfig = serde_json::from_str(&json).expect("should deserialize");
+		let json =
+			serde_json::to_string(&config).unwrap_or_else(|e| panic!("should serialize: {e}"));
+		let deserialized: AnalysisConfig =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 		assert_eq!(config.max_suggestions, deserialized.max_suggestions);
 	}
 
 	#[test]
 	fn test_serialize_deserialize_grouping_thresholds() {
 		let thresholds = GroupingThresholds::default();
-		let json = serde_json::to_string(&thresholds).expect("should serialize");
+		let json =
+			serde_json::to_string(&thresholds).unwrap_or_else(|e| panic!("should serialize: {e}"));
 		let deserialized: GroupingThresholds =
-			serde_json::from_str(&json).expect("should deserialize");
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 		assert_eq!(thresholds.group_public_api, deserialized.group_public_api);
 	}
 
@@ -1618,9 +1667,10 @@ mod tests {
 			BumpSuggestion::Major,
 		];
 		for bump in bumps {
-			let json = serde_json::to_string(&bump).expect("should serialize");
+			let json =
+				serde_json::to_string(&bump).unwrap_or_else(|e| panic!("should serialize: {e}"));
 			let deserialized: BumpSuggestion =
-				serde_json::from_str(&json).expect("should deserialize");
+				serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 			assert_eq!(bump, deserialized);
 		}
 	}
@@ -1633,9 +1683,10 @@ mod tests {
 			DetectionLevel::Semantic,
 		];
 		for level in levels {
-			let json = serde_json::to_string(&level).expect("should serialize");
+			let json =
+				serde_json::to_string(&level).unwrap_or_else(|e| panic!("should serialize: {e}"));
 			let deserialized: DetectionLevel =
-				serde_json::from_str(&json).expect("should deserialize");
+				serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 			assert_eq!(level, deserialized);
 		}
 	}
@@ -1649,9 +1700,10 @@ mod tests {
 			ArtifactType::Mixed,
 		];
 		for artifact_type in types {
-			let json = serde_json::to_string(&artifact_type).expect("should serialize");
+			let json = serde_json::to_string(&artifact_type)
+				.unwrap_or_else(|e| panic!("should serialize: {e}"));
 			let deserialized: ArtifactType =
-				serde_json::from_str(&json).expect("should deserialize");
+				serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 			assert_eq!(artifact_type, deserialized);
 		}
 	}
@@ -1752,7 +1804,7 @@ mod tests {
 			file_path: PathBuf::from("src/lib.rs"),
 			line_number: Some(42),
 		};
-		let debug = format!("{:?}", api);
+		let debug = format!("{api:?}");
 		assert!(debug.contains("FunctionAdded"));
 		assert!(debug.contains("test"));
 	}
@@ -1767,7 +1819,7 @@ mod tests {
 			is_user_visible: true,
 			file_path: PathBuf::from("src/pages/home.tsx"),
 		};
-		let debug = format!("{:?}", app);
+		let debug = format!("{app:?}");
 		assert!(debug.contains("RouteAdded"));
 		assert!(debug.contains("home"));
 	}
@@ -1782,7 +1834,7 @@ mod tests {
 			is_breaking: false,
 			file_path: PathBuf::from("src/cli.rs"),
 		};
-		let debug = format!("{:?}", cli);
+		let debug = format!("{cli:?}");
 		assert!(debug.contains("CommandAdded"));
 		assert!(debug.contains("build"));
 	}
@@ -1794,7 +1846,7 @@ mod tests {
 			description: "Changed port".to_string(),
 			is_user_facing: true,
 		};
-		let debug = format!("{:?}", config);
+		let debug = format!("{config:?}");
 		assert!(debug.contains("config.toml"));
 		assert!(debug.contains("Changed port"));
 	}
@@ -1886,7 +1938,7 @@ mod tests {
 				SemanticChange::Api(ApiChange {
 					kind: ApiChangeKind::FunctionAdded,
 					visibility: Visibility::Public,
-					name: format!("fn{}", i),
+					name: format!("fn{i}"),
 					signature: None,
 					doc_comment: None,
 					is_breaking: false,

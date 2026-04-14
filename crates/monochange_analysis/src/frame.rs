@@ -694,7 +694,7 @@ mod tests {
 			provider: "github".to_string(),
 		};
 		// Test that debug formatting works
-		let debug_str = format!("{:?}", pr_env);
+		let debug_str = format!("{pr_env:?}");
 		assert!(debug_str.contains("PrEnvironment"));
 		assert!(debug_str.contains("feature"));
 		assert!(debug_str.contains("main"));
@@ -762,24 +762,30 @@ mod tests {
 			base: "main".to_string(),
 			head: "feature".to_string(),
 		};
-		let json = serde_json::to_string(&frame).expect("Should serialize");
-		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		let json =
+			serde_json::to_string(&frame).unwrap_or_else(|e| panic!("Should serialize: {e}"));
+		let deserialized: ChangeFrame =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("Should deserialize: {e}"));
 		assert_eq!(frame.to_string(), deserialized.to_string());
 	}
 
 	#[test]
 	fn test_change_frame_working_directory_serialize() {
 		let frame = ChangeFrame::WorkingDirectory;
-		let json = serde_json::to_string(&frame).expect("Should serialize");
-		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		let json =
+			serde_json::to_string(&frame).unwrap_or_else(|e| panic!("Should serialize: {e}"));
+		let deserialized: ChangeFrame =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("Should deserialize: {e}"));
 		assert!(matches!(deserialized, ChangeFrame::WorkingDirectory));
 	}
 
 	#[test]
 	fn test_change_frame_staged_only_serialize() {
 		let frame = ChangeFrame::StagedOnly;
-		let json = serde_json::to_string(&frame).expect("Should serialize");
-		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		let json =
+			serde_json::to_string(&frame).unwrap_or_else(|e| panic!("Should serialize: {e}"));
+		let deserialized: ChangeFrame =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("Should deserialize: {e}"));
 		assert!(matches!(deserialized, ChangeFrame::StagedOnly));
 	}
 
@@ -789,8 +795,10 @@ mod tests {
 			target: "main".to_string(),
 			pr_branch: "feature".to_string(),
 		};
-		let json = serde_json::to_string(&frame).expect("Should serialize");
-		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		let json =
+			serde_json::to_string(&frame).unwrap_or_else(|e| panic!("Should serialize: {e}"));
+		let deserialized: ChangeFrame =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("Should deserialize: {e}"));
 		assert!(matches!(deserialized, ChangeFrame::PullRequest { .. }));
 	}
 
@@ -800,8 +808,10 @@ mod tests {
 			base: "v1.0.0".to_string(),
 			head: "v2.0.0".to_string(),
 		};
-		let json = serde_json::to_string(&frame).expect("Should serialize");
-		let deserialized: ChangeFrame = serde_json::from_str(&json).expect("Should deserialize");
+		let json =
+			serde_json::to_string(&frame).unwrap_or_else(|e| panic!("Should serialize: {e}"));
+		let deserialized: ChangeFrame =
+			serde_json::from_str(&json).unwrap_or_else(|e| panic!("Should deserialize: {e}"));
 		assert!(matches!(deserialized, ChangeFrame::CustomRange { .. }));
 	}
 
@@ -928,9 +938,10 @@ mod tests {
 		];
 
 		for frame in frames {
-			let json = serde_json::to_string(&frame).expect("should serialize");
+			let json =
+				serde_json::to_string(&frame).unwrap_or_else(|e| panic!("should serialize: {e}"));
 			let deserialized: ChangeFrame =
-				serde_json::from_str(&json).expect("should deserialize");
+				serde_json::from_str(&json).unwrap_or_else(|e| panic!("should deserialize: {e}"));
 			assert_eq!(frame.to_string(), deserialized.to_string());
 		}
 	}
@@ -943,7 +954,7 @@ mod tests {
 			pr_number: Some("42".to_string()),
 			provider: "github".to_string(),
 		};
-		let debug = format!("{:?}", pr_env);
+		let debug = format!("{pr_env:?}");
 		assert!(debug.contains("PrEnvironment"));
 		assert!(debug.contains("feature"));
 		assert!(debug.contains("main"));
@@ -956,7 +967,7 @@ mod tests {
 			base: "main".to_string(),
 			head: "feature".to_string(),
 		};
-		let debug = format!("{:?}", frame);
+		let debug = format!("{frame:?}");
 		assert!(debug.contains("BranchRange"));
 		assert!(debug.contains("main"));
 		assert!(debug.contains("feature"));
