@@ -108,6 +108,49 @@ As features are added and removed, changesets must be actively managed throughou
 
 <!-- {/changesetLifecycleDecisionMatrix} -->
 
+**Golden rule:** Create a new changeset for a genuinely new user-facing change, but collapse near-duplicate notes before finalizing. If several packages changed for the same outward reason and would otherwise produce the same release note with different names, combine them into one related multi-package changeset.
+
+#### Similar-note consolidation
+
+Do not produce several changesets that all say the same thing with only the package id swapped out.
+
+**Bad:** cloned compatibility notes for adjacent packages
+
+```markdown
+---
+monochange_github: patch
+---
+
+#### align release manifest example with package publications
+
+---
+monochange_gitlab: none
+---
+
+#### align release manifest fixture with package publications
+
+---
+monochange_gitea: none
+---
+
+#### align release manifest fixture with package publications
+```
+
+**Good:** one combined changeset for the shared outward change
+
+```markdown
+---
+monochange_github: patch
+monochange_gitlab: none
+monochange_gitea: none
+monochange_hosting: none
+---
+
+#### align provider and hosting release manifests with package publications
+
+All affected provider-facing crates now use the expanded `ReleaseManifest` shape consistently.
+```
+
 #### Example workflow
 
 **Scenario 1: Feature evolves during development**

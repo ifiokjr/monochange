@@ -16,6 +16,7 @@ Agents are now instructed to:
 
 - review existing `.changeset/*.md` files before writing a new one
 - keep changesets package-centric and split unrelated features apart
+- combine near-duplicate changesets when the outward change is the same across multiple related packages
 - update an existing changeset only when the same feature expands in scope
 - remove stale changesets when a feature is reverted before release
 - dedicate separate changesets to breaking changes with migration guidance
