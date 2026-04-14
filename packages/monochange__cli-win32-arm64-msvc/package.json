@@ -18,8 +18,7 @@
 		"arm64"
 	],
 	"files": [
-		"bin",
-		"LICENSE"
+		"bin"
 	],
 	"publishConfig": {
 		"access": "public",

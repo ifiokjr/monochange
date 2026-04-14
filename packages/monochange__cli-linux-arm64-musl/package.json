@@ -21,8 +21,7 @@
 		"musl"
 	],
 	"files": [
-		"bin",
-		"LICENSE"
+		"bin"
 	],
 	"publishConfig": {
 		"access": "public",
