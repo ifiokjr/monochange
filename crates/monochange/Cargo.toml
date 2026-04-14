@@ -4,10 +4,10 @@ version = { workspace = true }
 categories = { workspace = true }
 documentation = "https://docs.rs/monochange"
 edition = { workspace = true }
-include = { workspace = true }
+include = ["src/**/*.rs", "src/**/*.yml", "src/**/*.toml", "Cargo.toml", "readme.md"]
 keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
 license = { workspace = true }
-readme = { workspace = true }
+readme = "readme.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = "Manage versions and releases for your multiplatform, multilanguage monorepo"
