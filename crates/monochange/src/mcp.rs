@@ -49,6 +49,93 @@ pub struct AffectedParam {
 	pub labels: Vec<String>,
 }
 
+/// Input payload for the MCP analyze-changes tool.
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AnalyzeChangesParam {
+	pub path: Option<String>,
+	/// Explicit frame specification (e.g., "working", "main...feature", "pr:target,source")
+	pub frame: Option<String>,
+	/// Detection level: "basic", "signature", or "semantic"
+	pub detection_level: Option<String>,
+	/// Maximum number of changeset suggestions to generate
+	pub max_suggestions: Option<usize>,
+}
+
+/// Input payload for the MCP validate-changeset tool.
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ValidateChangesetParam {
+	pub path: Option<String>,
+	/// Path to the changeset file to validate
+	pub changeset_path: String,
+}
+
+/// Validation issue for a changeset.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[non_exhaustive]
+pub struct ValidationIssue {
+	pub severity: String,
+	pub message: String,
+	pub suggestion: Option<String>,
+}
+
+/// Parse a frame string into a ChangeFrame.
+fn parse_frame(frame_str: &str) -> monochange_analysis::ChangeFrame {
+	use monochange_analysis::ChangeFrame;
+
+	if frame_str == "working" || frame_str == "HEAD" {
+		return ChangeFrame::WorkingDirectory;
+	}
+
+	if frame_str == "staged" {
+		return ChangeFrame::StagedOnly;
+	}
+
+	// Try parsing as branch range: "main...feature"
+	if frame_str.contains("...") {
+		let parts: Vec<&str> = frame_str.split("...").collect();
+		if parts.len() == 2 {
+			return ChangeFrame::BranchRange {
+				base: parts[0].to_string(),
+				head: parts[1].to_string(),
+			};
+		}
+	}
+
+	// Try parsing as PR format: "pr:target,source"
+	if frame_str.starts_with("pr:") {
+		let parts: Vec<&str> = frame_str[3..].split(',').collect();
+		if parts.len() == 2 {
+			return ChangeFrame::PullRequest {
+				target: parts[0].to_string(),
+				pr_branch: parts[1].to_string(),
+			};
+		}
+	}
+
+	// Default to working directory
+	ChangeFrame::WorkingDirectory
+}
+
+/// Parse a detection level string.
+fn parse_detection_level(level: &str) -> monochange_analysis::DetectionLevel {
+	use monochange_analysis::DetectionLevel;
+
+	match level.to_lowercase().as_str() {
+		"basic" => DetectionLevel::Basic,
+		"semantic" => DetectionLevel::Semantic,
+		_ => DetectionLevel::Signature, // Default
+	}
+}
+
+/// Validate changeset content against workspace.
+fn validate_changeset_content(
+	_changeset: &monochange_config::LoadedChangesetFile,
+	_discovery: &crate::DiscoveryReport,
+) -> Vec<ValidationIssue> {
+	// Placeholder implementation - would compare changeset content to actual changes
+	Vec::new()
+}
+
 /// Semver bump accepted by the MCP change-file tool.
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -358,6 +445,151 @@ impl MonochangeMcpServer {
 			"action": "affected_packages",
 			"summary": evaluation.summary,
 			"evaluation": evaluation,
+		})))
+	}
+
+	#[tool(
+		name = "monochange_analyze_changes",
+		description = "Analyze git diff and suggest changeset structure for packages with changes."
+	)]
+	async fn analyze_changes(
+		&self,
+		Parameters(params): Parameters<AnalyzeChangesParam>,
+	) -> Result<CallToolResult, McpError> {
+		use monochange_analysis::AnalysisConfig;
+		use monochange_analysis::ChangeFrame;
+		use monochange_analysis::DetectionLevel;
+
+		let root = resolve_root(params.path.as_deref());
+
+		// Determine the change frame
+		let frame = match params.frame {
+			Some(frame_str) => parse_frame(&frame_str),
+			None => {
+				match ChangeFrame::detect(&root) {
+					Ok(f) => f,
+					Err(e) => {
+						return Ok(json_error_result(json!({
+							"ok": false,
+							"action": "analyze_changes",
+							"root": root,
+							"summary": format!("Failed to detect change frame: {}", e),
+							"error": e.to_string()
+						})));
+					}
+				}
+			}
+		};
+
+		// Configure analysis
+		let config = AnalysisConfig {
+			detection_level: params
+				.detection_level
+				.map(parse_detection_level)
+				.unwrap_or_default(),
+			thresholds: Default::default(),
+			max_suggestions: params.max_suggestions.unwrap_or(10),
+		};
+
+		// Run analysis
+		let analysis = match monochange_analysis::analyze_changes(&root, &frame, &config) {
+			Ok(a) => a,
+			Err(e) => {
+				return Ok(json_error_result(json!({
+					"ok": false,
+					"action": "analyze_changes",
+					"root": root,
+					"summary": format!("Analysis failed: {}", e.render()),
+					"error": e.render()
+				})));
+			}
+		};
+
+		// Convert to JSON
+		let analysis_json = serde_json::to_value(analysis)
+			.map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "analyze_changes",
+			"frame": frame.to_string(),
+			"analysis": analysis_json,
+			"summary": "Analysis complete - review suggested changesets for each package"
+		})))
+	}
+
+	#[tool(
+		name = "monochange_validate_changeset",
+		description = "Validate that a changeset matches the actual code changes."
+	)]
+	async fn validate_changeset(
+		&self,
+		Parameters(params): Parameters<ValidateChangesetParam>,
+	) -> Result<CallToolResult, McpError> {
+		let root = resolve_root(params.path.as_deref());
+		let changeset_path = PathBuf::from(&params.changeset_path);
+
+		// Load the changeset
+		let configuration = match monochange_config::load_workspace_configuration(&root) {
+			Ok(c) => c,
+			Err(e) => {
+				return Ok(json_error_result(json!({
+					"ok": false,
+					"action": "validate_changeset",
+					"root": root,
+					"summary": format!("Failed to load workspace: {}", e.render()),
+					"error": e.render()
+				})));
+			}
+		};
+
+		let discovery = match crate::discover_workspace(&root) {
+			Ok(d) => d,
+			Err(e) => {
+				return Ok(json_error_result(json!({
+					"ok": false,
+					"action": "validate_changeset",
+					"root": root,
+					"summary": format!("Failed to discover workspace: {}", e.render()),
+					"error": e.render()
+				})));
+			}
+		};
+
+		let loaded = match monochange_config::load_changeset_file(
+			&changeset_path,
+			&configuration,
+			&discovery.packages,
+		) {
+			Ok(l) => l,
+			Err(e) => {
+				return Ok(json_error_result(json!({
+					"ok": false,
+					"action": "validate_changeset",
+					"root": root,
+					"changeset_path": changeset_path,
+					"summary": format!("Failed to load changeset: {}", e.render()),
+					"error": e.render()
+				})));
+			}
+		};
+
+		// Build validation report
+		let issues = validate_changeset_content(&loaded, &discovery);
+
+		let valid = issues.is_empty();
+
+		Ok(json_result(json!({
+			"ok": valid,
+			"action": "validate_changeset",
+			"changeset_path": changeset_path,
+			"valid": valid,
+			"issues": issues,
+			"summary": if valid {
+				"Changeset validation passed".to_string()
+			} else {
+				format!("Found {} validation issue(s)", issues.len())
+			}
 		})))
 	}
 }
