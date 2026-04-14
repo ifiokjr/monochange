@@ -311,6 +311,7 @@ packages = [
 	"monochange_gitlab",
 	"monochange_gitea",
 	"monochange_hosting",
+	"monochange_analysis",
 	"@monochange/cli",
 	"@monochange/cli-darwin-arm64",
 	"@monochange/cli-darwin-x64",
