@@ -59,6 +59,7 @@
 //!         rendered_changelog_title: "[1.2.0](https://example.com) (2026-04-06)".to_string(),
 //!     }],
 //!     released_packages: vec!["workflow-core".to_string(), "workflow-app".to_string()],
+//!     package_publications: Vec::new(),
 //!     changed_files: Vec::new(),
 //!     changesets: Vec::new(),
 //!     changelogs: Vec::new(),
