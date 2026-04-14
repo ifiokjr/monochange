@@ -32,6 +32,7 @@ use crate::PackageType;
 use crate::ProviderBotSettings;
 use crate::ProviderMergeRequestSettings;
 use crate::ProviderReleaseSettings;
+use crate::PublishMode;
 use crate::PublishSettings;
 use crate::PublishState;
 use crate::RELEASE_RECORD_END_MARKER;
@@ -39,6 +40,7 @@ use crate::RELEASE_RECORD_HEADING;
 use crate::RELEASE_RECORD_KIND;
 use crate::RELEASE_RECORD_SCHEMA_VERSION;
 use crate::RELEASE_RECORD_START_MARKER;
+use crate::RegistryKind;
 use crate::ReleaseManifest;
 use crate::ReleaseManifestPlan;
 use crate::ReleaseNotesDocument;
@@ -211,6 +213,19 @@ fn init_git_repository(root: &Path) {
 		"git checkout -B main failed:\n{}",
 		String::from_utf8_lossy(&checkout.stderr)
 	);
+}
+
+#[test]
+fn publish_mode_and_registry_kind_display_canonical_names() {
+	assert_eq!(PublishMode::Builtin.as_str(), "builtin");
+	assert_eq!(PublishMode::External.as_str(), "external");
+	assert_eq!(PublishMode::Builtin.to_string(), "builtin");
+	assert_eq!(PublishMode::External.to_string(), "external");
+
+	assert_eq!(RegistryKind::CratesIo.as_str(), "crates_io");
+	assert_eq!(RegistryKind::Npm.as_str(), "npm");
+	assert_eq!(RegistryKind::Jsr.as_str(), "jsr");
+	assert_eq!(RegistryKind::PubDev.as_str(), "pub_dev");
 }
 
 #[test]

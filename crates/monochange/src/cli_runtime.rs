@@ -624,22 +624,15 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::PlaceholderPublish { .. } => {
-					let report = package_publish::run_placeholder_publish(
-						root,
-						configuration,
-						context.dry_run,
-					)?;
+					#[rustfmt::skip]
+					let report = package_publish::run_placeholder_publish(root, configuration, context.dry_run)?;
 					context.package_publish_report = Some(report);
 					output = None;
 					Ok(())
 				}
 				CliStepDefinition::PublishPackages { .. } => {
-					let report = package_publish::run_publish_packages(
-						root,
-						configuration,
-						context.prepared_release.as_ref(),
-						context.dry_run,
-					)?;
+					#[rustfmt::skip]
+					let report = package_publish::run_publish_packages(root, configuration, context.prepared_release.as_ref(), context.dry_run)?;
 					context.package_publish_report = Some(report);
 					output = None;
 					Ok(())
@@ -1767,23 +1760,20 @@ fn render_package_publish_report_markdown(
 			"- **Trust message:** {}",
 			package.trusted_publishing.message
 		));
-		if let Some(repository) = &package.trusted_publishing.repository {
-			lines.push(format!(
-				"- **Repository:** {}",
-				paint_markdown_inline(&format!("`{repository}`"), MarkdownStyle::Code, color,)
-			));
+		#[rustfmt::skip]
+		let repository_line = package.trusted_publishing.repository.as_ref().map(|repository| format!("- **Repository:** {}", paint_markdown_inline(&format!("`{repository}`"), MarkdownStyle::Code, color,)));
+		if let Some(repository_line) = repository_line {
+			lines.push(repository_line);
 		}
-		if let Some(workflow) = &package.trusted_publishing.workflow {
-			lines.push(format!(
-				"- **Workflow:** {}",
-				paint_markdown_inline(&format!("`{workflow}`"), MarkdownStyle::Code, color,)
-			));
+		#[rustfmt::skip]
+		let workflow_line = package.trusted_publishing.workflow.as_ref().map(|workflow| format!("- **Workflow:** {}", paint_markdown_inline(&format!("`{workflow}`"), MarkdownStyle::Code, color,)));
+		if let Some(workflow_line) = workflow_line {
+			lines.push(workflow_line);
 		}
-		if let Some(environment) = &package.trusted_publishing.environment {
-			lines.push(format!(
-				"- **Environment:** {}",
-				paint_markdown_inline(&format!("`{environment}`"), MarkdownStyle::Code, color,)
-			));
+		#[rustfmt::skip]
+		let environment_line = package.trusted_publishing.environment.as_ref().map(|environment| format!("- **Environment:** {}", paint_markdown_inline(&format!("`{environment}`"), MarkdownStyle::Code, color,)));
+		if let Some(environment_line) = environment_line {
+			lines.push(environment_line);
 		}
 		if let Some(setup_url) = &package.trusted_publishing.setup_url {
 			lines.push(format!(
@@ -2021,11 +2011,10 @@ pub(crate) fn render_cli_command_result(
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
 		lines.push(format!("changeset policy: {}", evaluation.status));
 		lines.push(evaluation.summary.clone());
-		if !evaluation.matched_skip_labels.is_empty() {
-			lines.push(format!(
-				"matched skip labels: {}",
-				evaluation.matched_skip_labels.join(", ")
-			));
+		#[rustfmt::skip]
+			let matched_skip_labels_line = (!evaluation.matched_skip_labels.is_empty()).then(|| format!("matched skip labels: {}", evaluation.matched_skip_labels.join(", ")));
+		if let Some(matched_skip_labels_line) = matched_skip_labels_line {
+			lines.push(matched_skip_labels_line);
 		}
 		if !evaluation.matched_paths.is_empty() {
 			lines.push("matched paths:".to_string());
@@ -2510,13 +2499,8 @@ fn resolve_command_output(
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
-			OutputFormat::Json => {
-				serde_json::to_string_pretty(evaluation).map_err(|error| {
-					MonochangeError::Config(format!(
-						"failed to render changeset policy evaluation as json: {error}"
-					))
-				})?
-			}
+			#[rustfmt::skip]
+			OutputFormat::Json => serde_json::to_string_pretty(evaluation).map_err(|error| MonochangeError::Config(format!("failed to render changeset policy evaluation as json: {error}")))?,
 			OutputFormat::Markdown | OutputFormat::Text => {
 				render_cli_command_result(cli_command, context)
 			}
@@ -2561,13 +2545,8 @@ fn resolve_command_output(
 	if let Some(report) = &context.package_publish_report {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
-			OutputFormat::Json => {
-				serde_json::to_string_pretty(report).map_err(|error| {
-					MonochangeError::Config(format!(
-						"failed to render package publish report as json: {error}"
-					))
-				})?
-			}
+			#[rustfmt::skip]
+				OutputFormat::Json => serde_json::to_string_pretty(report).map_err(|error| MonochangeError::Config(format!("failed to render package publish report as json: {error}")))?,
 			OutputFormat::Markdown => render_cli_command_markdown_result(cli_command, context),
 			OutputFormat::Text => render_cli_command_result(cli_command, context),
 		};
@@ -2649,6 +2628,29 @@ mod tests {
 			.into_iter()
 			.find(|command| command.name == name)
 			.unwrap_or_else(|| panic!("expected default cli command `{name}`"))
+	}
+
+	fn sample_package_publish_outcome(
+		status: package_publish::PackagePublishStatus,
+		trust_status: package_publish::TrustedPublishingStatus,
+	) -> package_publish::PackagePublishOutcome {
+		package_publish::PackagePublishOutcome {
+			package: "@scope/pkg".to_string(),
+			ecosystem: Ecosystem::Npm,
+			registry: "npm".to_string(),
+			version: "1.2.3".to_string(),
+			status,
+			message: "published package to npm".to_string(),
+			placeholder: false,
+			trusted_publishing: package_publish::TrustedPublishingOutcome {
+				status: trust_status,
+				repository: Some("ifiokjr/monochange".to_string()),
+				workflow: Some("publish.yml".to_string()),
+				environment: Some("release".to_string()),
+				setup_url: Some("https://docs.npmjs.com/cli/v11/commands/npm-trust".to_string()),
+				message: "trusted publishing already configured".to_string(),
+			},
+		}
 	}
 
 	#[test]
@@ -2899,6 +2901,89 @@ mod tests {
 	}
 
 	#[test]
+	fn render_package_publish_reports_cover_empty_and_detailed_variants() {
+		let empty_placeholder = package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Placeholder,
+			dry_run: true,
+			packages: Vec::new(),
+		};
+		let text_lines = render_package_publish_report(&empty_placeholder);
+		assert_eq!(text_lines[0], "placeholder publishing:");
+		assert_eq!(
+			text_lines[1],
+			"- no packages matched the publishing criteria"
+		);
+		assert_eq!(
+			render_package_publish_report_markdown(&empty_placeholder, false),
+			vec!["- no packages matched the publishing criteria".to_string()]
+		);
+
+		let detailed_report = package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![sample_package_publish_outcome(
+				package_publish::PackagePublishStatus::SkippedExternal,
+				package_publish::TrustedPublishingStatus::ManualActionRequired,
+			)],
+		};
+		let text = render_package_publish_report(&detailed_report).join("\n");
+		assert!(text.contains("repository: ifiokjr/monochange"));
+		assert!(text.contains("workflow: publish.yml"));
+		assert!(text.contains("environment: release"));
+		assert!(text.contains("setup: https://docs.npmjs.com/cli/v11/commands/npm-trust"));
+
+		let markdown = render_package_publish_report_markdown(&detailed_report, false).join("\n");
+		assert!(markdown.contains("**Repository:** `ifiokjr/monochange`"));
+		assert!(markdown.contains("**Workflow:** `publish.yml`"));
+		assert!(markdown.contains("**Environment:** `release`"));
+		assert!(
+			markdown.contains("**Setup:** `https://docs.npmjs.com/cli/v11/commands/npm-trust`")
+		);
+	}
+
+	#[test]
+	fn package_publish_status_labels_cover_all_variants() {
+		assert_eq!(
+			package_publish_status_label(package_publish::PackagePublishStatus::Planned),
+			"planned"
+		);
+		assert_eq!(
+			package_publish_status_label(package_publish::PackagePublishStatus::Published),
+			"published"
+		);
+		assert_eq!(
+			package_publish_status_label(package_publish::PackagePublishStatus::SkippedExisting),
+			"skipped-existing"
+		);
+		assert_eq!(
+			package_publish_status_label(package_publish::PackagePublishStatus::SkippedExternal),
+			"skipped-external"
+		);
+	}
+
+	#[test]
+	fn trusted_publishing_status_labels_cover_all_variants() {
+		assert_eq!(
+			trusted_publishing_status_label(package_publish::TrustedPublishingStatus::Disabled),
+			"disabled"
+		);
+		assert_eq!(
+			trusted_publishing_status_label(package_publish::TrustedPublishingStatus::Planned),
+			"planned"
+		);
+		assert_eq!(
+			trusted_publishing_status_label(package_publish::TrustedPublishingStatus::Configured),
+			"configured"
+		);
+		assert_eq!(
+			trusted_publishing_status_label(
+				package_publish::TrustedPublishingStatus::ManualActionRequired
+			),
+			"manual-action-required"
+		);
+	}
+
+	#[test]
 	fn resolve_command_output_supports_package_publish_json_without_release_state() {
 		let cli_command = CliCommandDefinition {
 			name: "placeholder-publish".to_string(),
@@ -2959,6 +3044,58 @@ mod tests {
 			parsed["packages"][0]["trustedPublishing"]["status"],
 			serde_json::json!("manual_action_required")
 		);
+	}
+
+	#[test]
+	fn resolve_command_output_supports_package_publish_text_and_markdown_without_release_state() {
+		let cli_command = CliCommandDefinition {
+			name: "placeholder-publish".to_string(),
+			help_text: Some("publish placeholders".to_string()),
+			inputs: vec![monochange_core::CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec![
+					"text".to_string(),
+					"markdown".to_string(),
+					"json".to_string(),
+				],
+				short: None,
+			}],
+			steps: vec![CliStepDefinition::PlaceholderPublish {
+				name: Some("publish placeholder packages".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		};
+
+		let mut text_context = cli_context();
+		text_context.last_step_inputs =
+			BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
+		text_context.package_publish_report = Some(package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Placeholder,
+			dry_run: true,
+			packages: Vec::new(),
+		});
+		let text = resolve_command_output(&cli_command, &text_context, true, None)
+			.unwrap_or_else(|error| panic!("package publish text output: {error}"));
+		assert!(text.contains("placeholder publishing:"));
+		assert!(text.contains("no packages matched the publishing criteria"));
+
+		let mut markdown_context = cli_context();
+		markdown_context.last_step_inputs =
+			BTreeMap::from([("format".to_string(), vec!["markdown".to_string()])]);
+		markdown_context.package_publish_report = Some(package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Placeholder,
+			dry_run: true,
+			packages: Vec::new(),
+		});
+		let markdown = resolve_command_output(&cli_command, &markdown_context, true, None)
+			.unwrap_or_else(|error| panic!("package publish markdown output: {error}"));
+		assert!(markdown.contains("## Placeholder publishing"));
+		assert!(markdown.contains("no packages matched the publishing criteria"));
 	}
 
 	#[test]

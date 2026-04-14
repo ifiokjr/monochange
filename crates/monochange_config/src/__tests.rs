@@ -1921,6 +1921,66 @@ fn load_workspace_configuration_assigns_default_publish_registries_per_ecosystem
 }
 
 #[test]
+fn default_publish_registry_for_ecosystem_covers_all_supported_types() {
+	assert_eq!(
+		crate::default_publish_registry_for_ecosystem(EcosystemType::Cargo),
+		Some(PublishRegistry::Builtin(RegistryKind::CratesIo))
+	);
+	assert_eq!(
+		crate::default_publish_registry_for_ecosystem(EcosystemType::Npm),
+		Some(PublishRegistry::Builtin(RegistryKind::Npm))
+	);
+	assert_eq!(
+		crate::default_publish_registry_for_ecosystem(EcosystemType::Deno),
+		Some(PublishRegistry::Builtin(RegistryKind::Jsr))
+	);
+	assert_eq!(
+		crate::default_publish_registry_for_ecosystem(EcosystemType::Dart),
+		Some(PublishRegistry::Builtin(RegistryKind::PubDev))
+	);
+}
+
+#[test]
+fn normalize_trusted_publishing_settings_supports_boolean_shorthand() {
+	let settings = crate::normalize_trusted_publishing_settings(
+		None,
+		Some(crate::RawTrustedPublishingSettings::Enabled(false)),
+	);
+	assert!(!settings.enabled);
+	assert_eq!(settings.repository, None);
+	assert_eq!(settings.workflow, None);
+	assert_eq!(settings.environment, None);
+}
+
+#[test]
+fn normalize_publish_settings_rejects_conflicting_placeholder_sources() {
+	let error = crate::normalize_publish_settings(
+		r#"
+[package.core.publish.placeholder]
+"#,
+		Some(&monochange_core::PublishSettings {
+			registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+			placeholder: monochange_core::PlaceholderSettings {
+				readme: Some("inline".to_string()),
+				readme_file: Some(PathBuf::from("docs/placeholder.md")),
+			},
+			..monochange_core::PublishSettings::default()
+		}),
+		crate::RawPublishSettings::default(),
+		"package",
+		"core",
+		EcosystemType::Cargo,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected placeholder conflict error"));
+	assert!(
+		error.to_string().contains(
+			"package `core` publish.placeholder cannot set both `readme` and `readme_file`"
+		)
+	);
+}
+
+#[test]
 fn load_workspace_configuration_allows_package_publish_placeholder_to_override_ecosystem_default() {
 	let root = fixture_path("config/publish-placeholder-package-override");
 	let configuration = load_workspace_configuration(&root)

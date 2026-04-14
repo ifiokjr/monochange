@@ -1,11 +1,11 @@
 ---
-monochange: patch
-monochange_core: patch
-monochange_config: patch
-monochange_hosting: patch
-monochange_github: patch
-monochange_gitlab: patch
-monochange_gitea: patch
+monochange: minor
+monochange_core: minor
+monochange_config: minor
+monochange_hosting: minor
+monochange_github: minor
+monochange_gitlab: minor
+monochange_gitea: minor
 ---
 
 #### add publish configuration and publication targets

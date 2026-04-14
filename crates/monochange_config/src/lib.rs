@@ -766,41 +766,33 @@ fn normalize_ecosystem_settings(
 	inferred_ecosystem_type: EcosystemType,
 	raw: RawEcosystemSettings,
 ) -> MonochangeResult<EcosystemSettings> {
+	#[rustfmt::skip]
+	let publish = normalize_publish_settings(contents, None, raw.publish, "ecosystems", owner_id, inferred_ecosystem_type)?;
+	#[rustfmt::skip]
+	let versioned_files = normalize_versioned_files(contents, raw.versioned_files, inferred_ecosystem_type, "ecosystems", owner_id, true)?;
+
 	Ok(EcosystemSettings {
 		enabled: raw.enabled,
 		roots: raw.roots,
 		exclude: raw.exclude,
 		dependency_version_prefix: raw.dependency_version_prefix,
-		versioned_files: normalize_versioned_files(
-			contents,
-			raw.versioned_files,
-			inferred_ecosystem_type,
-			"ecosystems",
-			owner_id,
-			true,
-		)?,
+		versioned_files,
 		lockfile_commands: raw.lockfile_commands,
-		publish: normalize_publish_settings(
-			contents,
-			None,
-			raw.publish,
-			"ecosystems",
-			owner_id,
-			inferred_ecosystem_type,
-		)?,
+		publish,
 	})
 }
 
 fn default_publish_registry_for_ecosystem(
 	inferred_ecosystem_type: EcosystemType,
 ) -> Option<PublishRegistry> {
-	match inferred_ecosystem_type {
+	#[rustfmt::skip]
+	let registry = match inferred_ecosystem_type {
 		EcosystemType::Cargo => Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
 		EcosystemType::Npm => Some(PublishRegistry::Builtin(RegistryKind::Npm)),
 		EcosystemType::Deno => Some(PublishRegistry::Builtin(RegistryKind::Jsr)),
-		EcosystemType::Dart => Some(PublishRegistry::Builtin(RegistryKind::PubDev)),
-		_ => None,
-	}
+		EcosystemType::Dart => Some(PublishRegistry::Builtin(RegistryKind::PubDev)), _ => None,
+	};
+	registry
 }
 
 fn normalize_trusted_publishing_settings(
@@ -886,25 +878,23 @@ fn normalize_publish_settings(
 		));
 	}
 
-	if settings.mode == PublishMode::Builtin {
-		let default_registry = default_publish_registry_for_ecosystem(inferred_ecosystem_type);
-		if settings.registry != default_registry {
-			return Err(config_diagnostic(
+	let default_registry = default_publish_registry_for_ecosystem(inferred_ecosystem_type);
+	if settings.mode == PublishMode::Builtin && settings.registry != default_registry {
+		return Err(config_diagnostic(
+			contents,
+			format!(
+				"{owner_kind} `{owner_id}` uses built-in publishing with an unsupported registry override"
+			),
+			vec![config_section_label(
 				contents,
-				format!(
-					"{owner_kind} `{owner_id}` uses built-in publishing with an unsupported registry override"
-				),
-				vec![config_section_label(
-					contents,
-					owner_kind,
-					owner_id,
-					"unsupported built-in publish registry",
-				)],
-				Some(
-					"remove the registry override to use the default public registry for that ecosystem, or set `mode = \"external\"` for custom/private registries".to_string(),
-				),
-			));
-		}
+				owner_kind,
+				owner_id,
+				"unsupported built-in publish registry",
+			)],
+			Some(
+				"remove the registry override to use the default public registry for that ecosystem, or set `mode = \"external\"` for custom/private registries".to_string(),
+			),
+		));
 	}
 
 	Ok(settings)
@@ -1020,15 +1010,18 @@ fn build_package_definitions(
 				tag: package.tag,
 				release: package.release,
 				version_format: package.version_format,
-				publish: normalize_publish_settings(
-					contents,
-					Some(match inferred_ecosystem_type {
-						EcosystemType::Cargo => &cargo_ecosystem.publish,
-						EcosystemType::Npm => &npm_ecosystem.publish,
-						EcosystemType::Deno => &deno_ecosystem.publish,
-						EcosystemType::Dart => &dart_ecosystem.publish,
-						_ => unreachable!("unsupported ecosystem type for package publish"),
-					}),
+					publish: normalize_publish_settings(
+						contents,
+						Some({
+							#[rustfmt::skip]
+							let publish = match inferred_ecosystem_type {
+								EcosystemType::Cargo => &cargo_ecosystem.publish,
+								EcosystemType::Npm => &npm_ecosystem.publish,
+								EcosystemType::Deno => &deno_ecosystem.publish,
+								EcosystemType::Dart => &dart_ecosystem.publish, _ => unreachable!("unsupported ecosystem type for package publish"),
+							};
+							publish
+						}),
 					package.publish,
 					"package",
 					&id,

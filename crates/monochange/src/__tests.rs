@@ -4481,6 +4481,75 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 }
 
 #[test]
+fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let server = MockServer::start();
+	let _registry = server.mock(|when, then| {
+		when.method(GET);
+		then.status(404);
+	});
+
+	temp_env::with_var(
+		"MONOCHANGE_CRATES_IO_API_URL",
+		Some(server.base_url()),
+		|| {
+			let placeholder_command = monochange_core::CliCommandDefinition {
+				name: "placeholder-publish".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![monochange_core::CliStepDefinition::PlaceholderPublish {
+					name: None,
+					when: None,
+					inputs: BTreeMap::new(),
+				}],
+			};
+			let placeholder_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&placeholder_command,
+				true,
+				BTreeMap::new(),
+			)
+			.unwrap_or_else(|error| panic!("placeholder publish: {error}"));
+			assert!(placeholder_output.contains("placeholder publishing:"));
+			assert!(placeholder_output.contains("would publish placeholder"));
+
+			let publish_command = monochange_core::CliCommandDefinition {
+				name: "publish".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![
+					monochange_core::CliStepDefinition::PrepareRelease {
+						name: None,
+						when: None,
+						inputs: BTreeMap::new(),
+					},
+					monochange_core::CliStepDefinition::PublishPackages {
+						name: None,
+						when: None,
+						inputs: BTreeMap::new(),
+					},
+				],
+			};
+			let publish_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&publish_command,
+				true,
+				BTreeMap::new(),
+			)
+			.unwrap_or_else(|error| panic!("publish packages: {error}"));
+			assert!(publish_output.contains("package publishing:"));
+			assert!(publish_output.contains("would publish workflow-core"));
+		},
+	);
+}
+
+#[test]
 fn release_follow_up_helpers_render_real_operation_outputs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let manifest = sample_release_manifest_for_commit_message(true, true);
