@@ -7,7 +7,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const launcherPath = join(process.cwd(), "npm/bin/monochange.js");
+const launcherPath = join(
+	process.cwd(),
+	"packages/monochange__cli/bin/monochange.js",
+);
 
 function createSandbox() {
 	return mkdtempSync(join(tmpdir(), "monochange-bin-"));

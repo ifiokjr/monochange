@@ -1,0 +1,48 @@
+{
+	"name": "@monochange/cli",
+	"version": "0.1.0",
+	"description": "CLI for cross-ecosystem monorepo release planning with monochange",
+	"license": "Unlicense",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ifiokjr/monochange.git"
+	},
+	"homepage": "https://github.com/ifiokjr/monochange",
+	"bugs": {
+		"url": "https://github.com/ifiokjr/monochange/issues"
+	},
+	"keywords": [
+		"monochange",
+		"releases",
+		"changesets",
+		"cli",
+		"mcp",
+		"monorepo"
+	],
+	"engines": {
+		"node": ">=18"
+	},
+	"bin": {
+		"monochange": "bin/monochange.js",
+		"mc": "bin/monochange.js"
+	},
+	"files": [
+		"bin",
+		"README.md",
+		"LICENSE"
+	],
+	"optionalDependencies": {
+		"@monochange/cli-darwin-arm64": "0.1.0",
+		"@monochange/cli-darwin-x64": "0.1.0",
+		"@monochange/cli-linux-arm64-gnu": "0.1.0",
+		"@monochange/cli-linux-arm64-musl": "0.1.0",
+		"@monochange/cli-linux-x64-gnu": "0.1.0",
+		"@monochange/cli-linux-x64-musl": "0.1.0",
+		"@monochange/cli-win32-x64-msvc": "0.1.0",
+		"@monochange/cli-win32-arm64-msvc": "0.1.0"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

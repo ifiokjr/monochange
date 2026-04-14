@@ -1,10 +1,34 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { spawnSync as nodeSpawnSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-function parseArgs(argv) {
+export const PLATFORM_PACKAGE_DIRS = [
+	"monochange__cli-darwin-arm64",
+	"monochange__cli-darwin-x64",
+	"monochange__cli-linux-arm64-gnu",
+	"monochange__cli-linux-arm64-musl",
+	"monochange__cli-linux-x64-gnu",
+	"monochange__cli-linux-x64-musl",
+	"monochange__cli-win32-x64-msvc",
+	"monochange__cli-win32-arm64-msvc",
+];
+
+export const CLI_PACKAGE_DIR = "monochange__cli";
+
+let _spawnSync = nodeSpawnSync;
+
+export function _setSpawnSync(fn) {
+	_spawnSync = fn;
+}
+
+export function _resetSpawnSync() {
+	_spawnSync = nodeSpawnSync;
+}
+
+export function parseArgs(argv) {
 	const args = {};
 
 	for (let index = 0; index < argv.length; index += 1) {
@@ -22,8 +46,8 @@ function parseArgs(argv) {
 	return args;
 }
 
-function run(command, args, options = {}) {
-	const result = spawnSync(command, args, {
+export function run(command, args, options = {}) {
+	const result = _spawnSync(command, args, {
 		encoding: "utf8",
 		stdio: options.stdio ?? "pipe",
 		cwd: options.cwd,
@@ -38,12 +62,12 @@ function run(command, args, options = {}) {
 	return result;
 }
 
-function packageMetadata(dir) {
+export function packageMetadata(dir) {
 	return JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
 }
 
-function packageExists(name, version) {
-	const result = spawnSync("npm", [
+export function packageExists(name, version) {
+	const result = _spawnSync("npm", [
 		"view",
 		`${name}@${version}`,
 		"version",
@@ -55,8 +79,27 @@ function packageExists(name, version) {
 	return result.status === 0;
 }
 
-function publishPackage(dir) {
+export function hasBinary(dir) {
+	const binDir = join(dir, "bin");
+	if (!existsSync(binDir)) {
+		return false;
+	}
+
+	const entries = readdirSync(binDir);
+	return entries.some((entry) => entry.startsWith("monochange"));
+}
+
+export function publishPackage(dir) {
 	const pkg = packageMetadata(dir);
+	if (hasBinary(dir) === false) {
+		throw new Error(
+			`Cannot publish ${pkg.name}@${pkg.version}: no binary found in ${
+				join(dir, "bin")
+			}. ` +
+				"Run build-packages.mjs first to populate platform binaries.",
+		);
+	}
+
 	if (packageExists(pkg.name, pkg.version)) {
 		console.log(`Skipping ${pkg.name}@${pkg.version}; already published.`);
 		return;
@@ -69,24 +112,24 @@ function publishPackage(dir) {
 	});
 }
 
-function main() {
-	const args = parseArgs(process.argv.slice(2));
-	const packagesDir = resolve(args["packages-dir"] ?? "");
-
-	if (packagesDir) {
+export function main(argv = process.argv.slice(2)) {
+	const args = parseArgs(argv);
+	if (!args["packages-dir"]) {
 		throw new Error("usage: publish-packages.mjs --packages-dir <dir>");
 	}
 
-	const platformRoot = join(packagesDir, "platform");
-	const platformPackages = readdirSync(platformRoot)
-		.sort()
-		.map((entry) => join(platformRoot, entry));
+	const packagesDir = resolve(args["packages-dir"]);
 
-	for (const packageDir of platformPackages) {
-		publishPackage(packageDir);
+	for (const dirName of PLATFORM_PACKAGE_DIRS) {
+		publishPackage(join(packagesDir, dirName));
 	}
 
-	publishPackage(join(packagesDir, "root"));
+	publishPackage(join(packagesDir, CLI_PACKAGE_DIR));
 }
 
-main();
+if (
+	process.argv[1] &&
+	resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+) {
+	main();
+}

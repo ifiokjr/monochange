@@ -8,4 +8,22 @@ importers:
 
   .: {}
 
-  npm/skill: {}
+  packages/monochange__cli: {}
+
+  packages/monochange__cli-darwin-arm64: {}
+
+  packages/monochange__cli-darwin-x64: {}
+
+  packages/monochange__cli-linux-arm64-gnu: {}
+
+  packages/monochange__cli-linux-arm64-musl: {}
+
+  packages/monochange__cli-linux-x64-gnu: {}
+
+  packages/monochange__cli-linux-x64-musl: {}
+
+  packages/monochange__cli-win32-arm64-msvc: {}
+
+  packages/monochange__cli-win32-x64-msvc: {}
+
+  packages/monochange__skill: {}

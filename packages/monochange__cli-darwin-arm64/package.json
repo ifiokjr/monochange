@@ -1,0 +1,28 @@
+{
+	"name": "@monochange/cli-darwin-arm64",
+	"version": "0.1.0",
+	"description": "Prebuilt monochange binary for macOS arm64",
+	"license": "Unlicense",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ifiokjr/monochange.git"
+	},
+	"homepage": "https://github.com/ifiokjr/monochange",
+	"bugs": {
+		"url": "https://github.com/ifiokjr/monochange/issues"
+	},
+	"os": [
+		"darwin"
+	],
+	"cpu": [
+		"arm64"
+	],
+	"files": [
+		"bin",
+		"LICENSE"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

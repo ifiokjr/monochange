@@ -74,7 +74,7 @@ jobs:
         run: mc publish
         shell: devenv shell -- bash -e {0}
 
-      - name: build cli npm packages
+      - name: populate cli npm packages with release binaries
         if: startsWith( steps.release_tag.outputs.tag , 'v')
         env:
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
@@ -83,8 +83,7 @@ jobs:
           node scripts/npm/build-packages.mjs \
             --version "$VERSION" \
             --release-tag "$RELEASE_TAG" \
-            --assets-dir "$RUNNER_TEMP/release-assets" \
-            --out-dir "$RUNNER_TEMP/npm-packages"
+            --assets-dir "$RUNNER_TEMP/release-assets"
         shell: devenv shell -- bash -e {0}
 
       - name: publish cli npm packages
@@ -93,5 +92,5 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/npm/publish-packages.mjs \
-            --packages-dir "$RUNNER_TEMP/npm-packages"
+            --packages-dir packages
         shell: devenv shell -- bash -e {0}
