@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/github_releases.rs
-assertion_line: 23
 expression: json
 ---
 {
@@ -67,6 +66,21 @@ expression: json
     "deletedChangesets": [],
     "dryRun": true,
     "groupVersion": null,
+    "packagePublications": [
+      {
+        "ecosystem": "cargo",
+        "mode": "builtin",
+        "package": "core",
+        "registry": "crates_io",
+        "trustedPublishing": {
+          "enabled": true,
+          "environment": null,
+          "repository": null,
+          "workflow": null
+        },
+        "version": "1.0.1"
+      }
+    ],
     "plan": {
       "compatibilityEvidence": [],
       "decisions": [
@@ -109,6 +123,7 @@ expression: json
     ],
     "version": "1.0.1"
   },
+  "packagePublish": null,
   "releaseCommit": null,
   "releaseRequest": null,
   "releases": [

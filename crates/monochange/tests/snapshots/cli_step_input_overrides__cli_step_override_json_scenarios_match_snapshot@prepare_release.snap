@@ -90,6 +90,34 @@ expression: json
   "deletedChangesets": [],
   "dryRun": true,
   "groupVersion": "1.1.0",
+  "packagePublications": [
+    {
+      "ecosystem": "cargo",
+      "mode": "builtin",
+      "package": "app",
+      "registry": "crates_io",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.1.0"
+    },
+    {
+      "ecosystem": "cargo",
+      "mode": "builtin",
+      "package": "core",
+      "registry": "crates_io",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.1.0"
+    }
+  ],
   "plan": {
     "compatibilityEvidence": [],
     "decisions": [

@@ -16,6 +16,7 @@ expression: parsed
     ],
     "groupVersion": "1.2.3",
     "kind": "monochange.releaseRecord",
+    "packagePublications": [],
     "provider": {
       "host": null,
       "kind": "github",

@@ -45,6 +45,60 @@ expression: json
   "deletedChangesets": [],
   "dryRun": true,
   "groupVersion": "1.1.0",
+  "packagePublications": [
+    {
+      "ecosystem": "deno",
+      "mode": "builtin",
+      "package": "deno-tool",
+      "registry": "jsr",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.0.1"
+    },
+    {
+      "ecosystem": "dart",
+      "mode": "builtin",
+      "package": "mobile-sdk",
+      "registry": "pub_dev",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.0.1"
+    },
+    {
+      "ecosystem": "cargo",
+      "mode": "builtin",
+      "package": "sdk-core",
+      "registry": "crates_io",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.1.0"
+    },
+    {
+      "ecosystem": "npm",
+      "mode": "builtin",
+      "package": "web-sdk",
+      "registry": "npm",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.1.0"
+    }
+  ],
   "plan": {
     "compatibilityEvidence": [],
     "decisions": [
