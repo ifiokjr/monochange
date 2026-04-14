@@ -1753,7 +1753,7 @@ impl CliStepDefinition {
 				Some(&["format", "changed_paths", "since", "verify", "label"])
 			}
 			Self::DiagnoseChangesets { .. } => Some(&["format", "changeset"]),
-			Self::Lint { .. } => Some(&["format", "fix"]),
+			Self::Lint { .. } => Some(&["format", "fix", "ecosystem"]),
 			Self::RetargetRelease { .. } => Some(&["from", "target", "force", "sync_provider"]),
 			Self::Command { .. } => None,
 		}
@@ -1808,6 +1808,7 @@ impl CliStepDefinition {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					"fix" => Some(CliInputKind::Boolean),
+					"ecosystem" => Some(CliInputKind::StringList),
 					_ => None,
 				}
 			}
