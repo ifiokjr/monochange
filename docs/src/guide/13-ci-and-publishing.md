@@ -86,10 +86,10 @@ For GitHub Actions, the most common structure is:
 1. a workflow prepares or updates a release PR branch
 2. a release commit lands on `main`
 3. a post-merge workflow detects the release commit
-4. package publication runs from that durable release commit
-5. provider release and tag automation runs in a dedicated release workflow
+4. that workflow creates the declared tags and publishes packages from the durable release commit
+5. hosted release objects or extra assets come either from downstream tag-driven workflows or from a separate workflow that still uses `mc publish-release`
 
-The important current implementation detail is that `mc publish` can publish from the `ReleaseRecord` on `HEAD`, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state.
+The important current implementation detail is that `mc publish` can publish from the `ReleaseRecord` on `HEAD`, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state when you want a manifest-driven hosted-release job.
 
 If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection and before `mc publish`.
 

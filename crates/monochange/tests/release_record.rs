@@ -262,6 +262,88 @@ fn tag_release_command_rejects_descendant_refs_that_are_not_release_commits() {
 	);
 }
 
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn tag_release_command_dry_run_reports_planned_tags_without_creating_them() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	configure_origin_remote(repo);
+	let release_record = sample_release_record();
+	commit_release_record(repo, &release_record);
+	git(repo, &["push", "-u", "origin", "HEAD:main"]);
+
+	let output = tag_release_output(repo, &["--from", "HEAD", "--dry-run", "--push=false"]);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert_snapshot!(
+		String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("stdout utf8: {error}"))
+	);
+	assert!(
+		git_command(repo, &["rev-parse", "refs/tags/v1.2.3^{commit}"]).is_none(),
+		"expected dry run to avoid creating a local tag"
+	);
+	assert!(
+		git_command(repo, &["ls-remote", "--tags", "origin", "v1.2.3"]).is_none(),
+		"expected dry run to avoid pushing a remote tag"
+	);
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn tag_release_command_reports_when_no_tags_are_declared() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	configure_origin_remote(repo);
+	let mut release_record = sample_release_record();
+	release_record.release_targets[0].tag = false;
+	let (commit, _) = commit_release_record(repo, &release_record);
+	git(repo, &["push", "-u", "origin", "HEAD:main"]);
+
+	let output = tag_release_output(repo, &["--from", "HEAD", "--push=false"]);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert_snapshot!(
+		String::from_utf8(output.stdout).unwrap_or_else(|error| panic!("stdout utf8: {error}"))
+	);
+	assert_eq!(git_output_trimmed(repo, &["rev-parse", "HEAD"]), commit);
+	assert!(
+		git_command(repo, &["ls-remote", "--tags", "origin", "v1.2.3"]).is_none(),
+		"expected no declared tags to skip remote pushes"
+	);
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn tag_release_command_rejects_existing_tags_that_point_elsewhere() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	let initial_commit = git_output_trimmed(repo, &["rev-parse", "HEAD"]);
+	let release_record = sample_release_record();
+	commit_release_record(repo, &release_record);
+	git(repo, &["tag", "v1.2.3", &initial_commit]);
+
+	let output = tag_release_output(repo, &["--from", "HEAD"]);
+	assert!(!output.status.success());
+	assert_snapshot!(
+		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("stderr utf8: {error}"))
+	);
+}
+
 fn setup_release_repo() -> TempDir {
 	let tempdir = setup_fixture("release-record/base-repo");
 	let repo = tempdir.path();
@@ -307,6 +389,27 @@ fn configure_origin_remote(root: &Path) {
 			remote_root.to_string_lossy().as_ref(),
 		],
 	);
+}
+
+fn git_command(root: &Path, args: &[&str]) -> Option<String> {
+	let output = std::process::Command::new("git")
+		.current_dir(root)
+		.args(args)
+		.output()
+		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
+	if !output.status.success() {
+		return None;
+	}
+
+	let stdout = String::from_utf8(output.stdout)
+		.unwrap_or_else(|error| panic!("git stdout utf8: {error}"))
+		.trim()
+		.to_string();
+	if stdout.is_empty() {
+		None
+	} else {
+		Some(stdout)
+	}
 }
 
 fn sample_release_record() -> ReleaseRecord {

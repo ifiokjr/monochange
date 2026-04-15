@@ -248,7 +248,7 @@ monochange now includes a release workflow modeled around long-running release P
 
 - `.github/workflows/release.yml` refreshes the dedicated release PR branch on normal `main` pushes
 - the same workflow detects when `HEAD` is already a merged monochange release commit, runs `mc tag-release --from HEAD`, and then runs `mc publish`
-- tag-triggered or downstream workflows can then build archives, create hosted releases, or publish additional assets from the pushed tags
+- tag-triggered or downstream workflows can then build archives, create hosted releases, publish additional assets from the pushed tags, or run a separate `mc publish-release` job when you still want manifest-driven hosted-release publication
 
 That split keeps tag creation on the default branch side of the merge and lets downstream automation consume the exact durable release metadata that monochange stored in git history.
 

@@ -7545,7 +7545,17 @@ fn write_blank_monochange_config(root: &Path) {
 }
 
 fn create_release_record_history(root: &Path) {
+	create_release_record_commit(root);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	fs::write(root.join("release.txt"), "follow-up\n")
+		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "fix: follow-up release change"]);
+}
+
+fn create_release_record_commit(root: &Path) -> String {
 	init_git_repo(root);
+	write_blank_monochange_config(root);
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git_in_temp_repo(root, &["add", "monochange.toml", "release.txt"]);
@@ -7562,11 +7572,7 @@ fn create_release_record_history(root: &Path) {
 			release_record.as_str(),
 		],
 	);
-	git_in_temp_repo(root, &["tag", "v1.2.3"]);
-	fs::write(root.join("release.txt"), "follow-up\n")
-		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
-	git_in_temp_repo(root, &["add", "release.txt"]);
-	git_in_temp_repo(root, &["commit", "-m", "fix: follow-up release change"]);
+	git_output_in_temp_repo(root, &["rev-parse", "HEAD"])
 }
 
 fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
@@ -8374,6 +8380,70 @@ fn render_release_record_discovery_supports_text_and_json_formats() {
 }
 
 #[test]
+fn render_release_tag_report_supports_text_and_json_formats() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let release_commit = create_release_record_commit(root);
+
+	let text = crate::release_record::render_release_tag_report(
+		root,
+		"HEAD",
+		crate::OutputFormat::Text,
+		false,
+		true,
+	)
+	.unwrap_or_else(|error| panic!("tag-release text: {error}"));
+	assert!(text.contains("release tags:"));
+	assert!(text.contains("push: no"));
+	assert!(text.contains("status: dry-run"));
+	assert!(text.contains("[planned]"));
+
+	let json = crate::release_record::render_release_tag_report(
+		root,
+		"HEAD",
+		crate::OutputFormat::Json,
+		false,
+		true,
+	)
+	.unwrap_or_else(|error| panic!("tag-release json: {error}"));
+	assert!(json.contains("\"recordCommit\": "));
+	assert!(json.contains("\"push\": false"));
+	assert!(json.contains("\"status\": \"dry_run\""));
+	assert!(json.contains(&release_commit[..7]));
+}
+
+#[test]
+fn create_release_tags_creates_and_pushes_tags_in_process() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let release_commit = create_release_record_commit(root);
+	configure_origin_remote(root);
+	git_in_temp_repo(root, &["push", "-u", "origin", "HEAD:main"]);
+	let discovery = crate::discover_release_record(root, "HEAD")
+		.unwrap_or_else(|error| panic!("discover release record: {error}"));
+
+	let report = crate::release_record::create_release_tags(root, &discovery, true, false)
+		.unwrap_or_else(|error| panic!("create release tags: {error}"));
+	assert_eq!(report.status, "completed");
+	assert_eq!(report.tag_results.len(), 1);
+	assert_eq!(
+		report.tag_results[0].operation,
+		crate::release_record::ReleaseTagOperation::Created
+	);
+	assert_eq!(
+		git_output_in_temp_repo(root, &["rev-parse", "refs/tags/v1.2.3^{commit}"]),
+		release_commit
+	);
+	assert_eq!(
+		git_output_in_temp_repo(root, &["ls-remote", "--tags", "origin", "v1.2.3"])
+			.split_whitespace()
+			.next()
+			.unwrap_or_else(|| panic!("expected remote tag sha")),
+		release_commit
+	);
+}
+
+#[test]
 fn render_tag_name_and_provider_urls_follow_provider_conventions() {
 	let github = sample_github_source_configuration("https://api.github.com");
 	assert_eq!(
@@ -9013,6 +9083,15 @@ fn init_git_repo(root: &Path) {
 	git_in_temp_repo(root, &["config", "user.name", "monochange Tests"]);
 	git_in_temp_repo(root, &["config", "user.email", "monochange@example.com"]);
 	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);
+}
+
+fn configure_origin_remote(root: &Path) {
+	let remote_root = root.join("origin.git");
+	git_in_temp_repo(root, &["init", "--bare", &remote_root.to_string_lossy()]);
+	git_in_temp_repo(
+		root,
+		&["remote", "add", "origin", &remote_root.to_string_lossy()],
+	);
 }
 
 fn sanitized_git_command() -> std::process::Command {
