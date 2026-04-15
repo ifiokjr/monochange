@@ -247,7 +247,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 ```
 
-For monorepos with multiple Cargo packages, split this into one job per published crate or have an external script decide which crates should publish for the current tag.
+For monorepos with multiple Cargo packages, split this into one job per published crate or have an external script decide which crates should publish for the current tag. For a broader decision guide across built-in and external multi-package flows, see [Multi-package publishing patterns](./14-multi-package-publishing.md).
 
 Important current behavior:
 
@@ -414,7 +414,7 @@ jobs:
       # environment: pub.dev
 ```
 
-If you need custom generation or build steps before publishing, switch to a custom workflow that runs `dart pub publish --force` or `flutter pub publish --force` after the OIDC-authenticated setup.
+If you need custom generation or build steps before publishing, switch to a custom workflow that runs `dart pub publish --force` or `flutter pub publish --force` after the OIDC-authenticated setup. For monorepos that mix package-specific tags, working directories, and external-mode jobs, see [Multi-package publishing patterns](./14-multi-package-publishing.md).
 
 Current behavior:
 
