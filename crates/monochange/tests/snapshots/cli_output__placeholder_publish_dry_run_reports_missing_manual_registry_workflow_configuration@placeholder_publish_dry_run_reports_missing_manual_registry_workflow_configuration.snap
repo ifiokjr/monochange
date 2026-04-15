@@ -1,0 +1,78 @@
+---
+source: crates/monochange/tests/cli_output.rs
+info:
+  program: mc
+  args:
+    - placeholder-publish
+    - "--dry-run"
+    - "--format"
+    - json
+  env:
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:65017"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:65017"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:65017"
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+{
+  "mode": "placeholder",
+  "dryRun": true,
+  "packages": [
+    {
+      "package": "core",
+      "ecosystem": "cargo",
+      "registry": "crates_io",
+      "version": "0.0.0",
+      "status": "planned",
+      "message": "would publish placeholder core 0.0.0 to crates_io",
+      "placeholder": true,
+      "trustedPublishing": {
+        "status": "manual_action_required",
+        "repository": null,
+        "workflow": null,
+        "environment": null,
+        "setupUrl": "https://crates.io/crates/core",
+        "message": "configure trusted publishing manually for `core` before the next built-in release publish; open https://crates.io/crates/core and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`"
+      }
+    },
+    {
+      "package": "dart_pkg",
+      "ecosystem": "dart",
+      "registry": "pub_dev",
+      "version": "0.0.0",
+      "status": "planned",
+      "message": "would publish placeholder dart_pkg 0.0.0 to pub_dev",
+      "placeholder": true,
+      "trustedPublishing": {
+        "status": "manual_action_required",
+        "repository": null,
+        "workflow": null,
+        "environment": null,
+        "setupUrl": "https://pub.dev/packages/dart_pkg/admin",
+        "message": "configure trusted publishing manually for `dart_pkg` before the next built-in release publish; open https://pub.dev/packages/dart_pkg/admin and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`"
+      }
+    },
+    {
+      "package": "jsr_pkg",
+      "ecosystem": "deno",
+      "registry": "jsr",
+      "version": "0.0.0",
+      "status": "planned",
+      "message": "would publish placeholder @scope/jsr-pkg 0.0.0 to jsr",
+      "placeholder": true,
+      "trustedPublishing": {
+        "status": "manual_action_required",
+        "repository": null,
+        "workflow": null,
+        "environment": null,
+        "setupUrl": "https://jsr.io/@scope/jsr-pkg",
+        "message": "configure trusted publishing manually for `@scope/jsr-pkg` before the next built-in release publish; open https://jsr.io/@scope/jsr-pkg and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`"
+      }
+    }
+  ]
+}
+
+----- stderr -----

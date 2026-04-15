@@ -1,0 +1,11 @@
+name: publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: publisher
+    steps:
+      - run: echo publish
