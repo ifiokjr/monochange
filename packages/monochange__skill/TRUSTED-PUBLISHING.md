@@ -436,3 +436,23 @@ Keep a package on `mode = "external"` when:
 - your registry requires a CI pattern that differs substantially from monochange's built-in publish flow
 
 In those cases, you can still use this guide for the registry-side OIDC setup while letting your own workflow own the actual publish command.
+
+## Possible future automation for manual registries
+
+monochange is intentionally conservative here.
+
+Today, npm is the only registry where monochange performs trusted-publishing enrollment itself. For `crates.io`, `jsr`, and `pub.dev`, monochange currently focuses on setup guidance, preflight checks, and actionable diagnostics instead of trying to mutate registry-side trust records automatically.
+
+Areas that may become more automated later, where the registry and CI contracts make it safe enough, include:
+
+- **`crates.io`** — stronger preflight validation around explicit workflow filenames, environment alignment, and clearer checks for first-publish bootstrap versus post-bootstrap trusted publishing
+- **`jsr`** — better repository-link diagnostics and package metadata checks before publish, especially when the package already exists but repository-side linking is incomplete
+- **`pub.dev`** — stronger validation that tag patterns, workflow triggers, working directories, and optional environments still match the automated-publishing setup expected by pub.dev
+
+Areas that monochange does **not** promise today:
+
+- auto-enrolling registry-side trusted-publisher records for `crates.io`, `jsr`, or `pub.dev`
+- bypassing browser-confirmed or admin-page-only steps that the registry intentionally keeps manual
+- inferring enough registry-side state to claim a package is fully enrolled when the registry does not expose that state safely or consistently
+
+Treat this as a direction of travel, not a guarantee of upcoming behavior. If you need a registry-native workflow today, keep the package on `mode = "external"` and let the registry-maintained workflow own the actual publish command.
