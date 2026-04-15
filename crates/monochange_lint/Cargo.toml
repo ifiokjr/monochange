@@ -12,13 +12,13 @@ rust-version = { workspace = true }
 
 [dependencies]
 monochange_core = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
 toml = { workspace = true, default-features = true }
-toml_edit = { workspace = true, features = ["display"] }
-tracing = { workspace = true }
-walkdir = { workspace = true }
+toml_edit = { workspace = true, features = ["display"], default-features = true }
+tracing = { workspace = true, default-features = true }
+walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true }
-tempfile = { workspace = true }
+insta = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }

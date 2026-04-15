@@ -231,6 +231,7 @@ impl LintResult {
 /// Configuration for a single lint rule.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[allow(variant_size_differences)]
 pub enum LintRuleConfig {
 	/// Simple severity configuration (e.g., "error", "warn", or "off").
 	Severity(LintSeverity),
@@ -265,7 +266,7 @@ impl LintRuleConfig {
 	/// Get a boolean option value.
 	pub fn bool_option(&self, key: &str, default: bool) -> bool {
 		self.option(key)
-			.and_then(|v| v.as_bool())
+			.and_then(serde_json::Value::as_bool)
 			.unwrap_or(default)
 	}
 
@@ -424,7 +425,7 @@ impl LintRuleRegistry {
 		self.rules
 			.iter()
 			.find(|r| r.rule().id == id)
-			.map(|r| r.as_ref())
+			.map(AsRef::as_ref)
 	}
 
 	/// Find all rules that apply to a given file.
@@ -433,7 +434,7 @@ impl LintRuleRegistry {
 		self.rules
 			.iter()
 			.filter(|r| r.applies_to(path))
-			.map(|r| r.as_ref())
+			.map(AsRef::as_ref)
 			.collect()
 	}
 }

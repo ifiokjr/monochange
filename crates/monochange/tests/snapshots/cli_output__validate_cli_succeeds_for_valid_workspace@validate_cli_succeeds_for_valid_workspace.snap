@@ -1,12 +1,12 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 22
 info:
   program: mc
   args:
     - validate
   env:
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: true
 exit_code: 0
@@ -14,3 +14,11 @@ exit_code: 0
 workspace validation passed for .
 
 ----- stderr -----
+lint: 3 errors, 0 warnings
+
+[ROOT]/crates/core/Cargo.toml:
+  ✗ Missing required package field: 'description' at 1:1
+  ✗ Missing required package field: 'license' at 1:1
+  ✗ Missing required package field: 'repository' at 1:1
+
+No auto-fixable issues found.

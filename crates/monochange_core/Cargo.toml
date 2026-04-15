@@ -17,7 +17,7 @@ http = ["reqwest"]
 
 [dependencies]
 ignore = { workspace = true, default-features = true }
-reqwest = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true, default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }

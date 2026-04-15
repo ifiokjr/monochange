@@ -195,7 +195,7 @@ When provided, the generated config includes:\n\
 			.subcommand(Command::new("mcp").about(
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
 			))
-			.subcommand(build_lint_subcommand());
+			.subcommand(build_check_subcommand());
 
 	for cli_command in cli {
 		command = command.subcommand(build_cli_command_subcommand(cli_command));
@@ -251,27 +251,20 @@ Inspection notes:
 		)
 }
 
-pub(crate) fn build_lint_subcommand() -> Command {
-	Command::new("lint")
-		.about("Run lint rules against package manifests")
+pub(crate) fn build_check_subcommand() -> Command {
+	Command::new("check")
+		.about("Validate configuration, changesets, and run lint rules on package manifests")
 		.after_help(
-			r"Examples:
-  mc lint
-  mc lint --fix
-  mc lint --ecosystem cargo,npm
-
-Lint rules are configured per ecosystem in monochange.toml:
-
-  [ecosystem.cargo.lints]
-  dependency-field-order = "error"
-  internal-dependency-workspace = { level = "error", fix = true }
-",
+			"Examples:\n  mc check\n  mc check --fix\n  mc check --ecosystem cargo,npm\n\n\
+			 Lint rules are configured per ecosystem in monochange.toml:\n\n\
+			 [ecosystem.cargo.lints]\n  dependency-field-order = \"error\"\n  \
+			 internal-dependency-workspace = { level = \"error\", fix = true }",
 		)
 		.arg(
 			Arg::new("fix")
 				.long("fix")
 				.short('f')
-				.help("Automatically fix issues where possible")
+				.help("Automatically fix lint issues where possible")
 				.action(ArgAction::SetTrue),
 		)
 		.arg(

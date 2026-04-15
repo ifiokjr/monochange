@@ -120,8 +120,8 @@ impl DependencyFieldOrderRule {
 				config.severity(),
 			);
 
-			if fix.is_some() {
-				result = result.with_fix(fix.unwrap());
+			if let Some(fix) = fix {
+				result = result.with_fix(fix);
 			}
 
 			return Some(result);
@@ -279,8 +279,7 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 							// Generate autofix
 							let replacement = if let Some(table) = value.as_table() {
 								let mut new_table = table.clone();
-								new_table["workspace"] = toml_edit::value(true);
-								// Remove version if present since workspace provides it
+								new_table.insert("workspace", toml_edit::value(true));
 								new_table.remove("version");
 								format!("{} = {}", dep_name, new_table.to_string().trim())
 							} else {
@@ -451,11 +450,10 @@ impl LintRuleRunner for SortedDependenciesRule {
 				);
 
 				if config.bool_option("fix", true) {
-					// Generate a fix by creating a new sorted table
 					let mut new_table = toml_edit::Table::new();
 					for key in sorted_keys.iter() {
 						if let Some(value) = table.get(key) {
-							new_table[key] = value.clone();
+							new_table.insert(key, value.clone());
 						}
 					}
 					let replacement = format!("[{}]\n{}", section, new_table.to_string().trim());
@@ -516,21 +514,18 @@ impl UnlistedPackagePrivateRule {
 		};
 
 		// Check if package is defined in [package] section
-		if let Some(packages) = parsed.get("package") {
-			if let Some(table) = packages.as_table() {
-				for (id, package) in table {
-					// Check by id
-					if id == package_name {
-						return true;
-					}
-					// Also check by name field if present
-					if let Some(name) = package.get("name") {
-						if let Some(name_str) = name.as_str() {
-							if name_str == package_name {
-								return true;
-							}
-						}
-					}
+		if let Some(packages) = parsed.get("package")
+			&& let Some(table) = packages.as_table()
+		{
+			for (id, package) in table {
+				if id == package_name {
+					return true;
+				}
+				if let Some(name) = package.get("name")
+					&& let Some(name_str) = name.as_str()
+					&& name_str == package_name
+				{
+					return true;
 				}
 			}
 		}

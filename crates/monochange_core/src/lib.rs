@@ -1571,17 +1571,6 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
-	/// Run lint rules against package manifests and apply autofixes.
-	///
-	/// Standalone step for checking and fixing ecosystem-specific lint rules.
-	Lint {
-		#[serde(default)]
-		name: Option<String>,
-		#[serde(default)]
-		when: Option<String>,
-		#[serde(default)]
-		inputs: BTreeMap<String, CliStepInputValue>,
-	},
 	/// Repair a recent release by retargeting its stored release tag set.
 	///
 	/// This step is independent from `PrepareRelease` and exposes structured
@@ -1635,7 +1624,6 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { inputs, .. }
 			| Self::AffectedPackages { inputs, .. }
 			| Self::DiagnoseChangesets { inputs, .. }
-			| Self::Lint { inputs, .. }
 			| Self::RetargetRelease { inputs, .. }
 			| Self::Command { inputs, .. } => inputs,
 		}
@@ -1657,7 +1645,6 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { name, .. }
 			| Self::AffectedPackages { name, .. }
 			| Self::DiagnoseChangesets { name, .. }
-			| Self::Lint { name, .. }
 			| Self::RetargetRelease { name, .. }
 			| Self::Command { name, .. } => name.as_deref(),
 		}
@@ -1685,7 +1672,6 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { when, .. }
 			| Self::AffectedPackages { when, .. }
 			| Self::DiagnoseChangesets { when, .. }
-			| Self::Lint { when, .. }
 			| Self::RetargetRelease { when, .. }
 			| Self::Command { when, .. } => when.as_deref(),
 		}
@@ -1718,7 +1704,6 @@ impl CliStepDefinition {
 			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
 			Self::AffectedPackages { .. } => "AffectedPackages",
 			Self::DiagnoseChangesets { .. } => "DiagnoseChangesets",
-			Self::Lint { .. } => "Lint",
 			Self::RetargetRelease { .. } => "RetargetRelease",
 			Self::Command { .. } => "Command",
 		}
@@ -1732,7 +1717,7 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
-			Self::Validate { .. } | Self::CommitRelease { .. } => Some(&[]),
+			Self::Validate { .. } | Self::CommitRelease { .. } => Some(&["fix"]),
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
@@ -1756,7 +1741,6 @@ impl CliStepDefinition {
 				Some(&["format", "changed_paths", "since", "verify", "label"])
 			}
 			Self::DiagnoseChangesets { .. } => Some(&["format", "changeset"]),
-			Self::Lint { .. } => Some(&["format", "fix", "ecosystem"]),
 			Self::RetargetRelease { .. } => Some(&["from", "target", "force", "sync_provider"]),
 			Self::Command { .. } => None,
 		}
@@ -1768,7 +1752,13 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn expected_input_kind(&self, name: &str) -> Option<CliInputKind> {
 		match self {
-			Self::Validate { .. } | Self::CommitRelease { .. } | Self::Command { .. } => None,
+			Self::Validate { .. } => {
+				match name {
+					"fix" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
+			Self::CommitRelease { .. } | Self::Command { .. } => None,
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
@@ -1804,14 +1794,6 @@ impl CliStepDefinition {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					"changeset" => Some(CliInputKind::StringList),
-					_ => None,
-				}
-			}
-			Self::Lint { .. } => {
-				match name {
-					"format" => Some(CliInputKind::Choice),
-					"fix" => Some(CliInputKind::Boolean),
-					"ecosystem" => Some(CliInputKind::StringList),
 					_ => None,
 				}
 			}

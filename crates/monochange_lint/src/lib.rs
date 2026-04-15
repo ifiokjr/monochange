@@ -13,9 +13,7 @@ use std::path::Path;
 use monochange_core::Ecosystem;
 use monochange_core::lint::LintContext;
 use monochange_core::lint::LintFix;
-use monochange_core::lint::LintLocation;
 use monochange_core::lint::LintReport;
-use monochange_core::lint::LintResult;
 use monochange_core::lint::LintRuleConfig;
 use monochange_core::lint::LintRuleRegistry;
 use monochange_core::lint::LintSeverity;
@@ -116,10 +114,7 @@ impl Linter {
 				.get(ecosystem)
 				.and_then(|ecosystem_config| ecosystem_config.get(&rule_id))
 				.cloned()
-				.unwrap_or_else(|| {
-					// Default: error for most rules
-					LintRuleConfig::Severity(LintSeverity::Error)
-				});
+				.unwrap_or(LintRuleConfig::Severity(LintSeverity::Error));
 
 			// Skip if rule is disabled
 			if !config.severity().is_enabled() {

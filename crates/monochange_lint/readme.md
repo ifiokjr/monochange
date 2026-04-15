@@ -15,20 +15,20 @@ This crate provides linting capabilities for monorepo package manifests across m
 
 ## Cargo Rules
 
-| Rule ID | Description | Autofixable |
-|---------|-------------|-------------|
-| `dependency-field-order` | Enforces consistent ordering of dependency fields | Yes |
-| `internal-dependency-workspace` | Requires `workspace = true` for internal dependencies | Yes |
-| `required-package-fields` | Enforces required `[package]` fields | Partial |
-| `sorted-dependencies` | Requires alphabetically sorted dependency tables | Yes |
+| Rule ID                         | Description                                           | Autofixable |
+| ------------------------------- | ----------------------------------------------------- | ----------- |
+| `dependency-field-order`        | Enforces consistent ordering of dependency fields     | Yes         |
+| `internal-dependency-workspace` | Requires `workspace = true` for internal dependencies | Yes         |
+| `required-package-fields`       | Enforces required `[package]` fields                  | Partial     |
+| `sorted-dependencies`           | Requires alphabetically sorted dependency tables      | Yes         |
 
 ## NPM Rules
 
-| Rule ID | Description | Autofixable |
-|---------|-------------|-------------|
-| `workspace-protocol` | Requires `workspace:` protocol for internal deps | Yes |
-| `sorted-dependencies` | Requires alphabetically sorted dependencies | Yes |
-| `required-package-fields` | Enforces required fields in package.json | Partial |
+| Rule ID                   | Description                                      | Autofixable |
+| ------------------------- | ------------------------------------------------ | ----------- |
+| `workspace-protocol`      | Requires `workspace:` protocol for internal deps | Yes         |
+| `sorted-dependencies`     | Requires alphabetically sorted dependencies      | Yes         |
+| `required-package-fields` | Enforces required fields in package.json         | Partial     |
 
 ## Usage
 

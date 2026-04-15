@@ -304,7 +304,7 @@ impl LintRuleRunner for RequiredPackageFieldsRule {
 		let mut results = Vec::new();
 
 		for field in required_fields {
-			if !parsed.get(&field).is_some() {
+			if parsed.get(&field).is_none() {
 				let location = LintLocation::new(ctx.manifest_path, 1, 1);
 				let message = format!("Missing required package.json field: '{}'", field);
 				results.push(LintResult::new(
@@ -367,31 +367,30 @@ impl LintRuleRunner for RootNoProdDepsRule {
 
 		let mut results = Vec::new();
 
-		if let Some(deps) = parsed.get("dependencies") {
-			if deps.as_object().is_some_and(|o| !o.is_empty()) {
-				let location = LintLocation::new(ctx.manifest_path, 1, 1);
-				let message = String::from(
-					"Root package.json should not have production dependencies. Use devDependencies instead.",
-				);
+		if let Some(deps) = parsed.get("dependencies")
+			&& deps.as_object().is_some_and(|o| !o.is_empty())
+		{
+			let location = LintLocation::new(ctx.manifest_path, 1, 1);
+			let message = String::from(
+				"Root package.json should not have production dependencies. Use devDependencies instead.",
+			);
 
-				let mut result = LintResult::new(
-					"npm/root-no-prod-deps",
-					location,
-					message,
-					config.severity(),
-				);
+			let mut result = LintResult::new(
+				"npm/root-no-prod-deps",
+				location,
+				message,
+				config.severity(),
+			);
 
-				if config.bool_option("fix", true) {
-					// Move deps to devDependencies
-					result = result.with_fix(LintFix::single(
-						"Move dependencies to devDependencies",
-						(0, 0),
-						"Move 'dependencies' to 'devDependencies' section",
-					));
-				}
-
-				results.push(result);
+			if config.bool_option("fix", true) {
+				result = result.with_fix(LintFix::single(
+					"Move dependencies to devDependencies",
+					(0, 0),
+					"Move 'dependencies' to 'devDependencies' section",
+				));
 			}
+
+			results.push(result);
 		}
 
 		results
@@ -558,22 +557,18 @@ impl UnlistedPackagePrivateRule {
 			return false;
 		};
 
-		// Check if package is defined in [package] section
-		if let Some(packages) = parsed.get("package") {
-			if let Some(table) = packages.as_table() {
-				for (id, package) in table {
-					// Check by id
-					if id == package_name {
-						return true;
-					}
-					// Also check by name field if present
-					if let Some(name) = package.get("name") {
-						if let Some(name_str) = name.as_str() {
-							if name_str == package_name {
-								return true;
-							}
-						}
-					}
+		if let Some(packages) = parsed.get("package")
+			&& let Some(table) = packages.as_table()
+		{
+			for (id, package) in table {
+				if id == package_name {
+					return true;
+				}
+				if let Some(name) = package.get("name")
+					&& let Some(name_str) = name.as_str()
+					&& name_str == package_name
+				{
+					return true;
 				}
 			}
 		}

@@ -1900,6 +1900,7 @@ dependencies = [
  "monochange_github",
  "monochange_gitlab",
  "monochange_graph",
+ "monochange_lint",
  "monochange_npm",
  "monochange_semver",
  "monochange_test_helpers",
