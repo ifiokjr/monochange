@@ -173,9 +173,17 @@ monochange can verify existing npm trust configuration and, when needed, run the
 
 ### Registry-side setup
 
-crates.io supports trusted publishing for GitHub Actions.
+crates.io supports trusted publishing for GitHub Actions and GitLab CI/CD. monochange currently focuses on GitHub workflow context.
 
-**Important:** the crate must already exist on crates.io before you can finish trusted-publishing setup. If it does not exist yet, bootstrap it first with a real initial release or `mc placeholder-publish`.
+Trusted publishing on crates.io exchanges your CI identity for a short-lived publish token, so you do not need a long-lived crates.io API token in CI.
+
+**Prerequisites**
+
+- the crate must already exist on `crates.io`
+- you must be an owner of the crate on `crates.io`
+- the repository must live on GitHub or GitLab
+
+If the crate does not exist yet, bootstrap it first with a real initial release or `mc placeholder-publish`. The first publish still uses the normal crates.io token flow.
 
 **UI path**
 
@@ -185,35 +193,47 @@ crates.io supports trusted publishing for GitHub Actions.
 
 - **Repository owner** — GitHub owner
 - **Repository name** — GitHub repository name
-- **Workflow filename** — for example `publish.yml`
-- **Environment** — optional, for example `publisher`
+- **Workflow filename** — for example `release.yml`
+- **Environment** — optional, for example `release`
 
-These fields match the crates.io trusted-publisher form and are also reflected in the crates.io documentation and UI templates.
+Use the workflow filename only, not the full `.github/workflows/...` path.
 
 ### Workflow setup
 
-A GitHub Actions job can use the official token-exchange action:
+A typical GitHub Actions release job looks like this:
 
 ```yaml
-permissions:
-  contents: read
-  id-token: write
+name: Publish to crates.io
 
-steps:
-  - uses: actions/checkout@v6
+on:
+  push:
+    tags:
+      - "v*"
 
-  - uses: rust-lang/crates-io-auth-action@v1
-    id: auth
-
-  - run: cargo publish
-    env:
-      CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 ```
+
+If you configure an environment on crates.io, the GitHub job must use the same environment name.
 
 ### Monochange notes
 
 - monochange does **not** create the crates.io trusted-publisher record for you yet.
 - Once the registry-side configuration exists, monochange can publish with the temporary token exposed by `rust-lang/crates-io-auth-action@v1`.
+- crates.io issues a short-lived publish token; the current docs describe these tokens as expiring after 30 minutes.
+- Use a specific workflow filename and, when needed, a protected GitHub environment to reduce the publish attack surface.
 - The current monochange GitHub publish workflow already includes this pattern.
 
 Useful references:
@@ -277,7 +297,15 @@ Useful references:
 
 pub.dev calls this **automated publishing**.
 
-**Important:** the package must already exist before you can enable automated publishing. If the package does not exist yet, publish it once first or use `mc placeholder-publish`.
+Automated publishing on pub.dev authenticates with a temporary GitHub-signed OIDC token instead of a long-lived pub credential.
+
+**Prerequisites**
+
+- the package must already exist on `pub.dev`
+- you must be an uploader or admin for the package
+- the repository must be on GitHub
+
+If the package does not exist yet, publish it once first or use `mc placeholder-publish`.
 
 **UI path**
 
@@ -295,28 +323,57 @@ Examples:
 - single-package repo: `v{{version}}`
 - monorepo package-specific tag: `my_package-v{{version}}`
 
-For a monorepo, give each package its own tag pattern so a tag for one package cannot publish another package by accident.
+For a monorepo, give each package its own tag pattern so a tag for one package cannot publish another package by accident. The official pub.dev guidance also recommends a separate workflow file per package when one repository publishes multiple Dart packages.
+
+**Optional hardening**
+
+- click **Require GitHub Actions environment** on the package admin page
+- choose an environment name such as `pub.dev`
+- use the same environment name in the GitHub workflow
 
 ### Workflow requirements
 
-pub.dev only accepts GitHub Actions automated publishing when the workflow was triggered by a **tag push**.
+pub.dev only accepts GitHub Actions automated publishing when the workflow was triggered by a **tag push**. It rejects branch-triggered and manually dispatched workflows for this publishing flow.
 
-That means the GitHub workflow trigger must align with the configured tag pattern.
+That means the GitHub workflow trigger must align exactly with the configured tag pattern.
 
-Example tag trigger for `v{{version}}`:
+### Recommended reusable workflow
+
+pub.dev strongly encourages the reusable workflow maintained by `dart-lang/setup-dart`:
 
 ```yaml
+name: Publish to pub.dev
+
 on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
 
-permissions:
-  contents: read
-  id-token: write
+jobs:
+  publish:
+    permissions:
+      id-token: write
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    # with:
+    #   working-directory: path/to/package/within/repository
 ```
 
-The publish step can then run:
+If you require a GitHub Actions environment on pub.dev, pass the same environment name to the reusable workflow:
+
+```yaml
+jobs:
+  publish:
+    permissions:
+      id-token: write
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    with:
+      environment: pub.dev
+      # working-directory: path/to/package/within/repository
+```
+
+### Custom workflow
+
+If you need custom code generation or build steps, set up Dart yourself and publish manually after the OIDC-authenticated setup step:
 
 ```bash
 dart pub publish --force
@@ -333,7 +390,9 @@ flutter pub publish --force
 - monochange does **not** configure pub.dev automated publishing for you yet.
 - monochange reports the package admin URL so you can finish the setup manually.
 - pub.dev is stricter than the others here because the workflow must be tag-triggered, not just manually dispatched or branch-triggered.
+- The reusable workflow from `dart-lang/setup-dart` is the officially recommended path and is worth preferring unless you need custom pre-publish steps.
 - Keep the Git tag, `pubspec.yaml` version, and tag pattern aligned.
+- Protect matching tags, and use GitHub environment protection rules when you need an approval gate before publishing.
 
 Useful references:
 
