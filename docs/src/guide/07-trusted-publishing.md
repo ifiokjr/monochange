@@ -33,7 +33,7 @@ The goal is the same in every case:
 
 npm is currently the only ecosystem where monochange performs bulk trusted-publishing setup itself.
 
-For `crates.io`, `jsr`, and `pub.dev`, monochange reports the setup URL for each package and blocks the next built-in registry publish until the trust configuration has been completed manually.
+For `crates.io`, `jsr`, and `pub.dev`, monochange reports the setup URL for each package and blocks the next built-in registry publish until the trust configuration has been completed manually. It also preflights the GitHub trusted-publishing context for those registries, surfacing the repository, workflow, and environment it expects when that context can be resolved.
 
 ## monochange configuration
 
@@ -242,6 +242,7 @@ If you configure an environment on crates.io, the GitHub job must use the same e
 ### monochange notes
 
 - monochange does not create the `crates.io` trusted-publisher record for you yet.
+- monochange now preflights the GitHub repository/workflow/environment context it expects for manual registries and reports when one of those values still needs to be set explicitly in config.
 - Once the registry-side configuration exists, monochange can publish with the temporary token exposed by `rust-lang/crates-io-auth-action@v1`.
 - crates.io issues a short-lived publish token; the current docs describe these tokens as expiring after 30 minutes.
 - Use a specific workflow filename and, when needed, a protected GitHub environment to reduce the publish attack surface.
