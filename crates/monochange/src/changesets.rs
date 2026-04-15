@@ -138,51 +138,7 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 		}
 
 		if let Some(context) = &changeset.context {
-			if let Some(introduced) = context
-				.introduced
-				.as_ref()
-				.and_then(|revision| revision.commit.as_ref())
-			{
-				lines.push(format!("  introduced: {}", introduced.short_sha));
-			}
-
-			if let Some(last_updated) = context
-				.last_updated
-				.as_ref()
-				.and_then(|revision| revision.commit.as_ref())
-			{
-				lines.push(format!("  last-updated: {}", last_updated.short_sha));
-			}
-
-			let review_request = context
-				.introduced
-				.as_ref()
-				.and_then(|revision| revision.review_request.as_ref())
-				.or_else(|| {
-					context
-						.last_updated
-						.as_ref()
-						.and_then(|revision| revision.review_request.as_ref())
-				});
-
-			if let Some(review_request) = review_request {
-				let review_request_line = match &review_request.url {
-					Some(url) => format!("  review request: {} ({})", review_request.id, url),
-					None => format!("  review request: {}", review_request.id),
-				};
-
-				lines.push(review_request_line);
-			}
-
-			if !context.related_issues.is_empty() {
-				let issues = context
-					.related_issues
-					.iter()
-					.map(|issue| issue.id.as_str())
-					.collect::<Vec<_>>()
-					.join(", ");
-				lines.push(format!("  related issues: {issues}"));
-			}
+			push_changeset_context_lines(&mut lines, context);
 		}
 
 		lines.push(String::new());
@@ -190,6 +146,56 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 
 	lines.pop();
 	lines.join("\n")
+}
+
+fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetContext) {
+	if let Some(introduced) = context
+		.introduced
+		.as_ref()
+		.and_then(|revision| revision.commit.as_ref())
+	{
+		lines.push(format!("  introduced: {}", introduced.short_sha));
+	}
+
+	if let Some(last_updated) = context
+		.last_updated
+		.as_ref()
+		.and_then(|revision| revision.commit.as_ref())
+	{
+		lines.push(format!("  last-updated: {}", last_updated.short_sha));
+	}
+
+	let review_request = context
+		.introduced
+		.as_ref()
+		.and_then(|revision| revision.review_request.as_ref())
+		.or_else(|| {
+			context
+				.last_updated
+				.as_ref()
+				.and_then(|revision| revision.review_request.as_ref())
+		});
+
+	if let Some(review_request) = review_request {
+		let review_request_line = match &review_request.url {
+			Some(url) => format!("  review request: {} ({})", review_request.id, url),
+			None => format!("  review request: {}", review_request.id),
+		};
+
+		lines.push(review_request_line);
+	}
+
+	if context.related_issues.is_empty() {
+		return;
+	}
+
+	let issues = context
+		.related_issues
+		.iter()
+		.map(|issue| issue.id.as_str())
+		.collect::<Vec<_>>()
+		.join(", ");
+	lines.push(format!("  related issues: {issues}"));
 }
 
 #[must_use = "the discovery result must be checked"]

@@ -190,10 +190,13 @@ pub fn update_package_lock(
 			let Some(entry_object) = entry_value.as_object_mut() else {
 				continue;
 			};
+
 			if let Some(name) = entry_object.get("name").and_then(Value::as_str) {
-				if let Some(version) = raw_versions.get(name) {
-					entry_object.insert("version".to_string(), Value::String(version.clone()));
-				}
+				let Some(version) = raw_versions.get(name) else {
+					continue;
+				};
+
+				entry_object.insert("version".to_string(), Value::String(version.clone()));
 				continue;
 			}
 			for (name, package_dir) in package_paths_by_name {
@@ -212,6 +215,10 @@ pub fn update_package_lock(
 			}
 		}
 	}
+}
+
+fn uses_workspace_reference(text: &str) -> bool {
+	text.starts_with("link:") || text.starts_with("workspace:")
 }
 
 /// Update versions embedded in a parsed `pnpm-lock.yaml` mapping.
@@ -245,16 +252,21 @@ pub fn update_pnpm_lock(
 					let Some(entry) = dependencies.get_mut(&key) else {
 						continue;
 					};
+
 					if let Some(text) = entry.as_str() {
-						if !text.starts_with("link:") && !text.starts_with("workspace:") {
-							*entry = serde_yaml_ng::Value::String(version.clone());
+						if uses_workspace_reference(text) {
+							continue;
 						}
-					} else if let Some(entry_mapping) = entry.as_mapping_mut() {
+
+						*entry = serde_yaml_ng::Value::String(version.clone());
+						continue;
+					}
+
+					if let Some(entry_mapping) = entry.as_mapping_mut() {
 						let version_key = serde_yaml_ng::Value::String("version".to_string());
 						if let Some(version_value) = entry_mapping.get_mut(&version_key)
 							&& let Some(text) = version_value.as_str()
-							&& !text.starts_with("link:")
-							&& !text.starts_with("workspace:")
+							&& !uses_workspace_reference(text)
 						{
 							*version_value = serde_yaml_ng::Value::String(version.clone());
 						}

@@ -2517,6 +2517,44 @@ fn validate_package_and_group_definitions(
 	Ok(())
 }
 
+fn validate_cli_input_default(
+	cli_command: &CliCommandDefinition,
+	input: &CliInputDefinition,
+	default: &str,
+) -> MonochangeResult<()> {
+	if matches!(input.kind, CliInputKind::Choice)
+		&& !input.choices.iter().any(|choice| choice == default)
+	{
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` input `{}` default `{default}` is not one of the configured choices",
+			cli_command.name, input.name
+		)));
+	}
+
+	if matches!(input.kind, CliInputKind::Boolean) && default != "true" && default != "false" {
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` input `{}` boolean default must be `true` or `false`",
+			cli_command.name, input.name
+		)));
+	}
+
+	Ok(())
+}
+
+fn validate_affected_packages_step_enabled(
+	cli_command: &CliCommandDefinition,
+	verify_enabled: bool,
+) -> MonochangeResult<()> {
+	if verify_enabled {
+		return Ok(());
+	}
+
+	Err(MonochangeError::Config(format!(
+		"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",
+		cli_command.name
+	)))
+}
+
 fn path_uses_glob(path: &str) -> bool {
 	path.contains('*') || path.contains('?') || path.contains('[')
 }
@@ -2583,6 +2621,7 @@ fn validate_versioned_files(
 					Some("remove `prefix`, `fields`, and `name` when using `regex`; those options only apply to ecosystem-aware manifest updates".to_string()),
 				));
 			}
+
 			let compiled = Regex::new(regex).map_err(|error| {
 				config_diagnostic(
 					config_contents,
@@ -3110,23 +3149,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				)));
 			}
 			if let Some(default) = &input.default {
-				if matches!(input.kind, CliInputKind::Choice)
-					&& !input.choices.iter().any(|choice| choice == default)
-				{
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` input `{}` default `{default}` is not one of the configured choices",
-						cli_command.name, input.name
-					)));
-				}
-				if matches!(input.kind, CliInputKind::Boolean)
-					&& default != "true"
-					&& default != "false"
-				{
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` input `{}` boolean default must be `true` or `false`",
-						cli_command.name, input.name
-					)));
-				}
+				validate_cli_input_default(cli_command, input, default)?;
 			}
 		}
 
@@ -3175,16 +3198,18 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 					..
 				} => {
 					if let Some(step_id) = id {
-						if step_id.trim().is_empty() {
+						let trimmed = step_id.trim();
+						if trimmed.is_empty() {
 							return Err(MonochangeError::Config(format!(
 								"CLI command `{}` has a command step with an empty id",
 								cli_command.name
 							)));
 						}
-						if !seen_step_ids.insert(step_id.clone()) {
+
+						if !seen_step_ids.insert(trimmed.to_string()) {
 							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` has duplicate step id `{}`",
-								cli_command.name, step_id
+								"CLI command `{}` has duplicate step id `{trimmed}`",
+								cli_command.name
 							)));
 						}
 					}
@@ -3283,12 +3308,8 @@ fn validate_cli_runtime_requirements(
 		for step in &cli_command.steps {
 			validate_step_input_overrides(cli_command, step)?;
 			if let CliStepDefinition::AffectedPackages { inputs, .. } = step {
-				if !changesets.verify.enabled {
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",
-						cli_command.name
-					)));
-				}
+				validate_affected_packages_step_enabled(cli_command, changesets.verify.enabled)?;
+
 				let has_changed_paths = inputs.contains_key("changed_paths")
 					|| cli_command_input(cli_command, "changed_paths")
 						.is_some_and(|input| matches!(input.kind, CliInputKind::StringList));

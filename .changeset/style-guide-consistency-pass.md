@@ -1,10 +1,13 @@
 ---
 monochange: patch
 monochange_analysis: patch
+monochange_cargo: patch
 monochange_config: patch
+monochange_core: patch
 monochange_gitea: patch
 monochange_gitlab: patch
 monochange_hosting: patch
+monochange_npm: patch
 monochange_test_helpers: patch
 ---
 
@@ -16,7 +19,8 @@ This pass improves readability and documentation consistency across the workspac
 
 - extracted shared crate-level docs into `.templates/crates.t.md` and reused them from Rust `lib.rs` module docs and crate readmes
 - added missing readmes and module docs for `monochange_analysis`, `monochange_hosting`, and `monochange_test_helpers`
-- rewrote a few nested control-flow sections into flatter early-return or `match`-based forms in `monochange`, `monochange_config`, `monochange_gitea`, `monochange_gitlab`, and the shared test helpers
+- rewrote a few nested control-flow sections into flatter early-return or `match`-based forms in `monochange`, `monochange_config`, `monochange_gitea`, `monochange_gitlab`, `monochange_npm`, and the shared test helpers
+- replaced duplicated fixture-copy helpers in `monochange_cargo` and `monochange_core` tests with the shared `monochange_test_helpers::copy_directory` utility
 
 **Before:**
 

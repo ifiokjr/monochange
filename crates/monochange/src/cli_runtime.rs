@@ -852,6 +852,7 @@ pub(crate) fn execute_cli_command_with_options(
 				let progress_error = progress_error_detail(&error).to_string();
 				progress.step_failed(step_index, step, step_started_at.elapsed(), &progress_error);
 			}
+
 			return Err(error);
 		}
 		if show_progress {
@@ -2181,6 +2182,7 @@ pub(crate) fn render_cli_command_result(
 		if let Some(version) = &prepared_release.version {
 			lines.push(format!("version: {version}"));
 		}
+
 		if !prepared_release.released_packages.is_empty() {
 			lines.push(format!(
 				"released packages: {}",
@@ -2730,13 +2732,15 @@ fn execute_affected_packages_step(
 		.get("changed_paths")
 		.cloned()
 		.unwrap_or_default();
-	let changed_paths = if let Some(rev) = &since {
-		if !quiet && !explicit_paths.is_empty() {
-			eprintln!("warning: --since takes priority; --changed-paths was ignored");
+	let changed_paths = match &since {
+		Some(rev) => {
+			if !quiet && !explicit_paths.is_empty() {
+				eprintln!("warning: --since takes priority; --changed-paths was ignored");
+			}
+
+			compute_changed_paths_since(root, rev)?
 		}
-		compute_changed_paths_since(root, rev)?
-	} else {
-		explicit_paths
+		None => explicit_paths,
 	};
 	let labels = step_inputs.get("label").cloned().unwrap_or_default();
 	let enforce = step_inputs
@@ -2792,6 +2796,7 @@ fn resolve_command_output(
 			if !context.quiet {
 				println!("{rendered}");
 			}
+
 			return Err(MonochangeError::Config(evaluation.summary.clone()));
 		}
 		return Ok(rendered);
