@@ -10,6 +10,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use ignore::overrides::Override;
+use ignore::overrides::OverrideBuilder;
 use monochange_core::Ecosystem;
 use monochange_core::lint::LintContext;
 use monochange_core::lint::LintFix;
@@ -142,9 +144,20 @@ impl Linter {
 	pub fn lint_workspace(&self, workspace_root: &Path) -> LintReport {
 		let mut report = LintReport::new();
 
+		let mut overrides = OverrideBuilder::new(workspace_root);
+		if let Err(e) = overrides.add("!fixtures/**") {
+			tracing::warn!("invalid override: {e}");
+		}
+		if let Err(e) = overrides.add("!target/**") {
+			tracing::warn!("invalid override: {e}");
+		}
+		let overrides = overrides.build().unwrap_or_else(|e| {
+			tracing::warn!("failed to build overrides: {e}");
+			Override::empty()
+		});
+
 		let walker = ignore::WalkBuilder::new(workspace_root)
-			.add_custom_ignore_filename("fixtures")
-			.add_custom_ignore_filename("target")
+			.overrides(overrides)
 			.build();
 
 		for entry in walker.filter_map(Result::ok) {
