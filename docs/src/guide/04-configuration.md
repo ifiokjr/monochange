@@ -203,6 +203,8 @@ When `trusted_publishing` is enabled:
 - pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, so workspace protocol and catalog dependency handling stays aligned with the workspace manager
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks built-in release publishing until trust is configured
 
+For a GitHub-focused setup guide with exact registry fields, commands, and workflow requirements, see [Trusted publishing and OIDC](./07-trusted-publishing.md).
+
 monochange resolves the GitHub trust context from:
 
 - explicit `repository`, `workflow`, and `environment` values in config

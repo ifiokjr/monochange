@@ -88,6 +88,8 @@ When `publish.trusted_publishing` is enabled, monochange can derive GitHub trust
 
 For `crates.io`, `jsr`, and `pub.dev`, monochange reports the setup URL for the package and requires manual trusted-publishing setup before the next built-in release publish. Placeholder publishing can still proceed so the package exists before that manual step.
 
+For exact registry-side setup steps and field mappings, see [Trusted publishing and OIDC](./07-trusted-publishing.md).
+
 For full GitHub and GitLab CI examples by ecosystem — npm, Cargo, Deno/JSR, and Dart/pub.dev — see [Advanced: CI, package publishing, and release PR flows](./13-ci-and-publishing.md).
 
 ## Release notes, GitHub releases, and release PRs
