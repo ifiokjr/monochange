@@ -64,6 +64,20 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {/projectMilestoneCapabilities} -->
 
+<!-- {@projectRecentPublishingImprovements} -->
+
+### Recent package publishing improvements
+
+Recent `monochange` improvements made package publishing guidance and diagnostics much more actionable:
+
+- a dedicated trusted-publishing guide now covers `npm`, `crates.io`, `jsr`, and `pub.dev`
+- CI examples now prefer the official registry-maintained workflows for `crates.io` and `pub.dev`
+- a dedicated multi-package publishing guide now covers monorepo tag, workflow, and package-boundary patterns
+- CLI output now gives clearer manual next steps for registries that still require registry-side trusted-publishing enrollment
+- built-in publish preflight now validates and reports the expected GitHub repository, workflow, and environment context for manual registries when it can infer them
+
+<!-- {/projectRecentPublishingImprovements} -->
+
 <!-- {@projectCommandAutomationMatrix} -->
 
 | Goal                             | Command                                                     | Use it when                                                                                              |
