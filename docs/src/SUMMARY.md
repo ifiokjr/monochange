@@ -18,6 +18,7 @@
 - [Advanced: Diagnostics](guide/11-diagnostics.md)
 - [Advanced: Repairable releases](guide/12-repairable-releases.md)
 - [Advanced: CI, package publishing, and release PR flows](guide/13-ci-and-publishing.md)
+- [Advanced: Multi-package publishing patterns](guide/14-multi-package-publishing.md)
 
 # Reference
 

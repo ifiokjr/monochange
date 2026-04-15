@@ -330,7 +330,7 @@ Examples:
 - single-package repo: `v{{version}}`
 - monorepo package-specific tag: `my_package-v{{version}}`
 
-For a monorepo, give each package its own tag pattern so a tag for one package cannot publish another package by accident. The official pub.dev guidance also recommends a separate workflow file per package when one repository publishes multiple Dart packages.
+For a monorepo, give each package its own tag pattern so a tag for one package cannot publish another package by accident. The official pub.dev guidance also recommends a separate workflow file per package when one repository publishes multiple Dart packages. For a broader monorepo strategy across registries, see [Multi-package publishing patterns](./14-multi-package-publishing.md).
 
 **Optional hardening**
 
@@ -436,4 +436,4 @@ Keep a package on `mode = "external"` when:
 - you need retry or delayed requeue behavior that monochange does not manage yet
 - your registry requires a CI pattern that differs substantially from monochange's built-in publish flow
 
-In those cases, you can still use the same registry-side trusted-publishing setup while letting your own workflow own the actual publish command.
+In those cases, you can still use the same registry-side trusted-publishing setup while letting your own workflow own the actual publish command. The same approach is often the cleanest fit for multi-package repositories that need package-specific tags or workflows; see [Multi-package publishing patterns](./14-multi-package-publishing.md).
