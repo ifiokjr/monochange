@@ -36,7 +36,24 @@ mc --help
 ```bash
 npm install -g @monochange/skill
 monochange-skill --print-install
+monochange-skill --print-skill
+monochange-skill --copy ~/.pi/agent/skills/monochange
 ```
+
+## Skill map
+
+Use the bundled docs like this:
+
+- [SKILL.md](./SKILL.md) — concise entrypoint for agents
+- [skills/README.md](./skills/README.md) — index of focused skill modules
+- [skills/changesets.md](./skills/changesets.md) — creating and managing changesets
+- [skills/commands.md](./skills/commands.md) — built-in commands and workflow selection
+- [skills/configuration.md](./skills/configuration.md) — creating and evolving `monochange.toml`
+- [skills/linting.md](./skills/linting.md) — current lint policy, rationale, and examples
+- [CHANGESET-GUIDE.md](./CHANGESET-GUIDE.md) — full lifecycle guidance
+- [ARTIFACT-TYPES.md](./ARTIFACT-TYPES.md) — artifact-aware changeset framing
+
+Keep this `REFERENCE.md` open when you want one longer document with broader examples and copy-paste snippets.
 
 ## Recommended command flow
 
@@ -51,6 +68,79 @@ monochange-skill --print-install
 7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
 
 <!-- {/recommendedCommandFlow} -->
+
+For release-oriented commands, markdown is the default human-readable output format. Use `--format json` for automation and `--diff` when you want file previews without mutating the workspace.
+
+## Command catalog
+
+### Bootstrap and validate
+
+```bash
+mc init
+mc init --provider github
+mc populate
+mc validate
+```
+
+Use these when you are creating or refining `monochange.toml`.
+
+- `mc init` generates a starter config from detected packages
+- `mc init --provider github` also seeds source/provider automation config
+- `mc populate` appends any missing built-in `[cli.<command>]` definitions to an existing config
+- `mc validate` checks config shape and changeset targets before you do anything riskier
+
+### Inspect the workspace model
+
+```bash
+mc discover --format json
+mc diagnostics --format json
+mc release-record --from HEAD --format json
+```
+
+Use these when you need facts before making changes.
+
+- `mc discover --format json` gives you package ids, dependency edges, and groups
+- `mc diagnostics --format json` adds changeset provenance, linked reviews, and related issues
+- `mc release-record --from <ref>` inspects the durable release declaration stored in release history
+
+### Create release intent
+
+```bash
+mc change --package monochange --bump minor --reason "add diagnostics command"
+mc change --package monochange_config --bump none --caused-by monochange_core --reason "dependency-only follow-up"
+mc affected --changed-paths crates/monochange/src/lib.rs --format json
+```
+
+Use these when you are deciding what should be released.
+
+### Preview and apply releases
+
+```bash
+mc release --dry-run
+mc release --dry-run --diff
+mc release --dry-run --format json
+mc commit-release --dry-run --diff
+mc publish --dry-run --format json
+mc publish-release --dry-run --format json
+mc release-pr --dry-run --format json
+mc placeholder-publish --dry-run --format json
+mc repair-release --from v1.2.3 --target HEAD --dry-run
+```
+
+Use the dry-run forms first. They are the safest way to audit release behavior before mutating files, git state, registries, or provider releases.
+
+### Assistant setup and MCP
+
+```bash
+mc assist pi
+mc assist generic
+mc assist claude --format json
+mc mcp
+```
+
+Use `mc assist` when you need install instructions and client-specific MCP configuration. Use `mc mcp` when the client actually needs the stdio server process.
+
+For a shorter command-only guide, see [skills/commands.md](./skills/commands.md).
 
 ## Changeset authoring
 
@@ -453,6 +543,26 @@ required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
 ```
+
+## Linting and validation reference
+
+The repository currently enforces workspace rust lints, workspace clippy groups, explicit clippy overrides, and crate-level `#![forbid(clippy::indexing_slicing)]` declarations in the Rust crates.
+
+Use this workflow after documentation, config, or code edits:
+
+```bash
+devenv shell fix:all
+devenv shell lint:all
+mc validate
+```
+
+If you edited shared docs in `.templates/`, also run:
+
+```bash
+devenv shell docs:check
+```
+
+For the full rule-by-rule explanation — including why each lint exists, when to rely on it, and examples of what changes with and without it — see [skills/linting.md](./skills/linting.md).
 
 ## Important modeling rules
 

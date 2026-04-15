@@ -23,6 +23,22 @@ monochange-skill --print-install
 monochange-skill --copy ~/.pi/agent/skills/monochange
 ```
 
+<!-- {=assistantSkillBundleContents} -->
+
+After copying the bundled skill, you get a small documentation set that is designed to load in layers:
+
+- `SKILL.md` — concise entrypoint for agents
+- `REFERENCE.md` — broader high-context reference with more examples
+- `skills/README.md` — index of focused deep dives
+- `skills/changesets.md` — changeset authoring and lifecycle guidance
+- `skills/commands.md` — built-in command catalog and workflow selection
+- `skills/configuration.md` — `monochange.toml` setup and editing guidance
+- `skills/linting.md` — the current lint policy, rationale, and examples
+
+This layout keeps the top-level skill small while still making the richer guidance available when an assistant needs more context.
+
+<!-- {/assistantSkillBundleContents} -->
+
 ## Print an assistant profile
 
 Examples:

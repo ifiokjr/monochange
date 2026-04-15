@@ -49,6 +49,33 @@ sdk: minor
 # coordinated SDK release
 ```
 
+## Package ids first, group ids when the release boundary is shared
+
+Use a **package id** when one package changed directly:
+
+```markdown
+---
+sdk-core: minor
+---
+
+# add changelog rendering API
+```
+
+Use a **group id** when the outward release note should be owned by the whole group:
+
+```markdown
+---
+sdk: minor
+---
+
+# coordinated SDK release
+```
+
+A quick rule of thumb:
+
+- **package id** — the leaf package changed and monochange can propagate the rest
+- **group id** — the note should read as one coordinated release for all members
+
 <!-- {=releaseExplicitVersionChangesetExample} -->
 
 Use scalar shorthand for plain bumps (`sdk-core: minor`) or for configured change types (`sdk-core: security`). To pin an exact version or combine `bump`, `version`, and `type`, use the object syntax:
@@ -66,6 +93,31 @@ sdk-core:
 When `version` is provided without `bump`, the bump is inferred from the current version. If the package belongs to a version group, the explicit version propagates to the whole group.
 
 <!-- {/releaseExplicitVersionChangesetExample} -->
+
+When a dependent package changes only because another package moved first, author that context explicitly with `caused_by`:
+
+```markdown
+---
+sdk-config:
+  bump: patch
+  caused_by: ["sdk-core"]
+---
+
+# update dependency on sdk-core
+```
+
+And when the package is affected but does not deserve a consumer-facing version bump, use `bump: none`:
+
+```markdown
+---
+sdk-config:
+  bump: none
+  caused_by: ["sdk-core"]
+  type: docs
+---
+
+# document the coordinated release
+```
 
 If multiple changesets specify conflicting explicit versions for the same package or group, monochange uses the highest semver version and emits a warning by default. Set `defaults.strict_version_conflicts = true` to fail instead.
 
@@ -122,6 +174,33 @@ mc release --dry-run --format json --diff
 ```
 
 Markdown and text output render unified diffs directly in the terminal. JSON output wraps the normal manifest payload under `manifest` and adds `fileDiffs` entries for each changed file.
+
+A good planning loop looks like this:
+
+```bash
+mc validate
+mc discover --format json
+mc diagnostics --format json
+mc release --dry-run --diff
+```
+
+Use each command for a different question:
+
+- `mc validate` — is the config and changeset set valid?
+- `mc discover --format json` — which package ids, groups, and dependency edges exist?
+- `mc diagnostics --format json` — who introduced these changesets and what review context is attached?
+- `mc release --dry-run --diff` — what exact files would change if I prepared the release now?
+
+### Compare preview modes
+
+Use the preview mode that matches the decision you are trying to make:
+
+| Command                                     | Best for                                      |
+| ------------------------------------------- | --------------------------------------------- |
+| `mc release --dry-run`                      | Human review in the terminal                  |
+| `mc release --dry-run --diff`               | Human review plus exact file patches          |
+| `mc release --dry-run --format json`        | Automation, scripts, MCP clients              |
+| `mc release --dry-run --format json --diff` | Automation that also needs file patch details |
 
 When you want command semantics without any command-line noise, add `--quiet`. Quiet mode suppresses stdout/stderr and uses dry-run behavior for release-oriented commands so the workspace stays unchanged.
 
@@ -248,6 +327,15 @@ Current planning rules:
 - CLI text and JSON output render workspace paths relative to the repository root for stable snapshots and automation
 
 <!-- {/releasePlanningRules} -->
+
+### Diagnostics vs. release records
+
+These two commands answer different questions:
+
+- `mc diagnostics --format json` — what is currently pending in `.changeset/*.md`, and who introduced it?
+- `mc release-record --from <ref>` — what did a past release commit declare durably in git history?
+
+Use diagnostics **before** you release. Use release records **after** a release exists and you need to inspect or repair it later.
 
 Across release-oriented commands, global `--quiet` suppresses stdout/stderr and reuses dry-run behavior for commands that support it.
 

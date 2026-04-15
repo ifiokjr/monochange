@@ -88,6 +88,8 @@ When `publish.trusted_publishing` is enabled, monochange can derive GitHub trust
 
 For `crates.io`, `jsr`, and `pub.dev`, monochange reports the setup URL for the package and requires manual trusted-publishing setup before the next built-in release publish. Placeholder publishing can still proceed so the package exists before that manual step.
 
+For full GitHub and GitLab CI examples by ecosystem — npm, Cargo, Deno/JSR, and Dart/pub.dev — see [Advanced: CI, package publishing, and release PR flows](./13-ci-and-publishing.md).
+
 ## Release notes, GitHub releases, and release PRs
 
 <!-- {=githubAutomationReleaseConfigExample} -->
@@ -335,3 +337,5 @@ The `--provider` flag supports three source providers:
 | Gitea    | `gitea`            | No — use Gitea Actions    | Yes                | Yes                 |
 
 All providers configure the `[source]` section in `monochange.toml` with appropriate settings for releases and pull/merge requests. GitLab and Gitea require manual CI configuration since they don't support GitHub Actions workflow files.
+
+If you are comparing provider-specific CI layouts or designing a long-running release PR branch, continue with [Advanced: CI, package publishing, and release PR flows](./13-ci-and-publishing.md).

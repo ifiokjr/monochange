@@ -71,6 +71,26 @@ Most first changes should target a package id.
 
 Use group ids only when the change is intentionally owned by the whole group.
 
+A typical generated file looks like this:
+
+```markdown
+---
+<id>: patch
+---
+
+#### describe the change
+```
+
+If the same package changed for a more specific reason, you can add more context right away:
+
+```bash
+mc change \
+  --package <id> \
+  --bump minor \
+  --reason "add release preview improvements" \
+  --details "Adds file diff previews during dry runs."
+```
+
 ## 6. Preview the release plan safely
 
 ```bash
@@ -78,6 +98,18 @@ mc release --dry-run
 ```
 
 By default this now renders a human-friendly markdown preview in the terminal. Use `--format json` when you want structured output for tooling, or `--format text` when you explicitly want the older plain-text rendering.
+
+When you want to see the exact file patch without mutating the workspace, add `--diff`:
+
+```bash
+mc release --dry-run --diff
+```
+
+When you want to inspect changeset provenance before releasing, add a diagnostics pass:
+
+```bash
+mc diagnostics --format json
+```
 
 Stop here on your first run. This previews the release plan without publishing anything.
 
@@ -107,5 +139,7 @@ If you need a silent safety check, run `mc release --quiet`. Quiet mode suppress
 - [Your first release plan](./02-setup.md) — a fuller walkthrough built around `mc init`
 - [Discovery](./03-discovery.md) — what discovery finds and how ids are rendered
 - [Configuration](./04-configuration.md) — evolve the generated config once the basics feel familiar
+- [Release planning](./06-release-planning.md) — compare preview modes, grouped releases, and planning rules
 - [Advanced: GitHub automation](./08-github-automation.md) — provider publishing, release PRs, and automation
 - [Advanced: Assistant setup and MCP](./09-assistant-setup.md) — optional AI-assisted workflows
+- [Reference: Linting policy](../reference/linting.md) — current rust/clippy rules and why they exist
