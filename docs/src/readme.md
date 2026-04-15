@@ -88,8 +88,32 @@ If you want a slower, more guided walkthrough, continue with [Start here](./guid
 - [Installation](./guide/01-installation.md) — npm, Cargo, optional assistant tooling, and repository development setup
 - [Your first release plan](./guide/02-setup.md) — generated config first, package ids before groups
 - [Configuration reference](./guide/04-configuration.md) — the full package, group, changelog, and CLI model
+- [Release planning](./guide/06-release-planning.md) — changesets, dry runs, diff previews, and planning rules
 - [Advanced: GitHub automation](./guide/08-github-automation.md) — provider publishing and release requests
+- [Advanced: CI, package publishing, and release PR flows](./guide/13-ci-and-publishing.md) — per-provider CI patterns, trusted publishing, and long-running release PR design notes
 - [Advanced: Assistant setup and MCP](./guide/09-assistant-setup.md) — optional AI-assisted workflows
+- [Reference: Manifest linting with `mc check`](./reference/linting.md) — `[ecosystems.<name>.lints]` rules for Cargo and npm-family manifests
+
+## Command and automation matrix
+
+<!-- {=projectCommandAutomationMatrix} -->
+
+| Goal                             | Command                                                     | Use it when                                                                                              |
+| -------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Validate config and changesets   | `mc validate`                                               | You changed `monochange.toml` or `.changeset/*.md` files                                                 |
+| Inspect package ids and groups   | `mc discover --format json`                                 | You need the normalized workspace model                                                                  |
+| Create release intent            | `mc change --package <id> --bump <severity> --reason "..."` | You need a new `.changeset/*.md` file                                                                    |
+| Audit pending release context    | `mc diagnostics --format json`                              | You need git provenance, PR/MR links, or related issues                                                  |
+| Preview the release plan         | `mc release --dry-run --diff`                               | You want changelog/version patches without mutating the repo                                             |
+| Create a durable release commit  | `mc commit-release`                                         | You want a monochange-managed release commit with an embedded `ReleaseRecord`                            |
+| Open or update a release request | `mc release-pr`                                             | You want a long-lived release PR/MR branch updated from current release state                            |
+| Publish packages to registries   | `mc publish`                                                | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
+| Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
+| Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
+| Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
+| Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
+
+<!-- {/projectCommandAutomationMatrix} -->
 
 ## What monochange can do today
 

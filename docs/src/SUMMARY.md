@@ -16,9 +16,11 @@
 - [Migrating from knope](guide/10-migrating-from-knope.md)
 - [Advanced: Diagnostics](guide/11-diagnostics.md)
 - [Advanced: Repairable releases](guide/12-repairable-releases.md)
+- [Advanced: CI, package publishing, and release PR flows](guide/13-ci-and-publishing.md)
 
 # Reference
 
+- [Manifest linting with `mc check`](reference/linting.md)
 - [Progress output](reference/progress-output.md)
 - [Hosted release benchmarks](reference/hosted-release-benchmarks.md)
 - [CLI step reference](reference/cli-steps/00-index.md)

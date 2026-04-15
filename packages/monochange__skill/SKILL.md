@@ -7,13 +7,14 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 ## Quick start
 
-1. Read `monochange.toml` first — it is the single source of truth.
-2. Run `mc validate` before making release-affecting edits.
-3. Use `mc discover --format json` to inspect the workspace model.
-4. Use `mc change` to write explicit release intent as `.changeset/*.md` files.
-5. Use `mc release --dry-run --format json` before mutating release state.
+1. If `monochange.toml` does not exist yet, run `mc init`. If it exists but you want editable built-in command definitions, run `mc populate`.
+2. Read `monochange.toml` first — it is the single source of truth.
+3. Run `mc validate` before making release-affecting edits.
+4. Use `mc discover --format json` to inspect the workspace model.
+5. Use `mc change` to write explicit release intent as `.changeset/*.md` files.
 6. Use `mc diagnostics --format json` to inspect changeset context and git provenance.
-7. Use `mc lint` to check package manifests for consistency and best practices.
+7. Use `mc check` to validate the workspace and run configured manifest lint rules.
+8. Use `mc release --dry-run --format json` or `mc release --dry-run --diff` before mutating release state.
 
 ## Working rules
 
@@ -27,7 +28,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 - Combine near-duplicate changesets when the outward change is the same across multiple related packages. Do not emit cloned compatibility notes that differ only by package name.
 - Breaking changes must always get their own dedicated changeset with a migration path instead of being bundled into a broader feature note.
 - Run dry-run flows before real release commands.
-- Run `mc lint` before releases to catch manifest inconsistencies early.
+- Run `mc check` before releases to catch manifest inconsistencies early.
 - Keep docs, templates, and changelog behavior aligned with config changes.
 - Use `mc diagnostics --format json` to audit changesets before release — it shows git provenance, linked PRs, related issues, and introduced/last-updated commits.
 
@@ -44,6 +45,19 @@ description: Guides agents through monochange discovery, changesets, release pla
 7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
 
 <!-- {/recommendedCommandFlow} -->
+
+Release-oriented commands default to markdown output. Use `--format json` for automation and `--diff` when you want unified file previews without mutating the workspace.
+
+## Deep dives
+
+- [REFERENCE.md](REFERENCE.md) — high-context reference with more examples
+- [skills/README.md](skills/README.md) — index of focused skill modules
+- [skills/changesets.md](skills/changesets.md) — creating and managing changesets
+- [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
+- [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
+- [skills/linting.md](skills/linting.md) — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
+- [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) — full lifecycle guidance
+- [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) — package-type-specific release-note guidance
 
 ## CLI commands
 
@@ -63,6 +77,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 | `mc release-pr`          | Open or update a release pull request                                  |
 | `mc affected`            | Evaluate changeset policy from changed paths                           |
 | `mc diagnostics`         | Show changeset context with git and review metadata                    |
+| `mc release-record`      | Inspect a durable release declaration from git history                 |
 | `mc repair-release`      | Repair a recent release by retargeting tags                            |
 | `mc assist`              | Print assistant install and MCP setup guidance                         |
 | `mc mcp`                 | Start the stdio MCP server                                             |
@@ -197,7 +212,7 @@ See [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) for per-type rules, templates, exampl
 
 ### Lint configuration
 
-Configure ecosystem-specific lint rules in `monochange.toml`:
+Configure ecosystem-specific manifest lint rules in `monochange.toml` and run them with `mc check`:
 
 ```toml
 [ecosystems.cargo.lints]
@@ -221,8 +236,8 @@ Each rule can be configured as:
 - Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
 - Detailed config: `{ level = "error", ...rule_specific_options }`
 
-Use `mc check --fix` to auto-fix issues where possible.
+Use `mc check --fix` to auto-fix issues where possible. Today the built-in rule sets focus on Cargo and npm-family manifests.
 
 ## Guidance
 
-See [REFERENCE.md](REFERENCE.md) for install steps, changeset authoring, grouped release rules, input types, step composition, and assistant setup guidance.
+Start with [REFERENCE.md](REFERENCE.md) for the broad reference. Then open the focused deep dives in [skills/README.md](skills/README.md) when you need dedicated guidance for changesets, commands, configuration, or linting.

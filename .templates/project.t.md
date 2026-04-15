@@ -64,6 +64,44 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 
 <!-- {/projectMilestoneCapabilities} -->
 
+<!-- {@projectCommandAutomationMatrix} -->
+
+| Goal                             | Command                                                     | Use it when                                                                                              |
+| -------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Validate config and changesets   | `mc validate`                                               | You changed `monochange.toml` or `.changeset/*.md` files                                                 |
+| Inspect package ids and groups   | `mc discover --format json`                                 | You need the normalized workspace model                                                                  |
+| Create release intent            | `mc change --package <id> --bump <severity> --reason "..."` | You need a new `.changeset/*.md` file                                                                    |
+| Audit pending release context    | `mc diagnostics --format json`                              | You need git provenance, PR/MR links, or related issues                                                  |
+| Preview the release plan         | `mc release --dry-run --diff`                               | You want changelog/version patches without mutating the repo                                             |
+| Create a durable release commit  | `mc commit-release`                                         | You want a monochange-managed release commit with an embedded `ReleaseRecord`                            |
+| Open or update a release request | `mc release-pr`                                             | You want a long-lived release PR/MR branch updated from current release state                            |
+| Publish packages to registries   | `mc publish`                                                | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
+| Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
+| Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
+| Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
+| Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
+
+<!-- {/projectCommandAutomationMatrix} -->
+
+<!-- {@projectCapabilityMatrix} -->
+
+| Capability                                                               | Current status                                                             |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter                                   |
+| Package release planning                                                 | Built in                                                                   |
+| Grouped/shared versioning                                                | Built in                                                                   |
+| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                 |
+| Durable release history                                                  | Built in via `ReleaseRecord`, `mc release-record`, and `mc repair-release` |
+| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                      |
+| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                      |
+| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`                                       |
+| GitHub npm trusted-publishing automation                                 | Built in                                                                   |
+| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                 |
+| GitLab trusted-publishing auto-derivation                                | Not built in today                                                         |
+| Release-retarget sync for hosted releases                                | GitHub first                                                               |
+
+<!-- {/projectCapabilityMatrix} -->
+
 <!-- {@projectGitHubAutomationOverview} -->
 
 monochange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.

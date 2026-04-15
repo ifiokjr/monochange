@@ -221,6 +221,8 @@ The built-in package publishing flow is intentionally narrow for now:
 
 If your workflow needs any of those today, keep the package on `mode = "external"` and let your own CI or scripts own publication.
 
+For end-to-end GitHub and GitLab examples — including npm trusted publishing on GitHub and token/external-mode patterns on GitLab — see [Advanced: CI, package publishing, and release PR flows](./13-ci-and-publishing.md).
+
 ## Groups
 
 Groups own outward release identity for their member packages.
