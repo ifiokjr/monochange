@@ -1,0 +1,58 @@
+---
+source: crates/monochange/tests/cli_output.rs
+info:
+  program: mc
+  args:
+    - placeholder-publish
+    - "--dry-run"
+    - "--format"
+    - text
+  env:
+    GITHUB_JOB: release
+    GITHUB_WORKFLOW_REF: ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:64982"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:64982"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:64982"
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+command `placeholder-publish` completed (dry-run)
+placeholder publishing:
+- core 0.0.0 via crates_io -> planned
+  ecosystem: cargo
+  placeholder: yes
+  publish: would publish placeholder core 0.0.0 to crates_io
+  trusted publishing: manual-action-required
+  trust message: configure trusted publishing manually for `core` before the next built-in release publish; open https://crates.io/crates/core and register repository `ifiokjr/monochange`, workflow `publish.yml`, environment `publisher` there
+  repository: ifiokjr/monochange
+  workflow: publish.yml
+  environment: publisher
+  setup: https://crates.io/crates/core
+  next: open the setup URL, configure trusted publishing for this package, then rerun `mc publish`
+- dart_pkg 0.0.0 via pub_dev -> planned
+  ecosystem: dart
+  placeholder: yes
+  publish: would publish placeholder dart_pkg 0.0.0 to pub_dev
+  trusted publishing: manual-action-required
+  trust message: configure trusted publishing manually for `dart_pkg` before the next built-in release publish; open https://pub.dev/packages/dart_pkg/admin and register repository `ifiokjr/monochange`, workflow `publish.yml`, environment `publisher` there
+  repository: ifiokjr/monochange
+  workflow: publish.yml
+  environment: publisher
+  setup: https://pub.dev/packages/dart_pkg/admin
+  next: open the setup URL, configure trusted publishing for this package, then rerun `mc publish`
+- jsr_pkg 0.0.0 via jsr -> planned
+  ecosystem: deno
+  placeholder: yes
+  publish: would publish placeholder @scope/jsr-pkg 0.0.0 to jsr
+  trusted publishing: manual-action-required
+  trust message: configure trusted publishing manually for `@scope/jsr-pkg` before the next built-in release publish; open https://jsr.io/@scope/jsr-pkg and register repository `ifiokjr/monochange`, workflow `publish.yml`, environment `publisher` there
+  repository: ifiokjr/monochange
+  workflow: publish.yml
+  environment: publisher
+  setup: https://jsr.io/@scope/jsr-pkg
+  next: open the setup URL, configure trusted publishing for this package, then rerun `mc publish`
+
+----- stderr -----

@@ -1,5 +1,7 @@
 use std::fs;
 
+use httpmock::Method::GET;
+use httpmock::MockServer;
 use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
 
@@ -13,6 +15,27 @@ fn release_cli_command() -> std::process::Command {
 	monochange_command(Some("2026-04-06"))
 }
 
+fn mock_missing_publish_versions(server: &MockServer) {
+	server.mock(|when, then| {
+		when.method(GET).path("/crates/core");
+		then.status(200).json_body_obj(&serde_json::json!({
+			"versions": []
+		}));
+	});
+	server.mock(|when, then| {
+		when.method(GET).path("/packages/dart_pkg");
+		then.status(200).json_body_obj(&serde_json::json!({
+			"versions": []
+		}));
+	});
+	server.mock(|when, then| {
+		when.method(GET).path("/@scope/jsr-pkg/meta.json");
+		then.status(200).json_body_obj(&serde_json::json!({
+			"versions": {}
+		}));
+	});
+}
+
 #[test]
 fn validate_cli_succeeds_for_valid_workspace() {
 	let mut settings = snapshot_settings();
@@ -24,6 +47,57 @@ fn validate_cli_succeeds_for_valid_workspace() {
 		monochange_command(None)
 			.current_dir(tempdir.path())
 			.arg("validate")
+	);
+}
+
+#[test]
+fn placeholder_publish_dry_run_reports_manual_registry_trust_contexts() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/manual-trust-diagnostics");
+	let server = MockServer::start();
+	mock_missing_publish_versions(&server);
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.env(
+				"GITHUB_WORKFLOW_REF",
+				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main"
+			)
+			.env("GITHUB_JOB", "release")
+			.env("MONOCHANGE_CRATES_IO_API_URL", server.base_url())
+			.env("MONOCHANGE_PUB_DEV_API_URL", server.base_url())
+			.env("MONOCHANGE_JSR_BASE_URL", server.base_url())
+			.arg("placeholder-publish")
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("text")
+	);
+}
+
+#[test]
+fn placeholder_publish_dry_run_reports_missing_manual_registry_workflow_configuration() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/manual-trust-diagnostics");
+	let server = MockServer::start();
+	mock_missing_publish_versions(&server);
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.env_remove("GITHUB_WORKFLOW_REF")
+			.env_remove("GITHUB_JOB")
+			.env("MONOCHANGE_CRATES_IO_API_URL", server.base_url())
+			.env("MONOCHANGE_PUB_DEV_API_URL", server.base_url())
+			.env("MONOCHANGE_JSR_BASE_URL", server.base_url())
+			.arg("placeholder-publish")
+			.arg("--dry-run")
+			.arg("--format")
+			.arg("json")
 	);
 }
 
