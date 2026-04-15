@@ -330,12 +330,13 @@ Current planning rules:
 
 ### Diagnostics vs. release records
 
-These two commands answer different questions:
+These commands answer different questions:
 
 - `mc diagnostics --format json` — what is currently pending in `.changeset/*.md`, and who introduced it?
 - `mc release-record --from <ref>` — what did a past release commit declare durably in git history?
+- `mc tag-release --from HEAD` — if `HEAD` is the merged release commit, which release tags should be created now?
 
-Use diagnostics **before** you release. Use release records **after** a release exists and you need to inspect or repair it later.
+Use diagnostics **before** you release. Use release records **after** a release exists and you need to inspect it. Use `tag-release` in post-merge CI when the release commit has landed on the default branch and you want to create the declared tag set from that durable history record.
 
 Across release-oriented commands, global `--quiet` suppresses stdout/stderr and reuses dry-run behavior for commands that support it.
 

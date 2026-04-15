@@ -175,6 +175,93 @@ fn release_record_command_reports_unsupported_schema_version() {
 	);
 }
 
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn tag_release_command_creates_and_pushes_declared_tags() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	configure_origin_remote(repo);
+	let release_record = sample_release_record();
+	let (commit, _) = commit_release_record(repo, &release_record);
+	git(repo, &["push", "-u", "origin", "HEAD:main"]);
+
+	let output = tag_release_output(repo, &["--from", "HEAD", "--format", "json"]);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let parsed: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+		panic!("json: {error}\n{}", String::from_utf8_lossy(&output.stdout))
+	});
+	assert_json_snapshot!(parsed);
+	assert_eq!(
+		git_output_trimmed(repo, &["rev-parse", "refs/tags/v1.2.3^{commit}"]),
+		commit
+	);
+	assert_eq!(
+		git_output_trimmed(repo, &["ls-remote", "--tags", "origin", "v1.2.3"])
+			.split_whitespace()
+			.next()
+			.unwrap_or_else(|| panic!("expected remote tag sha")),
+		commit
+	);
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn tag_release_command_is_idempotent_when_tags_already_exist() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	configure_origin_remote(repo);
+	let release_record = sample_release_record();
+	commit_release_record(repo, &release_record);
+	git(repo, &["push", "-u", "origin", "HEAD:main"]);
+
+	let first = tag_release_output(repo, &["--from", "HEAD"]);
+	assert!(
+		first.status.success(),
+		"{}",
+		String::from_utf8_lossy(&first.stderr)
+	);
+
+	let second = tag_release_output(repo, &["--from", "HEAD"]);
+	assert!(
+		second.status.success(),
+		"{}",
+		String::from_utf8_lossy(&second.stderr)
+	);
+	assert_snapshot!(
+		String::from_utf8(second.stdout).unwrap_or_else(|error| panic!("stdout utf8: {error}"))
+	);
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn tag_release_command_rejects_descendant_refs_that_are_not_release_commits() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	configure_origin_remote(repo);
+	let release_record = sample_release_record();
+	commit_release_record(repo, &release_record);
+	commit_plain(repo, "fix: follow-up", "release-record/follow-up");
+
+	let output = tag_release_output(repo, &["--from", "HEAD"]);
+	assert!(!output.status.success());
+	assert_snapshot!(
+		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("stderr utf8: {error}"))
+	);
+}
+
 fn setup_release_repo() -> TempDir {
 	let tempdir = setup_fixture("release-record/base-repo");
 	let repo = tempdir.path();
@@ -194,6 +281,32 @@ fn release_record_output(root: &Path, args: &[&str]) -> std::process::Output {
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("release-record output: {error}"))
+}
+
+fn tag_release_output(root: &Path, args: &[&str]) -> std::process::Output {
+	monochange_command(None)
+		.current_dir(root)
+		.arg("tag-release")
+		.args(args)
+		.output()
+		.unwrap_or_else(|error| panic!("tag-release output: {error}"))
+}
+
+fn configure_origin_remote(root: &Path) {
+	let remote_root = root.join("origin.git");
+	git(
+		root,
+		&["init", "--bare", remote_root.to_string_lossy().as_ref()],
+	);
+	git(
+		root,
+		&[
+			"remote",
+			"add",
+			"origin",
+			remote_root.to_string_lossy().as_ref(),
+		],
+	);
 }
 
 fn sample_release_record() -> ReleaseRecord {

@@ -133,6 +133,7 @@ monochange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
+- `mc tag-release --from HEAD --dry-run --format json` previews the post-merge release tag set declared by that durable record
 - `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
 - `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
@@ -169,6 +170,7 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
 - inspect durable release records from tags or descendant commits with `mc release-record`
+- create post-merge release tags from a merged release commit with `mc tag-release --from HEAD`
 - repair a recent source/provider release by retargeting its release tags with `mc repair-release`
 - inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
 - apply Rust semver evidence when provided
@@ -222,6 +224,7 @@ mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-record --from v1.2.3
+mc tag-release --from HEAD --dry-run --format json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc release
 ```

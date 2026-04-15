@@ -192,6 +192,7 @@ When provided, the generated config includes:\n\
 			))
 			.subcommand(build_assist_subcommand())
 			.subcommand(build_release_record_subcommand())
+			.subcommand(build_tag_release_subcommand())
 			.subcommand(Command::new("mcp").about(
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
 			))
@@ -241,6 +242,53 @@ Inspection notes:
 				.required(true)
 				.value_name("REF")
 				.help("Tag or commit-ish used to locate the release record"),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format")
+				.default_value("text")
+				.value_parser(["text", "json"]),
+		)
+}
+
+pub(crate) fn build_tag_release_subcommand() -> Command {
+	Command::new("tag-release")
+		.about("Create and push release tags from the monochange release record on a commit")
+		.after_help(
+			r"Examples:
+  mc tag-release --from HEAD
+  mc tag-release --from HEAD --dry-run --format json
+  mc tag-release --from HEAD --push=false
+
+Tagging notes:
+  - Resolves the supplied ref to a commit and requires that commit itself to be the release commit.
+  - Creates the full tag set declared by the embedded monochange release record.
+  - Pushes tags to `origin` by default and treats reruns on the same commit as already up to date.",
+		)
+		.arg(
+			Arg::new("from")
+				.long("from")
+				.required(true)
+				.value_name("REF")
+				.help("Release commit ref used to create the declared tag set"),
+		)
+		.arg(
+			Arg::new("dry-run")
+				.long("dry-run")
+				.help("Preview release tag creation without mutating local or remote refs")
+				.action(ArgAction::SetTrue),
+		)
+		.arg(
+			Arg::new("push")
+				.long("push")
+				.help("Push created tags to origin")
+				.value_name("PUSH")
+				.num_args(0..=1)
+				.default_value("true")
+				.default_missing_value("true")
+				.require_equals(true)
+				.value_parser(["true", "false"]),
 		)
 		.arg(
 			Arg::new("format")
@@ -414,6 +462,20 @@ Repair notes:
   - Moves the full release tag set together.
   - Defaults to descendant-only retargets unless --force is set.
   - Hosted release sync runs by default and can be disabled with --sync-provider=false.",
+			)
+		}
+		"tag-release" => {
+			Some(
+				r"Examples:
+  mc tag-release --from HEAD
+  mc tag-release --from HEAD --dry-run --format json
+  mc tag-release --from HEAD --push=false
+
+Tagging notes:
+  - Requires the resolved ref itself to be the monochange release commit.
+  - Creates the full tag set declared by that release record.
+  - Treats reruns on the same commit as already up to date.
+  - Use `mc repair-release` if you need to move existing tags later.",
 			)
 		}
 		_ => None,

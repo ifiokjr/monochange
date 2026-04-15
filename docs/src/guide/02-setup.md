@@ -86,7 +86,7 @@ name = "open release PR"
 
 The GitHub Actions workflows enable:
 
-- **Release automation** — `release.yml` builds binaries and creates GitHub releases from tags
+- **Release automation** — `release.yml` refreshes the release PR on normal `main` pushes, then tags and publishes when the merged release commit lands on `main`
 - **Changeset policy enforcement** — `changeset-policy.yml` validates PRs have required changeset coverage
 
 For GitLab and Gitea, the `[source]` section is configured but workflows are not generated (use their respective CI configuration files).

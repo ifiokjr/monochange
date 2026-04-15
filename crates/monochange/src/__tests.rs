@@ -131,6 +131,7 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("publish"));
 	assert!(output.contains("repair-release"));
 	assert!(output.contains("release-record"));
+	assert!(output.contains("tag-release"));
 }
 
 #[test]
@@ -194,6 +195,27 @@ fn release_record_help_describes_first_parent_discovery() {
 	assert!(
 		output.contains("Walks first-parent ancestry until it finds a monochange release record")
 	);
+}
+
+#[test]
+fn tag_release_help_describes_post_merge_tagging_workflow() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("tag-release"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("tag-release help: {error}"));
+
+	assert!(
+		output.contains(
+			"Create and push release tags from the monochange release record on a commit"
+		)
+	);
+	assert!(output.contains("mc tag-release --from HEAD --dry-run --format json"));
+	assert!(output.contains("reruns on the same commit as already up to date"));
 }
 
 #[test]
@@ -8174,6 +8196,10 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		("affected", "Group-owned changesets cover all members"),
 		("diagnostics", "linked review request"),
 		("repair-release", "Defaults to descendant-only retargets"),
+		(
+			"tag-release",
+			"Treats reruns on the same commit as already up to date",
+		),
 	];
 	for (name, expected) in cases {
 		let after_help = crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
@@ -9661,8 +9687,16 @@ fn init_with_github_provider_creates_workflow_files() {
 	let release = fs::read_to_string(tempdir.path().join(".github/workflows/release.yml"))
 		.unwrap_or_else(|error| panic!("release.yml: {error}"));
 	assert!(
-		release.contains("mc commit-release"),
-		"expected mc commit-release command"
+		release.contains("mc release-pr"),
+		"expected mc release-pr command"
+	);
+	assert!(
+		release.contains("mc tag-release --from HEAD"),
+		"expected mc tag-release command"
+	);
+	assert!(
+		release.contains("mc publish"),
+		"expected mc publish command"
 	);
 	assert!(
 		release.contains("github-actions[bot]"),

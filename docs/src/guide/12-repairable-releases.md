@@ -2,6 +2,8 @@
 
 `mc repair-release` is for the stressful moment right after a release when you discover that a few follow-up commits still need to be part of that release.
 
+If you have **not created the tags yet** and only need the initial post-merge tag creation step, use `mc tag-release --from HEAD` instead. `repair-release` is the follow-up tool for moving an already-created release tag set.
+
 Examples:
 
 - a packaging file was missing from the release branch
@@ -31,7 +33,7 @@ If you prefer the emphasized version:
 
 The important consequence is that `ReleaseRecord` does **not** replace the cached release manifest.
 
-Use the manifest when you want execution-time automation. Use the release record when you want history-time inspection or repair.
+Use the manifest when you want execution-time automation. Use the release record when you want history-time inspection, post-merge tagging, or repair.
 
 ## Where the release record lives
 
@@ -51,6 +53,7 @@ Use `mc release-record` when you want to inspect the durable release declaration
 ```bash
 mc release-record --from v1.2.3
 mc release-record --from HEAD --format json
+mc tag-release --from HEAD --dry-run --format json
 ```
 
 monochange will:
@@ -138,6 +141,8 @@ It does **not**:
 ## When to use this vs publish a new patch release
 
 Use `repair-release` for **just-created source/provider releases** when the right fix is to move the release tags forward to a later commit.
+
+Use `tag-release` when the release commit has merged but the declared tags have not been created yet.
 
 Prefer publishing a new patch release when:
 
