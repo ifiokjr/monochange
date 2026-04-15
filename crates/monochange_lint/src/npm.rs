@@ -53,7 +53,7 @@ impl WorkspaceProtocolRule {
 		}
 	}
 
-	fn is_internal_dependency(&self, dep_name: &str, workspace_root: &std::path::Path) -> bool {
+	fn is_internal_dependency(dep_name: &str, workspace_root: &std::path::Path) -> bool {
 		// Check if this is a workspace package
 		let potential_path = workspace_root.join("packages").join(dep_name);
 		if potential_path.exists() {
@@ -63,7 +63,7 @@ impl WorkspaceProtocolRule {
 		// Also check common patterns
 		let scoped_path = workspace_root
 			.join("packages")
-			.join(dep_name.replacen("@", "", 1).replace('/', "-"));
+			.join(dep_name.replacen('@', "", 1).replace('/', "-"));
 		scoped_path.exists()
 	}
 }
@@ -93,7 +93,7 @@ impl LintRuleRunner for WorkspaceProtocolRule {
 		// Check if package is private
 		let is_private = parsed
 			.get("private")
-			.and_then(|v| v.as_bool())
+			.and_then(Value::as_bool)
 			.unwrap_or(false);
 		if is_private && !require_for_private {
 			return results;
@@ -114,19 +114,18 @@ impl LintRuleRunner for WorkspaceProtocolRule {
 				continue;
 			};
 
-			for (dep_name, version) in obj.iter() {
+			for (dep_name, version) in obj {
 				let Some(version_str) = version.as_str() else {
 					continue;
 				};
 
 				// Check if this is an internal dependency
-				if self.is_internal_dependency(dep_name, ctx.workspace_root) {
+				if Self::is_internal_dependency(dep_name, ctx.workspace_root) {
 					// Check if it uses workspace: protocol
 					if !version_str.starts_with("workspace:") {
 						let location = LintLocation::new(ctx.manifest_path, 1, 1);
 						let message = format!(
-							"Internal dependency '{}' should use 'workspace:' protocol (got: '{}')",
-							dep_name, version_str
+							"Internal dependency '{dep_name}' should use 'workspace:' protocol (got: '{version_str}')"
 						);
 
 						let mut result = LintResult::new(
@@ -137,7 +136,7 @@ impl LintRuleRunner for WorkspaceProtocolRule {
 						);
 
 						if config.bool_option("fix", true) {
-							let replacement = format!("\"{}\": \"workspace:*\"", dep_name);
+							let replacement = format!("\"{dep_name}\": \"workspace:*\"");
 							result = result.with_fix(LintFix::single(
 								"Use workspace protocol",
 								(0, 0), // Would need actual position
@@ -217,10 +216,7 @@ impl LintRuleRunner for SortedDependenciesRule {
 
 			if keys != sorted_keys {
 				let location = LintLocation::new(ctx.manifest_path, 1, 1);
-				let message = format!(
-					"Dependencies in '{}' are not sorted alphabetically",
-					section
-				);
+				let message = format!("Dependencies in '{section}' are not sorted alphabetically");
 
 				let mut result = LintResult::new(
 					"npm/sorted-dependencies",
@@ -232,7 +228,7 @@ impl LintRuleRunner for SortedDependenciesRule {
 				if config.bool_option("fix", true) {
 					// Create a sorted version
 					let mut sorted: BTreeMap<&String, &Value> = BTreeMap::new();
-					for (k, v) in obj.iter() {
+					for (k, v) in obj {
 						sorted.insert(k, v);
 					}
 					let replacement = serde_json::to_string_pretty(&sorted).unwrap_or_default();
@@ -306,7 +302,7 @@ impl LintRuleRunner for RequiredPackageFieldsRule {
 		for field in required_fields {
 			if parsed.get(&field).is_none() {
 				let location = LintLocation::new(ctx.manifest_path, 1, 1);
-				let message = format!("Missing required package.json field: '{}'", field);
+				let message = format!("Missing required package.json field: '{field}'");
 				results.push(LintResult::new(
 					"npm/required-package-fields",
 					location,
@@ -486,7 +482,7 @@ impl LintRuleRunner for NoDuplicateDependenciesRule {
 						result = result.with_fix(LintFix::single(
 							"Remove duplicate from production dependencies",
 							(0, 0),
-							format!("Remove '{}' from non-dev dependency sections", dep_name),
+							format!("Remove '{dep_name}' from non-dev dependency sections"),
 						));
 					}
 				}
@@ -539,11 +535,7 @@ impl UnlistedPackagePrivateRule {
 		}
 	}
 
-	fn is_package_in_monochange_toml(
-		&self,
-		package_name: &str,
-		workspace_root: &std::path::Path,
-	) -> bool {
+	fn is_package_in_monochange_toml(package_name: &str, workspace_root: &std::path::Path) -> bool {
 		let config_path = workspace_root.join("monochange.toml");
 		if !config_path.exists() {
 			return false;
@@ -591,7 +583,7 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 			return Vec::new();
 		}
 
-		let Ok(parsed) = serde_json::from_str::<serde_json::Value>(ctx.contents) else {
+		let Ok(parsed) = serde_json::from_str::<Value>(ctx.contents) else {
 			return Vec::new();
 		};
 
@@ -600,14 +592,14 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 		};
 
 		// Check if package is in monochange.toml
-		if self.is_package_in_monochange_toml(package_name, ctx.workspace_root) {
+		if Self::is_package_in_monochange_toml(package_name, ctx.workspace_root) {
 			return Vec::new();
 		}
 
 		// Check if package is already marked as private
 		let is_private = parsed
 			.get("private")
-			.and_then(|v| v.as_bool())
+			.and_then(Value::as_bool)
 			.unwrap_or(false);
 
 		if is_private {
@@ -617,9 +609,8 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 		// Package is not in monochange.toml and not private - report error
 		let location = LintLocation::new(ctx.manifest_path, 1, 1);
 		let message = format!(
-			"Package '{}' is not defined in monochange.toml and must be marked as private. \
-             Either add it to monochange.toml or set \"private\": true in package.json",
-			package_name
+			"Package '{package_name}' is not defined in monochange.toml and must be marked as private. \
+             Either add it to monochange.toml or set \"private\": true in package.json"
 		);
 
 		let mut result = LintResult::new(
@@ -634,7 +625,7 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 			result = result.with_fix(LintFix::single(
 				"Add `private: true` to package.json",
 				(0, 0),
-				format!("\"name\": \"{}\",\n  \"private\": true", package_name),
+				format!("\"name\": \"{package_name}\",\n  \"private\": true"),
 			));
 		}
 

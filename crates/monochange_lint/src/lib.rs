@@ -134,21 +134,25 @@ impl Linter {
 	}
 
 	/// Lint all files in a workspace.
+	///
+	/// Uses the `ignore` crate to walk the directory tree, respecting
+	/// `.gitignore` rules and additionally skipping `fixtures/`
+	/// and `target/` directories.
 	#[must_use]
 	pub fn lint_workspace(&self, workspace_root: &Path) -> LintReport {
 		let mut report = LintReport::new();
 
-		// Walk the workspace looking for manifest files
-		for entry in walkdir::WalkDir::new(workspace_root)
-			.into_iter()
-			.filter_map(Result::ok)
-		{
+		let walker = ignore::WalkBuilder::new(workspace_root)
+			.add_custom_ignore_filename("fixtures")
+			.add_custom_ignore_filename("target")
+			.build();
+
+		for entry in walker.filter_map(Result::ok) {
 			let path = entry.path();
 			if !path.is_file() {
 				continue;
 			}
 
-			// Check if file is a manifest we can lint
 			let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 			if matches!(
 				file_name,
@@ -182,9 +186,8 @@ impl Linter {
 		// Apply fixes to each file
 		let mut fixed_files = BTreeMap::new();
 		for (file_path, fixes) in fixes_by_file {
-			let contents = match std::fs::read_to_string(&file_path) {
-				Ok(contents) => contents,
-				Err(_) => continue,
+			let Ok(contents) = std::fs::read_to_string(&file_path) else {
+				continue;
 			};
 
 			let fixed = apply_fixes_to_content(&contents, &fixes);

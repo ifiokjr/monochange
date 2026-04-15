@@ -8,6 +8,7 @@ homepage = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
+description = "Analysis utilities for monochange workspace packages"
 
 [dependencies]
 monochange_core = { workspace = true }

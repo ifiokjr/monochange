@@ -2145,6 +2145,7 @@ dependencies = [
 name = "monochange_lint"
 version = "0.1.0"
 dependencies = [
+ "ignore",
  "insta",
  "monochange_core",
  "serde",

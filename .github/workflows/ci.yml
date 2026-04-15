@@ -41,6 +41,10 @@ jobs:
         run: deny:check
         shell: devenv shell -- bash -e {0}
 
+      - name: manifest lint
+        run: lint:check
+        shell: devenv shell -- bash -e {0}
+
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest

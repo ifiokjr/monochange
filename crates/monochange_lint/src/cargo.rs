@@ -57,7 +57,6 @@ impl DependencyFieldOrderRule {
 	}
 
 	fn check_dependency_table(
-		&self,
 		dep_name: &str,
 		table: &toml_edit::Table,
 		location: &LintLocation,
@@ -97,8 +96,7 @@ impl DependencyFieldOrderRule {
 
 		if keys != expected_keys {
 			let message = format!(
-				"Dependency '{}' has fields in incorrect order. Preferred order: workspace/version first, then default-features, then features, then others",
-				dep_name
+				"Dependency '{dep_name}' has fields in incorrect order. Preferred order: workspace/version first, then default-features, then features, then others"
 			);
 
 			let span = location.span;
@@ -161,11 +159,11 @@ impl LintRuleRunner for DependencyFieldOrderRule {
 				continue;
 			};
 
-			for (dep_name, value) in table.iter() {
+			for (dep_name, value) in table {
 				if let Some(table) = value.as_table() {
 					let location = LintLocation::new(ctx.manifest_path, 1, 1);
 					if let Some(result) =
-						self.check_dependency_table(dep_name, table, &location, config)
+						Self::check_dependency_table(dep_name, table, &location, config)
 					{
 						results.push(result);
 					}
@@ -230,7 +228,7 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 				continue;
 			};
 
-			for (dep_name, value) in table.iter() {
+			for (dep_name, value) in table {
 				// Check if this looks like an internal dependency (has path or is simple version)
 				let is_internal = match value {
 					Item::Value(v) if v.is_str() => {
@@ -264,8 +262,7 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 						};
 
 						let message = format!(
-							"Internal dependency '{}' should use 'workspace = true'",
-							dep_name
+							"Internal dependency '{dep_name}' should use 'workspace = true'"
 						);
 
 						let mut result = LintResult::new(
@@ -283,10 +280,10 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 								new_table.remove("version");
 								format!("{} = {}", dep_name, new_table.to_string().trim())
 							} else {
-								format!("{} = {{ workspace = true }}", dep_name)
+								format!("{dep_name} = {{ workspace = true }}")
 							};
 
-							let span = span_range.map(|s| (s.start, s.end)).unwrap_or((0, 0));
+							let span = span_range.map_or((0, 0), |s| (s.start, s.end));
 							result = result.with_fix(LintFix::single(
 								"Add workspace = true",
 								span,
@@ -366,7 +363,7 @@ impl LintRuleRunner for RequiredPackageFieldsRule {
 		for field in required_fields {
 			if !table.contains_key(&field) {
 				let location = LintLocation::new(ctx.manifest_path, 1, 1);
-				let message = format!("Missing required package field: '{}'", field);
+				let message = format!("Missing required package field: '{field}'");
 				results.push(LintResult::new(
 					"cargo/required-package-fields",
 					location,
@@ -433,14 +430,11 @@ impl LintRuleRunner for SortedDependenciesRule {
 
 			let keys: Vec<_> = table.iter().map(|(k, _)| k).collect();
 			let mut sorted_keys = keys.clone();
-			sorted_keys.sort();
+			sorted_keys.sort_unstable();
 
 			if keys != sorted_keys {
 				let location = LintLocation::new(ctx.manifest_path, 1, 1);
-				let message = format!(
-					"Dependencies in '{}' are not sorted alphabetically",
-					section
-				);
+				let message = format!("Dependencies in '{section}' are not sorted alphabetically");
 
 				let mut result = LintResult::new(
 					"cargo/sorted-dependencies",
@@ -451,7 +445,7 @@ impl LintRuleRunner for SortedDependenciesRule {
 
 				if config.bool_option("fix", true) {
 					let mut new_table = toml_edit::Table::new();
-					for key in sorted_keys.iter() {
+					for key in &sorted_keys {
 						if let Some(value) = table.get(key) {
 							new_table.insert(key, value.clone());
 						}
@@ -495,11 +489,7 @@ impl UnlistedPackagePrivateRule {
 		}
 	}
 
-	fn is_package_in_monochange_toml(
-		&self,
-		package_name: &str,
-		workspace_root: &std::path::Path,
-	) -> bool {
+	fn is_package_in_monochange_toml(package_name: &str, workspace_root: &std::path::Path) -> bool {
 		let config_path = workspace_root.join("monochange.toml");
 		if !config_path.exists() {
 			return false;
@@ -570,14 +560,14 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 		};
 
 		// Check if package is in monochange.toml
-		if self.is_package_in_monochange_toml(package_name, ctx.workspace_root) {
+		if Self::is_package_in_monochange_toml(package_name, ctx.workspace_root) {
 			return Vec::new();
 		}
 
 		// Check if package is already marked as private
 		let is_private = package_table
 			.get("publish")
-			.and_then(|v| v.as_bool())
+			.and_then(Item::as_bool)
 			.is_some_and(|b| !b);
 
 		if is_private {
@@ -587,9 +577,8 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 		// Package is not in monochange.toml and not private - report error
 		let location = LintLocation::new(ctx.manifest_path, 1, 1);
 		let message = format!(
-			"Package '{}' is not defined in monochange.toml and must be marked as private. \
-             Either add it to monochange.toml or set `publish = false` in Cargo.toml",
-			package_name
+			"Package '{package_name}' is not defined in monochange.toml and must be marked as private. \
+             Either add it to monochange.toml or set `publish = false` in Cargo.toml"
 		);
 
 		let mut result = LintResult::new(
@@ -602,7 +591,7 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 		if config.bool_option("fix", true) {
 			// Add `publish = false` to [package]
 			let span_range = package.span();
-			let span = span_range.map(|s| (s.end, s.end)).unwrap_or((0, 0));
+			let span = span_range.map_or((0, 0), |s| (s.end, s.end));
 			result = result.with_fix(LintFix::single(
 				"Add `publish = false` to [package]",
 				span,
