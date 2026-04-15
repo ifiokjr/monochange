@@ -166,6 +166,13 @@ Use:
 - `mc publish` for package-registry publishing
 - `mc publish-release` for hosted/provider releases
 
+Preference rules for trusted publishing:
+
+- for npm on GitHub, `mode = "builtin"` is the preferred path because monochange can verify and configure trust itself
+- for `crates.io`, prefer `rust-lang/crates-io-auth-action@v1` when you want a registry-native GitHub Actions publish workflow
+- for `pub.dev`, prefer `dart-lang/setup-dart/.github/workflows/publish.yml@v1` when you want the workflow shape recommended by the Dart team
+- for `crates.io` and `pub.dev`, `mode = "external"` is often the clearest fit when the registry-maintained workflow should own the publish command directly
+
 ## Release titles and changelog headings
 
 Customize outward release text with these fields:

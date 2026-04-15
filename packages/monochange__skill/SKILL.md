@@ -157,7 +157,8 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.
 - npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, and monochange verifies the trust state before changing it.
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
-- See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for the exact registry fields, commands, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
+- Prefer the official GitHub publishing workflows for manual registries when they exist: `rust-lang/crates-io-auth-action@v1` for `crates.io` and `dart-lang/setup-dart/.github/workflows/publish.yml@v1` for `pub.dev`.
+- See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
 
 ### Release titles
