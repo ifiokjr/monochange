@@ -495,7 +495,7 @@ fn execute_publish_requests(
 		} else if request.registry == RegistryKind::Npm {
 			configure_npm_trusted_publishing(request, source, root, env_map, executor)?
 		} else {
-			manual_trust_outcome(request)
+			manual_trust_outcome(request, source, root, env_map)
 		};
 
 		outcomes.push(PackagePublishOutcome {
@@ -551,10 +551,22 @@ fn enforce_release_trust_prerequisites(
 		resolve_github_trust_context(root, source, &request.trusted_publishing, env_map).map(|_| ())
 	} else {
 		let setup_url = manual_setup_url(request);
-		Err(MonochangeError::Config(format!(
-			"`{}` requires manual trusted publishing setup before built-in release publishing can continue: {}. Configure the registry entry there, then rerun `mc publish`.",
-			request.package_id, setup_url,
-		)))
+		match resolve_github_trust_context(root, source, &request.trusted_publishing, env_map) {
+			Ok(context) => {
+				Err(MonochangeError::Config(format!(
+					"`{}` requires manual trusted publishing setup before built-in release publishing can continue: {}. Register {} there, then rerun `mc publish`.",
+					request.package_id,
+					setup_url,
+					format_manual_trust_context(&context),
+				)))
+			}
+			Err(error) => {
+				Err(MonochangeError::Config(format!(
+					"`{}` requires trusted-publishing preflight configuration before built-in release publishing can continue: {}. Finish the GitHub context configuration first, then complete registry setup at {} and rerun `mc publish`.",
+					request.package_id, error, setup_url,
+				)))
+			}
+		}
 	}
 }
 
@@ -581,7 +593,7 @@ fn trust_outcome_for_skip(
 			Err(_) => planned_trust_outcome(request, source, root, env_map),
 		}
 	} else {
-		manual_trust_outcome(request)
+		manual_trust_outcome(request, source, root, env_map)
 	}
 }
 
@@ -605,10 +617,10 @@ fn planned_trust_outcome(
 					message: "would configure npm trusted publishing".to_string(),
 				}
 			}
-			Err(_) => manual_trust_outcome(request),
+			Err(_) => manual_trust_outcome(request, source, root, env_map),
 		}
 	} else {
-		manual_trust_outcome(request)
+		manual_trust_outcome(request, source, root, env_map)
 	}
 }
 
@@ -1342,19 +1354,55 @@ fn disabled_trust_outcome() -> TrustedPublishingOutcome {
 	}
 }
 
-fn manual_trust_outcome(request: &PublishRequest) -> TrustedPublishingOutcome {
+fn manual_trust_outcome(
+	request: &PublishRequest,
+	source: Option<&SourceConfiguration>,
+	root: &Path,
+	env_map: &BTreeMap<String, String>,
+) -> TrustedPublishingOutcome {
 	let setup_url = manual_setup_url(request);
-	TrustedPublishingOutcome {
-		status: TrustedPublishingStatus::ManualActionRequired,
-		repository: request.trusted_publishing.repository.clone(),
-		workflow: request.trusted_publishing.workflow.clone(),
-		environment: request.trusted_publishing.environment.clone(),
-		setup_url: Some(setup_url.clone()),
-		message: format!(
-			"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and match repository/workflow/environment to the current GitHub context",
-			request.package_name, setup_url
-		),
+	match resolve_github_trust_context(root, source, &request.trusted_publishing, env_map) {
+		Ok(context) => {
+			let message = format!(
+				"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and register {} there",
+				request.package_name,
+				setup_url,
+				format_manual_trust_context(&context),
+			);
+			TrustedPublishingOutcome {
+				status: TrustedPublishingStatus::ManualActionRequired,
+				repository: Some(context.repository),
+				workflow: Some(context.workflow),
+				environment: context.environment,
+				setup_url: Some(setup_url),
+				message,
+			}
+		}
+		Err(error) => {
+			TrustedPublishingOutcome {
+				status: TrustedPublishingStatus::ManualActionRequired,
+				repository: request.trusted_publishing.repository.clone(),
+				workflow: request.trusted_publishing.workflow.clone(),
+				environment: request.trusted_publishing.environment.clone(),
+				setup_url: Some(setup_url.clone()),
+				message: format!(
+					"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and finish the GitHub context setup first: {}",
+					request.package_name, setup_url, error,
+				),
+			}
+		}
 	}
+}
+
+fn format_manual_trust_context(context: &GitHubTrustContext) -> String {
+	let mut parts = vec![
+		format!("repository `{}`", context.repository),
+		format!("workflow `{}`", context.workflow),
+	];
+	if let Some(environment) = &context.environment {
+		parts.push(format!("environment `{environment}`"));
+	}
+	parts.join(", ")
 }
 
 fn manual_setup_url(request: &PublishRequest) -> String {
@@ -2702,6 +2750,9 @@ jobs:
 			&env_map,
 		);
 		assert_eq!(manual.status, TrustedPublishingStatus::ManualActionRequired);
+		assert_eq!(manual.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(manual.workflow.as_deref(), Some("publish.yml"));
+		assert_eq!(manual.environment.as_deref(), Some("publisher"));
 		assert!(
 			manual
 				.setup_url
@@ -2712,16 +2763,27 @@ jobs:
 
 	#[test]
 	fn trust_outcome_for_skip_uses_manual_action_for_non_npm_packages() {
+		let root = workflow_root();
+		let env_map = BTreeMap::from([
+			(
+				"GITHUB_WORKFLOW_REF".to_string(),
+				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+			),
+			("GITHUB_JOB".to_string(), "release".to_string()),
+		]);
 		let outcome = trust_outcome_for_skip(
 			&trusted_request(RegistryKind::CratesIo),
 			Some(&sample_source()),
-			Path::new("."),
-			&BTreeMap::new(),
+			root.path(),
+			&env_map,
 		);
 		assert_eq!(
 			outcome.status,
 			TrustedPublishingStatus::ManualActionRequired
 		);
+		assert_eq!(outcome.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(outcome.workflow.as_deref(), Some("publish.yml"));
+		assert_eq!(outcome.environment.as_deref(), Some("publisher"));
 	}
 
 	#[test]
@@ -2731,7 +2793,7 @@ jobs:
 		request.trusted_publishing.workflow = Some("publish.yml".to_string());
 		request.trusted_publishing.environment = Some("pub.dev".to_string());
 
-		let outcome = manual_trust_outcome(&request);
+		let outcome = manual_trust_outcome(&request, None, Path::new("."), &BTreeMap::new());
 
 		assert_eq!(
 			outcome.status,
@@ -2749,10 +2811,33 @@ jobs:
 				.message
 				.contains("configure trusted publishing manually for `pkg`")
 		);
+		assert!(outcome.message.contains(
+			"register repository `ifiokjr/monochange`, workflow `publish.yml`, environment `pub.dev`"
+		));
+	}
+
+	#[test]
+	fn manual_trust_outcome_reports_missing_github_context_configuration() {
+		let mut request = trusted_request(RegistryKind::Jsr);
+		request.trusted_publishing.repository = Some("ifiokjr/monochange".to_string());
+
+		let outcome = manual_trust_outcome(&request, None, Path::new("."), &BTreeMap::new());
+
+		assert_eq!(
+			outcome.status,
+			TrustedPublishingStatus::ManualActionRequired
+		);
+		assert_eq!(outcome.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(outcome.workflow, None);
 		assert!(
 			outcome
 				.message
-				.contains("match repository/workflow/environment to the current GitHub context")
+				.contains("finish the GitHub context setup first")
+		);
+		assert!(
+			outcome
+				.message
+				.contains("set `publish.trusted_publishing.workflow`")
 		);
 	}
 
@@ -2970,6 +3055,9 @@ jobs:
 				.to_string()
 				.contains("manual trusted publishing setup")
 		);
+		assert!(manual_error.to_string().contains(
+			"repository `ifiokjr/monochange`, workflow `publish.yml`, environment `publisher`"
+		));
 
 		enforce_release_trust_prerequisites(
 			&sample_request(RegistryKind::Npm),
@@ -2978,6 +3066,27 @@ jobs:
 			&BTreeMap::new(),
 		)
 		.expect("expected disabled trust success:");
+
+		let mut missing_workflow_request = trusted_request(RegistryKind::PubDev);
+		missing_workflow_request.trusted_publishing.repository =
+			Some("ifiokjr/monochange".to_string());
+		let missing_context_error = enforce_release_trust_prerequisites(
+			&missing_workflow_request,
+			None,
+			root.path(),
+			&BTreeMap::new(),
+		)
+		.expect_err("expected missing context error");
+		assert!(
+			missing_context_error
+				.to_string()
+				.contains("trusted-publishing preflight configuration")
+		);
+		assert!(
+			missing_context_error
+				.to_string()
+				.contains("set `publish.trusted_publishing.workflow`")
+		);
 	}
 
 	#[test]
