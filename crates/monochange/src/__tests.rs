@@ -131,6 +131,7 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("publish"));
 	assert!(output.contains("repair-release"));
 	assert!(output.contains("release-record"));
+	assert!(output.contains("tag-release"));
 }
 
 #[test]
@@ -194,6 +195,27 @@ fn release_record_help_describes_first_parent_discovery() {
 	assert!(
 		output.contains("Walks first-parent ancestry until it finds a monochange release record")
 	);
+}
+
+#[test]
+fn tag_release_help_describes_post_merge_tagging_workflow() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("tag-release"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("tag-release help: {error}"));
+
+	assert!(
+		output.contains(
+			"Create and push release tags from the monochange release record on a commit"
+		)
+	);
+	assert!(output.contains("mc tag-release --from HEAD --dry-run --format json"));
+	assert!(output.contains("reruns on the same commit as already up to date"));
 }
 
 #[test]
@@ -7523,7 +7545,17 @@ fn write_blank_monochange_config(root: &Path) {
 }
 
 fn create_release_record_history(root: &Path) {
+	create_release_record_commit(root);
+	git_in_temp_repo(root, &["tag", "v1.2.3"]);
+	fs::write(root.join("release.txt"), "follow-up\n")
+		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
+	git_in_temp_repo(root, &["add", "release.txt"]);
+	git_in_temp_repo(root, &["commit", "-m", "fix: follow-up release change"]);
+}
+
+fn create_release_record_commit(root: &Path) -> String {
 	init_git_repo(root);
+	write_blank_monochange_config(root);
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git_in_temp_repo(root, &["add", "monochange.toml", "release.txt"]);
@@ -7540,11 +7572,7 @@ fn create_release_record_history(root: &Path) {
 			release_record.as_str(),
 		],
 	);
-	git_in_temp_repo(root, &["tag", "v1.2.3"]);
-	fs::write(root.join("release.txt"), "follow-up\n")
-		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
-	git_in_temp_repo(root, &["add", "release.txt"]);
-	git_in_temp_repo(root, &["commit", "-m", "fix: follow-up release change"]);
+	git_output_in_temp_repo(root, &["rev-parse", "HEAD"])
 }
 
 fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
@@ -8174,6 +8202,10 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		("affected", "Group-owned changesets cover all members"),
 		("diagnostics", "linked review request"),
 		("repair-release", "Defaults to descendant-only retargets"),
+		(
+			"tag-release",
+			"Treats reruns on the same commit as already up to date",
+		),
 	];
 	for (name, expected) in cases {
 		let after_help = crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
@@ -8345,6 +8377,70 @@ fn render_release_record_discovery_supports_text_and_json_formats() {
 	assert!(json.contains("\"record\""));
 	assert!(json.contains("\"resolvedCommit\""));
 	assert!(json.contains("\"inputRef\": "));
+}
+
+#[test]
+fn render_release_tag_report_supports_text_and_json_formats() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let release_commit = create_release_record_commit(root);
+
+	let text = crate::release_record::render_release_tag_report(
+		root,
+		"HEAD",
+		crate::OutputFormat::Text,
+		false,
+		true,
+	)
+	.unwrap_or_else(|error| panic!("tag-release text: {error}"));
+	assert!(text.contains("release tags:"));
+	assert!(text.contains("push: no"));
+	assert!(text.contains("status: dry-run"));
+	assert!(text.contains("[planned]"));
+
+	let json = crate::release_record::render_release_tag_report(
+		root,
+		"HEAD",
+		crate::OutputFormat::Json,
+		false,
+		true,
+	)
+	.unwrap_or_else(|error| panic!("tag-release json: {error}"));
+	assert!(json.contains("\"recordCommit\": "));
+	assert!(json.contains("\"push\": false"));
+	assert!(json.contains("\"status\": \"dry_run\""));
+	assert!(json.contains(&release_commit[..7]));
+}
+
+#[test]
+fn create_release_tags_creates_and_pushes_tags_in_process() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let release_commit = create_release_record_commit(root);
+	configure_origin_remote(root);
+	git_in_temp_repo(root, &["push", "-u", "origin", "HEAD:main"]);
+	let discovery = crate::discover_release_record(root, "HEAD")
+		.unwrap_or_else(|error| panic!("discover release record: {error}"));
+
+	let report = crate::release_record::create_release_tags(root, &discovery, true, false)
+		.unwrap_or_else(|error| panic!("create release tags: {error}"));
+	assert_eq!(report.status, "completed");
+	assert_eq!(report.tag_results.len(), 1);
+	assert_eq!(
+		report.tag_results[0].operation,
+		crate::release_record::ReleaseTagOperation::Created
+	);
+	assert_eq!(
+		git_output_in_temp_repo(root, &["rev-parse", "refs/tags/v1.2.3^{commit}"]),
+		release_commit
+	);
+	assert_eq!(
+		git_output_in_temp_repo(root, &["ls-remote", "--tags", "origin", "v1.2.3"])
+			.split_whitespace()
+			.next()
+			.unwrap_or_else(|| panic!("expected remote tag sha")),
+		release_commit
+	);
 }
 
 #[test]
@@ -8987,6 +9083,15 @@ fn init_git_repo(root: &Path) {
 	git_in_temp_repo(root, &["config", "user.name", "monochange Tests"]);
 	git_in_temp_repo(root, &["config", "user.email", "monochange@example.com"]);
 	git_in_temp_repo(root, &["config", "commit.gpgsign", "false"]);
+}
+
+fn configure_origin_remote(root: &Path) {
+	let remote_root = root.join("origin.git");
+	git_in_temp_repo(root, &["init", "--bare", &remote_root.to_string_lossy()]);
+	git_in_temp_repo(
+		root,
+		&["remote", "add", "origin", &remote_root.to_string_lossy()],
+	);
 }
 
 fn sanitized_git_command() -> std::process::Command {
@@ -9661,8 +9766,16 @@ fn init_with_github_provider_creates_workflow_files() {
 	let release = fs::read_to_string(tempdir.path().join(".github/workflows/release.yml"))
 		.unwrap_or_else(|error| panic!("release.yml: {error}"));
 	assert!(
-		release.contains("mc commit-release"),
-		"expected mc commit-release command"
+		release.contains("mc release-pr"),
+		"expected mc release-pr command"
+	);
+	assert!(
+		release.contains("mc tag-release --from HEAD"),
+		"expected mc tag-release command"
+	);
+	assert!(
+		release.contains("mc publish"),
+		"expected mc publish command"
 	);
 	assert!(
 		release.contains("github-actions[bot]"),

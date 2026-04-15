@@ -14,12 +14,15 @@ use monochange_core::SourceProvider;
 use monochange_core::parse_release_record_block;
 use monochange_core::release_record_release_tag_names;
 use monochange_core::release_record_tag_names;
+use serde::Serialize;
 
 use crate::OutputFormat;
+use crate::git_support::create_git_tag;
 use crate::git_support::first_parent_commits;
 use crate::git_support::git_is_ancestor;
 use crate::git_support::move_git_tag;
 use crate::git_support::push_git_tags;
+use crate::git_support::push_git_tags_without_force;
 use crate::git_support::read_git_commit_message;
 use crate::git_support::resolve_git_commit_ref;
 use crate::git_support::resolve_git_tag_commit;
@@ -306,6 +309,200 @@ pub(crate) fn sync_retargeted_provider_releases(
 		tag_results,
 		dry_run,
 	)
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ReleaseTagOperation {
+	Planned,
+	Created,
+	AlreadyUpToDate,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReleaseTagResult {
+	pub tag_name: String,
+	pub target_commit: String,
+	#[serde(default)]
+	pub existing_commit: Option<String>,
+	pub operation: ReleaseTagOperation,
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReleaseTagReport {
+	pub from: String,
+	pub resolved_from_commit: String,
+	pub record_commit: String,
+	pub distance: usize,
+	pub push: bool,
+	pub dry_run: bool,
+	pub tag_results: Vec<ReleaseTagResult>,
+	pub status: String,
+}
+
+pub(crate) fn render_release_tag_report(
+	root: &Path,
+	from: &str,
+	format: OutputFormat,
+	push: bool,
+	dry_run: bool,
+) -> MonochangeResult<String> {
+	let discovery = discover_release_record(root, from)?;
+	let report = create_release_tags(root, &discovery, push, dry_run)?;
+
+	match format {
+		OutputFormat::Json => {
+			serde_json::to_string_pretty(&report)
+				.map_err(|error| MonochangeError::Discovery(error.to_string()))
+		}
+		OutputFormat::Markdown | OutputFormat::Text => Ok(text_release_tag_report(&report)),
+	}
+}
+
+pub(crate) fn create_release_tags(
+	root: &Path,
+	discovery: &ReleaseRecordDiscovery,
+	push: bool,
+	dry_run: bool,
+) -> MonochangeResult<ReleaseTagReport> {
+	if discovery.distance != 0 {
+		return Err(MonochangeError::Config(format!(
+			"resolved ref `{}` points to commit {}, but the nearest monochange release record is in ancestor commit {} at distance {}; `tag-release` only tags a commit that is itself the release commit",
+			discovery.input_ref,
+			crate::short_commit_sha(&discovery.resolved_commit),
+			crate::short_commit_sha(&discovery.record_commit),
+			discovery.distance,
+		)));
+	}
+
+	let tag_results = release_record_tag_names(&discovery.record)
+		.into_iter()
+		.map(|tag_name| {
+			let existing_commit = resolve_git_tag_commit(root, &tag_name).ok();
+			let operation = if existing_commit.as_deref() == Some(discovery.record_commit.as_str())
+			{
+				ReleaseTagOperation::AlreadyUpToDate
+			} else {
+				ReleaseTagOperation::Planned
+			};
+
+			Ok(ReleaseTagResult {
+				tag_name,
+				target_commit: discovery.record_commit.clone(),
+				existing_commit,
+				operation,
+			})
+		})
+		.collect::<MonochangeResult<Vec<_>>>()?;
+
+	for tag_result in &tag_results {
+		if let Some(existing_commit) = &tag_result.existing_commit
+			&& existing_commit != &tag_result.target_commit
+		{
+			return Err(MonochangeError::Config(format!(
+				"tag `{}` already points to commit {}; use `mc repair-release` if you need to move an existing release tag",
+				tag_result.tag_name,
+				crate::short_commit_sha(existing_commit),
+			)));
+		}
+	}
+
+	let mut tag_results = tag_results;
+
+	if !dry_run {
+		for tag_result in &mut tag_results {
+			if tag_result.operation == ReleaseTagOperation::AlreadyUpToDate {
+				continue;
+			}
+
+			create_git_tag(root, &tag_result.tag_name, &tag_result.target_commit)?;
+			tag_result.operation = ReleaseTagOperation::Created;
+		}
+
+		if push {
+			let tags_to_push = tag_results
+				.iter()
+				.filter(|tag_result| tag_result.operation == ReleaseTagOperation::Created)
+				.map(|tag_result| tag_result.tag_name.as_str())
+				.collect::<Vec<_>>();
+
+			if !tags_to_push.is_empty() {
+				push_git_tags_without_force(root, &tags_to_push)?;
+			}
+		}
+	}
+
+	let status = if dry_run {
+		"dry_run"
+	} else if tag_results.is_empty() {
+		"no_tags_declared"
+	} else if tag_results
+		.iter()
+		.all(|tag_result| tag_result.operation == ReleaseTagOperation::AlreadyUpToDate)
+	{
+		"already_up_to_date"
+	} else {
+		"completed"
+	};
+
+	Ok(ReleaseTagReport {
+		from: discovery.input_ref.clone(),
+		resolved_from_commit: discovery.resolved_commit.clone(),
+		record_commit: discovery.record_commit.clone(),
+		distance: discovery.distance,
+		push,
+		dry_run,
+		tag_results,
+		status: status.to_string(),
+	})
+}
+
+pub(crate) fn text_release_tag_report(report: &ReleaseTagReport) -> String {
+	let mut lines = vec!["release tags:".to_string()];
+	lines.push(format!("  from: {}", report.from));
+	lines.push(format!(
+		"  resolved commit: {}",
+		crate::short_commit_sha(&report.resolved_from_commit)
+	));
+	lines.push(format!(
+		"  record commit: {}",
+		crate::short_commit_sha(&report.record_commit)
+	));
+	lines.push(format!(
+		"  push: {}",
+		if report.push { "yes" } else { "no" }
+	));
+
+	if report.tag_results.is_empty() {
+		lines.push("  tags: none declared by release record".to_string());
+	} else {
+		lines.push("  tags:".to_string());
+		for tag_result in &report.tag_results {
+			let existing = tag_result
+				.existing_commit
+				.as_ref()
+				.map_or("missing".to_string(), |commit| {
+					crate::short_commit_sha(commit)
+				});
+			lines.push(format!(
+				"    - {} (existing: {}, target: {}) [{}]",
+				tag_result.tag_name,
+				existing,
+				crate::short_commit_sha(&tag_result.target_commit),
+				match tag_result.operation {
+					ReleaseTagOperation::Planned => "planned",
+					ReleaseTagOperation::Created => "created",
+					ReleaseTagOperation::AlreadyUpToDate => "already_up_to_date",
+				},
+			));
+		}
+	}
+
+	lines.push(format!("  status: {}", report.status.replace('_', "-")));
+	lines.join("\n")
 }
 
 pub(crate) fn text_release_record_discovery(discovery: &ReleaseRecordDiscovery) -> String {

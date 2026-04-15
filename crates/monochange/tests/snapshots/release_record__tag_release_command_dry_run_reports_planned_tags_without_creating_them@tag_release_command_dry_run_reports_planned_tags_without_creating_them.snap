@@ -1,0 +1,13 @@
+---
+source: crates/monochange/tests/release_record.rs
+assertion_line: 287
+expression: "String::from_utf8(output.stdout).unwrap_or_else(|error|\npanic!(\"stdout utf8: {error}\"))"
+---
+release tags:
+  from: HEAD
+  resolved commit: [SHA]
+  record commit: [SHA]
+  push: no
+  tags:
+    - v1.2.3 (existing: missing, target: [SHA]) [planned]
+  status: dry-run

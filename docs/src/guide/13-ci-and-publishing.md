@@ -2,7 +2,7 @@
 
 This guide brings together the practical CI patterns around `mc publish`, `mc placeholder-publish`, `mc release-pr`, `mc commit-release`, and provider release automation.
 
-It also captures an important proposed workflow for long-running release PR branches.
+It also documents the recommended workflow for long-running release PR branches.
 
 ## Start with the command surface
 
@@ -22,6 +22,7 @@ These commands solve different automation problems:
 | Publish packages to registries   | `mc publish`                                                | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
 | Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
 | Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
+| Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
 | Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
 | Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
 
@@ -30,9 +31,10 @@ These commands solve different automation problems:
 A practical rule of thumb:
 
 - use **`mc publish`** for registry packages
-- use **`mc publish-release`** for hosted releases
+- use **`mc publish-release`** for hosted releases from prepared release state
 - use **`mc release-pr`** when you want a provider-backed release request branch
 - use **`mc commit-release`** when you want a durable local release commit in git history
+- use **`mc tag-release`** when that durable release commit has merged and you want to create its tag set on the default branch
 
 ## The three automation layers
 
@@ -48,20 +50,20 @@ Keeping those layers separate is important. Package publication and hosted-relea
 
 <!-- {=projectCapabilityMatrix} -->
 
-| Capability                                                               | Current status                                                             |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter                                   |
-| Package release planning                                                 | Built in                                                                   |
-| Grouped/shared versioning                                                | Built in                                                                   |
-| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                 |
-| Durable release history                                                  | Built in via `ReleaseRecord`, `mc release-record`, and `mc repair-release` |
-| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                      |
-| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                      |
-| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`                                       |
-| GitHub npm trusted-publishing automation                                 | Built in                                                                   |
-| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                 |
-| GitLab trusted-publishing auto-derivation                                | Not built in today                                                         |
-| Release-retarget sync for hosted releases                                | GitHub first                                                               |
+| Capability                                                               | Current status                                                                               |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter                                                     |
+| Package release planning                                                 | Built in                                                                                     |
+| Grouped/shared versioning                                                | Built in                                                                                     |
+| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                                   |
+| Durable release history and post-merge tagging                           | Built in via `ReleaseRecord`, `mc release-record`, `mc tag-release`, and `mc repair-release` |
+| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                                        |
+| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                                        |
+| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`                                                         |
+| GitHub npm trusted-publishing automation                                 | Built in                                                                                     |
+| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                                   |
+| GitLab trusted-publishing auto-derivation                                | Not built in today                                                                           |
+| Release-retarget sync for hosted releases                                | GitHub first                                                                                 |
 
 <!-- {/projectCapabilityMatrix} -->
 
@@ -84,10 +86,12 @@ For GitHub Actions, the most common structure is:
 1. a workflow prepares or updates a release PR branch
 2. a release commit lands on `main`
 3. a post-merge workflow detects the release commit
-4. package publication runs from that durable release commit
-5. provider release and tag automation runs in a dedicated release workflow
+4. that workflow creates the declared tags and publishes packages from the durable release commit
+5. hosted release objects or extra assets come either from downstream tag-driven workflows or from a separate workflow that still uses `mc publish-release`
 
-The important current implementation detail is that `mc publish` can publish from the `ReleaseRecord` on `HEAD`, while `mc publish-release` still works from prepared release state.
+The important current implementation detail is that `mc publish` can publish from the `ReleaseRecord` on `HEAD`, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state when you want a manifest-driven hosted-release job.
+
+If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection and before `mc publish`.
 
 ### GitHub + npm trusted publishing
 
@@ -469,7 +473,15 @@ publish_npm:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
   script:
     - corepack enable
-    - if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then mc publish; else echo "not a release commit"; fi
+    - git fetch --force --tags origin
+    - |
+        set -euo pipefail
+        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+          mc tag-release --from HEAD
+          mc publish
+        else
+          echo "not a release commit"
+        fi
 ```
 
 If your npm flow needs registry-token setup or a custom `.npmrc`, do that in CI before running `mc publish`.
@@ -494,7 +506,15 @@ publish_cargo:
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
   script:
-    - if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then mc publish; else echo "not a release commit"; fi
+    - git fetch --force --tags origin
+    - |
+        set -euo pipefail
+        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+          mc tag-release --from HEAD
+          mc publish
+        else
+          echo "not a release commit"
+        fi
 ```
 
 If you need a crates.io token or a more customized release process, inject the credential in GitLab CI or switch the package to `mode = "external"`.
@@ -520,7 +540,15 @@ publish_jsr:
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
   script:
-    - if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then mc publish; else echo "not a release commit"; fi
+    - git fetch --force --tags origin
+    - |
+        set -euo pipefail
+        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+          mc tag-release --from HEAD
+          mc publish
+        else
+          echo "not a release commit"
+        fi
 ```
 
 If your JSR auth bootstrap is more specialized than the built-in path expects, prefer `mode = "external"` and run the native publish command yourself.
@@ -546,7 +574,15 @@ publish_pub_dev:
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
   script:
-    - if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then mc publish; else echo "not a release commit"; fi
+    - git fetch --force --tags origin
+    - |
+        set -euo pipefail
+        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+          mc tag-release --from HEAD
+          mc publish
+        else
+          echo "not a release commit"
+        fi
 ```
 
 As with JSR, use `mode = "external"` when you need CI-specific auth or publish orchestration outside monochange's built-in assumptions.
@@ -560,14 +596,15 @@ This is the flow you described:
 3. the release PR stays open and keeps tracking the latest releasable state
 4. when the PR merges, publication happens from that merged release commit
 
-### What monochange supports today
+### What monochange supports now
 
-monochange already supports a large part of this shape:
+monochange now supports the core post-merge pieces of this shape directly:
 
 - `mc release-pr` can open or update a release request branch from current release state
 - `mc commit-release` can create a durable monochange release commit with an embedded `ReleaseRecord`
 - `mc release-record --from HEAD` can detect whether the latest commit is a monochange release commit
-- `mc publish` can publish package registries from that durable record on `HEAD`
+- `mc tag-release --from HEAD` can create and push the declared tag set from that merged release commit
+- `mc publish` can publish package registries from that same durable record on `HEAD`
 
 ### The important tag semantics
 
@@ -583,43 +620,87 @@ That means:
 
 That is why pre-merge tagging on a long-running release PR is usually the wrong move.
 
-### Recommended current approach
+### Recommended workflow
 
-For the long-running release PR model, the safest current shape is:
+For the long-running release PR model, the recommended shape is now:
 
 1. on every push to `main`, run `mc release-pr` to refresh the dedicated release PR branch
 2. do **not** create tags on the release PR branch
 3. merge the release PR when you are ready
 4. on the post-merge workflow, run `mc release-record --from HEAD --format json`
-5. if the latest commit is a release commit, run `mc publish` for package registries
-6. handle tag creation and hosted-release publication in a dedicated follow-up workflow
+5. if the latest commit is a release commit, run `mc tag-release --from HEAD`
+6. after tags exist, run `mc publish` for package registries and let tag-triggered workflows create hosted releases or other downstream assets
 
-### Captured future workflow
+That keeps tag creation on the default branch side of the merge, which is much safer than tagging the PR branch early.
 
-The missing piece for a fully first-class version of this pattern is a built-in post-merge tagger.
+### GitHub Actions reference sketch
 
-The strongest future shape would be:
+```yaml
+name: release
 
-1. `mc release-pr` keeps the long-running release PR branch up to date
-2. the release PR merges into `main`
-3. a post-merge monochange command inspects `ReleaseRecord` on `HEAD`
-4. that command creates and pushes the declared tag set
-5. tag-triggered workflows publish hosted releases and any additional downstream assets
+on:
+  push:
+    branches: [main]
 
-That would keep tag creation on the default branch side of the merge, which is much safer than tagging the PR branch early.
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-### Captured implementation gap
+      - name: fetch tags
+        run: git fetch --force --tags origin
 
-Today monochange does **not** ship a dedicated top-level command that says "read the `ReleaseRecord` on `HEAD` and create/push the release tags now".
+      - name: detect merged release commit
+        id: release_record
+        shell: bash
+        run: |
+          set -euo pipefail
+          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+            echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+          fi
 
-That gap is important to capture because it affects exactly this release-PR-merge flow.
+      - name: refresh release PR
+        if: steps.release_record.outputs.is_release_commit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mc release-pr
 
-A future enhancement in this area would likely include:
+      - name: create release tags
+        if: steps.release_record.outputs.is_release_commit == 'true'
+        run: mc tag-release --from HEAD
 
-- a built-in post-merge release-commit detector and tagger
-- a smoother first-class long-running release PR workflow
-- branch-refresh semantics that make repeated release-branch updates more explicit
-- possibly force-refresh behavior for workflows that intentionally rewrite the dedicated release branch over time
+      - name: publish packages
+        if: steps.release_record.outputs.is_release_commit == 'true'
+        run: mc publish
+```
+
+### GitLab CI reference sketch
+
+```yaml
+release_pr_or_publish:
+  stage: release
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  script:
+    - git fetch --force --tags origin
+    - |
+        set -euo pipefail
+        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+          mc tag-release --from HEAD
+          mc publish
+        else
+          mc release-pr
+        fi
+```
 
 ## Choosing a CI pattern
 
@@ -627,7 +708,7 @@ Use this decision rule:
 
 - **Need human review before release files land?** → use `mc release-pr`
 - **Need a durable local release commit?** → use `mc commit-release`
-- **Need package registries after merge?** → detect `ReleaseRecord` on `HEAD`, then run `mc publish`
+- **Need package registries after merge?** → detect `ReleaseRecord` on `HEAD`, run `mc tag-release --from HEAD`, then run `mc publish`
 - **Need hosted provider releases from prepared release state?** → use `mc publish-release`
 - **Need to bootstrap a package that does not exist yet?** → use `mc placeholder-publish`
 - **Need GitHub npm trusted publishing with the least custom glue?** → use `trusted_publishing = true` with `mc publish`

@@ -220,6 +220,7 @@ pub use release_record::discover_release_record;
 pub use release_record::execute_release_retarget;
 pub use release_record::plan_release_retarget;
 use release_record::render_release_record_discovery;
+use release_record::render_release_tag_report;
 pub use release_record::retarget_release;
 use serde::Deserialize;
 use serde::Serialize;
@@ -712,6 +713,25 @@ where
 				OutputFormat::Text
 			};
 			render_release_record_discovery(root, from, format)
+		}
+		Some(("tag-release", tag_release_matches)) => {
+			let from = tag_release_matches
+				.get_one::<String>("from")
+				.map(String::as_str)
+				.ok_or_else(|| MonochangeError::Config("missing tag-release ref".to_string()))?;
+			let format = if tag_release_matches
+				.get_one::<String>("format")
+				.is_some_and(|value| value == "json")
+			{
+				OutputFormat::Json
+			} else {
+				OutputFormat::Text
+			};
+			let push = tag_release_matches
+				.get_one::<String>("push")
+				.is_none_or(|value| value == "true");
+			let dry_run = quiet || tag_release_matches.get_flag("dry-run");
+			render_release_tag_report(root, from, format, push, dry_run)
 		}
 		Some(("check", check_matches)) => {
 			if quiet {

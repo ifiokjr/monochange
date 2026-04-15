@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
+assertion_line: 14
 info:
   program: monochange
   args:
@@ -19,6 +20,7 @@ Commands:
   populate             Add any missing built-in CLI commands to monochange.toml so you can customize them
   assist               Print assistant setup guidance, install steps, and MCP configuration
   release-record       Inspect the monochange release record associated with a tag or commit
+  tag-release          Create and push release tags from the monochange release record on a commit
   mcp                  Start the monochange MCP (Model Context Protocol) server over stdin/stdout
   check                Validate configuration, changesets, and run lint rules on package manifests
   validate             Validate monochange configuration and changesets

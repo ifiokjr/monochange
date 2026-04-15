@@ -124,6 +124,7 @@ Recent `monochange` improvements made package publishing guidance and diagnostic
 | Publish packages to registries   | `mc publish`                                                | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
 | Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
 | Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
+| Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
 | Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
 | Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
 
@@ -143,6 +144,7 @@ Recent `monochange` improvements made package publishing guidance and diagnostic
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
 - inspect durable release records from tags or descendant commits with `mc release-record`
+- create post-merge release tags from a merged release commit with `mc tag-release --from HEAD`
 - repair a recent source/provider release by retargeting its release tags with `mc repair-release`
 - inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
 - apply Rust semver evidence when provided

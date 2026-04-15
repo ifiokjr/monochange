@@ -1,0 +1,13 @@
+---
+source: crates/monochange/tests/release_record.rs
+assertion_line: 236
+expression: "String::from_utf8(second.stdout).unwrap_or_else(|error|\npanic!(\"stdout utf8: {error}\"))"
+---
+release tags:
+  from: HEAD
+  resolved commit: [SHA]
+  record commit: [SHA]
+  push: yes
+  tags:
+    - v1.2.3 (existing: [SHA], target: [SHA]) [already_up_to_date]
+  status: already-up-to-date

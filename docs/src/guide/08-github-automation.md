@@ -55,10 +55,11 @@ mc affected --format json --changed-paths crates/monochange/src/lib.rs
 
 GitHub automation now has a repair-oriented history flow in addition to the existing manifest-driven execution flow.
 
-Use these commands when you need to inspect or repair a just-created release:
+Use these commands when you need to inspect, tag, or repair a just-created release:
 
 ```bash
 mc release-record --from v1.2.3
+mc tag-release --from HEAD --dry-run --format json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc repair-release --from v1.2.3 --target HEAD
 ```
@@ -67,6 +68,7 @@ The important distinction is:
 
 - the cached release manifest still describes the execution-time release plan for automation
 - `ReleaseRecord` describes the durable release declaration stored in the release commit body
+- `mc tag-release` consumes that durable record after merge and creates the declared tag set on the default branch
 
 Use `--dry-run` first for `repair-release`. It is a destructive workflow because it retargets release tags.
 
@@ -242,12 +244,13 @@ type = "AffectedPackages"
 
 ## Release and npm publish workflows
 
-monochange now includes a release workflow modeled after the latest `mdt` pattern:
+monochange now includes a release workflow modeled around long-running release PR refresh plus post-merge tagging:
 
-- `.github/workflows/release.yml` builds tagged release archives for the `monochange` binary across supported targets and uploads them to the GitHub release
-- `.github/workflows/npm-publish.yml` runs after a successful release workflow, downloads those exact release assets, repackages them into `@monochange/cli` platform packages plus the `@monochange/cli` root package, and publishes `@monochange/skill`
+- `.github/workflows/release.yml` refreshes the dedicated release PR branch on normal `main` pushes
+- the same workflow detects when `HEAD` is already a merged monochange release commit, runs `mc tag-release --from HEAD`, and then runs `mc publish`
+- tag-triggered or downstream workflows can then build archives, create hosted releases, publish additional assets from the pushed tags, or run a separate `mc publish-release` job when you still want manifest-driven hosted-release publication
 
-That split keeps npm publication tied to the exact binaries shipped in the GitHub release instead of rebuilding them separately.
+That split keeps tag creation on the default branch side of the merge and lets downstream automation consume the exact durable release metadata that monochange stored in git history.
 
 For release repair, GitHub is also the first provider with hosted-release retarget sync support. monochange uses the durable release record plus tag names from that record to keep the hosted release view aligned with moved tags.
 

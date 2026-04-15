@@ -1,0 +1,6 @@
+---
+source: crates/monochange/tests/release_record.rs
+assertion_line: 345
+expression: "String::from_utf8(output.stderr).unwrap_or_else(|error|\npanic!(\"stderr utf8: {error}\"))"
+---
+config error: tag `v1.2.3` already points to commit [SHA]; use `mc repair-release` if you need to move an existing release tag

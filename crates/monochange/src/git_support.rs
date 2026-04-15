@@ -42,6 +42,18 @@ pub(crate) fn git_is_ancestor(
 	}
 }
 
+pub(crate) fn create_git_tag(
+	root: &Path,
+	tag_name: &str,
+	target_commit: &str,
+) -> MonochangeResult<()> {
+	run_git_status(
+		root,
+		&["tag", tag_name, target_commit],
+		&format!("failed to create tag `{tag_name}`"),
+	)
+}
+
 pub(crate) fn move_git_tag(
 	root: &Path,
 	tag_name: &str,
@@ -56,7 +68,25 @@ pub(crate) fn move_git_tag(
 
 #[must_use = "the push result must be checked"]
 pub(crate) fn push_git_tags(root: &Path, tags: &[&str]) -> MonochangeResult<()> {
-	let mut args = vec!["push", "--force", "origin"];
+	push_git_tags_with_options(root, tags, true, "failed to push retargeted release tags")
+}
+
+#[must_use = "the push result must be checked"]
+pub(crate) fn push_git_tags_without_force(root: &Path, tags: &[&str]) -> MonochangeResult<()> {
+	push_git_tags_with_options(root, tags, false, "failed to push release tags")
+}
+
+fn push_git_tags_with_options(
+	root: &Path,
+	tags: &[&str],
+	force: bool,
+	error_message: &str,
+) -> MonochangeResult<()> {
+	let mut args = vec!["push"];
+	if force {
+		args.push("--force");
+	}
+	args.push("origin");
 
 	let tag_refs: Vec<String> = tags
 		.iter()
@@ -67,7 +97,7 @@ pub(crate) fn push_git_tags(root: &Path, tags: &[&str]) -> MonochangeResult<()> 
 		args.push(tag_ref.as_str());
 	}
 
-	run_git_status(root, &args, "failed to push retargeted release tags")
+	run_git_status(root, &args, error_message)
 }
 
 #[must_use = "the ref resolution result must be checked"]

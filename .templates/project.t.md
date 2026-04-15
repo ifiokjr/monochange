@@ -55,6 +55,7 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
 - inspect durable release records from tags or descendant commits with `mc release-record`
+- create post-merge release tags from a merged release commit with `mc tag-release --from HEAD`
 - repair a recent source/provider release by retargeting its release tags with `mc repair-release`
 - inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
 - apply Rust semver evidence when provided
@@ -92,6 +93,7 @@ Recent `monochange` improvements made package publishing guidance and diagnostic
 | Publish packages to registries   | `mc publish`                                                | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
 | Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
 | Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
+| Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
 | Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
 | Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
 
@@ -99,20 +101,20 @@ Recent `monochange` improvements made package publishing guidance and diagnostic
 
 <!-- {@projectCapabilityMatrix} -->
 
-| Capability                                                               | Current status                                                             |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter                                   |
-| Package release planning                                                 | Built in                                                                   |
-| Grouped/shared versioning                                                | Built in                                                                   |
-| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                 |
-| Durable release history                                                  | Built in via `ReleaseRecord`, `mc release-record`, and `mc repair-release` |
-| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                      |
-| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                      |
-| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`                                       |
-| GitHub npm trusted-publishing automation                                 | Built in                                                                   |
-| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                 |
-| GitLab trusted-publishing auto-derivation                                | Not built in today                                                         |
-| Release-retarget sync for hosted releases                                | GitHub first                                                               |
+| Capability                                                               | Current status                                                                               |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter                                                     |
+| Package release planning                                                 | Built in                                                                                     |
+| Grouped/shared versioning                                                | Built in                                                                                     |
+| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                                   |
+| Durable release history and post-merge tagging                           | Built in via `ReleaseRecord`, `mc release-record`, `mc tag-release`, and `mc repair-release` |
+| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                                        |
+| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                                        |
+| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`                                                         |
+| GitHub npm trusted-publishing automation                                 | Built in                                                                                     |
+| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                                   |
+| GitLab trusted-publishing auto-derivation                                | Not built in today                                                                           |
+| Release-retarget sync for hosted releases                                | GitHub first                                                                                 |
 
 <!-- {/projectCapabilityMatrix} -->
 
@@ -124,6 +126,7 @@ monochange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
+- `mc tag-release --from HEAD --dry-run --format json` previews the post-merge release tag set declared by that durable record
 - `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
 - `mc affected --format json --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels
@@ -144,6 +147,7 @@ mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-record --from v1.2.3
+mc tag-release --from HEAD --dry-run --format json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc release
 ```

@@ -61,6 +61,9 @@ jobs:
             exit 0
           fi
 
+      - name: create release tags
+        run: devenv shell -- mc tag-release --from HEAD
+
       - name: publish packages
         run: devenv shell -- mc publish
 ```
