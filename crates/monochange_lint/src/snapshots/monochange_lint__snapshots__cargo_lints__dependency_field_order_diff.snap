@@ -1,0 +1,22 @@
+---
+source: crates/monochange_lint/src/snapshots.rs
+expression: "format_file_diff(content, fixed_content)"
+---
+=== ORIGINAL ===
+[package]
+name = "test"
+version = "1.0.0"
+
+[dependencies]
+serde = { features = ["derive"], workspace = true }
+
+=== FIXED ===
+
+publish = false[package]
+name = "test"
+version = "1.0.0"
+
+[dependencies]
+serde = { features = ["derive"], workspace = true }
+
+=== END ===

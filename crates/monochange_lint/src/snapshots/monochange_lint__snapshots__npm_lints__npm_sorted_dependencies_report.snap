@@ -1,0 +1,12 @@
+---
+source: crates/monochange_lint/src/snapshots.rs
+assertion_line: 389
+expression: format_report(&report)
+---
+Errors: 5, Warnings: 0
+
+[error] npm/required-package-fields: Missing required package.json field: 'description'
+[error] npm/required-package-fields: Missing required package.json field: 'repository'
+[error] npm/required-package-fields: Missing required package.json field: 'license'
+[error] npm/root-no-prod-deps: Root package.json should not have production dependencies. Use devDependencies instead. [FIXABLE: Move dependencies to devDependencies]
+[error] npm/unlisted-package-private: Package 'test' is not defined in monochange.toml and must be marked as private. Either add it to monochange.toml or set "private": true in package.json [FIXABLE: Add `private: true` to package.json]

@@ -263,6 +263,7 @@ in
         docs:update # runs `mdt update`
         fix:format
         mc validate
+        cargo run --bin mc -- check --fix
         publish:check
       '';
       description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
@@ -300,6 +301,7 @@ in
         deny:check
         docs:check
         mc validate
+        lint:check
         publish:check
       '';
       description = "Run all checks.";
@@ -311,6 +313,14 @@ in
         dprint check
       '';
       description = "Check that all files are formatted.";
+      binary = "bash";
+    };
+    "lint:check" = {
+      exec = ''
+        set -e
+        cargo run --bin mc -- check
+      '';
+      description = "Run manifest lint rules across all ecosystems.";
       binary = "bash";
     };
     "lint:clippy" = {

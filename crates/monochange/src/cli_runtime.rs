@@ -545,6 +545,14 @@ pub(crate) fn execute_cli_command_with_options(
 							eprintln!("warning: {warning}");
 						}
 					}
+					let fix = step_inputs
+						.get("fix")
+						.and_then(|values| values.first())
+						.is_some_and(|value| value == "true");
+					let (lint_output, _lint_has_errors) = lint::run_lint_step(root, fix)?;
+					if !context.quiet && !lint_output.is_empty() {
+						eprintln!("{lint_output}");
+					}
 					output = Some(format!(
 						"workspace validation passed for {}",
 						root_relative(root, root).display()

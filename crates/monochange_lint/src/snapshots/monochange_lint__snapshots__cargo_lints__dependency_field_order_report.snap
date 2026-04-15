@@ -1,0 +1,10 @@
+---
+source: crates/monochange_lint/src/snapshots.rs
+expression: format_report(&report)
+---
+Errors: 4, Warnings: 0
+
+[error] cargo/required-package-fields: Missing required package field: 'description'
+[error] cargo/required-package-fields: Missing required package field: 'license'
+[error] cargo/required-package-fields: Missing required package field: 'repository'
+[error] cargo/unlisted-package-private: Package 'test' is not defined in monochange.toml and must be marked as private. Either add it to monochange.toml or set `publish = false` in Cargo.toml [FIXABLE: Add `publish = false` to [package]]

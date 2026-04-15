@@ -42,6 +42,7 @@ monochange_gitea = { workspace = true, optional = true }
 monochange_github = { workspace = true, optional = true }
 monochange_gitlab = { workspace = true, optional = true }
 monochange_graph = { workspace = true }
+monochange_lint = { workspace = true }
 monochange_npm = { workspace = true, optional = true }
 monochange_semver = { workspace = true }
 rayon = { workspace = true, default-features = true }
@@ -53,7 +54,7 @@ serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 serde_yaml_ng = { workspace = true, default-features = true }
 shlex = { workspace = true, default-features = true }
-similar = { workspace = true }
+similar = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"], default-features = true }

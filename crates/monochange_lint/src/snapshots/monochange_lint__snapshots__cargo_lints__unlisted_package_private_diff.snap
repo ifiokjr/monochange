@@ -1,0 +1,16 @@
+---
+source: crates/monochange_lint/src/snapshots.rs
+expression: "format_file_diff(content, fixed_content)"
+---
+=== ORIGINAL ===
+[package]
+name = "unlisted-crate"
+version = "1.0.0"
+
+=== FIXED ===
+
+publish = false[package]
+name = "unlisted-crate"
+version = "1.0.0"
+
+=== END ===

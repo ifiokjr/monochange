@@ -4,14 +4,15 @@ version = "0.0.1"
 edition = { workspace = true }
 license = { workspace = true }
 publish = false
+repository = { workspace = true }
 description = "Internal shared test helpers for monochange"
 
 [dependencies]
-insta = { workspace = true }
+insta = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
-rmcp = { workspace = true }
-shlex = { workspace = true }
-tempfile = { workspace = true }
+rmcp = { workspace = true, default-features = true }
+shlex = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

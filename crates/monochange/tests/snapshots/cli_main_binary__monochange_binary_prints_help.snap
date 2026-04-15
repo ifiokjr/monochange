@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
-assertion_line: 14
 info:
   program: monochange
   args:
@@ -21,6 +20,7 @@ Commands:
   assist               Print assistant setup guidance, install steps, and MCP configuration
   release-record       Inspect the monochange release record associated with a tag or commit
   mcp                  Start the monochange MCP (Model Context Protocol) server over stdin/stdout
+  check                Validate configuration, changesets, and run lint rules on package manifests
   validate             Validate monochange configuration and changesets
   discover             Discover packages across supported ecosystems
   change               Create a change file for one or more packages

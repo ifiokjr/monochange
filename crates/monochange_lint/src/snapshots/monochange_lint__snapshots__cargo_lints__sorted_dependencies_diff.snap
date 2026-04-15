@@ -1,0 +1,29 @@
+---
+source: crates/monochange_lint/src/snapshots.rs
+expression: "format_file_diff(content, fixed_content)"
+---
+=== ORIGINAL ===
+[package]
+name = "test"
+version = "1.0.0"
+
+[dependencies]
+zzzz = "1.0"
+aaaa = "1.0"
+mmmm = "1.0"
+
+=== FIXED ===
+
+publish = false[dependencies]
+aaaa = "1.0"
+mmmm = "1.0"
+zzzz = "1.0"[package]
+name = "test"
+version = "1.0.0"
+
+[dependencies]
+zzzz = "1.0"
+aaaa = "1.0"
+mmmm = "1.0"
+
+=== END ===

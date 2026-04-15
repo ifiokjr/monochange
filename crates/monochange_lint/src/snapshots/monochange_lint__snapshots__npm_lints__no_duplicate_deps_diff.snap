@@ -1,0 +1,28 @@
+---
+source: crates/monochange_lint/src/snapshots.rs
+expression: "format_file_diff(content, fixed_content)"
+---
+=== ORIGINAL ===
+{
+  "name": "test",
+  "version": "1.0.0",
+  "dependencies": {
+    "shared-dep": "^1.0.0"
+  },
+  "devDependencies": {
+    "shared-dep": "^1.0.0"
+  }
+}
+=== FIXED ===
+"name": "test",
+  "private": trueRemove 'shared-dep' from non-dev dependency sectionsMove 'dependencies' to 'devDependencies' section{
+  "name": "test",
+  "version": "1.0.0",
+  "dependencies": {
+    "shared-dep": "^1.0.0"
+  },
+  "devDependencies": {
+    "shared-dep": "^1.0.0"
+  }
+}
+=== END ===

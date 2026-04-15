@@ -1,0 +1,35 @@
+---
+source: crates/monochange_lint/src/snapshots.rs
+assertion_line: 298
+expression: "format_file_diff(content, fixed_content)"
+---
+=== ORIGINAL ===
+# Top level comment
+[package]
+name = "test"
+version = "1.0.0"
+
+# Dependencies section comment
+[dependencies]
+# Internal dep comment
+internal-crate = { path = "../internal-crate", version = "1.0.0" }
+
+# External dep
+serde = "1.0"
+
+=== FIXED ===
+
+publish = false# Top level comment
+[package]
+name = "test"
+version = "1.0.0"
+
+# Dependencies section comment
+[dependencies]
+# Internal dep comment
+internal-crate = { path = "../internal-crate", version = "1.0.0" }
+
+# External dep
+serde = "1.0"
+
+=== END ===

@@ -237,6 +237,9 @@ changelog = false
 [package.monochange_analysis]
 path = "crates/monochange_analysis"
 
+[package.monochange_lint]
+path = "crates/monochange_lint"
+
 [package."@monochange/skill"]
 path = "packages/monochange__skill"
 type = "npm"
@@ -337,6 +340,7 @@ packages = [
 	"monochange_gitea",
 	"monochange_hosting",
 	"monochange_analysis",
+	"monochange_lint",
 	"@monochange/cli",
 	"@monochange/cli-darwin-arm64",
 	"@monochange/cli-darwin-x64",
@@ -438,8 +442,23 @@ comment_on_failure = true
 enabled = true
 versioned_files = ["Cargo.toml"]
 
+[ecosystems.cargo.lints]
+"cargo/dependency-field-order" = "error"
+"cargo/internal-dependency-workspace" = "error"
+"cargo/required-package-fields" = "error"
+"cargo/sorted-dependencies" = "error"
+"cargo/unlisted-package-private" = "warning"
+
 [ecosystems.npm]
 enabled = true
+
+[ecosystems.npm.lints]
+"npm/workspace-protocol" = "error"
+"npm/sorted-dependencies" = "error"
+"npm/required-package-fields" = "error"
+"npm/root-no-prod-deps" = "error"
+"npm/no-duplicate-dependencies" = "error"
+"npm/unlisted-package-private" = "warning"
 
 # Uncomment to enable Deno or Dart/Flutter discovery:
 # [ecosystems.deno]
