@@ -156,7 +156,7 @@ Use this when you want the most automated trusted-publishing path monochange cur
 
 ### GitHub + Cargo (`crates.io`) trusted publishing
 
-Config:
+Config for monochange-managed release planning:
 
 ```toml
 [source]
@@ -170,7 +170,7 @@ mode = "builtin"
 trusted_publishing = true
 ```
 
-Workflow sketch:
+Monochange-oriented post-merge workflow sketch:
 
 ```yaml
 name: publish-cargo
@@ -207,18 +207,63 @@ jobs:
         run: devenv shell -- mc publish
 ```
 
+More copy-pasteable registry-native example:
+
+If you want to follow the crates.io documentation more literally, let the official auth action own the token exchange and keep monochange focused on release planning. In that case, prefer `mode = "external"` for Cargo publication.
+
+```toml
+[source]
+provider = "github"
+owner = "owner"
+repo = "repo"
+
+[ecosystems.cargo.publish]
+enabled = true
+mode = "external"
+trusted_publishing = true
+```
+
+```yaml
+name: publish-cargo
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: cargo publish --package my_crate
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+```
+
+For monorepos with multiple Cargo packages, split this into one job per published crate or have an external script decide which crates should publish for the current tag.
+
 Important current behavior:
 
 - monochange can carry the trust expectation in config
 - monochange can report the setup URL and enforce that trust is configured before built-in release publishing continues
 - monochange does **not** currently auto-configure `crates.io` trust the way it can for npm on GitHub
+- if you want the most literal crates.io/OIDC workflow today, `mode = "external"` plus `rust-lang/crates-io-auth-action@v1` is the clearest path
 
 Recommended setup:
 
 1. configure `trusted_publishing = true`
 2. bootstrap missing packages with `mc placeholder-publish` if needed
 3. manually enroll the repository/workflow in `crates.io`
-4. let `mc publish` perform the actual publish after the release commit lands
+4. choose either:
+   - `mode = "builtin"` and let monochange own the publish command, or
+   - `mode = "external"` and use the official crates.io auth action directly
 
 ### GitHub + Deno / JSR trusted publishing
 
@@ -282,7 +327,7 @@ Current behavior matches Cargo more than npm:
 
 ### GitHub + Dart / Flutter (`pub.dev`) trusted publishing
 
-Config:
+Config for monochange-managed release planning:
 
 ```toml
 [source]
@@ -297,7 +342,7 @@ trusted_publishing = true
 registry = "pub.dev"
 ```
 
-Workflow sketch:
+Monochange-oriented post-merge workflow sketch:
 
 ```yaml
 name: publish-pub-dev
@@ -334,11 +379,49 @@ jobs:
         run: devenv shell -- mc publish
 ```
 
+More copy-pasteable registry-native example:
+
+If you want the workflow shape recommended by the Dart team, prefer the reusable workflow from `dart-lang/setup-dart` and keep monochange focused on release planning. In that case, `mode = "external"` is usually the clearest fit.
+
+```toml
+[source]
+provider = "github"
+owner = "owner"
+repo = "repo"
+
+[ecosystems.dart.publish]
+enabled = true
+mode = "external"
+trusted_publishing = true
+registry = "pub.dev"
+```
+
+```yaml
+name: publish-pub-dev
+
+on:
+  push:
+    tags:
+      - "my_package-v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  publish:
+    permissions:
+      id-token: write
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    with:
+      working-directory: packages/my_package
+      # environment: pub.dev
+```
+
+If you need custom generation or build steps before publishing, switch to a custom workflow that runs `dart pub publish --force` or `flutter pub publish --force` after the OIDC-authenticated setup.
+
 Current behavior:
 
 - monochange can enforce the configured trust expectation
 - monochange reports the manual setup URL when trust is not configured
 - monochange does **not** auto-configure `pub.dev` trusted publishing today
+- if you want the most copy-pasteable pub.dev flow today, `mode = "external"` plus the reusable `dart-lang/setup-dart` workflow is the clearest path
 
 ### GitHub post-merge package publish flow
 
