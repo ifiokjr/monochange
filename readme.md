@@ -112,6 +112,20 @@ If you do not know which package id to target, rerun `mc discover --format json`
 - [Advanced: CI, package publishing, and release PR flows](docs/src/guide/13-ci-and-publishing.md) — per-provider CI patterns, trusted publishing, and long-running release PR design notes
 - [Reference: Manifest linting with `mc check`](docs/src/reference/linting.md) — `[ecosystems.<name>.lints]` rules for Cargo and npm-family manifests
 
+<!-- {=projectRecentPublishingImprovements} -->
+
+### Recent package publishing improvements
+
+Recent `monochange` improvements made package publishing guidance and diagnostics much more actionable:
+
+- a dedicated trusted-publishing guide now covers `npm`, `crates.io`, `jsr`, and `pub.dev`
+- CI examples now prefer the official registry-maintained workflows for `crates.io` and `pub.dev`
+- a dedicated multi-package publishing guide now covers monorepo tag, workflow, and package-boundary patterns
+- CLI output now gives clearer manual next steps for registries that still require registry-side trusted-publishing enrollment
+- built-in publish preflight now validates and reports the expected GitHub repository, workflow, and environment context for manual registries when it can infer them
+
+<!-- {/projectRecentPublishingImprovements} -->
+
 ## Command and automation matrix
 
 <!-- {=projectCommandAutomationMatrix} -->
