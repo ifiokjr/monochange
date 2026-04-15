@@ -3071,6 +3071,45 @@ path = "crates/core"
 	}
 
 	#[test]
+	fn render_package_publish_reports_include_manual_registry_guidance() {
+		let report = package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![package_publish::PackagePublishOutcome {
+				package: "pkg".to_string(),
+				ecosystem: Ecosystem::Cargo,
+				registry: "crates_io".to_string(),
+				version: "1.2.3".to_string(),
+				status: package_publish::PackagePublishStatus::SkippedExternal,
+				message: "skipped built-in publish".to_string(),
+				placeholder: false,
+				trusted_publishing: package_publish::TrustedPublishingOutcome {
+					status: package_publish::TrustedPublishingStatus::ManualActionRequired,
+					repository: Some("ifiokjr/monochange".to_string()),
+					workflow: Some("publish.yml".to_string()),
+					environment: Some("release".to_string()),
+					setup_url: Some("https://crates.io/crates/pkg".to_string()),
+					message:
+						"configure trusted publishing manually for `pkg` before the next built-in release publish"
+							.to_string(),
+				},
+			}],
+		};
+
+		let text = render_package_publish_report(&report).join("\n");
+		assert!(text.contains("trusted publishing: manual-action-required"));
+		assert!(text.contains("trust message: configure trusted publishing manually for `pkg`"));
+		assert!(text.contains("setup: https://crates.io/crates/pkg"));
+
+		let markdown = render_package_publish_report_markdown(&report, false).join("\n");
+		assert!(markdown.contains("**Trusted publishing:** manual-action-required"));
+		assert!(
+			markdown.contains("**Trust message:** configure trusted publishing manually for `pkg`")
+		);
+		assert!(markdown.contains("**Setup:** `https://crates.io/crates/pkg`"));
+	}
+
+	#[test]
 	fn package_publish_status_labels_cover_all_variants() {
 		assert_eq!(
 			package_publish_status_label(package_publish::PackagePublishStatus::Planned),

@@ -2728,6 +2728,33 @@ jobs:
 	}
 
 	#[test]
+	fn manual_trust_outcome_preserves_explicit_context_and_registry_setup_url() {
+		let mut request = trusted_request(RegistryKind::PubDev);
+		request.trusted_publishing.repository = Some("ifiokjr/monochange".to_string());
+		request.trusted_publishing.workflow = Some("publish.yml".to_string());
+		request.trusted_publishing.environment = Some("pub.dev".to_string());
+
+		let outcome = manual_trust_outcome(&request);
+
+		assert_eq!(
+			outcome.status,
+			TrustedPublishingStatus::ManualActionRequired
+		);
+		assert_eq!(outcome.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(outcome.workflow.as_deref(), Some("publish.yml"));
+		assert_eq!(outcome.environment.as_deref(), Some("pub.dev"));
+		assert_eq!(
+			outcome.setup_url.as_deref(),
+			Some("https://pub.dev/packages/pkg/admin")
+		);
+		assert!(
+			outcome
+				.message
+				.contains("configure trusted publishing manually for `pkg`")
+		);
+	}
+
+	#[test]
 	fn planned_trust_outcome_returns_disabled_when_trust_is_off() {
 		let outcome = planned_trust_outcome(
 			&sample_request(RegistryKind::Npm),
