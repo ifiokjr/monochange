@@ -73,7 +73,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 
 **Standalone steps** (no prerequisites):
 
-- `Validate` — validate config, changeset targets, and run lint rules
+- `Validate` — validate config and changeset targets
 - `Discover` — discover packages across ecosystems
 - `CreateChangeFile` — write a `.changeset/*.md` file
 - `AffectedPackages` — evaluate changeset policy from CI-supplied paths and labels

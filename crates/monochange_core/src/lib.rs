@@ -1445,8 +1445,8 @@ impl<'de> Deserialize<'de> for ShellConfig {
 #[serde(tag = "type", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum CliStepDefinition {
-	/// Validate `monochange` configuration and changesets without preparing a
-	/// release.
+	/// Validate `monochange` configuration and changesets, and run lint rules
+	/// on package manifests.
 	Validate {
 		#[serde(default)]
 		name: Option<String>,
