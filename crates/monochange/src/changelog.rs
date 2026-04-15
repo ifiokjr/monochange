@@ -992,16 +992,16 @@ fn classify_release_note_change(
 	change: &ReleaseNoteChange,
 	extra_sections: &[ResolvedSectionDefinition],
 ) -> ResolvedReleaseSectionTarget {
-	if let Some(change_type) = change.change_type.as_deref() {
-		if let Some(index) = extra_sections
+	if let Some(change_type) = change.change_type.as_deref()
+		&& let Some(index) = extra_sections
 			.iter()
 			.position(|section| section_matches_resolved_type(section, change_type))
-		{
-			return ResolvedReleaseSectionTarget::Extra(index);
-		}
-		if change_type == BuiltinReleaseSection::Note.selector() {
-			return ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note);
-		}
+	{
+		return ResolvedReleaseSectionTarget::Extra(index);
+	}
+
+	if change.change_type.as_deref() == Some(BuiltinReleaseSection::Note.selector()) {
+		return ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note);
 	}
 	let builtin = BuiltinReleaseSection::from_bump(change.bump);
 	if let Some(index) = extra_sections

@@ -371,14 +371,18 @@ pub(crate) fn resolve_release_datetime() -> chrono::NaiveDateTime {
 	use chrono::NaiveDate;
 	use chrono::NaiveDateTime;
 
-	if let Ok(env_date) = std::env::var("MONOCHANGE_RELEASE_DATE") {
-		if let Ok(ndt) = NaiveDateTime::parse_from_str(&env_date, "%Y-%m-%dT%H:%M:%S") {
-			return ndt;
-		}
-		if let Ok(nd) = NaiveDate::parse_from_str(&env_date, "%Y-%m-%d") {
-			return nd.and_hms_opt(0, 0, 0).unwrap_or_default();
-		}
+	let Ok(env_date) = std::env::var("MONOCHANGE_RELEASE_DATE") else {
+		return chrono::Local::now().naive_local();
+	};
+
+	if let Ok(ndt) = NaiveDateTime::parse_from_str(&env_date, "%Y-%m-%dT%H:%M:%S") {
+		return ndt;
 	}
+
+	if let Ok(nd) = NaiveDate::parse_from_str(&env_date, "%Y-%m-%d") {
+		return nd.and_hms_opt(0, 0, 0).unwrap_or_default();
+	}
+
 	chrono::Local::now().naive_local()
 }
 

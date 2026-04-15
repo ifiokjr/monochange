@@ -1,5 +1,32 @@
 #![forbid(clippy::indexing_slicing)]
 
+//! # `monochange_gitlab`
+//!
+//! <!-- {=monochangeGitlabCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange_gitlab` turns `monochange` release manifests into GitLab automation requests.
+//!
+//! Reach for this crate when you want to preview or publish GitLab releases and merge requests using the same structured release data that powers changelog files and release manifests.
+//!
+//! ## Why use it?
+//!
+//! - derive GitLab release payloads and merge-request bodies from `monochange`'s structured release manifest
+//! - keep GitLab automation aligned with changelog rendering and release targets
+//! - reuse one publishing path for dry-run previews and real repository updates
+//!
+//! ## Best for
+//!
+//! - building GitLab release automation on top of `mc release`
+//! - previewing would-be GitLab releases and merge requests in CI before publishing
+//! - self-hosted GitLab instances that need the same release workflow as GitHub
+//!
+//! ## Public entry points
+//!
+//! - `build_release_requests(manifest, source)` builds release payloads from prepared release state
+//! - `build_change_request(manifest, source)` builds a merge-request payload for the release
+//! - `validate_source_configuration(source)` validates GitLab-specific source config
+//! - `source_capabilities()` returns provider feature flags
+//! <!-- {/monochangeGitlabCrateDocs} -->
+
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
@@ -522,13 +549,14 @@ fn publish_merge_request_with_existing(
 		existing.and_then(|merge_request| merge_request.sha.as_deref()) == Some(head_commit);
 	let project_id = encode(&format!("{}/{}", request.owner, request.repo)).into_owned();
 	let create_url = format!("{api_base}/projects/{project_id}/merge_requests");
-	let response: GitLabMergeRequestResponse = if let Some(existing_mr) = &existing {
-		if content_matches && labels_match {
+	let response: GitLabMergeRequestResponse = match existing {
+		Some(existing_mr) if content_matches && labels_match => {
 			GitLabMergeRequestResponse {
 				iid: existing_mr.iid,
 				web_url: existing_mr.web_url.clone(),
 			}
-		} else {
+		}
+		Some(existing_mr) => {
 			let update_url = format!(
 				"{api_base}/projects/{project_id}/merge_requests/{}",
 				existing_mr.iid
@@ -542,32 +570,33 @@ fn publish_merge_request_with_existing(
 
 			put_json(client, headers, &update_url, &update_payload, "GitLab")?
 		}
-	} else {
-		post_json(
-			client,
-			headers,
-			&create_url,
-			&GitLabMergeRequestPayload {
-				title: &request.title,
-				source_branch: &request.head_branch,
-				target_branch: &request.base_branch,
-				description: &request.body,
-				labels: &labels,
-			},
-			"GitLab",
-		)?
+		None => {
+			post_json(
+				client,
+				headers,
+				&create_url,
+				&GitLabMergeRequestPayload {
+					title: &request.title,
+					source_branch: &request.head_branch,
+					target_branch: &request.base_branch,
+					description: &request.body,
+					labels: &labels,
+				},
+				"GitLab",
+			)?
+		}
 	};
 	Ok(SourceChangeRequestOutcome {
 		provider: SourceProvider::GitLab,
 		repository: request.repository.clone(),
 		number: response.iid,
 		head_branch: request.head_branch.clone(),
-		operation: if existing.is_none() {
-			SourceChangeRequestOperation::Created
-		} else if content_matches && labels_match && head_matches_existing {
-			SourceChangeRequestOperation::Skipped
-		} else {
-			SourceChangeRequestOperation::Updated
+		operation: match existing {
+			None => SourceChangeRequestOperation::Created,
+			Some(_) if content_matches && labels_match && head_matches_existing => {
+				SourceChangeRequestOperation::Skipped
+			}
+			Some(_) => SourceChangeRequestOperation::Updated,
 		},
 		url: response.web_url,
 	})

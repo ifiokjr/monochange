@@ -2424,21 +2424,7 @@ fn validate_package_and_group_definitions(
 			));
 		}
 		if package.version_format == VersionFormat::Primary {
-			if let Some(existing_owner) = &primary_owner {
-				return Err(config_diagnostic(
-					config_contents,
-					format!("`version_format = \"primary\"` is already used by `{existing_owner}`"),
-					vec![
-						config_primary_label(config_contents, existing_owner),
-						config_primary_label(config_contents, &package.id),
-					],
-					Some(
-						"choose a single package or group as the primary outward release identity"
-							.to_string(),
-					),
-				));
-			}
-			primary_owner = Some(package.id.clone());
+			assign_primary_release_owner(config_contents, &mut primary_owner, &package.id)?;
 		}
 	}
 
@@ -2483,21 +2469,7 @@ fn validate_package_and_group_definitions(
 			));
 		}
 		if group.version_format == VersionFormat::Primary {
-			if let Some(existing_owner) = &primary_owner {
-				return Err(config_diagnostic(
-					config_contents,
-					format!("`version_format = \"primary\"` is already used by `{existing_owner}`"),
-					vec![
-						config_primary_label(config_contents, existing_owner),
-						config_primary_label(config_contents, &group.id),
-					],
-					Some(
-						"choose a single package or group as the primary outward release identity"
-							.to_string(),
-					),
-				));
-			}
-			primary_owner = Some(group.id.clone());
+			assign_primary_release_owner(config_contents, &mut primary_owner, &group.id)?;
 		}
 		for package_id in &group.packages {
 			if !declared_packages.contains(package_id.as_str()) {
@@ -2576,22 +2548,23 @@ fn validate_versioned_files(
 	owner_id: &str,
 ) -> MonochangeResult<()> {
 	for versioned_file in versioned_files {
-		if let Some(regex) = &versioned_file.regex {
-			if versioned_file.ecosystem_type.is_some() {
-				return Err(config_diagnostic(
+		if versioned_file.regex.is_some() && versioned_file.ecosystem_type.is_some() {
+			return Err(config_diagnostic(
+				config_contents,
+				format!(
+					"{owner_kind} `{owner_id}` regex versioned_files cannot also set `type`"
+				),
+				vec![config_section_label(
 					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files cannot also set `type`"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"regex versioned_files cannot set `type`",
-					)],
-					Some("remove `type` when using `regex`; regex versioned_files operate on plain text files without ecosystem-specific parsing".to_string()),
-				));
-			}
+					owner_kind,
+					owner_id,
+					"regex versioned_files cannot set `type`",
+				)],
+				Some("remove `type` when using `regex`; regex versioned_files operate on plain text files without ecosystem-specific parsing".to_string()),
+			));
+		}
+
+		if let Some(regex) = &versioned_file.regex {
 			if versioned_file.prefix.is_some()
 				|| versioned_file.fields.is_some()
 				|| versioned_file.name.is_some()
@@ -2735,29 +2708,34 @@ fn validate_lockfile_commands(
 				"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty command"
 			)));
 		}
-		if let Some(cwd) = &lockfile_command.cwd {
-			if cwd.as_os_str().is_empty() {
-				return Err(MonochangeError::Config(format!(
-					"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty cwd when set"
-				)));
-			}
-			let resolved = if cwd.is_absolute() {
-				cwd.clone()
-			} else {
-				root.join(cwd)
-			};
-			if !resolved.starts_with(root) {
-				return Err(MonochangeError::Config(format!(
-					"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` must stay within the workspace root",
-					cwd.display()
-				)));
-			}
-			if !resolved.is_dir() {
-				return Err(MonochangeError::Config(format!(
-					"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` does not exist or is not a directory",
-					cwd.display()
-				)));
-			}
+		let Some(cwd) = &lockfile_command.cwd else {
+			continue;
+		};
+
+		if cwd.as_os_str().is_empty() {
+			return Err(MonochangeError::Config(format!(
+				"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty cwd when set"
+			)));
+		}
+
+		let resolved = if cwd.is_absolute() {
+			cwd.clone()
+		} else {
+			root.join(cwd)
+		};
+
+		if !resolved.starts_with(root) {
+			return Err(MonochangeError::Config(format!(
+				"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` must stay within the workspace root",
+				cwd.display()
+			)));
+		}
+
+		if !resolved.is_dir() {
+			return Err(MonochangeError::Config(format!(
+				"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` does not exist or is not a directory",
+				cwd.display()
+			)));
 		}
 	}
 
@@ -3554,6 +3532,31 @@ fn config_primary_label(config_contents: &str, owner_id: &str) -> LabeledSpan {
 		Some("primary release identity".to_string()),
 		range_to_span(span),
 	)
+}
+
+fn assign_primary_release_owner(
+	config_contents: &str,
+	primary_owner: &mut Option<String>,
+	owner_id: &str,
+) -> MonochangeResult<()> {
+	if let Some(existing_owner) = primary_owner {
+		return Err(config_diagnostic(
+			config_contents,
+			format!("`version_format = \"primary\"` is already used by `{existing_owner}`"),
+			vec![
+				config_primary_label(config_contents, existing_owner),
+				config_primary_label(config_contents, owner_id),
+			],
+			Some(
+				"choose a single package or group as the primary outward release identity"
+					.to_string(),
+			),
+		));
+	}
+
+	*primary_owner = Some(owner_id.to_string());
+
+	Ok(())
 }
 
 fn render_source_diagnostic(

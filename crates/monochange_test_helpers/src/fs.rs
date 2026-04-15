@@ -90,18 +90,21 @@ fn copy_directory_filtered(source: &Path, destination: &Path, skipped: &dyn Fn(&
 			continue;
 		}
 
-		if metadata.is_file() {
-			if let Some(parent) = destination_path.parent() {
-				fs::create_dir_all(parent)
-					.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
-			}
-			fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
-				panic!(
-					"copy {} -> {}: {error}",
-					source_path.display(),
-					destination_path.display()
-				)
-			});
+		if !metadata.is_file() {
+			continue;
 		}
+
+		if let Some(parent) = destination_path.parent() {
+			fs::create_dir_all(parent)
+				.unwrap_or_else(|error| panic!("create parent {}: {error}", parent.display()));
+		}
+
+		fs::copy(&source_path, &destination_path).unwrap_or_else(|error| {
+			panic!(
+				"copy {} -> {}: {error}",
+				source_path.display(),
+				destination_path.display()
+			)
+		});
 	}
 }

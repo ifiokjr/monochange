@@ -144,16 +144,15 @@ pub fn affected_packages(
 	let covered_package_ids = covered_package_ids.into_iter().collect::<Vec<_>>();
 	let required =
 		!affected_package_ids.is_empty() && verify.required && matched_skip_labels.is_empty();
-	let status = if errors.is_empty() {
-		if !matched_skip_labels.is_empty() {
-			ChangesetPolicyStatus::Skipped
-		} else if affected_package_ids.is_empty() {
-			ChangesetPolicyStatus::NotRequired
-		} else {
-			ChangesetPolicyStatus::Passed
-		}
-	} else {
-		ChangesetPolicyStatus::Failed
+	let status = match (
+		errors.is_empty(),
+		matched_skip_labels.is_empty(),
+		affected_package_ids.is_empty(),
+	) {
+		(false, ..) => ChangesetPolicyStatus::Failed,
+		(true, false, _) => ChangesetPolicyStatus::Skipped,
+		(true, true, true) => ChangesetPolicyStatus::NotRequired,
+		(true, true, false) => ChangesetPolicyStatus::Passed,
 	};
 	let summary = match status {
 		ChangesetPolicyStatus::Failed

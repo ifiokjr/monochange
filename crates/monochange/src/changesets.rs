@@ -166,11 +166,12 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 				});
 
 			if let Some(review_request) = review_request {
-				if let Some(url) = &review_request.url {
-					lines.push(format!("  review request: {} ({})", review_request.id, url));
-				} else {
-					lines.push(format!("  review request: {}", review_request.id));
-				}
+				let review_request_line = match &review_request.url {
+					Some(url) => format!("  review request: {} ({})", review_request.id, url),
+					None => format!("  review request: {}", review_request.id),
+				};
+
+				lines.push(review_request_line);
 			}
 
 			if !context.related_issues.is_empty() {
