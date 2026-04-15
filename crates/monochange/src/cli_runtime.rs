@@ -12,6 +12,7 @@ use std::process::Stdio;
 use std::sync::mpsc;
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
 use std::time::Instant;
 
 use clap::ArgMatches;
@@ -848,10 +849,14 @@ pub(crate) fn execute_cli_command_with_options(
 			}
 		})();
 		if let Err(error) = step_result {
-			if show_progress {
-				let progress_error = progress_error_detail(&error).to_string();
-				progress.step_failed(step_index, step, step_started_at.elapsed(), &progress_error);
-			}
+			report_cli_step_failure(
+				&mut progress,
+				show_progress,
+				step_index,
+				step,
+				step_started_at.elapsed(),
+				&error,
+			);
 
 			return Err(error);
 		}
@@ -867,19 +872,12 @@ pub(crate) fn execute_cli_command_with_options(
 
 	progress.command_finished(command_started_at.elapsed());
 
-	if let Some(prepared_release) = &context.prepared_release
-		&& let Err(error) = save_prepared_release_execution(
-			root,
-			configuration,
-			prepared_release,
-			&context.prepared_file_diffs,
-			prepared_release_path.as_deref(),
-		) {
-		if prepared_release_path.is_some() {
-			return Err(error);
-		}
-		tracing::warn!(%error, "failed to save prepared release artifact");
-	}
+	save_prepared_release_artifact(
+		root,
+		configuration,
+		&context,
+		prepared_release_path.as_deref(),
+	)?;
 
 	resolve_command_output(cli_command, &context, dry_run, output)
 }
@@ -2178,70 +2176,11 @@ pub(crate) fn render_cli_command_result(
 		cli_command.name,
 		if context.dry_run { " (dry-run)" } else { "" }
 	)];
-	if let Some(prepared_release) = &context.prepared_release {
-		if let Some(version) = &prepared_release.version {
-			lines.push(format!("version: {version}"));
-		}
 
-		if !prepared_release.released_packages.is_empty() {
-			lines.push(format!(
-				"released packages: {}",
-				prepared_release.released_packages.join(", ")
-			));
-		}
-		if !prepared_release.release_targets.is_empty() {
-			lines.push("release targets:".to_string());
-			for target in &prepared_release.release_targets {
-				lines.push(format!(
-					"- {} {} -> {} (tag: {}, release: {})",
-					target.kind, target.id, target.tag_name, target.tag, target.release,
-				));
-			}
-		}
-		if let Some(path) = &context.release_manifest_path {
-			lines.push(format!("release manifest: {}", path.display()));
-		}
-		if !context.release_results.is_empty() {
-			lines.push("releases:".to_string());
-			for release in &context.release_results {
-				lines.push(format!("- {release}"));
-			}
-		}
-		if let Some(release_commit_report) = &context.release_commit_report {
-			lines.extend(render_release_commit_report(release_commit_report));
-		}
-		if let Some(release_request_result) = &context.release_request_result {
-			lines.push("release request:".to_string());
-			lines.push(format!("- {release_request_result}"));
-		}
-		if !context.issue_comment_results.is_empty() {
-			lines.push("issue comments:".to_string());
-			for issue_comment in &context.issue_comment_results {
-				lines.push(format!("- {issue_comment}"));
-			}
-		}
-		if !prepared_release.changed_files.is_empty() {
-			lines.push("changed files:".to_string());
-			for path in &prepared_release.changed_files {
-				lines.push(format!("- {}", path.display()));
-			}
-		}
-		if context.show_diff && !context.prepared_file_diffs.is_empty() {
-			lines.push("file diffs:".to_string());
-			for (index, file_diff) in context.prepared_file_diffs.iter().enumerate() {
-				if index > 0 {
-					lines.push(String::new());
-				}
-				lines.push(file_diff.display_diff.clone());
-			}
-		}
-		if !prepared_release.deleted_changesets.is_empty() {
-			lines.push("deleted changesets:".to_string());
-			for path in &prepared_release.deleted_changesets {
-				lines.push(format!("- {}", path.display()));
-			}
-		}
+	if let Some(prepared_release) = &context.prepared_release {
+		render_prepared_release_summary(&mut lines, prepared_release, context);
 	}
+
 	if let Some(report) = &context.package_publish_report {
 		lines.extend(render_package_publish_report(report));
 	}
@@ -2322,6 +2261,87 @@ pub(crate) fn render_cli_command_result(
 		}
 	}
 	lines.join("\n")
+}
+
+fn render_prepared_release_summary(
+	lines: &mut Vec<String>,
+	prepared_release: &PreparedRelease,
+	context: &CliContext,
+) {
+	if let Some(version) = &prepared_release.version {
+		lines.push(format!("version: {version}"));
+	}
+
+	if !prepared_release.released_packages.is_empty() {
+		lines.push(format!(
+			"released packages: {}",
+			prepared_release.released_packages.join(", ")
+		));
+	}
+
+	if !prepared_release.release_targets.is_empty() {
+		lines.push("release targets:".to_string());
+		for target in &prepared_release.release_targets {
+			lines.push(format!(
+				"- {} {} -> {} (tag: {}, release: {})",
+				target.kind, target.id, target.tag_name, target.tag, target.release,
+			));
+		}
+	}
+
+	if let Some(path) = &context.release_manifest_path {
+		lines.push(format!("release manifest: {}", path.display()));
+	}
+
+	if !context.release_results.is_empty() {
+		lines.push("releases:".to_string());
+		for release in &context.release_results {
+			lines.push(format!("- {release}"));
+		}
+	}
+
+	if let Some(release_commit_report) = &context.release_commit_report {
+		lines.extend(render_release_commit_report(release_commit_report));
+	}
+
+	if let Some(release_request_result) = &context.release_request_result {
+		lines.push("release request:".to_string());
+		lines.push(format!("- {release_request_result}"));
+	}
+
+	if !context.issue_comment_results.is_empty() {
+		lines.push("issue comments:".to_string());
+		for issue_comment in &context.issue_comment_results {
+			lines.push(format!("- {issue_comment}"));
+		}
+	}
+
+	if !prepared_release.changed_files.is_empty() {
+		lines.push("changed files:".to_string());
+		for path in &prepared_release.changed_files {
+			lines.push(format!("- {}", path.display()));
+		}
+	}
+
+	if context.show_diff && !context.prepared_file_diffs.is_empty() {
+		lines.push("file diffs:".to_string());
+		for (index, file_diff) in context.prepared_file_diffs.iter().enumerate() {
+			if index > 0 {
+				lines.push(String::new());
+			}
+
+			lines.push(file_diff.display_diff.clone());
+		}
+	}
+
+	if prepared_release.deleted_changesets.is_empty() {
+		return;
+	}
+
+	lines.push("deleted changesets:".to_string());
+	for path in &prepared_release.deleted_changesets {
+		lines.push(format!("- {}", path.display()));
+	}
 }
 
 pub(crate) fn render_cli_command_markdown_result(
@@ -2751,6 +2771,70 @@ fn execute_affected_packages_step(
 	Ok(evaluation)
 }
 
+fn report_cli_step_failure(
+	progress: &mut CliProgressReporter,
+	show_progress: bool,
+	step_index: usize,
+	step: &CliStepDefinition,
+	elapsed: Duration,
+	error: &MonochangeError,
+) {
+	if !show_progress {
+		return;
+	}
+
+	let progress_error = progress_error_detail(error).to_string();
+	progress.step_failed(step_index, step, elapsed, &progress_error);
+}
+
+fn maybe_fail_enforced_changeset_policy(
+	evaluation: &ChangesetPolicyEvaluation,
+	quiet: bool,
+	rendered: String,
+) -> MonochangeResult<String> {
+	match (
+		evaluation.enforce,
+		evaluation.status == ChangesetPolicyStatus::Failed,
+	) {
+		(true, true) => {
+			if !quiet {
+				println!("{rendered}");
+			}
+
+			Err(MonochangeError::Config(evaluation.summary.clone()))
+		}
+		_ => Ok(rendered),
+	}
+}
+
+fn save_prepared_release_artifact(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	context: &CliContext,
+	prepared_release_path: Option<&Path>,
+) -> MonochangeResult<()> {
+	let Some(prepared_release) = &context.prepared_release else {
+		return Ok(());
+	};
+
+	let save_result = save_prepared_release_execution(
+		root,
+		configuration,
+		prepared_release,
+		&context.prepared_file_diffs,
+		prepared_release_path,
+	);
+
+	match (prepared_release_path.is_some(), save_result) {
+		(_, Ok(())) => Ok(()),
+		(true, Err(error)) => Err(error),
+		(false, Err(error)) => {
+			tracing::warn!(%error, "failed to save prepared release artifact");
+			Ok(())
+		}
+	}
+}
+
 fn resolve_command_output(
 	cli_command: &CliCommandDefinition,
 	context: &CliContext,
@@ -2792,14 +2876,8 @@ fn resolve_command_output(
 				render_cli_command_result(cli_command, context)
 			}
 		};
-		if evaluation.enforce && evaluation.status == ChangesetPolicyStatus::Failed {
-			if !context.quiet {
-				println!("{rendered}");
-			}
 
-			return Err(MonochangeError::Config(evaluation.summary.clone()));
-		}
-		return Ok(rendered);
+		return maybe_fail_enforced_changeset_policy(evaluation, context.quiet, rendered);
 	}
 	if let Some(report) = &context.changeset_diagnostics {
 		let format = context

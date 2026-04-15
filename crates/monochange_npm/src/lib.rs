@@ -253,24 +253,25 @@ pub fn update_pnpm_lock(
 						continue;
 					};
 
-					if let Some(text) = entry.as_str() {
-						if uses_workspace_reference(text) {
-							continue;
+					let Some(text) = entry.as_str() else {
+						if let Some(entry_mapping) = entry.as_mapping_mut() {
+							let version_key = serde_yaml_ng::Value::String("version".to_string());
+							if let Some(version_value) = entry_mapping.get_mut(&version_key)
+								&& let Some(text) = version_value.as_str()
+								&& !uses_workspace_reference(text)
+							{
+								*version_value = serde_yaml_ng::Value::String(version.clone());
+							}
 						}
 
-						*entry = serde_yaml_ng::Value::String(version.clone());
+						continue;
+					};
+
+					if uses_workspace_reference(text) {
 						continue;
 					}
 
-					if let Some(entry_mapping) = entry.as_mapping_mut() {
-						let version_key = serde_yaml_ng::Value::String("version".to_string());
-						if let Some(version_value) = entry_mapping.get_mut(&version_key)
-							&& let Some(text) = version_value.as_str()
-							&& !uses_workspace_reference(text)
-						{
-							*version_value = serde_yaml_ng::Value::String(version.clone());
-						}
-					}
+					*entry = serde_yaml_ng::Value::String(version.clone());
 				}
 			}
 		}

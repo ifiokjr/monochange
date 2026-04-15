@@ -2555,6 +2555,47 @@ fn validate_affected_packages_step_enabled(
 	)))
 }
 
+fn validate_command_step_definition(
+	cli_command: &CliCommandDefinition,
+	command: &str,
+	dry_run_command: Option<&str>,
+	step_id: Option<&str>,
+	seen_step_ids: &mut BTreeSet<String>,
+) -> MonochangeResult<()> {
+	if let Some(step_id) = step_id {
+		let trimmed = step_id.trim();
+		if trimmed.is_empty() {
+			return Err(MonochangeError::Config(format!(
+				"CLI command `{}` has a command step with an empty id",
+				cli_command.name
+			)));
+		}
+
+		if !seen_step_ids.insert(trimmed.to_string()) {
+			return Err(MonochangeError::Config(format!(
+				"CLI command `{}` has duplicate step id `{trimmed}`",
+				cli_command.name
+			)));
+		}
+	}
+
+	if command.trim().is_empty() {
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` command steps must provide a non-empty command",
+			cli_command.name
+		)));
+	}
+
+	if matches!(dry_run_command, Some(value) if value.trim().is_empty()) {
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` command steps with `dry_run_command` must provide a non-empty command",
+			cli_command.name
+		)));
+	}
+
+	Ok(())
+}
+
 fn path_uses_glob(path: &str) -> bool {
 	path.contains('*') || path.contains('?') || path.contains('[')
 }
@@ -2586,72 +2627,14 @@ fn validate_versioned_files(
 	owner_id: &str,
 ) -> MonochangeResult<()> {
 	for versioned_file in versioned_files {
-		if versioned_file.regex.is_some() && versioned_file.ecosystem_type.is_some() {
-			return Err(config_diagnostic(
+		if let Some(regex) = versioned_file.regex.as_deref() {
+			validate_regex_versioned_file(
 				config_contents,
-				format!(
-					"{owner_kind} `{owner_id}` regex versioned_files cannot also set `type`"
-				),
-				vec![config_section_label(
-					config_contents,
-					owner_kind,
-					owner_id,
-					"regex versioned_files cannot set `type`",
-				)],
-				Some("remove `type` when using `regex`; regex versioned_files operate on plain text files without ecosystem-specific parsing".to_string()),
-			));
-		}
-
-		if let Some(regex) = &versioned_file.regex {
-			if versioned_file.prefix.is_some()
-				|| versioned_file.fields.is_some()
-				|| versioned_file.name.is_some()
-			{
-				return Err(config_diagnostic(
-					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files cannot also set `prefix`, `fields`, or `name`"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"regex versioned_files cannot mix text and dependency settings",
-					)],
-					Some("remove `prefix`, `fields`, and `name` when using `regex`; those options only apply to ecosystem-aware manifest updates".to_string()),
-				));
-			}
-
-			let compiled = Regex::new(regex).map_err(|error| {
-				config_diagnostic(
-					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` is invalid"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"invalid regex versioned_files pattern",
-					)],
-					Some(error.to_string()),
-				)
-			})?;
-			if !compiled.capture_names().any(|name| name == Some("version")) {
-				return Err(config_diagnostic(
-					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` must include a named `version` capture"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"regex versioned_files must capture the version",
-					)],
-					Some("use a named capture like `(?<version>\\d+\\.\\d+\\.\\d+)` so monochange knows which substring to replace".to_string()),
-				));
-			}
+				versioned_file,
+				owner_kind,
+				owner_id,
+				regex,
+			)?;
 			continue;
 		}
 
@@ -3099,6 +3082,82 @@ fn validate_changesets_configuration(
 }
 
 #[allow(clippy::match_same_arms)]
+fn validate_regex_versioned_file(
+	config_contents: &str,
+	versioned_file: &VersionedFileDefinition,
+	owner_kind: &str,
+	owner_id: &str,
+	regex: &str,
+) -> MonochangeResult<()> {
+	if versioned_file.ecosystem_type.is_some() {
+		return Err(config_diagnostic(
+			config_contents,
+			format!("{owner_kind} `{owner_id}` regex versioned_files cannot also set `type`"),
+			vec![config_section_label(
+				config_contents,
+				owner_kind,
+				owner_id,
+				"regex versioned_files cannot set `type`",
+			)],
+			Some("remove `type` when using `regex`; regex versioned_files operate on plain text files without ecosystem-specific parsing".to_string()),
+		));
+	}
+
+	if versioned_file.prefix.is_some()
+		|| versioned_file.fields.is_some()
+		|| versioned_file.name.is_some()
+	{
+		return Err(config_diagnostic(
+			config_contents,
+			format!(
+				"{owner_kind} `{owner_id}` regex versioned_files cannot also set `prefix`, `fields`, or `name`"
+			),
+			vec![config_section_label(
+				config_contents,
+				owner_kind,
+				owner_id,
+				"regex versioned_files cannot mix text and dependency settings",
+			)],
+			Some("remove `prefix`, `fields`, and `name` when using `regex`; those options only apply to ecosystem-aware manifest updates".to_string()),
+		));
+	}
+
+	let compiled = Regex::new(regex).map_err(|error| {
+		config_diagnostic(
+			config_contents,
+			format!("{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` is invalid"),
+			vec![config_section_label(
+				config_contents,
+				owner_kind,
+				owner_id,
+				"invalid regex versioned_files pattern",
+			)],
+			Some(error.to_string()),
+		)
+	})?;
+
+	if compiled.capture_names().any(|name| name == Some("version")) {
+		return Ok(());
+	}
+
+	Err(config_diagnostic(
+		config_contents,
+		format!(
+			"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` must include a named `version` capture"
+		),
+		vec![config_section_label(
+			config_contents,
+			owner_kind,
+			owner_id,
+			"regex versioned_files must capture the version",
+		)],
+		Some(
+			"use a named capture like `(?<version>\\d+\\.\\d+\\.\\d+)` so monochange knows which substring to replace"
+				.to_string(),
+		),
+	))
+}
+
 fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 	let mut seen_names = BTreeSet::new();
 
@@ -3197,34 +3256,13 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 					id,
 					..
 				} => {
-					if let Some(step_id) = id {
-						let trimmed = step_id.trim();
-						if trimmed.is_empty() {
-							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` has a command step with an empty id",
-								cli_command.name
-							)));
-						}
-
-						if !seen_step_ids.insert(trimmed.to_string()) {
-							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` has duplicate step id `{trimmed}`",
-								cli_command.name
-							)));
-						}
-					}
-					if command.trim().is_empty() {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` command steps must provide a non-empty command",
-							cli_command.name
-						)));
-					}
-					if matches!(dry_run_command, Some(value) if value.trim().is_empty()) {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` command steps with `dry_run_command` must provide a non-empty command",
-							cli_command.name
-						)));
-					}
+					validate_command_step_definition(
+						cli_command,
+						command,
+						dry_run_command.as_deref(),
+						id.as_deref(),
+						&mut seen_step_ids,
+					)?;
 				}
 				CliStepDefinition::Validate { .. }
 				| CliStepDefinition::Discover { .. }
