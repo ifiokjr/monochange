@@ -56,6 +56,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 - [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
 - [skills/linting.md](skills/linting.md) — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
+- [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) — patterns for publishing multiple public packages from one repository
 - [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) — full lifecycle guidance
 - [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) — package-type-specific release-note guidance
 
@@ -159,6 +160,7 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
 - Prefer the official GitHub publishing workflows for manual registries when they exist: `rust-lang/crates-io-auth-action@v1` for `crates.io` and `dart-lang/setup-dart/.github/workflows/publish.yml@v1` for `pub.dev`.
 - See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
+- See [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) when one repository publishes multiple packages and you need to choose between shared `mc publish` flows, package-specific jobs, or external workflows.
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
 
 ### Release titles
@@ -247,3 +249,5 @@ Start with [REFERENCE.md](REFERENCE.md) for the broad reference.
 Open [skills/README.md](skills/README.md) when you need the focused deep dives for changesets, commands, configuration, or linting.
 
 See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for GitHub/OIDC trusted-publishing setup details across the registries that monochange supports.
+
+See [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) for monorepo publishing patterns when one repository ships multiple public packages.

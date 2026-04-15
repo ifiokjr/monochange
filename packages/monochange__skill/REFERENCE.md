@@ -472,6 +472,7 @@ Placeholder README content can come from:
 - npm trusted publishing can be configured automatically from GitHub Actions context; monochange verifies the current state first, then runs `npm trust github <package> --repo <owner/repo> --file <workflow> [--env <environment>] --yes` or the `pnpm exec npm trust ...` equivalent for pnpm workspaces
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks the next built-in release publish until trust is configured
 - See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for a GitHub-focused setup guide covering the exact registry fields and commands for `npm`, `crates.io`, `jsr`, and `pub.dev`
+- See [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) when one repository publishes multiple public packages and you need to choose between shared built-in flows and package-specific external workflows
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues; use `mode = "external"` when your workflow needs custom scheduling
 
 ### Lint rules
