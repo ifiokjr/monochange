@@ -519,16 +519,7 @@ pub(crate) fn execute_cli_command_with_options(
 		let show_progress = step_shows_progress(step, &step_inputs);
 
 		if !should_execute_cli_step(step, &context, &step_inputs)? {
-			if show_progress {
-				progress.step_skipped(step_index, step, step.when());
-			}
-			if let Some(condition) = step.when() {
-				tracing::debug!(step = step.kind_name(), condition = %condition, "skipped CLI step");
-				context.command_logs.push(format!(
-					"skipped step `{}` because when condition `{condition}` is false",
-					step.display_name()
-				));
-			}
+			record_skipped_cli_step(&mut context, step, step_index, &mut progress, show_progress);
 			continue;
 		}
 
@@ -1051,23 +1042,8 @@ fn run_cli_command_command(
 	show_progress: bool,
 	options: CommandStepOptions<'_>,
 ) -> MonochangeResult<()> {
-	let command_to_run = if context.dry_run {
-		if let Some(command) = options.dry_run_command {
-			command
-		} else {
-			let skipped = interpolate_cli_command_command(
-				context,
-				options.command,
-				options.variables,
-				options.step_inputs,
-			);
-			context
-				.command_logs
-				.push(format!("skipped command `{skipped}` (dry-run)"));
-			return Ok(());
-		}
-	} else {
-		options.command
+	let Some(command_to_run) = resolve_command_step_command(context, &options) else {
+		return Ok(());
 	};
 	let interpolated = interpolate_cli_command_command(
 		context,
@@ -1075,12 +1051,81 @@ fn run_cli_command_command(
 		options.variables,
 		options.step_inputs,
 	);
-	let mut process_command = if let Some(shell_binary) = options.shell.shell_binary() {
+	let mut process_command = build_process_command(&context.root, options.shell, &interpolated)?;
+	let output = execute_process_command(
+		&mut process_command,
+		progress,
+		show_progress,
+		step_index,
+		step,
+		&interpolated,
+	)?;
+
+	ensure_command_succeeded(&output, &interpolated)?;
+	store_command_step_output(context, options.step_id, &output);
+	log_command_step_output(context, &interpolated, &output);
+
+	Ok(())
+}
+
+fn record_skipped_cli_step(
+	context: &mut CliContext,
+	step: &CliStepDefinition,
+	step_index: usize,
+	progress: &mut CliProgressReporter,
+	show_progress: bool,
+) {
+	if show_progress {
+		progress.step_skipped(step_index, step, step.when());
+	}
+
+	let Some(condition) = step.when() else {
+		return;
+	};
+
+	tracing::debug!(step = step.kind_name(), condition = %condition, "skipped CLI step");
+	context.command_logs.push(format!(
+		"skipped step `{}` because when condition `{condition}` is false",
+		step.display_name()
+	));
+}
+
+fn resolve_command_step_command<'a>(
+	context: &mut CliContext,
+	options: &CommandStepOptions<'a>,
+) -> Option<&'a str> {
+	if !context.dry_run {
+		return Some(options.command);
+	}
+
+	if let Some(command) = options.dry_run_command {
+		return Some(command);
+	}
+
+	let skipped = interpolate_cli_command_command(
+		context,
+		options.command,
+		options.variables,
+		options.step_inputs,
+	);
+	context
+		.command_logs
+		.push(format!("skipped command `{skipped}` (dry-run)"));
+
+	None
+}
+
+fn build_process_command(
+	root: &Path,
+	shell: &ShellConfig,
+	interpolated: &str,
+) -> MonochangeResult<ProcessCommand> {
+	let mut process_command = if let Some(shell_binary) = shell.shell_binary() {
 		let mut process_command = ProcessCommand::new(shell_binary);
-		process_command.arg("-c").arg(&interpolated);
+		process_command.arg("-c").arg(interpolated);
 		process_command
 	} else {
-		let parts = shlex::split(&interpolated).ok_or_else(|| {
+		let parts = shlex::split(interpolated).ok_or_else(|| {
 			MonochangeError::Config(format!("failed to parse command `{interpolated}`"))
 		})?;
 		let Some((program, args)) = parts.split_first() else {
@@ -1092,59 +1137,90 @@ fn run_cli_command_command(
 		process_command.args(args);
 		process_command
 	};
-	process_command.current_dir(&context.root);
+	process_command.current_dir(root);
 
-	let output = if progress.is_enabled() && show_progress {
-		let streamed_output = run_process_with_streaming(
-			&mut process_command,
+	Ok(process_command)
+}
+
+fn execute_process_command(
+	process_command: &mut ProcessCommand,
+	progress: &mut CliProgressReporter,
+	show_progress: bool,
+	step_index: usize,
+	step: &CliStepDefinition,
+	interpolated: &str,
+) -> MonochangeResult<PreparedProcessOutput> {
+	if progress.is_enabled() && show_progress {
+		return run_process_with_streaming(
+			process_command,
 			progress,
 			step_index,
 			step,
-			&interpolated,
+			interpolated,
 		);
-		streamed_output?
-	} else {
-		let output = process_command.output().map_err(|error| {
-			MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
-		})?;
-		PreparedProcessOutput {
-			status: output.status,
-			stdout: output.stdout,
-			stderr: output.stderr,
-		}
-	};
-	if !output.status.success() {
-		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-		let details = if stderr.is_empty() {
-			format!("exit status {}", output.status)
-		} else {
-			stderr
-		};
-		let rendered_command = render_command_for_error(&interpolated);
-		return Err(MonochangeError::Discovery(format!(
-			"command `{rendered_command}` failed: {details}"
-		)));
 	}
+
+	let output = process_command.output().map_err(|error| {
+		MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
+	})?;
+
+	Ok(PreparedProcessOutput {
+		status: output.status,
+		stdout: output.stdout,
+		stderr: output.stderr,
+	})
+}
+
+fn ensure_command_succeeded(
+	output: &PreparedProcessOutput,
+	interpolated: &str,
+) -> MonochangeResult<()> {
+	if output.status.success() {
+		return Ok(());
+	}
+
+	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	let details = if stderr.is_empty() {
+		format!("exit status {}", output.status)
+	} else {
+		stderr
+	};
+	let rendered_command = render_command_for_error(interpolated);
+
+	Err(MonochangeError::Discovery(format!(
+		"command `{rendered_command}` failed: {details}"
+	)))
+}
+
+fn store_command_step_output(
+	context: &mut CliContext,
+	step_id: Option<&str>,
+	output: &PreparedProcessOutput,
+) {
+	let Some(id) = step_id else {
+		return;
+	};
 
 	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-	let stderr_text = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	context
+		.step_outputs
+		.insert(id.to_string(), CommandStepOutput { stdout, stderr });
+}
 
-	if let Some(id) = options.step_id {
-		context.step_outputs.insert(
-			id.to_string(),
-			CommandStepOutput {
-				stdout: stdout.clone(),
-				stderr: stderr_text,
-			},
-		);
-	}
+fn log_command_step_output(
+	context: &mut CliContext,
+	interpolated: &str,
+	output: &PreparedProcessOutput,
+) {
+	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
 	if stdout.is_empty() {
 		context.command_logs.push(format!("ran `{interpolated}`"));
-	} else {
-		context.command_logs.push(stdout);
+		return;
 	}
-	Ok(())
+
+	context.command_logs.push(stdout);
 }
 
 struct PreparedProcessOutput {
