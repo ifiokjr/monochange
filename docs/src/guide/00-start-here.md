@@ -142,4 +142,4 @@ If you need a silent safety check, run `mc release --quiet`. Quiet mode suppress
 - [Release planning](./06-release-planning.md) — compare preview modes, grouped releases, and planning rules
 - [Advanced: GitHub automation](./08-github-automation.md) — provider publishing, release PRs, and automation
 - [Advanced: Assistant setup and MCP](./09-assistant-setup.md) — optional AI-assisted workflows
-- [Reference: Linting policy](../reference/linting.md) — current rust/clippy rules and why they exist
+- [Reference: Manifest linting with `mc check`](../reference/linting.md) — `[ecosystems.<name>.lints]` rules for Cargo and npm-family manifests

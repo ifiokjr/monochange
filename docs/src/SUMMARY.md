@@ -20,7 +20,7 @@
 
 # Reference
 
-- [Linting policy](reference/linting.md)
+- [Manifest linting with `mc check`](reference/linting.md)
 - [Progress output](reference/progress-output.md)
 - [Hosted release benchmarks](reference/hosted-release-benchmarks.md)
 - [CLI step reference](reference/cli-steps/00-index.md)

@@ -49,7 +49,7 @@ Use the bundled docs like this:
 - [skills/changesets.md](./skills/changesets.md) — creating and managing changesets
 - [skills/commands.md](./skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](./skills/configuration.md) — creating and evolving `monochange.toml`
-- [skills/linting.md](./skills/linting.md) — current lint policy, rationale, and examples
+- [skills/linting.md](./skills/linting.md) — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
 - [CHANGESET-GUIDE.md](./CHANGESET-GUIDE.md) — full lifecycle guidance
 - [ARTIFACT-TYPES.md](./ARTIFACT-TYPES.md) — artifact-aware changeset framing
 
@@ -475,7 +475,7 @@ Placeholder README content can come from:
 
 ### Lint rules
 
-Configure ecosystem-specific lint rules to enforce consistency across package manifests:
+Configure ecosystem-specific manifest lint rules and run them through `mc check`:
 
 ```toml
 [ecosystems.cargo.lints]
@@ -498,6 +498,8 @@ Rule configuration:
 
 - Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
 - Detailed config: `{ level = "error", fix = true, ...options }`
+
+Today the built-in rule sets focus on Cargo and npm-family manifests.
 
 Available Cargo lint rules:
 
@@ -546,14 +548,14 @@ comment_on_failure = true
 
 ## Linting and validation reference
 
-The repository currently enforces workspace rust lints, workspace clippy groups, explicit clippy overrides, and crate-level `#![forbid(clippy::indexing_slicing)]` declarations in the Rust crates.
+monochange's linting docs in this skill package are about **manifest lint rules configured in `monochange.toml` and run via `mc check`**.
 
-Use this workflow after documentation, config, or code edits:
+Use this workflow when editing package manifests or lint configuration:
 
 ```bash
-devenv shell fix:all
-devenv shell lint:all
 mc validate
+mc check
+mc check --fix
 ```
 
 If you edited shared docs in `.templates/`, also run:
@@ -562,7 +564,7 @@ If you edited shared docs in `.templates/`, also run:
 devenv shell docs:check
 ```
 
-For the full rule-by-rule explanation — including why each lint exists, when to rely on it, and examples of what changes with and without it — see [skills/linting.md](./skills/linting.md).
+For the full rule-by-rule explanation — including the available `[ecosystems.<name>.lints]` rules, why you would enable them, and examples of what changes with and without them — see [skills/linting.md](./skills/linting.md).
 
 ## Important modeling rules
 

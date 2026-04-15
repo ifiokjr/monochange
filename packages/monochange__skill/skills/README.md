@@ -5,7 +5,7 @@ Use these focused guides when the top-level [SKILL.md](../SKILL.md) is not enoug
 - [changesets.md](./changesets.md) — creating, updating, replacing, and removing `.changeset/*.md` files
 - [commands.md](./commands.md) — the built-in `mc` commands, when to run them, and how they fit together
 - [configuration.md](./configuration.md) — creating and evolving `monochange.toml`
-- [linting.md](./linting.md) — current workspace lint policy, why each lint exists, and examples of what changes with or without it
+- [linting.md](./linting.md) — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
 
 Keep [REFERENCE.md](../REFERENCE.md) open when you want a single high-context document with broader examples and copy-paste snippets.
 

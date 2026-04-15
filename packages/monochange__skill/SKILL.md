@@ -13,7 +13,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 4. Use `mc discover --format json` to inspect the workspace model.
 5. Use `mc change` to write explicit release intent as `.changeset/*.md` files.
 6. Use `mc diagnostics --format json` to inspect changeset context and git provenance.
-7. Use `mc lint` to check package manifests for consistency and best practices.
+7. Use `mc check` to validate the workspace and run configured manifest lint rules.
 8. Use `mc release --dry-run --format json` or `mc release --dry-run --diff` before mutating release state.
 
 ## Working rules
@@ -28,7 +28,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 - Combine near-duplicate changesets when the outward change is the same across multiple related packages. Do not emit cloned compatibility notes that differ only by package name.
 - Breaking changes must always get their own dedicated changeset with a migration path instead of being bundled into a broader feature note.
 - Run dry-run flows before real release commands.
-- Run `mc lint` before releases to catch manifest inconsistencies early.
+- Run `mc check` before releases to catch manifest inconsistencies early.
 - Keep docs, templates, and changelog behavior aligned with config changes.
 - Use `mc diagnostics --format json` to audit changesets before release — it shows git provenance, linked PRs, related issues, and introduced/last-updated commits.
 
@@ -55,7 +55,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 - [skills/changesets.md](skills/changesets.md) — creating and managing changesets
 - [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
-- [skills/linting.md](skills/linting.md) — current lint rules, rationale, and examples
+- [skills/linting.md](skills/linting.md) — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
 - [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) — full lifecycle guidance
 - [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) — package-type-specific release-note guidance
 
@@ -212,7 +212,7 @@ See [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) for per-type rules, templates, exampl
 
 ### Lint configuration
 
-Configure ecosystem-specific lint rules in `monochange.toml`:
+Configure ecosystem-specific manifest lint rules in `monochange.toml` and run them with `mc check`:
 
 ```toml
 [ecosystems.cargo.lints]
@@ -236,7 +236,7 @@ Each rule can be configured as:
 - Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
 - Detailed config: `{ level = "error", ...rule_specific_options }`
 
-Use `mc check --fix` to auto-fix issues where possible.
+Use `mc check --fix` to auto-fix issues where possible. Today the built-in rule sets focus on Cargo and npm-family manifests.
 
 ## Guidance
 

@@ -110,7 +110,7 @@ If you do not know which package id to target, rerun `mc discover --format json`
 - [Groups and shared release identity](docs/src/guide/05-version-groups.md) — when to reach for group ids instead of package ids
 - [Release planning](docs/src/guide/06-release-planning.md) — changesets, dry runs, diff previews, and planning rules
 - [Advanced: CI, package publishing, and release PR flows](docs/src/guide/13-ci-and-publishing.md) — per-provider CI patterns, trusted publishing, and long-running release PR design notes
-- [Reference: Linting policy](docs/src/reference/linting.md) — the current rust/clippy rules and their rationale
+- [Reference: Manifest linting with `mc check`](docs/src/reference/linting.md) — `[ecosystems.<name>.lints]` rules for Cargo and npm-family manifests
 
 ## Command and automation matrix
 
@@ -208,7 +208,7 @@ After copying the bundled skill, you get a small documentation set that is desig
 - `skills/changesets.md` — changeset authoring and lifecycle guidance
 - `skills/commands.md` — built-in command catalog and workflow selection
 - `skills/configuration.md` — `monochange.toml` setup and editing guidance
-- `skills/linting.md` — the current lint policy, rationale, and examples
+- `skills/linting.md` — `[ecosystems.<name>.lints]` rules, `mc check`, and manifest-focused examples
 
 This layout keeps the top-level skill small while still making the richer guidance available when an assistant needs more context.
 

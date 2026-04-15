@@ -9,7 +9,7 @@ This package bundles:
 - `skills/changesets.md` — changeset authoring and lifecycle guidance
 - `skills/commands.md` — built-in command catalog and usage patterns
 - `skills/configuration.md` — `monochange.toml` setup and editing guidance
-- `skills/linting.md` — current lint policy, rationale, and examples
+- `skills/linting.md` — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
 - `REFERENCE.md` — high-context reference with broader examples
 - `monochange-skill` — helper executable for printing or copying the bundled skill
 
