@@ -1,18 +1,16 @@
 # Changeset generation
 
-Agent rules for creating granular, well-composed changesets that accurately describe user-facing changes across libraries, applications, and CLI tools.
+Agent rules for creating granular, well-composed changesets that accurately describe user-facing changes across libraries, applications, CLI tools, and LSP/MCP servers.
 
 ## Philosophy
 
+<!-- {=changesetPhilosophy} -->
+
 **A changeset is a user-facing record of change, not a code diff summary.**
 
-Different artifact types have different "user-facing" boundaries:
+Different artifact types have different user-facing boundaries:
 
-| Artifact Type   | User-Facing Changes                        | Internal Changes                               |
-| --------------- | ------------------------------------------ | ---------------------------------------------- |
-| **Library**     | Public API signatures, types, traits       | Private functions, internal refactoring        |
-| **Application** | UI behavior, user workflows, navigation    | Internal state management, component structure |
-| **CLI tool**    | Commands, flags, output format, exit codes | Internal command dispatch, error handling      |
+<!-- {/changesetPhilosophy} -->
 
 The agent must adapt its analysis based on what type of package it is examining.
 
@@ -78,25 +76,37 @@ Introduces unified diff output for dry-run releases.
 
 ### Changeset lifecycle management
 
-As features are added and removed, changesets must be actively managed throughout the development lifecycle. The agent must:
+<!-- {=changesetLifecycleRules} -->
 
-1. **Analyze existing changesets** before creating new ones
+As features are added and removed, changesets must be actively managed throughout the development lifecycle:
+
+1. **Analyze existing changesets** before creating new ones — read every `.changeset/*.md` file and understand what each covers
 2. **Determine the appropriate action** for each change:
    - **Create new** — For genuinely new changes (preferred)
-   - **Update existing** — When the changeset describes the same feature
-   - **Remove obsolete** — When the change is no longer relevant
+   - **Update existing** — When expanding the scope of a change already described
+   - **Remove obsolete** — When the feature was reverted or the change no longer exists
+   - **Replace** — When the same intent is now implemented differently
+
+**Golden rule:** Err on the side of creating a new changeset. It's easier to consolidate later than to split apart.
+
+<!-- {/changesetLifecycleRules} -->
 
 #### Decision matrix
 
-| Scenario                        | Action                   | Rationale                                |
-| ------------------------------- | ------------------------ | ---------------------------------------- |
-| New feature added               | **Create new**           | Granular tracking of distinct changes    |
-| Existing feature expanded       | **Update existing**      | Keep related changes together            |
-| Feature removed/reverted        | **Remove changeset**     | Don't release notes for removed features |
-| Same change, different approach | **Replace changeset**    | Document the actual implementation       |
-| Multiple small related changes  | **Create new** (grouped) | Summarize when exceeding threshold       |
+<!-- {=changesetLifecycleDecisionMatrix} -->
 
-**Golden rule:** Err on the side of creating a new changeset. It's easier to consolidate later than to split apart.
+| Scenario                          | Action                   | Rationale                                       |
+| --------------------------------- | ------------------------ | ----------------------------------------------- |
+| New feature added                 | **Create new**           | Granular tracking of distinct changes           |
+| Existing feature expanded         | **Update existing**      | Keep related changes together                   |
+| Feature removed or reverted       | **Remove changeset**     | Don't release notes for removed features        |
+| Same change, different approach   | **Replace changeset**    | Document the actual implementation              |
+| Multiple small related changes    | **Create new** (grouped) | Summarize when exceeding threshold              |
+| Bug found in unreleased feature   | **Update existing**      | Combine fix with feature, not a separate entry  |
+| Refactor of unreleased change     | **Update existing**      | Rewrite description to reflect new structure    |
+| Changeset references removed code | **Remove changeset**     | Stale changesets create confusing release notes |
+
+<!-- {/changesetLifecycleDecisionMatrix} -->
 
 #### Example workflow
 
@@ -235,21 +245,24 @@ Focus on **command-line interface**:
 
 ### Adaptive granularity
 
-Use context-aware thresholds to decide when to group vs. split:
+<!-- {=changesetGranularityRules} -->
 
-| Change Category            | Library Threshold | App Threshold     | CLI Threshold     |
-| -------------------------- | ----------------- | ----------------- | ----------------- |
-| **New public functions**   | 3+ → summarize    | N/A               | N/A               |
-| **New internal functions** | 5+ → summarize    | 3+ → summarize    | 3+ → summarize    |
-| **Modified functions**     | 4+ → summarize    | 3+ → summarize    | 3+ → summarize    |
-| **Breaking changes**       | 1+ → **separate** | 1+ → **separate** | 1+ → **separate** |
-| **New types/structs**      | 2+ → summarize    | 2+ → summarize    | 2+ → summarize    |
-| **UI components**          | N/A               | 3+ → summarize    | N/A               |
-| **CLI commands**           | N/A               | N/A               | 2+ → summarize    |
-| **New routes/pages**       | N/A               | 2+ → summarize    | N/A               |
-| **Documentation-only**     | 10+ → summarize   | 10+ → summarize   | 10+ → summarize   |
+When deciding how many changesets to create for a single PR or branch:
 
-**Summarize** = Create a single changeset with a grouped description **Separate** = Create individual changesets (or mark as breaking)
+| Change type                    | Library         | Application                 | CLI / LSP / MCP |
+| ------------------------------ | --------------- | --------------------------- | --------------- |
+| Single new feature             | Separate        | Separate                    | Separate        |
+| Multiple related API additions | 3+ → group      | 2+ → group                  | 2+ → group      |
+| Internal refactoring only      | Patch           | Patch                       | Patch           |
+| Breaking + non-breaking mixed  | Separate        | Separate                    | Separate        |
+| New routes/pages               | N/A             | 2+ → summarize              | N/A             |
+| New commands/tools             | N/A             | N/A                         | 2+ → summarize  |
+| **Documentation-only**         | 10+ → summarize | 10+ → summarize             | 10+ → summarize |
+| **UX / visual changes**        | N/A             | Separate (with screenshots) | N/A             |
+
+**Summarize** = Create a single changeset with a grouped description. **Separate** = Create individual changesets (or mark as breaking).
+
+<!-- {/changesetGranularityRules} -->
 
 ### Before and after examples
 

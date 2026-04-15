@@ -66,7 +66,7 @@ core: minor
 Introduce automated release preparation with changelog rendering and version bumps.
 ```
 
-Frontmatter keys are package or group ids. Values are bump severities (`none`, `patch`, `minor`, `major`) or configured change types. Object syntax supports `bump`, `version`, and `type`:
+Frontmatter keys are package or group ids. Values are bump severities (`none`, `patch`, `minor`, `major`) or configured change types. Object syntax supports `bump`, `version`, `type`, and `caused_by`:
 
 ```markdown
 ---
@@ -80,6 +80,39 @@ core:
 
 Redesign the public API surface.
 ```
+
+### Dependency propagation with `caused_by`
+
+When a dependency changes, monochange automatically patches all dependents with no context. The `caused_by` field provides that context and suppresses the automatic propagation:
+
+```markdown
+---
+monochange_config:
+  bump: patch
+  caused_by: ["monochange_core"]
+---
+
+#### update dependency on monochange_core
+
+Bumps `monochange_core` dependency to v2.1.0 after the public API change to `ChangelogFormat`.
+```
+
+For packages flagged by `mc affected` that have no meaningful change, use `bump: none` with `caused_by`:
+
+```markdown
+---
+monochange_config:
+  bump: none
+  caused_by: ["monochange_core"]
+  type: deps
+---
+
+#### update monochange_core dependency
+
+No user-facing changes. Dependency version updated to match the group release.
+```
+
+CLI flag: `mc change --package <id> --bump patch --caused-by monochange_core --reason "update dependency"`
 
 ## CLI step types and composition
 

@@ -19,6 +19,8 @@ description: Guides agents through monochange discovery, changesets, release pla
 - Treat `monochange.toml` as the source of truth for packages, groups, source providers, ecosystems, and `[cli.<command>]` entries.
 - Prefer configured package or group ids over guessing manifest names.
 - Use `.changeset/*.md` files for explicit release intent — each targets one or more package/group ids with a bump severity, optional `type`, optional explicit `version`, and a human-readable summary.
+- Use `caused_by` in changeset frontmatter when a dependent package is updating because of a dependency change — this provides context and replaces the automatic "dependency changed → patch" propagation.
+- When `mc affected` flags a package that has no meaningful change, create a changeset with `bump: none` and `caused_by` listing the root cause package(s).
 - Run dry-run flows before real release commands.
 - Keep docs, templates, and changelog behavior aligned with config changes.
 - Use `mc diagnostics --format json` to audit changesets before release — it shows git provenance, linked PRs, related issues, and introduced/last-updated commits.
@@ -141,6 +143,25 @@ Groups synchronize versions across packages. Group changelogs can filter include
 - `include = "all"` — all member changesets (default)
 - `include = "group-only"` — only direct group-targeted changesets
 - `include = ["package-id"]` — specific member changesets plus group-targeted ones
+
+## Changeset lifecycle
+
+**Changesets must be actively managed, not just created.** Before writing a new changeset:
+
+1. Read all existing `.changeset/*.md` files to understand current coverage
+2. Determine the right action: **create new**, **update existing**, or **remove stale**
+3. Choose bump level and section type based on artifact type (library, application, CLI, LSP/MCP)
+4. Validate with `mc validate` or `mc diagnostics --format json`
+
+See [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) for the full lifecycle management guide.
+
+## Artifact types
+
+Different package types have different user-facing boundaries. Libraries expose APIs, applications expose UI, CLI tools expose commands, and LSP/MCP servers expose protocols. Changeset content, bump levels, and section types should adapt accordingly.
+
+Applications and websites should use the `ux` changelog section type for visual and interaction changes, with screenshots when configured.
+
+See [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) for per-type rules, templates, examples, and configuration.
 
 ## Guidance
 
