@@ -1717,7 +1717,8 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
-			Self::Validate { .. } | Self::CommitRelease { .. } => Some(&["fix"]),
+			Self::Validate { .. } => Some(&["fix"]),
+			Self::CommitRelease { .. } => Some(&[]),
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }

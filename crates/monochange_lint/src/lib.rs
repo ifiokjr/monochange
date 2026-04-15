@@ -234,10 +234,6 @@ pub struct EcosystemLintConfig {
 
 #[cfg(test)]
 mod tests {
-	use std::io::Write;
-
-	use tempfile::TempDir;
-
 	use super::*;
 
 	#[test]
@@ -248,7 +244,7 @@ mod tests {
 
 	#[test]
 	fn test_lint_file_cargo_toml() {
-		let dir = TempDir::new().unwrap();
+		let dir = tempfile::TempDir::new().unwrap();
 		let cargo_toml = dir.path().join("Cargo.toml");
 
 		let content = r#"
@@ -266,7 +262,6 @@ tokio = { version = "1.0", features = ["full"] }
 		let linter = Linter::new();
 		let report = linter.lint_file(&cargo_toml, dir.path());
 
-		// Should have results for dependency ordering
 		assert!(!report.results.is_empty());
 	}
 

@@ -182,8 +182,6 @@ fn format_check_report(report: &LintReport, fixed: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-	use tempfile::TempDir;
-
 	use super::*;
 
 	#[test]

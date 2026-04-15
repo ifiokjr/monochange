@@ -7,6 +7,7 @@
 //! 4. The autofix produces expected results
 
 use std::collections::BTreeMap;
+use std::fmt::Write;
 
 use insta::assert_snapshot;
 use monochange_core::lint::LintRuleConfig;
@@ -18,23 +19,24 @@ use crate::Linter;
 /// Helper to format a lint report for snapshot testing
 fn format_report(report: &monochange_core::lint::LintReport) -> String {
 	let mut output = String::new();
-	output.push_str(&format!(
+	let _ = write!(
+		output,
 		"Errors: {}, Warnings: {}\n\n",
 		report.error_count, report.warning_count
-	));
+	);
 
 	for result in &report.results {
-		let fix_info = if result.fix.is_some() {
-			let fix = result.fix.as_ref().unwrap();
+		let fix_info = if let Some(fix) = result.fix.as_ref() {
 			format!(" [FIXABLE: {}]", fix.description)
 		} else {
 			String::new()
 		};
 
-		output.push_str(&format!(
-			"[{}] {}: {}{}\n",
+		let _ = writeln!(
+			output,
+			"[{}] {}: {}{}",
 			result.severity, result.rule_id, result.message, fix_info
-		));
+		);
 	}
 
 	output
@@ -580,6 +582,11 @@ version = "1.0.0"
 
 		// Should only report missing description, not license/repository
 		assert_eq!(report.results.len(), 1);
-		assert!(report.results[0].message.contains("description"));
+		assert!(
+			report
+				.results
+				.first()
+				.is_some_and(|r| r.message.contains("description"))
+		);
 	}
 }

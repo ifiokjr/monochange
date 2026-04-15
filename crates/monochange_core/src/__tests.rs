@@ -1199,13 +1199,13 @@ fn valid_input_names_returns_none_for_command_steps() {
 }
 
 #[test]
-fn valid_input_names_returns_empty_for_validate() {
+fn valid_input_names_returns_fix_for_validate() {
 	let step = CliStepDefinition::Validate {
 		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(step.valid_input_names(), Some([].as_slice()));
+	assert_eq!(step.valid_input_names(), Some(["fix"].as_slice()));
 }
 
 #[test]
