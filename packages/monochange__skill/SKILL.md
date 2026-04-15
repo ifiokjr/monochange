@@ -52,7 +52,7 @@ description: Guides agents through monochange discovery, changesets, release pla
 | `mc init`                | Generate a starter `monochange.toml` from detected packages            |
 | `mc populate`            | Append missing built-in CLI command definitions to config              |
 | `mc validate`            | Validate config and changeset targets                                  |
-| `mc check`                | Validate config and run lint rules against package manifests           |
+| `mc check`               | Validate config and run lint rules against package manifests           |
 | `mc discover`            | Discover packages across ecosystems                                    |
 | `mc change`              | Create a `.changeset/*.md` file                                        |
 | `mc release`             | Prepare a release plan from changesets and refresh the cached manifest |
@@ -217,6 +217,7 @@ Configure ecosystem-specific lint rules in `monochange.toml`:
 ```
 
 Each rule can be configured as:
+
 - Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
 - Detailed config: `{ level = "error", ...rule_specific_options }`
 

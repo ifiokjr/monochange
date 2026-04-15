@@ -405,10 +405,12 @@ Configure ecosystem-specific lint rules to enforce consistency across package ma
 ```
 
 Rule configuration:
+
 - Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
 - Detailed config: `{ level = "error", fix = true, ...options }`
 
 Available Cargo lint rules:
+
 - `cargo/dependency-field-order` — Enforces consistent field ordering in dependency specifications
 - `cargo/internal-dependency-workspace` — Requires `workspace = true` for internal dependencies
 - `cargo/required-package-fields` — Enforces required `[package]` fields
@@ -416,6 +418,7 @@ Available Cargo lint rules:
 - `cargo/unlisted-package-private` — Packages not in monochange.toml must be private
 
 Available NPM lint rules:
+
 - `npm/workspace-protocol` — Requires `workspace:` protocol for internal dependencies
 - `npm/sorted-dependencies` — Requires alphabetically sorted dependencies
 - `npm/required-package-fields` — Enforces required fields in package.json

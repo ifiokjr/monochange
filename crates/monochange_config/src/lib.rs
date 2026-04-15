@@ -394,6 +394,7 @@ struct RawTrustedPublishingDetails {
 	workflow: Option<String>,
 	#[serde(default)]
 	environment: Option<String>,
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
