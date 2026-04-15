@@ -1732,6 +1732,7 @@ fn render_package_publish_report(report: &package_publish::PackagePublishReport)
 		}
 		if let Some(setup_url) = &package.trusted_publishing.setup_url {
 			lines.push(format!("  setup: {setup_url}"));
+			lines.push("  next: open the setup URL, configure trusted publishing for this package, then rerun `mc publish`".to_string());
 		}
 	}
 
@@ -1805,6 +1806,10 @@ fn render_package_publish_report_markdown(
 				"- **Setup:** {}",
 				paint_markdown_inline(&format!("`{setup_url}`"), MarkdownStyle::Code, color,)
 			));
+			lines.push(
+				"- **Next:** open the setup URL, configure trusted publishing for this package, then rerun `mc publish`"
+					.to_string(),
+			);
 		}
 	}
 
@@ -3100,6 +3105,7 @@ path = "crates/core"
 		assert!(text.contains("trusted publishing: manual-action-required"));
 		assert!(text.contains("trust message: configure trusted publishing manually for `pkg`"));
 		assert!(text.contains("setup: https://crates.io/crates/pkg"));
+		assert!(text.contains("next: open the setup URL, configure trusted publishing for this package, then rerun `mc publish`"));
 
 		let markdown = render_package_publish_report_markdown(&report, false).join("\n");
 		assert!(markdown.contains("**Trusted publishing:** manual-action-required"));
@@ -3107,6 +3113,7 @@ path = "crates/core"
 			markdown.contains("**Trust message:** configure trusted publishing manually for `pkg`")
 		);
 		assert!(markdown.contains("**Setup:** `https://crates.io/crates/pkg`"));
+		assert!(markdown.contains("**Next:** open the setup URL, configure trusted publishing for this package, then rerun `mc publish`"));
 	}
 
 	#[test]
