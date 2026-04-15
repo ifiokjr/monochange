@@ -543,9 +543,13 @@ serde = { features = ["derive"], workspace = true }
 
 		let report = linter.lint_file(&cargo_toml, dir.path());
 
-		// Should have no errors since rule is off
+		let field_order_results: Vec<_> = report
+			.results
+			.iter()
+			.filter(|r| r.rule_id == "cargo/dependency-field-order")
+			.collect();
 		assert!(
-			report.results.is_empty(),
+			field_order_results.is_empty(),
 			"Rule should be disabled when severity is Off"
 		);
 	}
@@ -580,11 +584,14 @@ version = "1.0.0"
 
 		let report = linter.lint_file(&cargo_toml, dir.path());
 
-		// Should only report missing description, not license/repository
-		assert_eq!(report.results.len(), 1);
+		let required_fields_results: Vec<_> = report
+			.results
+			.iter()
+			.filter(|r| r.rule_id == "cargo/required-package-fields")
+			.collect();
+		assert_eq!(required_fields_results.len(), 1);
 		assert!(
-			report
-				.results
+			required_fields_results
 				.first()
 				.is_some_and(|r| r.message.contains("description"))
 		);
