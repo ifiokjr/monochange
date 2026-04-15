@@ -155,8 +155,9 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - `mc placeholder-publish` exists for first-release bootstrap. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
 - Placeholder README content can come from `publish.placeholder.readme` or `publish.placeholder.readme_file`.
 - `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.
-- npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`.
+- npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, and monochange verifies the trust state before changing it.
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
+- See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for the exact registry fields, commands, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
 
 ### Release titles
@@ -240,4 +241,8 @@ Use `mc check --fix` to auto-fix issues where possible. Today the built-in rule 
 
 ## Guidance
 
-Start with [REFERENCE.md](REFERENCE.md) for the broad reference. Then open the focused deep dives in [skills/README.md](skills/README.md) when you need dedicated guidance for changesets, commands, configuration, or linting.
+Start with [REFERENCE.md](REFERENCE.md) for the broad reference.
+
+Open [skills/README.md](skills/README.md) when you need the focused deep dives for changesets, commands, configuration, or linting.
+
+See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for GitHub/OIDC trusted-publishing setup details across the registries that monochange supports.
