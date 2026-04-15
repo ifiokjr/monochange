@@ -547,18 +547,14 @@ fn enforce_release_trust_prerequisites(
 		return Ok(());
 	}
 
-	match request.registry {
-		RegistryKind::Npm => {
-			resolve_github_trust_context(root, source, &request.trusted_publishing, env_map)
-				.map(|_| ())
-		}
-		_ => {
-			Err(MonochangeError::Config(format!(
-				"`{}` requires manual trusted publishing setup before built-in release publishing can continue: {}",
-				request.package_id,
-				manual_setup_url(request)
-			)))
-		}
+	if request.registry == RegistryKind::Npm {
+		resolve_github_trust_context(root, source, &request.trusted_publishing, env_map).map(|_| ())
+	} else {
+		let setup_url = manual_setup_url(request);
+		Err(MonochangeError::Config(format!(
+			"`{}` requires manual trusted publishing setup before built-in release publishing can continue: {}. Configure the registry entry there, then rerun `mc publish`.",
+			request.package_id, setup_url,
+		)))
 	}
 }
 
@@ -1347,15 +1343,16 @@ fn disabled_trust_outcome() -> TrustedPublishingOutcome {
 }
 
 fn manual_trust_outcome(request: &PublishRequest) -> TrustedPublishingOutcome {
+	let setup_url = manual_setup_url(request);
 	TrustedPublishingOutcome {
 		status: TrustedPublishingStatus::ManualActionRequired,
 		repository: request.trusted_publishing.repository.clone(),
 		workflow: request.trusted_publishing.workflow.clone(),
 		environment: request.trusted_publishing.environment.clone(),
-		setup_url: Some(manual_setup_url(request)),
+		setup_url: Some(setup_url.clone()),
 		message: format!(
-			"configure trusted publishing manually for `{}` before the next built-in release publish",
-			request.package_name
+			"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and match repository/workflow/environment to the current GitHub context",
+			request.package_name, setup_url
 		),
 	}
 }
@@ -2751,6 +2748,11 @@ jobs:
 			outcome
 				.message
 				.contains("configure trusted publishing manually for `pkg`")
+		);
+		assert!(
+			outcome
+				.message
+				.contains("match repository/workflow/environment to the current GitHub context")
 		);
 	}
 
