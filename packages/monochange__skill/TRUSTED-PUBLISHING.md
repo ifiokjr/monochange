@@ -234,6 +234,8 @@ If you configure an environment on crates.io, the GitHub job must use the same e
 - Once the registry-side configuration exists, monochange can publish with the temporary token exposed by `rust-lang/crates-io-auth-action@v1`.
 - crates.io issues a short-lived publish token; the current docs describe these tokens as expiring after 30 minutes.
 - Use a specific workflow filename and, when needed, a protected GitHub environment to reduce the publish attack surface.
+- If you want the most registry-native GitHub workflow, prefer `rust-lang/crates-io-auth-action@v1` and let it own the token exchange explicitly.
+- When you want that workflow to own the publish command directly, `mode = "external"` is usually the clearest monochange configuration.
 - The current monochange GitHub publish workflow already includes this pattern.
 
 Useful references:
@@ -391,6 +393,8 @@ flutter pub publish --force
 - monochange reports the package admin URL so you can finish the setup manually.
 - pub.dev is stricter than the others here because the workflow must be tag-triggered, not just manually dispatched or branch-triggered.
 - The reusable workflow from `dart-lang/setup-dart` is the officially recommended path and is worth preferring unless you need custom pre-publish steps.
+- If you want the workflow shape recommended by the Dart team, prefer `dart-lang/setup-dart/.github/workflows/publish.yml@v1`.
+- When that reusable workflow should own the publish command directly, `mode = "external"` is usually the clearest monochange configuration.
 - Keep the Git tag, `pubspec.yaml` version, and tag pattern aligned.
 - Protect matching tags, and use GitHub environment protection rules when you need an approval gate before publishing.
 
