@@ -17,6 +17,8 @@ The report includes:
 - a provider-agnostic batch schedule with package ids per batch
 - evidence links and confidence levels for the built-in limits
 
+`mc publish-plan` only counts package versions that are still missing from their registries. If you rerun a release after some packages were already published, the remaining batches shrink automatically.
+
 ## Current built-in coverage
 
 - `crates.io` — source-backed publish window metadata

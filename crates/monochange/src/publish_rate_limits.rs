@@ -73,7 +73,9 @@ fn build_placeholder_plan_requests(
 	packages: &[monochange_core::PackageRecord],
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
-	package_publish::build_placeholder_requests(root, configuration, packages, selected_packages)
+	#[rustfmt::skip]
+	let requests = package_publish::build_placeholder_requests(root, configuration, packages, selected_packages)?;
+	package_publish::filter_pending_publish_requests(&requests)
 }
 
 fn build_release_plan_requests(
@@ -84,7 +86,9 @@ fn build_release_plan_requests(
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
 	#[rustfmt::skip]
 	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	package_publish::build_release_requests(packages, &publications, selected_packages)
+	let requests =
+		package_publish::build_release_requests(packages, &publications, selected_packages)?;
+	package_publish::filter_pending_publish_requests(&requests)
 }
 
 pub(crate) fn plan_publish_rate_limits_for_requests(
@@ -336,11 +340,14 @@ fn registry_policies() -> Vec<RegistryRateLimitPolicy> {
 mod tests {
 	use std::fs;
 
+	use httpmock::Method::GET;
+	use httpmock::MockServer;
 	use monochange_core::PackagePublicationTarget;
 	use monochange_core::PublishMode;
 	use monochange_core::PublishRegistry;
 	use monochange_core::TrustedPublishingSettings;
 	use semver::Version;
+	use temp_env::with_vars;
 	use tempfile::tempdir;
 
 	use super::*;
@@ -465,13 +472,41 @@ mod tests {
 			dry_run: true,
 		};
 
-		let report = plan_publish_rate_limits(
-			tempdir.path(),
-			&configuration,
-			Some(&prepared_release),
-			&BTreeSet::new(),
-			PublishRateLimitMode::Publish,
-			true,
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/core");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/docs");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/web");
+			then.status(404);
+		});
+
+		let report = with_vars(
+			[
+				(
+					"MONOCHANGE_CRATES_IO_API_URL",
+					Some(server.base_url().as_str()),
+				),
+				(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				),
+			],
+			|| {
+				plan_publish_rate_limits(
+					tempdir.path(),
+					&configuration,
+					Some(&prepared_release),
+					&BTreeSet::new(),
+					PublishRateLimitMode::Publish,
+					true,
+				)
+			},
 		)
 		.unwrap_or_else(|error| panic!("plan rate limits: {error}"));
 
@@ -481,6 +516,176 @@ mod tests {
 			batch.registry == RegistryKind::Npm
 				&& batch.packages == vec!["docs".to_string(), "web".to_string()]
 		}));
+	}
+
+	#[test]
+	fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
+		copy_fixture_dir(&fixture, tempdir.path());
+		let configuration = crate::load_workspace_configuration(tempdir.path())
+			.unwrap_or_else(|error| panic!("load config: {error}"));
+		let prepared_release = PreparedRelease {
+			plan: monochange_core::ReleasePlan {
+				workspace_root: tempdir.path().to_path_buf(),
+				decisions: Vec::new(),
+				groups: Vec::new(),
+				warnings: Vec::new(),
+				unresolved_items: Vec::new(),
+				compatibility_evidence: Vec::new(),
+			},
+			changeset_paths: Vec::new(),
+			changesets: Vec::new(),
+			released_packages: vec!["core".to_string(), "docs".to_string(), "web".to_string()],
+			package_publications: vec![
+				PackagePublicationTarget {
+					package: "core".to_string(),
+					ecosystem: monochange_core::Ecosystem::Cargo,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+					version: Version::new(1, 0, 0).to_string(),
+					mode: PublishMode::Builtin,
+					trusted_publishing: TrustedPublishingSettings::default(),
+				},
+				PackagePublicationTarget {
+					package: "docs".to_string(),
+					ecosystem: monochange_core::Ecosystem::Npm,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+					version: Version::new(1, 0, 0).to_string(),
+					mode: PublishMode::Builtin,
+					trusted_publishing: TrustedPublishingSettings::default(),
+				},
+				PackagePublicationTarget {
+					package: "web".to_string(),
+					ecosystem: monochange_core::Ecosystem::Npm,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+					version: Version::new(1, 0, 0).to_string(),
+					mode: PublishMode::Builtin,
+					trusted_publishing: TrustedPublishingSettings::default(),
+				},
+			],
+			version: None,
+			group_version: None,
+			release_targets: Vec::new(),
+			changed_files: Vec::new(),
+			changelogs: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			dry_run: true,
+		};
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/core");
+			then.status(200).json_body_obj(&serde_json::json!({
+				"versions": [{ "num": "1.0.0" }]
+			}));
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/docs");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/web");
+			then.status(404);
+		});
+
+		let report = with_vars(
+			[
+				(
+					"MONOCHANGE_CRATES_IO_API_URL",
+					Some(server.base_url().as_str()),
+				),
+				(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				),
+			],
+			|| {
+				plan_publish_rate_limits(
+					tempdir.path(),
+					&configuration,
+					Some(&prepared_release),
+					&BTreeSet::new(),
+					PublishRateLimitMode::Publish,
+					true,
+				)
+			},
+		)
+		.unwrap_or_else(|error| panic!("plan rate limits: {error}"));
+
+		assert_eq!(report.windows.len(), 1);
+		assert_eq!(report.windows[0].registry, RegistryKind::Npm);
+		assert_eq!(report.windows[0].pending, 2);
+		assert!(
+			report
+				.batches
+				.iter()
+				.all(|batch| batch.registry == RegistryKind::Npm)
+		);
+		assert!(
+			report
+				.batches
+				.iter()
+				.flat_map(|batch| batch.packages.iter())
+				.all(|package| package != "core")
+		);
+	}
+
+	#[test]
+	fn build_placeholder_plan_requests_skips_placeholder_versions_that_already_exist() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
+		copy_fixture_dir(&fixture, tempdir.path());
+		let configuration = crate::load_workspace_configuration(tempdir.path())
+			.unwrap_or_else(|error| panic!("load config: {error}"));
+		let discovery = discover_workspace(tempdir.path())
+			.unwrap_or_else(|error| panic!("discover workspace: {error}"));
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/core");
+			then.status(200).json_body_obj(&serde_json::json!({
+				"versions": [{ "num": "0.0.0" }]
+			}));
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/docs");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/web");
+			then.status(404);
+		});
+
+		let requests = with_vars(
+			[
+				(
+					"MONOCHANGE_CRATES_IO_API_URL",
+					Some(server.base_url().as_str()),
+				),
+				(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				),
+			],
+			|| {
+				build_placeholder_plan_requests(
+					tempdir.path(),
+					&configuration,
+					&discovery.packages,
+					&BTreeSet::new(),
+				)
+			},
+		)
+		.unwrap_or_else(|error| panic!("build placeholder plan requests: {error}"));
+
+		assert_eq!(
+			requests
+				.iter()
+				.map(|request| request.package_id.as_str())
+				.collect::<Vec<_>>(),
+			vec!["docs", "web"]
+		);
 	}
 
 	#[test]
@@ -520,13 +725,41 @@ mod tests {
 		let configuration = crate::load_workspace_configuration(tempdir.path())
 			.unwrap_or_else(|error| panic!("load config: {error}"));
 
-		let report = plan_publish_rate_limits(
-			tempdir.path(),
-			&configuration,
-			None,
-			&BTreeSet::new(),
-			PublishRateLimitMode::Placeholder,
-			true,
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/core");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/docs");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/web");
+			then.status(404);
+		});
+
+		let report = with_vars(
+			[
+				(
+					"MONOCHANGE_CRATES_IO_API_URL",
+					Some(server.base_url().as_str()),
+				),
+				(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				),
+			],
+			|| {
+				plan_publish_rate_limits(
+					tempdir.path(),
+					&configuration,
+					None,
+					&BTreeSet::new(),
+					PublishRateLimitMode::Placeholder,
+					true,
+				)
+			},
 		)
 		.unwrap_or_else(|error| panic!("plan placeholder rate limits: {error}"));
 
