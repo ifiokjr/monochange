@@ -863,12 +863,8 @@ pub(crate) fn execute_cli_command_with_options(
 
 	progress.command_finished(command_started_at.elapsed());
 
-	save_prepared_release_artifact(
-		root,
-		configuration,
-		&context,
-		prepared_release_path.as_deref(),
-	)?;
+	let artifact_path = prepared_release_path.as_deref();
+	save_prepared_release_artifact(root, configuration, &context, artifact_path)?;
 
 	resolve_command_output(cli_command, &context, dry_run, output)
 }
@@ -2392,12 +2388,7 @@ fn render_prepared_release_summary(
 		}
 	}
 
-	if !prepared_release.changed_files.is_empty() {
-		lines.push("changed files:".to_string());
-		for path in &prepared_release.changed_files {
-			lines.push(format!("- {}", path.display()));
-		}
-	}
+	append_changed_file_lines(lines, &prepared_release.changed_files);
 
 	if context.show_diff && !context.prepared_file_diffs.is_empty() {
 		lines.push("file diffs:".to_string());
@@ -2405,7 +2396,6 @@ fn render_prepared_release_summary(
 			if index > 0 {
 				lines.push(String::new());
 			}
-
 			lines.push(file_diff.display_diff.clone());
 		}
 	}
@@ -2417,6 +2407,17 @@ fn render_prepared_release_summary(
 	lines.push("deleted changesets:".to_string());
 	for path in &prepared_release.deleted_changesets {
 		lines.push(format!("- {}", path.display()));
+	}
+}
+
+fn append_changed_file_lines(lines: &mut Vec<String>, changed_files: &[PathBuf]) {
+	if !changed_files.is_empty() {
+		lines.push("changed files:".to_string());
+		lines.extend(
+			changed_files
+				.iter()
+				.map(|path| format!("- {}", path.display())),
+		);
 	}
 }
 
@@ -3023,6 +3024,7 @@ mod tests {
 	use std::path::Path;
 	use std::path::PathBuf;
 	use std::sync::mpsc;
+	use std::time::Duration;
 
 	use monochange_config::load_workspace_configuration;
 	use monochange_core::ChangesetPolicyEvaluation;
@@ -3063,6 +3065,48 @@ mod tests {
 			retarget_report: None,
 			step_outputs: BTreeMap::new(),
 			command_logs: Vec::new(),
+		}
+	}
+
+	fn sample_configuration(root: &Path) -> monochange_core::WorkspaceConfiguration {
+		monochange_core::WorkspaceConfiguration {
+			root_path: root.to_path_buf(),
+			defaults: monochange_core::WorkspaceDefaults::default(),
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		}
+	}
+
+	fn sample_prepared_release() -> PreparedRelease {
+		PreparedRelease {
+			plan: ReleasePlan {
+				workspace_root: PathBuf::from("."),
+				decisions: Vec::new(),
+				groups: Vec::new(),
+				warnings: Vec::new(),
+				unresolved_items: Vec::new(),
+				compatibility_evidence: Vec::new(),
+			},
+			changeset_paths: Vec::new(),
+			changesets: Vec::new(),
+			released_packages: Vec::new(),
+			package_publications: Vec::new(),
+			version: None,
+			group_version: None,
+			release_targets: Vec::new(),
+			changed_files: Vec::new(),
+			changelogs: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			dry_run: true,
 		}
 	}
 
@@ -4196,6 +4240,103 @@ path = "crates/core"
 		assert_eq!(file_diffs.len(), 1);
 		assert_eq!(file_diffs[0]["path"], serde_json::json!("Cargo.toml"));
 		assert_eq!(file_diffs[0]["diff"], serde_json::json!("-old\n+new"));
+	}
+
+	#[test]
+	fn execute_cli_command_with_options_covers_final_artifact_save_call() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let cli_command = CliCommandDefinition {
+			name: "noop".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: Vec::new(),
+		};
+
+		let output = execute_cli_command_with_options(
+			tempdir.path(),
+			&sample_configuration(tempdir.path()),
+			&cli_command,
+			ExecuteCliCommandOptions {
+				dry_run: false,
+				quiet: true,
+				show_diff: false,
+				inputs: BTreeMap::new(),
+				prepared_release_path: None,
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.unwrap_or_else(|error| panic!("execute noop command: {error}"));
+
+		assert_eq!(output, "command `noop` completed");
+	}
+
+	#[test]
+	fn record_skipped_and_failure_helpers_cover_silent_paths() {
+		let cli_command = default_cli_command("validate");
+		let step = CliStepDefinition::Validate {
+			name: Some("validate".to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		};
+		let mut context = cli_context();
+		let mut progress =
+			CliProgressReporter::new(&cli_command, false, true, ProgressFormat::Auto);
+
+		record_skipped_cli_step(&mut context, &step, 0, &mut progress, false);
+		report_cli_step_failure(
+			&mut progress,
+			false,
+			0,
+			&step,
+			Duration::from_millis(1),
+			&MonochangeError::Config("boom".to_string()),
+		);
+
+		assert!(context.command_logs.is_empty());
+	}
+
+	#[test]
+	fn render_cli_command_result_includes_release_results_and_changed_files() {
+		let cli_command = default_cli_command("release");
+		let mut context = cli_context();
+		let mut prepared_release = sample_prepared_release();
+		prepared_release.changed_files = vec![PathBuf::from("Cargo.toml")];
+		context.prepared_release = Some(prepared_release);
+		context.release_manifest_path = Some(PathBuf::from(".monochange/prepared-release.json"));
+		context.release_results = vec!["published core".to_string()];
+
+		let rendered = render_cli_command_result(&cli_command, &context);
+
+		assert!(rendered.contains("release manifest: .monochange/prepared-release.json"));
+		assert!(rendered.contains("releases:"));
+		assert!(rendered.contains("- published core"));
+		assert!(rendered.contains("changed files:"));
+		assert!(rendered.contains("- Cargo.toml"));
+	}
+
+	#[test]
+	fn save_prepared_release_artifact_returns_explicit_errors() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let mut context = cli_context();
+		context.prepared_release = Some(sample_prepared_release());
+
+		let error = save_prepared_release_artifact(
+			tempdir.path(),
+			&sample_configuration(tempdir.path()),
+			&context,
+			Some(tempdir.path().join("prepared-release.json").as_path()),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected explicit artifact save error"));
+
+		assert!(!error.to_string().is_empty());
+	}
+
+	#[test]
+	fn append_changed_file_lines_returns_early_when_no_files_changed() {
+		let mut lines = vec!["start".to_string()];
+		append_changed_file_lines(&mut lines, &[]);
+		assert_eq!(lines, vec!["start".to_string()]);
 	}
 
 	#[test]

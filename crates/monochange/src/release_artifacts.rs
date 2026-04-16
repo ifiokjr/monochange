@@ -1706,6 +1706,18 @@ mod tests {
 	}
 
 	#[test]
+	fn resolve_release_datetime_falls_back_for_invalid_environment_values() {
+		temp_env::with_var("MONOCHANGE_RELEASE_DATE", Some("not-a-date"), || {
+			assert!(
+				!resolve_release_datetime()
+					.format("%Y-%m-%d")
+					.to_string()
+					.is_empty()
+			);
+		});
+	}
+
+	#[test]
 	fn build_package_publication_targets_filters_disabled_and_preserves_publish_metadata() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path();

@@ -571,22 +571,18 @@ fn publish_merge_request_with_existing(
 			put_json(client, headers, &update_url, &update_payload, "GitLab")?
 		}
 		None => {
-			post_json(
-				client,
-				headers,
-				&create_url,
-				&GitLabMergeRequestPayload {
-					title: &request.title,
-					source_branch: &request.head_branch,
-					target_branch: &request.base_branch,
-					description: &request.body,
-					labels: &labels,
-				},
-				"GitLab",
-			)?
+			let payload = GitLabMergeRequestPayload {
+				title: &request.title,
+				source_branch: &request.head_branch,
+				target_branch: &request.base_branch,
+				description: &request.body,
+				labels: &labels,
+			};
+
+			post_json(client, headers, &create_url, &payload, "GitLab")?
 		}
 	};
-	Ok(SourceChangeRequestOutcome {
+	let outcome = SourceChangeRequestOutcome {
 		provider: SourceProvider::GitLab,
 		repository: request.repository.clone(),
 		number: response.iid,
@@ -599,7 +595,9 @@ fn publish_merge_request_with_existing(
 			Some(_) => SourceChangeRequestOperation::Updated,
 		},
 		url: response.web_url,
-	})
+	};
+
+	Ok(outcome)
 }
 
 fn lookup_existing_merge_request(

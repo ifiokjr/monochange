@@ -665,27 +665,30 @@ fn extract_mixed_changes(
 	let mut all_analyzed = Vec::new();
 	let mut all_skipped = Vec::new();
 
-	append_extraction_result(
+	let library_result = append_mixed_extraction_result(
 		&mut all_changes,
 		&mut all_analyzed,
 		&mut all_skipped,
 		&lib_files,
-		|files| extract_library_changes(files, detection_level, repo_root),
-	)?;
-	append_extraction_result(
-		&mut all_changes,
-		&mut all_analyzed,
-		&mut all_skipped,
-		&bin_files,
-		|files| extract_cli_changes(files, detection_level, repo_root),
-	)?;
-	append_extraction_result(
-		&mut all_changes,
-		&mut all_analyzed,
-		&mut all_skipped,
-		&other_files,
-		|files| extract_cli_changes(files, detection_level, repo_root),
-	)?;
+		detection_level,
+		repo_root,
+		true,
+	);
+	library_result?;
+
+	let mut append_cli = |files: &[PathBuf]| {
+		append_mixed_extraction_result(
+			&mut all_changes,
+			&mut all_analyzed,
+			&mut all_skipped,
+			files,
+			detection_level,
+			repo_root,
+			false,
+		)
+	};
+	append_cli(&bin_files)?;
+	append_cli(&other_files)?;
 
 	Ok(ExtractionResult {
 		changes: all_changes,
@@ -708,6 +711,24 @@ fn is_mixed_binary_file(file: &Path) -> bool {
 	let path = file.to_string_lossy();
 
 	path.contains("/main.rs") || path.contains("/bin/") || path.contains("/src/bin/")
+}
+
+fn append_mixed_extraction_result(
+	all_changes: &mut Vec<SemanticChange>,
+	all_analyzed: &mut Vec<PathBuf>,
+	all_skipped: &mut Vec<(PathBuf, SkipReason)>,
+	files: &[PathBuf],
+	detection_level: DetectionLevel,
+	repo_root: &Path,
+	library_files: bool,
+) -> MonochangeResult<()> {
+	append_extraction_result(all_changes, all_analyzed, all_skipped, files, |files| {
+		if library_files {
+			return extract_library_changes(files, detection_level, repo_root);
+		}
+
+		extract_cli_changes(files, detection_level, repo_root)
+	})
 }
 
 fn append_extraction_result(
@@ -1039,6 +1060,12 @@ mod tests {
 	}
 
 	#[test]
+	fn test_api_item_helpers_cover_empty_names_and_unknown_kinds() {
+		assert_eq!(parse_api_item_parts("fn {"), None);
+		assert_eq!(parse_api_change_kind("mod", true), None);
+	}
+
+	#[test]
 	fn test_extract_route_from_path_pages() {
 		assert_eq!(
 			extract_route_from_path(Path::new("src/pages/index.tsx")),
@@ -1293,6 +1320,95 @@ mod tests {
 			Path::new("."),
 		);
 		assert!(result.is_ok());
+	}
+
+	#[test]
+	fn test_extract_mixed_changes_routes_each_file_bucket() {
+		let files = vec![
+			PathBuf::from("src/lib.rs"),
+			PathBuf::from("src/main.rs"),
+			PathBuf::from("docs/readme.md"),
+		];
+		let result = extract_mixed_changes(&files, DetectionLevel::Basic, Path::new("."))
+			.unwrap_or_else(|error| panic!("mixed extraction: {error}"));
+
+		assert_eq!(result.files_analyzed.len(), 2);
+		assert_eq!(result.files_skipped.len(), 1);
+		assert!(matches!(
+			result.files_skipped.first().map(|entry| &entry.1),
+			Some(SkipReason::UnsupportedExtension)
+		));
+	}
+
+	#[test]
+	fn test_get_file_diff_returns_empty_outside_git_and_run_git_diff_covers_fallback_paths() {
+		use std::fs;
+		use std::process::Command;
+
+		use tempfile::TempDir;
+
+		let non_git = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let empty_diff = get_file_diff(non_git.path(), Path::new("src/lib.rs"))
+			.unwrap_or_else(|error| panic!("outside git diff: {error}"));
+		assert!(empty_diff.is_empty());
+
+		let repo = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["init"])
+			.output()
+			.unwrap_or_else(|error| panic!("git init: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["config", "user.email", "test@example.com"])
+			.output()
+			.unwrap_or_else(|error| panic!("git config email: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["config", "user.name", "monochange Tests"])
+			.output()
+			.unwrap_or_else(|error| panic!("git config name: {error}"));
+		fs::create_dir_all(repo.path().join("src"))
+			.unwrap_or_else(|error| panic!("create src dir: {error}"));
+		fs::write(repo.path().join("src/lib.rs"), "pub fn staged() {}\n")
+			.unwrap_or_else(|error| panic!("write lib.rs: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["add", "src/lib.rs"])
+			.output()
+			.unwrap_or_else(|error| panic!("git add: {error}"));
+
+		let staged_diff = run_git_diff(
+			repo.path(),
+			Path::new("src/lib.rs"),
+			&["diff", "HEAD", "--"],
+		)
+		.unwrap_or_else(|error| panic!("head fallback diff: {error}"));
+		assert!(
+			staged_diff.is_some_and(|diff| diff.contains("staged")),
+			"expected cached diff from fallback"
+		);
+
+		let missing = run_git_diff(
+			repo.path(),
+			Path::new("src/lib.rs"),
+			&["diff", "--definitely-invalid", "--"],
+		)
+		.unwrap_or_else(|error| panic!("invalid diff invocation: {error}"));
+		assert_eq!(missing, None);
+	}
+
+	#[test]
+	fn test_extract_mixed_changes_propagates_library_errors() {
+		let missing_root = Path::new("/definitely/missing/monochange-analysis-root");
+		let error = extract_mixed_changes(
+			&[PathBuf::from("src/lib.rs")],
+			DetectionLevel::Signature,
+			missing_root,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected library extraction error"));
+		assert!(error.to_string().contains("failed to run git diff"));
 	}
 
 	#[test]

@@ -267,11 +267,9 @@ pub fn update_pnpm_lock(
 						continue;
 					};
 
-					if uses_workspace_reference(text) {
-						continue;
+					if !uses_workspace_reference(text) {
+						*entry = serde_yaml_ng::Value::String(version.clone());
 					}
-
-					*entry = serde_yaml_ng::Value::String(version.clone());
 				}
 			}
 		}

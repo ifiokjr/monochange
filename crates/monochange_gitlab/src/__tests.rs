@@ -643,6 +643,44 @@ fn publish_release_requests_reports_gitlab_api_errors() {
 	assert!(error.to_string().contains("GitLab API GET"));
 }
 
+#[test]
+fn publish_release_pull_request_create_branch_is_covered_without_etest() {
+	let server = MockServer::start();
+	let list = server.mock(|when, then| {
+		when.method(GET)
+			.path("/api/v4/projects/group%2Fmonochange/merge_requests")
+			.query_param("state", "opened")
+			.query_param("source_branch", "monochange/release/release")
+			.query_param("target_branch", "main");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let create = server.mock(|when, then| {
+		when.method(POST)
+			.path("/api/v4/projects/group%2Fmonochange/merge_requests");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(
+				"{\"iid\":7,\"web_url\":\"https://gitlab.example.com/group/monochange/-/merge_requests/7\"}",
+			);
+	});
+	let (_tempdir, repo) = seed_git_repository();
+	let source = sample_source(Some(format!("{}/api/v4", server.base_url())));
+	let mut request = build_release_pull_request_request(&source, &sample_manifest());
+	request.labels.clear();
+
+	let outcome = with_gitlab_env(Some("token"), || {
+		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
+			.unwrap_or_else(|error| panic!("publish merge request: {error}"))
+	});
+
+	list.assert();
+	create.assert();
+	assert_eq!(outcome.operation, SourceChangeRequestOperation::Created);
+	assert_eq!(outcome.number, 7);
+}
+
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 	let server = MockServer::start();

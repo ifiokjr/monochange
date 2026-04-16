@@ -590,18 +590,14 @@ fn publish_pull_request_with_existing(
 		}
 		None => {
 			let create_url = format!("{api_base}/repos/{}/{}/pulls", request.owner, request.repo);
-			post_json(
-				client,
-				headers,
-				&create_url,
-				&GiteaPullRequestPayload {
-					title: &request.title,
-					head: &request.head_branch,
-					base: &request.base_branch,
-					body: &request.body,
-				},
-				"Gitea",
-			)?
+			let payload = GiteaPullRequestPayload {
+				title: &request.title,
+				head: &request.head_branch,
+				base: &request.base_branch,
+				body: &request.body,
+			};
+
+			post_json(client, headers, &create_url, &payload, "Gitea")?
 		}
 	};
 	if !request.labels.is_empty() && !labels_match {
