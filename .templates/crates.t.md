@@ -15,9 +15,9 @@
 
 <!-- {/repoStatusBadgeLinks} -->
 
-<!-- {@crateBadgeLinks:"badge_name":"crate_name"} -->
+<!-- {@crateBadgeLinks:"crate_name"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-{{ badge_name }}-orange?logo=rust [crate-link]: https://crates.io/crates/{{ crate_name }} [docs-image]: https://img.shields.io/badge/docs.rs-{{ badge_name }}-1f425f?logo=docs.rs [docs-link]: https://docs.rs/{{ crate_name }}/
+[crate-image]: https://img.shields.io/badge/crates.io-{{ crate_name|replace("_", "__") }}-orange?logo=rust [crate-link]: https://crates.io/crates/{{ crate_name }} [docs-image]: https://img.shields.io/badge/docs.rs-{{ crate_name|replace("_", "__") }}-1f425f?logo=docs.rs [docs-link]: https://docs.rs/{{ crate_name }}/
 
 <!-- {/crateBadgeLinks} -->
 

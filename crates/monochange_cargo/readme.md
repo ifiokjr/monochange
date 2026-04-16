@@ -43,7 +43,7 @@ Reach for this crate when you want to scan Cargo workspaces into normalized `mon
 
 <!-- {/monochangeCargoCrateDocs} -->
 
-<!-- {=crateBadgeLinks:"monochange__cargo":"monochange_cargo"} -->
+<!-- {=crateBadgeLinks:"monochange_cargo"} -->
 
 [crate-image]: https://img.shields.io/badge/crates.io-monochange__cargo-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_cargo [docs-image]: https://img.shields.io/badge/docs.rs-monochange__cargo-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_cargo/
 

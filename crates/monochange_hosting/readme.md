@@ -38,7 +38,7 @@ Reach for this crate when you are implementing GitHub, Gitea, or GitLab release 
 
 <!-- {/monochangeHostingCrateDocs} -->
 
-<!-- {=crateBadgeLinks:"monochange__hosting":"monochange_hosting"} -->
+<!-- {=crateBadgeLinks:"monochange_hosting"} -->
 
 [crate-image]: https://img.shields.io/badge/crates.io-monochange__hosting-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_hosting [docs-image]: https://img.shields.io/badge/docs.rs-monochange__hosting-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_hosting/
 
