@@ -1,0 +1,7 @@
+name: override_private
+version: 1.0.0
+publish_to: none
+environment:
+  sdk: ^3.6.0
+dependency_overrides:
+  analyzer: ^7.0.0

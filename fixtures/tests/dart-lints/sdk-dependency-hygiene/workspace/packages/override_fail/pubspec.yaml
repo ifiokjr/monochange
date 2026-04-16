@@ -1,0 +1,6 @@
+name: override_fail
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+dependency_overrides:
+  analyzer: ^7.0.0

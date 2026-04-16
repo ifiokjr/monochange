@@ -1,0 +1,13 @@
+name: unsorted_deps
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+dependencies:
+  zebra: ^1.0.0
+  alpha: ^1.0.0
+dev_dependencies:
+  zeta: ^1.0.0
+  beta: ^1.0.0
+dependency_overrides:
+  yaml: ^3.0.0
+  analyzer: ^7.0.0

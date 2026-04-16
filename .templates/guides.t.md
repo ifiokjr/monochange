@@ -958,7 +958,7 @@ release_title = "v{{ version }} — released {{ date }}"
 
 Use this guide when the task is to configure or explain monochange's **manifest lint rules**.
 
-These are the rules that run through **`mc check`** and are configured in `monochange.toml` under **`[ecosystems.<name>.lints]`**.
+These are the rules that run through **`mc check`** and are configured in `monochange.toml` under the top-level **`[lints]`** section.
 
 They are separate from Rust compiler or Clippy lints used to develop monochange itself.
 
@@ -981,23 +981,26 @@ Use `--fix` when you want monochange to apply auto-fixes where a rule supports t
 
 ## Where lint rules live
 
-Configure rules per ecosystem in `monochange.toml`:
+Configure rules under the top-level lint section in `monochange.toml`:
 
 ```toml
-[ecosystems.cargo.lints]
+[lints]
+use = ["cargo/recommended", "npm/recommended", "dart/recommended"]
+
+[lints.rules]
 "cargo/dependency-field-order" = "error"
 "cargo/internal-dependency-workspace" = "error"
 "cargo/required-package-fields" = { level = "warning", fields = ["description", "license", "repository"] }
 "cargo/sorted-dependencies" = "warning"
 "cargo/unlisted-package-private" = { level = "warning", fix = true }
-
-[ecosystems.npm.lints]
 "npm/workspace-protocol" = "error"
 "npm/sorted-dependencies" = "warning"
 "npm/required-package-fields" = { level = "warning", fields = ["description", "repository", "license"] }
 "npm/root-no-prod-deps" = "error"
 "npm/no-duplicate-dependencies" = "error"
 "npm/unlisted-package-private" = { level = "warning", fix = true }
+"dart/sdk-constraint-modern" = { level = "warning", minimum = "3.6.0", require_upper_bound = false }
+"dart/no-unexpected-dependency-overrides" = { level = "warning", allow_for_private = true, allow_packages = ["app_shell"] }
 ```
 
 Rule configuration supports two forms:
@@ -1011,8 +1014,9 @@ Today, built-in manifest lint rules exist for:
 
 - **Cargo** manifests (`Cargo.toml`)
 - **npm-family** manifests (`package.json`)
+- **Dart / Flutter** manifests (`pubspec.yaml`)
 
-monochange already wires lint configuration through `configuration.cargo.lints`, `configuration.npm.lints`, `configuration.deno.lints`, and `configuration.dart.lints`, but the current built-in rule sets are implemented for Cargo and npm manifests.
+monochange routes all manifest lint configuration through the top-level `[lints]` section, while each ecosystem crate provides its own built-in suites and presets.
 
 ## Cargo manifest lint rules
 
@@ -1095,7 +1099,7 @@ version = "0.1.0"
 Example:
 
 ```toml
-[ecosystems.cargo.lints]
+[lints.rules]
 "cargo/required-package-fields" = { level = "error", fields = ["description", "license"] }
 ```
 
@@ -1321,6 +1325,64 @@ publish = false
 **Useful option:**
 
 - `fix` — defaults to `true`
+
+## Dart manifest lint rules
+
+### `dart/sdk-constraint-present`
+
+**Why:** every managed Dart package should declare the SDK range it expects rather than inheriting whatever the developer machine happens to provide.
+
+**With the rule:** monochange reports any `pubspec.yaml` that omits `environment.sdk`.
+
+### `dart/sdk-constraint-modern`
+
+**Why:** old or overly broad SDK ranges quietly expand your support policy and make releases harder to reason about.
+
+**Default policy:**
+
+- minimum lower bound: `3.0.0`
+- upper bound required by default
+
+**Useful options:**
+
+- `minimum` — override the minimum lower bound for your workspace
+- `require_upper_bound` — set to `false` if your policy intentionally omits an upper bound
+
+Example:
+
+```toml
+[lints.rules]
+"dart/sdk-constraint-modern" = { level = "warning", minimum = "3.6.0", require_upper_bound = false }
+```
+
+### `dart/dependency-sorted`
+
+**Why:** alphabetized `dependencies`, `dev_dependencies`, and `dependency_overrides` blocks reduce review noise and make Dart manifest diffs easier to scan.
+
+**Useful option:**
+
+- `fix` — defaults to `true`
+
+### `dart/no-unexpected-dependency-overrides`
+
+**Why:** `dependency_overrides` are sometimes necessary, but they should usually be limited to private packages or a small allow list of explicitly approved packages.
+
+**Useful options:**
+
+- `allow_for_private` — defaults to `true`
+- `allow_packages` — list package names that may keep `dependency_overrides`
+
+Example:
+
+```toml
+[lints.rules]
+"dart/no-unexpected-dependency-overrides" = { level = "warning", allow_for_private = true, allow_packages = ["app_shell"] }
+```
+
+### Dart presets
+
+- `dart/recommended` enables metadata/publishability checks, `dart/sdk-constraint-present`, and `dart/dependency-sorted` as a warning.
+- `dart/strict` adds `dart/sdk-constraint-modern`, `dart/no-unexpected-dependency-overrides`, and promotes `dart/dependency-sorted` to an error.
 
 ## What `mc check` looks like in practice
 
