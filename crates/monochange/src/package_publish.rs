@@ -356,6 +356,34 @@ pub(crate) fn build_release_requests(
 	Ok(requests)
 }
 
+pub(crate) fn filter_pending_publish_requests(
+	requests: &[PublishRequest],
+) -> MonochangeResult<Vec<PublishRequest>> {
+	let client = Client::new();
+	let endpoints = RegistryEndpoints::from_env();
+	filter_pending_publish_requests_with_transport(requests, &client, &endpoints)
+}
+
+fn filter_pending_publish_requests_with_transport(
+	requests: &[PublishRequest],
+	client: &Client,
+	endpoints: &RegistryEndpoints,
+) -> MonochangeResult<Vec<PublishRequest>> {
+	let mut pending_requests = Vec::with_capacity(requests.len());
+
+	for request in requests {
+		if request.mode == PublishMode::External {
+			continue;
+		}
+		if registry_version_exists(client, endpoints, request)? {
+			continue;
+		}
+		pending_requests.push(request.clone());
+	}
+
+	Ok(pending_requests)
+}
+
 fn packages_by_config_id(packages: &[PackageRecord]) -> BTreeMap<&str, &PackageRecord> {
 	packages
 		.iter()
@@ -3181,6 +3209,43 @@ jobs:
 			report.packages[1].status,
 			PackagePublishStatus::SkippedExisting
 		);
+	}
+
+	#[test]
+	fn filter_pending_publish_requests_skips_external_and_existing_versions() {
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/pkg");
+			then.status(200).json_body_obj(&serde_json::json!({
+				"versions": { "1.2.3": {} }
+			}));
+		});
+		let client = Client::builder().build().expect("http client:");
+		let endpoints = sample_endpoints(&server.base_url());
+		let request = PublishRequest {
+			mode: PublishMode::External,
+			..sample_request(RegistryKind::Npm)
+		};
+		let existing = sample_request(RegistryKind::Npm);
+		let pending = PublishRequest {
+			package_id: "pkg-next".to_string(),
+			package_name: "pkg-next".to_string(),
+			..sample_request(RegistryKind::Npm)
+		};
+		server.mock(|when, then| {
+			when.method(GET).path("/pkg-next");
+			then.status(404);
+		});
+
+		let filtered = filter_pending_publish_requests_with_transport(
+			&[request, existing, pending],
+			&client,
+			&endpoints,
+		)
+		.expect("filtered requests:");
+
+		assert_eq!(filtered.len(), 1);
+		assert_eq!(filtered[0].package_id, "pkg-next");
 	}
 
 	#[test]

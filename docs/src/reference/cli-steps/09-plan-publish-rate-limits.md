@@ -24,6 +24,7 @@ A structured publish-rate-limit report containing:
 - batch counts
 - explicit package ids per batch
 - evidence and confidence metadata for each built-in policy
+- only versions that are still missing from their registries, so reruns reflect the remaining work
 
 ## Examples
 
@@ -77,3 +78,5 @@ inputs = { ci = "github-actions" }
 ## Notes
 
 `PlanPublishRateLimits` is advisory by default. Built-in publish commands only become blocking when matching packages enable `publish.rate_limits.enforce = true`.
+
+The step checks the target registries before counting pending work, so already-published versions and placeholder packages that already exist do not inflate the batch plan.
