@@ -2410,6 +2410,99 @@ fn render_prepared_release_summary(
 	}
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseVersionSummary {
+	packages: BTreeMap<String, String>,
+	groups: BTreeMap<String, String>,
+}
+
+fn build_release_version_summary(prepared_release: &PreparedRelease) -> ReleaseVersionSummary {
+	ReleaseVersionSummary {
+		packages: prepared_release
+			.plan
+			.decisions
+			.iter()
+			.filter(|decision| decision.recommended_bump.is_release())
+			.filter_map(|decision| {
+				decision
+					.planned_version
+					.as_ref()
+					.map(|version| (decision.package_id.clone(), version.to_string()))
+			})
+			.collect(),
+		groups: prepared_release
+			.plan
+			.groups
+			.iter()
+			.filter(|group| group.recommended_bump.is_release())
+			.filter_map(|group| {
+				group
+					.planned_version
+					.as_ref()
+					.map(|version| (group.group_id.clone(), version.to_string()))
+			})
+			.collect(),
+	}
+}
+
+fn render_release_version_summary_text(summary: &ReleaseVersionSummary) -> String {
+	let mut lines = Vec::new();
+	if !summary.groups.is_empty() {
+		lines.push("group versions:".to_string());
+		for (group, version) in &summary.groups {
+			lines.push(format!("- {group}: {version}"));
+		}
+	}
+	if !summary.packages.is_empty() {
+		lines.push("package versions:".to_string());
+		for (package, version) in &summary.packages {
+			lines.push(format!("- {package}: {version}"));
+		}
+	}
+	if lines.is_empty() {
+		return "no package or group versions were planned".to_string();
+	}
+	lines.join("\n")
+}
+
+fn render_release_version_summary_markdown(summary: &ReleaseVersionSummary) -> String {
+	if summary.groups.is_empty() && summary.packages.is_empty() {
+		return "No package or group versions were planned.".to_string();
+	}
+	let color = stdout_supports_color();
+	let mut sections = Vec::new();
+	if !summary.groups.is_empty() {
+		let lines = summary
+			.groups
+			.iter()
+			.map(|(group, version)| {
+				format!(
+					"- {}: {}",
+					paint_markdown_inline(&format!("`{group}`"), MarkdownStyle::Code, color),
+					paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color),
+				)
+			})
+			.collect::<Vec<_>>();
+		sections.push(render_markdown_section("Group versions", &lines, color));
+	}
+	if !summary.packages.is_empty() {
+		let lines = summary
+			.packages
+			.iter()
+			.map(|(package, version)| {
+				format!(
+					"- {}: {}",
+					paint_markdown_inline(&format!("`{package}`"), MarkdownStyle::Code, color),
+					paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color),
+				)
+			})
+			.collect::<Vec<_>>();
+		sections.push(render_markdown_section("Package versions", &lines, color));
+	}
+	sections.join("\n\n")
+}
+
 fn append_changed_file_lines(lines: &mut Vec<String>, changed_files: &[PathBuf]) {
 	if !changed_files.is_empty() {
 		lines.push("changed files:".to_string());
@@ -2920,6 +3013,14 @@ fn resolve_command_output(
 ) -> MonochangeResult<String> {
 	if let Some(prepared_release) = &context.prepared_release {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
+		if parse_boolean_step_input(&context.last_step_inputs, "versions")?.unwrap_or(false) {
+			let summary = build_release_version_summary(prepared_release);
+			return match format {
+				OutputFormat::Json => render_json_output(&summary, "release versions"),
+				OutputFormat::Markdown => Ok(render_release_version_summary_markdown(&summary)),
+				OutputFormat::Text => Ok(render_release_version_summary_text(&summary)),
+			};
+		}
 		return match format {
 			OutputFormat::Json => {
 				let manifest =
@@ -3027,6 +3128,7 @@ mod tests {
 	use std::time::Duration;
 
 	use monochange_config::load_workspace_configuration;
+	use monochange_core::BumpSeverity;
 	use monochange_core::ChangesetPolicyEvaluation;
 	use monochange_core::ChangesetPolicyStatus;
 	use monochange_core::CliCommandDefinition;
@@ -3103,6 +3205,69 @@ mod tests {
 			group_version: None,
 			release_targets: Vec::new(),
 			changed_files: Vec::new(),
+			changelogs: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			dry_run: true,
+		}
+	}
+
+	fn sample_prepared_release_with_versions() -> PreparedRelease {
+		PreparedRelease {
+			plan: ReleasePlan {
+				workspace_root: PathBuf::from("."),
+				decisions: vec![
+					monochange_core::ReleaseDecision {
+						package_id: "core".to_string(),
+						trigger_type: "changeset".to_string(),
+						recommended_bump: BumpSeverity::Minor,
+						planned_version: Some(semver::Version::new(1, 2, 0)),
+						group_id: Some("sdk".to_string()),
+						reasons: vec!["feature".to_string()],
+						upstream_sources: Vec::new(),
+						warnings: Vec::new(),
+					},
+					monochange_core::ReleaseDecision {
+						package_id: "web".to_string(),
+						trigger_type: "changeset".to_string(),
+						recommended_bump: BumpSeverity::Patch,
+						planned_version: Some(semver::Version::new(1, 2, 1)),
+						group_id: Some("sdk".to_string()),
+						reasons: vec!["fix".to_string()],
+						upstream_sources: Vec::new(),
+						warnings: Vec::new(),
+					},
+					monochange_core::ReleaseDecision {
+						package_id: "docs".to_string(),
+						trigger_type: "changeset".to_string(),
+						recommended_bump: BumpSeverity::None,
+						planned_version: Some(semver::Version::new(9, 9, 9)),
+						group_id: None,
+						reasons: Vec::new(),
+						upstream_sources: Vec::new(),
+						warnings: Vec::new(),
+					},
+				],
+				groups: vec![monochange_core::PlannedVersionGroup {
+					group_id: "sdk".to_string(),
+					display_name: "SDK".to_string(),
+					members: vec!["core".to_string(), "web".to_string()],
+					mismatch_detected: false,
+					planned_version: Some(semver::Version::new(2, 0, 0)),
+					recommended_bump: BumpSeverity::Minor,
+				}],
+				warnings: Vec::new(),
+				unresolved_items: Vec::new(),
+				compatibility_evidence: Vec::new(),
+			},
+			changeset_paths: Vec::new(),
+			changesets: Vec::new(),
+			released_packages: vec!["core".to_string(), "web".to_string()],
+			package_publications: Vec::new(),
+			version: Some("1.2.1".to_string()),
+			group_version: Some("2.0.0".to_string()),
+			release_targets: Vec::new(),
+			changed_files: vec![PathBuf::from("Cargo.toml")],
 			changelogs: Vec::new(),
 			updated_changelogs: Vec::new(),
 			deleted_changesets: Vec::new(),
@@ -3465,6 +3630,84 @@ path = "crates/core"
 		assert!(markdown.contains("## File diffs"));
 		assert!(markdown.contains("## Deleted changesets"));
 		assert!(markdown.contains("## Commands"));
+	}
+
+	#[test]
+	fn resolve_command_output_supports_versions_only_prepare_release_outputs() {
+		let cli_command = default_cli_command("release");
+		let mut context = cli_context();
+		context.prepared_release = Some(sample_prepared_release_with_versions());
+
+		context.last_step_inputs = BTreeMap::from([
+			("format".to_string(), vec!["text".to_string()]),
+			("versions".to_string(), vec!["true".to_string()]),
+		]);
+		let text = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("versions text output: {error}"));
+		insta::assert_snapshot!("prepare_release_versions_only_text", text);
+
+		context.last_step_inputs = BTreeMap::from([
+			("format".to_string(), vec!["markdown".to_string()]),
+			("versions".to_string(), vec!["true".to_string()]),
+		]);
+		let markdown = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("versions markdown output: {error}"));
+		insta::assert_snapshot!("prepare_release_versions_only_markdown", markdown);
+
+		context.last_step_inputs = BTreeMap::from([
+			("format".to_string(), vec!["json".to_string()]),
+			("versions".to_string(), vec!["true".to_string()]),
+		]);
+		let json = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("versions json output: {error}"));
+		let parsed: serde_json::Value = serde_json::from_str(&json)
+			.unwrap_or_else(|error| panic!("parse versions json output: {error}"));
+		insta::assert_json_snapshot!("prepare_release_versions_only_json", parsed);
+	}
+
+	#[test]
+	fn release_version_summary_renderers_cover_empty_and_single_section_states() {
+		let empty = ReleaseVersionSummary {
+			groups: BTreeMap::new(),
+			packages: BTreeMap::new(),
+		};
+		assert_eq!(
+			render_release_version_summary_text(&empty),
+			"no package or group versions were planned"
+		);
+		assert_eq!(
+			render_release_version_summary_markdown(&empty),
+			"No package or group versions were planned."
+		);
+
+		let groups_only = ReleaseVersionSummary {
+			groups: BTreeMap::from([("sdk".to_string(), "2.0.0".to_string())]),
+			packages: BTreeMap::new(),
+		};
+		assert_eq!(
+			render_release_version_summary_text(&groups_only),
+			"group versions:\n- sdk: 2.0.0"
+		);
+		assert_eq!(
+			render_release_version_summary_markdown(&groups_only),
+			"## Group versions\n\n- `sdk`: `2.0.0`"
+		);
+
+		let packages_only = ReleaseVersionSummary {
+			groups: BTreeMap::new(),
+			packages: BTreeMap::from([
+				("core".to_string(), "1.2.0".to_string()),
+				("web".to_string(), "1.2.1".to_string()),
+			]),
+		};
+		assert_eq!(
+			render_release_version_summary_text(&packages_only),
+			"package versions:\n- core: 1.2.0\n- web: 1.2.1"
+		);
+		assert_eq!(
+			render_release_version_summary_markdown(&packages_only),
+			"## Package versions\n\n- `core`: `1.2.0`\n- `web`: `1.2.1`"
+		);
 	}
 
 	#[test]

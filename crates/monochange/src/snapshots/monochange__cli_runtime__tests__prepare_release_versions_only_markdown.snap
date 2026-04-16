@@ -1,0 +1,12 @@
+---
+source: crates/monochange/src/cli_runtime.rs
+expression: markdown
+---
+## Group versions
+
+- `sdk`: `2.0.0`
+
+## Package versions
+
+- `core`: `1.2.0`
+- `web`: `1.2.1`

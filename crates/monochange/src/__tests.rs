@@ -178,6 +178,34 @@ fn boolean_cli_inputs_support_explicit_false_values() {
 }
 
 #[test]
+fn release_help_and_matches_document_versions_summary_flag() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let help = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("release help: {error}"));
+	assert!(help.contains("--versions"));
+	assert!(help.contains("Print only planned package and group versions"));
+
+	let matches = build_command_for_root("mc", &fixture_root)
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--versions"),
+		])
+		.unwrap_or_else(|error| panic!("release matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected release subcommand"));
+	assert!(subcommand_matches.get_flag("versions"));
+}
+
+#[test]
 fn release_record_help_describes_first_parent_discovery() {
 	let output = run_with_args(
 		"mc",

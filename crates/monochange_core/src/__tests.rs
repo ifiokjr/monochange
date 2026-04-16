@@ -937,6 +937,13 @@ fn default_release_command_prefers_markdown_output() {
 			"json".to_string(),
 		]
 	);
+	let versions = release
+		.inputs
+		.iter()
+		.find(|input| input.name == "versions")
+		.unwrap_or_else(|| panic!("expected release versions input"));
+	assert_eq!(versions.kind, crate::CliInputKind::Boolean);
+	assert_eq!(versions.default.as_deref(), Some("false"));
 }
 
 #[test]
@@ -1362,6 +1369,21 @@ fn expected_input_kind_returns_none_for_commit_release() {
 #[test]
 fn expected_input_kind_returns_correct_types_for_publish_steps() {
 	use crate::CliInputKind;
+	let prepare = CliStepDefinition::PrepareRelease {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		prepare.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		prepare.expected_input_kind("versions"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(prepare.expected_input_kind("unknown"), None);
+
 	let publish = CliStepDefinition::PublishPackages {
 		name: None,
 		when: None,

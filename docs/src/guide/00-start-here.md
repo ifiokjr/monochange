@@ -97,7 +97,7 @@ mc change \
 mc release --dry-run
 ```
 
-By default this now renders a human-friendly markdown preview in the terminal. Use `--format json` when you want structured output for tooling, or `--format text` when you explicitly want the older plain-text rendering.
+By default this now renders a human-friendly markdown preview in the terminal. Use `--format json` when you want structured output for tooling, `--format text` when you explicitly want the older plain-text rendering, or `--versions` when you only need the planned package and group versions.
 
 When you want to see the exact file patch without mutating the workspace, add `--diff`:
 

@@ -1785,12 +1785,18 @@ impl CliStepDefinition {
 			}
 			Self::CommitRelease { .. } | Self::Command { .. } => None,
 			Self::Discover { .. }
-			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
 			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
+					_ => None,
+				}
+			}
+			Self::PrepareRelease { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"versions" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}
@@ -3395,19 +3401,30 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 		CliCommandDefinition {
 			name: "release".to_string(),
 			help_text: Some("Prepare a release from discovered change files".to_string()),
-			inputs: vec![CliInputDefinition {
-				name: "format".to_string(),
-				kind: CliInputKind::Choice,
-				help_text: Some("Output format".to_string()),
-				required: false,
-				default: Some("markdown".to_string()),
-				choices: vec![
-					"markdown".to_string(),
-					"text".to_string(),
-					"json".to_string(),
-				],
-				short: None,
-			}],
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Output format".to_string()),
+					required: false,
+					default: Some("markdown".to_string()),
+					choices: vec![
+						"markdown".to_string(),
+						"text".to_string(),
+						"json".to_string(),
+					],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "versions".to_string(),
+					kind: CliInputKind::Boolean,
+					help_text: Some("Print only planned package and group versions".to_string()),
+					required: false,
+					default: Some("false".to_string()),
+					choices: Vec::new(),
+					short: None,
+				},
+			],
 			steps: vec![CliStepDefinition::PrepareRelease {
 				name: Some("prepare release".to_string()),
 				when: None,
