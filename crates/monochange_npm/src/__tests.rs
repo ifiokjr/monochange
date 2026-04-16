@@ -834,6 +834,48 @@ snapshots:
 }
 
 #[test]
+fn update_pnpm_lock_updates_nested_non_workspace_version_mappings() {
+	let mut lock: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
+		r"
+snapshots:
+  core@1.0.0:
+    dependencies:
+      core:
+        version: 1.0.0
+",
+	)
+	.unwrap_or_else(|error| panic!("pnpm lock yaml: {error}"));
+	let raw_versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
+
+	update_pnpm_lock(&mut lock, &raw_versions);
+
+	let rendered = serde_yaml_ng::to_string(&YamlValue::Mapping(lock))
+		.unwrap_or_else(|error| panic!("render pnpm lock: {error}"));
+	assert!(rendered.contains("version: 2.0.0"));
+}
+
+#[test]
+fn update_pnpm_lock_skips_workspace_references_inside_nested_version_mappings() {
+	let mut lock: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
+		r"
+snapshots:
+  core@1.0.0:
+    dependencies:
+      core:
+        version: workspace:*
+",
+	)
+	.unwrap_or_else(|error| panic!("pnpm lock yaml: {error}"));
+	let raw_versions = BTreeMap::from([("core".to_string(), "2.0.0".to_string())]);
+
+	update_pnpm_lock(&mut lock, &raw_versions);
+
+	let rendered = serde_yaml_ng::to_string(&YamlValue::Mapping(lock))
+		.unwrap_or_else(|error| panic!("render pnpm lock: {error}"));
+	assert!(rendered.contains("version: workspace:*"));
+}
+
+#[test]
 fn update_bun_lock_and_binary_skip_unusable_replacements() {
 	let unchanged = update_bun_lock(
 		"{\n  \"core\": \"1.0.0\n}",

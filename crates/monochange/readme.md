@@ -53,14 +53,11 @@ mc mcp
 
 <!-- {/monochangeCrateDocs} -->
 
-<!-- {=monochangeBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange-orange?logo=rust [crate-link]: https://crates.io/crates/monochange [docs-image]: https://img.shields.io/badge/docs.rs-monochange-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange/
 
-<!-- {/monochangeBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

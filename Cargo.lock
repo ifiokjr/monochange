@@ -1966,6 +1966,7 @@ dependencies = [
  "insta",
  "monochange_core",
  "monochange_semver",
+ "monochange_test_helpers",
  "rstest",
  "semver",
  "serde",
@@ -2015,6 +2016,7 @@ version = "0.1.0"
 dependencies = [
  "ignore",
  "insta",
+ "monochange_test_helpers",
  "reqwest",
  "rstest",
  "semver",

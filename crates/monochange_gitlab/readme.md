@@ -37,14 +37,11 @@ Reach for this crate when you want to preview or publish GitLab releases and mer
 
 <!-- {/monochangeGitlabCrateDocs} -->
 
-<!-- {=monochangeGitlabBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange_gitlab"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitlab-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_gitlab
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitlab-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_gitlab/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitlab-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_gitlab [docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitlab-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_gitlab/
 
-<!-- {/monochangeGitlabBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

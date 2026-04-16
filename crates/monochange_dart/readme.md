@@ -42,14 +42,11 @@ Reach for this crate when you need to scan `pubspec.yaml` files, expand Dart or 
 
 <!-- {/monochangeDartCrateDocs} -->
 
-<!-- {=monochangeDartBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange_dart"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_dart
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_dart/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_dart [docs-image]: https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_dart/
 
-<!-- {/monochangeDartBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

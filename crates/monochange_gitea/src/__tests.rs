@@ -585,6 +585,51 @@ fn publish_release_requests_reports_gitea_api_errors() {
 	assert!(error.to_string().contains("Gitea API GET"));
 }
 
+#[test]
+fn publish_release_pull_request_create_branch_is_covered_without_etest() {
+	let server = MockServer::start();
+	let list = server.mock(|when, then| {
+		when.method(GET)
+			.path("/api/v1/repos/org/monochange/pulls")
+			.query_param("state", "open")
+			.query_param("head", "org:monochange/release/release")
+			.query_param("base", "main");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let create = server.mock(|when, then| {
+		when.method(POST).path("/api/v1/repos/org/monochange/pulls");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body("{\"number\":7,\"html_url\":\"https://codeberg.org/org/monochange/pulls/7\"}");
+	});
+	let labels = server.mock(|when, then| {
+		when.method(POST)
+			.path("/api/v1/repos/org/monochange/issues/7/labels");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let (_tempdir, repo) = seed_git_repository();
+	let source = sample_source(
+		Some(format!("{}/api/v1", server.base_url())),
+		Some("https://codeberg.org".to_string()),
+	);
+	let request = build_release_pull_request_request(&source, &sample_manifest());
+
+	let outcome = with_gitea_env(Some("token"), || {
+		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+	});
+
+	list.assert();
+	create.assert();
+	labels.assert();
+	assert_eq!(outcome.operation, SourceChangeRequestOperation::Created);
+	assert_eq!(outcome.number, 7);
+}
+
 #[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
 fn publish_release_pull_request_creates_pull_request_and_labels() {
 	let server = MockServer::start();

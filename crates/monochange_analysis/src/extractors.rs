@@ -177,52 +177,7 @@ fn parse_added_item(
 	file_path: &Path,
 	line_number: Option<usize>,
 ) -> Option<SemanticChange> {
-	let content = line.trim_start_matches('+').trim();
-
-	// Parse visibility
-	let (visibility, rest) = parse_visibility(content)?;
-
-	// Skip if not actually public
-	if !matches!(visibility, Visibility::Public) {
-		return None;
-	}
-
-	// Parse item kind
-	let tokens: Vec<&str> = rest.split_whitespace().collect();
-	let kind = tokens.first()?;
-	let name = tokens.get(1)?.trim_end_matches('{').trim_end_matches(';');
-
-	let api_kind = match *kind {
-		"fn" => ApiChangeKind::FunctionAdded,
-		"struct" | "enum" | "type" => ApiChangeKind::TypeAdded,
-		"trait" => ApiChangeKind::TraitAdded,
-		"const" | "static" => ApiChangeKind::ConstantAdded,
-		_ => return None,
-	};
-
-	// Skip if name is empty
-	if name.is_empty() {
-		return None;
-	}
-
-	let signature = if *kind == "fn" {
-		// Extract function signature
-		let sig_start = rest.find("fn")?;
-		Some(rest[sig_start..].to_string())
-	} else {
-		None
-	};
-
-	Some(SemanticChange::Api(ApiChange {
-		kind: api_kind,
-		visibility,
-		name: name.to_string(),
-		signature,
-		doc_comment: None, // Could extract from context
-		is_breaking: false,
-		file_path: file_path.to_path_buf(),
-		line_number,
-	}))
+	parse_public_api_item(line, file_path, line_number, true)
 }
 
 /// Parse a line with a removed public item.
@@ -231,39 +186,71 @@ fn parse_removed_item(
 	file_path: &Path,
 	line_number: Option<usize>,
 ) -> Option<SemanticChange> {
-	let content = line.trim_start_matches('-').trim();
+	parse_public_api_item(line, file_path, line_number, false)
+}
 
-	// Parse visibility
+fn parse_public_api_item(
+	line: &str,
+	file_path: &Path,
+	line_number: Option<usize>,
+	is_addition: bool,
+) -> Option<SemanticChange> {
+	let marker = if is_addition { '+' } else { '-' };
+	let content = line.trim_start_matches(marker).trim();
 	let (visibility, rest) = parse_visibility(content)?;
 
-	// Only track public removals as breaking
 	if !matches!(visibility, Visibility::Public) {
 		return None;
 	}
 
-	// Parse item kind
-	let tokens: Vec<&str> = rest.split_whitespace().collect();
-	let kind = tokens.first()?;
-	let name = tokens.get(1)?.trim_end_matches('{').trim_end_matches(';');
-
-	let api_kind = match *kind {
-		"fn" => ApiChangeKind::FunctionRemoved,
-		"struct" | "enum" | "type" => ApiChangeKind::TypeRemoved,
-		"trait" => ApiChangeKind::TraitRemoved,
-		"const" | "static" => ApiChangeKind::ConstantRemoved,
-		_ => return None,
-	};
+	let (kind, name) = parse_api_item_parts(rest)?;
+	let api_kind = parse_api_change_kind(kind, is_addition)?;
+	let signature = is_addition
+		.then(|| extract_function_signature(rest))
+		.flatten();
 
 	Some(SemanticChange::Api(ApiChange {
 		kind: api_kind,
 		visibility,
 		name: name.to_string(),
-		signature: None,
+		signature,
 		doc_comment: None,
-		is_breaking: true, // Removing public items is breaking
+		is_breaking: !is_addition,
 		file_path: file_path.to_path_buf(),
 		line_number,
 	}))
+}
+
+fn parse_api_item_parts(rest: &str) -> Option<(&str, &str)> {
+	let mut tokens = rest.split_whitespace();
+	let kind = tokens.next()?;
+	let name = tokens.next()?.trim_end_matches('{').trim_end_matches(';');
+
+	if name.is_empty() {
+		return None;
+	}
+
+	Some((kind, name))
+}
+
+fn parse_api_change_kind(kind: &str, is_addition: bool) -> Option<ApiChangeKind> {
+	match (kind, is_addition) {
+		("fn", true) => Some(ApiChangeKind::FunctionAdded),
+		("fn", false) => Some(ApiChangeKind::FunctionRemoved),
+		("struct" | "enum" | "type", true) => Some(ApiChangeKind::TypeAdded),
+		("struct" | "enum" | "type", false) => Some(ApiChangeKind::TypeRemoved),
+		("trait", true) => Some(ApiChangeKind::TraitAdded),
+		("trait", false) => Some(ApiChangeKind::TraitRemoved),
+		("const" | "static", true) => Some(ApiChangeKind::ConstantAdded),
+		("const" | "static", false) => Some(ApiChangeKind::ConstantRemoved),
+		_ => None,
+	}
+}
+
+fn extract_function_signature(rest: &str) -> Option<String> {
+	let sig_start = rest.find("fn")?;
+
+	Some(rest[sig_start..].to_string())
 }
 
 /// Parse visibility modifier.
@@ -487,28 +474,28 @@ fn extract_app_semantic(
 fn extract_route_from_path(file: &Path) -> Option<String> {
 	let path_str = file.to_string_lossy();
 
-	// Extract route from /routes/... or /pages/...
-	if let Some(routes_idx) = path_str.find("/routes/") {
-		let route_part = &path_str[routes_idx + 8..];
-		let route = route_part
-			.trim_end_matches(".tsx")
-			.trim_end_matches(".jsx")
-			.trim_end_matches(".ts")
-			.trim_end_matches(".js");
-		return Some(format!("/{}", route.replace("/index", "")));
-	}
+	path_after_route_marker(&path_str)
+		.map(normalize_route_path)
+		.map(|route| format!("/{route}"))
+}
 
-	if let Some(pages_idx) = path_str.find("/pages/") {
-		let route_part = &path_str[pages_idx + 7..];
-		let route = route_part
-			.trim_end_matches(".tsx")
-			.trim_end_matches(".jsx")
-			.trim_end_matches(".ts")
-			.trim_end_matches(".js");
-		return Some(format!("/{}", route.replace("/index", "")));
+fn path_after_route_marker(path: &str) -> Option<&str> {
+	for marker in ["/routes/", "/pages/"] {
+		if let Some(index) = path.find(marker) {
+			return path.get(index + marker.len()..);
+		}
 	}
 
 	None
+}
+
+fn normalize_route_path(route: &str) -> String {
+	route
+		.trim_end_matches(".tsx")
+		.trim_end_matches(".jsx")
+		.trim_end_matches(".ts")
+		.trim_end_matches(".js")
+		.replace("/index", "")
 }
 
 /// Helper to extract component name from file path.
@@ -669,65 +656,39 @@ fn extract_mixed_changes(
 	detection_level: DetectionLevel,
 	repo_root: &Path,
 ) -> MonochangeResult<ExtractionResult> {
-	// For mixed artifacts, analyze based on file location
-	let lib_files: Vec<_> = files
-		.iter()
-		.filter(|f| {
-			let p = f.to_string_lossy();
-			p.contains("/lib.rs") || p.contains("/src/lib/")
-		})
-		.cloned()
-		.collect();
-
-	let bin_files: Vec<_> = files
-		.iter()
-		.filter(|f| {
-			let p = f.to_string_lossy();
-			p.contains("/main.rs") || p.contains("/bin/") || p.contains("/src/bin/")
-		})
-		.cloned()
-		.collect();
-
+	let lib_files = collect_matching_files(files, is_mixed_library_file);
+	let bin_files = collect_matching_files(files, is_mixed_binary_file);
+	let other_files = collect_matching_files(files, |file| {
+		!is_mixed_library_file(file) && !is_mixed_binary_file(file)
+	});
 	let mut all_changes = Vec::new();
 	let mut all_analyzed = Vec::new();
 	let mut all_skipped = Vec::new();
 
-	// Analyze library files
-	if !lib_files.is_empty() {
-		let lib_result = extract_library_changes(&lib_files, detection_level, repo_root)?;
-		all_changes.extend(lib_result.changes);
-		all_analyzed.extend(lib_result.files_analyzed);
-		all_skipped.extend(lib_result.files_skipped);
-	}
+	let library_result = append_mixed_extraction_result(
+		&mut all_changes,
+		&mut all_analyzed,
+		&mut all_skipped,
+		&lib_files,
+		detection_level,
+		repo_root,
+		true,
+	);
+	library_result?;
 
-	// Analyze binary files
-	if !bin_files.is_empty() {
-		let bin_result = extract_cli_changes(&bin_files, detection_level, repo_root)?;
-		all_changes.extend(bin_result.changes);
-		all_analyzed.extend(bin_result.files_analyzed);
-		all_skipped.extend(bin_result.files_skipped);
-	}
-
-	// Handle remaining files
-	let other_files: Vec<_> = files
-		.iter()
-		.filter(|f| {
-			let p = f.to_string_lossy();
-			!p.contains("/lib.rs")
-				&& !p.contains("/src/lib/")
-				&& !p.contains("/main.rs")
-				&& !p.contains("/bin/")
-				&& !p.contains("/src/bin/")
-		})
-		.cloned()
-		.collect();
-
-	if !other_files.is_empty() {
-		let cli_result = extract_cli_changes(&other_files, detection_level, repo_root)?;
-		all_changes.extend(cli_result.changes);
-		all_analyzed.extend(cli_result.files_analyzed);
-		all_skipped.extend(cli_result.files_skipped);
-	}
+	let mut append_cli = |files: &[PathBuf]| {
+		append_mixed_extraction_result(
+			&mut all_changes,
+			&mut all_analyzed,
+			&mut all_skipped,
+			files,
+			detection_level,
+			repo_root,
+			false,
+		)
+	};
+	append_cli(&bin_files)?;
+	append_cli(&other_files)?;
 
 	Ok(ExtractionResult {
 		changes: all_changes,
@@ -736,33 +697,90 @@ fn extract_mixed_changes(
 	})
 }
 
+fn collect_matching_files(files: &[PathBuf], matches: impl Fn(&Path) -> bool) -> Vec<PathBuf> {
+	files.iter().filter(|file| matches(file)).cloned().collect()
+}
+
+fn is_mixed_library_file(file: &Path) -> bool {
+	let path = file.to_string_lossy();
+
+	path.contains("/lib.rs") || path.contains("/src/lib/")
+}
+
+fn is_mixed_binary_file(file: &Path) -> bool {
+	let path = file.to_string_lossy();
+
+	path.contains("/main.rs") || path.contains("/bin/") || path.contains("/src/bin/")
+}
+
+fn append_mixed_extraction_result(
+	all_changes: &mut Vec<SemanticChange>,
+	all_analyzed: &mut Vec<PathBuf>,
+	all_skipped: &mut Vec<(PathBuf, SkipReason)>,
+	files: &[PathBuf],
+	detection_level: DetectionLevel,
+	repo_root: &Path,
+	library_files: bool,
+) -> MonochangeResult<()> {
+	append_extraction_result(all_changes, all_analyzed, all_skipped, files, |files| {
+		if library_files {
+			return extract_library_changes(files, detection_level, repo_root);
+		}
+
+		extract_cli_changes(files, detection_level, repo_root)
+	})
+}
+
+fn append_extraction_result(
+	all_changes: &mut Vec<SemanticChange>,
+	all_analyzed: &mut Vec<PathBuf>,
+	all_skipped: &mut Vec<(PathBuf, SkipReason)>,
+	files: &[PathBuf],
+	extractor: impl FnOnce(&[PathBuf]) -> MonochangeResult<ExtractionResult>,
+) -> MonochangeResult<()> {
+	if files.is_empty() {
+		return Ok(());
+	}
+
+	let result = extractor(files)?;
+	all_changes.extend(result.changes);
+	all_analyzed.extend(result.files_analyzed);
+	all_skipped.extend(result.files_skipped);
+
+	Ok(())
+}
+
 /// Get git diff for a specific file.
 fn get_file_diff(repo_root: &Path, file: &Path) -> MonochangeResult<String> {
+	let diff_args = ["diff", "HEAD", "--"];
+	let Some(output) = run_git_diff(repo_root, file, &diff_args)? else {
+		return Ok(String::new());
+	};
+
+	Ok(output)
+}
+
+fn run_git_diff(repo_root: &Path, file: &Path, args: &[&str]) -> MonochangeResult<Option<String>> {
 	use std::process::Command;
 
 	let output = Command::new("git")
 		.current_dir(repo_root)
-		.args(["diff", "HEAD", "--", file.to_string_lossy().as_ref()])
+		.args(args)
+		.arg(file.to_string_lossy().as_ref())
 		.output()
-		.map_err(|e| MonochangeError::Io(format!("failed to run git diff: {e}")))?;
+		.map_err(|error| MonochangeError::Io(format!("failed to run git diff: {error}")))?;
 
 	if !output.status.success() {
-		// File might be new (not in HEAD)
-		let output = Command::new("git")
-			.current_dir(repo_root)
-			.args(["diff", "--cached", "--", file.to_string_lossy().as_ref()])
-			.output()
-			.map_err(|e| MonochangeError::Io(format!("failed to run git diff: {e}")))?;
-
-		if !output.status.success() {
-			return Ok(String::new());
+		if args.contains(&"HEAD") {
+			return run_git_diff(repo_root, file, &["diff", "--cached", "--"]);
 		}
 
-		return String::from_utf8(output.stdout)
-			.map_err(|e| MonochangeError::Io(format!("invalid utf-8: {e}")));
+		return Ok(None);
 	}
 
-	String::from_utf8(output.stdout).map_err(|e| MonochangeError::Io(format!("invalid utf-8: {e}")))
+	String::from_utf8(output.stdout)
+		.map(Some)
+		.map_err(|error| MonochangeError::Io(format!("invalid utf-8: {error}")))
 }
 
 /// Check if a file is a test file.
@@ -1042,6 +1060,12 @@ mod tests {
 	}
 
 	#[test]
+	fn test_api_item_helpers_cover_empty_names_and_unknown_kinds() {
+		assert_eq!(parse_api_item_parts("fn {"), None);
+		assert_eq!(parse_api_change_kind("mod", true), None);
+	}
+
+	#[test]
 	fn test_extract_route_from_path_pages() {
 		assert_eq!(
 			extract_route_from_path(Path::new("src/pages/index.tsx")),
@@ -1296,6 +1320,95 @@ mod tests {
 			Path::new("."),
 		);
 		assert!(result.is_ok());
+	}
+
+	#[test]
+	fn test_extract_mixed_changes_routes_each_file_bucket() {
+		let files = vec![
+			PathBuf::from("src/lib.rs"),
+			PathBuf::from("src/main.rs"),
+			PathBuf::from("docs/readme.md"),
+		];
+		let result = extract_mixed_changes(&files, DetectionLevel::Basic, Path::new("."))
+			.unwrap_or_else(|error| panic!("mixed extraction: {error}"));
+
+		assert_eq!(result.files_analyzed.len(), 2);
+		assert_eq!(result.files_skipped.len(), 1);
+		assert!(matches!(
+			result.files_skipped.first().map(|entry| &entry.1),
+			Some(SkipReason::UnsupportedExtension)
+		));
+	}
+
+	#[test]
+	fn test_get_file_diff_returns_empty_outside_git_and_run_git_diff_covers_fallback_paths() {
+		use std::fs;
+		use std::process::Command;
+
+		use tempfile::TempDir;
+
+		let non_git = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let empty_diff = get_file_diff(non_git.path(), Path::new("src/lib.rs"))
+			.unwrap_or_else(|error| panic!("outside git diff: {error}"));
+		assert!(empty_diff.is_empty());
+
+		let repo = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["init"])
+			.output()
+			.unwrap_or_else(|error| panic!("git init: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["config", "user.email", "test@example.com"])
+			.output()
+			.unwrap_or_else(|error| panic!("git config email: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["config", "user.name", "monochange Tests"])
+			.output()
+			.unwrap_or_else(|error| panic!("git config name: {error}"));
+		fs::create_dir_all(repo.path().join("src"))
+			.unwrap_or_else(|error| panic!("create src dir: {error}"));
+		fs::write(repo.path().join("src/lib.rs"), "pub fn staged() {}\n")
+			.unwrap_or_else(|error| panic!("write lib.rs: {error}"));
+		Command::new("git")
+			.current_dir(repo.path())
+			.args(["add", "src/lib.rs"])
+			.output()
+			.unwrap_or_else(|error| panic!("git add: {error}"));
+
+		let staged_diff = run_git_diff(
+			repo.path(),
+			Path::new("src/lib.rs"),
+			&["diff", "HEAD", "--"],
+		)
+		.unwrap_or_else(|error| panic!("head fallback diff: {error}"));
+		assert!(
+			staged_diff.is_some_and(|diff| diff.contains("staged")),
+			"expected cached diff from fallback"
+		);
+
+		let missing = run_git_diff(
+			repo.path(),
+			Path::new("src/lib.rs"),
+			&["diff", "--definitely-invalid", "--"],
+		)
+		.unwrap_or_else(|error| panic!("invalid diff invocation: {error}"));
+		assert_eq!(missing, None);
+	}
+
+	#[test]
+	fn test_extract_mixed_changes_propagates_library_errors() {
+		let missing_root = Path::new("/definitely/missing/monochange-analysis-root");
+		let error = extract_mixed_changes(
+			&[PathBuf::from("src/lib.rs")],
+			DetectionLevel::Signature,
+			missing_root,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected library extraction error"));
+		assert!(error.to_string().contains("failed to run git diff"));
 	}
 
 	#[test]

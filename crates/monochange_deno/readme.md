@@ -41,14 +41,11 @@ Reach for this crate when you need to scan `deno.json` or `deno.jsonc` files, ex
 
 <!-- {/monochangeDenoCrateDocs} -->
 
-<!-- {=monochangeDenoBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange_deno"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_deno
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_deno/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_deno [docs-image]: https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_deno/
 
-<!-- {/monochangeDenoBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

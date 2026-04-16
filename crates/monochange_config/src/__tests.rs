@@ -2967,6 +2967,73 @@ fn raw_changelog_config_resolves_package_and_group_paths() {
 }
 
 #[test]
+fn configured_version_field_helpers_cover_custom_and_default_cases() {
+	let custom_fields = vec![
+		"package.metadata.release.version".to_string(),
+		"version".to_string(),
+	];
+
+	assert_eq!(
+		crate::configured_cargo_version_fields(Some(&custom_fields)),
+		vec!["package.metadata.release.version", "version"]
+	);
+	assert_eq!(
+		crate::configured_cargo_version_fields(None),
+		vec!["package.version", "workspace.package.version", "version"]
+	);
+	assert_eq!(
+		crate::configured_primary_version_field(Some(&custom_fields)),
+		"package.metadata.release.version"
+	);
+	assert_eq!(crate::configured_primary_version_field(None), "version");
+}
+
+#[test]
+fn validate_ecosystem_version_readable_reports_missing_json_and_yaml_string_fields() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let package_json = root.join("package.json");
+	let pubspec = root.join("pubspec.yaml");
+	let npm_fields = vec!["releaseVersion".to_string()];
+
+	std::fs::write(&package_json, "{\"releaseVersion\":1}")
+		.unwrap_or_else(|error| panic!("write package.json {}: {error}", package_json.display()));
+	let npm_error = crate::validate_ecosystem_version_readable(
+		&package_json,
+		"package.json",
+		EcosystemType::Npm,
+		Some(&npm_fields),
+		"package",
+		"web",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing json version field error"));
+	assert!(
+		npm_error
+			.to_string()
+			.contains("does not contain a `releaseVersion` string field")
+	);
+
+	std::fs::write(&pubspec, "name: app\nversion: 1\n")
+		.unwrap_or_else(|error| panic!("write pubspec {}: {error}", pubspec.display()));
+	let dart_error = crate::validate_ecosystem_version_readable(
+		&pubspec,
+		"pubspec.yaml",
+		EcosystemType::Dart,
+		None,
+		"package",
+		"app",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing yaml version field error"));
+	assert!(
+		dart_error
+			.to_string()
+			.contains("does not contain a `version` string field")
+	);
+}
+
+#[test]
 fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 	assert_eq!(
 		crate::infer_bump_from_versions(&Version::new(1, 2, 3), &Version::new(2, 0, 0)),
@@ -3366,6 +3433,50 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		invalid_command
 			.to_string()
 			.contains("has an empty `when` condition")
+	);
+
+	let empty_command = crate::validate_cli(&[cli_command(
+		"release",
+		vec![CliStepDefinition::Command {
+			name: Some("Run command".to_string()),
+			when: None,
+			show_progress: None,
+			command: " ".to_string(),
+			dry_run_command: None,
+			shell: ShellConfig::Default,
+			id: Some("run-command".to_string()),
+			variables: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected empty command error"));
+	assert!(
+		empty_command
+			.to_string()
+			.contains("command steps must provide a non-empty command")
+	);
+
+	let empty_dry_run_command = crate::validate_cli(&[cli_command(
+		"release",
+		vec![CliStepDefinition::Command {
+			name: Some("Run command".to_string()),
+			when: None,
+			show_progress: None,
+			command: "echo release".to_string(),
+			dry_run_command: Some(" ".to_string()),
+			shell: ShellConfig::Default,
+			id: Some("run-command".to_string()),
+			variables: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected empty dry-run command error"));
+	assert!(
+		empty_dry_run_command
+			.to_string()
+			.contains("`dry_run_command` must provide a non-empty command")
 	);
 
 	let empty_input_name = crate::validate_cli(&[CliCommandDefinition {

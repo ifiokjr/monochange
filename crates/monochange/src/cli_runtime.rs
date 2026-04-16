@@ -12,6 +12,7 @@ use std::process::Stdio;
 use std::sync::mpsc;
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
 use std::time::Instant;
 
 use clap::ArgMatches;
@@ -518,16 +519,7 @@ pub(crate) fn execute_cli_command_with_options(
 		let show_progress = step_shows_progress(step, &step_inputs);
 
 		if !should_execute_cli_step(step, &context, &step_inputs)? {
-			if show_progress {
-				progress.step_skipped(step_index, step, step.when());
-			}
-			if let Some(condition) = step.when() {
-				tracing::debug!(step = step.kind_name(), condition = %condition, "skipped CLI step");
-				context.command_logs.push(format!(
-					"skipped step `{}` because when condition `{condition}` is false",
-					step.display_name()
-				));
-			}
+			record_skipped_cli_step(&mut context, step, step_index, &mut progress, show_progress);
 			continue;
 		}
 
@@ -848,10 +840,15 @@ pub(crate) fn execute_cli_command_with_options(
 			}
 		})();
 		if let Err(error) = step_result {
-			if show_progress {
-				let progress_error = progress_error_detail(&error).to_string();
-				progress.step_failed(step_index, step, step_started_at.elapsed(), &progress_error);
-			}
+			report_cli_step_failure(
+				&mut progress,
+				show_progress,
+				step_index,
+				step,
+				step_started_at.elapsed(),
+				&error,
+			);
+
 			return Err(error);
 		}
 		if show_progress {
@@ -866,19 +863,8 @@ pub(crate) fn execute_cli_command_with_options(
 
 	progress.command_finished(command_started_at.elapsed());
 
-	if let Some(prepared_release) = &context.prepared_release
-		&& let Err(error) = save_prepared_release_execution(
-			root,
-			configuration,
-			prepared_release,
-			&context.prepared_file_diffs,
-			prepared_release_path.as_deref(),
-		) {
-		if prepared_release_path.is_some() {
-			return Err(error);
-		}
-		tracing::warn!(%error, "failed to save prepared release artifact");
-	}
+	let artifact_path = prepared_release_path.as_deref();
+	save_prepared_release_artifact(root, configuration, &context, artifact_path)?;
 
 	resolve_command_output(cli_command, &context, dry_run, output)
 }
@@ -1052,23 +1038,8 @@ fn run_cli_command_command(
 	show_progress: bool,
 	options: CommandStepOptions<'_>,
 ) -> MonochangeResult<()> {
-	let command_to_run = if context.dry_run {
-		if let Some(command) = options.dry_run_command {
-			command
-		} else {
-			let skipped = interpolate_cli_command_command(
-				context,
-				options.command,
-				options.variables,
-				options.step_inputs,
-			);
-			context
-				.command_logs
-				.push(format!("skipped command `{skipped}` (dry-run)"));
-			return Ok(());
-		}
-	} else {
-		options.command
+	let Some(command_to_run) = resolve_command_step_command(context, &options) else {
+		return Ok(());
 	};
 	let interpolated = interpolate_cli_command_command(
 		context,
@@ -1076,12 +1047,81 @@ fn run_cli_command_command(
 		options.variables,
 		options.step_inputs,
 	);
-	let mut process_command = if let Some(shell_binary) = options.shell.shell_binary() {
+	let mut process_command = build_process_command(&context.root, options.shell, &interpolated)?;
+	let output = execute_process_command(
+		&mut process_command,
+		progress,
+		show_progress,
+		step_index,
+		step,
+		&interpolated,
+	)?;
+
+	ensure_command_succeeded(&output, &interpolated)?;
+	store_command_step_output(context, options.step_id, &output);
+	log_command_step_output(context, &interpolated, &output);
+
+	Ok(())
+}
+
+fn record_skipped_cli_step(
+	context: &mut CliContext,
+	step: &CliStepDefinition,
+	step_index: usize,
+	progress: &mut CliProgressReporter,
+	show_progress: bool,
+) {
+	if show_progress {
+		progress.step_skipped(step_index, step, step.when());
+	}
+
+	let Some(condition) = step.when() else {
+		return;
+	};
+
+	tracing::debug!(step = step.kind_name(), condition = %condition, "skipped CLI step");
+	context.command_logs.push(format!(
+		"skipped step `{}` because when condition `{condition}` is false",
+		step.display_name()
+	));
+}
+
+fn resolve_command_step_command<'a>(
+	context: &mut CliContext,
+	options: &CommandStepOptions<'a>,
+) -> Option<&'a str> {
+	if !context.dry_run {
+		return Some(options.command);
+	}
+
+	if let Some(command) = options.dry_run_command {
+		return Some(command);
+	}
+
+	let skipped = interpolate_cli_command_command(
+		context,
+		options.command,
+		options.variables,
+		options.step_inputs,
+	);
+	context
+		.command_logs
+		.push(format!("skipped command `{skipped}` (dry-run)"));
+
+	None
+}
+
+fn build_process_command(
+	root: &Path,
+	shell: &ShellConfig,
+	interpolated: &str,
+) -> MonochangeResult<ProcessCommand> {
+	let mut process_command = if let Some(shell_binary) = shell.shell_binary() {
 		let mut process_command = ProcessCommand::new(shell_binary);
-		process_command.arg("-c").arg(&interpolated);
+		process_command.arg("-c").arg(interpolated);
 		process_command
 	} else {
-		let parts = shlex::split(&interpolated).ok_or_else(|| {
+		let parts = shlex::split(interpolated).ok_or_else(|| {
 			MonochangeError::Config(format!("failed to parse command `{interpolated}`"))
 		})?;
 		let Some((program, args)) = parts.split_first() else {
@@ -1093,59 +1133,90 @@ fn run_cli_command_command(
 		process_command.args(args);
 		process_command
 	};
-	process_command.current_dir(&context.root);
+	process_command.current_dir(root);
 
-	let output = if progress.is_enabled() && show_progress {
-		let streamed_output = run_process_with_streaming(
-			&mut process_command,
+	Ok(process_command)
+}
+
+fn execute_process_command(
+	process_command: &mut ProcessCommand,
+	progress: &mut CliProgressReporter,
+	show_progress: bool,
+	step_index: usize,
+	step: &CliStepDefinition,
+	interpolated: &str,
+) -> MonochangeResult<PreparedProcessOutput> {
+	if progress.is_enabled() && show_progress {
+		return run_process_with_streaming(
+			process_command,
 			progress,
 			step_index,
 			step,
-			&interpolated,
+			interpolated,
 		);
-		streamed_output?
-	} else {
-		let output = process_command.output().map_err(|error| {
-			MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
-		})?;
-		PreparedProcessOutput {
-			status: output.status,
-			stdout: output.stdout,
-			stderr: output.stderr,
-		}
-	};
-	if !output.status.success() {
-		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-		let details = if stderr.is_empty() {
-			format!("exit status {}", output.status)
-		} else {
-			stderr
-		};
-		let rendered_command = render_command_for_error(&interpolated);
-		return Err(MonochangeError::Discovery(format!(
-			"command `{rendered_command}` failed: {details}"
-		)));
 	}
+
+	let output = process_command.output().map_err(|error| {
+		MonochangeError::Io(format!("failed to run command `{interpolated}`: {error}"))
+	})?;
+
+	Ok(PreparedProcessOutput {
+		status: output.status,
+		stdout: output.stdout,
+		stderr: output.stderr,
+	})
+}
+
+fn ensure_command_succeeded(
+	output: &PreparedProcessOutput,
+	interpolated: &str,
+) -> MonochangeResult<()> {
+	if output.status.success() {
+		return Ok(());
+	}
+
+	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	let details = if stderr.is_empty() {
+		format!("exit status {}", output.status)
+	} else {
+		stderr
+	};
+	let rendered_command = render_command_for_error(interpolated);
+
+	Err(MonochangeError::Discovery(format!(
+		"command `{rendered_command}` failed: {details}"
+	)))
+}
+
+fn store_command_step_output(
+	context: &mut CliContext,
+	step_id: Option<&str>,
+	output: &PreparedProcessOutput,
+) {
+	let Some(id) = step_id else {
+		return;
+	};
 
 	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-	let stderr_text = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+	context
+		.step_outputs
+		.insert(id.to_string(), CommandStepOutput { stdout, stderr });
+}
 
-	if let Some(id) = options.step_id {
-		context.step_outputs.insert(
-			id.to_string(),
-			CommandStepOutput {
-				stdout: stdout.clone(),
-				stderr: stderr_text,
-			},
-		);
-	}
+fn log_command_step_output(
+	context: &mut CliContext,
+	interpolated: &str,
+	output: &PreparedProcessOutput,
+) {
+	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
 	if stdout.is_empty() {
 		context.command_logs.push(format!("ran `{interpolated}`"));
-	} else {
-		context.command_logs.push(stdout);
+		return;
 	}
-	Ok(())
+
+	context.command_logs.push(stdout);
 }
 
 struct PreparedProcessOutput {
@@ -2177,69 +2248,11 @@ pub(crate) fn render_cli_command_result(
 		cli_command.name,
 		if context.dry_run { " (dry-run)" } else { "" }
 	)];
+
 	if let Some(prepared_release) = &context.prepared_release {
-		if let Some(version) = &prepared_release.version {
-			lines.push(format!("version: {version}"));
-		}
-		if !prepared_release.released_packages.is_empty() {
-			lines.push(format!(
-				"released packages: {}",
-				prepared_release.released_packages.join(", ")
-			));
-		}
-		if !prepared_release.release_targets.is_empty() {
-			lines.push("release targets:".to_string());
-			for target in &prepared_release.release_targets {
-				lines.push(format!(
-					"- {} {} -> {} (tag: {}, release: {})",
-					target.kind, target.id, target.tag_name, target.tag, target.release,
-				));
-			}
-		}
-		if let Some(path) = &context.release_manifest_path {
-			lines.push(format!("release manifest: {}", path.display()));
-		}
-		if !context.release_results.is_empty() {
-			lines.push("releases:".to_string());
-			for release in &context.release_results {
-				lines.push(format!("- {release}"));
-			}
-		}
-		if let Some(release_commit_report) = &context.release_commit_report {
-			lines.extend(render_release_commit_report(release_commit_report));
-		}
-		if let Some(release_request_result) = &context.release_request_result {
-			lines.push("release request:".to_string());
-			lines.push(format!("- {release_request_result}"));
-		}
-		if !context.issue_comment_results.is_empty() {
-			lines.push("issue comments:".to_string());
-			for issue_comment in &context.issue_comment_results {
-				lines.push(format!("- {issue_comment}"));
-			}
-		}
-		if !prepared_release.changed_files.is_empty() {
-			lines.push("changed files:".to_string());
-			for path in &prepared_release.changed_files {
-				lines.push(format!("- {}", path.display()));
-			}
-		}
-		if context.show_diff && !context.prepared_file_diffs.is_empty() {
-			lines.push("file diffs:".to_string());
-			for (index, file_diff) in context.prepared_file_diffs.iter().enumerate() {
-				if index > 0 {
-					lines.push(String::new());
-				}
-				lines.push(file_diff.display_diff.clone());
-			}
-		}
-		if !prepared_release.deleted_changesets.is_empty() {
-			lines.push("deleted changesets:".to_string());
-			for path in &prepared_release.deleted_changesets {
-				lines.push(format!("- {}", path.display()));
-			}
-		}
+		render_prepared_release_summary(&mut lines, prepared_release, context);
 	}
+
 	if let Some(report) = &context.package_publish_report {
 		lines.extend(render_package_publish_report(report));
 	}
@@ -2320,6 +2333,92 @@ pub(crate) fn render_cli_command_result(
 		}
 	}
 	lines.join("\n")
+}
+
+fn render_prepared_release_summary(
+	lines: &mut Vec<String>,
+	prepared_release: &PreparedRelease,
+	context: &CliContext,
+) {
+	if let Some(version) = &prepared_release.version {
+		lines.push(format!("version: {version}"));
+	}
+
+	if !prepared_release.released_packages.is_empty() {
+		lines.push(format!(
+			"released packages: {}",
+			prepared_release.released_packages.join(", ")
+		));
+	}
+
+	if !prepared_release.release_targets.is_empty() {
+		lines.push("release targets:".to_string());
+		for target in &prepared_release.release_targets {
+			lines.push(format!(
+				"- {} {} -> {} (tag: {}, release: {})",
+				target.kind, target.id, target.tag_name, target.tag, target.release,
+			));
+		}
+	}
+
+	if let Some(path) = &context.release_manifest_path {
+		lines.push(format!("release manifest: {}", path.display()));
+	}
+
+	if !context.release_results.is_empty() {
+		lines.push("releases:".to_string());
+		for release in &context.release_results {
+			lines.push(format!("- {release}"));
+		}
+	}
+
+	if let Some(release_commit_report) = &context.release_commit_report {
+		lines.extend(render_release_commit_report(release_commit_report));
+	}
+
+	if let Some(release_request_result) = &context.release_request_result {
+		lines.push("release request:".to_string());
+		lines.push(format!("- {release_request_result}"));
+	}
+
+	if !context.issue_comment_results.is_empty() {
+		lines.push("issue comments:".to_string());
+		for issue_comment in &context.issue_comment_results {
+			lines.push(format!("- {issue_comment}"));
+		}
+	}
+
+	append_changed_file_lines(lines, &prepared_release.changed_files);
+
+	if context.show_diff && !context.prepared_file_diffs.is_empty() {
+		lines.push("file diffs:".to_string());
+		for (index, file_diff) in context.prepared_file_diffs.iter().enumerate() {
+			if index > 0 {
+				lines.push(String::new());
+			}
+			lines.push(file_diff.display_diff.clone());
+		}
+	}
+
+	if prepared_release.deleted_changesets.is_empty() {
+		return;
+	}
+
+	lines.push("deleted changesets:".to_string());
+	for path in &prepared_release.deleted_changesets {
+		lines.push(format!("- {}", path.display()));
+	}
+}
+
+fn append_changed_file_lines(lines: &mut Vec<String>, changed_files: &[PathBuf]) {
+	if !changed_files.is_empty() {
+		lines.push("changed files:".to_string());
+		lines.extend(
+			changed_files
+				.iter()
+				.map(|path| format!("- {}", path.display())),
+		);
+	}
 }
 
 pub(crate) fn render_cli_command_markdown_result(
@@ -2730,13 +2829,15 @@ fn execute_affected_packages_step(
 		.get("changed_paths")
 		.cloned()
 		.unwrap_or_default();
-	let changed_paths = if let Some(rev) = &since {
-		if !quiet && !explicit_paths.is_empty() {
-			eprintln!("warning: --since takes priority; --changed-paths was ignored");
+	let changed_paths = match &since {
+		Some(rev) => {
+			if !quiet && !explicit_paths.is_empty() {
+				eprintln!("warning: --since takes priority; --changed-paths was ignored");
+			}
+
+			compute_changed_paths_since(root, rev)?
 		}
-		compute_changed_paths_since(root, rev)?
-	} else {
-		explicit_paths
+		None => explicit_paths,
 	};
 	let labels = step_inputs.get("label").cloned().unwrap_or_default();
 	let enforce = step_inputs
@@ -2745,6 +2846,70 @@ fn execute_affected_packages_step(
 	let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
 	evaluation.enforce = enforce;
 	Ok(evaluation)
+}
+
+fn report_cli_step_failure(
+	progress: &mut CliProgressReporter,
+	show_progress: bool,
+	step_index: usize,
+	step: &CliStepDefinition,
+	elapsed: Duration,
+	error: &MonochangeError,
+) {
+	if !show_progress {
+		return;
+	}
+
+	let progress_error = progress_error_detail(error).to_string();
+	progress.step_failed(step_index, step, elapsed, &progress_error);
+}
+
+fn maybe_fail_enforced_changeset_policy(
+	evaluation: &ChangesetPolicyEvaluation,
+	quiet: bool,
+	rendered: String,
+) -> MonochangeResult<String> {
+	match (
+		evaluation.enforce,
+		evaluation.status == ChangesetPolicyStatus::Failed,
+	) {
+		(true, true) => {
+			if !quiet {
+				println!("{rendered}");
+			}
+
+			Err(MonochangeError::Config(evaluation.summary.clone()))
+		}
+		_ => Ok(rendered),
+	}
+}
+
+fn save_prepared_release_artifact(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	context: &CliContext,
+	prepared_release_path: Option<&Path>,
+) -> MonochangeResult<()> {
+	let Some(prepared_release) = &context.prepared_release else {
+		return Ok(());
+	};
+
+	let save_result = save_prepared_release_execution(
+		root,
+		configuration,
+		prepared_release,
+		&context.prepared_file_diffs,
+		prepared_release_path,
+	);
+
+	match (prepared_release_path.is_some(), save_result) {
+		(_, Ok(())) => Ok(()),
+		(true, Err(error)) => Err(error),
+		(false, Err(error)) => {
+			tracing::warn!(%error, "failed to save prepared release artifact");
+			Ok(())
+		}
+	}
 }
 
 fn resolve_command_output(
@@ -2788,13 +2953,8 @@ fn resolve_command_output(
 				render_cli_command_result(cli_command, context)
 			}
 		};
-		if evaluation.enforce && evaluation.status == ChangesetPolicyStatus::Failed {
-			if !context.quiet {
-				println!("{rendered}");
-			}
-			return Err(MonochangeError::Config(evaluation.summary.clone()));
-		}
-		return Ok(rendered);
+
+		return maybe_fail_enforced_changeset_policy(evaluation, context.quiet, rendered);
 	}
 	if let Some(report) = &context.changeset_diagnostics {
 		let format = context
@@ -2864,6 +3024,7 @@ mod tests {
 	use std::path::Path;
 	use std::path::PathBuf;
 	use std::sync::mpsc;
+	use std::time::Duration;
 
 	use monochange_config::load_workspace_configuration;
 	use monochange_core::ChangesetPolicyEvaluation;
@@ -2904,6 +3065,48 @@ mod tests {
 			retarget_report: None,
 			step_outputs: BTreeMap::new(),
 			command_logs: Vec::new(),
+		}
+	}
+
+	fn sample_configuration(root: &Path) -> monochange_core::WorkspaceConfiguration {
+		monochange_core::WorkspaceConfiguration {
+			root_path: root.to_path_buf(),
+			defaults: monochange_core::WorkspaceDefaults::default(),
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		}
+	}
+
+	fn sample_prepared_release() -> PreparedRelease {
+		PreparedRelease {
+			plan: ReleasePlan {
+				workspace_root: PathBuf::from("."),
+				decisions: Vec::new(),
+				groups: Vec::new(),
+				warnings: Vec::new(),
+				unresolved_items: Vec::new(),
+				compatibility_evidence: Vec::new(),
+			},
+			changeset_paths: Vec::new(),
+			changesets: Vec::new(),
+			released_packages: Vec::new(),
+			package_publications: Vec::new(),
+			version: None,
+			group_version: None,
+			release_targets: Vec::new(),
+			changed_files: Vec::new(),
+			changelogs: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			dry_run: true,
 		}
 	}
 
@@ -4037,6 +4240,103 @@ path = "crates/core"
 		assert_eq!(file_diffs.len(), 1);
 		assert_eq!(file_diffs[0]["path"], serde_json::json!("Cargo.toml"));
 		assert_eq!(file_diffs[0]["diff"], serde_json::json!("-old\n+new"));
+	}
+
+	#[test]
+	fn execute_cli_command_with_options_covers_final_artifact_save_call() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let cli_command = CliCommandDefinition {
+			name: "noop".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: Vec::new(),
+		};
+
+		let output = execute_cli_command_with_options(
+			tempdir.path(),
+			&sample_configuration(tempdir.path()),
+			&cli_command,
+			ExecuteCliCommandOptions {
+				dry_run: false,
+				quiet: true,
+				show_diff: false,
+				inputs: BTreeMap::new(),
+				prepared_release_path: None,
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.unwrap_or_else(|error| panic!("execute noop command: {error}"));
+
+		assert_eq!(output, "command `noop` completed");
+	}
+
+	#[test]
+	fn record_skipped_and_failure_helpers_cover_silent_paths() {
+		let cli_command = default_cli_command("validate");
+		let step = CliStepDefinition::Validate {
+			name: Some("validate".to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		};
+		let mut context = cli_context();
+		let mut progress =
+			CliProgressReporter::new(&cli_command, false, true, ProgressFormat::Auto);
+
+		record_skipped_cli_step(&mut context, &step, 0, &mut progress, false);
+		report_cli_step_failure(
+			&mut progress,
+			false,
+			0,
+			&step,
+			Duration::from_millis(1),
+			&MonochangeError::Config("boom".to_string()),
+		);
+
+		assert!(context.command_logs.is_empty());
+	}
+
+	#[test]
+	fn render_cli_command_result_includes_release_results_and_changed_files() {
+		let cli_command = default_cli_command("release");
+		let mut context = cli_context();
+		let mut prepared_release = sample_prepared_release();
+		prepared_release.changed_files = vec![PathBuf::from("Cargo.toml")];
+		context.prepared_release = Some(prepared_release);
+		context.release_manifest_path = Some(PathBuf::from(".monochange/prepared-release.json"));
+		context.release_results = vec!["published core".to_string()];
+
+		let rendered = render_cli_command_result(&cli_command, &context);
+
+		assert!(rendered.contains("release manifest: .monochange/prepared-release.json"));
+		assert!(rendered.contains("releases:"));
+		assert!(rendered.contains("- published core"));
+		assert!(rendered.contains("changed files:"));
+		assert!(rendered.contains("- Cargo.toml"));
+	}
+
+	#[test]
+	fn save_prepared_release_artifact_returns_explicit_errors() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let mut context = cli_context();
+		context.prepared_release = Some(sample_prepared_release());
+
+		let error = save_prepared_release_artifact(
+			tempdir.path(),
+			&sample_configuration(tempdir.path()),
+			&context,
+			Some(tempdir.path().join("prepared-release.json").as_path()),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected explicit artifact save error"));
+
+		assert!(!error.to_string().is_empty());
+	}
+
+	#[test]
+	fn append_changed_file_lines_returns_early_when_no_files_changed() {
+		let mut lines = vec!["start".to_string()];
+		append_changed_file_lines(&mut lines, &[]);
+		assert_eq!(lines, vec!["start".to_string()]);
 	}
 
 	#[test]

@@ -15,113 +15,11 @@
 
 <!-- {/repoStatusBadgeLinks} -->
 
-<!-- {@monochangeBadgeLinks} -->
+<!-- {@crateBadgeLinks:"crate_name"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange/
+[crate-image]: https://img.shields.io/badge/crates.io-{{ crate_name|replace("_", "__") }}-orange?logo=rust [crate-link]: https://crates.io/crates/{{ crate_name }} [docs-image]: https://img.shields.io/badge/docs.rs-{{ crate_name|replace("_", "__") }}-1f425f?logo=docs.rs [docs-link]: https://docs.rs/{{ crate_name }}/
 
-<!-- {/monochangeBadgeLinks} -->
-
-<!-- {@monochangeCoreBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_core
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_core/
-
-<!-- {/monochangeCoreBadgeLinks} -->
-
-<!-- {@monochangeCargoBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__cargo-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_cargo
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__cargo-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_cargo/
-
-<!-- {/monochangeCargoBadgeLinks} -->
-
-<!-- {@monochangeConfigBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_config
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_config/
-
-<!-- {/monochangeConfigBadgeLinks} -->
-
-<!-- {@monochangeGraphBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_graph
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_graph/
-
-<!-- {/monochangeGraphBadgeLinks} -->
-
-<!-- {@monochangeGithubBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__github-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_github
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__github-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_github/
-
-<!-- {/monochangeGithubBadgeLinks} -->
-
-<!-- {@monochangeGiteaBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitea-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_gitea
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitea-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_gitea/
-
-<!-- {/monochangeGiteaBadgeLinks} -->
-
-<!-- {@monochangeGitlabBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitlab-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_gitlab
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitlab-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_gitlab/
-
-<!-- {/monochangeGitlabBadgeLinks} -->
-
-<!-- {@monochangeNpmBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__npm-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_npm
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__npm-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_npm/
-
-<!-- {/monochangeNpmBadgeLinks} -->
-
-<!-- {@monochangeDenoBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_deno
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_deno/
-
-<!-- {/monochangeDenoBadgeLinks} -->
-
-<!-- {@monochangeDartBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_dart
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_dart/
-
-<!-- {/monochangeDartBadgeLinks} -->
-
-<!-- {@monochangeSemverBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_semver
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_semver/
-
-<!-- {/monochangeSemverBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {@monochangeCrateDocs} -->
 
@@ -217,6 +115,39 @@ assert!(rendered.contains("- add keep-a-changelog output"));
 ```
 
 <!-- {/monochangeCoreCrateDocs} -->
+
+<!-- {@monochangeAnalysisCrateDocs} -->
+
+`monochange_analysis` turns git diff context into artifact-aware changeset suggestions.
+
+Reach for this crate when you want to classify changed packages as libraries, applications, CLI tools, or mixed artifacts and then extract the most user-facing parts of the diff.
+
+## Why use it?
+
+- convert raw changed files into package-centric semantic summaries
+- use different heuristics for libraries, applications, and CLI tools
+- reuse one analysis pipeline across CLI, MCP, and CI automation
+
+## Best for
+
+- suggesting changeset boundaries before writing `.changeset/*.md` files
+- analyzing pull-request or branch diffs in assistant workflows
+- experimenting with artifact-aware release note generation
+
+## Public entry points
+
+- `ChangeFrame::detect(root)` selects the git frame to analyze
+- `detect_artifact_type(package_path)` classifies a package as a library, application, CLI tool, or mixed artifact
+- `analyze_changes(root, frame, config)` returns package analyses and suggested changesets
+
+## Scope
+
+- git-aware frame detection
+- artifact classification
+- semantic diff extraction
+- adaptive suggestion grouping
+
+<!-- {/monochangeAnalysisCrateDocs} -->
 
 <!-- {@monochangeCargoCrateDocs} -->
 
@@ -503,6 +434,34 @@ Reach for this crate when you want to preview or publish GitLab releases and mer
 
 <!-- {/monochangeGitlabCrateDocs} -->
 
+<!-- {@monochangeHostingCrateDocs} -->
+
+`monochange_hosting` packages the shared git and HTTP plumbing used by hosted source providers.
+
+Reach for this crate when you are implementing GitHub, Gitea, or GitLab release adapters and want one place for release-body rendering, change-request branch naming, JSON requests, and git branch orchestration.
+
+## Why use it?
+
+- keep provider adapters focused on provider-specific payloads instead of repeated plumbing
+- share one markdown rendering path for release bodies and release pull requests
+- reuse one set of blocking HTTP helpers with consistent error messages
+
+## Best for
+
+- implementing or testing hosted source adapters
+- generating release pull request bodies from prepared manifests
+- staging, committing, and pushing release branches through shared wrappers
+
+## Public entry points
+
+- `release_body(source, manifest, target)` resolves the outward release body for a target
+- `release_pull_request_body(manifest)` renders the provider change-request body
+- `release_pull_request_branch(prefix, command)` normalizes the change-request branch name
+- `get_json`, `post_json`, `patch_json`, and `put_json` wrap provider API requests
+- `git_checkout_branch`, `git_stage_paths`, `git_commit_paths`, and `git_push_branch` wrap shared git operations
+
+<!-- {/monochangeHostingCrateDocs} -->
+
 <!-- {@monochangeNpmCrateDocs} -->
 
 `monochange_npm` discovers npm-family packages and normalizes them for shared planning.
@@ -638,3 +597,30 @@ assert_eq!(direct, BumpSeverity::Minor);
 ```
 
 <!-- {/monochangeSemverCrateDocs} -->
+
+<!-- {@monochangeTestHelpersCrateDocs} -->
+
+`monochange_test_helpers` packages the shared fixture, snapshot, git, and RMCP helpers used across the workspace test suite.
+
+Reach for this crate when you are writing integration or fixture-heavy tests that need scenario workspaces, command snapshots, or temporary git repositories.
+
+## Why use it?
+
+- keep tests focused on behavior instead of tempdir and setup boilerplate
+- share consistent fixture loading across crates
+- reuse snapshot and git helpers in integration suites
+
+## Best for
+
+- copying fixture workspaces into temp directories
+- writing git-backed integration tests
+- configuring `insta` snapshots and RMCP content assertions
+
+## Public entry points
+
+- `copy_directory` and `copy_directory_skip_git` clone fixture trees into temp workspaces
+- `git`, `git_output`, and `git_output_trimmed` run test git commands
+- `snapshot_settings()` configures shared snapshot behavior
+- `fixture_path!`, `setup_fixture!`, and `setup_scenario_workspace!` locate and materialize test fixtures
+
+<!-- {/monochangeTestHelpersCrateDocs} -->

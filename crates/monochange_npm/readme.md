@@ -42,14 +42,11 @@ Reach for this crate when you want one adapter for npm, pnpm, and Bun workspaces
 
 <!-- {/monochangeNpmCrateDocs} -->
 
-<!-- {=monochangeNpmBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange_npm"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__npm-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_npm
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__npm-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_npm/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__npm-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_npm [docs-image]: https://img.shields.io/badge/docs.rs-monochange__npm-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_npm/
 
-<!-- {/monochangeNpmBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

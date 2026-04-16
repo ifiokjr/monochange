@@ -2,11 +2,36 @@
 
 //! # `monochange_analysis`
 //!
-//! Semantic change analysis for generating granular changesets.
+//! <!-- {=monochangeAnalysisCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange_analysis` turns git diff context into artifact-aware changeset suggestions.
 //!
-//! This crate provides the analysis pipeline for detecting user-facing changes
-//! across libraries, applications, and CLI tools. It extracts semantic meaning
-//! from git diffs to suggest appropriate changeset granularity.
+//! Reach for this crate when you want to classify changed packages as libraries, applications, CLI tools, or mixed artifacts and then extract the most user-facing parts of the diff.
+//!
+//! ## Why use it?
+//!
+//! - convert raw changed files into package-centric semantic summaries
+//! - use different heuristics for libraries, applications, and CLI tools
+//! - reuse one analysis pipeline across CLI, MCP, and CI automation
+//!
+//! ## Best for
+//!
+//! - suggesting changeset boundaries before writing `.changeset/*.md` files
+//! - analyzing pull-request or branch diffs in assistant workflows
+//! - experimenting with artifact-aware release note generation
+//!
+//! ## Public entry points
+//!
+//! - `ChangeFrame::detect(root)` selects the git frame to analyze
+//! - `detect_artifact_type(package_path)` classifies a package as a library, application, CLI tool, or mixed artifact
+//! - `analyze_changes(root, frame, config)` returns package analyses and suggested changesets
+//!
+//! ## Scope
+//!
+//! - git-aware frame detection
+//! - artifact classification
+//! - semantic diff extraction
+//! - adaptive suggestion grouping
+//! <!-- {/monochangeAnalysisCrateDocs} -->
 
 use std::collections::BTreeMap;
 use std::fmt;

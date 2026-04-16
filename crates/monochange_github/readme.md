@@ -102,14 +102,11 @@ assert_eq!(requests[0].repository, "ifiokjr/monochange");
 
 <!-- {/monochangeGithubCrateDocs} -->
 
-<!-- {=monochangeGithubBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange_github"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__github-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_github
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__github-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_github/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__github-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_github [docs-image]: https://img.shields.io/badge/docs.rs-monochange__github-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_github/
 
-<!-- {/monochangeGithubBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

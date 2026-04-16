@@ -522,23 +522,21 @@ fn render_changelog_path_template(template: &str, package_path: &Path) -> String
 impl RawChangelogConfig {
 	fn as_defaults_definition(&self) -> ChangelogDefinition {
 		match self {
-			Self::Legacy(definition) => {
-				match definition {
-					RawChangelogDefinition::Enabled(false) => ChangelogDefinition::Disabled,
-					RawChangelogDefinition::Enabled(true) => ChangelogDefinition::PackageDefault,
-					RawChangelogDefinition::Path(path_pattern) => {
-						ChangelogDefinition::PathPattern(path_pattern.clone())
-					}
-				}
+			Self::Legacy(RawChangelogDefinition::Enabled(false)) => ChangelogDefinition::Disabled,
+			Self::Legacy(RawChangelogDefinition::Enabled(true)) => {
+				ChangelogDefinition::PackageDefault
+			}
+			Self::Legacy(RawChangelogDefinition::Path(path_pattern)) => {
+				ChangelogDefinition::PathPattern(path_pattern.clone())
+			}
+			Self::Detailed(table) if matches!(table.enabled, Some(false)) => {
+				ChangelogDefinition::Disabled
 			}
 			Self::Detailed(table) => {
-				match (table.enabled.unwrap_or(true), &table.path) {
-					(false, _) => ChangelogDefinition::Disabled,
-					(true, Some(path_pattern)) => {
-						ChangelogDefinition::PathPattern(path_pattern.clone())
-					}
-					(true, None) => ChangelogDefinition::PackageDefault,
-				}
+				table.path.clone().map_or(
+					ChangelogDefinition::PackageDefault,
+					ChangelogDefinition::PathPattern,
+				)
 			}
 		}
 	}
@@ -572,61 +570,47 @@ impl RawChangelogConfig {
 		treat_string_as_pattern: bool,
 	) -> Option<PathBuf> {
 		match self {
-			Self::Legacy(definition) => {
-				match definition {
-					RawChangelogDefinition::Enabled(false) => None,
-					RawChangelogDefinition::Enabled(true) => {
-						Some(package_path.join("CHANGELOG.md"))
-					}
-					RawChangelogDefinition::Path(path) => {
-						if treat_string_as_pattern {
-							Some(PathBuf::from(render_changelog_path_template(
-								path,
-								package_path,
-							)))
-						} else {
-							Some(PathBuf::from(path))
-						}
-					}
-				}
+			Self::Legacy(RawChangelogDefinition::Enabled(false)) => None,
+			Self::Legacy(RawChangelogDefinition::Enabled(true)) => {
+				Some(package_path.join("CHANGELOG.md"))
 			}
+			Self::Legacy(RawChangelogDefinition::Path(path)) => {
+				Some(resolve_changelog_path(
+					path,
+					package_path,
+					treat_string_as_pattern,
+				))
+			}
+			Self::Detailed(table) if matches!(table.enabled, Some(false)) => None,
 			Self::Detailed(table) => {
-				if matches!(table.enabled, Some(false)) {
-					return None;
-				}
-				match &table.path {
-					Some(path) => {
-						if treat_string_as_pattern {
-							Some(PathBuf::from(render_changelog_path_template(
-								path,
-								package_path,
-							)))
-						} else {
-							Some(PathBuf::from(path))
-						}
-					}
-					None => Some(package_path.join("CHANGELOG.md")),
-				}
+				Some(table.path.as_deref().map_or_else(
+					|| package_path.join("CHANGELOG.md"),
+					|path| resolve_changelog_path(path, package_path, treat_string_as_pattern),
+				))
 			}
 		}
 	}
 
 	fn resolve_for_group(&self) -> Option<PathBuf> {
 		match self {
-			Self::Legacy(definition) => {
-				match definition {
-					RawChangelogDefinition::Enabled(false | true) => None,
-					RawChangelogDefinition::Path(path) => Some(PathBuf::from(path)),
-				}
-			}
-			Self::Detailed(table) => {
-				if matches!(table.enabled, Some(false)) {
-					return None;
-				}
-				table.path.as_ref().map(PathBuf::from)
-			}
+			Self::Legacy(RawChangelogDefinition::Enabled(false | true)) => None,
+			Self::Legacy(RawChangelogDefinition::Path(path)) => Some(PathBuf::from(path)),
+			Self::Detailed(table) if matches!(table.enabled, Some(false)) => None,
+			Self::Detailed(table) => table.path.as_ref().map(PathBuf::from),
 		}
 	}
+}
+
+fn resolve_changelog_path(
+	path: &str,
+	package_path: &Path,
+	treat_string_as_pattern: bool,
+) -> PathBuf {
+	if treat_string_as_pattern {
+		return PathBuf::from(render_changelog_path_template(path, package_path));
+	}
+
+	PathBuf::from(path)
 }
 
 fn parse_group_changelog_include(
@@ -2424,21 +2408,7 @@ fn validate_package_and_group_definitions(
 			));
 		}
 		if package.version_format == VersionFormat::Primary {
-			if let Some(existing_owner) = &primary_owner {
-				return Err(config_diagnostic(
-					config_contents,
-					format!("`version_format = \"primary\"` is already used by `{existing_owner}`"),
-					vec![
-						config_primary_label(config_contents, existing_owner),
-						config_primary_label(config_contents, &package.id),
-					],
-					Some(
-						"choose a single package or group as the primary outward release identity"
-							.to_string(),
-					),
-				));
-			}
-			primary_owner = Some(package.id.clone());
+			assign_primary_release_owner(config_contents, &mut primary_owner, &package.id)?;
 		}
 	}
 
@@ -2483,21 +2453,7 @@ fn validate_package_and_group_definitions(
 			));
 		}
 		if group.version_format == VersionFormat::Primary {
-			if let Some(existing_owner) = &primary_owner {
-				return Err(config_diagnostic(
-					config_contents,
-					format!("`version_format = \"primary\"` is already used by `{existing_owner}`"),
-					vec![
-						config_primary_label(config_contents, existing_owner),
-						config_primary_label(config_contents, &group.id),
-					],
-					Some(
-						"choose a single package or group as the primary outward release identity"
-							.to_string(),
-					),
-				));
-			}
-			primary_owner = Some(group.id.clone());
+			assign_primary_release_owner(config_contents, &mut primary_owner, &group.id)?;
 		}
 		for package_id in &group.packages {
 			if !declared_packages.contains(package_id.as_str()) {
@@ -2545,6 +2501,85 @@ fn validate_package_and_group_definitions(
 	Ok(())
 }
 
+fn validate_cli_input_default(
+	cli_command: &CliCommandDefinition,
+	input: &CliInputDefinition,
+	default: &str,
+) -> MonochangeResult<()> {
+	if matches!(input.kind, CliInputKind::Choice)
+		&& !input.choices.iter().any(|choice| choice == default)
+	{
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` input `{}` default `{default}` is not one of the configured choices",
+			cli_command.name, input.name
+		)));
+	}
+
+	if matches!(input.kind, CliInputKind::Boolean) && default != "true" && default != "false" {
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` input `{}` boolean default must be `true` or `false`",
+			cli_command.name, input.name
+		)));
+	}
+
+	Ok(())
+}
+
+fn validate_affected_packages_step_enabled(
+	cli_command: &CliCommandDefinition,
+	verify_enabled: bool,
+) -> MonochangeResult<()> {
+	if verify_enabled {
+		return Ok(());
+	}
+
+	Err(MonochangeError::Config(format!(
+		"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",
+		cli_command.name
+	)))
+}
+
+fn validate_command_step_definition(
+	cli_command: &CliCommandDefinition,
+	command: &str,
+	dry_run_command: Option<&str>,
+	step_id: Option<&str>,
+	seen_step_ids: &mut BTreeSet<String>,
+) -> MonochangeResult<()> {
+	if let Some(step_id) = step_id {
+		let trimmed = step_id.trim();
+		if trimmed.is_empty() {
+			return Err(MonochangeError::Config(format!(
+				"CLI command `{}` has a command step with an empty id",
+				cli_command.name
+			)));
+		}
+
+		if !seen_step_ids.insert(trimmed.to_string()) {
+			return Err(MonochangeError::Config(format!(
+				"CLI command `{}` has duplicate step id `{trimmed}`",
+				cli_command.name
+			)));
+		}
+	}
+
+	if command.trim().is_empty() {
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` command steps must provide a non-empty command",
+			cli_command.name
+		)));
+	}
+
+	if matches!(dry_run_command, Some(value) if value.trim().is_empty()) {
+		return Err(MonochangeError::Config(format!(
+			"CLI command `{}` command steps with `dry_run_command` must provide a non-empty command",
+			cli_command.name
+		)));
+	}
+
+	Ok(())
+}
+
 fn path_uses_glob(path: &str) -> bool {
 	path.contains('*') || path.contains('?') || path.contains('[')
 }
@@ -2576,70 +2611,14 @@ fn validate_versioned_files(
 	owner_id: &str,
 ) -> MonochangeResult<()> {
 	for versioned_file in versioned_files {
-		if let Some(regex) = &versioned_file.regex {
-			if versioned_file.ecosystem_type.is_some() {
-				return Err(config_diagnostic(
-					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files cannot also set `type`"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"regex versioned_files cannot set `type`",
-					)],
-					Some("remove `type` when using `regex`; regex versioned_files operate on plain text files without ecosystem-specific parsing".to_string()),
-				));
-			}
-			if versioned_file.prefix.is_some()
-				|| versioned_file.fields.is_some()
-				|| versioned_file.name.is_some()
-			{
-				return Err(config_diagnostic(
-					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files cannot also set `prefix`, `fields`, or `name`"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"regex versioned_files cannot mix text and dependency settings",
-					)],
-					Some("remove `prefix`, `fields`, and `name` when using `regex`; those options only apply to ecosystem-aware manifest updates".to_string()),
-				));
-			}
-			let compiled = Regex::new(regex).map_err(|error| {
-				config_diagnostic(
-					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` is invalid"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"invalid regex versioned_files pattern",
-					)],
-					Some(error.to_string()),
-				)
-			})?;
-			if !compiled.capture_names().any(|name| name == Some("version")) {
-				return Err(config_diagnostic(
-					config_contents,
-					format!(
-						"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` must include a named `version` capture"
-					),
-					vec![config_section_label(
-						config_contents,
-						owner_kind,
-						owner_id,
-						"regex versioned_files must capture the version",
-					)],
-					Some("use a named capture like `(?<version>\\d+\\.\\d+\\.\\d+)` so monochange knows which substring to replace".to_string()),
-				));
-			}
+		if let Some(regex) = versioned_file.regex.as_deref() {
+			validate_regex_versioned_file(
+				config_contents,
+				versioned_file,
+				owner_kind,
+				owner_id,
+				regex,
+			)?;
 			continue;
 		}
 
@@ -2735,29 +2714,34 @@ fn validate_lockfile_commands(
 				"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty command"
 			)));
 		}
-		if let Some(cwd) = &lockfile_command.cwd {
-			if cwd.as_os_str().is_empty() {
-				return Err(MonochangeError::Config(format!(
-					"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty cwd when set"
-				)));
-			}
-			let resolved = if cwd.is_absolute() {
-				cwd.clone()
-			} else {
-				root.join(cwd)
-			};
-			if !resolved.starts_with(root) {
-				return Err(MonochangeError::Config(format!(
-					"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` must stay within the workspace root",
-					cwd.display()
-				)));
-			}
-			if !resolved.is_dir() {
-				return Err(MonochangeError::Config(format!(
-					"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` does not exist or is not a directory",
-					cwd.display()
-				)));
-			}
+		let Some(cwd) = &lockfile_command.cwd else {
+			continue;
+		};
+
+		if cwd.as_os_str().is_empty() {
+			return Err(MonochangeError::Config(format!(
+				"ecosystem `{ecosystem_id}` lockfile_commands must provide a non-empty cwd when set"
+			)));
+		}
+
+		let resolved = if cwd.is_absolute() {
+			cwd.clone()
+		} else {
+			root.join(cwd)
+		};
+
+		if !resolved.starts_with(root) {
+			return Err(MonochangeError::Config(format!(
+				"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` must stay within the workspace root",
+				cwd.display()
+			)));
+		}
+
+		if !resolved.is_dir() {
+			return Err(MonochangeError::Config(format!(
+				"ecosystem `{ecosystem_id}` lockfile_commands cwd `{}` does not exist or is not a directory",
+				cwd.display()
+			)));
 		}
 	}
 
@@ -3082,6 +3066,82 @@ fn validate_changesets_configuration(
 }
 
 #[allow(clippy::match_same_arms)]
+fn validate_regex_versioned_file(
+	config_contents: &str,
+	versioned_file: &VersionedFileDefinition,
+	owner_kind: &str,
+	owner_id: &str,
+	regex: &str,
+) -> MonochangeResult<()> {
+	if versioned_file.ecosystem_type.is_some() {
+		return Err(config_diagnostic(
+			config_contents,
+			format!("{owner_kind} `{owner_id}` regex versioned_files cannot also set `type`"),
+			vec![config_section_label(
+				config_contents,
+				owner_kind,
+				owner_id,
+				"regex versioned_files cannot set `type`",
+			)],
+			Some("remove `type` when using `regex`; regex versioned_files operate on plain text files without ecosystem-specific parsing".to_string()),
+		));
+	}
+
+	if versioned_file.prefix.is_some()
+		|| versioned_file.fields.is_some()
+		|| versioned_file.name.is_some()
+	{
+		return Err(config_diagnostic(
+			config_contents,
+			format!(
+				"{owner_kind} `{owner_id}` regex versioned_files cannot also set `prefix`, `fields`, or `name`"
+			),
+			vec![config_section_label(
+				config_contents,
+				owner_kind,
+				owner_id,
+				"regex versioned_files cannot mix text and dependency settings",
+			)],
+			Some("remove `prefix`, `fields`, and `name` when using `regex`; those options only apply to ecosystem-aware manifest updates".to_string()),
+		));
+	}
+
+	let compiled = Regex::new(regex).map_err(|error| {
+		config_diagnostic(
+			config_contents,
+			format!("{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` is invalid"),
+			vec![config_section_label(
+				config_contents,
+				owner_kind,
+				owner_id,
+				"invalid regex versioned_files pattern",
+			)],
+			Some(error.to_string()),
+		)
+	})?;
+
+	if compiled.capture_names().any(|name| name == Some("version")) {
+		return Ok(());
+	}
+
+	Err(config_diagnostic(
+		config_contents,
+		format!(
+			"{owner_kind} `{owner_id}` regex versioned_files pattern `{regex}` must include a named `version` capture"
+		),
+		vec![config_section_label(
+			config_contents,
+			owner_kind,
+			owner_id,
+			"regex versioned_files must capture the version",
+		)],
+		Some(
+			"use a named capture like `(?<version>\\d+\\.\\d+\\.\\d+)` so monochange knows which substring to replace"
+				.to_string(),
+		),
+	))
+}
+
 fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 	let mut seen_names = BTreeSet::new();
 
@@ -3132,23 +3192,7 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 				)));
 			}
 			if let Some(default) = &input.default {
-				if matches!(input.kind, CliInputKind::Choice)
-					&& !input.choices.iter().any(|choice| choice == default)
-				{
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` input `{}` default `{default}` is not one of the configured choices",
-						cli_command.name, input.name
-					)));
-				}
-				if matches!(input.kind, CliInputKind::Boolean)
-					&& default != "true"
-					&& default != "false"
-				{
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` input `{}` boolean default must be `true` or `false`",
-						cli_command.name, input.name
-					)));
-				}
+				validate_cli_input_default(cli_command, input, default)?;
 			}
 		}
 
@@ -3189,52 +3233,20 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 					)));
 				}
 			}
-			match step {
-				CliStepDefinition::Command {
+			if let CliStepDefinition::Command {
+				command,
+				dry_run_command,
+				id,
+				..
+			} = step
+			{
+				validate_command_step_definition(
+					cli_command,
 					command,
-					dry_run_command,
-					id,
-					..
-				} => {
-					if let Some(step_id) = id {
-						if step_id.trim().is_empty() {
-							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` has a command step with an empty id",
-								cli_command.name
-							)));
-						}
-						if !seen_step_ids.insert(step_id.clone()) {
-							return Err(MonochangeError::Config(format!(
-								"CLI command `{}` has duplicate step id `{}`",
-								cli_command.name, step_id
-							)));
-						}
-					}
-					if command.trim().is_empty() {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` command steps must provide a non-empty command",
-							cli_command.name
-						)));
-					}
-					if matches!(dry_run_command, Some(value) if value.trim().is_empty()) {
-						return Err(MonochangeError::Config(format!(
-							"CLI command `{}` command steps with `dry_run_command` must provide a non-empty command",
-							cli_command.name
-						)));
-					}
-				}
-				CliStepDefinition::Validate { .. }
-				| CliStepDefinition::Discover { .. }
-				| CliStepDefinition::CreateChangeFile { .. }
-				| CliStepDefinition::PrepareRelease { .. }
-				| CliStepDefinition::CommitRelease { .. }
-				| CliStepDefinition::PublishRelease { .. }
-				| CliStepDefinition::OpenReleaseRequest { .. }
-				| CliStepDefinition::CommentReleasedIssues { .. }
-				| CliStepDefinition::AffectedPackages { .. }
-				| CliStepDefinition::DiagnoseChangesets { .. }
-				| CliStepDefinition::RetargetRelease { .. } => {}
-				_ => {}
+					dry_run_command.as_deref(),
+					id.as_deref(),
+					&mut seen_step_ids,
+				)?;
 			}
 		}
 	}
@@ -3305,12 +3317,8 @@ fn validate_cli_runtime_requirements(
 		for step in &cli_command.steps {
 			validate_step_input_overrides(cli_command, step)?;
 			if let CliStepDefinition::AffectedPackages { inputs, .. } = step {
-				if !changesets.verify.enabled {
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",
-						cli_command.name
-					)));
-				}
+				validate_affected_packages_step_enabled(cli_command, changesets.verify.enabled)?;
+
 				let has_changed_paths = inputs.contains_key("changed_paths")
 					|| cli_command_input(cli_command, "changed_paths")
 						.is_some_and(|input| matches!(input.kind, CliInputKind::StringList));
@@ -3554,6 +3562,31 @@ fn config_primary_label(config_contents: &str, owner_id: &str) -> LabeledSpan {
 		Some("primary release identity".to_string()),
 		range_to_span(span),
 	)
+}
+
+fn assign_primary_release_owner(
+	config_contents: &str,
+	primary_owner: &mut Option<String>,
+	owner_id: &str,
+) -> MonochangeResult<()> {
+	if let Some(existing_owner) = primary_owner {
+		return Err(config_diagnostic(
+			config_contents,
+			format!("`version_format = \"primary\"` is already used by `{existing_owner}`"),
+			vec![
+				config_primary_label(config_contents, existing_owner),
+				config_primary_label(config_contents, owner_id),
+			],
+			Some(
+				"choose a single package or group as the primary outward release identity"
+					.to_string(),
+			),
+		));
+	}
+
+	*primary_owner = Some(owner_id.to_string());
+
+	Ok(())
 }
 
 fn render_source_diagnostic(
@@ -4171,28 +4204,12 @@ fn validate_ecosystem_version_readable(
 					"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid TOML: {error}"
 				))
 			})?;
+			let field_paths = configured_cargo_version_fields(fields);
 
-			// Check the configured fields, or fall back to common Cargo version
-			// paths including a bare root-level `version` (used by custom TOML
-			// files like group.toml).
-			let field_paths: Vec<&str> = match fields {
-				Some(f) if !f.is_empty() => f.iter().map(String::as_str).collect(),
-				_ => vec!["package.version", "workspace.package.version", "version"],
-			};
-
-			let found = field_paths.iter().any(|field_path| {
-				let parts: Vec<&str> = field_path.split('.').collect();
-				let mut current = &doc;
-				for part in &parts {
-					match current.get(part) {
-						Some(next) => current = next,
-						None => return false,
-					}
-				}
-				current.is_str()
-			});
-
-			if !found {
+			if !field_paths
+				.iter()
+				.any(|field_path| toml_string_field_exists(&doc, field_path))
+			{
 				return Err(MonochangeError::Config(format!(
 					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a readable version field (checked: {})",
 					field_paths.join(", ")
@@ -4205,13 +4222,13 @@ fn validate_ecosystem_version_readable(
 					"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid JSON: {error}"
 				))
 			})?;
+			let field_name = configured_primary_version_field(fields);
 
-			let field_name = match fields {
-				Some(f) if !f.is_empty() => f.first().map_or("version", String::as_str),
-				_ => "version",
-			};
-
-			if json.get(field_name).and_then(|v| v.as_str()).is_none() {
+			if json
+				.get(field_name)
+				.and_then(|value| value.as_str())
+				.is_none()
+			{
 				return Err(MonochangeError::Config(format!(
 					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `{field_name}` string field"
 				)));
@@ -4225,7 +4242,11 @@ fn validate_ecosystem_version_readable(
 					))
 				})?;
 
-			if yaml.get("version").and_then(|v| v.as_str()).is_none() {
+			if yaml
+				.get("version")
+				.and_then(|value| value.as_str())
+				.is_none()
+			{
 				return Err(MonochangeError::Config(format!(
 					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `version` string field"
 				)));
@@ -4239,6 +4260,34 @@ fn validate_ecosystem_version_readable(
 	}
 
 	Ok(())
+}
+
+fn configured_cargo_version_fields(fields: Option<&[String]>) -> Vec<&str> {
+	match fields {
+		Some(fields) if !fields.is_empty() => fields.iter().map(String::as_str).collect(),
+		_ => vec!["package.version", "workspace.package.version", "version"],
+	}
+}
+
+fn toml_string_field_exists(value: &toml::Value, field_path: &str) -> bool {
+	let mut current = value;
+
+	for part in field_path.split('.') {
+		let Some(next) = current.get(part) else {
+			return false;
+		};
+
+		current = next;
+	}
+
+	current.is_str()
+}
+
+fn configured_primary_version_field(fields: Option<&[String]>) -> &str {
+	match fields {
+		Some(fields) if !fields.is_empty() => fields.first().map_or("version", String::as_str),
+		_ => "version",
+	}
 }
 
 fn validate_changeset_targets(

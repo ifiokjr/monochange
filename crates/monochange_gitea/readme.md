@@ -37,14 +37,11 @@ Reach for this crate when you want to preview or publish Gitea releases and rele
 
 <!-- {/monochangeGiteaCrateDocs} -->
 
-<!-- {=monochangeGiteaBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange_gitea"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitea-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_gitea
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitea-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_gitea/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitea-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_gitea [docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitea-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_gitea/
 
-<!-- {/monochangeGiteaBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

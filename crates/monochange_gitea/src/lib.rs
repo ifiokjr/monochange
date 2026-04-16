@@ -1,5 +1,32 @@
 #![forbid(clippy::indexing_slicing)]
 
+//! # `monochange_gitea`
+//!
+//! <!-- {=monochangeGiteaCrateDocs|trim|linePrefix:"//! ":true} -->
+//! `monochange_gitea` turns `monochange` release manifests into Gitea automation requests.
+//!
+//! Reach for this crate when you want to preview or publish Gitea releases and release pull requests using the same structured release data that powers changelog files and release manifests.
+//!
+//! ## Why use it?
+//!
+//! - derive Gitea release payloads and release-PR bodies from `monochange`'s structured release manifest
+//! - keep Gitea automation aligned with changelog rendering and release targets
+//! - reuse one publishing path for dry-run previews and real repository updates
+//!
+//! ## Best for
+//!
+//! - building Gitea release automation on top of `mc release`
+//! - previewing would-be Gitea releases and release PRs in CI before publishing
+//! - self-hosted Gitea instances that need the same release workflow as GitHub or GitLab
+//!
+//! ## Public entry points
+//!
+//! - `build_release_requests(manifest, source)` builds release payloads from prepared release state
+//! - `build_change_request(manifest, source)` builds a pull-request payload for the release
+//! - `validate_source_configuration(source)` validates Gitea-specific source config
+//! - `source_capabilities()` returns provider feature flags
+//! <!-- {/monochangeGiteaCrateDocs} -->
+
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
@@ -541,13 +568,14 @@ fn publish_pull_request_with_existing(
 	});
 	let head_matches_existing =
 		existing.and_then(|pull_request| pull_request.head.sha.as_deref()) == Some(head_commit);
-	let response: GiteaPullRequestResponse = if let Some(existing_pr) = &existing {
-		if content_matches {
+	let response: GiteaPullRequestResponse = match existing {
+		Some(existing_pr) if content_matches => {
 			GiteaPullRequestResponse {
 				number: existing_pr.number,
 				html_url: existing_pr.html_url.clone(),
 			}
-		} else {
+		}
+		Some(existing_pr) => {
 			let update_url = format!(
 				"{api_base}/repos/{}/{}/pulls/{}",
 				request.owner, request.repo, existing_pr.number
@@ -560,20 +588,17 @@ fn publish_pull_request_with_existing(
 
 			patch_json(client, headers, &update_url, &update_payload, "Gitea")?
 		}
-	} else {
-		let create_url = format!("{api_base}/repos/{}/{}/pulls", request.owner, request.repo);
-		post_json(
-			client,
-			headers,
-			&create_url,
-			&GiteaPullRequestPayload {
+		None => {
+			let create_url = format!("{api_base}/repos/{}/{}/pulls", request.owner, request.repo);
+			let payload = GiteaPullRequestPayload {
 				title: &request.title,
 				head: &request.head_branch,
 				base: &request.base_branch,
 				body: &request.body,
-			},
-			"Gitea",
-		)?
+			};
+
+			post_json(client, headers, &create_url, &payload, "Gitea")?
+		}
 	};
 	if !request.labels.is_empty() && !labels_match {
 		let labels_url = format!(
@@ -595,12 +620,12 @@ fn publish_pull_request_with_existing(
 		repository: request.repository.clone(),
 		number: response.number,
 		head_branch: request.head_branch.clone(),
-		operation: if existing.is_none() {
-			SourceChangeRequestOperation::Created
-		} else if content_matches && labels_match && head_matches_existing {
-			SourceChangeRequestOperation::Skipped
-		} else {
-			SourceChangeRequestOperation::Updated
+		operation: match existing {
+			None => SourceChangeRequestOperation::Created,
+			Some(_) if content_matches && labels_match && head_matches_existing => {
+				SourceChangeRequestOperation::Skipped
+			}
+			Some(_) => SourceChangeRequestOperation::Updated,
 		},
 		url: response.html_url,
 	})
