@@ -5,7 +5,7 @@ monochange_core: patch
 
 #### add `--versions` output for `PrepareRelease`
 
-`mc release` can now render a versions-only summary when you only need the planned package and group versions instead of the full release preview.
+`mc release` can now render a versions-only summary when you only need the planned package and group versions instead of the full release preview. The `--versions` flag now implies `--dry-run`, so the summary path stays non-mutating.
 
 **Before:**
 
@@ -18,12 +18,12 @@ Rendered the full release summary, including release targets, changed files, and
 **After:**
 
 ```bash
-mc release --dry-run --versions --format text
-mc release --dry-run --versions --format markdown
-mc release --dry-run --versions --format json
+mc release --versions --format text
+mc release --versions --format markdown
+mc release --versions --format json
 ```
 
-This trims the output down to package and group version summaries only.
+This trims the output down to package and group version summaries only, without mutating manifests, changelogs, or consuming changesets.
 
 You can also expose the same behavior from custom commands that use `PrepareRelease`:
 

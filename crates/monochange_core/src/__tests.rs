@@ -944,6 +944,10 @@ fn default_release_command_prefers_markdown_output() {
 		.unwrap_or_else(|| panic!("expected release versions input"));
 	assert_eq!(versions.kind, crate::CliInputKind::Boolean);
 	assert_eq!(versions.default.as_deref(), Some("false"));
+	assert_eq!(
+		versions.help_text.as_deref(),
+		Some("Print only planned package and group versions (implies dry-run)")
+	);
 }
 
 #[test]

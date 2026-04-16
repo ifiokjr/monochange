@@ -744,7 +744,7 @@ steps = [{ name = "create change file", type = "CreateChangeFile" }]
 help_text = "Prepare a release from discovered change files"
 inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
-	{ name = "versions", type = "boolean", help_text = "print only planned package and group versions", default = "false" },
+	{ name = "versions", type = "boolean", help_text = "print only planned package and group versions (implies dry-run)", default = "false" },
 ]
 steps = [{ name = "prepare release", type = "PrepareRelease" }]
 

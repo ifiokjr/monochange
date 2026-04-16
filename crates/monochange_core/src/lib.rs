@@ -3418,7 +3418,10 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				CliInputDefinition {
 					name: "versions".to_string(),
 					kind: CliInputKind::Boolean,
-					help_text: Some("Print only planned package and group versions".to_string()),
+					help_text: Some(
+						"Print only planned package and group versions (implies dry-run)"
+							.to_string(),
+					),
 					required: false,
 					default: Some("false".to_string()),
 					choices: Vec::new(),

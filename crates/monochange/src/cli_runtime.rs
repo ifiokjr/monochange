@@ -58,7 +58,10 @@ pub(crate) fn execute_matches(
 		)));
 	};
 
-	let dry_run = quiet || cli_command_matches.get_flag("dry-run");
+	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
+	let dry_run = quiet
+		|| cli_command_matches.get_flag("dry-run")
+		|| command_implies_dry_run(cli_command, &inputs)?;
 	let show_diff =
 		command_supports_release_diff_preview(cli_command) && cli_command_matches.get_flag("diff");
 	let progress_format = cli_command_matches
@@ -77,7 +80,6 @@ pub(crate) fn execute_matches(
 		.then(|| cli_command_matches.get_one::<String>("prepared-release"))
 		.flatten()
 		.map(PathBuf::from);
-	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
 	if show_diff {
 		execute_cli_command_with_options(
 			root,
@@ -107,6 +109,25 @@ pub(crate) fn execute_matches(
 			},
 		)
 	}
+}
+
+fn command_implies_dry_run(
+	cli_command: &CliCommandDefinition,
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<bool> {
+	let has_prepare_release_step = cli_command
+		.steps
+		.iter()
+		.any(|step| matches!(step, CliStepDefinition::PrepareRelease { .. }));
+	let has_versions_boolean_input = cli_command
+		.inputs
+		.iter()
+		.any(|input| input.name == "versions" && input.kind == CliInputKind::Boolean);
+	if !has_prepare_release_step || !has_versions_boolean_input {
+		return Ok(false);
+	}
+
+	Ok(parse_boolean_step_input(inputs, "versions")?.unwrap_or(false))
 }
 
 fn parse_progress_format(value: &str) -> MonochangeResult<ProgressFormat> {
@@ -4198,6 +4219,34 @@ path = "crates/core"
 		assert_eq!(
 			error.to_string(),
 			"io error: failed to run command `echo hello`: boom"
+		);
+	}
+
+	#[test]
+	fn command_implies_dry_run_only_for_prepare_release_versions_inputs() {
+		let release = default_cli_command("release");
+		assert!(
+			command_implies_dry_run(
+				&release,
+				&BTreeMap::from([("versions".to_string(), vec!["true".to_string()])]),
+			)
+			.unwrap_or_else(|error| panic!("release versions dry-run implication: {error}"))
+		);
+		assert!(
+			!command_implies_dry_run(
+				&release,
+				&BTreeMap::from([("versions".to_string(), vec!["false".to_string()])]),
+			)
+			.unwrap_or_else(|error| panic!("release versions false implication: {error}"))
+		);
+
+		let discover = default_cli_command("discover");
+		assert!(
+			!command_implies_dry_run(
+				&discover,
+				&BTreeMap::from([("versions".to_string(), vec!["true".to_string()])]),
+			)
+			.unwrap_or_else(|error| panic!("discover should ignore versions: {error}"))
 		);
 	}
 

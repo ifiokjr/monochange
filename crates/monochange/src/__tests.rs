@@ -190,7 +190,7 @@ fn release_help_and_matches_document_versions_summary_flag() {
 	)
 	.unwrap_or_else(|error| panic!("release help: {error}"));
 	assert!(help.contains("--versions"));
-	assert!(help.contains("Print only planned package and group versions"));
+	assert!(help.contains("Print only planned package and group versions (implies dry-run)"));
 
 	let matches = build_command_for_root("mc", &fixture_root)
 		.try_get_matches_from([
@@ -1522,6 +1522,64 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 	assert_eq!(
 		fs::read_to_string(&core_changelog)
 			.unwrap_or_else(|error| panic!("core changelog after dry-run: {error}")),
+		original_changelog
+	);
+	assert!(tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn command_release_versions_implies_dry_run_without_mutating_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	let workspace_manifest = tempdir.path().join("Cargo.toml");
+	let core_changelog = tempdir.path().join("crates/core/changelog.md");
+	let original_manifest = fs::read_to_string(&workspace_manifest)
+		.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
+	let original_changelog = fs::read_to_string(&core_changelog)
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+	let mut configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("workspace configuration: {error}"));
+	let release = configuration
+		.cli
+		.iter_mut()
+		.find(|command| command.name == "release")
+		.unwrap_or_else(|| panic!("expected release command"));
+	release.inputs.push(CliInputDefinition {
+		name: "versions".to_string(),
+		kind: CliInputKind::Boolean,
+		help_text: Some(
+			"Print only planned package and group versions (implies dry-run)".to_string(),
+		),
+		required: false,
+		default: Some("false".to_string()),
+		choices: Vec::new(),
+		short: None,
+	});
+	let matches = crate::build_command_with_cli("mc", &configuration.cli)
+		.try_get_matches_from(["mc", "release", "--versions", "--format", "text"])
+		.unwrap_or_else(|error| panic!("release versions matches: {error}"));
+	let release_matches = matches
+		.subcommand_matches("release")
+		.unwrap_or_else(|| panic!("expected release subcommand matches"));
+	let output = crate::execute_matches(
+		tempdir.path(),
+		&configuration,
+		"release",
+		release_matches,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("versions output: {error}"));
+
+	assert!(output.contains("group versions:"));
+	assert!(output.contains("package versions:"));
+	assert_eq!(
+		fs::read_to_string(&workspace_manifest)
+			.unwrap_or_else(|error| panic!("workspace manifest after versions: {error}")),
+		original_manifest
+	);
+	assert_eq!(
+		fs::read_to_string(&core_changelog)
+			.unwrap_or_else(|error| panic!("core changelog after versions: {error}")),
 		original_changelog
 	);
 	assert!(tempdir.path().join(".changeset/feature.md").exists());
