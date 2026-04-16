@@ -84,14 +84,11 @@ let _ = std::fs::remove_dir_all(&root);
 
 <!-- {/monochangeConfigCrateDocs} -->
 
-<!-- {=monochangeConfigBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange__config":"monochange_config"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_config
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_config/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_config [docs-image]: https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_config/
 
-<!-- {/monochangeConfigBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

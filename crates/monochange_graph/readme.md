@@ -42,14 +42,11 @@ Reach for this crate when you already have discovered packages, dependency edges
 
 <!-- {/monochangeGraphCrateDocs} -->
 
-<!-- {=monochangeGraphBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange__graph":"monochange_graph"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_graph
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_graph/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_graph [docs-image]: https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_graph/
 
-<!-- {/monochangeGraphBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

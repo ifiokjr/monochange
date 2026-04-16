@@ -43,14 +43,11 @@ Reach for this crate when you want to classify changed packages as libraries, ap
 
 <!-- {/monochangeAnalysisCrateDocs} -->
 
-<!-- {=monochangeAnalysisBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange__analysis":"monochange_analysis"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__analysis-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_analysis
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__analysis-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_analysis/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__analysis-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_analysis [docs-image]: https://img.shields.io/badge/docs.rs-monochange__analysis-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_analysis/
 
-<!-- {/monochangeAnalysisBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

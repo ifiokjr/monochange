@@ -62,14 +62,11 @@ assert!(rendered.contains("- add keep-a-changelog output"));
 
 <!-- {/monochangeCoreCrateDocs} -->
 
-<!-- {=monochangeCoreBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange__core":"monochange_core"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_core
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_core/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_core [docs-image]: https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_core/
 
-<!-- {/monochangeCoreBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 

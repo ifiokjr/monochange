@@ -51,14 +51,11 @@ assert_eq!(direct, BumpSeverity::Minor);
 
 <!-- {/monochangeSemverCrateDocs} -->
 
-<!-- {=monochangeSemverBadgeLinks} -->
+<!-- {=crateBadgeLinks:"monochange__semver":"monochange_semver"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust
-[crate-link]: https://crates.io/crates/monochange_semver
-[docs-image]: https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs
-[docs-link]: https://docs.rs/monochange_semver/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_semver [docs-image]: https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_semver/
 
-<!-- {/monochangeSemverBadgeLinks} -->
+<!-- {/crateBadgeLinks} -->
 
 <!-- {=repoStatusBadgeLinks} -->
 
