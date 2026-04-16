@@ -526,7 +526,9 @@ mod tests {
 		assert!(text.contains("cargo/internal-dependency-workspace"));
 		assert!(text.contains("cargo/recommended"));
 		assert!(text.contains("dart/required-package-fields"));
+		assert!(text.contains("dart/sdk-constraint-present"));
 		assert!(text.contains("dart/recommended"));
+		assert!(text.contains("dart/strict"));
 
 		let json = render_lint_catalog(OutputFormat::Json).unwrap();
 		assert!(json.contains("\"rules\""));

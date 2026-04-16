@@ -1,0 +1,4 @@
+name: missing_sdk
+version: 1.0.0
+dependencies:
+  alpha: ^1.0.0

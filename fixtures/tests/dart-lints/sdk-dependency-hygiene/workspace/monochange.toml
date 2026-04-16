@@ -1,0 +1,30 @@
+[defaults]
+parent_bump = "patch"
+package_type = "dart"
+
+[package.modern_ok]
+path = "packages/modern_ok"
+
+[package.missing_sdk]
+path = "packages/missing_sdk"
+
+[package.legacy_sdk]
+path = "packages/legacy_sdk"
+
+[package.wide_sdk]
+path = "packages/wide_sdk"
+
+[package.unsorted_deps]
+path = "packages/unsorted_deps"
+
+[package.override_fail]
+path = "packages/override_fail"
+
+[package.override_private]
+path = "packages/override_private"
+
+[package.override_allowed]
+path = "packages/override_allowed"
+
+[ecosystems.dart]
+enabled = true

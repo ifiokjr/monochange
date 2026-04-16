@@ -10185,6 +10185,8 @@ fn lint_cli_lists_and_explains_rules() {
 	assert!(list_output.contains("npm/recommended"));
 	assert!(list_output.contains("dart/recommended"));
 	assert!(list_output.contains("dart/required-package-fields"));
+	assert!(list_output.contains("dart/sdk-constraint-present"));
+	assert!(list_output.contains("dart/no-unexpected-dependency-overrides"));
 
 	let explain_output = run_cli(
 		&root,

@@ -1,0 +1,7 @@
+name: modern_ok
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+dependencies:
+  alpha: ^1.0.0
+  beta: ^1.0.0
