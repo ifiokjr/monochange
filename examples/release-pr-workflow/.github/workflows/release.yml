@@ -1,0 +1,50 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: install monochange
+        run: cargo install monochange
+
+      - name: fetch tags
+        run: git fetch --force --tags origin
+
+      - name: detect merged release commit
+        id: release_record
+        shell: bash
+        run: |
+          set -euo pipefail
+          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+            echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: refresh release PR
+        if: steps.release_record.outputs.is_release_commit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mc release-pr
+
+      - name: create release tags
+        if: steps.release_record.outputs.is_release_commit == 'true'
+        run: mc tag-release --from HEAD
+
+      - name: downstream publish jobs would run here
+        if: steps.release_record.outputs.is_release_commit == 'true'
+        run: echo "run package publish or provider release workflows after tags exist"

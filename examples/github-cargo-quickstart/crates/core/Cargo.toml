@@ -1,0 +1,10 @@
+[package]
+name = "acme-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core crate for the monochange GitHub Cargo quickstart example"
+
+[lib]
+path = "src/lib.rs"

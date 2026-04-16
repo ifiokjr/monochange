@@ -1,0 +1,60 @@
+[defaults]
+package_type = "cargo"
+warn_on_group_mismatch = true
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+
+[package.cli]
+path = "crates/cli"
+
+[group.sdk]
+packages = ["core", "cli"]
+tag = true
+release = true
+version_format = "primary"
+
+[source]
+provider = "github"
+owner = "acme"
+repo = "monochange-github-cargo-quickstart"
+
+[source.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["crates/**"]
+ignored_paths = ["docs/**", "README.md"]
+
+[ecosystems.cargo]
+enabled = true
+
+[ecosystems.cargo.publish]
+enabled = true
+mode = "external"
+trusted_publishing = true
+
+[lints]
+use = ["cargo/recommended"]
+
+[lints.rules]
+"cargo/sorted-dependencies" = "error"

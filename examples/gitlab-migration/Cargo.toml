@@ -1,0 +1,11 @@
+[workspace]
+members = ["crates/cli", "crates/core"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://gitlab.example.com/acme/platform.git"
+
+[workspace.dependencies]
+acme-core = { path = "crates/core", version = "0.4.0" }

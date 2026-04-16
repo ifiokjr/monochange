@@ -1,0 +1,14 @@
+{
+	"name": "@acme/shared",
+	"version": "0.1.0",
+	"description": "Shared utilities for the monochange GitHub npm quickstart example",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/acme/monochange-github-npm-quickstart.git",
+		"directory": "packages/shared"
+	},
+	"exports": {
+		".": "./src/index.js"
+	}
+}

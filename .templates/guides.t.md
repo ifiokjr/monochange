@@ -849,10 +849,12 @@ After copying the bundled skill, you get a small documentation set that is desig
 - `SKILL.md` — concise entrypoint for agents
 - `REFERENCE.md` — broader high-context reference with more examples
 - `skills/README.md` — index of focused deep dives
+- `skills/adoption.md` — setup-depth questions, migration guidance, and recommendation patterns
 - `skills/changesets.md` — changeset authoring and lifecycle guidance
 - `skills/commands.md` — built-in command catalog and workflow selection
 - `skills/configuration.md` — `monochange.toml` setup and editing guidance
-- `skills/linting.md` — `[ecosystems.<name>.lints]` rules, `mc check`, and manifest-focused examples
+- `skills/linting.md` — `[lints]` presets, `mc check`, and manifest-focused examples
+- `examples/README.md` — condensed scenario examples for quick recommendations
 
 This layout keeps the top-level skill small while still making the richer guidance available when an assistant needs more context.
 
@@ -975,32 +977,30 @@ Common commands:
 mc check
 mc check --fix
 mc check --format json
+mc lint list
+mc lint explain cargo/recommended
 ```
 
 Use `--fix` when you want monochange to apply auto-fixes where a rule supports them.
 
 ## Where lint rules live
 
-Configure rules under the top-level lint section in `monochange.toml`:
+Configure presets, global rules, and scoped overrides in the top-level `[lints]` section of `monochange.toml`:
 
 ```toml
 [lints]
 use = ["cargo/recommended", "npm/recommended", "dart/recommended"]
 
 [lints.rules]
-"cargo/dependency-field-order" = "error"
 "cargo/internal-dependency-workspace" = "error"
-"cargo/required-package-fields" = { level = "warning", fields = ["description", "license", "repository"] }
-"cargo/sorted-dependencies" = "warning"
-"cargo/unlisted-package-private" = { level = "warning", fix = true }
 "npm/workspace-protocol" = "error"
-"npm/sorted-dependencies" = "warning"
-"npm/required-package-fields" = { level = "warning", fields = ["description", "repository", "license"] }
-"npm/root-no-prod-deps" = "error"
-"npm/no-duplicate-dependencies" = "error"
-"npm/unlisted-package-private" = { level = "warning", fix = true }
 "dart/sdk-constraint-modern" = { level = "warning", minimum = "3.6.0", require_upper_bound = false }
 "dart/no-unexpected-dependency-overrides" = { level = "warning", allow_for_private = true, allow_packages = ["app_shell"] }
+
+[[lints.scopes]]
+name = "published cargo packages"
+match = { ecosystems = ["cargo"], managed = true, publishable = true }
+rules = { "cargo/required-package-fields" = "error" }
 ```
 
 Rule configuration supports two forms:
@@ -1016,7 +1016,7 @@ Today, built-in manifest lint rules exist for:
 - **npm-family** manifests (`package.json`)
 - **Dart / Flutter** manifests (`pubspec.yaml`)
 
-monochange routes all manifest lint configuration through the top-level `[lints]` section, while each ecosystem crate provides its own built-in suites and presets.
+Lint suites still live in ecosystem crates, but monochange routes all manifest lint configuration through the top-level `[lints]` section via preset selection, rule overrides, and scoped matches.
 
 ## Cargo manifest lint rules
 
@@ -1424,6 +1424,8 @@ Example:
 
 - `dart/recommended` enables metadata/publishability checks, `dart/sdk-constraint-present`, and `dart/dependency-sorted` as a warning.
 - `dart/strict` adds `dart/sdk-constraint-modern`, `dart/no-unexpected-dependency-overrides`, `dart/internal-path-dependency-policy`, `dart/workspace-internal-version-consistency`, `dart/flutter-package-metadata-consistent`, and `dart/assets-sorted`, while promoting `dart/dependency-sorted` to an error.
+
+Use `mc lint list` to inspect registered rules and presets, and `mc lint explain <id>` to understand a rule or preset before enabling it.
 
 ## What `mc check` looks like in practice
 

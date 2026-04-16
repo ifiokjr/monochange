@@ -1,0 +1,10 @@
+[package]
+name = "acme-placeholder-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cargo crate for the monochange placeholder publish example"
+
+[lib]
+path = "src/lib.rs"

@@ -1,0 +1,9 @@
+[workspace]
+members = ["crates/app"]
+resolver = "2"
+
+[workspace.package]
+version = "2.3.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/acme/monochange-release-pr-workflow"

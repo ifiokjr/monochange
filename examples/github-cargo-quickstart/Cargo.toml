@@ -1,0 +1,12 @@
+[workspace]
+members = ["crates/cli", "crates/core"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/acme/monochange-github-cargo-quickstart"
+
+[workspace.dependencies]
+acme-core = { path = "crates/core", version = "0.1.0" }

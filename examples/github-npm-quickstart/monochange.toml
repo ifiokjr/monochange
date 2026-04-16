@@ -1,0 +1,64 @@
+[defaults]
+package_type = "npm"
+warn_on_group_mismatch = true
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.shared]
+path = "packages/shared"
+tag = true
+release = true
+
+[package.web]
+path = "packages/web"
+tag = true
+release = true
+
+[source]
+provider = "github"
+owner = "acme"
+repo = "monochange-github-npm-quickstart"
+
+[source.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["packages/**"]
+ignored_paths = ["docs/**", "README.md"]
+
+[ecosystems.npm]
+enabled = true
+
+[ecosystems.npm.publish]
+enabled = true
+mode = "builtin"
+registry = "npm"
+trusted_publishing = true
+
+[lints]
+use = ["npm/recommended"]
+
+[lints.rules]
+"npm/sorted-dependencies" = "error"
+
+[[lints.scopes]]
+name = "published npm packages"
+match = { ecosystems = ["npm"], managed = true, publishable = true }
+rules = { "npm/required-package-fields" = "error" }

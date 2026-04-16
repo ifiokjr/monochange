@@ -1,0 +1,14 @@
+{
+	"name": "internal-only-workspace",
+	"private": true,
+	"description": "Repo-shaped monochange internal-only workspace example",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/acme/monochange-internal-only-workspace.git"
+	},
+	"packageManager": "pnpm@10.8.0",
+	"workspaces": [
+		"packages/*"
+	]
+}

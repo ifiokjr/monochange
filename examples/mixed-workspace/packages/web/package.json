@@ -1,0 +1,11 @@
+{
+	"name": "@acme/web-sdk",
+	"version": "0.7.0",
+	"description": "Web package for the monochange mixed-workspace example",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/acme/monochange-mixed-workspace.git",
+		"directory": "packages/web"
+	}
+}

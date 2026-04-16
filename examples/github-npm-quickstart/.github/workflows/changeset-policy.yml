@@ -1,0 +1,51 @@
+name: changeset-policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: changeset-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: install monochange
+        run: npm install -g @monochange/cli
+
+      - name: collect changed files
+        id: changed
+        uses: tj-actions/changed-files@v46
+
+      - name: run changeset policy
+        env:
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
+          args=(affected --format json --verify)
+
+          for path in $CHANGED_FILES; do
+            args+=(--changed-paths "$path")
+          done
+
+          for label in "${labels[@]}"; do
+            args+=(--label "$label")
+          done
+
+          mc "${args[@]}" | tee policy.json
+          jq -e '.status != "failed"' policy.json >/dev/null

@@ -39,6 +39,24 @@ mc release-record --from v1.2.3
 mc release-record --from HEAD --format json
 ```
 
+### Inspect lint rules and presets
+
+| Goal                            | Command                | When to use it                                                          |
+| ------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
+| List registered rules/presets   | `mc lint list`         | You want to see which lint ids and presets monochange currently exposes |
+| Explain one rule or preset      | `mc lint explain <id>` | You want the details before configuring a rule in `[lints]`             |
+| Run configured lint enforcement | `mc check`             | You want validation plus lint execution against manifests               |
+
+Examples:
+
+```bash
+mc lint list
+mc lint list --format json
+mc lint explain cargo/recommended
+mc lint explain npm/workspace-protocol
+mc check --fix
+```
+
 ### Create release intent
 
 | Goal                                     | Command       | When to use it                                                      |

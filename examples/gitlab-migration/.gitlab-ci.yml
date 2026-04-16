@@ -1,0 +1,42 @@
+stages:
+  - validate
+  - plan
+  - release
+
+variables:
+  GIT_DEPTH: "0"
+
+validate_monochange:
+  image: node:22
+  stage: validate
+  before_script:
+    - npm install -g @monochange/cli
+  script:
+    - mc validate
+    - mc check
+
+release_preview:
+  image: node:22
+  stage: plan
+  before_script:
+    - npm install -g @monochange/cli
+  script:
+    - mc release --dry-run --diff
+
+release_or_publish:
+  image: node:22
+  stage: release
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  before_script:
+    - npm install -g @monochange/cli
+  script:
+    - git fetch --force --tags origin
+    - |
+        set -euo pipefail
+        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+          mc tag-release --from HEAD
+          ./scripts/legacy-release.sh
+        else
+          mc release-pr
+        fi
