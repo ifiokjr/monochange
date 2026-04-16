@@ -3368,6 +3368,50 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			.contains("has an empty `when` condition")
 	);
 
+	let empty_command = crate::validate_cli(&[cli_command(
+		"release",
+		vec![CliStepDefinition::Command {
+			name: Some("Run command".to_string()),
+			when: None,
+			show_progress: None,
+			command: " ".to_string(),
+			dry_run_command: None,
+			shell: ShellConfig::Default,
+			id: Some("run-command".to_string()),
+			variables: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected empty command error"));
+	assert!(
+		empty_command
+			.to_string()
+			.contains("command steps must provide a non-empty command")
+	);
+
+	let empty_dry_run_command = crate::validate_cli(&[cli_command(
+		"release",
+		vec![CliStepDefinition::Command {
+			name: Some("Run command".to_string()),
+			when: None,
+			show_progress: None,
+			command: "echo release".to_string(),
+			dry_run_command: Some(" ".to_string()),
+			shell: ShellConfig::Default,
+			id: Some("run-command".to_string()),
+			variables: None,
+			inputs: std::collections::BTreeMap::new(),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected empty dry-run command error"));
+	assert!(
+		empty_dry_run_command
+			.to_string()
+			.contains("`dry_run_command` must provide a non-empty command")
+	);
+
 	let empty_input_name = crate::validate_cli(&[CliCommandDefinition {
 		name: "release".to_string(),
 		help_text: None,
