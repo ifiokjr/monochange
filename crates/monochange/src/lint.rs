@@ -27,6 +27,8 @@ fn lint_suites() -> Vec<Box<dyn LintSuite>> {
 	suites.push(Box::new(monochange_cargo::lints::lint_suite()));
 	#[cfg(feature = "npm")]
 	suites.push(Box::new(monochange_npm::lints::lint_suite()));
+	#[cfg(feature = "dart")]
+	suites.push(Box::new(monochange_dart::lints::lint_suite()));
 	suites
 }
 
@@ -296,6 +298,7 @@ pub(crate) fn scaffold_lint_rule(root: &Path, id: &str) -> MonochangeResult<Stri
 	let crate_name = match suite {
 		"cargo" => "monochange_cargo",
 		"npm" => "monochange_npm",
+		"dart" => "monochange_dart",
 		other => {
 			return Err(MonochangeError::Config(format!(
 				"scaffolding is not yet supported for lint suite `{other}`"
@@ -613,10 +616,6 @@ mod tests {
 			.expect_err("expected invalid lint id to fail");
 		assert!(error.to_string().contains("<ecosystem>/<rule-name>"));
 
-		let unsupported = scaffold_lint_rule(Path::new("."), "dart/no-foo")
-			.expect_err("expected unsupported suite to fail");
-		assert!(unsupported.to_string().contains("not yet supported"));
-
 		let tempdir =
 			monochange_test_helpers::setup_scenario_workspace!("test-support/scenario-workspace");
 		let message = scaffold_lint_rule(tempdir.path(), "cargo/no-path-dependencies").unwrap();
@@ -643,6 +642,16 @@ mod tests {
 			fs::read_to_string(odd_file)
 				.unwrap()
 				.contains("pub FooRule")
+		);
+
+		let dart_message =
+			scaffold_lint_rule(tempdir.path(), "dart/sdk-constraint-present").unwrap();
+		assert!(dart_message.contains("sdk_constraint_present.rs"));
+		assert!(
+			tempdir
+				.path()
+				.join("crates/monochange_dart/src/lints/sdk_constraint_present.rs")
+				.exists()
 		);
 	}
 

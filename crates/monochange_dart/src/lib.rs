@@ -58,6 +58,8 @@ use serde_yaml_ng::Value;
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
+pub mod lints;
+
 pub const PUBSPEC_FILE: &str = "pubspec.yaml";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

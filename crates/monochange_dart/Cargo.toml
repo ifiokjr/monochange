@@ -24,6 +24,7 @@ walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
 insta = { workspace = true, default-features = true }
+monochange_config = { workspace = true }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 
