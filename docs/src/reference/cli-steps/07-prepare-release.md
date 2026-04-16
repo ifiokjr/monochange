@@ -26,7 +26,6 @@ If your command eventually needs release metadata, start with `PrepareRelease` r
 ## Inputs
 
 - `format` — `markdown`, `text`, or `json`
-- `versions` — boolean flag that prints only planned package and group versions in the selected format and implies dry-run
 
 ## Step-level `when` condition
 
@@ -59,7 +58,7 @@ It can produce:
 
 Built-in release-oriented commands now default their human-readable `format` input to `markdown`. Use `text` when you explicitly want the older plain-text style, or `json` for automation.
 
-When you only need the resolved package and group versions, add `--versions` to trim the output down to version summaries instead of the full release preview. `--versions` implies `--dry-run`, so it will not mutate manifests, changelogs, or consumed changesets.
+When you only need the resolved package and group versions, use the dedicated [`DisplayVersions`](14-display-versions.md) step or the built-in `mc versions` command instead of overloading `PrepareRelease`.
 
 It also fills the shorthand template values commonly used by `Command` steps:
 

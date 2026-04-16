@@ -22,7 +22,7 @@ The human renderer is designed for interactive terminal runs:
 - step labels use each step's `name = "..."` value when present, then fall back to the built-in step kind
 - long-running steps show a delayed spinner so short steps do not flicker
 - command stdout and stderr stream live under the active step
-- completed `PrepareRelease` steps print per-phase timings so slow phases are visible without a separate trace
+- completed `PrepareRelease` and `DisplayVersions` steps print per-phase timings so slow phases are visible without a separate trace
 
 Built-in commands already attach descriptive step names such as `prepare release`, `publish release`, and `open release request`. Custom commands can override those names per step.
 

@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
-assertion_line: 14
 info:
   program: monochange
   args:
@@ -27,6 +26,7 @@ Commands:
   discover             Discover packages across supported ecosystems
   change               Create a change file for one or more packages
   release              Prepare a release from discovered change files
+  versions             Display planned package and group versions from discovered change files
   placeholder-publish  Publish placeholder package versions for packages missing from their registries
   publish              Publish package versions from monochange release state using built-in workflows
   publish-plan         Plan package-registry publish work against known ecosystem rate limits

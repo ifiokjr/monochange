@@ -40,3 +40,4 @@
   - [OpenReleaseRequest](reference/cli-steps/11-open-release-request.md)
   - [CommentReleasedIssues](reference/cli-steps/12-comment-released-issues.md)
   - [Command](reference/cli-steps/13-command.md)
+  - [DisplayVersions](reference/cli-steps/14-display-versions.md)

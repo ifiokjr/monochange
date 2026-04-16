@@ -251,6 +251,68 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 }
 
 #[test]
+fn versions_cli_text_reports_planned_versions_without_mutating_workspace() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	let before_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("workspace manifest before versions: {error}"));
+	let before_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
+		.unwrap_or_else(|error| panic!("changelog before versions: {error}"));
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("versions")
+			.arg("--format")
+			.arg("text")
+	);
+	assert_eq!(
+		fs::read_to_string(tempdir.path().join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("workspace manifest after versions: {error}")),
+		before_manifest
+	);
+	assert_eq!(
+		fs::read_to_string(tempdir.path().join("changelog.md"))
+			.unwrap_or_else(|error| panic!("changelog after versions: {error}")),
+		before_changelog
+	);
+}
+
+#[test]
+fn versions_cli_markdown_reports_planned_versions() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("versions")
+			.arg("--format")
+			.arg("markdown")
+	);
+}
+
+#[test]
+fn versions_cli_json_reports_planned_versions() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_scenario_workspace("cli-output/group-basic");
+	assert_cmd_snapshot!(
+		release_cli_command()
+			.current_dir(tempdir.path())
+			.arg("versions")
+			.arg("--format")
+			.arg("json")
+	);
+}
+
+#[test]
 fn release_dry_run_cli_text_renders_diff_preview() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());

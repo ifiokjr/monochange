@@ -3,9 +3,9 @@ monochange: minor
 monochange_core: patch
 ---
 
-#### add `--versions` output for `PrepareRelease`
+#### add a dedicated `mc versions` command
 
-`mc release` can now render a versions-only summary when you only need the planned package and group versions instead of the full release preview. The `--versions` flag now implies `--dry-run`, so the summary path stays non-mutating.
+monochange now ships a dedicated `mc versions` command and `DisplayVersions` CLI step for rendering planned package and group versions without the rest of the release preview.
 
 **Before:**
 
@@ -18,21 +18,20 @@ Rendered the full release summary, including release targets, changed files, and
 **After:**
 
 ```bash
-mc release --versions --format text
-mc release --versions --format markdown
-mc release --versions --format json
+mc versions --format text
+mc versions --format markdown
+mc versions --format json
 ```
 
 This trims the output down to package and group version summaries only, without mutating manifests, changelogs, or consuming changesets.
 
-You can also expose the same behavior from custom commands that use `PrepareRelease`:
+You can also expose the same behavior from custom commands with `DisplayVersions`:
 
 ```toml
-[cli.release-versions]
-help_text = "Print only the planned release versions"
+[cli.versions]
+help_text = "Display planned package and group versions"
 inputs = [
-	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
-	{ name = "versions", type = "boolean", default = "false" },
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 ]
-steps = [{ type = "PrepareRelease" }]
+steps = [{ type = "DisplayVersions" }]
 ```
