@@ -129,6 +129,7 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("diagnostics"));
 	assert!(output.contains("placeholder-publish"));
 	assert!(output.contains("publish"));
+	assert!(output.contains("publish-plan"));
 	assert!(output.contains("repair-release"));
 	assert!(output.contains("release-record"));
 	assert!(output.contains("tag-release"));
@@ -378,6 +379,7 @@ fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	assert!(config.contains("[cli.release]"));
 	assert!(config.contains("[cli.placeholder-publish]"));
 	assert!(config.contains("[cli.publish]"));
+	assert!(config.contains("[cli.publish-plan]"));
 	assert!(config.contains("type = \"Discover\""));
 	assert!(config.contains("type = \"CreateChangeFile\""));
 	assert!(config.contains("type = \"PlaceholderPublish\""));
@@ -411,7 +413,7 @@ fn populate_adds_all_missing_default_cli_commands_to_an_existing_configuration()
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 9 default CLI commands"));
+	assert!(output.contains("added 10 default CLI commands"));
 	for table in [
 		"[cli.validate]",
 		"[cli.discover]",
@@ -419,6 +421,7 @@ fn populate_adds_all_missing_default_cli_commands_to_an_existing_configuration()
 		"[cli.release]",
 		"[cli.placeholder-publish]",
 		"[cli.publish]",
+		"[cli.publish-plan]",
 		"[cli.affected]",
 		"[cli.diagnostics]",
 		"[cli.repair-release]",
@@ -440,7 +443,7 @@ fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 8 default CLI commands"));
+	assert!(output.contains("added 9 default CLI commands"));
 	assert!(config.contains("help_text = \"Custom release pipeline\""));
 	assert_eq!(config.matches("[cli.release]").count(), 1);
 	for table in [
@@ -449,6 +452,7 @@ fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
 		"[cli.change]",
 		"[cli.placeholder-publish]",
 		"[cli.publish]",
+		"[cli.publish-plan]",
 		"[cli.affected]",
 		"[cli.diagnostics]",
 		"[cli.repair-release]",
@@ -555,7 +559,7 @@ fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 9 default CLI commands"));
+	assert!(output.contains("added 10 default CLI commands"));
 	assert!(config.starts_with("[cli.validate]"));
 }
 
@@ -2986,6 +2990,7 @@ fn cli_context_for_when_evaluation_tests() -> CliContext {
 		release_request_result: None,
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3702,6 +3707,7 @@ fn template_context_exposes_release_commit_namespace() {
 			status: "completed".to_string(),
 		}),
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3738,6 +3744,7 @@ fn template_context_exposes_retarget_namespace() {
 		release_request_result: None,
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3796,6 +3803,30 @@ fn template_context_exposes_publish_namespace() {
 				},
 			}],
 		}),
+		rate_limit_report: Some(monochange_core::PublishRateLimitReport {
+			dry_run: true,
+			windows: vec![monochange_core::RegistryRateLimitWindowPlan {
+				registry: monochange_core::RegistryKind::Npm,
+				operation: monochange_core::RateLimitOperation::Publish,
+				limit: None,
+				window_seconds: None,
+				pending: 1,
+				batches_required: 1,
+				fits_single_window: true,
+				confidence: monochange_core::RateLimitConfidence::Low,
+				notes: "npm soft limit".to_string(),
+				evidence: Vec::new(),
+			}],
+			batches: vec![monochange_core::PublishRateLimitBatch {
+				registry: monochange_core::RegistryKind::Npm,
+				operation: monochange_core::RateLimitOperation::Publish,
+				batch_index: 1,
+				total_batches: 1,
+				packages: vec!["@monochange/skill".to_string()],
+				recommended_wait_seconds: None,
+			}],
+			warnings: Vec::new(),
+		}),
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -3826,6 +3857,13 @@ fn template_context_exposes_publish_namespace() {
 			.and_then(serde_json::Value::as_str),
 		Some("planned")
 	);
+	assert_eq!(
+		template_context
+			.get("publish")
+			.and_then(|value| value.pointer("/rateLimits/batches/0/packages/0"))
+			.and_then(serde_json::Value::as_str),
+		Some("@monochange/skill")
+	);
 }
 
 #[test]
@@ -3854,6 +3892,7 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 		release_request_result: None,
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: Some(monochange_core::ChangesetPolicyEvaluation {
@@ -3967,6 +4006,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 		release_request_result: None,
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -4006,6 +4046,7 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 		),
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: vec!["dry-run org/repo 123".to_string()],
 		changeset_policy_evaluation: None,
@@ -4050,6 +4091,7 @@ fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release
 		release_request_result: None,
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -4103,6 +4145,7 @@ fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
 			status: "completed".to_string(),
 		}),
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: vec!["commented on #123".to_string()],
 		changeset_policy_evaluation: None,
@@ -4539,6 +4582,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 			.unwrap_or_else(|error| panic!("placeholder publish: {error}"));
 			assert!(placeholder_output.contains("placeholder publishing:"));
 			assert!(placeholder_output.contains("would publish placeholder"));
+			assert!(placeholder_output.contains("publish rate limits:"));
 
 			let publish_command = monochange_core::CliCommandDefinition {
 				name: "publish".to_string(),
@@ -4567,6 +4611,104 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 			.unwrap_or_else(|error| panic!("publish packages: {error}"));
 			assert!(publish_output.contains("package publishing:"));
 			assert!(publish_output.contains("would publish workflow-core"));
+			assert!(publish_output.contains("publish rate limits:"));
+		},
+	);
+}
+
+#[test]
+fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packages() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let server = MockServer::start();
+	let _registry = server.mock(|when, then| {
+		when.method(GET);
+		then.status(404);
+	});
+	let no_match_inputs =
+		BTreeMap::from([("package".to_string(), vec!["missing-package".to_string()])]);
+
+	temp_env::with_var(
+		"MONOCHANGE_CRATES_IO_API_URL",
+		Some(server.base_url()),
+		|| {
+			let placeholder_command = monochange_core::CliCommandDefinition {
+				name: "placeholder-publish".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![monochange_core::CliStepDefinition::PlaceholderPublish {
+					name: None,
+					when: None,
+					inputs: BTreeMap::new(),
+				}],
+			};
+			let placeholder_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&placeholder_command,
+				false,
+				no_match_inputs.clone(),
+			)
+			.unwrap_or_else(|error| panic!("non-dry-run placeholder publish: {error}"));
+			assert!(placeholder_output.contains("placeholder publishing:"));
+			assert!(placeholder_output.contains("no packages matched the publishing criteria"));
+			assert!(placeholder_output.contains("no publish operations matched the current plan"));
+
+			let publish_command = monochange_core::CliCommandDefinition {
+				name: "publish".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![
+					monochange_core::CliStepDefinition::PrepareRelease {
+						name: None,
+						when: None,
+						inputs: BTreeMap::new(),
+					},
+					monochange_core::CliStepDefinition::PublishPackages {
+						name: None,
+						when: None,
+						inputs: BTreeMap::new(),
+					},
+				],
+			};
+			let publish_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&publish_command,
+				false,
+				no_match_inputs.clone(),
+			)
+			.unwrap_or_else(|error| panic!("non-dry-run publish packages: {error}"));
+			assert!(publish_output.contains("package publishing:"));
+			assert!(publish_output.contains("no packages matched the publishing criteria"));
+			assert!(publish_output.contains("no publish operations matched the current plan"));
+
+			let plan_command = monochange_core::CliCommandDefinition {
+				name: "publish-plan".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![monochange_core::CliStepDefinition::PlanPublishRateLimits {
+					name: None,
+					when: None,
+					inputs: BTreeMap::new(),
+				}],
+			};
+			let plan_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&plan_command,
+				false,
+				BTreeMap::from([
+					("package".to_string(), vec!["missing-package".to_string()]),
+					("mode".to_string(), vec!["placeholder".to_string()]),
+				]),
+			)
+			.unwrap_or_else(|error| panic!("publish plan without matches: {error}"));
+			assert!(plan_output.contains("publish rate limits:"));
+			assert!(plan_output.contains("no publish operations matched the current plan"));
 		},
 	);
 }
@@ -8998,6 +9140,7 @@ fn tracked_release_pull_request_paths_include_manifest_path_and_deduplicate() {
 		release_request_result: None,
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,

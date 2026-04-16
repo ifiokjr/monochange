@@ -374,7 +374,15 @@ struct RawPublishSettings {
 	#[serde(default)]
 	trusted_publishing: Option<RawTrustedPublishingSettings>,
 	#[serde(default)]
+	rate_limits: RawPublishRateLimitSettings,
+	#[serde(default)]
 	placeholder: RawPlaceholderSettings,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawPublishRateLimitSettings {
+	#[serde(default)]
+	enforce: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -857,6 +865,9 @@ fn normalize_publish_settings(
 		base.map(|settings| &settings.trusted_publishing),
 		raw.trusted_publishing,
 	);
+	if let Some(enforce) = raw.rate_limits.enforce {
+		settings.rate_limits.enforce = enforce;
+	}
 	if raw.placeholder.readme.is_some() {
 		settings.placeholder.readme_file = None;
 		settings.placeholder.readme = raw.placeholder.readme;

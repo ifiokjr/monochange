@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 89
 info:
   program: mc
   args:
@@ -8,9 +9,11 @@ info:
     - "--format"
     - json
   env:
-    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:65017"
-    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:65017"
-    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:65017"
+    GITHUB_JOB: ""
+    GITHUB_WORKFLOW_REF: ""
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:55456"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:55456"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:55456"
     NO_COLOR: "1"
     RUST_LOG: ""
 ---
@@ -18,61 +21,158 @@ success: true
 exit_code: 0
 ----- stdout -----
 {
-  "mode": "placeholder",
-  "dryRun": true,
-  "packages": [
-    {
-      "package": "core",
-      "ecosystem": "cargo",
-      "registry": "crates_io",
-      "version": "0.0.0",
-      "status": "planned",
-      "message": "would publish placeholder core 0.0.0 to crates_io",
-      "placeholder": true,
-      "trustedPublishing": {
-        "status": "manual_action_required",
-        "repository": null,
-        "workflow": null,
-        "environment": null,
-        "setupUrl": "https://crates.io/crates/core",
-        "message": "configure trusted publishing manually for `core` before the next built-in release publish; open https://crates.io/crates/core and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`"
+  "packagePublish": {
+    "dryRun": true,
+    "mode": "placeholder",
+    "packages": [
+      {
+        "ecosystem": "cargo",
+        "message": "would publish placeholder core 0.0.0 to crates_io",
+        "package": "core",
+        "placeholder": true,
+        "registry": "crates_io",
+        "status": "planned",
+        "trustedPublishing": {
+          "environment": null,
+          "message": "configure trusted publishing manually for `core` before the next built-in release publish; open https://crates.io/crates/core and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`",
+          "repository": null,
+          "setupUrl": "https://crates.io/crates/core",
+          "status": "manual_action_required",
+          "workflow": null
+        },
+        "version": "0.0.0"
+      },
+      {
+        "ecosystem": "dart",
+        "message": "would publish placeholder dart_pkg 0.0.0 to pub_dev",
+        "package": "dart_pkg",
+        "placeholder": true,
+        "registry": "pub_dev",
+        "status": "planned",
+        "trustedPublishing": {
+          "environment": null,
+          "message": "configure trusted publishing manually for `dart_pkg` before the next built-in release publish; open https://pub.dev/packages/dart_pkg/admin and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`",
+          "repository": null,
+          "setupUrl": "https://pub.dev/packages/dart_pkg/admin",
+          "status": "manual_action_required",
+          "workflow": null
+        },
+        "version": "0.0.0"
+      },
+      {
+        "ecosystem": "deno",
+        "message": "would publish placeholder @scope/jsr-pkg 0.0.0 to jsr",
+        "package": "jsr_pkg",
+        "placeholder": true,
+        "registry": "jsr",
+        "status": "planned",
+        "trustedPublishing": {
+          "environment": null,
+          "message": "configure trusted publishing manually for `@scope/jsr-pkg` before the next built-in release publish; open https://jsr.io/@scope/jsr-pkg and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`",
+          "repository": null,
+          "setupUrl": "https://jsr.io/@scope/jsr-pkg",
+          "status": "manual_action_required",
+          "workflow": null
+        },
+        "version": "0.0.0"
       }
-    },
-    {
-      "package": "dart_pkg",
-      "ecosystem": "dart",
-      "registry": "pub_dev",
-      "version": "0.0.0",
-      "status": "planned",
-      "message": "would publish placeholder dart_pkg 0.0.0 to pub_dev",
-      "placeholder": true,
-      "trustedPublishing": {
-        "status": "manual_action_required",
-        "repository": null,
-        "workflow": null,
-        "environment": null,
-        "setupUrl": "https://pub.dev/packages/dart_pkg/admin",
-        "message": "configure trusted publishing manually for `dart_pkg` before the next built-in release publish; open https://pub.dev/packages/dart_pkg/admin and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`"
+    ]
+  },
+  "publishRateLimits": {
+    "batches": [
+      {
+        "batchIndex": 1,
+        "operation": "placeholder_publish",
+        "packages": [
+          "core"
+        ],
+        "recommendedWaitSeconds": null,
+        "registry": "crates_io",
+        "totalBatches": 1
+      },
+      {
+        "batchIndex": 1,
+        "operation": "placeholder_publish",
+        "packages": [
+          "jsr_pkg"
+        ],
+        "recommendedWaitSeconds": null,
+        "registry": "jsr",
+        "totalBatches": 1
+      },
+      {
+        "batchIndex": 1,
+        "operation": "placeholder_publish",
+        "packages": [
+          "dart_pkg"
+        ],
+        "recommendedWaitSeconds": null,
+        "registry": "pub_dev",
+        "totalBatches": 1
       }
-    },
-    {
-      "package": "jsr_pkg",
-      "ecosystem": "deno",
-      "registry": "jsr",
-      "version": "0.0.0",
-      "status": "planned",
-      "message": "would publish placeholder @scope/jsr-pkg 0.0.0 to jsr",
-      "placeholder": true,
-      "trustedPublishing": {
-        "status": "manual_action_required",
-        "repository": null,
-        "workflow": null,
-        "environment": null,
-        "setupUrl": "https://jsr.io/@scope/jsr-pkg",
-        "message": "configure trusted publishing manually for `@scope/jsr-pkg` before the next built-in release publish; open https://jsr.io/@scope/jsr-pkg and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`"
+    ],
+    "dryRun": true,
+    "warnings": [],
+    "windows": [
+      {
+        "batchesRequired": 1,
+        "confidence": "high",
+        "evidence": [
+          {
+            "kind": "source_code",
+            "notes": "upload endpoint rate limiting in server implementation",
+            "title": "crates.io application source",
+            "url": "https://github.com/rust-lang/crates.io"
+          }
+        ],
+        "fitsSingleWindow": true,
+        "limit": 10,
+        "notes": "crates.io source enforces 10 uploads per minute for existing crates",
+        "operation": "placeholder_publish",
+        "pending": 1,
+        "registry": "crates_io",
+        "windowSeconds": 60
+      },
+      {
+        "batchesRequired": 1,
+        "confidence": "high",
+        "evidence": [
+          {
+            "kind": "official",
+            "notes": "official JSR publishing limits documentation",
+            "title": "JSR publishing docs",
+            "url": "https://jsr.io/docs/publishing-packages"
+          }
+        ],
+        "fitsSingleWindow": true,
+        "limit": 20,
+        "notes": "JSR documents a daily publish limit per package scope",
+        "operation": "placeholder_publish",
+        "pending": 1,
+        "registry": "jsr",
+        "windowSeconds": 86400
+      },
+      {
+        "batchesRequired": 1,
+        "confidence": "medium",
+        "evidence": [
+          {
+            "kind": "official",
+            "notes": "official automation docs; limit itself is enforced operationally but not clearly enumerated on this page",
+            "title": "Dart automated publishing docs",
+            "url": "https://dart.dev/tools/pub/automated-publishing"
+          }
+        ],
+        "fitsSingleWindow": true,
+        "limit": 12,
+        "notes": "pub.dev community guidance consistently cites 12 publishes per day for new versions",
+        "operation": "placeholder_publish",
+        "pending": 1,
+        "registry": "pub_dev",
+        "windowSeconds": 86400
       }
-    }
-  ]
+    ]
+  }
 }
 
 ----- stderr -----

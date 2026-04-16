@@ -20,6 +20,7 @@ use crate::discover_npm_packages;
 use crate::discover_package_json_workspace;
 use crate::discover_pnpm_workspace;
 use crate::expand_member_patterns;
+use crate::load_configured_npm_package;
 use crate::package_json_declares_workspaces;
 use crate::parse_package_json;
 use crate::supported_versioned_file_kind;
@@ -591,6 +592,66 @@ fn discover_standalone_package_defaults_manager_to_npm() {
 		package.metadata.get("manager").map(String::as_str),
 		Some("npm")
 	);
+}
+
+#[test]
+fn discover_multiple_standalone_packages_keep_unique_manifest_ids() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/standalone-multiple-packages");
+	let discovery = discover_npm_packages(&fixture_root)
+		.unwrap_or_else(|error| panic!("npm discovery: {error}"));
+	assert_eq!(discovery.warnings, Vec::<String>::new());
+	assert_eq!(discovery.packages.len(), 2);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.id == "npm:packages/docs/package.json")
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.id == "npm:packages/web/package.json")
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "standalone-docs")
+	);
+	assert!(
+		discovery
+			.packages
+			.iter()
+			.any(|package| package.name == "standalone-web")
+	);
+}
+
+#[test]
+fn load_configured_npm_package_normalizes_ids_relative_to_root() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/npm/standalone-multiple-packages");
+	let package = load_configured_npm_package(&fixture_root, &fixture_root.join("packages/docs"))
+		.unwrap_or_else(|error| panic!("configured npm package: {error}"))
+		.unwrap_or_else(|| panic!("expected configured npm package"));
+	assert_eq!(package.id, "npm:packages/docs/package.json");
+	assert_eq!(package.name, "standalone-docs");
+}
+
+#[test]
+fn normalize_package_id_leaves_existing_id_when_manifest_is_outside_root() {
+	let mut package = PackageRecord::new(
+		Ecosystem::Npm,
+		"standalone-docs",
+		PathBuf::from("/tmp/outside-root/package.json"),
+		PathBuf::from("/tmp/outside-root"),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let original_id = package.id.clone();
+	super::normalize_package_id(Path::new("/tmp/workspace-root"), &mut package);
+	assert_eq!(package.id, original_id);
 }
 
 #[test]

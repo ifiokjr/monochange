@@ -141,6 +141,7 @@ Those namespaces are the main reason to prefer built-in steps over reimplementin
 - [RetargetRelease](06-retarget-release.md)
 - [PrepareRelease](07-prepare-release.md)
 - [CommitRelease](08-commit-release.md)
+- [PlanPublishRateLimits](09-plan-publish-rate-limits.md)
 - [PublishRelease](10-publish-release.md)
 - [OpenReleaseRequest](11-open-release-request.md)
 - [CommentReleasedIssues](12-comment-released-issues.md)

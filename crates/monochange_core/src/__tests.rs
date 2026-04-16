@@ -40,6 +40,7 @@ use crate::RELEASE_RECORD_HEADING;
 use crate::RELEASE_RECORD_KIND;
 use crate::RELEASE_RECORD_SCHEMA_VERSION;
 use crate::RELEASE_RECORD_START_MARKER;
+use crate::RateLimitOperation;
 use crate::RegistryKind;
 use crate::ReleaseManifest;
 use crate::ReleaseManifestPlan;
@@ -886,6 +887,7 @@ fn default_cli_commands_expose_publish_flows_alongside_release_planning() {
 			"release",
 			"placeholder-publish",
 			"publish",
+			"publish-plan",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -924,6 +926,19 @@ fn default_cli_commands_expose_publish_flows_alongside_release_planning() {
 		publish.steps,
 		vec![CliStepDefinition::PublishPackages {
 			name: Some("publish packages".to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		}]
+	);
+
+	let publish_plan = cli
+		.iter()
+		.find(|command| command.name == "publish-plan")
+		.unwrap_or_else(|| panic!("expected publish-plan cli command"));
+	assert_eq!(
+		publish_plan.steps,
+		vec![CliStepDefinition::PlanPublishRateLimits {
+			name: Some("plan publish rate limits".to_string()),
 			when: None,
 			inputs: BTreeMap::new(),
 		}]
@@ -1247,6 +1262,29 @@ fn valid_input_names_returns_expected_names_for_retarget_release() {
 }
 
 #[test]
+fn valid_input_names_returns_expected_names_for_publish_steps() {
+	let publish = CliStepDefinition::PublishPackages {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		publish.valid_input_names(),
+		Some(["format", "package"].as_slice())
+	);
+
+	let plan = CliStepDefinition::PlanPublishRateLimits {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	let names = plan.valid_input_names().unwrap();
+	for expected in ["format", "mode", "package", "ci"] {
+		assert!(names.contains(&expected), "missing: {expected}");
+	}
+}
+
+#[test]
 fn valid_input_names_returns_expected_names_for_create_change_file() {
 	let step = CliStepDefinition::CreateChangeFile {
 		show_progress: None,
@@ -1347,6 +1385,52 @@ fn expected_input_kind_returns_none_for_commit_release() {
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.expected_input_kind("format"), None);
+}
+
+#[test]
+fn expected_input_kind_returns_correct_types_for_publish_steps() {
+	use crate::CliInputKind;
+	let publish = CliStepDefinition::PublishPackages {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		publish.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		publish.expected_input_kind("package"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(publish.expected_input_kind("unknown"), None);
+
+	let plan = CliStepDefinition::PlanPublishRateLimits {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		plan.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(plan.expected_input_kind("mode"), Some(CliInputKind::Choice));
+	assert_eq!(
+		plan.expected_input_kind("package"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(plan.expected_input_kind("ci"), Some(CliInputKind::Choice));
+	assert_eq!(plan.expected_input_kind("unknown"), None);
+}
+
+#[test]
+fn rate_limit_operation_labels_cover_all_variants() {
+	assert_eq!(
+		RateLimitOperation::PlaceholderPublish.as_str(),
+		"placeholder_publish"
+	);
+	assert_eq!(RateLimitOperation::Publish.as_str(), "publish");
+	assert_eq!(RateLimitOperation::Update.as_str(), "update");
 }
 
 #[test]

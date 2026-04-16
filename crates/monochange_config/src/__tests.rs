@@ -102,7 +102,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 9);
+	assert_eq!(configuration.cli.len(), 10);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -117,6 +117,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 			"release",
 			"placeholder-publish",
 			"publish",
+			"publish-plan",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -165,6 +166,7 @@ fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_c
 			"release",
 			"placeholder-publish",
 			"publish",
+			"publish-plan",
 			"affected",
 			"diagnostics",
 			"repair-release"
@@ -1994,6 +1996,52 @@ fn load_workspace_configuration_allows_package_publish_placeholder_to_override_e
 		package.publish.placeholder.readme_file.as_deref(),
 		Some(Path::new("docs/web-placeholder.md"))
 	);
+}
+
+#[test]
+fn normalize_publish_settings_merges_rate_limit_enforcement_overrides() {
+	let disabled = crate::normalize_publish_settings(
+		r"[package.core.publish.rate_limits]
+enforce = false
+",
+		Some(&monochange_core::PublishSettings {
+			registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+			rate_limits: monochange_core::PublishRateLimitSettings { enforce: true },
+			..monochange_core::PublishSettings::default()
+		}),
+		crate::RawPublishSettings {
+			rate_limits: crate::RawPublishRateLimitSettings {
+				enforce: Some(false),
+			},
+			..crate::RawPublishSettings::default()
+		},
+		"package",
+		"core",
+		EcosystemType::Cargo,
+	)
+	.unwrap_or_else(|error| panic!("publish settings: {error}"));
+	assert!(!disabled.rate_limits.enforce);
+
+	let enabled = crate::normalize_publish_settings(
+		r"[package.core.publish.rate_limits]
+enforce = true
+",
+		Some(&monochange_core::PublishSettings {
+			registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+			..monochange_core::PublishSettings::default()
+		}),
+		crate::RawPublishSettings {
+			rate_limits: crate::RawPublishRateLimitSettings {
+				enforce: Some(true),
+			},
+			..crate::RawPublishSettings::default()
+		},
+		"package",
+		"core",
+		EcosystemType::Cargo,
+	)
+	.unwrap_or_else(|error| panic!("publish settings: {error}"));
+	assert!(enabled.rate_limits.enforce);
 }
 
 #[test]

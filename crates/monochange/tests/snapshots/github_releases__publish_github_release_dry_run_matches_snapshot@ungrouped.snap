@@ -184,6 +184,7 @@ expression: json
     "version": null
   },
   "packagePublish": null,
+  "publishRateLimits": null,
   "releaseCommit": null,
   "releaseRequest": null,
   "releases": [

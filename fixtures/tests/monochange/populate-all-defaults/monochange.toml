@@ -10,6 +10,8 @@
 
 [cli.publish]
 
+[cli.publish-plan]
+
 [cli.affected]
 
 [cli.diagnostics]

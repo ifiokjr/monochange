@@ -1081,7 +1081,7 @@ impl fmt::Display for PublishMode {
 	}
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum RegistryKind {
@@ -1125,6 +1125,12 @@ pub struct PlaceholderSettings {
 	pub readme_file: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct PublishRateLimitSettings {
+	#[serde(default)]
+	pub enforce: bool,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TrustedPublishingSettings {
 	#[serde(default = "default_true")]
@@ -1160,6 +1166,8 @@ pub struct PublishSettings {
 	#[serde(default)]
 	pub trusted_publishing: TrustedPublishingSettings,
 	#[serde(default)]
+	pub rate_limits: PublishRateLimitSettings,
+	#[serde(default)]
 	pub placeholder: PlaceholderSettings,
 }
 
@@ -1170,6 +1178,7 @@ impl Default for PublishSettings {
 			mode: PublishMode::default(),
 			registry: None,
 			trusted_publishing: TrustedPublishingSettings::default(),
+			rate_limits: PublishRateLimitSettings::default(),
 			placeholder: PlaceholderSettings::default(),
 		}
 	}
@@ -1527,6 +1536,15 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+	/// Plan package-registry rate-limit windows for publish operations.
+	PlanPublishRateLimits {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	/// Open or update a hosted release request from prepared release state.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
@@ -1620,6 +1638,7 @@ impl CliStepDefinition {
 			| Self::PublishRelease { inputs, .. }
 			| Self::PlaceholderPublish { inputs, .. }
 			| Self::PublishPackages { inputs, .. }
+			| Self::PlanPublishRateLimits { inputs, .. }
 			| Self::OpenReleaseRequest { inputs, .. }
 			| Self::CommentReleasedIssues { inputs, .. }
 			| Self::AffectedPackages { inputs, .. }
@@ -1641,6 +1660,7 @@ impl CliStepDefinition {
 			| Self::PublishRelease { name, .. }
 			| Self::PlaceholderPublish { name, .. }
 			| Self::PublishPackages { name, .. }
+			| Self::PlanPublishRateLimits { name, .. }
 			| Self::OpenReleaseRequest { name, .. }
 			| Self::CommentReleasedIssues { name, .. }
 			| Self::AffectedPackages { name, .. }
@@ -1668,6 +1688,7 @@ impl CliStepDefinition {
 			| Self::PublishRelease { when, .. }
 			| Self::PlaceholderPublish { when, .. }
 			| Self::PublishPackages { when, .. }
+			| Self::PlanPublishRateLimits { when, .. }
 			| Self::OpenReleaseRequest { when, .. }
 			| Self::CommentReleasedIssues { when, .. }
 			| Self::AffectedPackages { when, .. }
@@ -1700,6 +1721,7 @@ impl CliStepDefinition {
 			Self::PublishRelease { .. } => "PublishRelease",
 			Self::PlaceholderPublish { .. } => "PlaceholderPublish",
 			Self::PublishPackages { .. } => "PublishPackages",
+			Self::PlanPublishRateLimits { .. } => "PlanPublishRateLimits",
 			Self::OpenReleaseRequest { .. } => "OpenReleaseRequest",
 			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
 			Self::AffectedPackages { .. } => "AffectedPackages",
@@ -1722,10 +1744,12 @@ impl CliStepDefinition {
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
-			| Self::PlaceholderPublish { .. }
-			| Self::PublishPackages { .. }
 			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
+			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
+				Some(&["format", "package"])
+			}
+			Self::PlanPublishRateLimits { .. } => Some(&["format", "mode", "package", "ci"]),
 			Self::CreateChangeFile { .. } => {
 				Some(&[
 					"interactive",
@@ -1763,12 +1787,24 @@ impl CliStepDefinition {
 			Self::Discover { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
-			| Self::PlaceholderPublish { .. }
-			| Self::PublishPackages { .. }
 			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
+					_ => None,
+				}
+			}
+			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"package" => Some(CliInputKind::StringList),
+					_ => None,
+				}
+			}
+			Self::PlanPublishRateLimits { .. } => {
+				match name {
+					"package" => Some(CliInputKind::StringList),
+					"format" | "mode" | "ci" => Some(CliInputKind::Choice),
 					_ => None,
 				}
 			}
@@ -1962,6 +1998,104 @@ pub struct PackagePublicationTarget {
 	pub mode: PublishMode,
 	#[serde(default)]
 	pub trusted_publishing: TrustedPublishingSettings,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RateLimitOperation {
+	PlaceholderPublish,
+	Publish,
+	Update,
+}
+
+impl RateLimitOperation {
+	#[must_use]
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::PlaceholderPublish => "placeholder_publish",
+			Self::Publish => "publish",
+			Self::Update => "update",
+		}
+	}
+}
+
+impl fmt::Display for RateLimitOperation {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		formatter.write_str(self.as_str())
+	}
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RateLimitEvidenceKind {
+	Official,
+	SourceCode,
+	Secondary,
+	ConservativeDefault,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RateLimitConfidence {
+	High,
+	Medium,
+	Low,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimitEvidence {
+	pub title: String,
+	pub url: String,
+	pub kind: RateLimitEvidenceKind,
+	pub notes: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryRateLimitPolicy {
+	pub registry: RegistryKind,
+	pub operation: RateLimitOperation,
+	pub limit: Option<u32>,
+	pub window_seconds: Option<u64>,
+	pub confidence: RateLimitConfidence,
+	pub notes: String,
+	pub evidence: Vec<RateLimitEvidence>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryRateLimitWindowPlan {
+	pub registry: RegistryKind,
+	pub operation: RateLimitOperation,
+	pub limit: Option<u32>,
+	pub window_seconds: Option<u64>,
+	pub pending: usize,
+	pub batches_required: usize,
+	pub fits_single_window: bool,
+	pub confidence: RateLimitConfidence,
+	pub notes: String,
+	pub evidence: Vec<RateLimitEvidence>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishRateLimitBatch {
+	pub registry: RegistryKind,
+	pub operation: RateLimitOperation,
+	pub batch_index: usize,
+	pub total_batches: usize,
+	pub packages: Vec<String>,
+	pub recommended_wait_seconds: Option<u64>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishRateLimitReport {
+	pub dry_run: bool,
+	pub windows: Vec<RegistryRateLimitWindowPlan>,
+	pub batches: Vec<PublishRateLimitBatch>,
+	pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -3286,19 +3420,32 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				"Publish placeholder package versions for packages missing from their registries"
 					.to_string(),
 			),
-			inputs: vec![CliInputDefinition {
-				name: "format".to_string(),
-				kind: CliInputKind::Choice,
-				help_text: Some("Output format".to_string()),
-				required: false,
-				default: Some("text".to_string()),
-				choices: vec![
-					"text".to_string(),
-					"markdown".to_string(),
-					"json".to_string(),
-				],
-				short: None,
-			}],
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Output format".to_string()),
+					required: false,
+					default: Some("text".to_string()),
+					choices: vec![
+						"text".to_string(),
+						"markdown".to_string(),
+						"json".to_string(),
+					],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "package".to_string(),
+					kind: CliInputKind::StringList,
+					help_text: Some(
+						"Restrict placeholder publishing to explicit package ids".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+					short: None,
+				},
+			],
 			steps: vec![CliStepDefinition::PlaceholderPublish {
 				name: Some("publish placeholder packages".to_string()),
 				when: None,
@@ -3311,21 +3458,86 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				"Publish package versions from monochange release state using built-in workflows"
 					.to_string(),
 			),
-			inputs: vec![CliInputDefinition {
-				name: "format".to_string(),
-				kind: CliInputKind::Choice,
-				help_text: Some("Output format".to_string()),
-				required: false,
-				default: Some("text".to_string()),
-				choices: vec![
-					"text".to_string(),
-					"markdown".to_string(),
-					"json".to_string(),
-				],
-				short: None,
-			}],
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Output format".to_string()),
+					required: false,
+					default: Some("text".to_string()),
+					choices: vec![
+						"text".to_string(),
+						"markdown".to_string(),
+						"json".to_string(),
+					],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "package".to_string(),
+					kind: CliInputKind::StringList,
+					help_text: Some("Restrict publishing to explicit package ids".to_string()),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+					short: None,
+				},
+			],
 			steps: vec![CliStepDefinition::PublishPackages {
 				name: Some("publish packages".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		},
+		CliCommandDefinition {
+			name: "publish-plan".to_string(),
+			help_text: Some(
+				"Plan package-registry publish work against known ecosystem rate limits"
+					.to_string(),
+			),
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Output format".to_string()),
+					required: false,
+					default: Some("text".to_string()),
+					choices: vec![
+						"text".to_string(),
+						"markdown".to_string(),
+						"json".to_string(),
+					],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "mode".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Plan release publishes or placeholder publishes".to_string()),
+					required: false,
+					default: Some("publish".to_string()),
+					choices: vec!["publish".to_string(), "placeholder".to_string()],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "package".to_string(),
+					kind: CliInputKind::StringList,
+					help_text: Some("Restrict planning to explicit package ids".to_string()),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+					short: None,
+				},
+				CliInputDefinition {
+					name: "ci".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: Some("Render a CI snippet for the planned batches".to_string()),
+					required: false,
+					default: None,
+					choices: vec!["github-actions".to_string(), "gitlab-ci".to_string()],
+					short: None,
+				},
+			],
+			steps: vec![CliStepDefinition::PlanPublishRateLimits {
+				name: Some("plan publish rate limits".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],
