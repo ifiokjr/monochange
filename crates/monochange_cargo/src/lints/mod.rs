@@ -274,30 +274,22 @@ fn preferred_dependency_order() -> [&'static str; 14] {
 	]
 }
 
-#[derive(Debug)]
-struct DependencyFieldOrderRule {
-	rule: LintRule,
+monochange_linting::declare_lint_rule! {
+	DependencyFieldOrderRule,
+	id: "cargo/dependency-field-order",
+	name: "Dependency field order",
+	description: "Enforces consistent ordering inside Cargo dependency tables",
+	category: LintCategory::Style,
+	maturity: LintMaturity::Stable,
+	autofixable: true,
+	options: vec![LintOptionDefinition::new(
+		"fix",
+		"apply an autofix that rewrites the dependency entry",
+		LintOptionKind::Boolean,
+	)],
 }
 
 impl DependencyFieldOrderRule {
-	fn new() -> Self {
-		Self {
-			rule: LintRule::new(
-				"cargo/dependency-field-order",
-				"Dependency field order",
-				"Enforces consistent ordering inside Cargo dependency tables",
-				LintCategory::Style,
-				LintMaturity::Stable,
-				true,
-			)
-			.with_options(vec![LintOptionDefinition::new(
-				"fix",
-				"apply an autofix that rewrites the dependency entry",
-				LintOptionKind::Boolean,
-			)]),
-		}
-	}
-
 	fn ordered_fields(table: &toml_edit::Table) -> Vec<&str> {
 		let order = preferred_dependency_order();
 		let mut keys = table
@@ -382,36 +374,26 @@ impl LintRuleRunner for DependencyFieldOrderRule {
 	}
 }
 
-#[derive(Debug)]
-struct InternalDependencyWorkspaceRule {
-	rule: LintRule,
-}
-
-impl InternalDependencyWorkspaceRule {
-	fn new() -> Self {
-		Self {
-			rule: LintRule::new(
-				"cargo/internal-dependency-workspace",
-				"Internal dependency workspace",
-				"Requires workspace = true for internal Cargo dependencies",
-				LintCategory::Correctness,
-				LintMaturity::Stable,
-				true,
-			)
-			.with_options(vec![
-				LintOptionDefinition::new(
-					"require_workspace",
-					"require internal dependencies to use workspace = true",
-					LintOptionKind::Boolean,
-				),
-				LintOptionDefinition::new(
-					"fix",
-					"apply an autofix when a dependency can be rewritten safely",
-					LintOptionKind::Boolean,
-				),
-			]),
-		}
-	}
+monochange_linting::declare_lint_rule! {
+	InternalDependencyWorkspaceRule,
+	id: "cargo/internal-dependency-workspace",
+	name: "Internal dependency workspace",
+	description: "Requires workspace = true for internal Cargo dependencies",
+	category: LintCategory::Correctness,
+	maturity: LintMaturity::Stable,
+	autofixable: true,
+	options: vec![
+		LintOptionDefinition::new(
+			"require_workspace",
+			"require internal dependencies to use workspace = true",
+			LintOptionKind::Boolean,
+		),
+		LintOptionDefinition::new(
+			"fix",
+			"apply an autofix when a dependency can be rewritten safely",
+			LintOptionKind::Boolean,
+		),
+	],
 }
 
 impl LintRuleRunner for InternalDependencyWorkspaceRule {
@@ -473,29 +455,19 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 	}
 }
 
-#[derive(Debug)]
-struct RequiredPackageFieldsRule {
-	rule: LintRule,
-}
-
-impl RequiredPackageFieldsRule {
-	fn new() -> Self {
-		Self {
-			rule: LintRule::new(
-				"cargo/required-package-fields",
-				"Required package fields",
-				"Requires selected fields in the [package] table",
-				LintCategory::Correctness,
-				LintMaturity::Stable,
-				false,
-			)
-			.with_options(vec![LintOptionDefinition::new(
-				"fields",
-				"list of package fields that must be present",
-				LintOptionKind::StringList,
-			)]),
-		}
-	}
+monochange_linting::declare_lint_rule! {
+	RequiredPackageFieldsRule,
+	id: "cargo/required-package-fields",
+	name: "Required package fields",
+	description: "Requires selected fields in the [package] table",
+	category: LintCategory::Correctness,
+	maturity: LintMaturity::Stable,
+	autofixable: false,
+	options: vec![LintOptionDefinition::new(
+		"fields",
+		"list of package fields that must be present",
+		LintOptionKind::StringList,
+	)],
 }
 
 impl LintRuleRunner for RequiredPackageFieldsRule {
@@ -537,29 +509,19 @@ impl LintRuleRunner for RequiredPackageFieldsRule {
 	}
 }
 
-#[derive(Debug)]
-struct SortedDependenciesRule {
-	rule: LintRule,
-}
-
-impl SortedDependenciesRule {
-	fn new() -> Self {
-		Self {
-			rule: LintRule::new(
-				"cargo/sorted-dependencies",
-				"Sorted dependencies",
-				"Requires Cargo dependency tables to be alphabetically sorted",
-				LintCategory::Style,
-				LintMaturity::Stable,
-				true,
-			)
-			.with_options(vec![LintOptionDefinition::new(
-				"fix",
-				"apply an autofix that rewrites the dependency section",
-				LintOptionKind::Boolean,
-			)]),
-		}
-	}
+monochange_linting::declare_lint_rule! {
+	SortedDependenciesRule,
+	id: "cargo/sorted-dependencies",
+	name: "Sorted dependencies",
+	description: "Requires Cargo dependency tables to be alphabetically sorted",
+	category: LintCategory::Style,
+	maturity: LintMaturity::Stable,
+	autofixable: true,
+	options: vec![LintOptionDefinition::new(
+		"fix",
+		"apply an autofix that rewrites the dependency section",
+		LintOptionKind::Boolean,
+	)],
 }
 
 impl LintRuleRunner for SortedDependenciesRule {
@@ -619,29 +581,19 @@ impl LintRuleRunner for SortedDependenciesRule {
 	}
 }
 
-#[derive(Debug)]
-struct UnlistedPackagePrivateRule {
-	rule: LintRule,
-}
-
-impl UnlistedPackagePrivateRule {
-	fn new() -> Self {
-		Self {
-			rule: LintRule::new(
-				"cargo/unlisted-package-private",
-				"Unlisted package must be private",
-				"Requires unmanaged Cargo packages to declare publish = false",
-				LintCategory::Correctness,
-				LintMaturity::Stable,
-				true,
-			)
-			.with_options(vec![LintOptionDefinition::new(
-				"fix",
-				"apply an autofix that inserts publish = false",
-				LintOptionKind::Boolean,
-			)]),
-		}
-	}
+monochange_linting::declare_lint_rule! {
+	UnlistedPackagePrivateRule,
+	id: "cargo/unlisted-package-private",
+	name: "Unlisted package must be private",
+	description: "Requires unmanaged Cargo packages to declare publish = false",
+	category: LintCategory::Correctness,
+	maturity: LintMaturity::Stable,
+	autofixable: true,
+	options: vec![LintOptionDefinition::new(
+		"fix",
+		"apply an autofix that inserts publish = false",
+		LintOptionKind::Boolean,
+	)],
 }
 
 impl LintRuleRunner for UnlistedPackagePrivateRule {

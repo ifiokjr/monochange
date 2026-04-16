@@ -355,7 +355,9 @@ use monochange_linting::declare_lint_rule;
 use monochange_linting::LintCategory;
 use monochange_linting::LintMaturity;
 
-
+// Keep `declare_lint_rule!` for straightforward metadata-only construction.
+// If this rule later needs extra constructor state, switch to an explicit
+// `struct` plus `LintRule::new(...)`.
 declare_lint_rule! {{
     pub {struct_name},
     id: "{suite}/{rule_name}",
@@ -644,11 +646,9 @@ mod tests {
 		let odd_file = tempdir
 			.path()
 			.join("crates/monochange_cargo/src/lints/_foo.rs");
-		assert!(
-			fs::read_to_string(odd_file)
-				.unwrap()
-				.contains("pub FooRule")
-		);
+		let odd_contents = fs::read_to_string(odd_file).unwrap();
+		assert!(odd_contents.contains("pub FooRule"));
+		assert!(odd_contents.contains("Keep `declare_lint_rule!`"));
 
 		let dart_message =
 			scaffold_lint_rule(tempdir.path(), "dart/sdk-constraint-present").unwrap();
