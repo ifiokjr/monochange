@@ -1379,10 +1379,51 @@ Example:
 "dart/no-unexpected-dependency-overrides" = { level = "warning", allow_for_private = true, allow_packages = ["app_shell"] }
 ```
 
+### Workspace-aware Dart rules
+
+### `dart/internal-path-dependency-policy`
+
+**Why:** monorepos usually want one consistent policy for how internal Dart packages reference each other.
+
+**Default policy:** strict mode expects internal packages to use `path:` references.
+
+**Useful option:**
+
+- `mode` — choose `"path"` or `"hosted"`
+
+Example:
+
+```toml
+[lints.rules]
+"dart/internal-path-dependency-policy" = { level = "error", mode = "hosted" }
+```
+
+### `dart/workspace-internal-version-consistency`
+
+**Why:** when workspace packages reference each other with hosted version ranges, those ranges should not drift away from the current workspace version.
+
+**With the rule:** monochange compares internal dependency version references against the discovered workspace package version and reports mismatches.
+
+### Flutter-only rules
+
+### `dart/flutter-package-metadata-consistent`
+
+**Why:** packages with a `flutter` section should declare the Flutter SDK dependency consistently so they are unmistakably Flutter packages.
+
+**With the rule:** monochange requires `dependencies.flutter = { sdk = flutter }` in `pubspec.yaml` terms, expressed as the YAML mapping form.
+
+### `dart/assets-sorted`
+
+**Why:** stable ordering for `flutter.assets` and `flutter.fonts` reduces noisy diffs in Flutter packages.
+
+**Useful option:**
+
+- `fix` — defaults to `true`
+
 ### Dart presets
 
 - `dart/recommended` enables metadata/publishability checks, `dart/sdk-constraint-present`, and `dart/dependency-sorted` as a warning.
-- `dart/strict` adds `dart/sdk-constraint-modern`, `dart/no-unexpected-dependency-overrides`, and promotes `dart/dependency-sorted` to an error.
+- `dart/strict` adds `dart/sdk-constraint-modern`, `dart/no-unexpected-dependency-overrides`, `dart/internal-path-dependency-policy`, `dart/workspace-internal-version-consistency`, `dart/flutter-package-metadata-consistent`, and `dart/assets-sorted`, while promoting `dart/dependency-sorted` to an error.
 
 ## What `mc check` looks like in practice
 

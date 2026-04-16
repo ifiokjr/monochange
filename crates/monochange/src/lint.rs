@@ -527,6 +527,8 @@ mod tests {
 		assert!(text.contains("cargo/recommended"));
 		assert!(text.contains("dart/required-package-fields"));
 		assert!(text.contains("dart/sdk-constraint-present"));
+		assert!(text.contains("dart/internal-path-dependency-policy"));
+		assert!(text.contains("dart/flutter-package-metadata-consistent"));
 		assert!(text.contains("dart/recommended"));
 		assert!(text.contains("dart/strict"));
 

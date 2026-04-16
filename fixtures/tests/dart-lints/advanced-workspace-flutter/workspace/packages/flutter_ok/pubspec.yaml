@@ -1,0 +1,14 @@
+name: flutter_ok
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+dependencies:
+  flutter:
+    sdk: flutter
+  core:
+    path: ../core
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/add.png
+    - assets/icons/remove.png

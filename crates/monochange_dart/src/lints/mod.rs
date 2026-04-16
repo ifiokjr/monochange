@@ -29,6 +29,7 @@ use monochange_core::lint::LintTargetMetadata;
 use monochange_core::relative_to_root;
 use semver::Version;
 use serde_yaml_ng::Mapping;
+use serde_yaml_ng::Sequence;
 use serde_yaml_ng::Value;
 
 use crate::discover_dart_packages;
@@ -49,6 +50,7 @@ pub struct DartLintSuite;
 pub(crate) struct DartLintFile {
 	pub manifest: Mapping,
 	pub workspace_package_names: Arc<BTreeSet<String>>,
+	pub workspace_package_versions: Arc<BTreeMap<String, Version>>,
 }
 
 impl LintSuite for DartLintSuite {
@@ -58,13 +60,17 @@ impl LintSuite for DartLintSuite {
 
 	fn rules(&self) -> Vec<Box<dyn LintRuleRunner>> {
 		vec![
+			Box::new(AssetsSortedRule::new()),
 			Box::new(DependencySortedRule::new()),
+			Box::new(FlutterPackageMetadataConsistentRule::new()),
+			Box::new(InternalPathDependencyPolicyRule::new()),
 			Box::new(NoGitDependenciesInPublishedPackagesRule::new()),
 			Box::new(NoUnexpectedDependencyOverridesRule::new()),
 			Box::new(RequiredPackageFieldsRule::new()),
 			Box::new(SdkConstraintModernRule::new()),
 			Box::new(SdkConstraintPresentRule::new()),
 			Box::new(UnlistedPackagePrivateRule::new()),
+			Box::new(WorkspaceInternalVersionConsistencyRule::new()),
 		]
 	}
 
@@ -101,13 +107,28 @@ impl LintSuite for DartLintSuite {
 			LintPreset::new(
 				"dart/strict",
 				"Dart strict",
-				"Opinionated Dart manifest linting with SDK policy and dependency overrides enforced",
+				"Opinionated Dart manifest linting with workspace and Flutter policy rules enforced",
 				LintMaturity::Strict,
 			)
 			.with_rules(BTreeMap::from([
 				(
+					"dart/assets-sorted".to_string(),
+					LintRuleConfig::Severity(LintSeverity::Error),
+				),
+				(
 					"dart/dependency-sorted".to_string(),
 					LintRuleConfig::Severity(LintSeverity::Error),
+				),
+				(
+					"dart/flutter-package-metadata-consistent".to_string(),
+					LintRuleConfig::Severity(LintSeverity::Error),
+				),
+				(
+					"dart/internal-path-dependency-policy".to_string(),
+					LintRuleConfig::Detailed {
+						level: LintSeverity::Error,
+						options: BTreeMap::from([("mode".to_string(), serde_json::json!("path"))]),
+					},
 				),
 				(
 					"dart/no-git-dependencies-in-published-packages".to_string(),
@@ -133,6 +154,10 @@ impl LintSuite for DartLintSuite {
 					"dart/unlisted-package-private".to_string(),
 					LintRuleConfig::Severity(LintSeverity::Error),
 				),
+				(
+					"dart/workspace-internal-version-consistency".to_string(),
+					LintRuleConfig::Severity(LintSeverity::Error),
+				),
 			])),
 		]
 	}
@@ -149,6 +174,18 @@ impl LintSuite for DartLintSuite {
 				.iter()
 				.map(|package| package.name.clone())
 				.collect::<BTreeSet<_>>(),
+		);
+		let workspace_package_versions = Arc::new(
+			discovery
+				.packages
+				.iter()
+				.filter_map(|package| {
+					package
+						.current_version
+						.clone()
+						.map(|version| (package.name.clone(), version))
+				})
+				.collect::<BTreeMap<_, _>>(),
 		);
 
 		discovery
@@ -203,6 +240,7 @@ impl LintSuite for DartLintSuite {
 					Box::new(DartLintFile {
 						manifest,
 						workspace_package_names: Arc::clone(&workspace_package_names),
+						workspace_package_versions: Arc::clone(&workspace_package_versions),
 					}),
 				))
 			})
@@ -412,6 +450,243 @@ fn source_key_order(contents: &str, section: &str) -> Option<Vec<String>> {
 	Some(keys)
 }
 
+fn dependency_version_text(value: &Value) -> Option<String> {
+	match value {
+		Value::String(text) => Some(text.clone()),
+		Value::Mapping(mapping) => {
+			mapping
+				.get(yaml_key("version"))
+				.and_then(Value::as_str)
+				.map(ToString::to_string)
+		}
+		_ => None,
+	}
+}
+
+fn dependency_uses_path(value: &Value) -> bool {
+	matches!(value, Value::Mapping(mapping) if mapping.contains_key(yaml_key("path")))
+}
+
+fn dependency_declares_flutter_sdk(value: &Value) -> bool {
+	matches!(
+		value,
+		Value::Mapping(mapping)
+			if mapping
+				.get(yaml_key("sdk"))
+				.and_then(Value::as_str)
+				== Some("flutter")
+	)
+}
+
+fn first_constraint_version(value: &str) -> Option<Version> {
+	for token in value.split_whitespace() {
+		let trimmed = token
+			.trim()
+			.trim_end_matches(',')
+			.trim_start_matches(['^', '~', '>', '<', '=']);
+		if let Some(version) = parse_constraint_version(trimmed) {
+			return Some(version);
+		}
+	}
+	None
+}
+
+fn flutter_section(mapping: &Mapping) -> Option<&Mapping> {
+	yaml_mapping(mapping, "flutter")
+}
+
+fn flutter_section_mut(mapping: &mut Mapping) -> Option<&mut Mapping> {
+	mapping
+		.get_mut(yaml_key("flutter"))
+		.and_then(Value::as_mapping_mut)
+}
+
+fn yaml_sequence<'a>(mapping: &'a Mapping, key: &str) -> Option<&'a Sequence> {
+	mapping.get(yaml_key(key)).and_then(Value::as_sequence)
+}
+
+fn yaml_sequence_mut<'a>(mapping: &'a mut Mapping, key: &str) -> Option<&'a mut Sequence> {
+	mapping
+		.get_mut(yaml_key(key))
+		.and_then(Value::as_sequence_mut)
+}
+
+fn value_string(value: &Value) -> String {
+	value.as_str().unwrap_or_default().to_string()
+}
+
+fn sort_string_sequence(sequence: &mut Sequence) {
+	sequence.sort_by_key(value_string);
+}
+
+fn sequence_order(sequence: &Sequence) -> Vec<String> {
+	sequence.iter().map(value_string).collect()
+}
+
+fn sort_flutter_assets_and_fonts(mapping: &mut Mapping) {
+	let Some(flutter) = flutter_section_mut(mapping) else {
+		return;
+	};
+	if let Some(assets) = yaml_sequence_mut(flutter, "assets") {
+		sort_string_sequence(assets);
+	}
+	if let Some(fonts) = yaml_sequence_mut(flutter, "fonts") {
+		fonts.sort_by_key(|entry| {
+			entry
+				.as_mapping()
+				.and_then(|mapping| mapping.get(yaml_key("family")))
+				.and_then(Value::as_str)
+				.unwrap_or_default()
+				.to_string()
+		});
+		for entry in fonts {
+			let Some(font_entry) = entry.as_mapping_mut() else {
+				continue;
+			};
+			if let Some(font_assets) = yaml_sequence_mut(font_entry, "fonts") {
+				font_assets.sort_by_key(|asset| {
+					asset
+						.as_mapping()
+						.and_then(|mapping| mapping.get(yaml_key("asset")))
+						.and_then(Value::as_str)
+						.unwrap_or_default()
+						.to_string()
+				});
+			}
+		}
+	}
+}
+
+#[derive(Debug)]
+struct AssetsSortedRule {
+	rule: LintRule,
+}
+
+impl AssetsSortedRule {
+	fn new() -> Self {
+		Self {
+			rule: LintRule::new(
+				"dart/assets-sorted",
+				"Flutter assets sorted",
+				"Requires Flutter asset and font lists to use a stable alphabetical order",
+				LintCategory::Style,
+				LintMaturity::Stable,
+				true,
+			)
+			.with_options(vec![LintOptionDefinition::new(
+				"fix",
+				"apply an autofix that rewrites Flutter assets and fonts in sorted order",
+				LintOptionKind::Boolean,
+			)]),
+		}
+	}
+}
+
+impl LintRuleRunner for AssetsSortedRule {
+	fn rule(&self) -> &LintRule {
+		&self.rule
+	}
+
+	fn run(&self, ctx: &LintContext<'_>, config: &LintRuleConfig) -> Vec<LintResult> {
+		let Some(file) = dart_file(ctx) else {
+			return Vec::new();
+		};
+		let Some(flutter) = flutter_section(&file.manifest) else {
+			return Vec::new();
+		};
+
+		let mut messages = Vec::new();
+		if let Some(assets) = yaml_sequence(flutter, "assets") {
+			let current = sequence_order(assets);
+			let mut sorted = current.clone();
+			sorted.sort();
+			if current != sorted {
+				messages.push("flutter.assets is not sorted alphabetically".to_string());
+			}
+		}
+		if let Some(fonts) = yaml_sequence(flutter, "fonts") {
+			let current_families = fonts
+				.iter()
+				.map(|entry| {
+					entry
+						.as_mapping()
+						.and_then(|mapping| mapping.get(yaml_key("family")))
+						.and_then(Value::as_str)
+						.unwrap_or_default()
+						.to_string()
+				})
+				.collect::<Vec<_>>();
+			let mut sorted_families = current_families.clone();
+			sorted_families.sort();
+			if current_families != sorted_families {
+				messages.push("flutter.fonts families are not sorted alphabetically".to_string());
+			}
+			for entry in fonts {
+				let Some(mapping) = entry.as_mapping() else {
+					continue;
+				};
+				let family = mapping
+					.get(yaml_key("family"))
+					.and_then(Value::as_str)
+					.unwrap_or("unknown");
+				let Some(font_assets) = yaml_sequence(mapping, "fonts") else {
+					continue;
+				};
+				let current_assets = font_assets
+					.iter()
+					.map(|asset| {
+						asset
+							.as_mapping()
+							.and_then(|mapping| mapping.get(yaml_key("asset")))
+							.and_then(Value::as_str)
+							.unwrap_or_default()
+							.to_string()
+					})
+					.collect::<Vec<_>>();
+				let mut sorted_assets = current_assets.clone();
+				sorted_assets.sort();
+				if current_assets != sorted_assets {
+					messages.push(format!(
+						"flutter.fonts family `{family}` assets are not sorted alphabetically"
+					));
+				}
+			}
+		}
+
+		if messages.is_empty() {
+			return Vec::new();
+		}
+
+		let fix = if config.bool_option("fix", true) {
+			let mut rewritten = file.manifest.clone();
+			sort_flutter_assets_and_fonts(&mut rewritten);
+			Some(LintFix::single(
+				"sort Flutter assets and fonts alphabetically",
+				(0, ctx.contents.len()),
+				render_manifest(&rewritten, ctx.contents),
+			))
+		} else {
+			None
+		};
+
+		messages
+			.into_iter()
+			.map(|message| {
+				let mut result = LintResult::new(
+					self.rule.id.clone(),
+					location(ctx),
+					message,
+					config.severity(),
+				);
+				if let Some(fix) = fix.clone() {
+					result = result.with_fix(fix);
+				}
+				result
+			})
+			.collect()
+	}
+}
+
 #[derive(Debug)]
 struct DependencySortedRule {
 	rule: LintRule,
@@ -488,6 +763,129 @@ impl LintRuleRunner for DependencySortedRule {
 			}
 
 			results.push(result);
+		}
+
+		results
+	}
+}
+
+#[derive(Debug)]
+struct FlutterPackageMetadataConsistentRule {
+	rule: LintRule,
+}
+
+impl FlutterPackageMetadataConsistentRule {
+	fn new() -> Self {
+		Self {
+			rule: LintRule::new(
+				"dart/flutter-package-metadata-consistent",
+				"Flutter package metadata consistent",
+				"Requires packages with a flutter section to declare the Flutter SDK dependency consistently",
+				LintCategory::Correctness,
+				LintMaturity::Stable,
+				false,
+			),
+		}
+	}
+}
+
+impl LintRuleRunner for FlutterPackageMetadataConsistentRule {
+	fn rule(&self) -> &LintRule {
+		&self.rule
+	}
+
+	fn run(&self, ctx: &LintContext<'_>, config: &LintRuleConfig) -> Vec<LintResult> {
+		let Some(file) = dart_file(ctx) else {
+			return Vec::new();
+		};
+		if flutter_section(&file.manifest).is_none() {
+			return Vec::new();
+		}
+		let has_flutter_dependency = yaml_mapping(&file.manifest, "dependencies")
+			.and_then(|dependencies| dependencies.get(yaml_key("flutter")))
+			.is_some_and(dependency_declares_flutter_sdk);
+		if has_flutter_dependency {
+			return Vec::new();
+		}
+
+		vec![LintResult::new(
+			self.rule.id.clone(),
+			location(ctx),
+			"packages with a `flutter` section must declare `dependencies.flutter = { sdk: flutter }`",
+			config.severity(),
+		)]
+	}
+}
+
+#[derive(Debug)]
+struct InternalPathDependencyPolicyRule {
+	rule: LintRule,
+}
+
+impl InternalPathDependencyPolicyRule {
+	fn new() -> Self {
+		Self {
+			rule: LintRule::new(
+				"dart/internal-path-dependency-policy",
+				"Internal path dependency policy",
+				"Enforces how internal Dart workspace packages reference each other",
+				LintCategory::BestPractice,
+				LintMaturity::Stable,
+				false,
+			)
+			.with_options(vec![LintOptionDefinition::new(
+				"mode",
+				"dependency policy mode: `path` or `hosted`",
+				LintOptionKind::String,
+			)]),
+		}
+	}
+}
+
+impl LintRuleRunner for InternalPathDependencyPolicyRule {
+	fn rule(&self) -> &LintRule {
+		&self.rule
+	}
+
+	fn run(&self, ctx: &LintContext<'_>, config: &LintRuleConfig) -> Vec<LintResult> {
+		let Some(file) = dart_file(ctx) else {
+			return Vec::new();
+		};
+		let mode = config
+			.string_option("mode")
+			.unwrap_or_else(|| "path".to_string());
+		let require_path = mode != "hosted";
+		let mut results = Vec::new();
+
+		for section in ["dependencies", "dev_dependencies"] {
+			let Some(dependencies) = yaml_mapping(&file.manifest, section) else {
+				continue;
+			};
+			for (dependency_name, value) in dependencies {
+				let Some(dependency_name) = dependency_name.as_str() else {
+					continue;
+				};
+				if !file.workspace_package_names.contains(dependency_name) {
+					continue;
+				}
+				let uses_path = dependency_uses_path(value);
+				if (require_path && uses_path) || (!require_path && !uses_path) {
+					continue;
+				}
+				let expectation = if require_path {
+					"use `path:` references"
+				} else {
+					"use hosted version references"
+				};
+				results.push(LintResult::new(
+					self.rule.id.clone(),
+					location(ctx),
+					format!(
+						"internal dependency `{dependency_name}` in `{section}` should {expectation}"
+					),
+					config.severity(),
+				));
+			}
 		}
 
 		results
@@ -878,6 +1276,73 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 	}
 }
 
+#[derive(Debug)]
+struct WorkspaceInternalVersionConsistencyRule {
+	rule: LintRule,
+}
+
+impl WorkspaceInternalVersionConsistencyRule {
+	fn new() -> Self {
+		Self {
+			rule: LintRule::new(
+				"dart/workspace-internal-version-consistency",
+				"Workspace internal version consistency",
+				"Requires internal Dart dependency version references to match the current workspace package version",
+				LintCategory::Correctness,
+				LintMaturity::Stable,
+				false,
+			),
+		}
+	}
+}
+
+impl LintRuleRunner for WorkspaceInternalVersionConsistencyRule {
+	fn rule(&self) -> &LintRule {
+		&self.rule
+	}
+
+	fn run(&self, ctx: &LintContext<'_>, config: &LintRuleConfig) -> Vec<LintResult> {
+		let Some(file) = dart_file(ctx) else {
+			return Vec::new();
+		};
+		let mut results = Vec::new();
+
+		for section in dependency_sections() {
+			let Some(dependencies) = yaml_mapping(&file.manifest, section) else {
+				continue;
+			};
+			for (dependency_name, value) in dependencies {
+				let Some(dependency_name) = dependency_name.as_str() else {
+					continue;
+				};
+				let Some(expected_version) = file.workspace_package_versions.get(dependency_name)
+				else {
+					continue;
+				};
+				let Some(version_text) = dependency_version_text(value) else {
+					continue;
+				};
+				let Some(referenced_version) = first_constraint_version(&version_text) else {
+					continue;
+				};
+				if referenced_version == *expected_version {
+					continue;
+				}
+				results.push(LintResult::new(
+					self.rule.id.clone(),
+					location(ctx),
+					format!(
+						"internal dependency `{dependency_name}` in `{section}` references `{version_text}` but the workspace version is `{expected_version}`"
+					),
+					config.severity(),
+				));
+			}
+		}
+
+		results
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use std::path::Path;
@@ -915,6 +1380,19 @@ mod tests {
 		lint_suite()
 			.collect_targets(&root, &configuration)
 			.unwrap_or_else(|error| panic!("collect dart sdk fixture targets: {error}"))
+	}
+
+	fn advanced_workspace_flutter_root() -> std::path::PathBuf {
+		fixture_path!("dart-lints/advanced-workspace-flutter/workspace")
+	}
+
+	fn advanced_workspace_flutter_targets() -> Vec<LintTarget> {
+		let root = advanced_workspace_flutter_root();
+		let configuration = load_workspace_configuration(&root)
+			.unwrap_or_else(|error| panic!("load dart advanced fixture config: {error}"));
+		lint_suite()
+			.collect_targets(&root, &configuration)
+			.unwrap_or_else(|error| panic!("collect dart advanced fixture targets: {error}"))
 	}
 
 	fn find_target<'a>(targets: &'a [LintTarget], package_name: &str) -> &'a LintTarget {
@@ -956,20 +1434,24 @@ mod tests {
 			recommended.rules.get("dart/sdk-constraint-present"),
 			Some(&LintRuleConfig::Severity(LintSeverity::Error))
 		);
+		assert!(
+			!recommended
+				.rules
+				.contains_key("dart/internal-path-dependency-policy")
+		);
 
 		let strict = presets.get(1).expect("expected strict preset");
 		assert_eq!(strict.id, "dart/strict");
-		assert_eq!(
-			strict.rules.get("dart/dependency-sorted"),
-			Some(&LintRuleConfig::Severity(LintSeverity::Error))
+		assert!(strict.rules.contains_key("dart/assets-sorted"));
+		assert!(
+			strict
+				.rules
+				.contains_key("dart/flutter-package-metadata-consistent")
 		);
-		assert_eq!(
-			strict.rules.get("dart/sdk-constraint-modern"),
-			Some(&LintRuleConfig::Severity(LintSeverity::Error))
-		);
-		assert_eq!(
-			strict.rules.get("dart/no-unexpected-dependency-overrides"),
-			Some(&LintRuleConfig::Severity(LintSeverity::Error))
+		assert!(
+			strict
+				.rules
+				.contains_key("dart/workspace-internal-version-consistency")
 		);
 	}
 
@@ -1111,6 +1593,107 @@ mod tests {
 	}
 
 	#[test]
+	fn assets_sorted_rule_reports_unsorted_flutter_assets_and_families() {
+		let targets = advanced_workspace_flutter_targets();
+		let target = find_target(&targets, "flutter_assets_unsorted");
+		let results = AssetsSortedRule::new().run(&ctx(target), &config());
+		assert_eq!(results.len(), 4);
+
+		let replacement = results
+			.first()
+			.and_then(|result| result.fix.as_ref())
+			.and_then(|fix| fix.edits.first())
+			.map(|edit| edit.replacement.clone())
+			.expect("expected fix replacement");
+		let rewritten = serde_yaml_ng::from_str::<Mapping>(&replacement)
+			.unwrap_or_else(|error| panic!("expected yaml replacement: {error}"));
+		let flutter = flutter_section(&rewritten).expect("expected flutter section");
+		assert_eq!(
+			sequence_order(yaml_sequence(flutter, "assets").expect("expected assets")),
+			vec![
+				"assets/icons/alpha.png".to_string(),
+				"assets/icons/zebra.png".to_string(),
+			]
+		);
+	}
+
+	#[test]
+	fn flutter_package_metadata_consistent_rule_is_flutter_only() {
+		let targets = advanced_workspace_flutter_targets();
+		let failing = find_target(&targets, "flutter_missing_sdk");
+		let passing = find_target(&targets, "path_ok");
+
+		let results = FlutterPackageMetadataConsistentRule::new().run(&ctx(failing), &config());
+		assert_eq!(results.len(), 1);
+		assert!(
+			results
+				.first()
+				.expect("expected lint result")
+				.message
+				.contains("dependencies.flutter")
+		);
+		assert!(
+			FlutterPackageMetadataConsistentRule::new()
+				.run(&ctx(passing), &config())
+				.is_empty()
+		);
+	}
+
+	#[test]
+	fn internal_path_dependency_policy_rule_supports_path_and_hosted_modes() {
+		let targets = advanced_workspace_flutter_targets();
+		let path_ok = find_target(&targets, "path_ok");
+		let path_fail = find_target(&targets, "path_fail");
+
+		assert!(
+			InternalPathDependencyPolicyRule::new()
+				.run(&ctx(path_ok), &config())
+				.is_empty()
+		);
+		let failing = InternalPathDependencyPolicyRule::new().run(&ctx(path_fail), &config());
+		assert_eq!(failing.len(), 1);
+		assert!(
+			failing
+				.first()
+				.expect("expected lint result")
+				.message
+				.contains("use `path:` references")
+		);
+
+		let hosted_config = LintRuleConfig::Detailed {
+			level: LintSeverity::Error,
+			options: BTreeMap::from([("mode".to_string(), json!("hosted"))]),
+		};
+		assert!(
+			InternalPathDependencyPolicyRule::new()
+				.run(&ctx(path_fail), &hosted_config)
+				.is_empty()
+		);
+	}
+
+	#[test]
+	fn workspace_internal_version_consistency_rule_reports_workspace_drift() {
+		let targets = advanced_workspace_flutter_targets();
+		let mismatch = find_target(&targets, "version_mismatch");
+		let ok = find_target(&targets, "path_fail");
+
+		let results = WorkspaceInternalVersionConsistencyRule::new().run(&ctx(mismatch), &config());
+		assert_eq!(results.len(), 1);
+		assert!(
+			results
+				.first()
+				.expect("expected lint result")
+				.message
+				.contains("workspace version is `1.2.3`")
+		);
+		assert!(
+			WorkspaceInternalVersionConsistencyRule::new()
+				.run(&ctx(ok), &config())
+				.is_empty()
+		);
+	}
+
+	#[test]
 	fn no_git_dependencies_rule_reports_published_git_dependencies_and_supports_allow_list() {
 		let targets = metadata_publishability_targets();
 		let failing = find_target(&targets, "git_dep_fail");
@@ -1226,6 +1809,23 @@ mod tests {
 			targets
 				.iter()
 				.any(|target| target.metadata.package_name.as_deref() == Some("dart_shared"))
+		);
+	}
+
+	#[test]
+	fn collect_targets_mark_workspace_versions_for_internal_rules() {
+		let targets = advanced_workspace_flutter_targets();
+		let target = find_target(&targets, "path_fail");
+		let file = target
+			.parsed
+			.downcast_ref::<DartLintFile>()
+			.expect("expected dart lint file");
+		assert_eq!(
+			file.workspace_package_versions
+				.get("core")
+				.map(ToString::to_string)
+				.as_deref(),
+			Some("1.2.3")
 		);
 	}
 

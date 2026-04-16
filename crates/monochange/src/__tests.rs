@@ -10187,6 +10187,8 @@ fn lint_cli_lists_and_explains_rules() {
 	assert!(list_output.contains("dart/required-package-fields"));
 	assert!(list_output.contains("dart/sdk-constraint-present"));
 	assert!(list_output.contains("dart/no-unexpected-dependency-overrides"));
+	assert!(list_output.contains("dart/internal-path-dependency-policy"));
+	assert!(list_output.contains("dart/flutter-package-metadata-consistent"));
 
 	let explain_output = run_cli(
 		&root,
