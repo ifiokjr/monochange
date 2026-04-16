@@ -10183,6 +10183,8 @@ fn lint_cli_lists_and_explains_rules() {
 	.unwrap_or_else(|error| panic!("lint list: {error}"));
 	assert!(list_output.contains("cargo/recommended"));
 	assert!(list_output.contains("npm/recommended"));
+	assert!(list_output.contains("dart/recommended"));
+	assert!(list_output.contains("dart/required-package-fields"));
 
 	let explain_output = run_cli(
 		&root,

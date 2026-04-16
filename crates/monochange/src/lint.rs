@@ -525,6 +525,8 @@ mod tests {
 		let text = render_lint_catalog(OutputFormat::Text).unwrap();
 		assert!(text.contains("cargo/internal-dependency-workspace"));
 		assert!(text.contains("cargo/recommended"));
+		assert!(text.contains("dart/required-package-fields"));
+		assert!(text.contains("dart/recommended"));
 
 		let json = render_lint_catalog(OutputFormat::Json).unwrap();
 		assert!(json.contains("\"rules\""));
