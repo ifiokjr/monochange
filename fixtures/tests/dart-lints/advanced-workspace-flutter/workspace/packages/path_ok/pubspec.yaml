@@ -1,0 +1,7 @@
+name: path_ok
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+dependencies:
+  core:
+    path: ../core

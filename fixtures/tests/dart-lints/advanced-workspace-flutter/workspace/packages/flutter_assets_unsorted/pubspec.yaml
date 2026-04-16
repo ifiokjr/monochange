@@ -1,0 +1,21 @@
+name: flutter_assets_unsorted
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+dependencies:
+  flutter:
+    sdk: flutter
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/zebra.png
+    - assets/icons/alpha.png
+  fonts:
+    - family: Zebra
+      fonts:
+        - asset: assets/fonts/zebra_bold.ttf
+        - asset: assets/fonts/alpha_bold.ttf
+    - family: Alpha
+      fonts:
+        - asset: assets/fonts/zeta.ttf
+        - asset: assets/fonts/alpha.ttf

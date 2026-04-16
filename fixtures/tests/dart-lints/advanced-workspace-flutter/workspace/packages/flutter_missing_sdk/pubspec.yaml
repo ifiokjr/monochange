@@ -1,0 +1,8 @@
+name: flutter_missing_sdk
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/app.png

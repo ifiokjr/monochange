@@ -1,0 +1,27 @@
+[defaults]
+parent_bump = "patch"
+package_type = "dart"
+
+[package.core]
+path = "packages/core"
+
+[package.path_ok]
+path = "packages/path_ok"
+
+[package.path_fail]
+path = "packages/path_fail"
+
+[package.version_mismatch]
+path = "packages/version_mismatch"
+
+[package.flutter_ok]
+path = "packages/flutter_ok"
+
+[package.flutter_missing_sdk]
+path = "packages/flutter_missing_sdk"
+
+[package.flutter_assets_unsorted]
+path = "packages/flutter_assets_unsorted"
+
+[ecosystems.dart]
+enabled = true
