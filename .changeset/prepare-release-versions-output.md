@@ -1,5 +1,6 @@
 ---
 monochange: minor
+monochange_config: patch
 monochange_core: patch
 ---
 
@@ -24,6 +25,8 @@ mc versions --format json
 ```
 
 This trims the output down to package and group version summaries only, without mutating manifests, changelogs, or consuming changesets.
+
+`monochange_config` also now includes the built-in `versions` command in the default CLI command set returned from workspace configuration loading, so embedded callers and config-driven integrations see the same built-in command list as the `mc` binary.
 
 You can also expose the same behavior from custom commands with `DisplayVersions`:
 
