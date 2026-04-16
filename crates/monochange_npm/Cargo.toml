@@ -15,6 +15,7 @@ description = "Manage versions and releases for your multiplatform, multilanguag
 [dependencies]
 glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
+monochange_linting = { workspace = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
@@ -25,6 +26,9 @@ walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
 insta = { workspace = true, default-features = true }
+monochange_config = { workspace = true }
+monochange_lint_testing = { workspace = true }
+monochange_test_helpers = { workspace = true }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 

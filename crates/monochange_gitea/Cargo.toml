@@ -14,7 +14,7 @@ description = "Gitea release payload rendering and publishing for monochange"
 
 [dependencies]
 monochange_core = { workspace = true }
-monochange_hosting = { version = "0.1.0", path = "../monochange_hosting" }
+monochange_hosting = { workspace = true }
 reqwest = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }

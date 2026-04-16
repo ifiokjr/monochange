@@ -20,8 +20,9 @@ Commands:
   assist               Print assistant setup guidance, install steps, and MCP configuration
   release-record       Inspect the monochange release record associated with a tag or commit
   tag-release          Create and push release tags from the monochange release record on a commit
+  lint                 Inspect and scaffold manifest lint rules
   mcp                  Start the monochange MCP (Model Context Protocol) server over stdin/stdout
-  check                Validate configuration, changesets, and run lint rules on package manifests
+  check                Validate configuration, changesets, and run manifest lint rules
   validate             Validate monochange configuration and changesets
   discover             Discover packages across supported ecosystems
   change               Create a change file for one or more packages

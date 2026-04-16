@@ -1,0 +1,9 @@
+[defaults]
+package_type = "cargo"
+changelog = false
+
+[package.example]
+path = "crates/example"
+
+[ecosystems.cargo]
+enabled = true

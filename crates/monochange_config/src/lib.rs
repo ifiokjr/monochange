@@ -129,7 +129,7 @@ use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
 use monochange_core::default_cli_commands;
-use monochange_core::lint::LintRuleConfig;
+use monochange_core::lint::WorkspaceLintSettings;
 use monochange_core::relative_to_root;
 use regex::Regex;
 use semver::Version;
@@ -179,6 +179,8 @@ struct RawWorkspaceConfiguration {
 	changesets: ChangesetSettings,
 	#[serde(default)]
 	source: Option<RawSourceConfiguration>,
+	#[serde(default)]
+	lints: WorkspaceLintSettings,
 	#[serde(default)]
 	ecosystems: RawEcosystems,
 }
@@ -351,8 +353,6 @@ struct RawEcosystemSettings {
 	lockfile_commands: Vec<LockfileCommandDefinition>,
 	#[serde(default)]
 	publish: RawPublishSettings,
-	#[serde(default)]
-	lints: BTreeMap<String, LintRuleConfig>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -774,7 +774,6 @@ fn normalize_ecosystem_settings(
 		versioned_files,
 		lockfile_commands: raw.lockfile_commands,
 		publish,
-		lints: raw.lints,
 	})
 }
 
@@ -1136,6 +1135,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		cli,
 		changesets,
 		source,
+		lints,
 		ecosystems,
 	} = raw;
 	let cli = merge_cli_commands(cli);
@@ -1235,6 +1235,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		cli,
 		changesets,
 		source,
+		lints,
 		cargo: cargo_ecosystem,
 		npm: npm_ecosystem,
 		deno: deno_ecosystem,

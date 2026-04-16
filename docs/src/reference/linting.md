@@ -1,6 +1,6 @@
 # Manifest linting with `mc check`
 
-monochange can lint monorepo package manifests through `mc check`, using rules configured under `[ecosystems.<name>.lints]` in `monochange.toml`.
+monochange can lint monorepo package manifests through `mc check`, using rules configured under `[lints]` in `monochange.toml`.
 
 <!-- {=lintingPolicyReference} -->
 

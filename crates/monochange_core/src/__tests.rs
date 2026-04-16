@@ -1790,6 +1790,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		cli: Vec::new(),
 		changesets: crate::ChangesetSettings::default(),
 		source: None,
+		lints: crate::lint::WorkspaceLintSettings::default(),
 		cargo: EcosystemSettings::default(),
 		npm: EcosystemSettings::default(),
 		deno: EcosystemSettings::default(),

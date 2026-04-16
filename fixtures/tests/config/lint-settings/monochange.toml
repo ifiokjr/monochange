@@ -1,0 +1,28 @@
+[lints]
+use = ["cargo/recommended", "npm/recommended"]
+
+[lints.rules]
+"cargo/internal-dependency-workspace" = "error"
+"npm/workspace-protocol" = { level = "warning", fix = false }
+
+[[lints.scopes]]
+name = "published cargo packages"
+match = { ecosystems = ["cargo"], managed = true, publishable = true }
+rules = { "cargo/required-package-fields" = "error" }
+
+[defaults]
+package_type = "cargo"
+changelog = false
+
+[package.core]
+path = "crates/core"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[ecosystems.cargo]
+enabled = true
+
+[ecosystems.npm]
+enabled = true

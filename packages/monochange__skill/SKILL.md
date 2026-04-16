@@ -55,7 +55,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 - [skills/changesets.md](skills/changesets.md) — creating and managing changesets
 - [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
-- [skills/linting.md](skills/linting.md) — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
+- [skills/linting.md](skills/linting.md) — `mc check`, `[lints]`, and manifest-focused rule explanations with examples
 - [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) — patterns for publishing multiple public packages from one repository
 - [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) — full lifecycle guidance
 - [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) — package-type-specific release-note guidance
@@ -219,14 +219,14 @@ See [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) for per-type rules, templates, exampl
 Configure ecosystem-specific manifest lint rules in `monochange.toml` and run them with `mc check`:
 
 ```toml
-[ecosystems.cargo.lints]
+[lints.rules]
 "cargo/dependency-field-order" = "error"
 "cargo/internal-dependency-workspace" = "error"
 "cargo/required-package-fields" = "error"
 "cargo/sorted-dependencies" = "error"
 "cargo/unlisted-package-private" = "warning"
 
-[ecosystems.npm.lints]
+# npm rules also live under [lints.rules]
 "npm/workspace-protocol" = "error"
 "npm/sorted-dependencies" = "error"
 "npm/required-package-fields" = "error"

@@ -1,0 +1,13 @@
+[defaults]
+package_type = "cargo"
+changelog = false
+
+[lints.rules]
+"cargo/dependency-field-order" = "off"
+"cargo/internal-dependency-workspace" = "off"
+"cargo/required-package-fields" = "off"
+"cargo/sorted-dependencies" = "off"
+"cargo/unlisted-package-private" = { level = "warning", fix = true }
+
+[ecosystems.cargo]
+enabled = true

@@ -416,6 +416,26 @@ version_format = "primary"
 #     placeholder.readme / placeholder.readme_file — default placeholder README
 #                      source inherited by packages during bootstrap publishing
 
+# =============================================================================
+# [lints] — manifest lint configuration
+# =============================================================================
+#
+# Configure lint presets, global rules, and scoped overrides for package
+# manifests. Lint suites live in ecosystem crates, but configuration lives in
+# this top-level section.
+#
+# [lints]
+# use = ["cargo/recommended", "npm/recommended"]
+#
+# [lints.rules]
+# "cargo/internal-dependency-workspace" = "error"
+# "npm/workspace-protocol" = "error"
+#
+# [[lints.scopes]]
+# name = "published cargo packages"
+# match = { ecosystems = ["cargo"], managed = true, publishable = true }
+# rules = { "cargo/required-package-fields" = "error" }
+
 {% if has_cargo %}
 [ecosystems.cargo]
 enabled = true

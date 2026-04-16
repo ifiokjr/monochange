@@ -2,177 +2,200 @@
 
 //! # `monochange_lint`
 //!
-//! Ecosystem-specific lint rules for monochange.
+//! Ecosystem-agnostic manifest lint engine for monochange.
 //!
-//! This crate provides linting capabilities for monorepo package manifests
-//! across multiple ecosystems (Cargo, npm, Deno, Dart).
+//! Ecosystem crates contribute lint suites, rules, presets, and parsed lint
+//! targets. This crate is intentionally unaware of which ecosystems exist.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::Path;
+use std::path::PathBuf;
 
-use ignore::overrides::Override;
-use ignore::overrides::OverrideBuilder;
-use monochange_core::Ecosystem;
+use glob::Pattern;
+use monochange_core::WorkspaceConfiguration;
 use monochange_core::lint::LintContext;
 use monochange_core::lint::LintFix;
+use monochange_core::lint::LintPreset;
 use monochange_core::lint::LintReport;
+use monochange_core::lint::LintRule;
 use monochange_core::lint::LintRuleConfig;
 use monochange_core::lint::LintRuleRegistry;
+use monochange_core::lint::LintSelector;
 use monochange_core::lint::LintSeverity;
+use monochange_core::lint::LintSuite;
+use monochange_core::lint::LintTarget;
+use monochange_core::lint::WorkspaceLintSettings;
 
-mod cargo;
-mod npm;
-
-#[cfg(test)]
-mod snapshots;
-
-pub use cargo::CargoLintRules;
-pub use npm::NpmLintRules;
-
-/// A linter that can run lint rules across package manifests.
-#[derive(Debug)]
-pub struct Linter {
-	registry: LintRuleRegistry,
-	config: BTreeMap<String, BTreeMap<String, LintRuleConfig>>,
+/// Optional filters applied when running the linter.
+#[derive(Debug, Clone, Default)]
+pub struct LintSelection {
+	suites: BTreeSet<String>,
+	only_rules: BTreeSet<String>,
 }
 
-impl Default for Linter {
-	fn default() -> Self {
-		Self::new()
+impl LintSelection {
+	/// Create an unconstrained selection.
+	#[must_use]
+	pub fn all() -> Self {
+		Self::default()
 	}
+
+	/// Limit execution to the provided suites.
+	#[must_use]
+	pub fn with_suites(mut self, suites: impl IntoIterator<Item = impl Into<String>>) -> Self {
+		self.suites = suites.into_iter().map(Into::into).collect();
+		self
+	}
+
+	/// Limit execution to the provided rules.
+	#[must_use]
+	pub fn with_rules(mut self, rules: impl IntoIterator<Item = impl Into<String>>) -> Self {
+		self.only_rules = rules.into_iter().map(Into::into).collect();
+		self
+	}
+
+	#[must_use]
+	pub fn allows_suite(&self, suite_id: &str) -> bool {
+		self.suites.is_empty() || self.suites.contains(suite_id)
+	}
+
+	#[must_use]
+	pub fn allows_rule(&self, rule_id: &str) -> bool {
+		self.only_rules.is_empty() || self.only_rules.contains(rule_id)
+	}
+}
+
+/// Registered lint suites, rules, and presets.
+#[derive(Default)]
+pub struct LintRegistry {
+	rules: LintRuleRegistry,
+	presets: BTreeMap<String, LintPreset>,
+	suites: BTreeMap<String, Box<dyn LintSuite>>,
+}
+
+impl std::fmt::Debug for LintRegistry {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("LintRegistry")
+			.field("rule_count", &self.rules.rules().len())
+			.field("preset_count", &self.presets.len())
+			.field("suite_count", &self.suites.len())
+			.finish()
+	}
+}
+
+impl LintRegistry {
+	/// Build a registry from ecosystem-provided suites.
+	#[must_use]
+	pub fn new(suites: Vec<Box<dyn LintSuite>>) -> Self {
+		let mut registry = Self::default();
+		for suite in suites {
+			registry.register_suite(suite);
+		}
+		registry
+	}
+
+	/// Register one suite.
+	pub fn register_suite(&mut self, suite: Box<dyn LintSuite>) {
+		let suite_id = suite.suite_id().to_string();
+		for preset in suite.presets() {
+			self.presets.insert(preset.id.clone(), preset);
+		}
+		for rule in suite.rules() {
+			self.rules.register(rule);
+		}
+		self.suites.insert(suite_id, suite);
+	}
+
+	/// Return cloned rule metadata for display commands.
+	#[must_use]
+	pub fn rules(&self) -> Vec<LintRule> {
+		self.rules
+			.rules()
+			.iter()
+			.map(|rule| rule.rule().clone())
+			.collect()
+	}
+
+	/// Return cloned preset metadata.
+	#[must_use]
+	pub fn presets(&self) -> Vec<LintPreset> {
+		self.presets.values().cloned().collect()
+	}
+
+	/// Find a rule by id.
+	#[must_use]
+	pub fn find_rule(&self, id: &str) -> Option<LintRule> {
+		self.rules.find(id).map(|rule| rule.rule().clone())
+	}
+
+	/// Find a preset by id.
+	#[must_use]
+	pub fn find_preset(&self, id: &str) -> Option<LintPreset> {
+		self.presets.get(id).cloned()
+	}
+}
+
+/// Run lint suites against workspace manifests.
+#[derive(Debug)]
+pub struct Linter {
+	registry: LintRegistry,
+	settings: WorkspaceLintSettings,
+	selection: LintSelection,
 }
 
 impl Linter {
-	/// Create a new linter with default rules.
+	/// Create a linter from registered suites and workspace settings.
 	#[must_use]
-	pub fn new() -> Self {
-		let mut registry = LintRuleRegistry::new();
-
-		// Register cargo rules
-		for rule in CargoLintRules::default_rules() {
-			registry.register(rule);
-		}
-
-		// Register npm rules
-		for rule in NpmLintRules::default_rules() {
-			registry.register(rule);
-		}
-
+	pub fn new(suites: Vec<Box<dyn LintSuite>>, settings: WorkspaceLintSettings) -> Self {
 		Self {
-			registry,
-			config: BTreeMap::new(),
+			registry: LintRegistry::new(suites),
+			settings,
+			selection: LintSelection::all(),
 		}
 	}
 
-	/// Set the lint configuration for an ecosystem.
-	pub fn set_ecosystem_config(
-		&mut self,
-		ecosystem: Ecosystem,
-		config: BTreeMap<String, LintRuleConfig>,
-	) {
-		self.config.insert(ecosystem.as_str().to_string(), config);
-	}
-
-	/// Lint a single file.
+	/// Override the current selection filters.
 	#[must_use]
-	pub fn lint_file(&self, file_path: &Path, workspace_root: &Path) -> LintReport {
+	pub fn with_selection(mut self, selection: LintSelection) -> Self {
+		self.selection = selection;
+		self
+	}
+
+	/// Access the rule and preset registry.
+	#[must_use]
+	pub fn registry(&self) -> &LintRegistry {
+		&self.registry
+	}
+
+	/// Lint all suite targets in the workspace.
+	#[must_use]
+	pub fn lint_workspace(
+		&self,
+		workspace_root: &Path,
+		configuration: &WorkspaceConfiguration,
+	) -> LintReport {
 		let mut report = LintReport::new();
+		self.warn_for_missing_presets(&mut report);
 
-		// Determine which rules apply to this file
-		let applicable_rules = self.registry.applicable_rules(file_path);
-		if applicable_rules.is_empty() {
-			return report;
-		}
-
-		// Read file contents
-		let contents = match std::fs::read_to_string(file_path) {
-			Ok(contents) => contents,
-			Err(error) => {
-				report.warn(format!(
-					"Failed to read file {}: {}",
-					file_path.display(),
-					error
-				));
-				return report;
-			}
-		};
-
-		// Create lint context
-		let ctx = LintContext {
-			workspace_root,
-			manifest_path: file_path,
-			contents: &contents,
-			parsed: None,
-		};
-
-		// Run each applicable rule
-		for rule in applicable_rules {
-			let ecosystem = rule.rule().id.split('/').next().unwrap_or("unknown");
-			let rule_id = rule.rule().id.clone();
-
-			// Get config for this rule
-			let config = self
-				.config
-				.get(ecosystem)
-				.and_then(|ecosystem_config| ecosystem_config.get(&rule_id))
-				.cloned()
-				.unwrap_or(LintRuleConfig::Severity(LintSeverity::Error));
-
-			// Skip if rule is disabled
-			if !config.severity().is_enabled() {
+		for (suite_id, suite) in &self.registry.suites {
+			if !self.selection.allows_suite(suite_id) {
 				continue;
 			}
 
-			// Run the rule
-			let results = rule.run(&ctx, &config);
-			for mut result in results {
-				// Apply configured severity
-				result.severity = config.severity();
-				report.add(result);
-			}
-		}
+			let targets = match suite.collect_targets(workspace_root, configuration) {
+				Ok(targets) => targets,
+				Err(error) => {
+					report.warn(format!(
+						"failed to collect lint targets for suite `{suite_id}`: {error}"
+					));
+					continue;
+				}
+			};
 
-		report
-	}
-
-	/// Lint all files in a workspace.
-	///
-	/// Uses the `ignore` crate to walk the directory tree, respecting
-	/// `.gitignore` rules and additionally skipping `fixtures/`
-	/// and `target/` directories.
-	#[must_use]
-	pub fn lint_workspace(&self, workspace_root: &Path) -> LintReport {
-		let mut report = LintReport::new();
-
-		let mut overrides = OverrideBuilder::new(workspace_root);
-		if let Err(e) = overrides.add("!fixtures/**") {
-			tracing::warn!("invalid override: {e}");
-		}
-		if let Err(e) = overrides.add("!target/**") {
-			tracing::warn!("invalid override: {e}");
-		}
-		let overrides = overrides.build().unwrap_or_else(|e| {
-			tracing::warn!("failed to build overrides: {e}");
-			Override::empty()
-		});
-
-		let walker = ignore::WalkBuilder::new(workspace_root)
-			.overrides(overrides)
-			.build();
-
-		for entry in walker.filter_map(Result::ok) {
-			let path = entry.path();
-			if !path.is_file() {
-				continue;
-			}
-
-			let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-			if matches!(
-				file_name,
-				"Cargo.toml" | "package.json" | "deno.json" | "pubspec.yaml"
-			) {
-				let file_report = self.lint_file(path, workspace_root);
-				report.merge(file_report);
+			for target in &targets {
+				let target_report = self.lint_target(target);
+				report.merge(target_report);
 			}
 		}
 
@@ -180,13 +203,9 @@ impl Linter {
 	}
 
 	/// Apply autofixes from a lint report.
-	///
-	/// Returns a map of file paths to their fixed contents.
 	#[must_use]
-	pub fn apply_fixes(&self, report: &LintReport) -> BTreeMap<std::path::PathBuf, String> {
-		let mut fixes_by_file: BTreeMap<std::path::PathBuf, Vec<LintFix>> = BTreeMap::new();
-
-		// Collect all fixable results grouped by file
+	pub fn apply_fixes(&self, report: &LintReport) -> BTreeMap<PathBuf, String> {
+		let mut fixes_by_file: BTreeMap<PathBuf, Vec<LintFix>> = BTreeMap::new();
 		for result in report.autofixable() {
 			if let Some(fix) = &result.fix {
 				fixes_by_file
@@ -196,29 +215,185 @@ impl Linter {
 			}
 		}
 
-		// Apply fixes to each file
 		let mut fixed_files = BTreeMap::new();
 		for (file_path, fixes) in fixes_by_file {
 			let Ok(contents) = std::fs::read_to_string(&file_path) else {
 				continue;
 			};
-
-			let fixed = apply_fixes_to_content(&contents, &fixes);
-			fixed_files.insert(file_path, fixed);
+			fixed_files.insert(file_path, apply_fixes_to_content(&contents, &fixes));
 		}
 
 		fixed_files
 	}
+
+	fn lint_target(&self, target: &LintTarget) -> LintReport {
+		let mut report = LintReport::new();
+		let applicable_rules = self.registry.rules.applicable_rules(target);
+		if applicable_rules.is_empty() {
+			return report;
+		}
+
+		for rule in applicable_rules {
+			let rule_id = rule.rule().id.as_str();
+			if !self.selection.allows_rule(rule_id) {
+				continue;
+			}
+
+			let config = self
+				.resolve_rule_config(target, rule_id)
+				.unwrap_or(LintRuleConfig::Severity(LintSeverity::Error));
+			if !config.severity().is_enabled() {
+				continue;
+			}
+
+			let ctx = LintContext {
+				workspace_root: &target.workspace_root,
+				manifest_path: &target.manifest_path,
+				contents: &target.contents,
+				metadata: &target.metadata,
+				parsed: target.parsed.as_ref(),
+			};
+
+			for mut result in rule.run(&ctx, &config) {
+				result.severity = config.severity();
+				report.add(result);
+			}
+		}
+
+		report
+	}
+
+	fn resolve_rule_config(&self, target: &LintTarget, rule_id: &str) -> Option<LintRuleConfig> {
+		let mut resolved = None;
+		for preset_id in &self.settings.presets {
+			resolved = merge_config(
+				resolved,
+				self.registry
+					.presets
+					.get(preset_id)
+					.and_then(|preset| preset.rules.get(rule_id)),
+			);
+		}
+		resolved = merge_config(resolved, self.settings.rules.get(rule_id));
+
+		for scope in &self.settings.scopes {
+			if !selector_matches(&scope.selector, target) {
+				continue;
+			}
+			for preset_id in &scope.presets {
+				resolved = merge_config(
+					resolved,
+					self.registry
+						.presets
+						.get(preset_id)
+						.and_then(|preset| preset.rules.get(rule_id)),
+				);
+			}
+			resolved = merge_config(resolved, scope.rules.get(rule_id));
+		}
+
+		resolved
+	}
+
+	fn warn_for_missing_presets(&self, report: &mut LintReport) {
+		for preset_id in self.settings.presets.iter().chain(
+			self.settings
+				.scopes
+				.iter()
+				.flat_map(|scope| scope.presets.iter()),
+		) {
+			if !self.registry.presets.contains_key(preset_id) {
+				report.warn(format!("unknown lint preset `{preset_id}`"));
+			}
+		}
+	}
 }
 
-/// Apply a set of fixes to file contents.
-///
-/// Fixes are applied in reverse order of their spans to avoid
-/// invalidating earlier edits.
+fn merge_config(
+	current: Option<LintRuleConfig>,
+	next: Option<&LintRuleConfig>,
+) -> Option<LintRuleConfig> {
+	match (current, next) {
+		(None, None) => None,
+		(Some(config), None) => Some(config),
+		(None, Some(config)) => Some(config.clone()),
+		(Some(current), Some(next)) => Some(current.merged_with(next)),
+	}
+}
+
+fn selector_matches(selector: &LintSelector, target: &LintTarget) -> bool {
+	if !selector.ecosystems.is_empty()
+		&& !selector
+			.ecosystems
+			.iter()
+			.any(|ecosystem| ecosystem == &target.metadata.ecosystem)
+	{
+		return false;
+	}
+
+	if !selector.paths.is_empty() {
+		let relative = target.metadata.relative_path.to_string_lossy();
+		let matches_path = selector.paths.iter().any(|pattern| {
+			Pattern::new(pattern).map_or_else(
+				|error| {
+					tracing::warn!(pattern, error = %error, "invalid lint scope path pattern");
+					false
+				},
+				|pattern| pattern.matches(relative.as_ref()),
+			)
+		});
+		if !matches_path {
+			return false;
+		}
+	}
+
+	if !selector.package_ids.is_empty()
+		&& !target
+			.metadata
+			.package_id
+			.as_ref()
+			.is_some_and(|package_id| {
+				selector
+					.package_ids
+					.iter()
+					.any(|candidate| candidate == package_id)
+			}) {
+		return false;
+	}
+
+	if !selector.group_ids.is_empty()
+		&& !target.metadata.group_id.as_ref().is_some_and(|group_id| {
+			selector
+				.group_ids
+				.iter()
+				.any(|candidate| candidate == group_id)
+		}) {
+		return false;
+	}
+
+	if let Some(managed) = selector.managed
+		&& target.metadata.managed != managed
+	{
+		return false;
+	}
+
+	if let Some(private) = selector.private
+		&& target.metadata.private != Some(private)
+	{
+		return false;
+	}
+
+	if let Some(publishable) = selector.publishable
+		&& target.metadata.publishable != Some(publishable)
+	{
+		return false;
+	}
+
+	true
+}
+
 fn apply_fixes_to_content(contents: &str, fixes: &[LintFix]) -> String {
 	let mut edits: Vec<_> = fixes.iter().flat_map(|fix| fix.edits.iter()).collect();
-
-	// Sort by span start in reverse order (largest offsets first)
 	edits.sort_by_key(|edit| std::cmp::Reverse(edit.span.0));
 
 	let mut result = contents.to_string();
@@ -227,75 +402,489 @@ fn apply_fixes_to_content(contents: &str, fixes: &[LintFix]) -> String {
 			result.replace_range(edit.span.0..edit.span.1, &edit.replacement);
 		}
 	}
-
 	result
-}
-
-/// Configuration for lint rules per ecosystem.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct LintConfig {
-	#[serde(flatten)]
-	pub ecosystems: BTreeMap<String, EcosystemLintConfig>,
-}
-
-/// Configuration for a single ecosystem's lint rules.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct EcosystemLintConfig {
-	#[serde(flatten)]
-	pub rules: BTreeMap<String, LintRuleConfig>,
 }
 
 #[cfg(test)]
 mod tests {
+	use std::path::PathBuf;
+
+	use monochange_core::MonochangeResult;
+	use monochange_core::lint::LintCategory;
+	use monochange_core::lint::LintLocation;
+	use monochange_core::lint::LintMaturity;
+	use monochange_core::lint::LintResult;
+	use monochange_core::lint::LintRuleRunner;
+	use monochange_core::lint::LintTargetMetadata;
+
 	use super::*;
 
-	#[test]
-	fn test_linter_creation() {
-		let linter = Linter::new();
-		assert!(!linter.registry.rules().is_empty());
+	#[derive(Default)]
+	struct ExampleSuite;
+
+	struct ExampleRule {
+		rule: LintRule,
+	}
+
+	impl ExampleRule {
+		fn new() -> Self {
+			Self {
+				rule: LintRule::new(
+					"example/no-bad",
+					"No bad",
+					"Flags files containing the word bad",
+					LintCategory::Correctness,
+					LintMaturity::Stable,
+					false,
+				),
+			}
+		}
+	}
+
+	impl LintRuleRunner for ExampleRule {
+		fn rule(&self) -> &LintRule {
+			&self.rule
+		}
+
+		fn run(&self, ctx: &LintContext<'_>, config: &LintRuleConfig) -> Vec<LintResult> {
+			if ctx.contents.contains("bad") {
+				vec![LintResult::new(
+					self.rule.id.clone(),
+					LintLocation::new(ctx.manifest_path, 1, 1),
+					"found bad",
+					config.severity(),
+				)]
+			} else {
+				Vec::new()
+			}
+		}
+	}
+
+	impl LintSuite for ExampleSuite {
+		fn suite_id(&self) -> &'static str {
+			"example"
+		}
+
+		fn rules(&self) -> Vec<Box<dyn LintRuleRunner>> {
+			vec![Box::new(ExampleRule::new())]
+		}
+
+		fn presets(&self) -> Vec<LintPreset> {
+			vec![
+				LintPreset::new(
+					"example/recommended",
+					"Example recommended",
+					"Recommended example lints",
+					LintMaturity::Stable,
+				)
+				.with_rules(BTreeMap::from([(
+					"example/no-bad".to_string(),
+					LintRuleConfig::Severity(LintSeverity::Error),
+				)])),
+			]
+		}
+
+		fn collect_targets(
+			&self,
+			workspace_root: &Path,
+			_configuration: &WorkspaceConfiguration,
+		) -> MonochangeResult<Vec<LintTarget>> {
+			Ok(vec![LintTarget::new(
+				workspace_root.to_path_buf(),
+				workspace_root.join("example.txt"),
+				"this is bad",
+				LintTargetMetadata {
+					ecosystem: "example".to_string(),
+					relative_path: PathBuf::from("example.txt"),
+					package_name: None,
+					package_id: None,
+					group_id: None,
+					managed: false,
+					private: None,
+					publishable: None,
+				},
+				Box::new(()),
+			)])
+		}
+	}
+
+	#[derive(Default)]
+	struct FailingSuite;
+
+	#[derive(Default)]
+	struct EmptyTargetSuite;
+
+	impl LintSuite for FailingSuite {
+		fn suite_id(&self) -> &'static str {
+			"failing"
+		}
+
+		fn rules(&self) -> Vec<Box<dyn LintRuleRunner>> {
+			Vec::new()
+		}
+
+		fn collect_targets(
+			&self,
+			_workspace_root: &Path,
+			_configuration: &WorkspaceConfiguration,
+		) -> MonochangeResult<Vec<LintTarget>> {
+			Err(monochange_core::MonochangeError::Config("boom".to_string()))
+		}
+	}
+
+	impl LintSuite for EmptyTargetSuite {
+		fn suite_id(&self) -> &'static str {
+			"empty-target"
+		}
+
+		fn rules(&self) -> Vec<Box<dyn LintRuleRunner>> {
+			Vec::new()
+		}
+
+		fn collect_targets(
+			&self,
+			workspace_root: &Path,
+			_configuration: &WorkspaceConfiguration,
+		) -> MonochangeResult<Vec<LintTarget>> {
+			Ok(vec![LintTarget::new(
+				workspace_root.to_path_buf(),
+				workspace_root.join("empty.txt"),
+				"fine",
+				LintTargetMetadata {
+					ecosystem: "empty-target".to_string(),
+					relative_path: PathBuf::from("empty.txt"),
+					package_name: None,
+					package_id: None,
+					group_id: None,
+					managed: false,
+					private: None,
+					publishable: None,
+				},
+				Box::new(()),
+			)])
+		}
+	}
+
+	fn sample_workspace_configuration(root: &Path) -> WorkspaceConfiguration {
+		WorkspaceConfiguration {
+			root_path: root.to_path_buf(),
+			defaults: monochange_core::WorkspaceDefaults::default(),
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: Vec::new(),
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			lints: WorkspaceLintSettings::default(),
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		}
 	}
 
 	#[test]
-	fn test_lint_file_cargo_toml() {
-		let dir = tempfile::TempDir::new().unwrap();
-		let cargo_toml = dir.path().join("Cargo.toml");
-
-		let content = r#"
-[package]
-name = "test"
-version = "1.0.0"
-
-[dependencies]
-serde = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-"#;
-
-		std::fs::write(&cargo_toml, content).unwrap();
-
-		let linter = Linter::new();
-		let report = linter.lint_file(&cargo_toml, dir.path());
-
-		assert!(!report.results.is_empty());
+	fn linter_runs_preset_backed_rules() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			..WorkspaceLintSettings::default()
+		};
+		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
+		let report = linter.lint_workspace(root.path(), &configuration);
+		assert_eq!(report.error_count, 1);
+		assert_eq!(report.results.len(), 1);
 	}
 
 	#[test]
-	fn test_apply_fixes_to_content() {
-		let content = "Hello World";
-		let fixes = vec![LintFix::single("Replace World", (6, 11), "Universe")];
-
-		let result = apply_fixes_to_content(content, &fixes);
-		assert_eq!(result, "Hello Universe");
+	fn scoped_rule_override_can_disable_a_rule() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			scopes: vec![monochange_core::lint::LintScopeConfig {
+				name: Some("turn it off".to_string()),
+				selector: LintSelector {
+					ecosystems: vec!["example".to_string()],
+					paths: vec!["*.txt".to_string()],
+					package_ids: Vec::new(),
+					group_ids: Vec::new(),
+					managed: None,
+					private: None,
+					publishable: None,
+				},
+				presets: Vec::new(),
+				rules: BTreeMap::from([(
+					"example/no-bad".to_string(),
+					LintRuleConfig::Severity(LintSeverity::Off),
+				)]),
+			}],
+			rules: BTreeMap::new(),
+		};
+		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
+		let report = linter.lint_workspace(root.path(), &configuration);
+		assert!(report.results.is_empty());
 	}
 
 	#[test]
-	fn test_apply_multiple_fixes() {
-		let content = "Hello World and Earth";
-		let fixes = vec![
-			LintFix::single("Replace World", (6, 11), "Universe"),
-			LintFix::single("Replace Earth", (16, 21), "Mars"),
-		];
+	fn linter_warns_about_unknown_presets() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			presets: vec!["missing/preset".to_string()],
+			..WorkspaceLintSettings::default()
+		};
+		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
+		let report = linter.lint_workspace(root.path(), &configuration);
+		assert!(
+			report
+				.warnings
+				.iter()
+				.any(|warning| warning.contains("missing/preset"))
+		);
+	}
 
-		let result = apply_fixes_to_content(content, &fixes);
-		assert_eq!(result, "Hello Universe and Mars");
+	#[test]
+	fn selection_can_filter_suites_and_rules() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			..WorkspaceLintSettings::default()
+		};
+		let suite_filtered = Linter::new(vec![Box::new(ExampleSuite)], settings.clone())
+			.with_selection(LintSelection::all().with_suites(["other"]));
+		let suite_report = suite_filtered.lint_workspace(root.path(), &configuration);
+		assert!(suite_report.results.is_empty());
+
+		let rule_filtered = Linter::new(vec![Box::new(ExampleSuite)], settings)
+			.with_selection(LintSelection::all().with_rules(["other/rule"]));
+		let rule_report = rule_filtered.lint_workspace(root.path(), &configuration);
+		assert!(rule_report.results.is_empty());
+	}
+
+	#[test]
+	fn selector_matches_package_and_publishability_filters() {
+		let target = LintTarget::new(
+			PathBuf::from("."),
+			PathBuf::from("crates/core/Cargo.toml"),
+			"",
+			LintTargetMetadata {
+				ecosystem: "cargo".to_string(),
+				relative_path: PathBuf::from("crates/core/Cargo.toml"),
+				package_name: Some("core".to_string()),
+				package_id: Some("core".to_string()),
+				group_id: Some("sdk".to_string()),
+				managed: true,
+				private: Some(false),
+				publishable: Some(true),
+			},
+			Box::new(()),
+		);
+		let selector = LintSelector {
+			ecosystems: vec!["cargo".to_string()],
+			paths: vec!["crates/*/Cargo.toml".to_string()],
+			package_ids: vec!["core".to_string()],
+			group_ids: vec!["sdk".to_string()],
+			managed: Some(true),
+			private: Some(false),
+			publishable: Some(true),
+		};
+		assert!(selector_matches(&selector, &target));
+	}
+
+	#[test]
+	fn registry_debug_and_lookup_helpers_report_counts() {
+		let registry = LintRegistry::new(vec![Box::new(ExampleSuite)]);
+		let debug = format!("{registry:?}");
+		assert!(debug.contains("rule_count"));
+		assert!(registry.find_rule("example/no-bad").is_some());
+		assert!(registry.find_preset("example/recommended").is_some());
+	}
+
+	#[test]
+	fn linter_warns_when_suite_target_collection_fails() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let linter = Linter::new(
+			vec![Box::new(FailingSuite)],
+			WorkspaceLintSettings::default(),
+		);
+		let report = linter.lint_workspace(root.path(), &configuration);
+		assert!(
+			report
+				.warnings
+				.iter()
+				.any(|warning| warning.contains("failed to collect lint targets"))
+		);
+	}
+
+	#[test]
+	fn apply_fixes_skips_missing_files() {
+		let root = tempfile::tempdir().unwrap();
+		let linter = Linter::new(
+			vec![Box::new(ExampleSuite)],
+			WorkspaceLintSettings::default(),
+		);
+		let mut report = LintReport::new();
+		report.add(
+			LintResult::new(
+				"example/no-bad",
+				LintLocation::new(root.path().join("missing.txt"), 1, 1).with_span(0, 3),
+				"missing",
+				LintSeverity::Error,
+			)
+			.with_fix(LintFix::single("rewrite", (0, 3), "ok")),
+		);
+		assert!(linter.apply_fixes(&report).is_empty());
+	}
+
+	#[test]
+	fn merge_config_and_selector_helpers_cover_edge_cases() {
+		assert!(merge_config(None, None).is_none());
+		assert_eq!(
+			merge_config(None, Some(&LintRuleConfig::Severity(LintSeverity::Warning)))
+				.expect("config")
+				.severity(),
+			LintSeverity::Warning,
+		);
+		assert_eq!(
+			merge_config(Some(LintRuleConfig::Severity(LintSeverity::Error)), None)
+				.expect("config")
+				.severity(),
+			LintSeverity::Error,
+		);
+
+		let target = LintTarget::new(
+			".",
+			"example.txt",
+			"good",
+			LintTargetMetadata {
+				ecosystem: "example".to_string(),
+				relative_path: PathBuf::from("example.txt"),
+				package_name: None,
+				package_id: Some("pkg".to_string()),
+				group_id: Some("grp".to_string()),
+				managed: false,
+				private: Some(false),
+				publishable: Some(true),
+			},
+			Box::new(()),
+		);
+		assert!(!selector_matches(
+			&LintSelector {
+				ecosystems: vec!["cargo".to_string()],
+				..LintSelector::default()
+			},
+			&target,
+		));
+		assert!(!selector_matches(
+			&LintSelector {
+				paths: vec!["[".to_string()],
+				..LintSelector::default()
+			},
+			&target,
+		));
+		assert!(!selector_matches(
+			&LintSelector {
+				package_ids: vec!["other".to_string()],
+				..LintSelector::default()
+			},
+			&target,
+		));
+		assert!(!selector_matches(
+			&LintSelector {
+				group_ids: vec!["other".to_string()],
+				..LintSelector::default()
+			},
+			&target,
+		));
+		assert!(!selector_matches(
+			&LintSelector {
+				managed: Some(true),
+				..LintSelector::default()
+			},
+			&target,
+		));
+		assert!(!selector_matches(
+			&LintSelector {
+				private: Some(true),
+				..LintSelector::default()
+			},
+			&target,
+		));
+		assert!(!selector_matches(
+			&LintSelector {
+				publishable: Some(false),
+				..LintSelector::default()
+			},
+			&target,
+		));
+	}
+
+	#[test]
+	fn scope_presets_and_empty_targets_are_covered() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			scopes: vec![monochange_core::lint::LintScopeConfig {
+				name: Some("preset scope".to_string()),
+				selector: LintSelector {
+					ecosystems: vec!["example".to_string()],
+					paths: vec!["*.txt".to_string()],
+					package_ids: Vec::new(),
+					group_ids: Vec::new(),
+					managed: None,
+					private: None,
+					publishable: None,
+				},
+				presets: vec!["example/recommended".to_string()],
+				rules: BTreeMap::new(),
+			}],
+			..WorkspaceLintSettings::default()
+		};
+		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
+		let report = linter.lint_workspace(root.path(), &configuration);
+		assert_eq!(report.error_count, 1);
+
+		let empty_linter = Linter::new(
+			vec![Box::new(EmptyTargetSuite)],
+			WorkspaceLintSettings::default(),
+		);
+		let empty_report = empty_linter.lint_workspace(root.path(), &configuration);
+		assert!(empty_report.results.is_empty());
+	}
+
+	#[test]
+	fn example_rule_returns_no_results_when_contents_are_clean() {
+		let target = LintTarget::new(
+			".",
+			"example.txt",
+			"good",
+			LintTargetMetadata {
+				ecosystem: "example".to_string(),
+				relative_path: PathBuf::from("example.txt"),
+				package_name: None,
+				package_id: None,
+				group_id: None,
+				managed: false,
+				private: None,
+				publishable: None,
+			},
+			Box::new(()),
+		);
+		let ctx = LintContext {
+			workspace_root: target.workspace_root.as_path(),
+			manifest_path: target.manifest_path.as_path(),
+			contents: &target.contents,
+			metadata: &target.metadata,
+			parsed: target.parsed.as_ref(),
+		};
+		assert!(
+			ExampleRule::new()
+				.run(&ctx, &LintRuleConfig::Severity(LintSeverity::Error))
+				.is_empty()
+		);
 	}
 }
