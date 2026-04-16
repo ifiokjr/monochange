@@ -85,7 +85,7 @@ in
         pass_filenames = false;
         name = "lint and test";
         description = "Run the local CI lint rules and test suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all";
+        entry = "${pkgs.bash}/bin/bash -lc 'local_git_env_vars=$(git rev-parse --local-env-vars); if [ -n \"$local_git_env_vars\" ]; then unset $local_git_env_vars; fi; trap \"git restore --source=HEAD --worktree --staged -- Cargo.lock >/dev/null 2>&1 || true\" EXIT; ${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all'";
         stages = [ "pre-push" ];
       };
     };
@@ -196,9 +196,27 @@ in
     };
     "publish:check" = {
       exec = ''
-        set -e
+        set -euo pipefail
+
+        lockfile_backup="$(mktemp)"
+        cp Cargo.lock "$lockfile_backup"
+        restore_lockfile() {
+          cp "$lockfile_backup" Cargo.lock
+          rm -f "$lockfile_backup"
+        }
+        trap restore_lockfile EXIT
+
         cargo workspaces publish --from-git --allow-dirty --yes --dry-run
+        cp "$lockfile_backup" Cargo.lock
+
         cargo metadata --format-version 1 --filter-platform x86_64-unknown-linux-gnu >/dev/null
+
+        if ! cmp -s Cargo.lock "$lockfile_backup"; then
+          echo "Cargo.lock is missing Linux-specific resolution. Run:" >&2
+          echo "  cargo metadata --format-version 1 --filter-platform x86_64-unknown-linux-gnu >/dev/null" >&2
+          echo "and commit the resulting Cargo.lock changes." >&2
+          exit 1
+        fi
       '';
       description = "Check that publication is valid for this project";
       binary = "bash";
