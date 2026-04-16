@@ -52,6 +52,6 @@ jobs:
             args+=(--label "$label")
           done
 
-          devenv shell -- mc "${args[@]}" | tee policy.raw
+          devenv shell -- monochange "${args[@]}" | tee policy.raw
           awk 'BEGIN { capture = 0 } /^\{/ { capture = 1 } capture { print }' policy.raw > policy.json
           jq -e '.status != "failed"' policy.json >/dev/null
