@@ -342,6 +342,18 @@ fn workspace_and_manifest_helpers_cover_yaml_and_error_paths() {
 	assert_eq!(private.publish_state, PublishState::Private);
 	assert_eq!(private.current_version, None);
 
+	let workspace_root_manifest =
+		Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/dart/monorepo/pubspec.yaml");
+	let workspace_root = parse_manifest(
+		&workspace_root_manifest,
+		workspace_root_manifest
+			.parent()
+			.expect("workspace root parent"),
+	)
+	.unwrap_or_else(|error| panic!("parse workspace root manifest: {error}"))
+	.unwrap_or_else(|| panic!("expected workspace root package"));
+	assert_eq!(workspace_root.publish_state, PublishState::Private);
+
 	let discovery = discover_workspace_packages(&workspace_manifest)
 		.unwrap_or_else(|error| panic!("workspace discovery: {error}"));
 	assert_eq!(discovery.0.len(), 2);

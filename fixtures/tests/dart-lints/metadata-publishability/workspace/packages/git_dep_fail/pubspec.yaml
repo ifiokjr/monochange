@@ -1,0 +1,8 @@
+name: git_dep_fail
+version: 1.0.0
+description: Published package with a git dependency
+repository: https://example.com/git_dep_fail
+dependencies:
+  hosted_dep: ^1.0.0
+  git_dep:
+    git: https://github.com/example/git_dep.git

@@ -1,0 +1,8 @@
+name: private_git_dep
+version: 1.0.0
+publish_to: none
+description: Private package with a git dependency
+repository: https://example.com/private_git_dep
+dependencies:
+  git_dep:
+    git: https://github.com/example/git_dep.git

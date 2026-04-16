@@ -539,11 +539,7 @@ fn parse_manifest(
 		Ecosystem::Dart
 	};
 	let version = yaml_string(&parsed, "version").and_then(|value| Version::parse(&value).ok());
-	let publish_state = if yaml_bool(&parsed, "publish_to").is_some() {
-		PublishState::Private
-	} else {
-		PublishState::Public
-	};
+	let publish_state = manifest_publish_state(&parsed);
 
 	let mut package = PackageRecord::new(
 		ecosystem,
@@ -555,6 +551,14 @@ fn parse_manifest(
 	);
 	package.declared_dependencies = parse_dependencies(&parsed);
 	Ok(Some(package))
+}
+
+fn manifest_publish_state(parsed: &Mapping) -> PublishState {
+	match parsed.get(Value::String("publish_to".to_string())) {
+		Some(Value::String(value)) if value == "none" => PublishState::Private,
+		Some(Value::Bool(false)) => PublishState::Private,
+		_ => PublishState::Public,
+	}
 }
 
 fn parse_dependencies(parsed: &Mapping) -> Vec<PackageDependency> {
@@ -614,6 +618,7 @@ fn yaml_string(mapping: &Mapping, key: &str) -> Option<String> {
 		.map(ToString::to_string)
 }
 
+#[cfg(test)]
 fn yaml_bool(mapping: &Mapping, key: &str) -> Option<bool> {
 	mapping
 		.get(Value::String(key.to_string()))

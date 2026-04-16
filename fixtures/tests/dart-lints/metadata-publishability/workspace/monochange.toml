@@ -1,0 +1,18 @@
+[defaults]
+parent_bump = "patch"
+package_type = "dart"
+
+[package.published_ok]
+path = "packages/published_ok"
+
+[package.published_missing]
+path = "packages/published_missing"
+
+[package.git_dep_fail]
+path = "packages/git_dep_fail"
+
+[package.private_git_dep]
+path = "packages/private_git_dep"
+
+[ecosystems.dart]
+enabled = true
