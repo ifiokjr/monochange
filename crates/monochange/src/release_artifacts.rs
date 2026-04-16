@@ -1248,13 +1248,8 @@ pub(crate) fn render_release_cli_command_json(
 		"publishRateLimits": sections.publish_rate_limits,
 	});
 	if !sections.file_diffs.is_empty() {
-		value
-			.as_object_mut()
-			.unwrap_or_else(|| panic!("release json wrapper must stay object"))
-			.insert(
-				"fileDiffs".to_string(),
-				serde_json::to_value(sections.file_diffs).unwrap_or_default(),
-			);
+		#[rustfmt::skip]
+		value.as_object_mut().unwrap_or_else(|| panic!("release json wrapper must stay object")).insert("fileDiffs".to_string(), serde_json::to_value(sections.file_diffs).unwrap_or_default());
 	}
 	serde_json::to_string_pretty(&value)
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
@@ -1906,6 +1901,11 @@ mod tests {
 	#[test]
 	fn render_release_cli_command_json_includes_publish_rate_limits_when_present() {
 		let manifest = sample_manifest();
+		let file_diffs = vec![PreparedFileDiff {
+			path: PathBuf::from("Cargo.toml"),
+			diff: "-old\n+new".to_string(),
+			display_diff: "--- a/Cargo.toml\n+++ b/Cargo.toml\n-old\n+new".to_string(),
+		}];
 		let json = render_release_cli_command_json(
 			&manifest,
 			&ReleaseCliJsonSections {
@@ -1938,7 +1938,7 @@ mod tests {
 					}],
 					warnings: Vec::new(),
 				}),
-				file_diffs: &[],
+				file_diffs: &file_diffs,
 			},
 		)
 		.unwrap_or_else(|error| panic!("release cli json: {error}"));

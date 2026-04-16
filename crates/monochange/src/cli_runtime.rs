@@ -636,27 +636,14 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::PlaceholderPublish { .. } => {
 					let selected_packages = selected_package_ids(&step_inputs);
-					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(
-						root,
-						configuration,
-						context.prepared_release.as_ref(),
-						&selected_packages,
-						publish_rate_limits::PublishRateLimitMode::Placeholder,
-						context.dry_run,
-					)?;
+					#[rustfmt::skip]
+					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Placeholder, context.dry_run)?;
 					if !context.dry_run {
-						publish_rate_limits::enforce_publish_rate_limits(
-							configuration,
-							&rate_limit_report,
-							publish_rate_limits::PublishRateLimitMode::Placeholder,
-						)?;
+						#[rustfmt::skip]
+						publish_rate_limits::enforce_publish_rate_limits(configuration, &rate_limit_report, publish_rate_limits::PublishRateLimitMode::Placeholder)?;
 					}
-					let report = package_publish::run_placeholder_publish(
-						root,
-						configuration,
-						&selected_packages,
-						context.dry_run,
-					)?;
+					#[rustfmt::skip]
+					let report = package_publish::run_placeholder_publish(root, configuration, &selected_packages, context.dry_run)?;
 					context.package_publish_report = Some(report);
 					context.rate_limit_report = Some(rate_limit_report);
 					output = None;
@@ -664,42 +651,22 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::PublishPackages { .. } => {
 					let selected_packages = selected_package_ids(&step_inputs);
-					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(
-						root,
-						configuration,
-						context.prepared_release.as_ref(),
-						&selected_packages,
-						publish_rate_limits::PublishRateLimitMode::Publish,
-						context.dry_run,
-					)?;
+					#[rustfmt::skip]
+					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Publish, context.dry_run)?;
 					if !context.dry_run {
-						publish_rate_limits::enforce_publish_rate_limits(
-							configuration,
-							&rate_limit_report,
-							publish_rate_limits::PublishRateLimitMode::Publish,
-						)?;
+						#[rustfmt::skip]
+						publish_rate_limits::enforce_publish_rate_limits(configuration, &rate_limit_report, publish_rate_limits::PublishRateLimitMode::Publish)?;
 					}
-					let report = package_publish::run_publish_packages(
-						root,
-						configuration,
-						context.prepared_release.as_ref(),
-						&selected_packages,
-						context.dry_run,
-					)?;
+					#[rustfmt::skip]
+					let report = package_publish::run_publish_packages(root, configuration, context.prepared_release.as_ref(), &selected_packages, context.dry_run)?;
 					context.package_publish_report = Some(report);
 					context.rate_limit_report = Some(rate_limit_report);
 					output = None;
 					Ok(())
 				}
 				CliStepDefinition::PlanPublishRateLimits { .. } => {
-					let report = publish_rate_limits::plan_publish_rate_limits(
-						root,
-						configuration,
-						context.prepared_release.as_ref(),
-						&selected_package_ids(&step_inputs),
-						publish_rate_limit_mode_from_inputs(&step_inputs)?,
-						context.dry_run,
-					)?;
+					#[rustfmt::skip]
+					let report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_package_ids(&step_inputs), publish_rate_limit_mode_from_inputs(&step_inputs)?, context.dry_run)?;
 					context.rate_limit_report = Some(report);
 					output = None;
 					Ok(())
@@ -1672,15 +1639,13 @@ fn render_publish_command_json(
 	package_publish: Option<&package_publish::PackagePublishReport>,
 	rate_limit_report: Option<&monochange_core::PublishRateLimitReport>,
 ) -> MonochangeResult<String> {
-	let value = serde_json::json!({
-		"packagePublish": package_publish,
-		"publishRateLimits": rate_limit_report,
-	});
-	serde_json::to_string_pretty(&value).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to render combined publish output as json: {error}"
-		))
-	})
+	render_json_output(
+		&serde_json::json!({
+			"packagePublish": package_publish,
+			"publishRateLimits": rate_limit_report,
+		}),
+		"combined publish output",
+	)
 }
 
 fn requested_ci_renderer(inputs: &BTreeMap<String, Vec<String>>) -> MonochangeResult<Option<&str>> {
@@ -2983,6 +2948,43 @@ mod tests {
 		}
 	}
 
+	fn sample_rate_limit_report() -> monochange_core::PublishRateLimitReport {
+		monochange_core::PublishRateLimitReport {
+			dry_run: true,
+			windows: vec![monochange_core::RegistryRateLimitWindowPlan {
+				registry: monochange_core::RegistryKind::PubDev,
+				operation: monochange_core::RateLimitOperation::Publish,
+				limit: Some(12),
+				window_seconds: Some(86_400),
+				pending: 13,
+				batches_required: 2,
+				fits_single_window: false,
+				confidence: monochange_core::RateLimitConfidence::Medium,
+				notes: "pub.dev limit".to_string(),
+				evidence: Vec::new(),
+			}],
+			batches: vec![
+				monochange_core::PublishRateLimitBatch {
+					registry: monochange_core::RegistryKind::PubDev,
+					operation: monochange_core::RateLimitOperation::Publish,
+					batch_index: 1,
+					total_batches: 2,
+					packages: vec!["pkg-a".to_string()],
+					recommended_wait_seconds: None,
+				},
+				monochange_core::PublishRateLimitBatch {
+					registry: monochange_core::RegistryKind::PubDev,
+					operation: monochange_core::RateLimitOperation::Publish,
+					batch_index: 2,
+					total_batches: 2,
+					packages: vec!["pkg-b".to_string()],
+					recommended_wait_seconds: Some(86_400),
+				},
+			],
+			warnings: vec!["needs 2 batches".to_string()],
+		}
+	}
+
 	fn git_in_dir(root: &Path, args: &[&str]) {
 		let status = std::process::Command::new("git")
 			.current_dir(root)
@@ -3593,36 +3595,14 @@ path = "crates/core"
 		let mut context = cli_context();
 		context.last_step_inputs =
 			BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
-		context.rate_limit_report = Some(monochange_core::PublishRateLimitReport {
-			dry_run: true,
-			windows: vec![monochange_core::RegistryRateLimitWindowPlan {
-				registry: monochange_core::RegistryKind::PubDev,
-				operation: monochange_core::RateLimitOperation::Publish,
-				limit: Some(12),
-				window_seconds: Some(86_400),
-				pending: 13,
-				batches_required: 2,
-				fits_single_window: false,
-				confidence: monochange_core::RateLimitConfidence::Medium,
-				notes: "pub.dev limit".to_string(),
-				evidence: Vec::new(),
-			}],
-			batches: vec![monochange_core::PublishRateLimitBatch {
-				registry: monochange_core::RegistryKind::PubDev,
-				operation: monochange_core::RateLimitOperation::Publish,
-				batch_index: 1,
-				total_batches: 2,
-				packages: vec!["pkg-a".to_string()],
-				recommended_wait_seconds: None,
-			}],
-			warnings: vec!["needs 2 batches".to_string()],
-		});
+		context.rate_limit_report = Some(sample_rate_limit_report());
 
 		let text = resolve_command_output(&cli_command, &context, true, None)
 			.unwrap_or_else(|error| panic!("rate limit text output: {error}"));
 		assert!(text.contains("publish rate limits:"));
 		assert!(text.contains("batches=2"));
 		assert!(text.contains("planned batches:"));
+		assert!(text.contains("wait: 86400s before this batch"));
 
 		context.last_step_inputs =
 			BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
@@ -3636,7 +3616,35 @@ path = "crates/core"
 		let github = resolve_command_output(&cli_command, &context, true, None)
 			.unwrap_or_else(|error| panic!("rate limit github snippet: {error}"));
 		assert!(github.contains("jobs:"));
+		assert!(github.contains("wait_seconds: 86400"));
 		assert!(github.contains("mc publish"));
+
+		context.last_step_inputs =
+			BTreeMap::from([("ci".to_string(), vec!["gitlab-ci".to_string()])]);
+		let gitlab = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("rate limit gitlab snippet: {error}"));
+		assert!(gitlab.contains("publish_batches:"));
+		assert!(gitlab.contains("WAIT_SECONDS: \"86400\""));
+
+		context.last_step_inputs =
+			BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
+		context.rate_limit_report = Some(monochange_core::PublishRateLimitReport {
+			dry_run: true,
+			windows: Vec::new(),
+			batches: Vec::new(),
+			warnings: Vec::new(),
+		});
+		let empty = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("empty rate limit output: {error}"));
+		assert!(empty.contains("no publish operations matched the current plan"));
+
+		let mut windows_without_batches = sample_rate_limit_report();
+		windows_without_batches.batches.clear();
+		context.rate_limit_report = Some(windows_without_batches);
+		let no_batches = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("rate limit output without batches: {error}"));
+		assert!(no_batches.contains("publish rate limits:"));
+		assert!(!no_batches.contains("planned batches:"));
 	}
 
 	#[test]
@@ -3678,6 +3686,54 @@ path = "crates/core"
 			.unwrap_or_else(|error| panic!("ci renderer: {error}")),
 			Some("gitlab-ci")
 		);
+
+		let mode_error = publish_rate_limit_mode_from_inputs(&BTreeMap::from([(
+			"mode".to_string(),
+			vec!["ship-it".to_string()],
+		)]))
+		.expect_err("expected invalid mode error");
+		assert!(
+			mode_error
+				.to_string()
+				.contains("unsupported publish plan mode `ship-it`")
+		);
+
+		let renderer_error = requested_ci_renderer(&BTreeMap::from([(
+			"ci".to_string(),
+			vec!["circleci".to_string()],
+		)]))
+		.expect_err("expected invalid renderer error");
+		assert!(
+			renderer_error
+				.to_string()
+				.contains("unsupported publish CI renderer `circleci`")
+		);
+
+		let snippet_error =
+			render_publish_rate_limit_ci_snippet(&sample_rate_limit_report(), "circleci")
+				.expect_err("expected unsupported snippet renderer error");
+		assert!(
+			snippet_error
+				.to_string()
+				.contains("unsupported publish CI renderer `circleci`")
+		);
+	}
+
+	#[test]
+	fn build_cli_template_context_exposes_publish_rate_limits_without_publish_results() {
+		let mut context = cli_context();
+		context.rate_limit_report = Some(sample_rate_limit_report());
+
+		let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
+		assert_eq!(
+			template_context
+				.get("publish_rate_limits")
+				.and_then(serde_json::Value::as_object)
+				.and_then(|value| value.get("dryRun"))
+				.and_then(serde_json::Value::as_bool),
+			Some(true)
+		);
+		assert!(!template_context.contains_key("publish"));
 	}
 
 	#[test]

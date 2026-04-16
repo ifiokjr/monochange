@@ -40,6 +40,7 @@ use crate::RELEASE_RECORD_HEADING;
 use crate::RELEASE_RECORD_KIND;
 use crate::RELEASE_RECORD_SCHEMA_VERSION;
 use crate::RELEASE_RECORD_START_MARKER;
+use crate::RateLimitOperation;
 use crate::RegistryKind;
 use crate::ReleaseManifest;
 use crate::ReleaseManifestPlan;
@@ -1402,6 +1403,7 @@ fn expected_input_kind_returns_correct_types_for_publish_steps() {
 		publish.expected_input_kind("package"),
 		Some(CliInputKind::StringList)
 	);
+	assert_eq!(publish.expected_input_kind("unknown"), None);
 
 	let plan = CliStepDefinition::PlanPublishRateLimits {
 		name: None,
@@ -1418,6 +1420,17 @@ fn expected_input_kind_returns_correct_types_for_publish_steps() {
 		Some(CliInputKind::StringList)
 	);
 	assert_eq!(plan.expected_input_kind("ci"), Some(CliInputKind::Choice));
+	assert_eq!(plan.expected_input_kind("unknown"), None);
+}
+
+#[test]
+fn rate_limit_operation_labels_cover_all_variants() {
+	assert_eq!(
+		RateLimitOperation::PlaceholderPublish.as_str(),
+		"placeholder_publish"
+	);
+	assert_eq!(RateLimitOperation::Publish.as_str(), "publish");
+	assert_eq!(RateLimitOperation::Update.as_str(), "update");
 }
 
 #[test]

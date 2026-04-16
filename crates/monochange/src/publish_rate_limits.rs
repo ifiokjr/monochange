@@ -57,34 +57,34 @@ pub(crate) fn plan_publish_rate_limits(
 	dry_run: bool,
 ) -> MonochangeResult<PublishRateLimitReport> {
 	let discovery = discover_workspace(root)?;
-	let requests = match mode {
-		PublishRateLimitMode::Placeholder => {
-			package_publish::build_placeholder_requests(
-				root,
-				configuration,
-				&discovery.packages,
-				selected_packages,
-			)?
-		}
-		PublishRateLimitMode::Publish => {
-			let publications =
-				package_publish::release_record_package_publications_from_prepared_or_head(
-					root,
-					prepared_release,
-				)?;
-			package_publish::build_release_requests(
-				&discovery.packages,
-				&publications,
-				selected_packages,
-			)?
-		}
-	};
-
+	let packages = &discovery.packages;
+	#[rustfmt::skip]
+	let requests = if mode == PublishRateLimitMode::Placeholder { build_placeholder_plan_requests(root, configuration, packages, selected_packages)? } else { build_release_plan_requests(root, prepared_release, packages, selected_packages)? };
 	Ok(plan_publish_rate_limits_for_requests(
 		&requests,
 		mode.operation(),
 		dry_run,
 	))
+}
+
+fn build_placeholder_plan_requests(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	packages: &[monochange_core::PackageRecord],
+	selected_packages: &BTreeSet<String>,
+) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
+	package_publish::build_placeholder_requests(root, configuration, packages, selected_packages)
+}
+
+fn build_release_plan_requests(
+	root: &Path,
+	prepared_release: Option<&PreparedRelease>,
+	packages: &[monochange_core::PackageRecord],
+	selected_packages: &BTreeSet<String>,
+) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
+	#[rustfmt::skip]
+	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
+	package_publish::build_release_requests(packages, &publications, selected_packages)
 }
 
 pub(crate) fn plan_publish_rate_limits_for_requests(
@@ -113,9 +113,7 @@ pub(crate) fn plan_publish_rate_limits_for_requests(
 	let mut batches = Vec::new();
 
 	for (registry, requests) in requests_by_registry {
-		let Some(policy) = policies.get(&registry) else {
-			continue;
-		};
+		let policy = &policies[&registry];
 		let window = plan_window(policy, requests.len());
 		batches.extend(plan_batches(policy, &requests));
 		windows.push(window);
@@ -380,6 +378,37 @@ mod tests {
 			.unwrap_or_else(|error| panic!("copy fixture {}: {error}", current.display()));
 	}
 
+	fn sample_publish_request(
+		package_id: &str,
+		ecosystem: monochange_core::Ecosystem,
+		registry: RegistryKind,
+		mode: PublishMode,
+	) -> package_publish::PublishRequest {
+		package_publish::PublishRequest {
+			package_id: package_id.to_string(),
+			package_name: package_id.to_string(),
+			ecosystem,
+			manifest_path: Path::new("workspace/package.json").to_path_buf(),
+			package_root: Path::new("workspace").to_path_buf(),
+			registry,
+			package_manager: Some("pnpm".to_string()),
+			mode,
+			version: Version::new(1, 0, 0).to_string(),
+			trusted_publishing: TrustedPublishingSettings::default(),
+			placeholder_readme: String::new(),
+		}
+	}
+
+	#[test]
+	fn publish_rate_limit_mode_helpers_cover_placeholder_descriptions_and_windows() {
+		assert_eq!(
+			PublishRateLimitMode::Placeholder.description(),
+			"placeholder publish"
+		);
+		assert_eq!(render_window(Some(60)), "60s");
+		assert_eq!(render_window(None), "unknown window");
+	}
+
 	#[test]
 	fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -458,32 +487,18 @@ mod tests {
 	fn plan_publish_rate_limits_for_requests_groups_multiple_packages_into_one_batch_when_limit_is_unbounded()
 	 {
 		let requests = vec![
-			package_publish::PublishRequest {
-				package_id: "docs".to_string(),
-				package_name: "docs".to_string(),
-				ecosystem: monochange_core::Ecosystem::Npm,
-				manifest_path: Path::new("packages/docs/package.json").to_path_buf(),
-				package_root: Path::new("packages/docs").to_path_buf(),
-				registry: RegistryKind::Npm,
-				package_manager: Some("pnpm".to_string()),
-				mode: PublishMode::Builtin,
-				version: Version::new(1, 0, 0).to_string(),
-				trusted_publishing: TrustedPublishingSettings::default(),
-				placeholder_readme: String::new(),
-			},
-			package_publish::PublishRequest {
-				package_id: "web".to_string(),
-				package_name: "web".to_string(),
-				ecosystem: monochange_core::Ecosystem::Npm,
-				manifest_path: Path::new("packages/web/package.json").to_path_buf(),
-				package_root: Path::new("packages/web").to_path_buf(),
-				registry: RegistryKind::Npm,
-				package_manager: Some("pnpm".to_string()),
-				mode: PublishMode::Builtin,
-				version: Version::new(1, 0, 0).to_string(),
-				trusted_publishing: TrustedPublishingSettings::default(),
-				placeholder_readme: String::new(),
-			},
+			sample_publish_request(
+				"docs",
+				monochange_core::Ecosystem::Npm,
+				RegistryKind::Npm,
+				PublishMode::Builtin,
+			),
+			sample_publish_request(
+				"web",
+				monochange_core::Ecosystem::Npm,
+				RegistryKind::Npm,
+				PublishMode::Builtin,
+			),
 		];
 
 		let report =
@@ -494,6 +509,55 @@ mod tests {
 			report.batches[0].packages,
 			vec!["docs".to_string(), "web".to_string()]
 		);
+	}
+
+	#[test]
+	fn plan_publish_rate_limits_supports_placeholder_mode_and_skips_external_requests() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
+		copy_fixture_dir(&fixture, tempdir.path());
+		let configuration = crate::load_workspace_configuration(tempdir.path())
+			.unwrap_or_else(|error| panic!("load config: {error}"));
+
+		let report = plan_publish_rate_limits(
+			tempdir.path(),
+			&configuration,
+			None,
+			&BTreeSet::new(),
+			PublishRateLimitMode::Placeholder,
+			true,
+		)
+		.unwrap_or_else(|error| panic!("plan placeholder rate limits: {error}"));
+
+		assert!(
+			report
+				.windows
+				.iter()
+				.all(|window| { window.operation == RateLimitOperation::PlaceholderPublish })
+		);
+
+		let filtered = plan_publish_rate_limits_for_requests(
+			&[
+				sample_publish_request(
+					"docs",
+					monochange_core::Ecosystem::Npm,
+					RegistryKind::Npm,
+					PublishMode::Builtin,
+				),
+				sample_publish_request(
+					"external",
+					monochange_core::Ecosystem::Npm,
+					RegistryKind::Npm,
+					PublishMode::External,
+				),
+			],
+			RateLimitOperation::Publish,
+			true,
+		);
+		assert_eq!(filtered.windows.len(), 1);
+		assert_eq!(filtered.windows[0].pending, 1);
+		assert_eq!(filtered.batches[0].packages, vec!["docs".to_string()]);
 	}
 
 	#[test]
@@ -512,6 +576,86 @@ mod tests {
 
 		assert_eq!(window.batches_required, 3);
 		assert!(!window.fits_single_window);
+	}
+
+	#[test]
+	fn enforce_publish_rate_limits_returns_ok_when_enforcement_is_not_triggered() {
+		let configuration = WorkspaceConfiguration {
+			root_path: Path::new(".").to_path_buf(),
+			defaults: monochange_core::WorkspaceDefaults::default(),
+			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			packages: vec![monochange_core::PackageDefinition {
+				id: "pkg-a".to_string(),
+				path: Path::new("pkg-a").to_path_buf(),
+				package_type: monochange_core::PackageType::Dart,
+				changelog: None,
+				extra_changelog_sections: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: false,
+				release: false,
+				version_format: monochange_core::VersionFormat::default(),
+				publish: monochange_core::PublishSettings::default(),
+			}],
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
+		};
+		let unenforced = PublishRateLimitReport {
+			dry_run: true,
+			windows: vec![RegistryRateLimitWindowPlan {
+				registry: RegistryKind::PubDev,
+				operation: RateLimitOperation::Publish,
+				limit: Some(12),
+				window_seconds: Some(86_400),
+				pending: 13,
+				batches_required: 2,
+				fits_single_window: false,
+				confidence: RateLimitConfidence::Medium,
+				notes: "limit".to_string(),
+				evidence: Vec::new(),
+			}],
+			batches: vec![PublishRateLimitBatch {
+				registry: RegistryKind::PubDev,
+				operation: RateLimitOperation::Publish,
+				batch_index: 1,
+				total_batches: 2,
+				packages: vec!["pkg-a".to_string()],
+				recommended_wait_seconds: None,
+			}],
+			warnings: vec!["warning".to_string()],
+		};
+		enforce_publish_rate_limits(&configuration, &unenforced, PublishRateLimitMode::Publish)
+			.unwrap_or_else(|error| panic!("unenforced rate limits should pass: {error}"));
+
+		let mut enforced = configuration.clone();
+		enforced.packages[0].publish.rate_limits.enforce = true;
+		let single_window = PublishRateLimitReport {
+			dry_run: true,
+			windows: vec![RegistryRateLimitWindowPlan {
+				fits_single_window: true,
+				batches_required: 1,
+				pending: 1,
+				..unenforced.windows[0].clone()
+			}],
+			batches: vec![PublishRateLimitBatch {
+				total_batches: 1,
+				..unenforced.batches[0].clone()
+			}],
+			warnings: Vec::new(),
+		};
+		enforce_publish_rate_limits(&enforced, &single_window, PublishRateLimitMode::Placeholder)
+			.unwrap_or_else(|error| panic!("single-window rate limits should pass: {error}"));
 	}
 
 	#[test]

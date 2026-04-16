@@ -640,6 +640,21 @@ fn load_configured_npm_package_normalizes_ids_relative_to_root() {
 }
 
 #[test]
+fn normalize_package_id_leaves_existing_id_when_manifest_is_outside_root() {
+	let mut package = PackageRecord::new(
+		Ecosystem::Npm,
+		"standalone-docs",
+		PathBuf::from("/tmp/outside-root/package.json"),
+		PathBuf::from("/tmp/outside-root"),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	);
+	let original_id = package.id.clone();
+	super::normalize_package_id(Path::new("/tmp/workspace-root"), &mut package);
+	assert_eq!(package.id, original_id);
+}
+
+#[test]
 fn update_json_dependency_fields_ignores_missing_or_non_object_sections() {
 	let mut manifest = json!({
 		"dependencies": "not-an-object",

@@ -1948,6 +1948,15 @@ jobs:
 		.expect("requests");
 		assert_eq!(requests[0].package_manager.as_deref(), Some("pnpm"));
 
+		let selected = build_placeholder_requests(
+			root.path(),
+			&configuration,
+			&[package.clone()],
+			&BTreeSet::from(["pkg".to_string()]),
+		)
+		.expect("selected requests");
+		assert_eq!(selected.len(), 1);
+
 		configuration.packages[0].publish.registry =
 			Some(PublishRegistry::Custom("internal".to_string()));
 		let registry_error = build_placeholder_requests(

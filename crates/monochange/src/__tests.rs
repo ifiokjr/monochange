@@ -4617,6 +4617,103 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 }
 
 #[test]
+fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packages() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let server = MockServer::start();
+	let _registry = server.mock(|when, then| {
+		when.method(GET);
+		then.status(404);
+	});
+	let no_match_inputs =
+		BTreeMap::from([("package".to_string(), vec!["missing-package".to_string()])]);
+
+	temp_env::with_var(
+		"MONOCHANGE_CRATES_IO_API_URL",
+		Some(server.base_url()),
+		|| {
+			let placeholder_command = monochange_core::CliCommandDefinition {
+				name: "placeholder-publish".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![monochange_core::CliStepDefinition::PlaceholderPublish {
+					name: None,
+					when: None,
+					inputs: BTreeMap::new(),
+				}],
+			};
+			let placeholder_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&placeholder_command,
+				false,
+				no_match_inputs.clone(),
+			)
+			.unwrap_or_else(|error| panic!("non-dry-run placeholder publish: {error}"));
+			assert!(placeholder_output.contains("placeholder publishing:"));
+			assert!(placeholder_output.contains("no packages matched the publishing criteria"));
+			assert!(placeholder_output.contains("no publish operations matched the current plan"));
+
+			let publish_command = monochange_core::CliCommandDefinition {
+				name: "publish".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![
+					monochange_core::CliStepDefinition::PrepareRelease {
+						name: None,
+						when: None,
+						inputs: BTreeMap::new(),
+					},
+					monochange_core::CliStepDefinition::PublishPackages {
+						name: None,
+						when: None,
+						inputs: BTreeMap::new(),
+					},
+				],
+			};
+			let publish_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&publish_command,
+				false,
+				no_match_inputs.clone(),
+			)
+			.unwrap_or_else(|error| panic!("non-dry-run publish packages: {error}"));
+			assert!(publish_output.contains("package publishing:"));
+			assert!(publish_output.contains("no packages matched the publishing criteria"));
+			assert!(publish_output.contains("no publish operations matched the current plan"));
+
+			let plan_command = monochange_core::CliCommandDefinition {
+				name: "publish-plan".to_string(),
+				help_text: None,
+				inputs: Vec::new(),
+				steps: vec![monochange_core::CliStepDefinition::PlanPublishRateLimits {
+					name: None,
+					when: None,
+					inputs: BTreeMap::new(),
+				}],
+			};
+			let plan_output = crate::execute_cli_command(
+				root,
+				&configuration,
+				&plan_command,
+				false,
+				BTreeMap::from([
+					("package".to_string(), vec!["missing-package".to_string()]),
+					("mode".to_string(), vec!["placeholder".to_string()]),
+				]),
+			)
+			.unwrap_or_else(|error| panic!("publish plan without matches: {error}"));
+			assert!(plan_output.contains("publish rate limits:"));
+			assert!(plan_output.contains("no publish operations matched the current plan"));
+		},
+	);
+}
+
+#[test]
 fn release_follow_up_helpers_render_real_operation_outputs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let manifest = sample_release_manifest_for_commit_message(true, true);
