@@ -1214,39 +1214,46 @@ pub(crate) fn format_change_request_operation(
 	}
 }
 
+pub(crate) struct ReleaseCliJsonSections<'a> {
+	pub releases: &'a [SourceReleaseRequest],
+	pub release_request: Option<&'a SourceChangeRequest>,
+	pub issue_comments: &'a [HostedIssueCommentPlan],
+	pub release_commit: Option<&'a CommitReleaseReport>,
+	pub package_publish: Option<&'a package_publish::PackagePublishReport>,
+	pub publish_rate_limits: Option<&'a monochange_core::PublishRateLimitReport>,
+	pub file_diffs: &'a [PreparedFileDiff],
+}
+
 pub(crate) fn render_release_cli_command_json(
 	manifest: &ReleaseManifest,
-	releases: &[SourceReleaseRequest],
-	release_request: Option<&SourceChangeRequest>,
-	issue_comments: &[HostedIssueCommentPlan],
-	release_commit: Option<&CommitReleaseReport>,
-	package_publish: Option<&package_publish::PackagePublishReport>,
-	file_diffs: &[PreparedFileDiff],
+	sections: &ReleaseCliJsonSections,
 ) -> MonochangeResult<String> {
-	if releases.is_empty()
-		&& release_request.is_none()
-		&& issue_comments.is_empty()
-		&& release_commit.is_none()
-		&& package_publish.is_none()
-		&& file_diffs.is_empty()
+	if sections.releases.is_empty()
+		&& sections.release_request.is_none()
+		&& sections.issue_comments.is_empty()
+		&& sections.release_commit.is_none()
+		&& sections.package_publish.is_none()
+		&& sections.publish_rate_limits.is_none()
+		&& sections.file_diffs.is_empty()
 	{
 		return render_release_manifest_json(manifest);
 	}
 	let mut value = json!({
 		"manifest": manifest,
-		"releaseCommit": release_commit,
-		"releases": releases,
-		"releaseRequest": release_request,
-		"issueComments": issue_comments,
-		"packagePublish": package_publish,
+		"releaseCommit": sections.release_commit,
+		"releases": sections.releases,
+		"releaseRequest": sections.release_request,
+		"issueComments": sections.issue_comments,
+		"packagePublish": sections.package_publish,
+		"publishRateLimits": sections.publish_rate_limits,
 	});
-	if !file_diffs.is_empty() {
+	if !sections.file_diffs.is_empty() {
 		value
 			.as_object_mut()
 			.unwrap_or_else(|| panic!("release json wrapper must stay object"))
 			.insert(
 				"fileDiffs".to_string(),
-				serde_json::to_value(file_diffs).unwrap_or_default(),
+				serde_json::to_value(sections.file_diffs).unwrap_or_default(),
 			);
 	}
 	serde_json::to_string_pretty(&value)
@@ -1894,6 +1901,48 @@ mod tests {
 			manifest.package_publications,
 			prepared_release.package_publications
 		);
+	}
+
+	#[test]
+	fn render_release_cli_command_json_includes_publish_rate_limits_when_present() {
+		let manifest = sample_manifest();
+		let json = render_release_cli_command_json(
+			&manifest,
+			&ReleaseCliJsonSections {
+				releases: &[],
+				release_request: None,
+				issue_comments: &[],
+				release_commit: None,
+				package_publish: None,
+				publish_rate_limits: Some(&monochange_core::PublishRateLimitReport {
+					dry_run: true,
+					windows: vec![monochange_core::RegistryRateLimitWindowPlan {
+						registry: RegistryKind::Npm,
+						operation: monochange_core::RateLimitOperation::Publish,
+						limit: None,
+						window_seconds: None,
+						pending: 1,
+						batches_required: 1,
+						fits_single_window: true,
+						confidence: monochange_core::RateLimitConfidence::Low,
+						notes: "npm soft limit".to_string(),
+						evidence: Vec::new(),
+					}],
+					batches: vec![monochange_core::PublishRateLimitBatch {
+						registry: RegistryKind::Npm,
+						operation: monochange_core::RateLimitOperation::Publish,
+						batch_index: 1,
+						total_batches: 1,
+						packages: vec!["pkg".to_string()],
+						recommended_wait_seconds: None,
+					}],
+					warnings: Vec::new(),
+				}),
+				file_diffs: &[],
+			},
+		)
+		.unwrap_or_else(|error| panic!("release cli json: {error}"));
+		assert!(json.contains("publishRateLimits"));
 	}
 
 	#[test]

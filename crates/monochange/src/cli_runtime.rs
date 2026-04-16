@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::IsTerminal;
@@ -497,6 +498,7 @@ pub(crate) fn execute_cli_command_with_options(
 		release_request_result: None,
 		release_commit_report: None,
 		package_publish_report: None,
+		rate_limit_report: None,
 		issue_comment_plans: Vec::new(),
 		issue_comment_results: Vec::new(),
 		changeset_policy_evaluation: None,
@@ -633,16 +635,72 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::PlaceholderPublish { .. } => {
-					#[rustfmt::skip]
-					let report = package_publish::run_placeholder_publish(root, configuration, context.dry_run)?;
+					let selected_packages = selected_package_ids(&step_inputs);
+					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_packages,
+						publish_rate_limits::PublishRateLimitMode::Placeholder,
+						context.dry_run,
+					)?;
+					if !context.dry_run {
+						publish_rate_limits::enforce_publish_rate_limits(
+							configuration,
+							&rate_limit_report,
+							publish_rate_limits::PublishRateLimitMode::Placeholder,
+						)?;
+					}
+					let report = package_publish::run_placeholder_publish(
+						root,
+						configuration,
+						&selected_packages,
+						context.dry_run,
+					)?;
 					context.package_publish_report = Some(report);
+					context.rate_limit_report = Some(rate_limit_report);
 					output = None;
 					Ok(())
 				}
 				CliStepDefinition::PublishPackages { .. } => {
-					#[rustfmt::skip]
-					let report = package_publish::run_publish_packages(root, configuration, context.prepared_release.as_ref(), context.dry_run)?;
+					let selected_packages = selected_package_ids(&step_inputs);
+					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_packages,
+						publish_rate_limits::PublishRateLimitMode::Publish,
+						context.dry_run,
+					)?;
+					if !context.dry_run {
+						publish_rate_limits::enforce_publish_rate_limits(
+							configuration,
+							&rate_limit_report,
+							publish_rate_limits::PublishRateLimitMode::Publish,
+						)?;
+					}
+					let report = package_publish::run_publish_packages(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_packages,
+						context.dry_run,
+					)?;
 					context.package_publish_report = Some(report);
+					context.rate_limit_report = Some(rate_limit_report);
+					output = None;
+					Ok(())
+				}
+				CliStepDefinition::PlanPublishRateLimits { .. } => {
+					let report = publish_rate_limits::plan_publish_rate_limits(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_package_ids(&step_inputs),
+						publish_rate_limit_mode_from_inputs(&step_inputs)?,
+						context.dry_run,
+					)?;
+					context.rate_limit_report = Some(report);
 					output = None;
 					Ok(())
 				}
@@ -1410,7 +1468,12 @@ pub(crate) fn build_cli_template_context(
 	if let Some(report) = &context.package_publish_report {
 		template_context.insert(
 			"publish".to_string(),
-			build_package_publish_template_value(report),
+			build_package_publish_template_value(report, context.rate_limit_report.as_ref()),
+		);
+	} else if let Some(report) = &context.rate_limit_report {
+		template_context.insert(
+			"publish_rate_limits".to_string(),
+			serde_json::to_value(report).unwrap_or(serde_json::Value::Null),
 		);
 	}
 
@@ -1582,8 +1645,18 @@ fn build_release_commit_template_value(report: &CommitReleaseReport) -> serde_js
 
 fn build_package_publish_template_value(
 	report: &package_publish::PackagePublishReport,
+	rate_limit_report: Option<&monochange_core::PublishRateLimitReport>,
 ) -> serde_json::Value {
-	serde_json::to_value(report).unwrap_or(serde_json::Value::Null)
+	let mut value = serde_json::to_value(report).unwrap_or(serde_json::Value::Null);
+	if let Some(rate_limit_report) = rate_limit_report
+		&& let Some(object) = value.as_object_mut()
+	{
+		object.insert(
+			"rateLimits".to_string(),
+			serde_json::to_value(rate_limit_report).unwrap_or(serde_json::Value::Null),
+		);
+	}
+	value
 }
 
 fn render_json_output<T>(value: &T, context: &str) -> MonochangeResult<String>
@@ -1593,6 +1666,159 @@ where
 	serde_json::to_string_pretty(value).map_err(|error| {
 		MonochangeError::Config(format!("failed to render {context} as json: {error}"))
 	})
+}
+
+fn render_publish_command_json(
+	package_publish: Option<&package_publish::PackagePublishReport>,
+	rate_limit_report: Option<&monochange_core::PublishRateLimitReport>,
+) -> MonochangeResult<String> {
+	let value = serde_json::json!({
+		"packagePublish": package_publish,
+		"publishRateLimits": rate_limit_report,
+	});
+	serde_json::to_string_pretty(&value).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to render combined publish output as json: {error}"
+		))
+	})
+}
+
+fn requested_ci_renderer(inputs: &BTreeMap<String, Vec<String>>) -> MonochangeResult<Option<&str>> {
+	match inputs
+		.get("ci")
+		.and_then(|values| values.first())
+		.map(String::as_str)
+	{
+		None => Ok(None),
+		Some("github-actions") => Ok(Some("github-actions")),
+		Some("gitlab-ci") => Ok(Some("gitlab-ci")),
+		Some(other) => {
+			Err(MonochangeError::Config(format!(
+				"unsupported publish CI renderer `{other}`"
+			)))
+		}
+	}
+}
+
+fn render_publish_rate_limit_ci_snippet(
+	report: &monochange_core::PublishRateLimitReport,
+	renderer: &str,
+) -> MonochangeResult<String> {
+	match renderer {
+		"github-actions" => Ok(render_github_actions_publish_batches(report)),
+		"gitlab-ci" => Ok(render_gitlab_ci_publish_batches(report)),
+		other => {
+			Err(MonochangeError::Config(format!(
+				"unsupported publish CI renderer `{other}`"
+			)))
+		}
+	}
+}
+
+fn render_github_actions_publish_batches(
+	report: &monochange_core::PublishRateLimitReport,
+) -> String {
+	let mut lines = vec![
+		"jobs:".to_string(),
+		"  publish_batches:".to_string(),
+		"    runs-on: ubuntu-latest".to_string(),
+		"    strategy:".to_string(),
+		"      fail-fast: false".to_string(),
+		"      matrix:".to_string(),
+		"        include:".to_string(),
+	];
+
+	for batch in &report.batches {
+		lines.push(format!("          - registry: {}", batch.registry));
+		lines.push(format!("            batch: {}", batch.batch_index));
+		lines.push(format!(
+			"            total_batches: {}",
+			batch.total_batches
+		));
+		let packages = batch
+			.packages
+			.iter()
+			.map(|package| format!("--package {package}"))
+			.collect::<Vec<_>>()
+			.join(" ");
+		lines.push(format!("            packages: \"{packages}\""));
+		if let Some(wait_seconds) = batch.recommended_wait_seconds {
+			lines.push(format!("            wait_seconds: {wait_seconds}"));
+		} else {
+			lines.push("            wait_seconds: 0".to_string());
+		}
+	}
+
+	lines.extend([
+		"    steps:".to_string(),
+		"      - name: publish planned batch".to_string(),
+		"        run: |".to_string(),
+		"          # For batches after the first, trigger a later workflow run instead of sleeping in CI.".to_string(),
+		"          mc publish ${{ matrix.packages }} --format json".to_string(),
+	]);
+	lines.join("\n")
+}
+
+fn render_gitlab_ci_publish_batches(report: &monochange_core::PublishRateLimitReport) -> String {
+	let mut lines = vec![
+		"publish_batches:".to_string(),
+		"  stage: publish".to_string(),
+		"  parallel:".to_string(),
+		"    matrix:".to_string(),
+	];
+	for batch in &report.batches {
+		let packages = batch
+			.packages
+			.iter()
+			.map(|package| format!("--package {package}"))
+			.collect::<Vec<_>>()
+			.join(" ");
+		lines.push("      -".to_string());
+		lines.push(format!("        REGISTRY: \"{}\"", batch.registry));
+		lines.push(format!("        BATCH: \"{}\"", batch.batch_index));
+		lines.push(format!(
+			"        TOTAL_BATCHES: \"{}\"",
+			batch.total_batches
+		));
+		lines.push(format!("        PACKAGES: \"{packages}\""));
+		lines.push(format!(
+			"        WAIT_SECONDS: \"{}\"",
+			batch.recommended_wait_seconds.unwrap_or_default()
+		));
+	}
+	lines.extend([
+		"  script:".to_string(),
+		"    - '# For batches after the first, run a later pipeline instead of sleeping inside CI.'".to_string(),
+		"    - mc publish $PACKAGES --format json".to_string(),
+	]);
+	lines.join("\n")
+}
+
+fn selected_package_ids(inputs: &BTreeMap<String, Vec<String>>) -> BTreeSet<String> {
+	inputs
+		.get("package")
+		.into_iter()
+		.flatten()
+		.map(ToString::to_string)
+		.collect()
+}
+
+fn publish_rate_limit_mode_from_inputs(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<publish_rate_limits::PublishRateLimitMode> {
+	match inputs
+		.get("mode")
+		.and_then(|values| values.first())
+		.map_or("publish", String::as_str)
+	{
+		"publish" => Ok(publish_rate_limits::PublishRateLimitMode::Publish),
+		"placeholder" => Ok(publish_rate_limits::PublishRateLimitMode::Placeholder),
+		other => {
+			Err(MonochangeError::Config(format!(
+				"unsupported publish plan mode `{other}`"
+			)))
+		}
+	}
 }
 
 pub(crate) fn parse_boolean_step_input(
@@ -2052,6 +2278,48 @@ pub(crate) fn render_cli_command_result(
 	if let Some(report) = &context.package_publish_report {
 		lines.extend(render_package_publish_report(report));
 	}
+	if let Some(report) = &context.rate_limit_report {
+		lines.push("publish rate limits:".to_string());
+		if report.windows.is_empty() {
+			lines.push("- no publish operations matched the current plan".to_string());
+		} else {
+			for window in &report.windows {
+				lines.push(format!(
+					"- {} {} pending={} batches={} confidence={:?}",
+					window.registry,
+					window.operation,
+					window.pending,
+					window.batches_required,
+					window.confidence
+				));
+				if let Some(limit) = window.limit {
+					lines.push(format!("  limit: {limit}"));
+				}
+				if let Some(window_seconds) = window.window_seconds {
+					lines.push(format!("  window: {window_seconds}s"));
+				}
+				lines.push(format!("  notes: {}", window.notes));
+			}
+			if !report.batches.is_empty() {
+				lines.push("planned batches:".to_string());
+				for batch in &report.batches {
+					lines.push(format!(
+						"- {} batch {}/{} packages: {}",
+						batch.registry,
+						batch.batch_index,
+						batch.total_batches,
+						batch.packages.join(", ")
+					));
+					if let Some(wait_seconds) = batch.recommended_wait_seconds {
+						lines.push(format!("  wait: {wait_seconds}s before this batch"));
+					}
+				}
+			}
+		}
+		for warning in &report.warnings {
+			lines.push(format!("- warning: {warning}"));
+		}
+	}
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
 		lines.push(format!("changeset policy: {}", evaluation.status));
 		lines.push(evaluation.summary.clone());
@@ -2093,7 +2361,10 @@ pub(crate) fn render_cli_command_markdown_result(
 	cli_command: &CliCommandDefinition,
 	context: &CliContext,
 ) -> String {
-	if context.prepared_release.is_none() && context.package_publish_report.is_none() {
+	if context.prepared_release.is_none()
+		&& context.package_publish_report.is_none()
+		&& context.rate_limit_report.is_none()
+	{
 		return render_cli_command_result(cli_command, context);
 	}
 
@@ -2525,15 +2796,18 @@ fn resolve_command_output(
 					build_release_manifest(cli_command, prepared_release, &context.command_logs);
 				render_release_cli_command_json(
 					&manifest,
-					&context.release_requests,
-					context.release_request.as_ref(),
-					&context.issue_comment_plans,
-					context.release_commit_report.as_ref(),
-					context.package_publish_report.as_ref(),
-					if context.show_diff {
-						&context.prepared_file_diffs
-					} else {
-						&[]
+					&ReleaseCliJsonSections {
+						releases: &context.release_requests,
+						release_request: context.release_request.as_ref(),
+						issue_comments: &context.issue_comment_plans,
+						release_commit: context.release_commit_report.as_ref(),
+						package_publish: context.package_publish_report.as_ref(),
+						publish_rate_limits: context.rate_limit_report.as_ref(),
+						file_diffs: if context.show_diff {
+							&context.prepared_file_diffs
+						} else {
+							&[]
+						},
 					},
 				)
 			}
@@ -2583,9 +2857,24 @@ fn resolve_command_output(
 	if let Some(report) = &context.package_publish_report {
 		let format = cli_command_output_format(&context.last_step_inputs)?;
 		let rendered = match format {
-			OutputFormat::Json => render_json_output(report, "package publish report")?,
+			OutputFormat::Json => {
+				render_publish_command_json(Some(report), context.rate_limit_report.as_ref())?
+			}
 			OutputFormat::Markdown => render_cli_command_markdown_result(cli_command, context),
 			OutputFormat::Text => render_cli_command_result(cli_command, context),
+		};
+		return Ok(rendered);
+	}
+	if let Some(report) = &context.rate_limit_report {
+		if let Some(ci_renderer) = requested_ci_renderer(&context.last_step_inputs)? {
+			return render_publish_rate_limit_ci_snippet(report, ci_renderer);
+		}
+		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let rendered = match format {
+			OutputFormat::Json => render_publish_command_json(None, Some(report))?,
+			OutputFormat::Markdown | OutputFormat::Text => {
+				render_cli_command_result(cli_command, context)
+			}
 		};
 		return Ok(rendered);
 	}
@@ -2642,6 +2931,7 @@ mod tests {
 			release_request_result: None,
 			release_commit_report: None,
 			package_publish_report: None,
+			rate_limit_report: None,
 			issue_comment_plans: Vec::new(),
 			issue_comment_results: Vec::new(),
 			changeset_policy_evaluation: None,
@@ -3212,11 +3502,17 @@ path = "crates/core"
 			.unwrap_or_else(|error| panic!("package publish json output: {error}"));
 		let parsed: serde_json::Value = serde_json::from_str(&rendered)
 			.unwrap_or_else(|error| panic!("parse package publish json output: {error}"));
-		assert_eq!(parsed["mode"], serde_json::json!("placeholder"));
-		assert_eq!(parsed["dryRun"], serde_json::json!(true));
-		assert_eq!(parsed["packages"][0]["package"], serde_json::json!("core"));
 		assert_eq!(
-			parsed["packages"][0]["trustedPublishing"]["status"],
+			parsed["packagePublish"]["mode"],
+			serde_json::json!("placeholder")
+		);
+		assert_eq!(parsed["packagePublish"]["dryRun"], serde_json::json!(true));
+		assert_eq!(
+			parsed["packagePublish"]["packages"][0]["package"],
+			serde_json::json!("core")
+		);
+		assert_eq!(
+			parsed["packagePublish"]["packages"][0]["trustedPublishing"]["status"],
 			serde_json::json!("manual_action_required")
 		);
 	}
@@ -3274,12 +3570,114 @@ path = "crates/core"
 	}
 
 	#[test]
+	fn resolve_command_output_supports_publish_rate_limit_reports_without_release_state() {
+		let cli_command = CliCommandDefinition {
+			name: "publish-plan".to_string(),
+			help_text: Some("plan publish rate limits".to_string()),
+			inputs: vec![monochange_core::CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec!["text".to_string(), "json".to_string()],
+				short: None,
+			}],
+			steps: vec![CliStepDefinition::PlanPublishRateLimits {
+				name: Some("plan publish rate limits".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		};
+
+		let mut context = cli_context();
+		context.last_step_inputs =
+			BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
+		context.rate_limit_report = Some(monochange_core::PublishRateLimitReport {
+			dry_run: true,
+			windows: vec![monochange_core::RegistryRateLimitWindowPlan {
+				registry: monochange_core::RegistryKind::PubDev,
+				operation: monochange_core::RateLimitOperation::Publish,
+				limit: Some(12),
+				window_seconds: Some(86_400),
+				pending: 13,
+				batches_required: 2,
+				fits_single_window: false,
+				confidence: monochange_core::RateLimitConfidence::Medium,
+				notes: "pub.dev limit".to_string(),
+				evidence: Vec::new(),
+			}],
+			batches: vec![monochange_core::PublishRateLimitBatch {
+				registry: monochange_core::RegistryKind::PubDev,
+				operation: monochange_core::RateLimitOperation::Publish,
+				batch_index: 1,
+				total_batches: 2,
+				packages: vec!["pkg-a".to_string()],
+				recommended_wait_seconds: None,
+			}],
+			warnings: vec!["needs 2 batches".to_string()],
+		});
+
+		let text = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("rate limit text output: {error}"));
+		assert!(text.contains("publish rate limits:"));
+		assert!(text.contains("batches=2"));
+		assert!(text.contains("planned batches:"));
+
+		context.last_step_inputs =
+			BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
+		let json = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("rate limit json output: {error}"));
+		assert!(json.contains("batchesRequired"));
+		assert!(json.contains("publishRateLimits"));
+
+		context.last_step_inputs =
+			BTreeMap::from([("ci".to_string(), vec!["github-actions".to_string()])]);
+		let github = resolve_command_output(&cli_command, &context, true, None)
+			.unwrap_or_else(|error| panic!("rate limit github snippet: {error}"));
+		assert!(github.contains("jobs:"));
+		assert!(github.contains("mc publish"));
+	}
+
+	#[test]
 	fn normalize_when_expression_preserves_inequality_and_mid_token_bangs() {
 		assert_eq!(
 			normalize_when_expression("{{ flag != other }}"),
 			"{{ flag != other }}"
 		);
 		assert_eq!(normalize_when_expression("{{ foo!bar }}"), "{{ foo!bar }}");
+	}
+
+	#[test]
+	fn publish_rate_limit_helpers_parse_package_filters_modes_and_ci_renderers() {
+		assert_eq!(
+			selected_package_ids(&BTreeMap::from([(
+				"package".to_string(),
+				vec!["core".to_string(), "web".to_string(), "core".to_string()],
+			)])),
+			BTreeSet::from(["core".to_string(), "web".to_string()])
+		);
+		assert_eq!(
+			publish_rate_limit_mode_from_inputs(&BTreeMap::new())
+				.unwrap_or_else(|error| panic!("default mode: {error}")),
+			publish_rate_limits::PublishRateLimitMode::Publish
+		);
+		assert_eq!(
+			publish_rate_limit_mode_from_inputs(&BTreeMap::from([(
+				"mode".to_string(),
+				vec!["placeholder".to_string()],
+			)]))
+			.unwrap_or_else(|error| panic!("placeholder mode: {error}")),
+			publish_rate_limits::PublishRateLimitMode::Placeholder
+		);
+		assert_eq!(
+			requested_ci_renderer(&BTreeMap::from([(
+				"ci".to_string(),
+				vec!["gitlab-ci".to_string()],
+			)]))
+			.unwrap_or_else(|error| panic!("ci renderer: {error}")),
+			Some("gitlab-ci")
+		);
 	}
 
 	#[test]

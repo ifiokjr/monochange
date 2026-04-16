@@ -254,6 +254,10 @@ warn_on_group_mismatch = true
 #                             use a table to override GitHub trust metadata:
 #                             enabled, repository, workflow, environment
 #                             (default: enabled)
+#     rate_limits.enforce   — block built-in publish runs when the selected
+#                             package set requires more than one known registry
+#                             rate-limit window. Use `mc publish-plan` to inspect
+#                             batches first. (default: false)
 #     placeholder.readme    — inline README text to use when publishing a
 #                             placeholder package for the first bootstrap
 #                             release
@@ -406,6 +410,9 @@ version_format = "primary"
 #                      `trusted_publishing = true` for defaults, or use a table
 #                      with enabled/repository/workflow/environment to inherit
 #                      trust metadata into matching packages (default: enabled)
+#     rate_limits.enforce — block built-in publish runs for matching packages
+#                      when the selected package set exceeds a known single
+#                      registry window. (default: false)
 #     placeholder.readme / placeholder.readme_file — default placeholder README
 #                      source inherited by packages during bootstrap publishing
 
@@ -744,6 +751,7 @@ steps = [{ name = "prepare release", type = "PrepareRelease" }]
 help_text = "Publish placeholder package versions for missing registry packages"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+	{ name = "package", type = "string_list" },
 ]
 steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
 
@@ -751,8 +759,19 @@ steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
 help_text = "Publish package versions from monochange release state using built-in workflows"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+	{ name = "package", type = "string_list" },
 ]
 steps = [{ name = "publish packages", type = "PublishPackages" }]
+
+[cli.publish-plan]
+help_text = "Plan package-registry publish work against known ecosystem rate limits"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+	{ name = "mode", type = "choice", choices = ["publish", "placeholder"], default = "publish" },
+	{ name = "package", type = "string_list" },
+	{ name = "ci", type = "choice", choices = ["github-actions", "gitlab-ci"] },
+]
+steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]
 
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"

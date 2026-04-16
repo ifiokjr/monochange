@@ -29,6 +29,7 @@ Commands:
   release              Prepare a release from discovered change files
   placeholder-publish  Publish placeholder package versions for packages missing from their registries
   publish              Publish package versions from monochange release state using built-in workflows
+  publish-plan         Plan package-registry publish work against known ecosystem rate limits
   affected             Show packages affected by file changes and their changeset coverage
   diagnostics          Show per-changeset diagnostics including context and commit/PR context
   repair-release       Repair a recent release by moving its release tags to a later commit

@@ -1,0 +1,17 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.docs]
+path = "packages/docs"
+type = "npm"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[ecosystems.cargo]
+enabled = true
+
+[ecosystems.npm]
+enabled = true

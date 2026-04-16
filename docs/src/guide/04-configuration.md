@@ -154,6 +154,7 @@ Supported fields:
 - `mode` — `builtin` or `external`
 - `registry` — public registry override for the package ecosystem
 - `trusted_publishing` — `true`/`false` or a table with `enabled`, `repository`, `workflow`, and `environment`
+- `rate_limits.enforce` — block built-in publish runs when the selected package set exceeds a known single registry window
 - `placeholder.readme` — inline placeholder README content
 - `placeholder.readme_file` — workspace-relative file to use as placeholder README content
 
@@ -218,7 +219,7 @@ If monochange cannot determine the GitHub repository or workflow for an npm pack
 The built-in package publishing flow is intentionally narrow for now:
 
 - no private or custom registry support in `mode = "builtin"`
-- no built-in retry scheduler or delayed requeue for registry rate limits yet
+- rate-limit planning can batch work and enforce single-window safety, but monochange still does not sleep across windows or requeue later batches automatically
 - manual trusted-publishing setup is still required for `crates.io`, `jsr`, and `pub.dev`
 
 If your workflow needs any of those today, keep the package on `mode = "external"` and let your own CI or scripts own publication.

@@ -263,6 +263,7 @@ mod lint;
 mod mcp;
 mod package_publish;
 mod prepared_release_cache;
+mod publish_rate_limits;
 mod release_artifacts;
 mod release_record;
 mod tracing_setup;
@@ -540,6 +541,7 @@ struct CliContext {
 	release_request_result: Option<String>,
 	release_commit_report: Option<CommitReleaseReport>,
 	package_publish_report: Option<package_publish::PackagePublishReport>,
+	rate_limit_report: Option<monochange_core::PublishRateLimitReport>,
 	issue_comment_plans: Vec<HostedIssueCommentPlan>,
 	issue_comment_results: Vec<String>,
 	changeset_policy_evaluation: Option<ChangesetPolicyEvaluation>,

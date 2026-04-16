@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 62
 info:
   program: mc
   args:
@@ -10,9 +11,9 @@ info:
   env:
     GITHUB_JOB: release
     GITHUB_WORKFLOW_REF: ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main
-    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:64982"
-    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:64982"
-    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:64982"
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:55455"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:55455"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:55455"
     NO_COLOR: "1"
     RUST_LOG: ""
 ---
@@ -54,5 +55,22 @@ placeholder publishing:
   environment: publisher
   setup: https://jsr.io/@scope/jsr-pkg
   next: open the setup URL, configure trusted publishing for this package, then rerun `mc publish`
+publish rate limits:
+- crates_io placeholder_publish pending=1 batches=1 confidence=High
+  limit: 10
+  window: 60s
+  notes: crates.io source enforces 10 uploads per minute for existing crates
+- jsr placeholder_publish pending=1 batches=1 confidence=High
+  limit: 20
+  window: 86400s
+  notes: JSR documents a daily publish limit per package scope
+- pub_dev placeholder_publish pending=1 batches=1 confidence=Medium
+  limit: 12
+  window: 86400s
+  notes: pub.dev community guidance consistently cites 12 publishes per day for new versions
+planned batches:
+- crates_io batch 1/1 packages: core
+- jsr batch 1/1 packages: jsr_pkg
+- pub_dev batch 1/1 packages: dart_pkg
 
 ----- stderr -----

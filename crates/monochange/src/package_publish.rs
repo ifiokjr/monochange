@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
@@ -98,18 +99,18 @@ pub(crate) struct PackagePublishReport {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct PublishRequest {
-	package_id: String,
-	package_name: String,
-	ecosystem: Ecosystem,
-	manifest_path: PathBuf,
-	package_root: PathBuf,
-	registry: RegistryKind,
-	package_manager: Option<String>,
-	mode: PublishMode,
-	version: String,
-	trusted_publishing: TrustedPublishingSettings,
-	placeholder_readme: String,
+pub(crate) struct PublishRequest {
+	pub(crate) package_id: String,
+	pub(crate) package_name: String,
+	pub(crate) ecosystem: Ecosystem,
+	pub(crate) manifest_path: PathBuf,
+	pub(crate) package_root: PathBuf,
+	pub(crate) registry: RegistryKind,
+	pub(crate) package_manager: Option<String>,
+	pub(crate) mode: PublishMode,
+	pub(crate) version: String,
+	pub(crate) trusted_publishing: TrustedPublishingSettings,
+	pub(crate) placeholder_readme: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -186,10 +187,12 @@ impl RegistryEndpoints {
 pub(crate) fn run_placeholder_publish(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
+	selected_packages: &BTreeSet<String>,
 	dry_run: bool,
 ) -> MonochangeResult<PackagePublishReport> {
 	let discovery = discover_workspace(root)?;
-	let requests = build_placeholder_requests(root, configuration, &discovery.packages)?;
+	let requests =
+		build_placeholder_requests(root, configuration, &discovery.packages, selected_packages)?;
 	let env_map = current_env_map();
 	let endpoints = RegistryEndpoints::from_env();
 	let client = Client::new();
@@ -211,15 +214,14 @@ pub(crate) fn run_publish_packages(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
+	selected_packages: &BTreeSet<String>,
 	dry_run: bool,
 ) -> MonochangeResult<PackagePublishReport> {
 	let discovery = discover_workspace(root)?;
-	let publication_targets = if let Some(prepared_release) = prepared_release {
-		prepared_release.package_publications.clone()
-	} else {
-		release_record_package_publications(root)?
-	};
-	let requests = build_release_requests(&discovery.packages, &publication_targets)?;
+	let publication_targets =
+		release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
+	let requests =
+		build_release_requests(&discovery.packages, &publication_targets, selected_packages)?;
 	let env_map = current_env_map();
 	let endpoints = RegistryEndpoints::from_env();
 	let client = Client::new();
@@ -237,9 +239,13 @@ pub(crate) fn run_publish_packages(
 	)
 }
 
-fn release_record_package_publications(
+pub(crate) fn release_record_package_publications_from_prepared_or_head(
 	root: &Path,
+	prepared_release: Option<&PreparedRelease>,
 ) -> MonochangeResult<Vec<PackagePublicationTarget>> {
+	if let Some(prepared_release) = prepared_release {
+		return Ok(prepared_release.package_publications.clone());
+	}
 	Ok(discover_release_record(root, "HEAD")?
 		.record
 		.package_publications)
@@ -249,10 +255,11 @@ fn current_env_map() -> BTreeMap<String, String> {
 	env::vars().collect()
 }
 
-fn build_placeholder_requests(
+pub(crate) fn build_placeholder_requests(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	packages: &[PackageRecord],
+	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<PublishRequest>> {
 	let packages_by_config_id = packages_by_config_id(packages);
 	let mut requests = Vec::new();
@@ -268,7 +275,11 @@ fn build_placeholder_requests(
 					PublishState::Private | PublishState::Excluded
 				)
 			});
-		if let Some(package) = package.filter(|_| should_publish) {
+		if let Some(package) = package.filter(|_| {
+			should_publish
+				&& (selected_packages.is_empty()
+					|| selected_packages.contains(&package_definition.id))
+		}) {
 			requests.push(PublishRequest {
 				package_id: package_definition.id.clone(),
 				package_name: package.name.clone(),
@@ -305,14 +316,18 @@ fn build_placeholder_requests(
 	Ok(requests)
 }
 
-fn build_release_requests(
+pub(crate) fn build_release_requests(
 	packages: &[PackageRecord],
 	publications: &[PackagePublicationTarget],
+	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<PublishRequest>> {
 	let packages_by_config_id = packages_by_config_id(packages);
 	let mut requests = Vec::new();
 
 	for publication in publications {
+		if !selected_packages.is_empty() && !selected_packages.contains(&publication.package) {
+			continue;
+		}
 		if let Some(package) = packages_by_config_id
 			.get(publication.package.as_str())
 			.copied()
@@ -1448,6 +1463,7 @@ fn render_command_error(output: &CommandOutput) -> String {
 #[cfg(test)]
 #[allow(clippy::disallowed_methods, clippy::cloned_ref_to_slice_refs)]
 mod tests {
+	use std::collections::BTreeSet;
 	use std::collections::VecDeque;
 
 	use httpmock::Method::GET;
@@ -1914,27 +1930,42 @@ jobs:
 			id: "missing".to_string(),
 			..configuration.packages[0].clone()
 		});
-		let requests = build_placeholder_requests(root.path(), &disabled, &[package.clone()])
-			.expect("requests");
+		let requests = build_placeholder_requests(
+			root.path(),
+			&disabled,
+			&[package.clone()],
+			&BTreeSet::new(),
+		)
+		.expect("requests");
 		assert!(requests.is_empty());
 
-		let requests = build_placeholder_requests(root.path(), &configuration, &[package.clone()])
-			.expect("requests");
+		let requests = build_placeholder_requests(
+			root.path(),
+			&configuration,
+			&[package.clone()],
+			&BTreeSet::new(),
+		)
+		.expect("requests");
 		assert_eq!(requests[0].package_manager.as_deref(), Some("pnpm"));
 
 		configuration.packages[0].publish.registry =
 			Some(PublishRegistry::Custom("internal".to_string()));
-		let registry_error =
-			build_placeholder_requests(root.path(), &configuration, &[package.clone()])
-				.expect_err("expected registry error");
+		let registry_error = build_placeholder_requests(
+			root.path(),
+			&configuration,
+			&[package.clone()],
+			&BTreeSet::new(),
+		)
+		.expect_err("expected registry error");
 		assert!(registry_error.to_string().contains("custom registry"));
 
 		let mut missing_readme =
 			crate::load_workspace_configuration(root.path()).expect("configuration");
 		missing_readme.packages[0].publish.placeholder.readme_file =
 			Some(PathBuf::from("missing.md"));
-		let readme_error = build_placeholder_requests(root.path(), &missing_readme, &[package])
-			.expect_err("expected readme error");
+		let readme_error =
+			build_placeholder_requests(root.path(), &missing_readme, &[package], &BTreeSet::new())
+				.expect_err("expected readme error");
 		assert!(
 			readme_error
 				.to_string()
@@ -2622,10 +2653,19 @@ jobs:
 			},
 		];
 
-		let requests = build_release_requests(&[package], &publications).expect("requests");
+		let requests = build_release_requests(&[package.clone()], &publications, &BTreeSet::new())
+			.expect("requests");
 		assert_eq!(requests.len(), 1);
 		assert_eq!(requests[0].package_id, "pkg");
 		assert_eq!(requests[0].package_manager.as_deref(), Some("pnpm"));
+
+		let filtered = build_release_requests(
+			&[package],
+			&publications,
+			&BTreeSet::from(["missing".to_string()]),
+		)
+		.expect("filtered requests");
+		assert!(filtered.is_empty());
 	}
 
 	#[test]
@@ -3343,8 +3383,9 @@ jobs:
 				Some(server.base_url().as_str()),
 			)],
 			|| {
-				let report = run_placeholder_publish(root.path(), &configuration, true)
-					.expect("placeholder report:");
+				let report =
+					run_placeholder_publish(root.path(), &configuration, &BTreeSet::new(), true)
+						.expect("placeholder report:");
 				assert_eq!(report.mode, PackagePublishRunMode::Placeholder);
 				assert_eq!(report.packages.len(), 1);
 				assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
@@ -3395,6 +3436,7 @@ jobs:
 					root.path(),
 					&configuration,
 					Some(&prepared_release),
+					&BTreeSet::new(),
 					true,
 				)
 				.expect("publish report:");
@@ -3448,7 +3490,8 @@ jobs:
 			}],
 		);
 		let discovered =
-			release_record_package_publications(root.path()).expect("release record publications");
+			release_record_package_publications_from_prepared_or_head(root.path(), None)
+				.expect("release record publications");
 		assert_eq!(discovered.len(), 1);
 
 		with_vars(
@@ -3457,8 +3500,9 @@ jobs:
 				Some(server.base_url().as_str()),
 			)],
 			|| {
-				let report = run_publish_packages(root.path(), &configuration, None, true)
-					.expect("publish report:");
+				let report =
+					run_publish_packages(root.path(), &configuration, None, &BTreeSet::new(), true)
+						.expect("publish report:");
 				assert_eq!(report.mode, PackagePublishRunMode::Release);
 				assert_eq!(report.packages.len(), 1);
 				assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
@@ -3548,7 +3592,8 @@ jobs:
 			mode: PublishMode::Builtin,
 			trusted_publishing: TrustedPublishingSettings::default(),
 		};
-		let requests = build_release_requests(&[package], &[publication]).expect("requests:");
+		let requests = build_release_requests(&[package], &[publication], &BTreeSet::new())
+			.expect("requests:");
 		assert_eq!(requests.len(), 1);
 		assert_eq!(requests[0].version, "1.2.3");
 		assert_eq!(requests[0].package_name, "pkg");

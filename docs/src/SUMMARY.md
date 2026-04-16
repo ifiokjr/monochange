@@ -19,6 +19,7 @@
 - [Advanced: Repairable releases](guide/12-repairable-releases.md)
 - [Advanced: CI, package publishing, and release PR flows](guide/13-ci-and-publishing.md)
 - [Advanced: Multi-package publishing patterns](guide/14-multi-package-publishing.md)
+- [Advanced: Publish rate-limit planning](guide/15-publish-rate-limits.md)
 
 # Reference
 
@@ -34,6 +35,7 @@
   - [RetargetRelease](reference/cli-steps/06-retarget-release.md)
   - [PrepareRelease](reference/cli-steps/07-prepare-release.md)
   - [CommitRelease](reference/cli-steps/08-commit-release.md)
+  - [PlanPublishRateLimits](reference/cli-steps/09-plan-publish-rate-limits.md)
   - [PublishRelease](reference/cli-steps/10-publish-release.md)
   - [OpenReleaseRequest](reference/cli-steps/11-open-release-request.md)
   - [CommentReleasedIssues](reference/cli-steps/12-comment-released-issues.md)

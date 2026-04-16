@@ -53,6 +53,7 @@ use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
 use monochange_core::normalize_path;
+use monochange_core::relative_to_root;
 use semver::Version;
 use serde_json::Value;
 use serde_yaml_ng::Value as YamlValue;
@@ -641,6 +642,7 @@ pub fn discover_npm_packages(root: &Path) -> MonochangeResult<AdapterDiscovery> 
 		}
 	}
 
+	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
 	tracing::debug!(packages = packages.len(), "discovered npm packages");
@@ -666,11 +668,32 @@ pub fn load_configured_npm_package(
 			package_path.join(PACKAGE_JSON_FILE)
 		};
 	let workspace_root = manifest_path.parent().unwrap_or(root);
-	parse_package_json(
+	let mut package = parse_package_json(
 		&manifest_path,
 		workspace_root,
 		detect_npm_manager(workspace_root),
-	)
+	)?;
+	if let Some(package) = package.as_mut() {
+		normalize_package_id(root, package);
+	}
+	Ok(package)
+}
+
+fn normalize_package_ids(root: &Path, packages: &mut [PackageRecord]) {
+	for package in packages {
+		normalize_package_id(root, package);
+	}
+}
+
+fn normalize_package_id(root: &Path, package: &mut PackageRecord) {
+	let Some(relative_manifest) = relative_to_root(root, &package.manifest_path) else {
+		return;
+	};
+	package.id = format!(
+		"{}:{}",
+		package.ecosystem.as_str(),
+		relative_manifest.display()
+	);
 }
 
 fn discover_package_json_workspace(

@@ -124,6 +124,7 @@ expression: json
     "version": "1.1.0"
   },
   "packagePublish": null,
+  "publishRateLimits": null,
   "releaseCommit": null,
   "releaseRequest": null,
   "releases": [
