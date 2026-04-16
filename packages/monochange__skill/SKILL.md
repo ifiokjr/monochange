@@ -55,7 +55,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 - [REFERENCE.md](REFERENCE.md) — high-context reference with more examples
 - [skills/README.md](skills/README.md) — index of focused skill modules
 - [skills/adoption.md](skills/adoption.md) — interactive setup planning, migration questions, and recommendation patterns
-- [skills/changesets.md](skills/changesets.md) — creating and managing changesets
+- [skills/changesets.md](skills/changesets.md) — creating, auditing, cleaning up, and managing changesets
 - [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
 - [skills/linting.md](skills/linting.md) — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples

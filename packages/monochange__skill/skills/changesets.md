@@ -221,6 +221,104 @@ mc release --dry-run --format json
 
 Use `mc affected --changed-paths ...` in CI or review workflows when you need to prove all changed packages are covered.
 
+## Changeset cleanup job
+
+Before release, audit all pending changesets and resolve duplicates, stale entries, and incomplete descriptions.
+
+### Step 1: Export diagnostics data
+
+```bash
+mc diagnostics --format json > /tmp/changesets.json
+```
+
+This produces a JSON document with `requestedChangesets` and `changesets` arrays containing paths, summaries, targets, and git context.
+
+### Step 2: Filter for common issues
+
+**Find short summaries (likely incomplete):**
+
+```bash
+cat /tmp/changesets.json | jq '.changesets[] | select((.summary | length) < 20)'
+```
+
+**Find changesets touching a specific package:**
+
+```bash
+cat /tmp/changesets.json | jq '.changesets[] | select(.targets[].id == "monochange_core")'
+```
+
+**Find changesets without git context:**
+
+```bash
+cat /tmp/changesets.json | jq '.changesets[] | select(.context.introduced == null)'
+```
+
+**Find changesets with duplicate summaries:**
+
+```bash
+cat /tmp/changesets.json | jq -r '.changesets[].summary' | sort | uniq -d
+```
+
+### Step 3: Decision matrix
+
+| Situation                                | Action                                 |
+| ---------------------------------------- | -------------------------------------- |
+| **Same feature in multiple changesets**  | Merge into one multi-package changeset |
+| **Feature reverted / PR closed**         | Remove the changeset file              |
+| **Description too vague**                | Update body with user-facing details   |
+| **Wrong target packages**                | Edit frontmatter to correct targets    |
+| **Same change, same PR, multiple files** | Consolidate into single changeset      |
+
+### Step 4: Merge duplicate changesets
+
+When two changesets describe the same feature:
+
+```bash
+# Read both source changesets
+cat .changeset/feature-cli.md
+cat .changeset/feature-core.md
+
+# Create merged version
+cat > .changeset/unified-feature.md << 'EOF'
+---
+monochange_cli: minor
+monochange_core: minor
+---
+
+#### add unified feature across CLI and core
+
+Description covering both packages.
+EOF
+
+# Remove obsolete changesets
+git rm .changeset/feature-cli.md .changeset/feature-core.md
+git add .changeset/unified-feature.md
+```
+
+### Step 5: Remove stale changesets
+
+```bash
+# Verify the changeset is truly stale
+mc diagnostics --changeset .changeset/stale-feature.md
+
+# Confirm the feature was reverted or abandoned
+git log --oneline -- .changeset/stale-feature.md
+
+# Remove
+git rm .changeset/stale-feature.md
+```
+
+### Step 6: Validation checklist
+
+Before finalizing cleanup:
+
+- [ ] `mc validate` passes
+- [ ] `mc diagnostics --format json` loads all remaining changesets without error
+- [ ] `mc affected --changed-paths <files>` confirms coverage for recent changes
+- [ ] No duplicate summaries across changesets
+- [ ] No changesets reference reverted features
+- [ ] All changesets have user-facing descriptions per [CHANGESET-GUIDE.md](../CHANGESET-GUIDE.md)
+
 ## Keep these references nearby
 
 - [CHANGESET-GUIDE.md](../CHANGESET-GUIDE.md) — lifecycle details
