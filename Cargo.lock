@@ -2165,6 +2165,7 @@ version = "0.1.0"
 dependencies = [
  "monochange_core",
  "monochange_lint",
+ "monochange_test_helpers",
 ]
 
 [[package]]

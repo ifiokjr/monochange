@@ -198,6 +198,7 @@ in
       exec = ''
         set -e
         cargo workspaces publish --from-git --allow-dirty --yes --dry-run
+        cargo metadata --format-version 1 --filter-platform x86_64-unknown-linux-gnu >/dev/null
       '';
       description = "Check that publication is valid for this project";
       binary = "bash";
