@@ -844,7 +844,7 @@ fn changeset_verification_settings_default_to_enabled_enforcement() {
 }
 
 #[test]
-fn default_cli_commands_expose_publish_flows_alongside_release_planning() {
+fn default_cli_commands_expose_versions_and_publish_flows_alongside_release_planning() {
 	let cli = default_cli_commands();
 	let cli_command_names = cli
 		.iter()
@@ -857,6 +857,7 @@ fn default_cli_commands_expose_publish_flows_alongside_release_planning() {
 			"discover",
 			"change",
 			"release",
+			"versions",
 			"placeholder-publish",
 			"publish",
 			"publish-plan",
@@ -918,22 +919,43 @@ fn default_cli_commands_expose_publish_flows_alongside_release_planning() {
 }
 
 #[test]
-fn default_release_command_prefers_markdown_output() {
-	let release = default_cli_commands()
-		.into_iter()
+fn default_release_and_versions_commands_use_expected_output_defaults() {
+	let commands = default_cli_commands();
+	let release = commands
+		.iter()
 		.find(|command| command.name == "release")
 		.unwrap_or_else(|| panic!("expected release command"));
-	let format = release
+	let release_format = release
 		.inputs
 		.iter()
 		.find(|input| input.name == "format")
 		.unwrap_or_else(|| panic!("expected release format input"));
-	assert_eq!(format.default.as_deref(), Some("markdown"));
+	assert_eq!(release_format.default.as_deref(), Some("markdown"));
 	assert_eq!(
-		format.choices,
+		release_format.choices,
 		vec![
 			"markdown".to_string(),
 			"text".to_string(),
+			"json".to_string(),
+		]
+	);
+	assert!(release.inputs.iter().all(|input| input.name != "versions"));
+
+	let versions = commands
+		.iter()
+		.find(|command| command.name == "versions")
+		.unwrap_or_else(|| panic!("expected versions command"));
+	let versions_format = versions
+		.inputs
+		.iter()
+		.find(|input| input.name == "format")
+		.unwrap_or_else(|| panic!("expected versions format input"));
+	assert_eq!(versions_format.default.as_deref(), Some("text"));
+	assert_eq!(
+		versions_format.choices,
+		vec![
+			"text".to_string(),
+			"markdown".to_string(),
 			"json".to_string(),
 		]
 	);
@@ -958,6 +980,14 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 				inputs: BTreeMap::new(),
 			},
 			"Discover",
+		),
+		(
+			CliStepDefinition::DisplayVersions {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			"DisplayVersions",
 		),
 		(
 			CliStepDefinition::CreateChangeFile {
@@ -1106,6 +1136,11 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 			when: None,
 			inputs: BTreeMap::new(),
 		},
+		CliStepDefinition::DisplayVersions {
+			name: Some(expected.to_string()),
+			when: None,
+			inputs: BTreeMap::new(),
+		},
 		CliStepDefinition::CreateChangeFile {
 			show_progress: None,
 			name: Some(expected.to_string()),
@@ -1234,7 +1269,17 @@ fn valid_input_names_returns_expected_names_for_retarget_release() {
 }
 
 #[test]
-fn valid_input_names_returns_expected_names_for_publish_steps() {
+fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
+	let display_versions = CliStepDefinition::DisplayVersions {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		display_versions.valid_input_names(),
+		Some(["format"].as_slice())
+	);
+
 	let publish = CliStepDefinition::PublishPackages {
 		name: None,
 		when: None,
@@ -1360,8 +1405,31 @@ fn expected_input_kind_returns_none_for_commit_release() {
 }
 
 #[test]
-fn expected_input_kind_returns_correct_types_for_publish_steps() {
+fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	use crate::CliInputKind;
+	let display_versions = CliStepDefinition::DisplayVersions {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		display_versions.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(display_versions.expected_input_kind("unknown"), None);
+
+	let prepare = CliStepDefinition::PrepareRelease {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		prepare.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(prepare.expected_input_kind("versions"), None);
+	assert_eq!(prepare.expected_input_kind("unknown"), None);
+
 	let publish = CliStepDefinition::PublishPackages {
 		name: None,
 		when: None,

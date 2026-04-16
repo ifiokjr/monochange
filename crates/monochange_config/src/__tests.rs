@@ -102,7 +102,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 10);
+	assert_eq!(configuration.cli.len(), 11);
 	let cli_command_names = configuration
 		.cli
 		.iter()
@@ -115,6 +115,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 			"discover",
 			"change",
 			"release",
+			"versions",
 			"placeholder-publish",
 			"publish",
 			"publish-plan",
@@ -164,6 +165,7 @@ fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_c
 			"discover",
 			"change",
 			"release",
+			"versions",
 			"placeholder-publish",
 			"publish",
 			"publish-plan",

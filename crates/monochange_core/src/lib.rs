@@ -1473,6 +1473,15 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+	/// Display planned package and group versions without mutating release files.
+	DisplayVersions {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	/// Create a `.changeset/*.md` file from typed CLI inputs or interactive
 	/// prompts.
 	CreateChangeFile {
@@ -1632,6 +1641,7 @@ impl CliStepDefinition {
 		match self {
 			Self::Validate { inputs, .. }
 			| Self::Discover { inputs, .. }
+			| Self::DisplayVersions { inputs, .. }
 			| Self::CreateChangeFile { inputs, .. }
 			| Self::PrepareRelease { inputs, .. }
 			| Self::CommitRelease { inputs, .. }
@@ -1654,6 +1664,7 @@ impl CliStepDefinition {
 		match self {
 			Self::Validate { name, .. }
 			| Self::Discover { name, .. }
+			| Self::DisplayVersions { name, .. }
 			| Self::CreateChangeFile { name, .. }
 			| Self::PrepareRelease { name, .. }
 			| Self::CommitRelease { name, .. }
@@ -1682,6 +1693,7 @@ impl CliStepDefinition {
 		match self {
 			Self::Validate { when, .. }
 			| Self::Discover { when, .. }
+			| Self::DisplayVersions { when, .. }
 			| Self::CreateChangeFile { when, .. }
 			| Self::PrepareRelease { when, .. }
 			| Self::CommitRelease { when, .. }
@@ -1715,6 +1727,7 @@ impl CliStepDefinition {
 		match self {
 			Self::Validate { .. } => "Validate",
 			Self::Discover { .. } => "Discover",
+			Self::DisplayVersions { .. } => "DisplayVersions",
 			Self::CreateChangeFile { .. } => "CreateChangeFile",
 			Self::PrepareRelease { .. } => "PrepareRelease",
 			Self::CommitRelease { .. } => "CommitRelease",
@@ -1742,6 +1755,7 @@ impl CliStepDefinition {
 			Self::Validate { .. } => Some(&["fix"]),
 			Self::CommitRelease { .. } => Some(&[]),
 			Self::Discover { .. }
+			| Self::DisplayVersions { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
 			| Self::OpenReleaseRequest { .. }
@@ -1785,6 +1799,7 @@ impl CliStepDefinition {
 			}
 			Self::CommitRelease { .. } | Self::Command { .. } => None,
 			Self::Discover { .. }
+			| Self::DisplayVersions { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
 			| Self::OpenReleaseRequest { .. }
@@ -3410,6 +3425,31 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			}],
 			steps: vec![CliStepDefinition::PrepareRelease {
 				name: Some("prepare release".to_string()),
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		},
+		CliCommandDefinition {
+			name: "versions".to_string(),
+			help_text: Some(
+				"Display planned package and group versions from discovered change files"
+					.to_string(),
+			),
+			inputs: vec![CliInputDefinition {
+				name: "format".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: Some("Output format".to_string()),
+				required: false,
+				default: Some("text".to_string()),
+				choices: vec![
+					"text".to_string(),
+					"markdown".to_string(),
+					"json".to_string(),
+				],
+				short: None,
+			}],
+			steps: vec![CliStepDefinition::DisplayVersions {
+				name: Some("display versions".to_string()),
 				when: None,
 				inputs: BTreeMap::new(),
 			}],

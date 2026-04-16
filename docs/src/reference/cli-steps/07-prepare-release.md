@@ -58,6 +58,8 @@ It can produce:
 
 Built-in release-oriented commands now default their human-readable `format` input to `markdown`. Use `text` when you explicitly want the older plain-text style, or `json` for automation.
 
+When you only need the resolved package and group versions, use the dedicated [`DisplayVersions`](14-display-versions.md) step or the built-in `mc versions` command instead of overloading `PrepareRelease`.
+
 It also fills the shorthand template values commonly used by `Command` steps:
 
 - `{{ version }}`

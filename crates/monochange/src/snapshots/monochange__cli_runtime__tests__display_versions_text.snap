@@ -1,0 +1,9 @@
+---
+source: crates/monochange/src/cli_runtime.rs
+expression: text
+---
+group versions:
+- sdk: 2.0.0
+package versions:
+- core: 1.2.0
+- web: 1.2.1

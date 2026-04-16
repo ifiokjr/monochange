@@ -58,6 +58,7 @@ pub(crate) fn execute_matches(
 		)));
 	};
 
+	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
 	let dry_run = quiet || cli_command_matches.get_flag("dry-run");
 	let show_diff =
 		command_supports_release_diff_preview(cli_command) && cli_command_matches.get_flag("diff");
@@ -77,7 +78,6 @@ pub(crate) fn execute_matches(
 		.then(|| cli_command_matches.get_one::<String>("prepared-release"))
 		.flatten()
 		.map(PathBuf::from);
-	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
 	if show_diff {
 		execute_cli_command_with_options(
 			root,
@@ -559,6 +559,25 @@ pub(crate) fn execute_cli_command_with_options(
 						.and_then(|values| values.first())
 						.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
 					output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
+					Ok(())
+				}
+				CliStepDefinition::DisplayVersions { .. } => {
+					let prepared_execution = match maybe_load_prepared_release_execution(
+						root,
+						configuration,
+						prepared_release_path.as_deref(),
+						true,
+						false,
+					)? {
+						Some(loaded) => loaded.execution,
+						None => prepare_release_execution_with_file_diffs(root, true, false)?,
+					};
+					step_phase_timings.clone_from(&prepared_execution.phase_timings);
+					let rendered_output = render_display_versions_output(
+						&prepared_execution.prepared_release,
+						&step_inputs,
+					)?;
+					output = Some(rendered_output);
 					Ok(())
 				}
 				CliStepDefinition::CreateChangeFile { .. } => {
@@ -2410,6 +2429,111 @@ fn render_prepared_release_summary(
 	}
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseVersionSummary {
+	packages: BTreeMap<String, String>,
+	groups: BTreeMap<String, String>,
+}
+
+fn build_release_version_summary(prepared_release: &PreparedRelease) -> ReleaseVersionSummary {
+	ReleaseVersionSummary {
+		packages: prepared_release
+			.plan
+			.decisions
+			.iter()
+			.filter(|decision| decision.recommended_bump.is_release())
+			.filter_map(|decision| {
+				decision
+					.planned_version
+					.as_ref()
+					.map(|version| (decision.package_id.clone(), version.to_string()))
+			})
+			.collect(),
+		groups: prepared_release
+			.plan
+			.groups
+			.iter()
+			.filter(|group| group.recommended_bump.is_release())
+			.filter_map(|group| {
+				group
+					.planned_version
+					.as_ref()
+					.map(|version| (group.group_id.clone(), version.to_string()))
+			})
+			.collect(),
+	}
+}
+
+fn render_release_version_summary_text(summary: &ReleaseVersionSummary) -> String {
+	let mut lines = Vec::new();
+	if !summary.groups.is_empty() {
+		lines.push("group versions:".to_string());
+		for (group, version) in &summary.groups {
+			lines.push(format!("- {group}: {version}"));
+		}
+	}
+	if !summary.packages.is_empty() {
+		lines.push("package versions:".to_string());
+		for (package, version) in &summary.packages {
+			lines.push(format!("- {package}: {version}"));
+		}
+	}
+	if lines.is_empty() {
+		return "no package or group versions were planned".to_string();
+	}
+	lines.join("\n")
+}
+
+fn render_release_version_summary_markdown(summary: &ReleaseVersionSummary) -> String {
+	if summary.groups.is_empty() && summary.packages.is_empty() {
+		return "No package or group versions were planned.".to_string();
+	}
+	let color = stdout_supports_color();
+	let mut sections = Vec::new();
+	if !summary.groups.is_empty() {
+		let lines = summary
+			.groups
+			.iter()
+			.map(|(group, version)| {
+				format!(
+					"- {}: {}",
+					paint_markdown_inline(&format!("`{group}`"), MarkdownStyle::Code, color),
+					paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color),
+				)
+			})
+			.collect::<Vec<_>>();
+		sections.push(render_markdown_section("Group versions", &lines, color));
+	}
+	if !summary.packages.is_empty() {
+		let lines = summary
+			.packages
+			.iter()
+			.map(|(package, version)| {
+				format!(
+					"- {}: {}",
+					paint_markdown_inline(&format!("`{package}`"), MarkdownStyle::Code, color),
+					paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color),
+				)
+			})
+			.collect::<Vec<_>>();
+		sections.push(render_markdown_section("Package versions", &lines, color));
+	}
+	sections.join("\n\n")
+}
+
+fn render_display_versions_output(
+	prepared_release: &PreparedRelease,
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<String> {
+	let summary = build_release_version_summary(prepared_release);
+	match cli_command_output_format(inputs)? {
+		OutputFormat::Json => render_json_output(&summary, "display versions"),
+		OutputFormat::Markdown => Ok(render_release_version_summary_markdown(&summary)),
+		OutputFormat::Text => Ok(render_release_version_summary_text(&summary)),
+	}
+}
+
 fn append_changed_file_lines(lines: &mut Vec<String>, changed_files: &[PathBuf]) {
 	if !changed_files.is_empty() {
 		lines.push("changed files:".to_string());
@@ -3027,6 +3151,7 @@ mod tests {
 	use std::time::Duration;
 
 	use monochange_config::load_workspace_configuration;
+	use monochange_core::BumpSeverity;
 	use monochange_core::ChangesetPolicyEvaluation;
 	use monochange_core::ChangesetPolicyStatus;
 	use monochange_core::CliCommandDefinition;
@@ -3103,6 +3228,69 @@ mod tests {
 			group_version: None,
 			release_targets: Vec::new(),
 			changed_files: Vec::new(),
+			changelogs: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			dry_run: true,
+		}
+	}
+
+	fn sample_prepared_release_with_versions() -> PreparedRelease {
+		PreparedRelease {
+			plan: ReleasePlan {
+				workspace_root: PathBuf::from("."),
+				decisions: vec![
+					monochange_core::ReleaseDecision {
+						package_id: "core".to_string(),
+						trigger_type: "changeset".to_string(),
+						recommended_bump: BumpSeverity::Minor,
+						planned_version: Some(semver::Version::new(1, 2, 0)),
+						group_id: Some("sdk".to_string()),
+						reasons: vec!["feature".to_string()],
+						upstream_sources: Vec::new(),
+						warnings: Vec::new(),
+					},
+					monochange_core::ReleaseDecision {
+						package_id: "web".to_string(),
+						trigger_type: "changeset".to_string(),
+						recommended_bump: BumpSeverity::Patch,
+						planned_version: Some(semver::Version::new(1, 2, 1)),
+						group_id: Some("sdk".to_string()),
+						reasons: vec!["fix".to_string()],
+						upstream_sources: Vec::new(),
+						warnings: Vec::new(),
+					},
+					monochange_core::ReleaseDecision {
+						package_id: "docs".to_string(),
+						trigger_type: "changeset".to_string(),
+						recommended_bump: BumpSeverity::None,
+						planned_version: Some(semver::Version::new(9, 9, 9)),
+						group_id: None,
+						reasons: Vec::new(),
+						upstream_sources: Vec::new(),
+						warnings: Vec::new(),
+					},
+				],
+				groups: vec![monochange_core::PlannedVersionGroup {
+					group_id: "sdk".to_string(),
+					display_name: "SDK".to_string(),
+					members: vec!["core".to_string(), "web".to_string()],
+					mismatch_detected: false,
+					planned_version: Some(semver::Version::new(2, 0, 0)),
+					recommended_bump: BumpSeverity::Minor,
+				}],
+				warnings: Vec::new(),
+				unresolved_items: Vec::new(),
+				compatibility_evidence: Vec::new(),
+			},
+			changeset_paths: Vec::new(),
+			changesets: Vec::new(),
+			released_packages: vec!["core".to_string(), "web".to_string()],
+			package_publications: Vec::new(),
+			version: Some("1.2.1".to_string()),
+			group_version: Some("2.0.0".to_string()),
+			release_targets: Vec::new(),
+			changed_files: vec![PathBuf::from("Cargo.toml")],
 			changelogs: Vec::new(),
 			updated_changelogs: Vec::new(),
 			deleted_changesets: Vec::new(),
@@ -3465,6 +3653,79 @@ path = "crates/core"
 		assert!(markdown.contains("## File diffs"));
 		assert!(markdown.contains("## Deleted changesets"));
 		assert!(markdown.contains("## Commands"));
+	}
+
+	#[test]
+	fn render_display_versions_output_supports_text_markdown_and_json() {
+		let prepared_release = sample_prepared_release_with_versions();
+
+		let text = render_display_versions_output(
+			&prepared_release,
+			&BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
+		)
+		.unwrap_or_else(|error| panic!("versions text output: {error}"));
+		insta::assert_snapshot!("display_versions_text", text);
+
+		let markdown = render_display_versions_output(
+			&prepared_release,
+			&BTreeMap::from([("format".to_string(), vec!["markdown".to_string()])]),
+		)
+		.unwrap_or_else(|error| panic!("versions markdown output: {error}"));
+		insta::assert_snapshot!("display_versions_markdown", markdown);
+
+		let json = render_display_versions_output(
+			&prepared_release,
+			&BTreeMap::from([("format".to_string(), vec!["json".to_string()])]),
+		)
+		.unwrap_or_else(|error| panic!("versions json output: {error}"));
+		let parsed: serde_json::Value = serde_json::from_str(&json)
+			.unwrap_or_else(|error| panic!("parse versions json output: {error}"));
+		insta::assert_json_snapshot!("display_versions_json", parsed);
+	}
+
+	#[test]
+	fn release_version_summary_renderers_cover_empty_and_single_section_states() {
+		let empty = ReleaseVersionSummary {
+			groups: BTreeMap::new(),
+			packages: BTreeMap::new(),
+		};
+		assert_eq!(
+			render_release_version_summary_text(&empty),
+			"no package or group versions were planned"
+		);
+		assert_eq!(
+			render_release_version_summary_markdown(&empty),
+			"No package or group versions were planned."
+		);
+
+		let groups_only = ReleaseVersionSummary {
+			groups: BTreeMap::from([("sdk".to_string(), "2.0.0".to_string())]),
+			packages: BTreeMap::new(),
+		};
+		assert_eq!(
+			render_release_version_summary_text(&groups_only),
+			"group versions:\n- sdk: 2.0.0"
+		);
+		assert_eq!(
+			render_release_version_summary_markdown(&groups_only),
+			"## Group versions\n\n- `sdk`: `2.0.0`"
+		);
+
+		let packages_only = ReleaseVersionSummary {
+			groups: BTreeMap::new(),
+			packages: BTreeMap::from([
+				("core".to_string(), "1.2.0".to_string()),
+				("web".to_string(), "1.2.1".to_string()),
+			]),
+		};
+		assert_eq!(
+			render_release_version_summary_text(&packages_only),
+			"package versions:\n- core: 1.2.0\n- web: 1.2.1"
+		);
+		assert_eq!(
+			render_release_version_summary_markdown(&packages_only),
+			"## Package versions\n\n- `core`: `1.2.0`\n- `web`: `1.2.1`"
+		);
 	}
 
 	#[test]
@@ -3959,6 +4220,19 @@ path = "crates/core"
 	}
 
 	#[test]
+	fn render_display_versions_output_rejects_unknown_formats() {
+		let error = render_display_versions_output(
+			&sample_prepared_release_with_versions(),
+			&BTreeMap::from([("format".to_string(), vec!["yaml".to_string()])]),
+		)
+		.unwrap_err();
+		assert_eq!(
+			error.to_string(),
+			"config error: unsupported output format `yaml`"
+		);
+	}
+
+	#[test]
 	fn execute_matches_uses_progress_format_from_environment_and_rejects_invalid_values() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 
@@ -4268,6 +4542,113 @@ path = "crates/core"
 		.unwrap_or_else(|error| panic!("execute noop command: {error}"));
 
 		assert_eq!(output, "command `noop` completed");
+	}
+
+	#[test]
+	fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
+		let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+			.unwrap_or_else(|error| panic!("workspace root: {error}"));
+		let configuration = sample_configuration(&root);
+		let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let artifact_path = artifact_dir.path().join("prepared-release.json");
+		save_prepared_release_execution(
+			&root,
+			&configuration,
+			&sample_prepared_release_with_versions(),
+			&[],
+			Some(artifact_path.as_path()),
+		)
+		.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
+
+		let output = execute_cli_command_with_options(
+			&root,
+			&configuration,
+			&default_cli_command("versions"),
+			ExecuteCliCommandOptions {
+				dry_run: false,
+				quiet: false,
+				show_diff: false,
+				inputs: BTreeMap::from([("format".to_string(), vec!["json".to_string()])]),
+				prepared_release_path: Some(artifact_path),
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.unwrap_or_else(|error| panic!("execute versions command: {error}"));
+		let parsed: serde_json::Value = serde_json::from_str(&output)
+			.unwrap_or_else(|error| panic!("parse versions output: {error}"));
+
+		assert_eq!(parsed["groups"]["sdk"], serde_json::json!("2.0.0"));
+		assert_eq!(parsed["packages"]["core"], serde_json::json!("1.2.0"));
+		assert_eq!(parsed["packages"]["web"], serde_json::json!("1.2.1"));
+	}
+
+	#[test]
+	fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
+		let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+			.unwrap_or_else(|error| panic!("workspace root: {error}"));
+		let configuration = sample_configuration(&root);
+		let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let invalid_artifact_path = artifact_dir.path().join("prepared-release.json");
+		fs::write(&invalid_artifact_path, "not json")
+			.unwrap_or_else(|error| panic!("write invalid artifact: {error}"));
+
+		let error = execute_cli_command_with_options(
+			&root,
+			&configuration,
+			&default_cli_command("versions"),
+			ExecuteCliCommandOptions {
+				dry_run: false,
+				quiet: false,
+				show_diff: false,
+				inputs: BTreeMap::new(),
+				prepared_release_path: Some(invalid_artifact_path),
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.expect_err("invalid prepared release artifact should fail");
+
+		assert!(
+			error
+				.to_string()
+				.contains("failed to parse prepared release artifact")
+		);
+	}
+
+	#[test]
+	fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
+		let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+			.unwrap_or_else(|error| panic!("workspace root: {error}"));
+		let configuration = sample_configuration(&root);
+		let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let artifact_path = artifact_dir.path().join("prepared-release.json");
+		save_prepared_release_execution(
+			&root,
+			&configuration,
+			&sample_prepared_release_with_versions(),
+			&[],
+			Some(artifact_path.as_path()),
+		)
+		.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
+
+		let error = execute_cli_command_with_options(
+			&root,
+			&configuration,
+			&default_cli_command("versions"),
+			ExecuteCliCommandOptions {
+				dry_run: false,
+				quiet: false,
+				show_diff: false,
+				inputs: BTreeMap::from([("format".to_string(), vec!["yaml".to_string()])]),
+				prepared_release_path: Some(artifact_path),
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.expect_err("unsupported versions output format should fail");
+
+		assert_eq!(
+			error.to_string(),
+			"config error: unsupported output format `yaml`"
+		);
 	}
 
 	#[test]

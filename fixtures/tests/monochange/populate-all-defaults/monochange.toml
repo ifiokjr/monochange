@@ -6,6 +6,8 @@
 
 [cli.release]
 
+[cli.versions]
+
 [cli.placeholder-publish]
 
 [cli.publish]

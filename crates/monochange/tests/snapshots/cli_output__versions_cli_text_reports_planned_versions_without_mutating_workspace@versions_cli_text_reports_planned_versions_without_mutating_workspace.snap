@@ -1,0 +1,23 @@
+---
+source: crates/monochange/tests/cli_output.rs
+info:
+  program: mc
+  args:
+    - versions
+    - "--format"
+    - text
+  env:
+    MONOCHANGE_RELEASE_DATE: 2026-04-06
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+group versions:
+- sdk: 1.1.0
+package versions:
+- cargo:crates/app/Cargo.toml: 1.1.0
+- cargo:crates/core/Cargo.toml: 1.1.0
+
+----- stderr -----

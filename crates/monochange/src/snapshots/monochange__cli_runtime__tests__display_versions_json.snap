@@ -1,0 +1,13 @@
+---
+source: crates/monochange/src/cli_runtime.rs
+expression: parsed
+---
+{
+  "groups": {
+    "sdk": "2.0.0"
+  },
+  "packages": {
+    "core": "1.2.0",
+    "web": "1.2.1"
+  }
+}

@@ -413,6 +413,18 @@ Planning reminders:
   - Explicit versions on grouped members propagate to the whole group.",
 			)
 		}
+		"versions" => {
+			Some(
+				r"Examples:
+  mc versions
+  mc versions --format markdown
+  mc versions --format json
+
+Summary notes:
+  - This command is read-only and does not update manifests or changelogs.
+  - It computes the same planned versions used by monochange release workflows.",
+			)
+		}
 		"commit-release" => {
 			Some(
 				r"Examples:

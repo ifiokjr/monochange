@@ -178,6 +178,51 @@ fn boolean_cli_inputs_support_explicit_false_values() {
 }
 
 #[test]
+fn versions_help_and_matches_document_dedicated_versions_command() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let release_help = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("release help: {error}"));
+	assert!(!release_help.contains("--versions"));
+
+	let versions_help = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("versions"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("versions help: {error}"));
+	assert!(versions_help.contains("Display planned package and group versions"));
+	assert!(versions_help.contains("--format <FORMAT>"));
+
+	let matches = build_command_for_root("mc", &fixture_root)
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("versions"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		])
+		.unwrap_or_else(|error| panic!("versions matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected versions subcommand"));
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("format")
+			.map(String::as_str),
+		Some("json")
+	);
+}
+
+#[test]
 fn release_record_help_describes_first_parent_discovery() {
 	let output = run_with_args(
 		"mc",
@@ -377,6 +422,7 @@ fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	assert!(config.contains("[cli.discover]"));
 	assert!(config.contains("[cli.change]"));
 	assert!(config.contains("[cli.release]"));
+	assert!(config.contains("[cli.versions]"));
 	assert!(config.contains("[cli.placeholder-publish]"));
 	assert!(config.contains("[cli.publish]"));
 	assert!(config.contains("[cli.publish-plan]"));
@@ -413,12 +459,13 @@ fn populate_adds_all_missing_default_cli_commands_to_an_existing_configuration()
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 10 default CLI commands"));
+	assert!(output.contains("added 11 default CLI commands"));
 	for table in [
 		"[cli.validate]",
 		"[cli.discover]",
 		"[cli.change]",
 		"[cli.release]",
+		"[cli.versions]",
 		"[cli.placeholder-publish]",
 		"[cli.publish]",
 		"[cli.publish-plan]",
@@ -443,13 +490,14 @@ fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 9 default CLI commands"));
+	assert!(output.contains("added 10 default CLI commands"));
 	assert!(config.contains("help_text = \"Custom release pipeline\""));
 	assert_eq!(config.matches("[cli.release]").count(), 1);
 	for table in [
 		"[cli.validate]",
 		"[cli.discover]",
 		"[cli.change]",
+		"[cli.versions]",
 		"[cli.placeholder-publish]",
 		"[cli.publish]",
 		"[cli.publish-plan]",
@@ -559,8 +607,9 @@ fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 10 default CLI commands"));
+	assert!(output.contains("added 11 default CLI commands"));
 	assert!(config.starts_with("[cli.validate]"));
+	assert!(config.contains("[cli.versions]"));
 }
 
 #[test]
@@ -1494,6 +1543,48 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 	assert_eq!(
 		fs::read_to_string(&core_changelog)
 			.unwrap_or_else(|error| panic!("core changelog after dry-run: {error}")),
+		original_changelog
+	);
+	assert!(tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn command_versions_reports_planned_versions_without_mutating_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	let workspace_manifest = tempdir.path().join("Cargo.toml");
+	let core_changelog = tempdir.path().join("crates/core/changelog.md");
+	let original_manifest = fs::read_to_string(&workspace_manifest)
+		.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
+	let original_changelog = fs::read_to_string(&core_changelog)
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("workspace configuration: {error}"));
+	let matches = crate::build_command_with_cli("mc", &configuration.cli)
+		.try_get_matches_from(["mc", "versions", "--format", "text"])
+		.unwrap_or_else(|error| panic!("versions matches: {error}"));
+	let versions_matches = matches
+		.subcommand_matches("versions")
+		.unwrap_or_else(|| panic!("expected versions subcommand matches"));
+	let output = crate::execute_matches(
+		tempdir.path(),
+		&configuration,
+		"versions",
+		versions_matches,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("versions output: {error}"));
+
+	assert!(output.contains("group versions:"));
+	assert!(output.contains("package versions:"));
+	assert_eq!(
+		fs::read_to_string(&workspace_manifest)
+			.unwrap_or_else(|error| panic!("workspace manifest after versions: {error}")),
+		original_manifest
+	);
+	assert_eq!(
+		fs::read_to_string(&core_changelog)
+			.unwrap_or_else(|error| panic!("core changelog after versions: {error}")),
 		original_changelog
 	);
 	assert!(tempdir.path().join(".changeset/feature.md").exists());

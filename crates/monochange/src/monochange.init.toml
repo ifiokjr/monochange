@@ -651,19 +651,24 @@ comment_on_failure = true
 #   "choice"      — constrained to a set of choices
 #
 # Available step types:
-#   Validate             — validate monochange.toml and changesets
-#   Discover             — discover packages across ecosystems
-#   CreateChangeFile     — create a .changeset/*.md file
-#   PrepareRelease       — compute release plan, update versions, changelogs,
-#                          and refresh .monochange/release-manifest.json
-#   CommitRelease        — create a local release commit (requires PrepareRelease)
-#   PublishRelease       — create provider releases (requires PrepareRelease)
-#   OpenReleaseRequest   — open/update a release PR (requires PrepareRelease)
+#   Validate              — validate monochange.toml and changesets
+#   Discover              — discover packages across ecosystems
+#   DisplayVersions       — display planned package and group versions
+#   CreateChangeFile      — create a .changeset/*.md file
+#   PrepareRelease        — compute release plan, update versions, changelogs,
+#                           and refresh .monochange/release-manifest.json
+#   CommitRelease         — create a local release commit (requires PrepareRelease)
+#   PublishRelease        — create provider releases (requires PrepareRelease)
+#   PlaceholderPublish    — publish placeholder package versions
+#   PublishPackages       — publish package versions using built-in workflows
+#   PlanPublishRateLimits — plan package-registry publish work against known rate limits
+#   OpenReleaseRequest    — open/update a release PR (requires PrepareRelease)
 #   CommentReleasedIssues — comment on issues referenced in changesets
-#   AffectedPackages     — show affected packages and evaluate changeset coverage
-#   DiagnoseChangesets   — render per-changeset commit/PR/context diagnostics
-#   Deploy               — emit deployment intents (reserved, currently unsupported)
-#   Command              — run an arbitrary shell command
+#   AffectedPackages      — show affected packages and evaluate changeset coverage
+#   DiagnoseChangesets    — render per-changeset commit/PR/context diagnostics
+#   RetargetRelease       — repair a recent release by moving its stored tag set
+#   Deploy                — emit deployment intents (reserved, currently unsupported)
+#   Command               — run an arbitrary shell command
 #
 # Common step fields:
 #   name            — optional human-readable label shown in progress output and
@@ -746,6 +751,13 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
 ]
 steps = [{ name = "prepare release", type = "PrepareRelease" }]
+
+[cli.versions]
+help_text = "Display planned package and group versions from discovered change files"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+]
+steps = [{ name = "display versions", type = "DisplayVersions" }]
 
 [cli.placeholder-publish]
 help_text = "Publish placeholder package versions for missing registry packages"

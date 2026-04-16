@@ -62,6 +62,7 @@ In practice, most workflows fit one of four patterns:
 1. **validation / inspection**
    - `Validate`
    - `Discover`
+   - `DisplayVersions`
    - `AffectedPackages`
    - `DiagnoseChangesets`
 2. **change authoring**
@@ -92,7 +93,7 @@ Use `--progress-format auto|unicode|ascii|json` or `MONOCHANGE_PROGRESS_FORMAT` 
 - `ascii` forces the human renderer with ASCII-safe symbols
 - `json` emits newline-delimited progress events for automation and benchmarks
 
-`PrepareRelease` steps also report per-phase timings. Those timings power the benchmark phase-budget checks for `mc release --dry-run` and `mc release`.
+`PrepareRelease` and `DisplayVersions` steps also report per-phase timings when they compute release state. Those timings power the benchmark phase-budget checks for `mc release --dry-run` and `mc release`.
 
 See [Progress output](../progress-output.md) for the full renderer behavior and JSON event shape.
 
@@ -146,3 +147,4 @@ Those namespaces are the main reason to prefer built-in steps over reimplementin
 - [OpenReleaseRequest](11-open-release-request.md)
 - [CommentReleasedIssues](12-comment-released-issues.md)
 - [Command](13-command.md)
+- [DisplayVersions](14-display-versions.md)
