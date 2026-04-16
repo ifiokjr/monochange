@@ -1,4 +1,5 @@
 ---
+"@monochange/skill": none
 "monochange": minor
 "monochange_dart": minor
 ---
