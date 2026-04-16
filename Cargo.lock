@@ -1964,12 +1964,16 @@ version = "0.1.0"
 dependencies = [
  "glob",
  "insta",
+ "monochange_config",
  "monochange_core",
+ "monochange_lint_testing",
+ "monochange_linting",
  "monochange_semver",
  "monochange_test_helpers",
  "rstest",
  "semver",
  "serde",
+ "serde_json",
  "similar-asserts",
  "tempfile",
  "thiserror 2.0.18",
@@ -2147,16 +2151,27 @@ dependencies = [
 name = "monochange_lint"
 version = "0.1.0"
 dependencies = [
- "ignore",
- "insta",
+ "glob",
  "monochange_core",
  "serde",
  "serde_json",
  "tempfile",
- "toml",
- "toml_edit",
  "tracing",
- "walkdir",
+]
+
+[[package]]
+name = "monochange_lint_testing"
+version = "0.1.0"
+dependencies = [
+ "monochange_core",
+ "monochange_lint",
+]
+
+[[package]]
+name = "monochange_linting"
+version = "0.1.0"
+dependencies = [
+ "monochange_core",
 ]
 
 [[package]]
@@ -2165,7 +2180,11 @@ version = "0.1.0"
 dependencies = [
  "glob",
  "insta",
+ "monochange_config",
  "monochange_core",
+ "monochange_lint_testing",
+ "monochange_linting",
+ "monochange_test_helpers",
  "rstest",
  "semver",
  "serde",

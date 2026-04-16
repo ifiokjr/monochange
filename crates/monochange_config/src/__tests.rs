@@ -4350,3 +4350,36 @@ fn changeset_files_with_bare_cr_line_endings_parse_correctly() {
 		.unwrap_or_else(|| panic!("expected summary"));
 	assert!(summary.contains("bare CR"));
 }
+
+#[test]
+fn load_workspace_configuration_parses_top_level_lints_and_scopes() {
+	let root = fixture_path("config/lint-settings");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert_eq!(
+		configuration.lints.presets,
+		vec![
+			"cargo/recommended".to_string(),
+			"npm/recommended".to_string()
+		]
+	);
+	assert_eq!(
+		configuration
+			.lints
+			.rules
+			.get("cargo/internal-dependency-workspace")
+			.map(monochange_core::lint::LintRuleConfig::severity),
+		Some(monochange_core::lint::LintSeverity::Error)
+	);
+	assert_eq!(configuration.lints.scopes.len(), 1);
+	let scope = configuration
+		.lints
+		.scopes
+		.first()
+		.expect("expected lint scope");
+	assert_eq!(scope.name.as_deref(), Some("published cargo packages"));
+	assert_eq!(scope.selector.ecosystems, vec!["cargo".to_string()]);
+	assert_eq!(scope.selector.managed, Some(true));
+	assert_eq!(scope.selector.publishable, Some(true));
+}

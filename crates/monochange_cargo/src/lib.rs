@@ -33,6 +33,8 @@
 //! - Rust semver provider integration for release planning
 //! <!-- {/monochangeCargoCrateDocs} -->
 
+pub mod lints;
+
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;

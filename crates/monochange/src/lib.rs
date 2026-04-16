@@ -752,7 +752,17 @@ where
 				.get_many::<String>("ecosystem")
 				.map(|values| values.map(String::as_str).map(String::from).collect())
 				.unwrap_or_default();
-			lint::run_check_command(root, fix, &ecosystems, format)
+			let only_rules: Vec<String> = check_matches
+				.get_many::<String>("only")
+				.map(|values| values.map(String::as_str).map(String::from).collect())
+				.unwrap_or_default();
+			lint::run_check_command(root, fix, &ecosystems, &only_rules, format)
+		}
+		Some(("lint", lint_matches)) => {
+			if quiet {
+				return Ok(String::new());
+			}
+			lint::handle_lint_subcommand(root, lint_matches)
 		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;

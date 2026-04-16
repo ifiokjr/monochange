@@ -1286,8 +1286,6 @@ pub struct EcosystemSettings {
 	pub lockfile_commands: Vec<LockfileCommandDefinition>,
 	#[serde(default)]
 	pub publish: PublishSettings,
-	#[serde(default)]
-	pub lints: BTreeMap<String, lint::LintRuleConfig>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -3208,6 +3206,7 @@ pub struct WorkspaceConfiguration {
 	pub cli: Vec<CliCommandDefinition>,
 	pub changesets: ChangesetSettings,
 	pub source: Option<SourceConfiguration>,
+	pub lints: lint::WorkspaceLintSettings,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
 	pub deno: EcosystemSettings,

@@ -110,7 +110,7 @@ If you do not know which package id to target, rerun `mc discover --format json`
 - [Groups and shared release identity](docs/src/guide/05-version-groups.md) — when to reach for group ids instead of package ids
 - [Release planning](docs/src/guide/06-release-planning.md) — changesets, dry runs, diff previews, and planning rules
 - [Advanced: CI, package publishing, and release PR flows](docs/src/guide/13-ci-and-publishing.md) — per-provider CI patterns, trusted publishing, and long-running release PR design notes
-- [Reference: Manifest linting with `mc check`](docs/src/reference/linting.md) — `[ecosystems.<name>.lints]` rules for Cargo and npm-family manifests
+- [Reference: Manifest linting with `mc check`](docs/src/reference/linting.md) — `[lints]` rules for Cargo and npm-family manifests
 
 <!-- {=projectRecentPublishingImprovements} -->
 

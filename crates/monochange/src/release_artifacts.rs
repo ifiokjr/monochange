@@ -1412,6 +1412,7 @@ mod tests {
 			cli: Vec::new(),
 			changesets: monochange_core::ChangesetSettings::default(),
 			source: None,
+			lints: monochange_core::lint::WorkspaceLintSettings::default(),
 			cargo: monochange_core::EcosystemSettings::default(),
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),

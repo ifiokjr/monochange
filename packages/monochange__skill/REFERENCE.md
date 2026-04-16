@@ -49,7 +49,7 @@ Use the bundled docs like this:
 - [skills/changesets.md](./skills/changesets.md) — creating and managing changesets
 - [skills/commands.md](./skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](./skills/configuration.md) — creating and evolving `monochange.toml`
-- [skills/linting.md](./skills/linting.md) — `mc check`, `[ecosystems.<name>.lints]`, and manifest-focused rule explanations with examples
+- [skills/linting.md](./skills/linting.md) — `mc check`, `[lints]`, and manifest-focused rule explanations with examples
 - [CHANGESET-GUIDE.md](./CHANGESET-GUIDE.md) — full lifecycle guidance
 - [ARTIFACT-TYPES.md](./ARTIFACT-TYPES.md) — artifact-aware changeset framing
 
@@ -480,14 +480,14 @@ Placeholder README content can come from:
 Configure ecosystem-specific manifest lint rules and run them through `mc check`:
 
 ```toml
-[ecosystems.cargo.lints]
+[lints.rules]
 "cargo/dependency-field-order" = "error"
 "cargo/internal-dependency-workspace" = "error"
 "cargo/required-package-fields" = "error"
 "cargo/sorted-dependencies" = "error"
 "cargo/unlisted-package-private" = "warning"
 
-[ecosystems.npm.lints]
+# npm rules also live under [lints.rules]
 "npm/workspace-protocol" = "error"
 "npm/sorted-dependencies" = "error"
 "npm/required-package-fields" = "error"
@@ -566,7 +566,7 @@ If you edited shared docs in `.templates/`, also run:
 devenv shell docs:check
 ```
 
-For the full rule-by-rule explanation — including the available `[ecosystems.<name>.lints]` rules, why you would enable them, and examples of what changes with and without them — see [skills/linting.md](./skills/linting.md).
+For the full rule-by-rule explanation — including the available `[lints]` rules, why you would enable them, and examples of what changes with and without them — see [skills/linting.md](./skills/linting.md).
 
 ## Important modeling rules
 

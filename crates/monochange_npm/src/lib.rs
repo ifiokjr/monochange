@@ -32,6 +32,8 @@
 //! - normalized dependency extraction
 //! <!-- {/monochangeNpmCrateDocs} -->
 
+pub mod lints;
+
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;

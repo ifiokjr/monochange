@@ -1990,6 +1990,7 @@ mod workspace_ops_tests {
 			cli: Vec::new(),
 			changesets: monochange_core::ChangesetSettings::default(),
 			source: None,
+			lints: monochange_core::lint::WorkspaceLintSettings::default(),
 			cargo: monochange_core::EcosystemSettings {
 				lockfile_commands: vec![LockfileCommandDefinition {
 					command: "cargo metadata".to_string(),
@@ -2221,6 +2222,7 @@ mod workspace_ops_tests {
 			cli: Vec::new(),
 			changesets: monochange_core::ChangesetSettings::default(),
 			source: None,
+			lints: monochange_core::lint::WorkspaceLintSettings::default(),
 			cargo: monochange_core::EcosystemSettings::default(),
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
@@ -2269,6 +2271,7 @@ mod workspace_ops_tests {
 			cli: Vec::new(),
 			changesets: monochange_core::ChangesetSettings::default(),
 			source: None,
+			lints: monochange_core::lint::WorkspaceLintSettings::default(),
 			cargo: monochange_core::EcosystemSettings::default(),
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),

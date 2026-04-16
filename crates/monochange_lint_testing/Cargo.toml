@@ -1,0 +1,22 @@
+[package]
+name = "monochange_lint_testing"
+version = { workspace = true }
+authors = { workspace = true }
+categories = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Testing helpers for monochange lint suites"
+
+[dependencies]
+monochange_core = { workspace = true }
+monochange_lint = { workspace = true }
+
+[dev-dependencies]
+monochange_test_helpers = { workspace = true }
+
+[lints]
+workspace = true

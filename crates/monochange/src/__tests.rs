@@ -8065,6 +8065,7 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 		cli: Vec::new(),
 		changesets: monochange_core::ChangesetSettings::default(),
 		source: None,
+		lints: monochange_core::lint::WorkspaceLintSettings::default(),
 		cargo: monochange_core::EcosystemSettings::default(),
 		npm: monochange_core::EcosystemSettings::default(),
 		deno: monochange_core::EcosystemSettings::default(),
@@ -8138,6 +8139,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 		cli: Vec::new(),
 		changesets: monochange_core::ChangesetSettings::default(),
 		source: None,
+		lints: monochange_core::lint::WorkspaceLintSettings::default(),
 		cargo: monochange_core::EcosystemSettings::default(),
 		npm: monochange_core::EcosystemSettings::default(),
 		deno: monochange_core::EcosystemSettings::default(),
@@ -8192,6 +8194,7 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 		cli: Vec::new(),
 		changesets: monochange_core::ChangesetSettings::default(),
 		source: None,
+		lints: monochange_core::lint::WorkspaceLintSettings::default(),
 		cargo: monochange_core::EcosystemSettings::default(),
 		npm: monochange_core::EcosystemSettings::default(),
 		deno: monochange_core::EcosystemSettings::default(),
@@ -10072,4 +10075,89 @@ fn init_with_gitlab_provider_writes_source_but_no_workflows() {
 		"gitlab should not generate GitHub workflows"
 	);
 	assert!(!tempdir.path().join(".github/workflows").exists());
+}
+
+#[test]
+fn lint_cli_lists_and_explains_rules() {
+	let root = fixture_path("config/lint-settings");
+	let list_output = run_cli(
+		&root,
+		[
+			OsString::from("mc"),
+			OsString::from("lint"),
+			OsString::from("list"),
+			OsString::from("--format=json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("lint list: {error}"));
+	assert!(list_output.contains("cargo/recommended"));
+	assert!(list_output.contains("npm/recommended"));
+
+	let explain_output = run_cli(
+		&root,
+		[
+			OsString::from("mc"),
+			OsString::from("lint"),
+			OsString::from("explain"),
+			OsString::from("cargo/internal-dependency-workspace"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("lint explain: {error}"));
+	assert!(explain_output.contains("Internal dependency workspace"));
+}
+
+#[test]
+fn lint_cli_new_scaffolds_rule_files() {
+	let tempdir = setup_scenario_workspace("test-support/scenario-workspace");
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("lint"),
+			OsString::from("new"),
+			OsString::from("cargo/no-path-dependencies"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("lint new: {error}"));
+	assert!(output.contains("no_path_dependencies.rs"));
+	assert!(
+		tempdir
+			.path()
+			.join("crates/monochange_cargo/src/lints/no_path_dependencies.rs")
+			.exists()
+	);
+}
+
+#[test]
+fn check_command_supports_only_rule_filters() {
+	let root = fixture_path("config/lint-settings");
+	let output = run_cli(
+		&root,
+		[
+			OsString::from("mc"),
+			OsString::from("check"),
+			OsString::from("--only"),
+			OsString::from("cargo/internal-dependency-workspace"),
+			OsString::from("--format=json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("check only: {error}"));
+	assert!(output.contains("\"results\""));
+	assert!(output.contains("\"warning_count\""));
+}
+
+#[test]
+fn quiet_lint_commands_return_empty_output() {
+	let root = fixture_path("config/lint-settings");
+	let output = run_cli(
+		&root,
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("lint"),
+			OsString::from("list"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet lint list: {error}"));
+	assert!(output.is_empty());
 }

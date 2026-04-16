@@ -193,6 +193,7 @@ When provided, the generated config includes:\n\
 			.subcommand(build_assist_subcommand())
 			.subcommand(build_release_record_subcommand())
 			.subcommand(build_tag_release_subcommand())
+			.subcommand(build_lint_subcommand())
 			.subcommand(Command::new("mcp").about(
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
 			))
@@ -301,12 +302,12 @@ Tagging notes:
 
 pub(crate) fn build_check_subcommand() -> Command {
 	Command::new("check")
-		.about("Validate configuration, changesets, and run lint rules on package manifests")
+		.about("Validate configuration, changesets, and run manifest lint rules")
 		.after_help(
-			"Examples:\n  mc check\n  mc check --fix\n  mc check --ecosystem cargo,npm\n\n\
-			 Lint rules are configured per ecosystem in monochange.toml:\n\n\
-			 [ecosystem.cargo.lints]\n  dependency-field-order = \"error\"\n  \
-			 internal-dependency-workspace = { level = \"error\", fix = true }",
+			"Examples:\n  mc check\n  mc check --fix\n  mc check --ecosystem cargo,npm\n  mc check --only cargo/sorted-dependencies\n\n\
+			 Lint rules are configured in the top-level [lints] section of monochange.toml:\n\n\
+			 [lints]\n  use = [\"cargo/recommended\", \"npm/recommended\"]\n\n\
+			 [lints.rules]\n  \"cargo/internal-dependency-workspace\" = \"error\"",
 		)
 		.arg(
 			Arg::new("fix")
@@ -319,8 +320,15 @@ pub(crate) fn build_check_subcommand() -> Command {
 			Arg::new("ecosystem")
 				.long("ecosystem")
 				.short('e')
-				.help("Limit linting to specific ecosystems")
+				.help("Limit linting to specific lint suites")
 				.value_name("ECOSYSTEMS")
+				.value_delimiter(','),
+		)
+		.arg(
+			Arg::new("only")
+				.long("only")
+				.help("Run only the specified lint rule ids")
+				.value_name("RULES")
 				.value_delimiter(','),
 		)
 		.arg(
@@ -329,6 +337,52 @@ pub(crate) fn build_check_subcommand() -> Command {
 				.help("Output format")
 				.default_value("text")
 				.value_parser(["text", "json"]),
+		)
+}
+
+pub(crate) fn build_lint_subcommand() -> Command {
+	Command::new("lint")
+		.about("Inspect and scaffold manifest lint rules")
+		.subcommand_required(true)
+		.arg_required_else_help(true)
+		.subcommand(
+			Command::new("list")
+				.about("List registered lint rules and presets")
+				.arg(
+					Arg::new("format")
+						.long("format")
+						.help("Output format")
+						.default_value("text")
+						.value_parser(["text", "json"]),
+				),
+		)
+		.subcommand(
+			Command::new("explain")
+				.about("Explain a lint rule or preset")
+				.arg(
+					Arg::new("id")
+						.required(true)
+						.help("Lint rule id or preset id to explain"),
+				)
+				.arg(
+					Arg::new("format")
+						.long("format")
+						.help("Output format")
+						.default_value("text")
+						.value_parser(["text", "json"]),
+				),
+		)
+		.subcommand(
+			Command::new("new")
+				.about("Scaffold a new lint rule in an ecosystem crate")
+				.after_help(
+					"Examples:\n  mc lint new cargo/no-path-dependencies\n  mc lint new npm/require-package-manager",
+				)
+				.arg(
+					Arg::new("id")
+						.required(true)
+						.help("New lint id in the form <ecosystem>/<rule-name>"),
+				),
 		)
 }
 

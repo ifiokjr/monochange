@@ -240,6 +240,12 @@ path = "crates/monochange_analysis"
 [package.monochange_lint]
 path = "crates/monochange_lint"
 
+[package.monochange_linting]
+path = "crates/monochange_linting"
+
+[package.monochange_lint_testing]
+path = "crates/monochange_lint_testing"
+
 [package."@monochange/skill"]
 path = "packages/monochange__skill"
 type = "npm"
@@ -341,6 +347,8 @@ packages = [
 	"monochange_hosting",
 	"monochange_analysis",
 	"monochange_lint",
+	"monochange_linting",
+	"monochange_lint_testing",
 	"@monochange/cli",
 	"@monochange/cli-darwin-arm64",
 	"@monochange/cli-darwin-x64",
@@ -438,27 +446,33 @@ comment_on_failure = true
 # Note: roots and exclude are parsed but discovery currently scans all
 # supported ecosystems regardless of these settings.
 
-[ecosystems.cargo]
-enabled = true
-versioned_files = ["Cargo.toml"]
+[lints]
+use = ["cargo/recommended", "npm/recommended"]
 
-[ecosystems.cargo.lints]
+[lints.rules]
 "cargo/dependency-field-order" = "error"
 "cargo/internal-dependency-workspace" = "error"
 "cargo/required-package-fields" = "error"
 "cargo/sorted-dependencies" = "error"
 "cargo/unlisted-package-private" = "warning"
-
-[ecosystems.npm]
-enabled = true
-
-[ecosystems.npm.lints]
 "npm/workspace-protocol" = "error"
 "npm/sorted-dependencies" = "error"
 "npm/required-package-fields" = "error"
 "npm/root-no-prod-deps" = "error"
 "npm/no-duplicate-dependencies" = "error"
 "npm/unlisted-package-private" = "warning"
+
+[[lints.scopes]]
+name = "published cargo packages"
+match = { ecosystems = ["cargo"], managed = true, publishable = true }
+rules = { "cargo/required-package-fields" = "error" }
+
+[ecosystems.cargo]
+enabled = true
+versioned_files = ["Cargo.toml"]
+
+[ecosystems.npm]
+enabled = true
 
 # Uncomment to enable Deno or Dart/Flutter discovery:
 # [ecosystems.deno]

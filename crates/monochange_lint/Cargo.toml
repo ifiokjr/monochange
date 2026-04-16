@@ -9,20 +9,16 @@ license = { workspace = true }
 readme = "readme.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = "Lint rules for monochange package manifests across ecosystems"
+description = "Ecosystem-agnostic manifest lint engine for monochange"
 
 [dependencies]
-ignore = { workspace = true, default-features = true }
+glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
-toml = { workspace = true, default-features = true }
-toml_edit = { workspace = true, features = ["display"], default-features = true }
 tracing = { workspace = true, default-features = true }
-walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 
 [lints]
