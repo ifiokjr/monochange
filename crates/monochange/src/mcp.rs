@@ -21,6 +21,8 @@ use serde_json::json;
 use crate::ChangeBump;
 use crate::PreparedRelease;
 
+const ANALYSIS_ISSUE_URL: &str = "https://github.com/ifiokjr/monochange/issues/243";
+
 /// Common `path` parameter used by MCP tools that operate on a repository root.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct PathParam {
@@ -52,6 +54,7 @@ pub struct AffectedParam {
 
 /// Input payload for the MCP analyze-changes tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[allow(dead_code)] // Temporarily unused while analysis remains experimental.
 pub struct AnalyzeChangesParam {
 	pub path: Option<String>,
 	/// Explicit frame specification (e.g., "working", "main...feature", "pr:target,source")
@@ -73,6 +76,7 @@ pub struct ValidateChangesetParam {
 /// Validation issue for a changeset.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 #[non_exhaustive]
+#[allow(dead_code)] // Temporarily unused while validation remains experimental.
 pub struct ValidationIssue {
 	pub severity: String,
 	pub message: String,
@@ -80,6 +84,7 @@ pub struct ValidationIssue {
 }
 
 /// Parse a frame string into a `ChangeFrame`.
+#[allow(dead_code)] // Temporarily unused while analysis remains experimental.
 fn parse_frame(frame_str: &str) -> monochange_analysis::ChangeFrame {
 	use monochange_analysis::ChangeFrame;
 
@@ -118,6 +123,7 @@ fn parse_frame(frame_str: &str) -> monochange_analysis::ChangeFrame {
 }
 
 /// Parse a detection level string.
+#[allow(dead_code)] // Temporarily unused while analysis remains experimental.
 fn parse_detection_level(level: &str) -> monochange_analysis::DetectionLevel {
 	use monochange_analysis::DetectionLevel;
 
@@ -129,6 +135,7 @@ fn parse_detection_level(level: &str) -> monochange_analysis::DetectionLevel {
 }
 
 /// Validate changeset content against workspace.
+#[allow(dead_code)] // Temporarily unused while validation remains experimental.
 fn validate_changeset_content(
 	_changeset: &monochange_config::LoadedChangesetFile,
 	_discovery: &crate::DiscoveryReport,
@@ -451,147 +458,58 @@ impl MonochangeMcpServer {
 
 	#[tool(
 		name = "monochange_analyze_changes",
-		description = "Analyze git diff and suggest changeset structure for packages with changes."
+		description = "Analyze git diff and suggest changeset structure for packages with changes. EXPERIMENTAL: This tool is not yet implemented and returns an explicit not-implemented response."
 	)]
 	async fn analyze_changes(
 		&self,
 		Parameters(params): Parameters<AnalyzeChangesParam>,
 	) -> Result<CallToolResult, McpError> {
-		use monochange_analysis::AnalysisConfig;
-		use monochange_analysis::ChangeFrame;
-
 		let root = resolve_root(params.path.as_deref());
 
-		// Determine the change frame
-		let frame = match params.frame {
-			Some(frame_str) => parse_frame(&frame_str),
-			None => {
-				match ChangeFrame::detect(&root) {
-					Ok(f) => f,
-					Err(e) => {
-						return Ok(json_error_result(json!({
-							"ok": false,
-							"action": "analyze_changes",
-							"root": root,
-							"summary": format!("Failed to detect change frame: {}", e),
-							"error": e.to_string()
-						})));
-					}
-				}
-			}
-		};
-
-		// Configure analysis
-		// Configure analysis
-		let detection_level = params.detection_level.as_deref().map(parse_detection_level);
-		let config = AnalysisConfig {
-			detection_level: detection_level.unwrap_or_else(|| {
-				use monochange_analysis::DetectionLevel;
-				DetectionLevel::Signature
-			}),
-			thresholds: monochange_analysis::GroupingThresholds::default(),
-			max_suggestions: params.max_suggestions.unwrap_or(10),
-		};
-
-		// Run analysis
-		let analysis = match monochange_analysis::analyze_changes(&root, &frame, &config) {
-			Ok(a) => a,
-			Err(e) => {
-				return Ok(json_error_result(json!({
-					"ok": false,
-					"action": "analyze_changes",
-					"root": root,
-					"summary": format!("Analysis failed: {}", e.render()),
-					"error": e.render()
-				})));
-			}
-		};
-
-		// Convert to JSON
-		let analysis_json = serde_json::to_value(analysis)
-			.map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-		Ok(json_result(json!({
-			"ok": true,
+		Ok(json_error_result(json!({
+			"ok": false,
 			"action": "analyze_changes",
-			"frame": frame.to_string(),
-			"analysis": analysis_json,
-			"summary": "Analysis complete - review suggested changesets for each package"
+			"root": root,
+			"experimental": true,
+			"summary": "monochange_analyze_changes is experimental and not yet implemented",
+			"error": concat!(
+				"The analyze_changes MCP tool is experimental and not yet fully implemented. ",
+				"The semantic analysis engine is still in development. For now, use ",
+				"monochange_discover to inspect packages and create changesets manually with ",
+				"monochange_change or the CLI 'mc change' command."
+			),
+			"note": format!(
+				"Track implementation progress in issue #243 ({ANALYSIS_ISSUE_URL})"
+			),
 		})))
 	}
 
 	#[tool(
 		name = "monochange_validate_changeset",
-		description = "Validate that a changeset matches the actual code changes."
+		description = "Validate that a changeset matches the actual code changes. EXPERIMENTAL: This tool is not yet implemented and returns an explicit not-implemented response."
 	)]
 	async fn validate_changeset(
 		&self,
 		Parameters(params): Parameters<ValidateChangesetParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
-		let changeset_path = PathBuf::from(&params.changeset_path);
 
-		// Load the changeset
-		let configuration = match monochange_config::load_workspace_configuration(&root) {
-			Ok(c) => c,
-			Err(e) => {
-				return Ok(json_error_result(json!({
-					"ok": false,
-					"action": "validate_changeset",
-					"root": root,
-					"summary": format!("Failed to load workspace: {}", e.render()),
-					"error": e.render()
-				})));
-			}
-		};
-
-		let discovery = match crate::discover_workspace(&root) {
-			Ok(d) => d,
-			Err(e) => {
-				return Ok(json_error_result(json!({
-					"ok": false,
-					"action": "validate_changeset",
-					"root": root,
-					"summary": format!("Failed to discover workspace: {}", e.render()),
-					"error": e.render()
-				})));
-			}
-		};
-
-		let loaded = match monochange_config::load_changeset_file(
-			&changeset_path,
-			&configuration,
-			&discovery.packages,
-		) {
-			Ok(l) => l,
-			Err(e) => {
-				return Ok(json_error_result(json!({
-					"ok": false,
-					"action": "validate_changeset",
-					"root": root,
-					"changeset_path": changeset_path,
-					"summary": format!("Failed to load changeset: {}", e.render()),
-					"error": e.render()
-				})));
-			}
-		};
-
-		// Build validation report
-		let issues = validate_changeset_content(&loaded, &discovery);
-
-		let valid = issues.is_empty();
-
-		Ok(json_result(json!({
-			"ok": valid,
+		Ok(json_error_result(json!({
+			"ok": false,
 			"action": "validate_changeset",
-			"changeset_path": changeset_path,
-			"valid": valid,
-			"issues": issues,
-			"summary": if valid {
-				"Changeset validation passed".to_string()
-			} else {
-				format!("Found {} validation issue(s)", issues.len())
-			}
+			"root": root,
+			"changeset_path": params.changeset_path,
+			"experimental": true,
+			"summary": "monochange_validate_changeset is experimental and not yet implemented",
+			"error": concat!(
+				"The validate_changeset MCP tool is experimental and not yet fully implemented. ",
+				"The semantic validation engine that compares changeset claims to actual code ",
+				"changes is still in development. For now, review the diff manually and use ",
+				"mc validate plus mc diagnostics --format json for structured changeset context."
+			),
+			"note": format!(
+				"Track implementation progress in issue #243 ({ANALYSIS_ISSUE_URL})"
+			),
 		})))
 	}
 }
@@ -627,11 +545,14 @@ mod __tests {
 	use rmcp::handler::server::wrapper::Parameters;
 	use tempfile::tempdir;
 
+	use super::ANALYSIS_ISSUE_URL;
 	use super::AffectedParam;
+	use super::AnalyzeChangesParam;
 	use super::ChangeParam;
 	use super::McpChangeBump;
 	use super::MonochangeMcpServer;
 	use super::PathParam;
+	use super::ValidateChangesetParam;
 	use super::json_error_result;
 	use super::json_result;
 	use super::resolve_root;
@@ -1055,5 +976,41 @@ mod __tests {
 				|| rendered.contains("empty id")
 				|| rendered.contains("step")
 		);
+	}
+
+	#[tokio::test]
+	async fn analyze_changes_reports_experimental_not_implemented_message() {
+		let tempdir = setup_fixture("monochange/release-base");
+		let result = MonochangeMcpServer::new()
+			.analyze_changes(Parameters(AnalyzeChangesParam {
+				path: Some(tempdir.path().display().to_string()),
+				frame: Some("main...feature-branch".to_string()),
+				detection_level: Some("signature".to_string()),
+				max_suggestions: Some(10),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("analyze_changes: {error}"));
+		let rendered = content_text(&result);
+		assert_eq!(result.is_error, Some(true));
+		assert!(rendered.contains("experimental and not yet implemented"));
+		assert!(rendered.contains(ANALYSIS_ISSUE_URL));
+		assert!(rendered.contains("monochange_change"));
+	}
+
+	#[tokio::test]
+	async fn validate_changeset_reports_experimental_not_implemented_message() {
+		let tempdir = setup_fixture("monochange/release-base");
+		let result = MonochangeMcpServer::new()
+			.validate_changeset(Parameters(ValidateChangesetParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset_path: ".changeset/example.md".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate_changeset: {error}"));
+		let rendered = content_text(&result);
+		assert_eq!(result.is_error, Some(true));
+		assert!(rendered.contains("experimental and not yet implemented"));
+		assert!(rendered.contains(ANALYSIS_ISSUE_URL));
+		assert!(rendered.contains("mc diagnostics --format json"));
 	}
 }

@@ -372,9 +372,11 @@ LSP and MCP servers serve developers and their tools. Changesets should emphasiz
 monochange: minor
 ---
 
-#### add `monochange_validate_changeset` MCP tool
+#### add `monochange_validate_changeset` MCP tool *(experimental)*
 
 Introduces a new MCP tool for validating changeset content against actual code changes.
+
+> ⚠️ This tool is currently experimental. Track implementation in issue #243.
 
 - **Tool name:** `monochange_validate_changeset`
 - **New parameters:** `path`, `changeset_path`

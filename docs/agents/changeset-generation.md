@@ -212,6 +212,8 @@ Even though both are "validation" features, they target different files and shou
 
 #### MCP tool integration for lifecycle management
 
+> ⚠️ `monochange_analyze_changes` and `monochange_validate_changeset` are still experimental and intentionally return not-implemented responses today. Track implementation in [#243](https://github.com/ifiokjr/monochange/issues/243).
+
 The `monochange_analyze_changes` tool should:
 
 1. **Scan existing changesets** in `.changeset/` directory
@@ -564,6 +566,8 @@ group_ui_components = 4 # More granular UI tracking
 
 ### Tool: `monochange_analyze_changes`
 
+> Status: experimental / not yet implemented. This section describes the intended design tracked in [#243](https://github.com/ifiokjr/monochange/issues/243).
+
 Analyzes git diff and suggests changeset structure with lifecycle awareness.
 
 **Input:**
@@ -657,6 +661,8 @@ When `auto_analyze: true`:
 5. Execute lifecycle actions based on approved suggestions
 
 ### Tool: `monochange_validate_changeset`
+
+> Status: experimental / not yet implemented. This section describes the intended design tracked in [#243](https://github.com/ifiokjr/monochange/issues/243).
 
 Validates that a changeset matches actual code changes.
 

@@ -115,4 +115,6 @@ The MCP server is JSON-first and focuses on reviewable operations:
 
 These tools are designed to help assistants inspect the workspace, write explicit release intent, and preview release effects before a human or CI system performs mutating follow-up commands.
 
+Experimental MCP tools for semantic analysis may also be present in some builds, but `monochange_analyze_changes` and `monochange_validate_changeset` are not yet implemented today. For now, prefer `monochange_discover`, `monochange_change`, `mc validate`, and `mc diagnostics --format json` until issue [#243](https://github.com/ifiokjr/monochange/issues/243) is complete.
+
 When you need full changeset context — introduced commit, linked PR, related issues — use `mc diagnostics --format json` directly. It returns stable workspace-relative paths and structured records that agents can parse without reading raw markdown files.

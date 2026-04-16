@@ -107,9 +107,11 @@ Do not leave orphaned changesets. A changeset that describes code that no longer
 
 <!-- {=changesetAnalysisMcpTools} -->
 
-The `monochange_analysis` crate provides MCP tools for automated changeset generation:
+The `monochange_analysis` crate provides MCP tools for automated changeset generation.
 
-**`monochange_analyze_changes`** — Analyzes git diffs and suggests granular changeset structure:
+> ⚠️ **Experimental:** `monochange_analyze_changes` and `monochange_validate_changeset` are not fully implemented yet and currently return explicit not-implemented responses. Track progress in [#243](https://github.com/ifiokjr/monochange/issues/243).
+
+**`monochange_analyze_changes`** — *(planned)* Analyze git diffs and suggest granular changeset structure:
 
 ```json
 {
@@ -120,14 +122,14 @@ The `monochange_analysis` crate provides MCP tools for automated changeset gener
 }
 ```
 
-Returns an analysis with:
+When implemented, this will return:
 
 - Per-package change classifications (library, application, CLI, mixed)
 - Semantic change details (added/removed functions, routes, commands)
-- Suggested bump levels and grouping
-- Breaking change detection
+- Structured diffs an agent can reason over
+- Suggested changeset candidates for review
 
-**`monochange_validate_changeset`** — Validates that a changeset matches the actual code changes:
+**`monochange_validate_changeset`** — *(planned)* Validate that a changeset matches the actual code changes:
 
 ```json
 {
@@ -136,15 +138,15 @@ Returns an analysis with:
 }
 ```
 
-Returns validation issues with severity levels and suggestions for fixing mismatches between changeset claims and actual code changes.
+When implemented, this will return validation issues with severity levels and suggestions for fixing mismatches between changeset claims and actual code changes.
 
 **Lifecycle integration:**
 
-These tools integrate with the changeset lifecycle:
+These tools will integrate with the changeset lifecycle:
 
 - Use `monochange_analyze_changes` to understand what changed before deciding whether to create, update, or remove a changeset
 - Use `monochange_validate_changeset` to verify that existing changesets still accurately describe the current diff
-- Both tools respect the artifact type classification to provide appropriate suggestions
+- Both tools should respect artifact-type classification while leaving the final release-impact judgment to the agent
 
 <!-- {/changesetAnalysisMcpTools} -->
 
