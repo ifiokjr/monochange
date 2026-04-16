@@ -46,14 +46,18 @@ Use the bundled docs like this:
 
 - [SKILL.md](./SKILL.md) — concise entrypoint for agents
 - [skills/README.md](./skills/README.md) — index of focused skill modules
+- [skills/adoption.md](./skills/adoption.md) — setup-depth questions, migration guidance, and recommendation patterns
 - [skills/changesets.md](./skills/changesets.md) — creating and managing changesets
 - [skills/commands.md](./skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](./skills/configuration.md) — creating and evolving `monochange.toml`
-- [skills/linting.md](./skills/linting.md) — `mc check`, `[lints]`, and manifest-focused rule explanations with examples
+- [skills/linting.md](./skills/linting.md) — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
+- [examples/README.md](./examples/README.md) — condensed scenario examples for quick recommendations
 - [CHANGESET-GUIDE.md](./CHANGESET-GUIDE.md) — full lifecycle guidance
 - [ARTIFACT-TYPES.md](./ARTIFACT-TYPES.md) — artifact-aware changeset framing
 
 Keep this `REFERENCE.md` open when you want one longer document with broader examples and copy-paste snippets.
+
+When the user is still choosing setup depth or migrating from existing tooling, start with [skills/adoption.md](./skills/adoption.md) before generating files.
 
 ## Recommended command flow
 
@@ -477,29 +481,28 @@ Placeholder README content can come from:
 
 ### Lint rules
 
-Configure ecosystem-specific manifest lint rules and run them through `mc check`:
+Configure manifest lint presets, global rules, and scoped overrides in the top-level `[lints]` section, then run them through `mc check`:
 
 ```toml
-[lints.rules]
-"cargo/dependency-field-order" = "error"
-"cargo/internal-dependency-workspace" = "error"
-"cargo/required-package-fields" = "error"
-"cargo/sorted-dependencies" = "error"
-"cargo/unlisted-package-private" = "warning"
+[lints]
+use = ["cargo/recommended", "npm/recommended"]
 
-# npm rules also live under [lints.rules]
+[lints.rules]
+"cargo/internal-dependency-workspace" = "error"
 "npm/workspace-protocol" = "error"
-"npm/sorted-dependencies" = "error"
-"npm/required-package-fields" = "error"
-"npm/root-no-prod-deps" = "error"
-"npm/no-duplicate-dependencies" = "error"
-"npm/unlisted-package-private" = "warning"
+
+[[lints.scopes]]
+name = "published cargo packages"
+match = { ecosystems = ["cargo"], managed = true, publishable = true }
+rules = { "cargo/required-package-fields" = "error" }
 ```
 
 Rule configuration:
 
 - Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
 - Detailed config: `{ level = "error", fix = true, ...options }`
+
+Use `mc lint list` to inspect registered rules and presets. Use `mc lint explain <id>` to see the details for a rule or preset before configuring it.
 
 Today the built-in rule sets focus on Cargo and npm-family manifests.
 
@@ -566,7 +569,7 @@ If you edited shared docs in `.templates/`, also run:
 devenv shell docs:check
 ```
 
-For the full rule-by-rule explanation — including the available `[lints]` rules, why you would enable them, and examples of what changes with and without them — see [skills/linting.md](./skills/linting.md).
+For the full rule-by-rule explanation — including the available `[lints]` presets and rules, why you would enable them, and examples of what changes with and without them — see [skills/linting.md](./skills/linting.md).
 
 ## Important modeling rules
 

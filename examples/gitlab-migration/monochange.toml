@@ -1,0 +1,58 @@
+[defaults]
+package_type = "cargo"
+warn_on_group_mismatch = true
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+
+[package.cli]
+path = "crates/cli"
+
+[group.sdk]
+packages = ["core", "cli"]
+tag = true
+release = true
+version_format = "primary"
+
+[source]
+provider = "gitlab"
+owner = "acme"
+repo = "platform"
+host = "https://gitlab.example.com"
+
+[source.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[ecosystems.cargo]
+enabled = true
+
+[ecosystems.cargo.publish]
+enabled = true
+mode = "external"
+trusted_publishing = false
+
+[lints]
+use = ["cargo/recommended"]
+
+[lints.rules]
+"cargo/sorted-dependencies" = "error"
+
+[[lints.scopes]]
+name = "managed crates"
+match = { ecosystems = ["cargo"], managed = true }
+rules = { "cargo/internal-dependency-workspace" = "error" }

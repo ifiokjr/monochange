@@ -1,0 +1,37 @@
+[defaults]
+package_type = "cargo"
+warn_on_group_mismatch = true
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.app]
+path = "crates/app"
+tag = true
+release = true
+
+[source]
+provider = "github"
+owner = "acme"
+repo = "monochange-release-pr-workflow"
+
+[source.releases]
+enabled = true
+draft = false
+prerelease = false
+source = "monochange"
+
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[ecosystems.cargo]
+enabled = true
+
+[lints]
+use = ["cargo/recommended"]

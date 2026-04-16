@@ -1,0 +1,27 @@
+[defaults]
+warn_on_group_mismatch = true
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[group.sdk]
+packages = ["core", "web"]
+tag = true
+release = true
+version_format = "primary"
+
+[lints]
+use = ["cargo/recommended", "npm/recommended"]
+
+[lints.rules]
+"cargo/sorted-dependencies" = "error"
+"npm/sorted-dependencies" = "error"

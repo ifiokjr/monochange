@@ -1,0 +1,10 @@
+[package]
+name = "acme-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core crate for the monochange mixed-workspace example"
+
+[lib]
+path = "src/lib.rs"

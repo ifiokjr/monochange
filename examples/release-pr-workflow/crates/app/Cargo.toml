@@ -1,0 +1,11 @@
+[package]
+name = "acme-release-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "App crate for the monochange release PR workflow example"
+
+[[bin]]
+name = "acme-release-app"
+path = "src/main.rs"

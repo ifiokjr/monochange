@@ -1,0 +1,17 @@
+{
+	"name": "github-npm-quickstart",
+	"private": true,
+	"description": "Repo-shaped monochange GitHub npm quickstart example",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/acme/monochange-github-npm-quickstart.git"
+	},
+	"packageManager": "pnpm@10.8.0",
+	"workspaces": [
+		"packages/*"
+	],
+	"devDependencies": {
+		"typescript": "^5.8.0"
+	}
+}

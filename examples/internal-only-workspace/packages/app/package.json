@@ -1,0 +1,15 @@
+{
+	"name": "@acme/internal-app",
+	"version": "1.2.0",
+	"private": true,
+	"description": "Internal app package for the monochange internal-only example",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/acme/monochange-internal-only-workspace.git",
+		"directory": "packages/app"
+	},
+	"dependencies": {
+		"@acme/internal-shared": "workspace:*"
+	}
+}

@@ -1,7 +1,7 @@
 {
 	"name": "@monochange/skill",
 	"version": "0.1.0",
-	"description": "Skill for monochange workflows and release planning guidance",
+	"description": "Skill for monochange adoption, release planning, and publishing guidance",
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
@@ -19,6 +19,7 @@
 		"TRUSTED-PUBLISHING.md",
 		"MULTI-PACKAGE-PUBLISHING.md",
 		"skills",
+		"examples",
 		"README.md",
 		"LICENSE",
 		"changelog.md"

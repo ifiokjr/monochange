@@ -1,0 +1,15 @@
+{
+	"name": "@acme/placeholder-web",
+	"version": "0.0.1",
+	"description": "Web package for the monochange placeholder publish example",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/acme/monochange-public-placeholder.git",
+		"directory": "packages/web"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

@@ -1,0 +1,25 @@
+[defaults]
+package_type = "npm"
+warn_on_group_mismatch = true
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+
+[package.shared]
+path = "packages/shared"
+
+[package.app]
+path = "packages/app"
+
+[ecosystems.npm]
+enabled = true
+
+[ecosystems.npm.publish]
+enabled = false
+
+[lints]
+use = ["npm/recommended"]
+
+[lints.rules]
+"npm/unlisted-package-private" = "error"

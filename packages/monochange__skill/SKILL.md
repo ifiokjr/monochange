@@ -1,11 +1,13 @@
 ---
 name: monochange
-description: Guides agents through monochange discovery, changesets, release planning, and provider-aware release workflows. Use when working on `monochange.toml`, `.changeset/*.md`, release automation, grouped versions, cross-ecosystem monorepo releases, CLI step composition, MCP tool interactions, or linting configuration.
+description: Guides agents through monochange adoption planning, discovery, changesets, release planning, and provider-aware release workflows. Use when working on `monochange.toml`, `.changeset/*.md`, release automation, grouped versions, migration into existing monorepos, cross-ecosystem monorepo releases, CLI step composition, MCP tool interactions, or linting configuration.
 ---
 
 # monochange
 
 ## Quick start
+
+If the user is still deciding how deeply to adopt monochange, start with [skills/adoption.md](skills/adoption.md) and [examples/README.md](examples/README.md) before generating files.
 
 1. If `monochange.toml` does not exist yet, run `mc init`. If it exists but you want editable built-in command definitions, run `mc populate`.
 2. Read `monochange.toml` first — it is the single source of truth.
@@ -52,10 +54,12 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 
 - [REFERENCE.md](REFERENCE.md) — high-context reference with more examples
 - [skills/README.md](skills/README.md) — index of focused skill modules
+- [skills/adoption.md](skills/adoption.md) — interactive setup planning, migration questions, and recommendation patterns
 - [skills/changesets.md](skills/changesets.md) — creating and managing changesets
 - [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
-- [skills/linting.md](skills/linting.md) — `mc check`, `[lints]`, and manifest-focused rule explanations with examples
+- [skills/linting.md](skills/linting.md) — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
+- [examples/README.md](examples/README.md) — condensed setup examples for quick recommendations
 - [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) — patterns for publishing multiple public packages from one repository
 - [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) — full lifecycle guidance
 - [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) — package-type-specific release-note guidance
@@ -68,6 +72,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 | `mc populate`            | Append missing built-in CLI command definitions to config              |
 | `mc validate`            | Validate config and changeset targets                                  |
 | `mc check`               | Validate config and run lint rules against package manifests           |
+| `mc lint`                | Inspect registered lint rules and presets                              |
 | `mc discover`            | Discover packages across ecosystems                                    |
 | `mc change`              | Create a `.changeset/*.md` file                                        |
 | `mc release`             | Prepare a release plan from changesets and refresh the cached manifest |
@@ -216,23 +221,20 @@ See [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) for per-type rules, templates, exampl
 
 ### Lint configuration
 
-Configure ecosystem-specific manifest lint rules in `monochange.toml` and run them with `mc check`:
+Configure manifest lint presets, global rules, and scoped overrides in the top-level `[lints]` section of `monochange.toml`, then run them with `mc check`:
 
 ```toml
-[lints.rules]
-"cargo/dependency-field-order" = "error"
-"cargo/internal-dependency-workspace" = "error"
-"cargo/required-package-fields" = "error"
-"cargo/sorted-dependencies" = "error"
-"cargo/unlisted-package-private" = "warning"
+[lints]
+use = ["cargo/recommended", "npm/recommended"]
 
-# npm rules also live under [lints.rules]
+[lints.rules]
+"cargo/internal-dependency-workspace" = "error"
 "npm/workspace-protocol" = "error"
-"npm/sorted-dependencies" = "error"
-"npm/required-package-fields" = "error"
-"npm/root-no-prod-deps" = "error"
-"npm/no-duplicate-dependencies" = "error"
-"npm/unlisted-package-private" = "warning"
+
+[[lints.scopes]]
+name = "published cargo packages"
+match = { ecosystems = ["cargo"], managed = true, publishable = true }
+rules = { "cargo/required-package-fields" = "error" }
 ```
 
 Each rule can be configured as:
@@ -240,13 +242,17 @@ Each rule can be configured as:
 - Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
 - Detailed config: `{ level = "error", ...rule_specific_options }`
 
+Use `mc lint list` or `mc lint explain <id>` to inspect available rules and presets.
+
 Use `mc check --fix` to auto-fix issues where possible. Today the built-in rule sets focus on Cargo and npm-family manifests.
 
 ## Guidance
 
 Start with [REFERENCE.md](REFERENCE.md) for the broad reference.
 
-Open [skills/README.md](skills/README.md) when you need the focused deep dives for changesets, commands, configuration, or linting.
+Open [skills/README.md](skills/README.md) when you need the focused deep dives for adoption planning, changesets, commands, configuration, or linting.
+
+Open [examples/README.md](examples/README.md) when a short scenario-based recommendation is more useful than a long reference document.
 
 See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for GitHub/OIDC trusted-publishing setup details across the registries that monochange supports.
 

@@ -41,10 +41,12 @@ After copying the bundled skill, you get a small documentation set that is desig
 - `SKILL.md` — concise entrypoint for agents
 - `REFERENCE.md` — broader high-context reference with more examples
 - `skills/README.md` — index of focused deep dives
+- `skills/adoption.md` — setup-depth questions, migration guidance, and recommendation patterns
 - `skills/changesets.md` — changeset authoring and lifecycle guidance
 - `skills/commands.md` — built-in command catalog and workflow selection
 - `skills/configuration.md` — `monochange.toml` setup and editing guidance
-- `skills/linting.md` — `[ecosystems.<name>.lints]` rules, `mc check`, and manifest-focused examples
+- `skills/linting.md` — `[lints]` presets, `mc check`, and manifest-focused examples
+- `examples/README.md` — condensed scenario examples for quick recommendations
 
 This layout keeps the top-level skill small while still making the richer guidance available when an assistant needs more context.
 
