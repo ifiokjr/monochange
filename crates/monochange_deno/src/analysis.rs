@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::path::PathBuf;
 
 use monochange_core::AnalyzedFileChange;
 use monochange_core::DetectionLevel;
@@ -9,12 +8,13 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageAnalysisContext;
 use monochange_core::PackageAnalysisResult;
 use monochange_core::PackageRecord;
-use monochange_core::PackageSnapshot;
-use monochange_core::PackageSnapshotFile;
 use monochange_core::SemanticAnalyzer;
 use monochange_core::SemanticChange;
 use monochange_core::SemanticChangeCategory;
 use monochange_core::SemanticChangeKind;
+use monochange_ecmascript::EcmascriptExportConfig;
+use monochange_ecmascript::diff_public_symbols;
+use monochange_ecmascript::snapshot_exported_symbols;
 use serde_json::Value;
 
 /// Deno analyzer that extracts exported JS/TS symbols and `deno.json` semantic diffs.
@@ -44,10 +44,16 @@ impl SemanticAnalyzer for DenoSemanticAnalyzer {
 		let mut warnings = Vec::new();
 
 		if context.detection_level != DetectionLevel::Basic {
-			let before_symbols =
-				snapshot_exported_symbols(context.before_snapshot, context.changed_files);
-			let after_symbols =
-				snapshot_exported_symbols(context.after_snapshot, context.changed_files);
+			let before_symbols = snapshot_exported_symbols(
+				context.before_snapshot,
+				context.changed_files,
+				&DENO_ECMASCRIPT_EXPORT_CONFIG,
+			);
+			let after_symbols = snapshot_exported_symbols(
+				context.after_snapshot,
+				context.changed_files,
+				&DENO_ECMASCRIPT_EXPORT_CONFIG,
+			);
 			semantic_changes.extend(diff_public_symbols(&before_symbols, &after_symbols));
 		}
 
@@ -97,342 +103,14 @@ fn display_package_id(package: &PackageRecord) -> String {
 		.unwrap_or_else(|| package.id.clone())
 }
 
-#[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
-struct PublicSymbol {
-	item_kind: String,
-	item_path: String,
-	signature: String,
-	file_path: PathBuf,
-}
-
-fn snapshot_exported_symbols(
-	snapshot: Option<&PackageSnapshot>,
-	changed_files: &[AnalyzedFileChange],
-) -> BTreeMap<(String, String), PublicSymbol> {
-	let mut symbols = BTreeMap::new();
-
-	if let Some(snapshot) = snapshot {
-		for file in &snapshot.files {
-			if !is_source_file(&file.path) {
-				continue;
-			}
-
-			for symbol in collect_public_symbols(file) {
-				symbols.insert((symbol.item_kind.clone(), symbol.item_path.clone()), symbol);
-			}
-		}
-
-		return symbols;
-	}
-
-	for change in changed_files {
-		let Some(contents) = change
-			.after_contents
-			.as_deref()
-			.or(change.before_contents.as_deref())
-		else {
-			continue;
-		};
-		if !is_source_file(&change.package_path) {
-			continue;
-		}
-
-		let file = PackageSnapshotFile {
-			path: change.package_path.clone(),
-			contents: contents.to_string(),
-		};
-		for symbol in collect_public_symbols(&file) {
-			symbols.insert((symbol.item_kind.clone(), symbol.item_path.clone()), symbol);
-		}
-	}
-
-	symbols
-}
-
-fn is_source_file(path: &Path) -> bool {
-	let Some(extension) = path.extension().and_then(|ext| ext.to_str()) else {
-		return false;
-	};
-	if !matches!(extension, "js" | "jsx" | "ts" | "tsx" | "mjs" | "mts") {
-		return false;
-	}
-
-	!path.starts_with("dist") && !path.starts_with("build") && !path.starts_with("node_modules")
-}
-
-fn is_manifest_file(path: &Path) -> bool {
-	matches!(
-		path.file_name().and_then(|name| name.to_str()),
-		Some("deno.json" | "deno.jsonc")
-	)
-}
-
-fn collect_public_symbols(file: &PackageSnapshotFile) -> Vec<PublicSymbol> {
-	let module_prefix = module_prefix_for_file(&file.path);
-	let mut symbols = Vec::new();
-
-	for raw_line in file.contents.lines() {
-		let line = normalize_signature(raw_line);
-		if !line.starts_with("export ") || line == "export {}" || line == "export {};" {
-			continue;
-		}
-
-		if let Some(target) = parse_wildcard_reexport(&line) {
-			push_symbol(
-				&mut symbols,
-				"wildcard_reexport",
-				&module_prefix,
-				target,
-				&line,
-				&file.path,
-			);
-			continue;
-		}
-
-		let named_exports = parse_named_exports(&line);
-		if !named_exports.is_empty() {
-			for (item_kind, item_name) in named_exports {
-				push_symbol(
-					&mut symbols,
-					&item_kind,
-					&module_prefix,
-					item_name,
-					&line,
-					&file.path,
-				);
-			}
-			continue;
-		}
-
-		if let Some((item_kind, item_name)) = parse_declaration_export(&line) {
-			push_symbol(
-				&mut symbols,
-				item_kind,
-				&module_prefix,
-				item_name,
-				&line,
-				&file.path,
-			);
-		}
-	}
-
-	symbols
-}
-
-fn normalize_signature(line: &str) -> String {
-	line.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn parse_wildcard_reexport(line: &str) -> Option<String> {
-	let rest = line.strip_prefix("export ")?;
-	let target = rest.strip_prefix("* from ")?;
-	extract_quoted_text(target)
-}
-
-fn parse_named_exports(line: &str) -> Vec<(String, String)> {
-	let Some(mut rest) = line.strip_prefix("export ") else {
-		return Vec::new();
-	};
-	let mut item_kind = "reexport";
-	if let Some(stripped) = rest.strip_prefix("type ") {
-		rest = stripped;
-		item_kind = "type_reexport";
-	}
-	if !rest.starts_with('{') {
-		return Vec::new();
-	}
-	let brace_start = rest
-		.find('{')
-		.expect("named exports should include an opening brace after the prefix check");
-	let Some(brace_end) = rest[brace_start + 1..].find('}') else {
-		return Vec::new();
-	};
-	let inside = &rest[brace_start + 1..brace_start + 1 + brace_end];
-
-	inside
-		.split(',')
-		.filter_map(|entry| {
-			let entry = entry.trim();
-			if entry.is_empty() {
-				return None;
-			}
-			let exported_name = entry.split(" as ").last().unwrap_or(entry).trim();
-			(!exported_name.is_empty()).then(|| (item_kind.to_string(), exported_name.to_string()))
-		})
-		.collect()
-}
-
-fn parse_declaration_export(line: &str) -> Option<(&'static str, String)> {
-	let mut rest = line.strip_prefix("export ")?;
-	if let Some(stripped) = rest.strip_prefix("default ") {
-		rest = stripped;
-	}
-	if let Some(stripped) = rest.strip_prefix("async ") {
-		rest = stripped;
-	}
-	if let Some(stripped) = rest.strip_prefix("abstract ") {
-		rest = stripped;
-	}
-
-	for (prefix, item_kind) in [
-		("function ", "function"),
-		("class ", "class"),
-		("const ", "constant"),
-		("let ", "variable"),
-		("var ", "variable"),
-		("interface ", "interface"),
-		("type ", "type_alias"),
-		("enum ", "enum"),
-	] {
-		if let Some(stripped) = rest.strip_prefix(prefix)
-			&& let Some(name) = take_identifier(stripped)
-		{
-			return Some((item_kind, name));
-		}
-	}
-
-	Some(("default_export", "default".to_string())).filter(|_| line.starts_with("export default "))
-}
-
-fn take_identifier(text: &str) -> Option<String> {
-	let identifier = text
-		.chars()
-		.take_while(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '$'))
-		.collect::<String>();
-	(!identifier.is_empty()).then_some(identifier)
-}
-
-fn extract_quoted_text(text: &str) -> Option<String> {
-	let quote = text
-		.chars()
-		.find(|character| matches!(character, '\'' | '"'))?;
-	let start = text.find(quote)? + 1;
-	let end = text[start..].find(quote)? + start;
-	Some(text[start..end].to_string())
-}
-
-fn module_prefix_for_file(path: &Path) -> Vec<String> {
-	let mut components = path
-		.parent()
-		.map(|parent| {
-			parent
-				.components()
-				.filter_map(|component| component.as_os_str().to_str())
-				.map(ToString::to_string)
-				.collect::<Vec<_>>()
-		})
-		.unwrap_or_default();
-
-	if components
-		.first()
-		.is_some_and(|component| component == "src")
-	{
-		components.remove(0);
-	}
-
-	let stem = path
-		.file_stem()
-		.and_then(|stem| stem.to_str())
-		.unwrap_or_default();
-	if !stem.is_empty() && stem != "index" && stem != "mod" {
-		components.push(stem.to_string());
-	}
-
-	components
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn push_symbol(
-	output: &mut Vec<PublicSymbol>,
-	item_kind: &str,
-	module_prefix: &[String],
-	item_name: String,
-	signature: &str,
-	file_path: &Path,
-) {
-	let item_path = if module_prefix.is_empty() {
-		item_name.clone()
-	} else {
-		format!("{}::{item_name}", module_prefix.join("::"))
-	};
-
-	output.push(PublicSymbol {
-		item_kind: item_kind.to_string(),
-		item_path,
-		signature: signature.to_string(),
-		file_path: file_path.to_path_buf(),
-	});
-}
-
-fn diff_public_symbols(
-	before: &BTreeMap<(String, String), PublicSymbol>,
-	after: &BTreeMap<(String, String), PublicSymbol>,
-) -> Vec<SemanticChange> {
-	let mut changes = Vec::new();
-
-	for (key, after_symbol) in after {
-		match before.get(key) {
-			None => {
-				changes.push(build_symbol_change(
-					SemanticChangeKind::Added,
-					after_symbol,
-					None,
-					Some(after_symbol.signature.clone()),
-				));
-			}
-			Some(before_symbol) if before_symbol.signature != after_symbol.signature => {
-				changes.push(build_symbol_change(
-					SemanticChangeKind::Modified,
-					after_symbol,
-					Some(before_symbol.signature.clone()),
-					Some(after_symbol.signature.clone()),
-				));
-			}
-			Some(_) => {}
-		}
-	}
-
-	for (key, before_symbol) in before {
-		if after.contains_key(key) {
-			continue;
-		}
-
-		changes.push(build_symbol_change(
-			SemanticChangeKind::Removed,
-			before_symbol,
-			Some(before_symbol.signature.clone()),
-			None,
-		));
-	}
-
-	changes
-}
-
-fn build_symbol_change(
-	kind: SemanticChangeKind,
-	symbol: &PublicSymbol,
-	before_signature: Option<String>,
-	after_signature: Option<String>,
-) -> SemanticChange {
-	let verb = if kind == SemanticChangeKind::Added {
-		"added"
-	} else if kind == SemanticChangeKind::Removed {
-		"removed"
-	} else {
-		"modified"
-	};
-
-	SemanticChange {
-		category: SemanticChangeCategory::PublicApi,
-		kind,
-		item_kind: symbol.item_kind.clone(),
-		item_path: symbol.item_path.clone(),
-		summary: format!("{} `{}` {verb}", symbol.item_kind, symbol.item_path),
-		file_path: symbol.file_path.clone(),
-		before_signature,
-		after_signature,
-	}
-}
+const DENO_ECMASCRIPT_EXPORT_CONFIG: EcmascriptExportConfig = EcmascriptExportConfig {
+	source_extensions: &["js", "jsx", "ts", "tsx", "mjs", "mts"],
+	module_roots_to_strip: &["src"],
+	ignored_module_stems: &["index", "mod"],
+	strip_declaration_stem_suffix: false,
+	legacy_supports_declare_prefix: false,
+	legacy_supports_namespace_exports: false,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct ManifestEntry {
@@ -503,6 +181,13 @@ fn analyze_manifest_change(
 	));
 
 	changes
+}
+
+fn is_manifest_file(path: &Path) -> bool {
+	matches!(
+		path.file_name().and_then(|name| name.to_str()),
+		Some("deno.json" | "deno.jsonc")
+	)
 }
 
 fn parse_manifest(
@@ -737,30 +422,11 @@ fn describe_json_value(value: &Value) -> String {
 
 #[cfg(test)]
 mod tests {
+	use std::path::PathBuf;
+
 	use monochange_core::FileChangeKind;
 
 	use super::*;
-
-	#[test]
-	fn collect_public_symbols_finds_exported_items() {
-		let file = PackageSnapshotFile {
-			path: PathBuf::from("mod.ts"),
-			contents: concat!(
-				"export function run() {}\n",
-				"export { build } from './build.ts';\n",
-				"export * from './types.ts';\n",
-			)
-			.to_string(),
-		};
-
-		let symbols = collect_public_symbols(&file);
-
-		assert!(symbols.iter().any(|symbol| symbol.item_path == "run"));
-		assert!(symbols.iter().any(|symbol| symbol.item_path == "build"));
-		assert!(symbols.iter().any(|symbol| {
-			symbol.item_kind == "wildcard_reexport" && symbol.item_path == "./types.ts"
-		}));
-	}
 
 	#[test]
 	fn analyze_manifest_change_reports_export_import_and_task_diffs() {
@@ -816,46 +482,9 @@ mod tests {
 	}
 
 	#[test]
-	fn snapshot_and_manifest_helpers_cover_additional_deno_branches() {
-		let changed_files = vec![
-			AnalyzedFileChange {
-				path: PathBuf::from("mod.ts"),
-				package_path: PathBuf::from("mod.ts"),
-				kind: FileChangeKind::Modified,
-				before_contents: Some("export const previous = true;".to_string()),
-				after_contents: None,
-			},
-			AnalyzedFileChange {
-				path: PathBuf::from("cli.mts"),
-				package_path: PathBuf::from("cli.mts"),
-				kind: FileChangeKind::Modified,
-				before_contents: None,
-				after_contents: Some(
-					concat!(
-						"export default async function run() {}\n",
-						"export abstract class Runner {}\n",
-						"export { build } from './build.ts';\n",
-					)
-					.to_string(),
-				),
-			},
-		];
-
-		let symbols = snapshot_exported_symbols(None, &changed_files);
-		for expected in ["previous", "cli::run", "cli::Runner", "cli::build"] {
-			assert!(
-				symbols
-					.iter()
-					.any(|((_, item_path), _)| item_path == expected)
-			);
-		}
-		assert!(is_source_file(Path::new("cli.mts")));
-		assert!(!is_source_file(Path::new("build/mod.ts")));
+	fn manifest_helpers_cover_parse_failures_removed_entries_and_metadata() {
 		assert!(is_manifest_file(Path::new("deno.jsonc")));
-		assert_eq!(
-			module_prefix_for_file(Path::new("src/tools/index.ts")),
-			vec!["tools".to_string()]
-		);
+		assert!(!is_manifest_file(Path::new("mod.ts")));
 
 		let mut warnings = Vec::new();
 		assert!(parse_manifest(Some("{"), Path::new("deno.json"), &mut warnings).is_none());
@@ -884,6 +513,17 @@ mod tests {
 		assert!(export_changes.iter().any(|change| {
 			change.item_path == "./cli" && change.kind == SemanticChangeKind::Removed
 		}));
+
+		let mut nested_exports = BTreeMap::new();
+		collect_export_entries(
+			"runtime",
+			&serde_json::json!({".": "./mod.ts", "./cli": "./cli.ts", "types": "./mod.d.ts"}),
+			&mut nested_exports,
+		);
+		assert!(nested_exports.contains_key("."));
+		assert!(nested_exports.contains_key("./cli"));
+		assert!(!nested_exports.contains_key("runtime"));
+
 		let metadata_changes = compare_manifest_entries(
 			SemanticChangeCategory::Metadata,
 			Path::new("deno.json"),
@@ -896,93 +536,6 @@ mod tests {
 		assert!(metadata_changes.iter().any(|change| {
 			change.item_path == "task.lint" && change.kind == SemanticChangeKind::Removed
 		}));
-		assert!(describe_json_value(&serde_json::json!({"b": 2, "a": [1, 2]})).contains("a=1, 2"));
-	}
-
-	#[test]
-	fn parser_diff_and_metadata_helpers_cover_remaining_deno_branches() {
-		let skipped_symbols = snapshot_exported_symbols(
-			None,
-			&[
-				AnalyzedFileChange {
-					path: PathBuf::from("mod.ts"),
-					package_path: PathBuf::from("mod.ts"),
-					kind: FileChangeKind::Modified,
-					before_contents: None,
-					after_contents: None,
-				},
-				AnalyzedFileChange {
-					path: PathBuf::from("README.md"),
-					package_path: PathBuf::from("README.md"),
-					kind: FileChangeKind::Modified,
-					before_contents: None,
-					after_contents: Some("ignored".to_string()),
-				},
-			],
-		);
-		assert!(skipped_symbols.is_empty());
-		assert!(!is_source_file(Path::new("mod")));
-
-		assert!(parse_named_exports("const nope = true;").is_empty());
-		assert_eq!(
-			parse_named_exports("export type { Foo as Bar, , Baz } from './types.ts';"),
-			vec![
-				("type_reexport".to_string(), "Bar".to_string()),
-				("type_reexport".to_string(), "Baz".to_string()),
-			]
-		);
-		assert!(parse_named_exports("export { Foo as Bar from './types.ts';").is_empty());
-		assert_eq!(
-			parse_declaration_export("export default {};"),
-			Some(("default_export", "default".to_string()))
-		);
-
-		let before = BTreeMap::from([
-			(
-				("function".to_string(), "run".to_string()),
-				PublicSymbol {
-					item_kind: "function".to_string(),
-					item_path: "run".to_string(),
-					signature: "export function run() {}".to_string(),
-					file_path: PathBuf::from("mod.ts"),
-				},
-			),
-			(
-				("class".to_string(), "Runner".to_string()),
-				PublicSymbol {
-					item_kind: "class".to_string(),
-					item_path: "Runner".to_string(),
-					signature: "export class Runner {}".to_string(),
-					file_path: PathBuf::from("mod.ts"),
-				},
-			),
-		]);
-		let after = BTreeMap::from([(
-			("function".to_string(), "run".to_string()),
-			PublicSymbol {
-				item_kind: "function".to_string(),
-				item_path: "run".to_string(),
-				signature: "export function run() {}".to_string(),
-				file_path: PathBuf::from("mod.ts"),
-			},
-		)]);
-		let changes = diff_public_symbols(&before, &after);
-		assert_eq!(changes.len(), 1);
-		let change = changes
-			.first()
-			.unwrap_or_else(|| panic!("expected one removed change"));
-		assert_eq!(change.kind, SemanticChangeKind::Removed);
-		assert!(change.summary.contains("removed"));
-
-		let mut nested_exports = BTreeMap::new();
-		collect_export_entries(
-			"runtime",
-			&serde_json::json!({".": "./mod.ts", "./cli": "./cli.ts", "types": "./mod.d.ts"}),
-			&mut nested_exports,
-		);
-		assert!(nested_exports.contains_key("."));
-		assert!(nested_exports.contains_key("./cli"));
-		assert!(!nested_exports.contains_key("runtime"));
 
 		let metadata_entries = extract_metadata_entries(&serde_json::json!({
 			"tasks": {"lint": "deno lint"},
@@ -993,6 +546,7 @@ mod tests {
 		assert!(metadata_entries.contains_key("compiler_options.jsxImportSource"));
 		assert!(metadata_entries.contains_key("vendor"));
 
+		assert!(describe_json_value(&serde_json::json!({"b": 2, "a": [1, 2]})).contains("a=1, 2"));
 		assert_eq!(describe_json_value(&serde_json::json!(null)), "null");
 		assert_eq!(describe_json_value(&serde_json::json!(3)), "3");
 		assert_eq!(describe_json_value(&serde_json::json!("deno")), "deno");

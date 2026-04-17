@@ -38,6 +38,7 @@ When removing a changeset for a reverted feature, delete the file entirely — d
 | Scenario                          | Action                   | Rationale                                       |
 | --------------------------------- | ------------------------ | ----------------------------------------------- |
 | New feature added                 | **Create new**           | Granular tracking of distinct changes           |
+| New published package or crate    | **Create new**           | First release note should use a `major` bump    |
 | Existing feature expanded         | **Update existing**      | Keep related changes together                   |
 | Feature removed or reverted       | **Remove changeset**     | Don't release notes for removed features        |
 | Same change, different approach   | **Replace changeset**    | Document the actual implementation              |

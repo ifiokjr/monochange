@@ -15,6 +15,7 @@ description = "Manage versions and releases for your multiplatform, multilanguag
 [dependencies]
 glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
+monochange_ecmascript = { workspace = true }
 monochange_linting = { workspace = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
