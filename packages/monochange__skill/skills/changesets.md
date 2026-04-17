@@ -213,7 +213,7 @@ Different package types need different release-note framing:
 - **CLI tools** — commands, flags, output, exit codes, config shape
 - **LSP/MCP** — tool names, schemas, protocol methods, response shapes
 
-See [ARTIFACT-TYPES.md](../ARTIFACT-TYPES.md) for detailed templates.
+See [artifact-types.md](./artifact-types.md) for detailed templates.
 
 ## Validation loop
 
@@ -323,10 +323,10 @@ Before finalizing cleanup:
 - [ ] `mc affected --changed-paths <files>` confirms coverage for recent changes
 - [ ] No duplicate summaries across changesets
 - [ ] No changesets reference reverted features
-- [ ] All changesets have user-facing descriptions per [CHANGESET-GUIDE.md](../CHANGESET-GUIDE.md)
+- [ ] All changesets have user-facing descriptions per [changeset-guide.md](./changeset-guide.md)
 
 ## Keep these references nearby
 
-- [CHANGESET-GUIDE.md](../CHANGESET-GUIDE.md) — lifecycle details
-- [ARTIFACT-TYPES.md](../ARTIFACT-TYPES.md) — package-type-specific guidance
-- [REFERENCE.md](../REFERENCE.md) — longer examples and config cross-references
+- [changeset-guide.md](./changeset-guide.md) — lifecycle details
+- [artifact-types.md](./artifact-types.md) — package-type-specific guidance
+- [reference.md](./reference.md) — longer examples and config cross-references

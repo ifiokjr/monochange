@@ -44,20 +44,20 @@ monochange-skill --copy ~/.pi/agent/skills/monochange
 
 Use the bundled docs like this:
 
-- [SKILL.md](./SKILL.md) — concise entrypoint for agents
-- [skills/README.md](./skills/README.md) — index of focused skill modules
-- [skills/adoption.md](./skills/adoption.md) — setup-depth questions, migration guidance, and recommendation patterns
-- [skills/changesets.md](./skills/changesets.md) — creating and managing changesets
-- [skills/commands.md](./skills/commands.md) — built-in commands and workflow selection
-- [skills/configuration.md](./skills/configuration.md) — creating and evolving `monochange.toml`
-- [skills/linting.md](./skills/linting.md) — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
-- [examples/README.md](./examples/README.md) — condensed scenario examples for quick recommendations
-- [CHANGESET-GUIDE.md](./CHANGESET-GUIDE.md) — full lifecycle guidance
-- [ARTIFACT-TYPES.md](./ARTIFACT-TYPES.md) — artifact-aware changeset framing
+- [SKILL.md](../SKILL.md) — concise entrypoint for agents
+- [readme.md](./readme.md) — index of focused skill modules
+- [adoption.md](./adoption.md) — setup-depth questions, migration guidance, and recommendation patterns
+- [changesets.md](./changesets.md) — creating and managing changesets
+- [commands.md](./commands.md) — built-in commands and workflow selection
+- [configuration.md](./configuration.md) — creating and evolving `monochange.toml`
+- [linting.md](./linting.md) — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
+- [../examples/readme.md](../examples/readme.md) — condensed scenario examples for quick recommendations
+- [changeset-guide.md](./changeset-guide.md) — full lifecycle guidance
+- [artifact-types.md](./artifact-types.md) — artifact-aware changeset framing
 
-Keep this `REFERENCE.md` open when you want one longer document with broader examples and copy-paste snippets.
+Keep this `reference.md` open when you want one longer document with broader examples and copy-paste snippets.
 
-When the user is still choosing setup depth or migrating from existing tooling, start with [skills/adoption.md](./skills/adoption.md) before generating files.
+When the user is still choosing setup depth or migrating from existing tooling, start with [adoption.md](./adoption.md) before generating files.
 
 ## Recommended command flow
 
@@ -144,7 +144,7 @@ mc mcp
 
 Use `mc assist` when you need install instructions and client-specific MCP configuration. Use `mc mcp` when the client actually needs the stdio server process.
 
-For a shorter command-only guide, see [skills/commands.md](./skills/commands.md).
+For a shorter command-only guide, see [commands.md](./commands.md).
 
 ## Changeset authoring
 
@@ -480,8 +480,8 @@ Placeholder README content can come from:
 
 - npm trusted publishing can be configured automatically from GitHub Actions context; monochange verifies the current state first, then runs `npm trust github <package> --repo <owner/repo> --file <workflow> [--env <environment>] --yes` or the `pnpm exec npm trust ...` equivalent for pnpm workspaces
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks the next built-in release publish until trust is configured
-- See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for a GitHub-focused setup guide covering the exact registry fields and commands for `npm`, `crates.io`, `jsr`, and `pub.dev`
-- See [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) when one repository publishes multiple public packages and you need to choose between shared built-in flows and package-specific external workflows
+- See [trusted-publishing.md](./trusted-publishing.md) for a GitHub-focused setup guide covering the exact registry fields and commands for `npm`, `crates.io`, `jsr`, and `pub.dev`
+- See [multi-package-publishing.md](./multi-package-publishing.md) when one repository publishes multiple public packages and you need to choose between shared built-in flows and package-specific external workflows
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues; use `mode = "external"` when your workflow needs custom scheduling
 
 ### Lint rules
@@ -574,7 +574,7 @@ If you edited shared docs in `.templates/`, also run:
 devenv shell docs:check
 ```
 
-For the full rule-by-rule explanation — including the available `[lints]` presets and rules, why you would enable them, and examples of what changes with and without them — see [skills/linting.md](./skills/linting.md).
+For the full rule-by-rule explanation — including the available `[lints]` presets and rules, why you would enable them, and examples of what changes with and without them — see [linting.md](./linting.md).
 
 ## Important modeling rules
 

@@ -2,7 +2,7 @@
 
 Use this guide when one repository publishes more than one public package and the publish workflow cannot be explained by a single generic `mc publish` example.
 
-This is the practical companion to [TRUSTED-PUBLISHING.md](./TRUSTED-PUBLISHING.md).
+This is the practical companion to [trusted-publishing.md](./trusted-publishing.md).
 
 ## Core idea
 
@@ -230,6 +230,6 @@ Avoid these failure modes:
 
 ## Related references
 
-- [TRUSTED-PUBLISHING.md](./TRUSTED-PUBLISHING.md) — registry-side trusted-publishing setup details
-- [skills/configuration.md](./skills/configuration.md) — publishing config and per-package overrides
-- [REFERENCE.md](./REFERENCE.md) — broader publishing and release workflow reference
+- [trusted-publishing.md](./trusted-publishing.md) — registry-side trusted-publishing setup details
+- [configuration.md](./configuration.md) — publishing config and per-package overrides
+- [reference.md](./reference.md) — broader publishing and release workflow reference
