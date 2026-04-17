@@ -81,11 +81,7 @@ fn ungrouped_transitive_bump_with_parent_bump_minor_escalates_dependent_version(
 		.as_array()
 		.unwrap_or_else(|| panic!("decisions array"))
 		.iter()
-		.find(|decision| {
-			decision["package"]
-				.as_str()
-				.is_some_and(|package| package.contains("app"))
-		})
+		.find(|decision| decision["package"].as_str() == Some("cargo:crates/app/Cargo.toml"))
 		.unwrap_or_else(|| panic!("expected app decision"));
 
 	assert_json_snapshot!(app_decision);

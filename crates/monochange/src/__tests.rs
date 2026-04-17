@@ -1241,9 +1241,8 @@ fn add_change_file_rejects_none_without_type_or_version() {
 			.build(),
 	)
 	.expect_err("none bump without type/version should fail");
-	assert!(error.to_string().contains(
-		"must not use a `none` bump without also declaring `type`, `version`, or `caused_by`"
-	));
+	let _guard = snapshot_settings().bind_to_scope();
+	insta::assert_snapshot!(error.to_string());
 }
 
 #[test]
@@ -1265,9 +1264,8 @@ fn add_change_file_allows_none_with_caused_by_context() {
 	.unwrap_or_else(|error| panic!("change file output: {error}"));
 
 	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
-	assert!(content.contains("core:"));
-	assert!(content.contains("  bump: none"));
-	assert!(content.contains("  caused_by: [\"sdk\"]"));
+	let _guard = snapshot_settings().bind_to_scope();
+	insta::assert_snapshot!(content);
 }
 
 #[test]
@@ -1341,9 +1339,8 @@ fn add_interactive_change_file_renders_caused_by_context_for_none_bumps() {
 	add_interactive_change_file(tempdir.path(), &result, Some(&output_path))
 		.unwrap_or_else(|error| panic!("interactive caused_by change file: {error}"));
 	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
-	assert!(content.contains("core:"));
-	assert!(content.contains("  bump: none"));
-	assert!(content.contains("  caused_by: [\"sdk\"]"));
+	let _guard = snapshot_settings().bind_to_scope();
+	insta::assert_snapshot!(content);
 }
 
 #[test]

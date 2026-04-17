@@ -1,0 +1,5 @@
+---
+source: crates/monochange_config/src/__tests.rs
+expression: invalid_compound_error.to_string()
+---
+config error: failed to parse change.md: target `core` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, `type`, and/or `caused_by`

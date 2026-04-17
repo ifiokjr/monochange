@@ -1,0 +1,12 @@
+---
+source: crates/monochange_config/src/__tests.rs
+expression: unknown_target_error.to_string()
+---
+error: changeset `[ROOT]/unknown-target.md` references unknown package or group `unknown`
+  --> [ROOT]/unknown-target.md:2:2
+
+  |
+2 | unknown: note
+  |  ^^^^^^^^ unknown package or group
+
+  = help: declare the package or group id in monochange.toml before referencing it in a changeset

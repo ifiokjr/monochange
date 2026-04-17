@@ -22,6 +22,7 @@ use monochange_core::RegistryKind;
 use monochange_core::ShellConfig;
 use monochange_core::SourceProvider;
 use monochange_test_helpers::current_test_name;
+use monochange_test_helpers::snapshot_settings;
 use semver::Version;
 use tempfile::tempdir;
 
@@ -3939,10 +3940,9 @@ fn parse_markdown_change_target_and_validation_helpers_cover_remaining_error_pat
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected unknown caused_by error"));
-	assert!(
-		unknown_caused_by_error
-			.to_string()
-			.contains("unknown `caused_by` package or group `missing`")
+	insta::assert_snapshot!(
+		"parse_markdown_change_target_unknown_caused_by_error",
+		unknown_caused_by_error.to_string()
 	);
 
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -3968,15 +3968,15 @@ fn parse_markdown_change_target_and_validation_helpers_cover_remaining_error_pat
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid type error"));
-	assert!(
-		no_types_error
-			.to_string()
-			.contains("no configured types are available")
+	insta::assert_snapshot!(
+		"parse_markdown_change_target_no_configured_types_error",
+		no_types_error.to_string()
 	);
 }
 
 #[test]
 fn parse_markdown_change_target_covers_caused_by_scalar_and_error_paths() {
+	let _guard = snapshot_settings().bind_to_scope();
 	let root = fixture_path("changeset-target-metadata/render-workspace");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -4010,32 +4010,31 @@ fn parse_markdown_change_target_covers_caused_by_scalar_and_error_paths() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid compound error"));
-	assert!(
-		invalid_compound_error
-			.to_string()
-			.contains("must map to `none`, `patch`, `minor`, `major`")
+	insta::assert_snapshot!(
+		"parse_markdown_change_target_invalid_compound_error",
+		invalid_compound_error.to_string()
 	);
 
-	for (label, yaml, expected) in [
+	for (label, snapshot_name, yaml) in [
 		(
 			"empty string",
+			"parse_markdown_change_target_empty_caused_by_string_error",
 			"bump: patch\ncaused_by: \"   \"",
-			"must not use an empty `caused_by` reference",
 		),
 		(
 			"empty sequence",
+			"parse_markdown_change_target_empty_caused_by_sequence_error",
 			"bump: patch\ncaused_by: []",
-			"must list at least one `caused_by` reference",
 		),
 		(
 			"non-string entry",
+			"parse_markdown_change_target_non_string_caused_by_entry_error",
 			"bump: patch\ncaused_by: [123]",
-			"must use string package or group ids in `caused_by`",
 		),
 		(
 			"non-sequence type",
+			"parse_markdown_change_target_invalid_caused_by_type_error",
 			"bump: patch\ncaused_by: 123",
-			"must use a string or list of strings for `caused_by`",
 		),
 	] {
 		let value = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(yaml)
@@ -4048,15 +4047,13 @@ fn parse_markdown_change_target_covers_caused_by_scalar_and_error_paths() {
 		)
 		.err()
 		.unwrap_or_else(|| panic!("expected caused_by error for {label}"));
-		assert!(
-			error.to_string().contains(expected),
-			"unexpected error for {label}: {error}"
-		);
+		insta::assert_snapshot!(snapshot_name, error.to_string());
 	}
 }
 
 #[test]
 fn load_change_signals_covers_configured_type_and_caused_by_context_paths() {
+	let _guard = snapshot_settings().bind_to_scope();
 	let tempdir = setup_fixture("changeset-target-metadata/render-workspace");
 	std::fs::write(
 		tempdir.path().join("change.md"),
@@ -4117,10 +4114,9 @@ fn load_change_signals_covers_configured_type_and_caused_by_context_paths() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid compound target error"));
-	assert!(
-		error
-			.to_string()
-			.contains("must map to `none`, `patch`, `minor`, `major`")
+	insta::assert_snapshot!(
+		"load_change_signals_invalid_compound_target_error",
+		error.to_string()
 	);
 
 	std::fs::write(
@@ -4135,7 +4131,10 @@ fn load_change_signals_covers_configured_type_and_caused_by_context_paths() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected unknown target error"));
-	assert!(!unknown_target_error.to_string().trim().is_empty());
+	insta::assert_snapshot!(
+		"load_change_signals_unknown_target_error",
+		unknown_target_error.to_string()
+	);
 }
 
 #[test]

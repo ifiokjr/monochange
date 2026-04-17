@@ -444,9 +444,10 @@ fn build_release_plan_uses_highest_conflicting_explicit_version_with_warning() {
 		.unwrap_or_else(|| panic!("expected one warning"));
 	assert_eq!(decision.planned_version, Some(Version::new(2, 0, 0)));
 	assert_eq!(plan.warnings.len(), 1);
-	assert!(warning.contains("conflicting explicit versions"));
-	assert!(warning.contains("001-first.md"));
-	assert!(warning.contains("002-second.md"));
+	insta::assert_snapshot!(
+		"build_release_plan_conflicting_explicit_versions_warning",
+		warning
+	);
 }
 
 #[test]
@@ -490,7 +491,10 @@ fn build_release_plan_rejects_conflicting_explicit_versions_in_strict_mode() {
 	.err()
 	.unwrap_or_else(|| panic!("expected strict conflict error"));
 
-	assert!(error.to_string().contains("conflicting explicit versions"));
+	insta::assert_snapshot!(
+		"build_release_plan_conflicting_explicit_versions_strict_error",
+		error.to_string()
+	);
 }
 
 #[test]
@@ -520,10 +524,9 @@ fn build_release_plan_rejects_explicit_versions_not_greater_than_current() {
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid explicit version error"));
 
-	assert!(
-		error
-			.to_string()
-			.contains("must be greater than current version")
+	insta::assert_snapshot!(
+		"build_release_plan_explicit_version_not_greater_error",
+		error.to_string()
 	);
 }
 
@@ -553,8 +556,10 @@ fn build_release_plan_returns_error_for_unknown_package_in_changeset() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected error for unknown package"));
-	assert!(error.to_string().contains("cargo:nonexistent"));
-	assert!(error.to_string().contains("not found"));
+	insta::assert_snapshot!(
+		"build_release_plan_unknown_package_error",
+		error.to_string()
+	);
 }
 
 #[test]
@@ -594,8 +599,7 @@ fn build_release_plan_returns_error_for_unknown_group_in_changeset() {
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected error for unknown group"));
-	assert!(error.to_string().contains("nonexistent-group"));
-	assert!(error.to_string().contains("not found"));
+	insta::assert_snapshot!("build_release_plan_unknown_group_error", error.to_string());
 }
 
 #[test]

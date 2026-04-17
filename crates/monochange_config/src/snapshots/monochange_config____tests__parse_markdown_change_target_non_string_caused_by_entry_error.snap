@@ -1,0 +1,5 @@
+---
+source: crates/monochange_config/src/__tests.rs
+expression: error.to_string()
+---
+config error: failed to parse change.md: target `core` must use string package or group ids in `caused_by`
