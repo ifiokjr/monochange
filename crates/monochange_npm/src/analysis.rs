@@ -243,9 +243,9 @@ fn parse_named_exports(line: &str) -> Vec<(String, String)> {
 	if !rest.starts_with('{') {
 		return Vec::new();
 	}
-	let Some(brace_start) = rest.find('{') else {
-		return Vec::new();
-	};
+	let brace_start = rest
+		.find('{')
+		.expect("named exports should include an opening brace after the prefix check");
 	let Some(brace_end) = rest[brace_start + 1..].find('}') else {
 		return Vec::new();
 	};
@@ -420,11 +420,12 @@ fn build_symbol_change(
 	before_signature: Option<String>,
 	after_signature: Option<String>,
 ) -> SemanticChange {
-	let verb = match kind {
-		SemanticChangeKind::Added => "added",
-		SemanticChangeKind::Removed => "removed",
-		SemanticChangeKind::Modified => "modified",
-		_ => "changed",
+	let verb = if kind == SemanticChangeKind::Added {
+		"added"
+	} else if kind == SemanticChangeKind::Removed {
+		"removed"
+	} else {
+		"modified"
 	};
 
 	SemanticChange {
@@ -717,11 +718,12 @@ fn build_manifest_change(
 	before_signature: Option<String>,
 	after_signature: Option<String>,
 ) -> SemanticChange {
-	let verb = match kind {
-		SemanticChangeKind::Added => "added",
-		SemanticChangeKind::Removed => "removed",
-		SemanticChangeKind::Modified => "modified",
-		_ => "changed",
+	let verb = if kind == SemanticChangeKind::Added {
+		"added"
+	} else if kind == SemanticChangeKind::Removed {
+		"removed"
+	} else {
+		"modified"
 	};
 
 	SemanticChange {
@@ -873,5 +875,205 @@ mod tests {
 				&& change.item_path == "script.build"
 				&& change.kind == SemanticChangeKind::Added
 		}));
+	}
+
+	#[test]
+	fn snapshot_and_symbol_helpers_cover_additional_export_forms() {
+		let changed_files = vec![
+			AnalyzedFileChange {
+				path: PathBuf::from("packages/web/src/index.ts"),
+				package_path: PathBuf::from("src/index.ts"),
+				kind: FileChangeKind::Modified,
+				before_contents: None,
+				after_contents: Some(
+					concat!(
+						"export declare async function greet(name: string): Promise<string> { return name; }\n",
+						"export default class Greeter {}\n",
+						"export abstract class BaseGreeter {}\n",
+						"export namespace Tools {}\n",
+						"export type { Foo as Bar } from './types';\n",
+					)
+					.to_string(),
+				),
+			},
+			AnalyzedFileChange {
+				path: PathBuf::from("packages/web/README.md"),
+				package_path: PathBuf::from("README.md"),
+				kind: FileChangeKind::Modified,
+				before_contents: None,
+				after_contents: Some("ignored".to_string()),
+			},
+			AnalyzedFileChange {
+				path: PathBuf::from("packages/web/src/legacy.ts"),
+				package_path: PathBuf::from("src/legacy.ts"),
+				kind: FileChangeKind::Modified,
+				before_contents: Some("export const previous = true;".to_string()),
+				after_contents: None,
+			},
+		];
+
+		let symbols = snapshot_exported_symbols(None, &changed_files);
+
+		for expected in [
+			"greet",
+			"Greeter",
+			"BaseGreeter",
+			"Tools",
+			"Bar",
+			"legacy::previous",
+		] {
+			assert!(
+				symbols
+					.iter()
+					.any(|((_, item_path), _)| item_path == expected)
+			);
+		}
+		assert!(is_source_file(Path::new("src/index.cts")));
+		assert!(!is_source_file(Path::new("build/index.ts")));
+		assert_eq!(
+			module_prefix_for_file(Path::new("lib/utils/index.d.ts")),
+			vec!["utils".to_string()]
+		);
+	}
+
+	#[test]
+	fn manifest_helpers_cover_parse_failures_removed_entries_and_scalar_bins() {
+		let mut warnings = Vec::new();
+		assert!(parse_manifest(Some("{"), Path::new("package.json"), &mut warnings).is_none());
+		assert_eq!(warnings.len(), 1);
+
+		let before = serde_json::json!({
+			"exports": {".": "./dist/index.js", "./cli": "./dist/cli.js"},
+			"bin": "./dist/index.js",
+			"dependencies": {"react": "18"},
+			"type": "module",
+			"scripts": {"build": "tsup"}
+		});
+		let after = serde_json::json!({
+			"exports": {".": "./dist/index.js"},
+			"dependencies": {},
+			"type": "commonjs"
+		});
+
+		let before_exports = extract_public_exports(&before, "pkg");
+		let after_exports = extract_public_exports(&after, "pkg");
+		let export_changes = compare_manifest_entries(
+			SemanticChangeCategory::Export,
+			Path::new("package.json"),
+			&before_exports,
+			&after_exports,
+		);
+		assert!(export_changes.iter().any(|change| {
+			change.item_path == "./cli" && change.kind == SemanticChangeKind::Removed
+		}));
+		assert!(export_changes.iter().any(|change| {
+			change.item_path == "pkg" && change.kind == SemanticChangeKind::Removed
+		}));
+
+		let metadata_changes = compare_manifest_entries(
+			SemanticChangeCategory::Metadata,
+			Path::new("package.json"),
+			&extract_metadata_entries(&before),
+			&extract_metadata_entries(&after),
+		);
+		assert!(metadata_changes.iter().any(|change| {
+			change.item_path == "type" && change.kind == SemanticChangeKind::Modified
+		}));
+		assert!(metadata_changes.iter().any(|change| {
+			change.item_path == "script.build" && change.kind == SemanticChangeKind::Removed
+		}));
+
+		assert_eq!(describe_json_value(&serde_json::json!(null)), "null");
+		assert_eq!(describe_json_value(&serde_json::json!(true)), "true");
+		assert_eq!(describe_json_value(&serde_json::json!(3)), "3");
+		assert!(describe_json_value(&serde_json::json!(["a", "b"])).contains("a, b"));
+		assert!(describe_json_value(&serde_json::json!({"b": 2, "a": 1})).contains("a=1"));
+	}
+
+	#[test]
+	fn parser_diff_and_export_helpers_cover_remaining_npm_branches() {
+		let skipped_symbols = snapshot_exported_symbols(
+			None,
+			&[
+				AnalyzedFileChange {
+					path: PathBuf::from("packages/web/src/empty.ts"),
+					package_path: PathBuf::from("src/empty.ts"),
+					kind: FileChangeKind::Modified,
+					before_contents: None,
+					after_contents: None,
+				},
+				AnalyzedFileChange {
+					path: PathBuf::from("packages/web/README.md"),
+					package_path: PathBuf::from("README.md"),
+					kind: FileChangeKind::Modified,
+					before_contents: None,
+					after_contents: Some("ignored".to_string()),
+				},
+			],
+		);
+		assert!(skipped_symbols.is_empty());
+		assert!(!is_source_file(Path::new("src/index")));
+
+		assert!(parse_named_exports("const nope = true;").is_empty());
+		assert_eq!(
+			parse_named_exports("export type { Foo as Bar, , Baz } from './types';"),
+			vec![
+				("type_reexport".to_string(), "Bar".to_string()),
+				("type_reexport".to_string(), "Baz".to_string()),
+			]
+		);
+		assert!(parse_named_exports("export { Foo as Bar from './types';").is_empty());
+		assert_eq!(
+			parse_declaration_export("export default {};"),
+			Some(("default_export", "default".to_string()))
+		);
+
+		let before = BTreeMap::from([
+			(
+				("function".to_string(), "greet".to_string()),
+				PublicSymbol {
+					item_kind: "function".to_string(),
+					item_path: "greet".to_string(),
+					signature: "export function greet() {}".to_string(),
+					file_path: PathBuf::from("src/index.ts"),
+				},
+			),
+			(
+				("class".to_string(), "Greeter".to_string()),
+				PublicSymbol {
+					item_kind: "class".to_string(),
+					item_path: "Greeter".to_string(),
+					signature: "export class Greeter {}".to_string(),
+					file_path: PathBuf::from("src/index.ts"),
+				},
+			),
+		]);
+		let after = BTreeMap::from([(
+			("function".to_string(), "greet".to_string()),
+			PublicSymbol {
+				item_kind: "function".to_string(),
+				item_path: "greet".to_string(),
+				signature: "export function greet() {}".to_string(),
+				file_path: PathBuf::from("src/index.ts"),
+			},
+		)]);
+		let changes = diff_public_symbols(&before, &after);
+		assert_eq!(changes.len(), 1);
+		let change = changes
+			.first()
+			.unwrap_or_else(|| panic!("expected one removed change"));
+		assert_eq!(change.kind, SemanticChangeKind::Removed);
+		assert!(change.summary.contains("removed"));
+
+		let exports = extract_public_exports(
+			&serde_json::json!({
+				"exports": {".": "./dist/index.js", "./cli": "./dist/cli.js"},
+				"bin": 7
+			}),
+			"pkg",
+		);
+		assert!(exports.contains_key("."));
+		assert!(exports.contains_key("./cli"));
+		assert!(!exports.contains_key("pkg"));
 	}
 }

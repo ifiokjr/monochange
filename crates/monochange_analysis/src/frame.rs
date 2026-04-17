@@ -536,6 +536,7 @@ mod tests {
 	use std::fs;
 
 	use monochange_test_helpers::git::git;
+	use monochange_test_helpers::git_output_trimmed;
 	use temp_env::with_vars;
 	use tempfile::tempdir;
 
@@ -559,6 +560,30 @@ mod tests {
 	}
 
 	#[test]
+	fn detect_uses_github_pr_environment_when_refs_exist() {
+		let tempdir = init_repo();
+		git(tempdir.path(), &["branch", "feature-branch"]);
+
+		let frame = with_vars(
+			[
+				("GITHUB_EVENT_NAME", Some("pull_request")),
+				("GITHUB_HEAD_REF", Some("feature-branch")),
+				("GITHUB_BASE_REF", Some("main")),
+			],
+			|| ChangeFrame::detect(tempdir.path()),
+		)
+		.unwrap_or_else(|error| panic!("detect frame: {error}"));
+
+		assert_eq!(
+			frame,
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature-branch".to_string(),
+			}
+		);
+	}
+
+	#[test]
 	fn detect_ignores_unresolvable_pr_environment_for_local_repos() {
 		let tempdir = init_repo();
 
@@ -573,6 +598,29 @@ mod tests {
 		.unwrap_or_else(|error| panic!("detect frame: {error}"));
 
 		assert_eq!(frame, ChangeFrame::WorkingDirectory);
+	}
+
+	#[test]
+	fn resolve_pr_source_branch_falls_back_to_head_for_detached_repos() {
+		let tempdir = init_repo();
+		let head = git_output_trimmed(tempdir.path(), &["rev-parse", "HEAD"]);
+		git(tempdir.path(), &["checkout", &head]);
+
+		assert_eq!(
+			resolve_pr_source_branch(tempdir.path(), "missing-branch"),
+			Some("HEAD".to_string())
+		);
+	}
+
+	#[test]
+	fn revision_helpers_return_false_for_missing_repositories() {
+		let missing = tempdir()
+			.unwrap_or_else(|error| panic!("tempdir: {error}"))
+			.path()
+			.join("missing");
+
+		assert!(!revision_exists(&missing, "HEAD"));
+		assert!(!is_detached_head(&missing));
 	}
 
 	#[test]

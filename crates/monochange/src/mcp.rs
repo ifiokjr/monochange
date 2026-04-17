@@ -190,22 +190,25 @@ fn validate_changeset_content(
 		}
 
 		let examples = item_refs.into_iter().take(3).collect::<Vec<_>>();
-		if !examples.is_empty() {
-			issues.push(ValidationIssue {
-				severity: "warning".to_string(),
-				message: format!(
-					"changeset does not mention any detected semantic item for `{package_label}`"
-				),
-				suggestion: Some(format!(
-					"mention one or more changed items such as {}",
-					examples
-						.iter()
-						.map(|item| format!("`{item}`"))
-						.collect::<Vec<_>>()
-						.join(", ")
-				)),
-			});
-		}
+		debug_assert!(
+			!examples.is_empty(),
+			"semantic changes should yield at least one item reference"
+		);
+
+		issues.push(ValidationIssue {
+			severity: "warning".to_string(),
+			message: format!(
+				"changeset does not mention any detected semantic item for `{package_label}`"
+			),
+			suggestion: Some(format!(
+				"mention one or more changed items such as {}",
+				examples
+					.iter()
+					.map(|item| format!("`{item}`"))
+					.collect::<Vec<_>>()
+					.join(", ")
+			)),
+		});
 	}
 
 	for reference in mentioned_refs {
@@ -818,6 +821,16 @@ mod __tests {
 	use std::path::PathBuf;
 
 	use insta::assert_snapshot;
+	use monochange_analysis::ChangeAnalysis;
+	use monochange_analysis::ChangeFrame;
+	use monochange_analysis::DetectionLevel;
+	use monochange_analysis::PackageChangeAnalysis;
+	use monochange_config::LoadedChangesetFile;
+	use monochange_core::ChangeSignal;
+	use monochange_core::Ecosystem;
+	use monochange_core::SemanticChange;
+	use monochange_core::SemanticChangeCategory;
+	use monochange_core::SemanticChangeKind;
 	use monochange_test_helpers::content_text;
 	use monochange_test_helpers::copy_directory;
 	use monochange_test_helpers::current_test_name;
@@ -870,6 +883,85 @@ mod __tests {
 			tempdir.path(),
 		);
 		tempdir
+	}
+
+	fn setup_analysis_workspace_without_git() -> tempfile::TempDir {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_directory(
+			&fixture_path("analysis/cargo-public-api-diff/after"),
+			tempdir.path(),
+		);
+		tempdir
+	}
+
+	fn setup_analysis_workspace_without_commits() -> tempfile::TempDir {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_directory(
+			&fixture_path("analysis/cargo-public-api-diff/after"),
+			tempdir.path(),
+		);
+		git(tempdir.path(), &["init"]);
+		tempdir
+	}
+
+	fn sample_package_analysis(
+		package_id: &str,
+		semantic_changes: Vec<SemanticChange>,
+	) -> PackageChangeAnalysis {
+		PackageChangeAnalysis {
+			package_id: package_id.to_string(),
+			package_record_id: package_id.to_string(),
+			package_name: package_id.to_string(),
+			ecosystem: Ecosystem::Cargo,
+			analyzer_id: Some("test".to_string()),
+			changed_files: vec![PathBuf::from("src/lib.rs")],
+			semantic_changes,
+			warnings: Vec::new(),
+		}
+	}
+
+	fn sample_change_analysis(package_analysis: PackageChangeAnalysis) -> ChangeAnalysis {
+		let mut analyses_by_package = std::collections::BTreeMap::new();
+		analyses_by_package.insert(package_analysis.package_id.clone(), package_analysis);
+		ChangeAnalysis {
+			frame: ChangeFrame::WorkingDirectory,
+			detection_level: DetectionLevel::Signature,
+			package_analyses: analyses_by_package,
+			warnings: Vec::new(),
+		}
+	}
+
+	fn sample_changeset(summary: Option<&str>, package_id: &str) -> LoadedChangesetFile {
+		LoadedChangesetFile {
+			path: PathBuf::from(".changeset/test.md"),
+			summary: summary.map(ToString::to_string),
+			details: None,
+			targets: Vec::new(),
+			signals: vec![ChangeSignal {
+				package_id: package_id.to_string(),
+				requested_bump: None,
+				explicit_version: None,
+				change_origin: "test".to_string(),
+				evidence_refs: Vec::new(),
+				notes: None,
+				details: None,
+				change_type: None,
+				source_path: PathBuf::from(".changeset/test.md"),
+			}],
+		}
+	}
+
+	fn sample_semantic_change(item_path: &str) -> SemanticChange {
+		SemanticChange {
+			category: SemanticChangeCategory::PublicApi,
+			kind: SemanticChangeKind::Modified,
+			item_kind: "function".to_string(),
+			item_path: item_path.to_string(),
+			summary: format!("function `{item_path}` modified"),
+			file_path: PathBuf::from("src/lib.rs"),
+			before_signature: Some(format!("fn {item_path}()")),
+			after_signature: Some(format!("fn {item_path}(arg: &str)")),
+		}
 	}
 
 	#[test]
@@ -1326,5 +1418,181 @@ mod __tests {
 		snapshot_settings().bind(|| {
 			assert_snapshot!(content_text(&result));
 		});
+	}
+
+	#[test]
+	fn validate_changeset_content_reports_missing_package_diffs() {
+		let changeset = sample_changeset(Some("mention `greet`"), "core");
+		let analysis = ChangeAnalysis {
+			frame: ChangeFrame::WorkingDirectory,
+			detection_level: DetectionLevel::Signature,
+			package_analyses: std::collections::BTreeMap::new(),
+			warnings: Vec::new(),
+		};
+
+		let issues = super::validate_changeset_content(&changeset, &analysis);
+
+		assert_eq!(issues.len(), 2);
+		assert!(
+			issues
+				.iter()
+				.any(|issue| issue.message.contains("has no current diff"))
+		);
+		assert!(
+			issues
+				.iter()
+				.any(|issue| issue.message.contains("references `greet`"))
+		);
+	}
+
+	#[test]
+	fn validate_changeset_content_warns_when_semantic_changes_are_empty() {
+		let changeset = sample_changeset(Some("internal cleanup"), "core");
+		let analysis = sample_change_analysis(sample_package_analysis("core", Vec::new()));
+
+		let issues = super::validate_changeset_content(&changeset, &analysis);
+
+		assert_eq!(issues.len(), 1);
+		assert!(
+			issues[0]
+				.message
+				.contains("no semantic changes were detected")
+		);
+		assert_eq!(issues[0].severity, "warning");
+	}
+
+	#[test]
+	fn validate_changeset_content_skips_warning_when_summary_mentions_detected_item() {
+		let changeset = sample_changeset(Some("update `greet` behavior"), "core");
+		let analysis = sample_change_analysis(sample_package_analysis(
+			"core",
+			vec![sample_semantic_change("greet")],
+		));
+
+		let issues = super::validate_changeset_content(&changeset, &analysis);
+
+		assert!(issues.is_empty());
+	}
+
+	#[test]
+	fn validate_changeset_content_suggests_detected_items_when_summary_is_generic() {
+		let changeset = sample_changeset(Some("update semantic analysis messaging"), "core");
+		let analysis = sample_change_analysis(sample_package_analysis(
+			"core",
+			vec![
+				sample_semantic_change("greet"),
+				sample_semantic_change("Greeter"),
+			],
+		));
+
+		let issues = super::validate_changeset_content(&changeset, &analysis);
+
+		assert_eq!(issues.len(), 1);
+		assert!(
+			issues[0]
+				.message
+				.contains("does not mention any detected semantic item")
+		);
+		assert!(issues[0].suggestion.as_ref().is_some_and(|suggestion| {
+			suggestion.contains("`greet`") && suggestion.contains("`Greeter`")
+		}));
+	}
+
+	#[tokio::test]
+	async fn validate_changeset_reports_frame_detection_errors() {
+		let tempdir = setup_analysis_workspace_without_git();
+		let changeset_dir = tempdir.path().join(".changeset");
+		fs::create_dir_all(&changeset_dir)
+			.unwrap_or_else(|error| panic!("create .changeset dir: {error}"));
+		fs::write(
+			changeset_dir.join("feature.md"),
+			"---\ncore: patch\n---\n\n#### test change\n",
+		)
+		.unwrap_or_else(|error| panic!("write changeset fixture: {error}"));
+
+		let result = MonochangeMcpServer::new()
+			.validate_changeset(Parameters(super::ValidateChangesetParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset_path: ".changeset/feature.md".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate_changeset: {error}"));
+		let rendered = content_text(&result);
+
+		assert!(rendered.contains("Failed to detect change frame"));
+	}
+
+	#[tokio::test]
+	async fn validate_changeset_reports_semantic_analysis_errors() {
+		let tempdir = setup_analysis_workspace_without_commits();
+		let changeset_dir = tempdir.path().join(".changeset");
+		fs::create_dir_all(&changeset_dir)
+			.unwrap_or_else(|error| panic!("create .changeset dir: {error}"));
+		fs::write(
+			changeset_dir.join("feature.md"),
+			"---\ncore: patch\n---\n\n#### test change\n",
+		)
+		.unwrap_or_else(|error| panic!("write changeset fixture: {error}"));
+
+		let result = MonochangeMcpServer::new()
+			.validate_changeset(Parameters(super::ValidateChangesetParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset_path: ".changeset/feature.md".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate_changeset: {error}"));
+		let rendered = content_text(&result);
+
+		assert!(rendered.contains("Semantic analysis failed"));
+	}
+
+	#[tokio::test]
+	async fn validate_changeset_reports_current_lifecycle_when_items_are_mentioned() {
+		let tempdir = setup_analysis_workspace();
+		let changeset_dir = tempdir.path().join(".changeset");
+		fs::create_dir_all(&changeset_dir)
+			.unwrap_or_else(|error| panic!("create .changeset dir: {error}"));
+		fs::write(
+			changeset_dir.join("feature.md"),
+			"---\ncore: patch\n---\n\n#### update `Greeter` behavior\n",
+		)
+		.unwrap_or_else(|error| panic!("write changeset fixture: {error}"));
+
+		let result = MonochangeMcpServer::new()
+			.validate_changeset(Parameters(super::ValidateChangesetParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset_path: ".changeset/feature.md".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate_changeset: {error}"));
+		let rendered = content_text(&result);
+
+		assert!(rendered.contains("\"lifecycle_status\": \"current\""));
+		assert!(rendered.contains("\"valid\": true"));
+	}
+
+	#[tokio::test]
+	async fn validate_changeset_reports_incomplete_lifecycle_for_warning_only_results() {
+		let tempdir = setup_analysis_workspace();
+		let changeset_dir = tempdir.path().join(".changeset");
+		fs::create_dir_all(&changeset_dir)
+			.unwrap_or_else(|error| panic!("create .changeset dir: {error}"));
+		fs::write(
+			changeset_dir.join("feature.md"),
+			"---\ncore: patch\n---\n\n#### update semantic analysis messaging\n",
+		)
+		.unwrap_or_else(|error| panic!("write changeset fixture: {error}"));
+
+		let result = MonochangeMcpServer::new()
+			.validate_changeset(Parameters(super::ValidateChangesetParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset_path: ".changeset/feature.md".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("validate_changeset: {error}"));
+		let rendered = content_text(&result);
+
+		assert!(rendered.contains("\"lifecycle_status\": \"incomplete\""));
+		assert!(rendered.contains("\"valid\": false"));
 	}
 }

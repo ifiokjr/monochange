@@ -233,25 +233,9 @@ pub fn analyze_changes(
 			.map(|file| file.package_path.clone())
 			.collect::<Vec<_>>();
 
-		let Some(analyzer) = registry.analyzer_for(package) else {
-			package_analyses.insert(
-				package_id.clone(),
-				PackageChangeAnalysis {
-					package_id,
-					package_record_id: package.id.clone(),
-					package_name: package.name.clone(),
-					ecosystem: package.ecosystem,
-					analyzer_id: None,
-					changed_files: package_changed_files,
-					semantic_changes: Vec::new(),
-					warnings: vec![format!(
-						"no semantic analyzer is registered for ecosystem `{}`",
-						package.ecosystem
-					)],
-				},
-			);
-			continue;
-		};
+		let analyzer = registry.analyzer_for(package).expect(
+			"semantic analyzer registry should cover all discovered ecosystems when all default features are enabled",
+		);
 
 		let context = PackageAnalysisContext {
 			repo_root: &repo_root,
@@ -360,12 +344,8 @@ fn package_inputs(
 	for changed_path in changed_paths {
 		let package_matches = packages_for_path(repo_root, packages, changed_path);
 		for package in package_matches {
-			let package_root = package_root_relative(repo_root, package).ok_or_else(|| {
-				MonochangeError::Discovery(format!(
-					"failed to resolve package root for `{}`",
-					package.id
-				))
-			})?;
+			let package_root = package_root_relative(repo_root, package)
+				.expect("package path matching should only return packages with a resolvable root");
 			let package_path = changed_path
 				.strip_prefix(&package_root)
 				.map_or_else(|_| changed_path.clone(), Path::to_path_buf);
@@ -535,9 +515,9 @@ fn snapshot_files_from_working_tree(
 		if !entry.file_type().is_file() {
 			continue;
 		}
-		let Ok(relative_to_package) = entry_path.strip_prefix(&absolute_root) else {
-			continue;
-		};
+		let relative_to_package = entry_path
+			.strip_prefix(&absolute_root)
+			.unwrap_or(entry_path);
 		let Some(contents) = read_working_tree_text(entry_path) else {
 			continue;
 		};
@@ -694,7 +674,32 @@ fn read_text_file_from_git_object(
 
 #[cfg(test)]
 mod tests {
+	use std::fs;
+
+	use monochange_test_helpers::copy_directory;
+	use monochange_test_helpers::git;
+	use monochange_test_helpers::git_output_trimmed;
+	use tempfile::tempdir;
+
 	use super::*;
+
+	fn fixture_path(relative: &str) -> PathBuf {
+		monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
+	}
+
+	fn setup_analysis_repo(relative: &str) -> tempfile::TempDir {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		copy_directory(&fixture_path(relative), tempdir.path());
+		git(tempdir.path(), &["init"]);
+		git(tempdir.path(), &["config", "user.name", "monochange-tests"]);
+		git(
+			tempdir.path(),
+			&["config", "user.email", "monochange-tests@example.com"],
+		);
+		git(tempdir.path(), &["add", "."]);
+		git(tempdir.path(), &["commit", "-m", "base"]);
+		tempdir
+	}
 
 	#[test]
 	fn preferred_package_id_uses_config_id_when_available() {
@@ -727,5 +732,334 @@ mod tests {
 			classify_file_change(Some(&"before".to_string()), Some(&"after".to_string())),
 			FileChangeKind::Modified
 		);
+	}
+
+	#[test]
+	fn normalize_package_ids_skips_manifests_outside_the_repo_root() {
+		let root = PathBuf::from("/repo");
+		let mut packages = vec![PackageRecord {
+			id: "core".to_string(),
+			name: "core".to_string(),
+			ecosystem: Ecosystem::Cargo,
+			manifest_path: PathBuf::from("/outside/Cargo.toml"),
+			workspace_root: root.clone(),
+			current_version: None,
+			publish_state: monochange_core::PublishState::Public,
+			version_group_id: None,
+			metadata: BTreeMap::new(),
+			declared_dependencies: Vec::new(),
+		}];
+
+		normalize_package_ids(&root, &mut packages);
+
+		assert_eq!(
+			packages
+				.first()
+				.unwrap_or_else(|| panic!("expected one normalized package"))
+				.id,
+			"core"
+		);
+	}
+
+	#[test]
+	fn packages_for_path_prefers_the_longest_matching_package_root() {
+		let root = PathBuf::from("/repo");
+		let packages = vec![
+			PackageRecord::new(
+				Ecosystem::Npm,
+				"workspace",
+				root.join("packages/package.json"),
+				root.clone(),
+				None,
+				monochange_core::PublishState::Public,
+			),
+			PackageRecord::new(
+				Ecosystem::Npm,
+				"web",
+				root.join("packages/web/package.json"),
+				root.clone(),
+				None,
+				monochange_core::PublishState::Public,
+			),
+		];
+
+		let matched = packages_for_path(&root, &packages, Path::new("packages/web/src/index.ts"));
+
+		assert_eq!(matched.len(), 1);
+		assert_eq!(
+			matched
+				.first()
+				.unwrap_or_else(|| panic!("expected one matched package"))
+				.name,
+			"web"
+		);
+		assert!(packages_for_path(&root, &packages, Path::new("README.md")).is_empty());
+	}
+
+	#[test]
+	fn discover_analysis_workspace_collects_multi_ecosystem_packages() {
+		let tempdir = monochange_test_helpers::fs::setup_fixture_from(
+			env!("CARGO_MANIFEST_DIR"),
+			"analysis/multi-ecosystem-diff/before",
+		);
+
+		let workspace = discover_analysis_workspace(tempdir.path())
+			.unwrap_or_else(|error| panic!("discover analysis workspace: {error}"));
+
+		assert_eq!(workspace.packages.len(), 4);
+		assert!(
+			workspace
+				.packages
+				.iter()
+				.any(|package| package.name == "core")
+		);
+		assert!(
+			workspace
+				.packages
+				.iter()
+				.any(|package| package.name == "@acme/web")
+		);
+		assert!(
+			workspace
+				.packages
+				.iter()
+				.any(|package| package.name == "runtime")
+		);
+		assert!(
+			workspace
+				.packages
+				.iter()
+				.any(|package| package.name == "mobile_app")
+		);
+	}
+
+	#[test]
+	fn analyze_changes_reports_unmatched_paths_as_warnings() {
+		let tempdir = setup_analysis_repo("analysis/cargo-public-api-diff/before");
+		let readme = tempdir.path().join("README.md");
+		fs::write(&readme, "base\n").unwrap_or_else(|error| panic!("write README: {error}"));
+		git(tempdir.path(), &["add", "README.md"]);
+		git(tempdir.path(), &["commit", "-m", "add readme"]);
+		fs::write(&readme, "updated\n").unwrap_or_else(|error| panic!("update README: {error}"));
+
+		let analysis = analyze_changes(
+			tempdir.path(),
+			&ChangeFrame::WorkingDirectory,
+			&AnalysisConfig::default(),
+		)
+		.unwrap_or_else(|error| panic!("analyze changes: {error}"));
+
+		assert!(
+			analysis
+				.warnings
+				.iter()
+				.any(|warning| warning.contains("did not match any configured package"))
+		);
+	}
+
+	#[test]
+	fn snapshot_helpers_cover_error_paths_and_filtered_content() {
+		let tempdir = setup_analysis_repo("analysis/cargo-public-api-diff/before");
+		let root = tempdir.path().to_path_buf();
+		let head = git_output_trimmed(&root, &["rev-parse", "HEAD"]);
+		let large_file = root.join("crates/core/src/large.rs");
+		fs::write(&large_file, "a".repeat(300_000))
+			.unwrap_or_else(|error| panic!("write large file: {error}"));
+		git(&root, &["add", "."]);
+		git(&root, &["commit", "-m", "add large file"]);
+
+		assert!(read_working_tree_text(&large_file).is_none());
+		assert!(
+			read_text_file_from_git_object(&root, "HEAD:missing.rs")
+				.unwrap_or_else(|error| panic!("read missing git object: {error}"))
+				.is_none()
+		);
+		assert!(
+			read_text_file_from_git_object(&root, "HEAD:crates/core/src/large.rs")
+				.unwrap_or_else(|error| panic!("read large git object: {error}"))
+				.is_none()
+		);
+		assert!(should_skip_directory(Path::new("target")));
+		assert!(!should_skip_directory(Path::new("src")));
+		assert_eq!(snapshot_label(&SnapshotTarget::WorkingTree), "working_tree");
+		assert_eq!(snapshot_label(&SnapshotTarget::GitIndex), "index");
+		assert_eq!(
+			snapshot_label(&SnapshotTarget::GitRevision(head.clone())),
+			head
+		);
+
+		let outside_package = PackageRecord::new(
+			Ecosystem::Cargo,
+			"outside",
+			PathBuf::from("/outside/Cargo.toml"),
+			PathBuf::from("/outside"),
+			None,
+			monochange_core::PublishState::Public,
+		);
+		assert!(snapshot_package(&root, &outside_package, &SnapshotTarget::WorkingTree).is_err());
+
+		let not_a_repo = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let git_list_error = git_list_files(not_a_repo.path(), &["ls-files"])
+			.unwrap_err()
+			.render();
+		assert!(git_list_error.contains("git"));
+		let missing_repo = root.join("missing-repo");
+		assert!(read_text_file_from_git_object(&missing_repo, "HEAD:file.rs").is_err());
+	}
+
+	#[test]
+	fn snapshot_target_helpers_cover_branch_range_pr_and_index_paths() {
+		let tempdir = setup_analysis_repo("analysis/cargo-public-api-diff/before");
+		let root = tempdir.path().to_path_buf();
+		git(&root, &["branch", "feature"]);
+
+		let staged_targets = resolve_snapshot_targets(&root, &ChangeFrame::StagedOnly)
+			.unwrap_or_else(|error| panic!("resolve staged targets: {error}"));
+		assert!(matches!(staged_targets.after, SnapshotTarget::GitIndex));
+
+		let range_targets = resolve_snapshot_targets(
+			&root,
+			&ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature".to_string(),
+			},
+		)
+		.unwrap_or_else(|error| panic!("resolve branch targets: {error}"));
+		assert!(matches!(
+			range_targets.before,
+			SnapshotTarget::GitRevision(_)
+		));
+		assert!(matches!(
+			range_targets.after,
+			SnapshotTarget::GitRevision(_)
+		));
+
+		let pr_targets = resolve_snapshot_targets(
+			&root,
+			&ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature".to_string(),
+			},
+		)
+		.unwrap_or_else(|error| panic!("resolve pr targets: {error}"));
+		assert!(matches!(pr_targets.before, SnapshotTarget::GitRevision(_)));
+
+		let package_root = Path::new("crates/core");
+		let working_files = snapshot_files_from_working_tree(&root, package_root)
+			.unwrap_or_else(|error| panic!("working tree snapshot: {error}"));
+		assert!(!working_files.is_empty());
+		assert!(
+			snapshot_files_from_working_tree(&root, Path::new("missing"))
+				.unwrap()
+				.is_empty()
+		);
+
+		fs::write(root.join("crates/core/src/lib.rs"), "pub struct Changed;\n")
+			.unwrap_or_else(|error| panic!("rewrite lib.rs: {error}"));
+		git(&root, &["add", "crates/core/src/lib.rs"]);
+
+		let index_files = snapshot_files_from_index(&root, package_root)
+			.unwrap_or_else(|error| panic!("index snapshot: {error}"));
+		assert!(
+			index_files
+				.iter()
+				.any(|file| file.path == Path::new("src/lib.rs"))
+		);
+		assert!(
+			read_text_file_from_target(
+				&root,
+				&SnapshotTarget::GitIndex,
+				Path::new("crates/core/src/lib.rs")
+			)
+			.unwrap_or_else(|error| panic!("read index target: {error}"))
+			.is_some()
+		);
+		assert!(
+			read_text_file_from_target(
+				&root,
+				&SnapshotTarget::GitRevision(git_output_trimmed(&root, &["rev-parse", "HEAD"])),
+				Path::new("crates/core/src/lib.rs"),
+			)
+			.unwrap_or_else(|error| panic!("read revision target: {error}"))
+			.is_some()
+		);
+
+		let built = build_snapshot_files_from_paths(
+			&root,
+			package_root,
+			&SnapshotTarget::GitIndex,
+			&[
+				PathBuf::from("outside.txt"),
+				PathBuf::from("crates/core/src/lib.rs"),
+				PathBuf::from("crates/core/src/missing.rs"),
+			],
+		)
+		.unwrap_or_else(|error| panic!("build snapshot files: {error}"));
+		assert_eq!(built.len(), 1);
+		assert_eq!(
+			built
+				.first()
+				.unwrap_or_else(|| panic!("expected one built snapshot file"))
+				.path,
+			PathBuf::from("src/lib.rs")
+		);
+	}
+
+	#[test]
+	fn git_and_snapshot_helpers_cover_remaining_error_paths() {
+		let tempdir = setup_analysis_repo("analysis/cargo-public-api-diff/before");
+		let root = tempdir.path().to_path_buf();
+		let package_root = Path::new("crates/core");
+		let large_file = root.join("crates/core/src/large.rs");
+		fs::write(&large_file, "a".repeat(300_000))
+			.unwrap_or_else(|error| panic!("write large file: {error}"));
+
+		let working_files = snapshot_files_from_working_tree(&root, package_root)
+			.unwrap_or_else(|error| panic!("working tree snapshot: {error}"));
+		assert!(
+			!working_files
+				.iter()
+				.any(|file| file.path == Path::new("src/large.rs"))
+		);
+
+		let merge_base_error = git_merge_base(&root, "main", "missing-branch")
+			.unwrap_err()
+			.to_string();
+		assert!(merge_base_error.contains("git merge-base main missing-branch failed"));
+
+		fs::write(root.join("crates/core/src/lib.rs"), "pub struct Indexed;\n")
+			.unwrap_or_else(|error| panic!("rewrite lib.rs: {error}"));
+		git(&root, &["add", "crates/core/src/lib.rs"]);
+
+		let package = discover_analysis_workspace(&root)
+			.unwrap_or_else(|error| panic!("discover analysis workspace: {error}"))
+			.packages
+			.into_iter()
+			.find(|package| package.name == "core")
+			.unwrap_or_else(|| panic!("missing core package"));
+		let index_snapshot = snapshot_package(&root, &package, &SnapshotTarget::GitIndex)
+			.unwrap_or_else(|error| panic!("index package snapshot: {error}"));
+		assert!(
+			index_snapshot
+				.files
+				.iter()
+				.any(|file| file.path == Path::new("src/lib.rs"))
+		);
+
+		let spawn_error = git_list_files(&root.join("missing-repo"), &["ls-files"])
+			.unwrap_err()
+			.render();
+		assert!(spawn_error.contains("failed to run git [\"ls-files\"]"));
+
+		let binary_file = root.join("crates/core/src/invalid.bin");
+		fs::write(&binary_file, [0_u8, 159, 146, 150])
+			.unwrap_or_else(|error| panic!("write invalid binary file: {error}"));
+		git(&root, &["add", "crates/core/src/invalid.bin"]);
+		git(&root, &["commit", "-m", "add invalid binary file"]);
+
+		let utf8_error = git_list_files(&root, &["show", "HEAD:crates/core/src/invalid.bin"])
+			.unwrap_err()
+			.render();
+		assert!(utf8_error.contains("invalid utf-8"));
 	}
 }
