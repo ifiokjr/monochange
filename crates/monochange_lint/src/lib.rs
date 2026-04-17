@@ -878,6 +878,11 @@ mod tests {
 	#[test]
 	fn merge_config_and_selector_helpers_cover_edge_cases() {
 		assert!(merge_config(None, None).is_none());
+		assert!(!lint_path_pattern_matches(
+			"[",
+			"packages/example/package.json",
+			"include"
+		));
 		assert_eq!(
 			merge_config(None, Some(&LintRuleConfig::Severity(LintSeverity::Warning)))
 				.expect("config")
