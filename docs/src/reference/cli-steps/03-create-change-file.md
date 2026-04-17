@@ -6,7 +6,7 @@
 
 It supports both:
 
-- explicit non-interactive authoring from inputs such as `package`, `bump`, `reason`, and `details`
+- explicit non-interactive authoring from inputs such as `package`, `bump`, `caused_by`, `reason`, and `details`
 - interactive authoring when `interactive = true`
 
 ## Why use it
@@ -28,6 +28,7 @@ That gives you a few advantages over rolling your own shell template generator:
 - `version` — explicit version pin for the change
 - `reason` — summary line
 - `type` — optional release-note type
+- `caused_by` — optional list of package or group ids that explain dependency-only follow-up changes
 - `details` — optional long-form body
 - `output` — optional explicit file path
 
@@ -147,3 +148,4 @@ inputs = { interactive = true }
 - omitting `package` in non-interactive mode
 - expecting `CreateChangeFile` to release anything immediately
 - using raw manifest paths when configured package ids are the stable interface
+- forgetting `caused_by` when a dependent package only changed because another package or group moved first

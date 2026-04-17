@@ -90,6 +90,7 @@ fn build_release_plan_patches_direct_parents_when_a_dependency_changes() {
 			notes: Some("feature".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/feature.md"),
 		}],
 		&[],
@@ -132,6 +133,7 @@ fn build_release_plan_propagates_direct_and_transitive_dependency_impact() {
 			notes: Some("public API addition".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/feature.md"),
 		}],
 		&[],
@@ -189,6 +191,7 @@ fn build_release_plan_synchronizes_version_groups() {
 			notes: Some("feature".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/feature.md"),
 		}],
 		&[],
@@ -238,6 +241,7 @@ fn build_release_plan_shifts_major_to_minor_for_pre_stable_versions() {
 			notes: Some("breaking change".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/feature.md"),
 		}],
 		&[],
@@ -286,6 +290,7 @@ fn build_release_plan_uses_compatibility_assessments_to_escalate_parents() {
 			notes: Some("breaking change".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/feature.md"),
 		}],
 		&[CompatibilityAssessment {
@@ -326,6 +331,7 @@ fn build_release_plan_uses_explicit_package_versions() {
 			notes: Some("pin release".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/pin.md"),
 		}],
 		&[],
@@ -367,6 +373,7 @@ fn build_release_plan_propagates_explicit_member_versions_to_group_version() {
 			notes: Some("promote sdk".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/group-pin.md"),
 		}],
 		&[],
@@ -405,6 +412,7 @@ fn build_release_plan_uses_highest_conflicting_explicit_version_with_warning() {
 				notes: Some("first pin".to_string()),
 				details: None,
 				change_type: None,
+				caused_by: Vec::new(),
 				source_path: PathBuf::from(".changeset/001-first.md"),
 			},
 			ChangeSignal {
@@ -416,6 +424,7 @@ fn build_release_plan_uses_highest_conflicting_explicit_version_with_warning() {
 				notes: Some("second pin".to_string()),
 				details: None,
 				change_type: None,
+				caused_by: Vec::new(),
 				source_path: PathBuf::from(".changeset/002-second.md"),
 			},
 		],
@@ -458,6 +467,7 @@ fn build_release_plan_rejects_conflicting_explicit_versions_in_strict_mode() {
 				notes: Some("first pin".to_string()),
 				details: None,
 				change_type: None,
+				caused_by: Vec::new(),
 				source_path: PathBuf::from(".changeset/001-first.md"),
 			},
 			ChangeSignal {
@@ -469,6 +479,7 @@ fn build_release_plan_rejects_conflicting_explicit_versions_in_strict_mode() {
 				notes: Some("second pin".to_string()),
 				details: None,
 				change_type: None,
+				caused_by: Vec::new(),
 				source_path: PathBuf::from(".changeset/002-second.md"),
 			},
 		],
@@ -499,6 +510,7 @@ fn build_release_plan_rejects_explicit_versions_not_greater_than_current() {
 			notes: Some("same version".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/same.md"),
 		}],
 		&[],
@@ -532,6 +544,7 @@ fn build_release_plan_returns_error_for_unknown_package_in_changeset() {
 			notes: None,
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/ghost.md"),
 		}],
 		&[],
@@ -572,6 +585,7 @@ fn build_release_plan_returns_error_for_unknown_group_in_changeset() {
 			notes: None,
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/orphan.md"),
 		}],
 		&[],
@@ -612,6 +626,7 @@ fn build_release_plan_warns_on_missing_group_member_during_traversal() {
 			notes: Some("feature".to_string()),
 			details: None,
 			change_type: None,
+			caused_by: Vec::new(),
 			source_path: PathBuf::from(".changeset/feature.md"),
 		}],
 		&[],
@@ -627,4 +642,180 @@ fn build_release_plan_warns_on_missing_group_member_during_traversal() {
 		.find(|decision| decision.package_id == core.id)
 		.unwrap_or_else(|| panic!("expected core decision"));
 	assert_eq!(core_decision.recommended_bump, BumpSeverity::Minor);
+}
+
+#[test]
+fn build_release_plan_suppresses_matching_dependency_propagation_when_caused_by_is_authored() {
+	let packages = vec![
+		package("cargo:core", Version::new(1, 0, 0)),
+		package("cargo:app", Version::new(1, 0, 0)),
+	];
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[edge("cargo:app", "cargo:core")],
+		&[],
+		&[
+			ChangeSignal {
+				package_id: "cargo:core".to_string(),
+				requested_bump: Some(BumpSeverity::Minor),
+				explicit_version: None,
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("core feature".to_string()),
+				details: None,
+				change_type: None,
+				caused_by: Vec::new(),
+				source_path: PathBuf::from(".changeset/core.md"),
+			},
+			ChangeSignal {
+				package_id: "cargo:app".to_string(),
+				requested_bump: Some(BumpSeverity::Patch),
+				explicit_version: None,
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("update dependency on core".to_string()),
+				details: None,
+				change_type: None,
+				caused_by: vec!["cargo:core".to_string()],
+				source_path: PathBuf::from(".changeset/app.md"),
+			},
+		],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	let app = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == "cargo:app")
+		.unwrap_or_else(|| panic!("expected app decision"));
+	assert_eq!(app.recommended_bump, BumpSeverity::Patch);
+	assert_eq!(app.trigger_type, "direct-change");
+	assert_eq!(app.upstream_sources, vec!["cargo:core".to_string()]);
+}
+
+#[test]
+fn build_release_plan_keeps_unrelated_dependency_propagation_when_caused_by_does_not_match() {
+	let packages = vec![
+		package("cargo:core", Version::new(1, 0, 0)),
+		package("cargo:util", Version::new(1, 0, 0)),
+		package("cargo:app", Version::new(1, 0, 0)),
+	];
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[
+			edge("cargo:app", "cargo:core"),
+			edge("cargo:app", "cargo:util"),
+		],
+		&[],
+		&[
+			ChangeSignal {
+				package_id: "cargo:util".to_string(),
+				requested_bump: Some(BumpSeverity::Minor),
+				explicit_version: None,
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("util feature".to_string()),
+				details: None,
+				change_type: None,
+				caused_by: Vec::new(),
+				source_path: PathBuf::from(".changeset/util.md"),
+			},
+			ChangeSignal {
+				package_id: "cargo:app".to_string(),
+				requested_bump: Some(BumpSeverity::None),
+				explicit_version: None,
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("dependency-only follow-up".to_string()),
+				details: None,
+				change_type: None,
+				caused_by: vec!["cargo:core".to_string()],
+				source_path: PathBuf::from(".changeset/app.md"),
+			},
+		],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	let app = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == "cargo:app")
+		.unwrap_or_else(|| panic!("expected app decision"));
+	assert_eq!(app.recommended_bump, BumpSeverity::Patch);
+	assert!(app.upstream_sources.contains(&"cargo:util".to_string()));
+}
+
+#[test]
+fn build_release_plan_suppresses_matching_dependency_propagation_when_caused_by_references_group() {
+	let mut core = package("cargo:core", Version::new(1, 0, 0));
+	core.version_group_id = Some("sdk".to_string());
+	let mut util = package("cargo:util", Version::new(1, 0, 0));
+	util.version_group_id = Some("sdk".to_string());
+	let packages = vec![
+		core.clone(),
+		util.clone(),
+		package("cargo:app", Version::new(1, 0, 0)),
+	];
+	let version_group = VersionGroup {
+		group_id: "sdk".to_string(),
+		display_name: "sdk".to_string(),
+		members: vec![core.id.clone(), util.id.clone()],
+		mismatch_detected: false,
+	};
+	let plan = build_release_plan(
+		PathBuf::from("fixtures/cargo").as_path(),
+		&packages,
+		&[edge("cargo:app", "cargo:core")],
+		&[version_group],
+		&[
+			ChangeSignal {
+				package_id: core.id.clone(),
+				requested_bump: Some(BumpSeverity::Minor),
+				explicit_version: None,
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("core feature".to_string()),
+				details: None,
+				change_type: None,
+				caused_by: Vec::new(),
+				source_path: PathBuf::from(".changeset/core.md"),
+			},
+			ChangeSignal {
+				package_id: "cargo:app".to_string(),
+				requested_bump: Some(BumpSeverity::None),
+				explicit_version: None,
+				change_origin: "direct-change".to_string(),
+				evidence_refs: Vec::new(),
+				notes: Some("dependency-only follow-up".to_string()),
+				details: None,
+				change_type: None,
+				caused_by: vec!["sdk".to_string()],
+				source_path: PathBuf::from(".changeset/app.md"),
+			},
+		],
+		&[],
+		BumpSeverity::Patch,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("release plan: {error}"));
+
+	let app = plan
+		.decisions
+		.iter()
+		.find(|decision| decision.package_id == "cargo:app")
+		.unwrap_or_else(|| panic!("expected app decision"));
+	assert_eq!(app.recommended_bump, BumpSeverity::None);
+	assert_eq!(app.trigger_type, "direct-change");
+	assert_eq!(
+		app.upstream_sources,
+		vec!["cargo:core".to_string(), "cargo:util".to_string()]
+	);
 }

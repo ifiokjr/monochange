@@ -272,6 +272,7 @@ fn rust_semver_provider_parses_compatibility_evidence() {
 		notes: Some("breaking change".to_string()),
 		details: None,
 		change_type: None,
+		caused_by: Vec::new(),
 		source_path: PathBuf::from(".changeset/feature.md"),
 	};
 	let provider = RustSemverProvider;
@@ -1282,6 +1283,7 @@ fn rust_semver_provider_defaults_unknown_severity_to_none() {
 		notes: None,
 		details: None,
 		change_type: None,
+		caused_by: Vec::new(),
 		source_path: PathBuf::from(".changeset/feature.md"),
 	};
 	let assessment = RustSemverProvider
@@ -1371,6 +1373,7 @@ fn rust_semver_provider_returns_none_for_non_cargo_packages() {
 		notes: None,
 		details: None,
 		change_type: None,
+		caused_by: Vec::new(),
 		source_path: PathBuf::from(".changeset/feature.md"),
 	};
 	assert_eq!(

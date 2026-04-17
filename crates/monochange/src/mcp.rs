@@ -37,6 +37,8 @@ pub struct ChangeParam {
 	pub reason: String,
 	#[serde(rename = "type")]
 	pub change_type: Option<String>,
+	#[serde(default)]
+	pub caused_by: Vec<String>,
 	pub details: Option<String>,
 	pub output: Option<String>,
 }
@@ -321,6 +323,7 @@ impl MonochangeMcpServer {
 			.reason(&params.reason)
 			.version(params.version.as_deref())
 			.change_type(params.change_type.as_deref())
+			.caused_by(&params.caused_by)
 			.details(params.details.as_deref())
 			.output(output)
 			.build();
@@ -819,6 +822,7 @@ mod __tests {
 				version: None,
 				reason: "add test coverage".to_string(),
 				change_type: None,
+				caused_by: Vec::new(),
 				details: None,
 				output: Some(
 					tempdir
@@ -872,6 +876,7 @@ mod __tests {
 				version: None,
 				reason: "document the migration".to_string(),
 				change_type: Some("docs".to_string()),
+				caused_by: Vec::new(),
 				details: None,
 				output: Some(
 					tempdir
@@ -922,6 +927,7 @@ mod __tests {
 				version: None,
 				reason: "missing package".to_string(),
 				change_type: None,
+				caused_by: Vec::new(),
 				details: None,
 				output: None,
 			}))

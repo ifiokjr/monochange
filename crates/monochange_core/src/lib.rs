@@ -2351,6 +2351,8 @@ pub struct PreparedChangesetTarget {
 	pub evidence_refs: Vec<String>,
 	#[serde(default)]
 	pub change_type: Option<String>,
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub caused_by: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -3379,6 +3381,17 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 					short: None,
 				},
 				CliInputDefinition {
+					name: "caused_by".to_string(),
+					kind: CliInputKind::StringList,
+					help_text: Some(
+						"Package or group ids that caused this dependent change".to_string(),
+					),
+					required: false,
+					default: None,
+					choices: Vec::new(),
+					short: None,
+				},
+				CliInputDefinition {
 					name: "details".to_string(),
 					kind: CliInputKind::String,
 					help_text: Some("Optional multi-line release-note details".to_string()),
@@ -3772,6 +3785,7 @@ pub struct ChangeSignal {
 	pub notes: Option<String>,
 	pub details: Option<String>,
 	pub change_type: Option<String>,
+	pub caused_by: Vec<String>,
 	pub source_path: PathBuf,
 }
 

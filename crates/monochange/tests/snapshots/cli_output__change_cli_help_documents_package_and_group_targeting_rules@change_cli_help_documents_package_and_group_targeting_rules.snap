@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 36
 info:
   program: mc
   args:
@@ -27,6 +26,7 @@ Options:
       --version <VERSION>         Pin an explicit version for this release
       --reason <REASON>           Short release-note summary for this change
       --type <TYPE>               Optional release-note type such as `security` or `note`
+      --caused-by <CAUSED_BY>     Package or group ids that caused this dependent change
       --details <DETAILS>         Optional multi-line release-note details
       --output <PATH>             Write the generated change file to a specific path
   -h, --help                      Print help
@@ -35,11 +35,13 @@ Examples:
   mc change --package sdk-core --bump patch --reason "fix panic"
   mc change --package sdk-core --bump minor --reason "add API" --output .changeset/sdk-core.md
   mc change --package sdk --bump minor --reason "coordinated release"
+  mc change --package sdk-config --bump none --caused-by sdk-core --reason "dependency-only follow-up"
 
 Rules:
   - Prefer configured package ids in change files whenever a leaf package changed.
   - Use a group id only when the change is intentionally owned by the whole group.
   - Dependents and grouped members are propagated automatically during planning.
+  - Use `--caused-by` when a package is only changing because another package or group moved first.
   - Legacy manifest paths may still resolve during migration, but declared ids are the stable interface.
 
 

@@ -96,6 +96,10 @@ When `version` is provided without `bump`, the bump is inferred from the current
 
 When a dependent package changes only because another package moved first, author that context explicitly with `caused_by`:
 
+```bash
+mc change --package sdk-config --bump none --caused-by sdk-core --reason "dependency-only follow-up"
+```
+
 ```markdown
 ---
 sdk-config:

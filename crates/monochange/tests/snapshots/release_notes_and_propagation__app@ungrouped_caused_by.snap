@@ -1,0 +1,13 @@
+---
+source: crates/monochange/tests/release_notes_and_propagation.rs
+expression: app_changelog
+---
+# Changelog
+
+## app 1.0.1 ([DATE])
+
+### Fixes
+
+#### update dependency on core
+
+Bumps the app dependency to consume the latest core API.

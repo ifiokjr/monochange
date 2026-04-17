@@ -445,11 +445,13 @@ pub(crate) fn cli_command_after_help(cli_command: &CliCommandDefinition) -> Opti
   mc change --package sdk-core --bump patch --reason "fix panic"
   mc change --package sdk-core --bump minor --reason "add API" --output .changeset/sdk-core.md
   mc change --package sdk --bump minor --reason "coordinated release"
+  mc change --package sdk-config --bump none --caused-by sdk-core --reason "dependency-only follow-up"
 
 Rules:
   - Prefer configured package ids in change files whenever a leaf package changed.
   - Use a group id only when the change is intentionally owned by the whole group.
   - Dependents and grouped members are propagated automatically during planning.
+  - Use `--caused-by` when a package is only changing because another package or group moved first.
   - Legacy manifest paths may still resolve during migration, but declared ids are the stable interface."#,
 			)
 		}

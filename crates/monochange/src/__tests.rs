@@ -1241,11 +1241,109 @@ fn add_change_file_rejects_none_without_type_or_version() {
 			.build(),
 	)
 	.expect_err("none bump without type/version should fail");
-	assert!(
-		error
-			.to_string()
-			.contains("must not use a `none` bump without also declaring `type` or `version`")
+	assert!(error.to_string().contains(
+		"must not use a `none` bump without also declaring `type`, `version`, or `caused_by`"
+	));
+}
+
+#[test]
+fn add_change_file_allows_none_with_caused_by_context() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+	let output_path = tempdir.path().join("dependency-follow-up.md");
+
+	add_change_file(
+		tempdir.path(),
+		crate::AddChangeFileRequest::builder()
+			.package_refs(&["core".to_string()])
+			.bump(BumpSeverity::None)
+			.reason("dependency-only follow-up")
+			.caused_by(&["sdk".to_string()])
+			.output(Some(&output_path))
+			.build(),
+	)
+	.unwrap_or_else(|error| panic!("change file output: {error}"));
+
+	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert!(content.contains("core:"));
+	assert!(content.contains("  bump: none"));
+	assert!(content.contains("  caused_by: [\"sdk\"]"));
+}
+
+#[test]
+fn render_change_target_markdown_uses_object_syntax_for_caused_by_context() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+	let caused_by = vec!["sdk".to_string()];
+	let lines = render_change_target_markdown(
+		&configuration,
+		"core",
+		BumpSeverity::Patch,
+		None,
+		Some("security"),
+		&caused_by,
+	)
+	.unwrap_or_else(|error| panic!("render target: {error}"));
+	assert_eq!(
+		lines,
+		vec![
+			"core:".to_string(),
+			"  bump: patch".to_string(),
+			"  type: security".to_string(),
+			"  caused_by: [\"sdk\"]".to_string(),
+		]
 	);
+}
+
+#[test]
+fn render_change_target_markdown_renders_version_and_caused_by_context() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+	let lines = render_change_target_markdown(
+		&configuration,
+		"core",
+		BumpSeverity::Patch,
+		Some("2.0.0"),
+		None,
+		&["sdk".to_string()],
+	)
+	.unwrap_or_else(|error| panic!("render version target: {error}"));
+	assert_eq!(
+		lines,
+		vec![
+			"core:".to_string(),
+			"  bump: patch".to_string(),
+			"  version: \"2.0.0\"".to_string(),
+			"  caused_by: [\"sdk\"]".to_string(),
+		]
+	);
+}
+
+#[test]
+fn add_interactive_change_file_renders_caused_by_context_for_none_bumps() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+	let output_path = tempdir.path().join("interactive-caused-by.md");
+	let result = InteractiveChangeResult {
+		targets: vec![InteractiveTarget {
+			id: "core".to_string(),
+			bump: BumpSeverity::None,
+			version: None,
+			change_type: None,
+		}],
+		caused_by: vec!["sdk".to_string()],
+		reason: "dependency follow-up".to_string(),
+		details: None,
+	};
+
+	add_interactive_change_file(tempdir.path(), &result, Some(&output_path))
+		.unwrap_or_else(|error| panic!("interactive caused_by change file: {error}"));
+	let content = fs::read_to_string(output_path).unwrap_or_else(|error| panic!("read: {error}"));
+	assert!(content.contains("core:"));
+	assert!(content.contains("  bump: none"));
+	assert!(content.contains("  caused_by: [\"sdk\"]"));
 }
 
 #[test]
@@ -1281,6 +1379,7 @@ fn render_change_target_markdown_uses_package_defaults() {
 		BumpSeverity::Patch,
 		None,
 		Some("security"),
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("render target: {error}"));
 	assert_eq!(lines, vec!["core: security".to_string()]);
@@ -1297,6 +1396,7 @@ fn render_change_target_markdown_uses_group_defaults() {
 		BumpSeverity::Minor,
 		None,
 		Some("test"),
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("render target: {error}"));
 	assert_eq!(lines, vec!["sdk: test".to_string()]);
@@ -1313,6 +1413,7 @@ fn render_change_target_markdown_quotes_special_character_ids() {
 		BumpSeverity::Patch,
 		None,
 		None,
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("render target: {error}"));
 	assert_eq!(lines, vec!["\"@monochange/skill\": patch".to_string()]);
@@ -1323,6 +1424,7 @@ fn render_change_target_markdown_quotes_special_character_ids() {
 		BumpSeverity::Patch,
 		None,
 		None,
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("render simple target: {error}"));
 	assert_eq!(simple, vec!["plain-package: patch".to_string()]);
@@ -1333,6 +1435,7 @@ fn render_change_target_markdown_quotes_special_character_ids() {
 		BumpSeverity::Patch,
 		None,
 		None,
+		&[],
 	)
 	.unwrap_or_else(|error| panic!("render escaped target: {error}"));
 	assert_eq!(escaped, vec!["\"pkg\\\\\\\"name\": patch".to_string()]);
@@ -1369,6 +1472,7 @@ fn add_interactive_change_file_writes_target_owned_metadata() {
 			version: None,
 			change_type: Some("test".to_string()),
 		}],
+		caused_by: Vec::new(),
 		reason: "broaden integration coverage".to_string(),
 		details: Some("Exercise the group-authored shorthand path.".to_string()),
 	};
@@ -1403,6 +1507,7 @@ fn add_interactive_change_file_quotes_special_character_targets() {
 			version: None,
 			change_type: None,
 		}],
+		caused_by: Vec::new(),
 		reason: "ship special package id support".to_string(),
 		details: None,
 	};
@@ -1602,6 +1707,7 @@ fn render_interactive_changeset_markdown_uses_natural_summary_heading() {
 			version: None,
 			change_type: None,
 		}],
+		caused_by: Vec::new(),
 		reason: "interactive heading".to_string(),
 		details: Some("Details body".to_string()),
 	};
@@ -1609,6 +1715,29 @@ fn render_interactive_changeset_markdown_uses_natural_summary_heading() {
 		.unwrap_or_else(|error| panic!("render interactive markdown: {error}"));
 	assert!(rendered.contains("# interactive heading"));
 	assert!(rendered.contains("Details body"));
+}
+
+#[test]
+fn render_interactive_changeset_markdown_renders_caused_by_context() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration =
+		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
+	let result = InteractiveChangeResult {
+		targets: vec![InteractiveTarget {
+			id: "core".to_string(),
+			bump: BumpSeverity::None,
+			version: None,
+			change_type: None,
+		}],
+		caused_by: vec!["sdk".to_string()],
+		reason: "interactive caused_by".to_string(),
+		details: None,
+	};
+	let rendered = crate::render_interactive_changeset_markdown(&configuration, &result)
+		.unwrap_or_else(|error| panic!("render interactive caused_by markdown: {error}"));
+	assert!(rendered.contains("core:"));
+	assert!(rendered.contains("  bump: none"));
+	assert!(rendered.contains("  caused_by: [\"sdk\"]"));
 }
 
 #[test]
@@ -7901,6 +8030,7 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 			origin: "author".to_string(),
 			evidence_refs: Vec::new(),
 			change_type: None,
+			caused_by: Vec::new(),
 		}],
 	)]);
 	let renamed = crate::filter_group_release_note_change(
@@ -7921,6 +8051,7 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 			origin: "author".to_string(),
 			evidence_refs: Vec::new(),
 			change_type: None,
+			caused_by: Vec::new(),
 		}],
 	)]);
 	assert!(
@@ -7949,6 +8080,7 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 			origin: "author".to_string(),
 			evidence_refs: Vec::new(),
 			change_type: None,
+			caused_by: Vec::new(),
 		}],
 	)]);
 	assert!(
@@ -7971,6 +8103,7 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 				origin: "author".to_string(),
 				evidence_refs: Vec::new(),
 				change_type: None,
+				caused_by: Vec::new(),
 			},
 			PreparedChangesetTarget {
 				id: "app".to_string(),
@@ -7979,6 +8112,7 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 				origin: "author".to_string(),
 				evidence_refs: Vec::new(),
 				change_type: None,
+				caused_by: Vec::new(),
 			},
 		],
 	)]);

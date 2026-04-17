@@ -986,6 +986,8 @@ pub struct AddChangeFileRequest<'a> {
 	#[builder(default)]
 	pub change_type: Option<&'a str>,
 	#[builder(default)]
+	pub caused_by: &'a [String],
+	#[builder(default)]
 	pub details: Option<&'a str>,
 	#[builder(default)]
 	pub output: Option<&'a Path>,
@@ -1030,6 +1032,7 @@ pub fn add_change_file(
 		request.version,
 		request.reason,
 		request.change_type,
+		request.caused_by,
 		request.details,
 	)?;
 
@@ -1121,15 +1124,30 @@ pub(crate) fn render_change_target_markdown(
 	bump: BumpSeverity,
 	version: Option<&str>,
 	change_type: Option<&str>,
+	caused_by: &[String],
 ) -> MonochangeResult<Vec<String>> {
-	if change_type.is_none() && version.is_none() && bump == BumpSeverity::None {
+	if change_type.is_none()
+		&& version.is_none()
+		&& bump == BumpSeverity::None
+		&& caused_by.is_empty()
+	{
 		return Err(MonochangeError::Config(format!(
-			"target `{target_id}` must not use a `none` bump without also declaring `type` or `version`"
+			"target `{target_id}` must not use a `none` bump without also declaring `type`, `version`, or `caused_by`"
 		)));
 	}
 
 	let mut lines = Vec::new();
 	let target_key = render_changeset_target_key(target_id);
+	let caused_by = caused_by
+		.iter()
+		.map(|reference| {
+			format!(
+				"\"{}\"",
+				reference.replace('\\', "\\\\").replace('"', "\\\"")
+			)
+		})
+		.collect::<Vec<_>>();
+	let forced_object_syntax = !caused_by.is_empty();
 
 	// Handle explicit change type
 	if let Some(change_type) = change_type.filter(|value| !value.trim().is_empty()) {
@@ -1140,7 +1158,7 @@ pub(crate) fn render_change_target_markdown(
 				))
 			})?;
 
-		if version.is_none() && bump == default_bump {
+		if !forced_object_syntax && version.is_none() && bump == default_bump {
 			lines.push(format!("{target_key}: {change_type}"));
 			return Ok(lines);
 		}
@@ -1153,22 +1171,49 @@ pub(crate) fn render_change_target_markdown(
 		if let Some(version) = version {
 			lines.push(format!("  version: \"{version}\""));
 		}
+		if !caused_by.is_empty() {
+			lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
+		}
 		return Ok(lines);
 	}
 
-	// Handle explicit version
 	if let Some(version) = version {
 		lines.push(format!("{target_key}:"));
 		if bump != BumpSeverity::None {
 			lines.push(format!("  bump: {bump}"));
 		}
 		lines.push(format!("  version: \"{version}\""));
+		if !caused_by.is_empty() {
+			lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
+		}
+		return Ok(lines);
+	}
+
+	if !caused_by.is_empty() {
+		lines.push(format!("{target_key}:"));
+		lines.push(format!("  bump: {bump}"));
+		lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
 		return Ok(lines);
 	}
 
 	lines.push(format!("{target_key}: {bump}"));
 
 	Ok(lines)
+}
+
+fn render_interactive_target_markdown(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	target: &interactive::InteractiveTarget,
+	caused_by: &[String],
+) -> MonochangeResult<Vec<String>> {
+	render_change_target_markdown(
+		configuration,
+		&target.id,
+		target.bump,
+		target.version.as_deref(),
+		target.change_type.as_deref(),
+		caused_by,
+	)
 }
 
 pub(crate) fn render_interactive_changeset_markdown(
@@ -1178,11 +1223,8 @@ pub(crate) fn render_interactive_changeset_markdown(
 	let mut lines = vec!["---".to_string()];
 
 	for target in &result.targets {
-		let id = &target.id;
-		let version = target.version.as_deref();
-		let change_type = target.change_type.as_deref();
 		let target_lines =
-			render_change_target_markdown(configuration, id, target.bump, version, change_type)?;
+			render_interactive_target_markdown(configuration, target, &result.caused_by)?;
 		lines.extend(target_lines);
 	}
 
@@ -2606,6 +2648,7 @@ path = "packages/web"
 					version: None,
 					change_type: None,
 				}],
+				caused_by: Vec::new(),
 				reason: "reason".to_string(),
 				details: None,
 			},
@@ -2661,6 +2704,7 @@ path = "packages/web"
 					version: None,
 					change_type: None,
 				}],
+				caused_by: Vec::new(),
 				reason: "reason".to_string(),
 				details: Some("extra details".to_string()),
 			},
@@ -2683,6 +2727,7 @@ path = "packages/web"
 					version: None,
 					change_type: None,
 				}],
+				caused_by: Vec::new(),
 				reason: "reason".to_string(),
 				details: None,
 			},

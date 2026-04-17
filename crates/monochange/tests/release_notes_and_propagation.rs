@@ -13,6 +13,7 @@ use test_support::snapshot_settings;
 
 #[rstest]
 #[case::ungrouped_patch("ungrouped-patch")]
+#[case::ungrouped_caused_by("ungrouped-caused-by")]
 #[case::grouped_default("grouped-default")]
 fn release_note_changelog_snapshots_match_expected_output(#[case] scenario: &str) {
 	let mut settings = snapshot_settings();
@@ -32,7 +33,7 @@ fn release_note_changelog_snapshots_match_expected_output(#[case] scenario: &str
 	);
 
 	match scenario {
-		"ungrouped-patch" => {
+		"ungrouped-patch" | "ungrouped-caused-by" => {
 			let core_changelog =
 				fs::read_to_string(tempdir.path().join("crates/core/CHANGELOG.md"))
 					.unwrap_or_else(|error| panic!("core changelog: {error}"));

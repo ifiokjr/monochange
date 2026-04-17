@@ -1460,11 +1460,9 @@ fn load_change_signals_reject_none_bump_without_type_or_version() {
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(
-		error
-			.to_string()
-			.contains("must not use `bump = \"none\"` without also declaring `type` or `version`")
-	);
+	assert!(error.to_string().contains(
+		"must not use `bump = \"none\"` without also declaring `type`, `version`, or `caused_by`"
+	));
 }
 
 #[test]
@@ -1519,7 +1517,7 @@ fn parse_markdown_change_target_accepts_unconfigured_object_type_literal() {
 		&configuration,
 	)
 	.unwrap_or_else(|error| panic!("parse target: {error}"));
-	assert_eq!(parsed, (None, None, Some("docs".to_string())));
+	assert_eq!(parsed, (None, None, Some("docs".to_string()), Vec::new()));
 }
 
 #[test]
@@ -1536,7 +1534,7 @@ fn parse_markdown_change_target_accepts_unconfigured_scalar_type_literal() {
 		&configuration,
 	)
 	.unwrap_or_else(|error| panic!("parse target: {error}"));
-	assert_eq!(parsed, (None, None, Some("docs".to_string())));
+	assert_eq!(parsed, (None, None, Some("docs".to_string()), Vec::new()));
 }
 
 #[test]
@@ -3910,6 +3908,43 @@ fn parse_markdown_change_target_and_validation_helpers_cover_remaining_error_pat
 			.contains("must not use `bump = \"none\"`")
 	);
 
+	let none_with_caused_by =
+		serde_yaml_ng::from_str::<serde_yaml_ng::Value>("bump: none\ncaused_by: [\"sdk\"]")
+			.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let parsed_none_with_caused_by = crate::parse_markdown_change_target(
+		&none_with_caused_by,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.unwrap_or_else(|error| panic!("parse none caused_by: {error}"));
+	assert_eq!(
+		parsed_none_with_caused_by,
+		(
+			Some(BumpSeverity::None),
+			None,
+			None,
+			vec!["sdk".to_string()]
+		)
+	);
+
+	let unknown_caused_by =
+		serde_yaml_ng::from_str::<serde_yaml_ng::Value>("bump: patch\ncaused_by: [\"missing\"]")
+			.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let unknown_caused_by_error = crate::parse_markdown_change_target(
+		&unknown_caused_by,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unknown caused_by error"));
+	assert!(
+		unknown_caused_by_error
+			.to_string()
+			.contains("unknown `caused_by` package or group `missing`")
+	);
+
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	std::fs::create_dir_all(tempdir.path().join("crates/core"))
 		.unwrap_or_else(|error| panic!("mkdir core: {error}"));
@@ -3938,6 +3973,217 @@ fn parse_markdown_change_target_and_validation_helpers_cover_remaining_error_pat
 			.to_string()
 			.contains("no configured types are available")
 	);
+}
+
+#[test]
+fn parse_markdown_change_target_covers_caused_by_scalar_and_error_paths() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+	let scalar_type = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("security")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let parsed_scalar_type = crate::parse_markdown_change_target(
+		&scalar_type,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.unwrap_or_else(|error| panic!("parse scalar type: {error}"));
+	assert_eq!(
+		parsed_scalar_type,
+		(
+			Some(BumpSeverity::Patch),
+			None,
+			Some("security".to_string()),
+			Vec::new(),
+		)
+	);
+
+	let invalid_compound = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("- security")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let invalid_compound_error = crate::parse_markdown_change_target(
+		&invalid_compound,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid compound error"));
+	assert!(
+		invalid_compound_error
+			.to_string()
+			.contains("must map to `none`, `patch`, `minor`, `major`")
+	);
+
+	for (label, yaml, expected) in [
+		(
+			"empty string",
+			"bump: patch\ncaused_by: \"   \"",
+			"must not use an empty `caused_by` reference",
+		),
+		(
+			"empty sequence",
+			"bump: patch\ncaused_by: []",
+			"must list at least one `caused_by` reference",
+		),
+		(
+			"non-string entry",
+			"bump: patch\ncaused_by: [123]",
+			"must use string package or group ids in `caused_by`",
+		),
+		(
+			"non-sequence type",
+			"bump: patch\ncaused_by: 123",
+			"must use a string or list of strings for `caused_by`",
+		),
+	] {
+		let value = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(yaml)
+			.unwrap_or_else(|error| panic!("yaml parse for {label}: {error}"));
+		let error = crate::parse_markdown_change_target(
+			&value,
+			Path::new("change.md"),
+			"core",
+			&configuration,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected caused_by error for {label}"));
+		assert!(
+			error.to_string().contains(expected),
+			"unexpected error for {label}: {error}"
+		);
+	}
+}
+
+#[test]
+fn load_change_signals_covers_configured_type_and_caused_by_context_paths() {
+	let tempdir = setup_fixture("changeset-target-metadata/render-workspace");
+	std::fs::write(
+		tempdir.path().join("change.md"),
+		"---\ncore: security\napp:\n  bump: none\n  caused_by: sdk\n---\n\n# follow-up\n",
+	)
+	.unwrap_or_else(|error| panic!("write change.md: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			tempdir.path().join("crates/core/Cargo.toml"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"app",
+			tempdir.path().join("crates/app/Cargo.toml"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	for (package, id) in packages.iter_mut().zip(["core", "app"]) {
+		package.id = id.to_string();
+	}
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let signals = load_change_signals(&tempdir.path().join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| panic!("change signals: {error}"));
+	assert_eq!(signals.len(), 2);
+	let core_signal = signals
+		.iter()
+		.find(|signal| signal.package_id == "core")
+		.unwrap_or_else(|| panic!("expected core signal"));
+	assert_eq!(core_signal.requested_bump, Some(BumpSeverity::Patch));
+	assert_eq!(core_signal.change_type.as_deref(), Some("security"));
+	let app_signal = signals
+		.iter()
+		.find(|signal| signal.package_id == "app")
+		.unwrap_or_else(|| panic!("expected app signal"));
+	assert_eq!(app_signal.requested_bump, Some(BumpSeverity::None));
+	assert_eq!(app_signal.caused_by, vec!["sdk".to_string()]);
+
+	std::fs::write(
+		tempdir.path().join("invalid-change.md"),
+		"---\ncore:\n  - invalid\n---\n\n# invalid\n",
+	)
+	.unwrap_or_else(|error| panic!("write invalid-change.md: {error}"));
+	let error = load_change_signals(
+		&tempdir.path().join("invalid-change.md"),
+		&configuration,
+		&packages,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid compound target error"));
+	assert!(
+		error
+			.to_string()
+			.contains("must map to `none`, `patch`, `minor`, `major`")
+	);
+
+	std::fs::write(
+		tempdir.path().join("unknown-target.md"),
+		"---\nunknown: note\n---\n\n# unknown\n",
+	)
+	.unwrap_or_else(|error| panic!("write unknown-target.md: {error}"));
+	let unknown_target_error = load_change_signals(
+		&tempdir.path().join("unknown-target.md"),
+		&configuration,
+		&packages,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unknown target error"));
+	assert!(!unknown_target_error.to_string().trim().is_empty());
+}
+
+#[test]
+fn load_change_signals_applies_default_bump_for_object_type_with_context() {
+	let tempdir = setup_fixture("changeset-target-metadata/render-workspace");
+	std::fs::write(
+		tempdir.path().join("object-type.md"),
+		"---\nsdk:\n  type: test\n---\n\n# grouped object type\n",
+	)
+	.unwrap_or_else(|error| panic!("write object-type.md: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			tempdir.path().join("crates/core/Cargo.toml"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"app",
+			tempdir.path().join("crates/app/Cargo.toml"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	for (package, id) in packages.iter_mut().zip(["core", "app"]) {
+		package.id = id.to_string();
+	}
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let signals = load_change_signals(
+		&tempdir.path().join("object-type.md"),
+		&configuration,
+		&packages,
+	)
+	.unwrap_or_else(|error| panic!("change signals: {error}"));
+	assert_eq!(signals.len(), 2);
+	for signal in &signals {
+		assert!(signal.package_id == "core" || signal.package_id == "app");
+		assert_eq!(signal.requested_bump, Some(BumpSeverity::Minor));
+		assert_eq!(signal.change_type.as_deref(), Some("test"));
+	}
 }
 
 #[test]

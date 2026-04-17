@@ -2861,6 +2861,7 @@ fn execute_create_change_file_step(
 
 	if is_interactive {
 		let options = interactive::InteractiveOptions {
+			caused_by: step_inputs.get("caused_by").cloned().unwrap_or_default(),
 			reason: step_inputs
 				.get("reason")
 				.and_then(|values| values.first())
@@ -2918,6 +2919,7 @@ fn execute_create_change_file_step(
 			.get("details")
 			.and_then(|values| values.first())
 			.cloned();
+		let caused_by = step_inputs.get("caused_by").cloned().unwrap_or_default();
 		let output_path = step_inputs
 			.get("output")
 			.and_then(|values| values.first())
@@ -2930,6 +2932,7 @@ fn execute_create_change_file_step(
 				.reason(&reason)
 				.version(version.as_deref())
 				.change_type(change_type.as_deref())
+				.caused_by(&caused_by)
 				.details(details.as_deref())
 				.output(output_path.as_deref())
 				.build(),

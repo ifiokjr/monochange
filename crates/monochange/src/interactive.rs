@@ -36,6 +36,8 @@ impl fmt::Display for SelectableTarget {
 pub struct InteractiveChangeResult {
 	/// Per-target (package or group id) selections.
 	pub targets: Vec<InteractiveTarget>,
+	/// Package or group ids that caused this dependent change.
+	pub caused_by: Vec<String>,
 	/// Release-note summary.
 	pub reason: String,
 	/// Optional long-form details.
@@ -52,6 +54,7 @@ pub struct InteractiveTarget {
 /// CLI-provided values that bypass their interactive prompts when present.
 #[derive(Debug, Default)]
 pub struct InteractiveOptions {
+	pub caused_by: Vec<String>,
 	pub reason: Option<String>,
 	pub details: Option<String>,
 }
@@ -112,6 +115,7 @@ pub fn run_interactive_change(
 
 	Ok(InteractiveChangeResult {
 		targets: interactive_targets,
+		caused_by: options.caused_by.clone(),
 		reason,
 		details,
 	})
