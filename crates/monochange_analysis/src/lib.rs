@@ -946,6 +946,13 @@ mod tests {
 		assert!(matches!(pr_targets.before, SnapshotTarget::GitRevision(_)));
 
 		let package_root = Path::new("crates/core");
+		fs::create_dir_all(root.join("crates/core/target/generated"))
+			.unwrap_or_else(|error| panic!("create skipped directory: {error}"));
+		fs::write(
+			root.join("crates/core/target/generated/ignored.rs"),
+			"pub struct Ignored;\n",
+		)
+		.unwrap_or_else(|error| panic!("write skipped file: {error}"));
 		let working_files = snapshot_files_from_working_tree(&root, package_root)
 			.unwrap_or_else(|error| panic!("working tree snapshot: {error}"));
 		assert!(!working_files.is_empty());
