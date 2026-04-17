@@ -16,7 +16,7 @@ Before merging architecture-sensitive work, check:
 2. Did `crates/monochange` add adapter-specific mutation logic instead of dispatching to an adapter?
 3. Did `crates/monochange_config` add implementation-specific validation that belongs in an adapter crate?
 4. Did the change add fixtures and integration tests that exercise the adapter boundary from the public CLI/API surface?
-5. Is touched-code coverage still above 92%?
+5. Is patch coverage for executable changed lines still at 100%?
 
 ## Preferred direction
 

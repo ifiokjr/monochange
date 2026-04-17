@@ -4,6 +4,7 @@
 - Release-planning logic needs realistic fixture coverage.
 - Cross-ecosystem behavior should remain consistent across Cargo, npm-family, Deno, Dart, and Flutter.
 - Keep `mc validate` green alongside the rest of the validation suite.
+- PRs must keep patch coverage at 100% for executable changed lines in the Rust coverage report.
 
 ## Fixture-first testing
 

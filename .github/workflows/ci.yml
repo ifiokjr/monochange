@@ -98,6 +98,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: setup
         uses: ./.github/actions/devenv
@@ -106,6 +108,14 @@ jobs:
 
       - name: run coverage
         run: coverage:all
+        shell: devenv shell -- bash -e {0}
+
+      - name: verify 100% patch coverage
+        if: github.event_name == 'pull_request'
+        env:
+          MONOCHANGE_PATCH_COVERAGE_BASE: ${{ github.event.pull_request.base.sha }}
+          MONOCHANGE_PATCH_COVERAGE_HEAD: ${{ github.sha }}
+        run: coverage:patch
         shell: devenv shell -- bash -e {0}
 
       - name: upload coverage to codecov
