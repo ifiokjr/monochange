@@ -698,6 +698,7 @@ mod tests {
 		);
 		git(tempdir.path(), &["add", "."]);
 		git(tempdir.path(), &["commit", "-m", "base"]);
+		git(tempdir.path(), &["branch", "-M", "main"]);
 		tempdir
 	}
 
