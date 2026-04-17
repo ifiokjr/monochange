@@ -2166,6 +2166,7 @@ name = "monochange_lint"
 version = "0.1.0"
 dependencies = [
  "glob",
+ "ignore",
  "monochange_core",
  "serde",
  "serde_json",

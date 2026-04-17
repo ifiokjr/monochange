@@ -4619,6 +4619,12 @@ fn load_workspace_configuration_parses_top_level_lints_and_scopes() {
 			.map(monochange_core::lint::LintRuleConfig::severity),
 		Some(monochange_core::lint::LintSeverity::Error)
 	);
+	assert_eq!(
+		configuration.lints.include,
+		vec!["crates/**".to_string(), "packages/**".to_string()]
+	);
+	assert_eq!(configuration.lints.exclude, vec!["examples/**".to_string()]);
+	assert!(configuration.lints.disable_gitignore);
 	assert_eq!(configuration.lints.scopes.len(), 1);
 	let scope = configuration
 		.lints
