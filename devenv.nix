@@ -111,8 +111,6 @@ in
     "install:all" = {
       exec = ''
         set -e
-        clean:mc
-        install:toolchains
         install:cargo:bin
       '';
       description = "Install all packages.";
@@ -130,6 +128,7 @@ in
     "install:cargo:bin" = {
       exec = ''
         set -e
+        clean:mc
         cargo bin --install
       '';
       description = "Install cargo binaries locally.";
