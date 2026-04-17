@@ -260,7 +260,7 @@ in
         set -e
         node --test npm/tests/*.test.mjs scripts/npm/tests/*.test.mjs
       '';
-      description = "Run npm helper and launcher tests with the built-in Node test runner.";
+      description = "Run npm helper, launcher, and repository utility tests with the built-in Node test runner.";
       binary = "bash";
     };
     "coverage:all" = {
@@ -273,6 +273,26 @@ in
         cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
       '';
       description = "Run workspace coverage, enforce a 70% line-coverage floor, and write target/coverage/lcov.info.";
+      binary = "bash";
+    };
+    "coverage:patch" = {
+      exec = ''
+        set -euo pipefail
+        base_ref="''${MONOCHANGE_PATCH_COVERAGE_BASE:-origin/main}"
+        head_ref="''${MONOCHANGE_PATCH_COVERAGE_HEAD:-HEAD}"
+
+        if [ ! -f target/coverage/lcov.info ]; then
+          coverage:all
+        fi
+
+        node scripts/check-patch-coverage.mjs \
+          --repo-root "$DEVENV_ROOT" \
+          --lcov target/coverage/lcov.info \
+          --base "$base_ref" \
+          --head "$head_ref" \
+          --target 100
+      '';
+      description = "Fail when executable changed lines fall below 100% patch coverage.";
       binary = "bash";
     };
     "fix:all" = {

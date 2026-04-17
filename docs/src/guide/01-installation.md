@@ -95,6 +95,7 @@ mc validate
 lint:all
 test:all
 coverage:all
+coverage:patch
 build:all
 build:book
 ```

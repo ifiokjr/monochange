@@ -17,6 +17,7 @@
 - `test:all`
 - `test:node`
 - `coverage:all`
+- `coverage:patch`
 - `build:book`
 
 ## Useful task-specific commands

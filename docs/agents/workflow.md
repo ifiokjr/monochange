@@ -18,6 +18,7 @@
 - Follow [Changeset generation](changeset-generation.md) when deciding changeset lifecycle actions, artifact-aware framing, and how granular to make release notes for libraries, CLI tools, and applications.
 - When adding or changing configuration options in any crate, update the annotations in `monochange.toml` to reflect the new option, its defaults, available values, and purpose. Use the existing comment style as a guide. Where possible, use mdt shared blocks in `.templates/` so the same documentation propagates to the guide, README, and config file.
 - Run the full local validation suite before opening a PR.
+- Patch coverage for executable changed lines must be 100% before opening or merging a PR. Treat anything lower as a blocker and add or adjust tests until the patch gate passes.
 - During review, explicitly check architecture boundaries for touched code: core defines contracts, adapter crates own implementation details, and `crates/monochange` only orchestrates.
 - If touched code adds provider/ecosystem-specific validation or mutation logic outside an adapter crate, either move it behind adapter dispatch or document why that exception is unavoidable.
-- For refactors that move implementation details across crate boundaries, add or update realistic fixtures and integration tests so touched-code coverage stays above 92%.
+- For refactors that move implementation details across crate boundaries, add or update realistic fixtures and integration tests so patch coverage for executable changed lines stays at 100%.

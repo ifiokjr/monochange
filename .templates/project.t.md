@@ -165,6 +165,7 @@ mc validate
 lint:all
 test:all
 coverage:all
+coverage:patch
 build:all
 build:book
 ```
@@ -183,6 +184,7 @@ mc change --package monochange --bump patch --reason "describe the change"
 lint:all
 test:all
 coverage:all
+coverage:patch
 build:all
 build:book
 ```
