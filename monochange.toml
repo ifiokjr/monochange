@@ -207,6 +207,9 @@ path = "crates/monochange_config"
 [package.monochange_deno]
 path = "crates/monochange_deno"
 
+[package.monochange_ecmascript]
+path = "crates/monochange_ecmascript"
+
 [package.monochange_dart]
 path = "crates/monochange_dart"
 
@@ -338,6 +341,7 @@ packages = [
 	"monochange_npm",
 	"monochange_config",
 	"monochange_deno",
+	"monochange_ecmascript",
 	"monochange_dart",
 	"monochange_graph",
 	"monochange_semver",

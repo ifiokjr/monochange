@@ -3,6 +3,7 @@ monochange: patch
 monochange_analysis: patch
 monochange_npm: patch
 monochange_deno: patch
+monochange_ecmascript: patch
 ---
 
 #### improve npm and Deno semantic analysis with parser-backed JS/TS export extraction
