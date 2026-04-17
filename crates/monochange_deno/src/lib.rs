@@ -31,6 +31,8 @@
 //! - normalized dependency and import extraction
 //! <!-- {/monochangeDenoCrateDocs} -->
 
+pub mod analysis;
+
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
@@ -38,6 +40,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use analysis::DenoSemanticAnalyzer;
+pub use analysis::semantic_analyzer;
 use glob::glob;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;

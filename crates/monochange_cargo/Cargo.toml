@@ -17,8 +17,10 @@ glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
 monochange_linting = { workspace = true }
 monochange_semver = { workspace = true }
+quote = { workspace = true, default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
+syn = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 toml = { workspace = true, default-features = true }
 toml_edit = { workspace = true, default-features = true }

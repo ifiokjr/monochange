@@ -564,18 +564,16 @@ group_ui_components = 4 # More granular UI tracking
 
 ### Tool: `monochange_analyze_changes`
 
-Analyzes git diff and suggests changeset structure with lifecycle awareness.
+Analyzes a git diff and returns ecosystem-specific semantic evidence for the affected packages.
 
 **Input:**
 
 ```json
 {
 	"path": "/path/to/repo",
-	"base_ref": "main",
-	"head_ref": "HEAD",
+	"frame": "main...feature-branch",
 	"detection_level": "signature",
-	"max_suggestions": 10,
-	"check_existing": true
+	"max_suggestions": 10
 }
 ```
 
@@ -583,54 +581,48 @@ Analyzes git diff and suggests changeset structure with lifecycle awareness.
 
 ```json
 {
-    "ok": true,
-    "analysis": {
-        "changed_packages": [
-            {
-                "package_id": "@monochange/core",
-                "artifact_type": "library",
-                "direct_changes": 5,
-                "propagated_changes": false,
-                "suggested_changesets": [
-                    {
-                        "summary": "add `ChangelogFormat` enum",
-                        "details": "Adds new enum for changelog format variants...",
-                        "bump": "minor",
-                        "change_type": "feature",
-                        "confidence": 0.92,
-                        "api_changes": [...],
-                        "files_changed": [...],
-                        "has_breaking_changes": false,
-                        "before_after_suggested": true
-                    }
-                ]
-            }
-        ],
-        "lifecycle_actions": [
-            {
-                "action": "remove",
-                "path": ".changeset/stale-feature.md",
-                "reason": "Feature was removed in commit abc123"
-            },
-            {
-                "action": "update",
-                "path": ".changeset/existing.md",
-                "additions": ["new flag --verbose"]
-            },
-            {
-                "action": "create",
-                "suggested_path": ".changeset/add-changelog-format.md",
-                "content": {...}
-            }
-        ],
-        "recommendations": [
-            "Create separate changeset for the new public type `ChangelogFormat`",
-            "Update existing changeset to include new --verbose flag",
-            "Remove stale changeset for reverted feature"
-        ]
-    }
+	"ok": true,
+	"action": "analyze_changes",
+	"frame": "working directory",
+	"summary": "Analyzed 1 package(s) and found 6 semantic change(s)",
+	"analysis": {
+		"packageAnalyses": {
+			"core": {
+				"packageId": "core",
+				"ecosystem": "cargo",
+				"changedFiles": ["Cargo.toml", "src/lib.rs"],
+				"semanticChanges": [
+					{
+						"category": "public_api",
+						"kind": "modified",
+						"itemKind": "function",
+						"itemPath": "greet",
+						"beforeSignature": "fn greet() -> &'static str",
+						"afterSignature": "fn greet(name: &str) -> String"
+					},
+					{
+						"category": "dependency",
+						"kind": "added",
+						"itemKind": "dependency",
+						"itemPath": "tracing"
+					}
+				],
+				"warnings": []
+			}
+		},
+		"warnings": []
+	}
 }
 ```
+
+This tool intentionally surfaces **semantic diffs, not bump decisions**. Agents should inspect the returned evidence and decide how to author or update a changeset.
+
+Current analyzer coverage includes:
+
+- Cargo public Rust API diffs plus `Cargo.toml` dependency and manifest metadata changes
+- npm-family JS/TS exported symbol diffs plus `package.json` exports, commands, dependency, and script changes
+- Deno JS/TS exported symbol diffs plus `deno.json` exports, import aliases, task, and compiler-option changes
+- Dart and Flutter public `lib/` API diffs plus `pubspec.yaml` executables, dependency, environment, and Flutter plugin-platform changes
 
 ### Tool: `monochange_change` (enhanced)
 
@@ -658,7 +650,9 @@ When `auto_analyze: true`:
 
 ### Tool: `monochange_validate_changeset`
 
-Validates that a changeset matches actual code changes.
+Validates that a changeset still matches the current semantic diff for the packages it targets.
+
+The validator uses the same Cargo, npm, Deno, and Dart/Flutter analyzer registry as `monochange_analyze_changes`, so stale symbol checks and missing-item suggestions stay aligned with the semantic evidence surfaced for each ecosystem.
 
 **Input:**
 
@@ -671,38 +665,30 @@ Validates that a changeset matches actual code changes.
 
 **Validation checks:**
 
-- Does the summary match the actual diff content?
-- Are before/after examples syntactically valid?
-- Is the bump level appropriate for the change type?
-- Are there undocumented API changes?
-- Is the artifact type correctly identified?
-- **Does the changeset reference code that still exists?**
-- **Should this changeset be updated based on new changes?**
+- Does the changeset still target packages that appear in the current diff?
+- Does it mention any of the semantic items that actually changed?
+- Does it reference backticked symbols that no longer exist in the current diff?
+- Should it be refreshed because the semantic scope of the change has moved?
 
 **Output:**
 
 ```json
 {
-	"ok": true,
+	"ok": false,
 	"valid": false,
+	"lifecycle_status": "stale",
 	"issues": [
 		{
 			"severity": "warning",
-			"message": "Changeset mentions `ChangelogFormat` but also adds `ChangelogParser` which is not documented",
-			"suggestion": "Add documentation for `ChangelogParser` or create separate changeset"
+			"message": "changeset does not mention any detected semantic item for `core`",
+			"suggestion": "mention one or more changed items such as `Greeter` or `greet`"
 		},
 		{
 			"severity": "error",
-			"message": "Bump level 'patch' but changes include new public type (usually 'minor')",
-			"suggestion": "Change bump to 'minor' or mark as internal change"
-		},
-		{
-			"severity": "error",
-			"message": "Changeset references `ConfigValidator` which was removed",
-			"suggestion": "Remove this stale changeset"
+			"message": "changeset references `OldGreeter` but that item was not found in the current semantic diff",
+			"suggestion": "remove the stale reference or update it to match the current code change"
 		}
-	],
-	"lifecycle_status": "stale"
+	]
 }
 ```
 

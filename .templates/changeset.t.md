@@ -247,11 +247,12 @@ monochange: minor
 
 #### add `monochange_validate_changeset` MCP tool
 
-Introduces a new MCP tool for validating changeset content against actual code changes.
+Introduces a new MCP tool for validating changeset content against the current semantic diff.
 
 - **Tool name:** `monochange_validate_changeset`
 - **New parameters:** `path`, `changeset_path`
-- **Returns:** validation result with severity-tagged issues
+- **Returns:** validation result with severity-tagged issues and lifecycle status
+- **Current semantic support:** Cargo, npm, Deno, and Dart/Flutter packages
 - **Backward compatible:** existing tools unchanged
 ```
 
@@ -425,9 +426,11 @@ When removing a changeset for a reverted feature, delete the file entirely — d
 
 <!-- {@changesetAnalysisMcpTools} -->
 
-The `monochange_analysis` crate provides MCP tools for automated changeset generation:
+The `monochange_analysis` crate provides MCP tools for semantic diff inspection and changeset validation.
 
-**`monochange_analyze_changes`** — Analyzes git diffs and suggests granular changeset structure:
+`monochange_analyze_changes` and `monochange_validate_changeset` now return real semantic analysis for Cargo, npm, Deno, and Dart/Flutter packages. They surface ecosystem-specific evidence such as Rust public API diffs, JS/TS export changes, `package.json` and `deno.json` export metadata, and `pubspec.yaml` dependency or plugin-platform changes.
+
+**`monochange_analyze_changes`** — Analyzes git diffs and returns granular semantic changes for affected packages:
 
 ```json
 {
@@ -438,14 +441,16 @@ The `monochange_analysis` crate provides MCP tools for automated changeset gener
 }
 ```
 
-Returns an analysis with:
+Current output includes:
 
-- Per-package change classifications (library, application, CLI, mixed)
-- Semantic change details (added/removed functions, routes, commands)
-- Suggested bump levels and grouping
-- Breaking change detection
+- Cargo public Rust API diffs plus `Cargo.toml` dependency and manifest metadata changes
+- npm-family JS/TS exported symbol diffs plus `package.json` exports, commands, dependency, and script changes
+- Deno JS/TS exported symbol diffs plus `deno.json` exports, import aliases, task, and compiler-option changes
+- Dart and Flutter public `lib/` API diffs plus `pubspec.yaml` executables, dependency, environment, and plugin-platform changes
 
-**`monochange_validate_changeset`** — Validates that a changeset matches the actual code changes:
+This tool intentionally **does not decide** whether the diff is patch/minor/major. It returns semantic evidence for the agent to interpret.
+
+**`monochange_validate_changeset`** — Validates that a changeset matches the current semantic diff:
 
 ```json
 {
@@ -454,15 +459,15 @@ Returns an analysis with:
 }
 ```
 
-Returns validation issues with severity levels and suggestions for fixing mismatches between changeset claims and actual code changes.
+The validator uses the same Cargo, npm, Deno, and Dart/Flutter analyzer registry as `monochange_analyze_changes`, so stale symbol checks and missing-item suggestions stay aligned with the semantic evidence surfaced for each ecosystem.
 
 **Lifecycle integration:**
 
 These tools integrate with the changeset lifecycle:
 
-- Use `monochange_analyze_changes` to understand what changed before deciding whether to create, update, or remove a changeset
-- Use `monochange_validate_changeset` to verify that existing changesets still accurately describe the current diff
-- Both tools respect the artifact type classification to provide appropriate suggestions
+- Use `monochange_analyze_changes` to inspect semantic evidence before creating or updating a changeset
+- Use `monochange_validate_changeset` to catch stale symbol references or underspecified summaries
+- Treat the returned semantic model as evidence for the agent, not an automatic bump decision
 
 <!-- {/changesetAnalysisMcpTools} -->
 

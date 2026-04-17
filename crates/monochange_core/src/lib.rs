@@ -60,9 +60,11 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub mod analysis;
 pub mod git;
 pub mod lint;
 
+pub use analysis::*;
 use ignore::gitignore::Gitignore;
 use ignore::gitignore::GitignoreBuilder;
 use semver::Version;

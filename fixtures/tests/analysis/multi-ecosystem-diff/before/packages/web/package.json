@@ -1,0 +1,9 @@
+{
+  "name": "@acme/web",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "react": "18.2.0"
+  }
+}

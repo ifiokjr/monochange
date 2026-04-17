@@ -1932,12 +1932,20 @@ dependencies = [
 name = "monochange_analysis"
 version = "0.1.0"
 dependencies = [
+ "insta",
+ "monochange_cargo",
+ "monochange_config",
  "monochange_core",
+ "monochange_dart",
+ "monochange_deno",
+ "monochange_npm",
+ "monochange_test_helpers",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
+ "walkdir",
 ]
 
 [[package]]
@@ -1970,11 +1978,13 @@ dependencies = [
  "monochange_linting",
  "monochange_semver",
  "monochange_test_helpers",
+ "quote",
  "rstest",
  "semver",
  "serde",
  "serde_json",
  "similar-asserts",
+ "syn",
  "tempfile",
  "thiserror 2.0.18",
  "toml",

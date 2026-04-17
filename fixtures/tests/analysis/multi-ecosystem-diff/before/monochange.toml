@@ -1,0 +1,15 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[package.runtime]
+path = "packages/runtime"
+type = "deno"
+
+[package.mobile]
+path = "packages/mobile"
+type = "flutter"

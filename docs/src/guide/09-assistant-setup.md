@@ -115,4 +115,6 @@ The MCP server is JSON-first and focuses on reviewable operations:
 
 These tools are designed to help assistants inspect the workspace, write explicit release intent, and preview release effects before a human or CI system performs mutating follow-up commands.
 
+`monochange_analyze_changes` and `monochange_validate_changeset` now provide semantic analysis across **Cargo, npm, Deno, and Dart/Flutter** packages. They surface ecosystem-specific evidence such as Rust public API diffs, JS/TS export changes, `package.json` and `deno.json` export metadata, and `pubspec.yaml` dependency or plugin-platform changes, then validate authored changesets against that semantic model.
+
 When you need full changeset context — introduced commit, linked PR, related issues — use `mc diagnostics --format json` directly. It returns stable workspace-relative paths and structured records that agents can parse without reading raw markdown files.
