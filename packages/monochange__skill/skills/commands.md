@@ -192,6 +192,6 @@ mc diagnostics --format json
 
 ## Related references
 
-- [REFERENCE.md](../REFERENCE.md)
+- [reference.md](./reference.md)
 - [configuration.md](./configuration.md)
 - [changesets.md](./changesets.md)

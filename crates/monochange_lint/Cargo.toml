@@ -13,6 +13,7 @@ description = "Ecosystem-agnostic manifest lint engine for monochange"
 
 [dependencies]
 glob = { workspace = true, default-features = true }
+ignore = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }

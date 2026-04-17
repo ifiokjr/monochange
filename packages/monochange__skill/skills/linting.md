@@ -513,6 +513,6 @@ devenv shell docs:check
 
 ## Related references
 
-- [REFERENCE.md](../REFERENCE.md)
+- [reference.md](./reference.md)
 - [configuration.md](./configuration.md)
 - [commands.md](./commands.md)

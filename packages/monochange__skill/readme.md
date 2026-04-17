@@ -5,16 +5,16 @@ Installable agent skill for monochange.
 This package bundles:
 
 - `SKILL.md` — concise entrypoint for agents
-- `skills/README.md` — index of focused deep dives
+- `skills/readme.md` — index of focused deep dives
 - `skills/adoption.md` — setup-depth questions, migration guidance, and recommendation patterns
 - `skills/changesets.md` — changeset authoring and lifecycle guidance
 - `skills/commands.md` — built-in command catalog and usage patterns
 - `skills/configuration.md` — `monochange.toml` setup and editing guidance
 - `skills/linting.md` — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
-- `examples/README.md` — condensed scenario examples for quick recommendations
-- `REFERENCE.md` — high-context reference with broader examples
-- `TRUSTED-PUBLISHING.md` — GitHub/OIDC setup guidance for `npm`, `crates.io`, `jsr`, and `pub.dev`
-- `MULTI-PACKAGE-PUBLISHING.md` — monorepo-oriented publishing patterns for multiple public packages
+- `examples/readme.md` — condensed scenario examples for quick recommendations
+- `skills/reference.md` — high-context reference with broader examples
+- `skills/trusted-publishing.md` — GitHub/OIDC setup guidance for `npm`, `crates.io`, `jsr`, and `pub.dev`
+- `skills/multi-package-publishing.md` — monorepo-oriented publishing patterns for multiple public packages
 - `monochange-skill` — helper executable for printing or copying the bundled skill
 
 ## Install
@@ -31,7 +31,7 @@ monochange-skill --print-skill
 monochange-skill --copy ~/.pi/agent/skills/monochange
 ```
 
-`monochange-skill --copy` copies the full skill bundle, including `SKILL.md`, `REFERENCE.md`, `TRUSTED-PUBLISHING.md`, `MULTI-PACKAGE-PUBLISHING.md`, the `skills/` deep-dive folder, and the bundled `examples/` folder.
+`monochange-skill --copy` copies the full skill bundle, including `SKILL.md`, `skills/reference.md`, `skills/trusted-publishing.md`, `skills/multi-package-publishing.md`, the `skills/` deep-dive folder, and the bundled `examples/` folder.
 
 ## What the skill teaches
 
@@ -48,6 +48,6 @@ The bundled skill explains how to:
 - choose sane multi-package publish patterns when one repository ships multiple public packages
 - point users at condensed bundled examples and fuller repository-level example indexes
 
-Open [SKILL.md](./SKILL.md) first, then use [skills/README.md](./skills/README.md), [examples/README.md](./examples/README.md), [REFERENCE.md](./REFERENCE.md), [TRUSTED-PUBLISHING.md](./TRUSTED-PUBLISHING.md), and [MULTI-PACKAGE-PUBLISHING.md](./MULTI-PACKAGE-PUBLISHING.md) for the deeper sections.
+Open [SKILL.md](./SKILL.md) first, then use [skills/readme.md](./skills/readme.md), [examples/readme.md](./examples/readme.md), [skills/reference.md](./skills/reference.md), [skills/trusted-publishing.md](./skills/trusted-publishing.md), and [skills/multi-package-publishing.md](./skills/multi-package-publishing.md) for the deeper sections.
 
 For fuller repo-shaped examples in the monochange repository, see <https://github.com/ifiokjr/monochange/tree/main/examples>.

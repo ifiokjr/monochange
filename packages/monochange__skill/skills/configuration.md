@@ -172,7 +172,7 @@ Preference rules for trusted publishing:
 - for `crates.io`, prefer `rust-lang/crates-io-auth-action@v1` when you want a registry-native GitHub Actions publish workflow
 - for `pub.dev`, prefer `dart-lang/setup-dart/.github/workflows/publish.yml@v1` when you want the workflow shape recommended by the Dart team
 - for `crates.io` and `pub.dev`, `mode = "external"` is often the clearest fit when the registry-maintained workflow should own the publish command directly
-- if one repository publishes multiple public packages, use [MULTI-PACKAGE-PUBLISHING.md](../MULTI-PACKAGE-PUBLISHING.md) to decide between one shared `mc publish` job, package-specific jobs, or fully external workflows
+- if one repository publishes multiple public packages, use [multi-package-publishing.md](./multi-package-publishing.md) to decide between one shared `mc publish` job, package-specific jobs, or fully external workflows
 
 ## Release titles and changelog headings
 
@@ -258,6 +258,6 @@ mc release --dry-run --format json
 
 ## Related references
 
-- [REFERENCE.md](../REFERENCE.md)
+- [reference.md](./reference.md)
 - [commands.md](./commands.md)
 - [linting.md](./linting.md)

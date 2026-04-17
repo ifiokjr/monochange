@@ -1,5 +1,8 @@
 [lints]
 use = ["cargo/recommended", "npm/recommended"]
+include = ["crates/**", "packages/**"]
+exclude = ["examples/**"]
+disable_gitignore = true
 
 [lints.rules]
 "cargo/internal-dependency-workspace" = "error"

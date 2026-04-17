@@ -411,6 +411,61 @@ skip_labels = ["no-changeset-required"]
 comment_on_failure = true
 
 # =============================================================================
+# [lints] — manifest lint configuration
+# =============================================================================
+#
+# Configure lint presets, path filters, and rule overrides for manifest files
+# checked by `mc check`.
+#
+# Fields:
+#   use             — preset ids to enable globally (default: [])
+#   include         — optional glob patterns that opt specific manifest paths
+#                     into linting; when empty, every non-gitignored manifest is
+#                     eligible (default: [])
+#   exclude         — glob patterns that remove matching manifest paths from
+#                     linting after include/default selection (default: [])
+#   disable_gitignore — when false, gitignored manifests are skipped before any
+#                     include/exclude matching; set true only when you
+#                     intentionally want lint coverage for ignored files
+#                     (default: false)
+#   rules           — explicit global rule overrides keyed by rule id
+#   scopes          — scoped preset/rule overrides for a subset of lint targets
+#     name          — optional label for the scope
+#     match         — selector that narrows the scope to matching targets
+#       ecosystems  — ecosystem ids such as cargo, npm, or dart
+#       paths       — glob patterns matched against manifest paths relative to
+#                     the workspace root
+#       package_ids — configured package ids to target directly
+#       group_ids   — configured group ids to target via group membership
+#       managed     — include only managed/unmanaged packages when set
+#       private     — include only private/public packages when set
+#       publishable — include only publishable/non-publishable packages when set
+#     use           — preset ids applied when the selector matches
+#     rules         — rule overrides applied when the selector matches
+#
+[lints]
+use = ["cargo/recommended", "npm/recommended"]
+exclude = ["examples/**"]
+
+[lints.rules]
+"cargo/dependency-field-order" = "error"
+"cargo/internal-dependency-workspace" = "error"
+"cargo/required-package-fields" = "error"
+"cargo/sorted-dependencies" = "error"
+"cargo/unlisted-package-private" = "warning"
+"npm/workspace-protocol" = "error"
+"npm/sorted-dependencies" = "error"
+"npm/required-package-fields" = "error"
+"npm/root-no-prod-deps" = "error"
+"npm/no-duplicate-dependencies" = "error"
+"npm/unlisted-package-private" = "warning"
+
+[[lints.scopes]]
+name = "published cargo packages"
+match = { ecosystems = ["cargo"], managed = true, publishable = true }
+rules = { "cargo/required-package-fields" = "error" }
+
+# =============================================================================
 # [ecosystems.*] — per-ecosystem discovery and publishing settings
 # =============================================================================
 #
@@ -445,27 +500,6 @@ comment_on_failure = true
 #
 # Note: roots and exclude are parsed but discovery currently scans all
 # supported ecosystems regardless of these settings.
-
-[lints]
-use = ["cargo/recommended", "npm/recommended"]
-
-[lints.rules]
-"cargo/dependency-field-order" = "error"
-"cargo/internal-dependency-workspace" = "error"
-"cargo/required-package-fields" = "error"
-"cargo/sorted-dependencies" = "error"
-"cargo/unlisted-package-private" = "warning"
-"npm/workspace-protocol" = "error"
-"npm/sorted-dependencies" = "error"
-"npm/required-package-fields" = "error"
-"npm/root-no-prod-deps" = "error"
-"npm/no-duplicate-dependencies" = "error"
-"npm/unlisted-package-private" = "warning"
-
-[[lints.scopes]]
-name = "published cargo packages"
-match = { ecosystems = ["cargo"], managed = true, publishable = true }
-rules = { "cargo/required-package-fields" = "error" }
 
 [ecosystems.cargo]
 enabled = true

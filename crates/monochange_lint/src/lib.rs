@@ -13,6 +13,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::Pattern;
+use ignore::gitignore::Gitignore;
+use ignore::gitignore::GitignoreBuilder;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::lint::LintContext;
 use monochange_core::lint::LintFix;
@@ -177,6 +179,8 @@ impl Linter {
 	) -> LintReport {
 		let mut report = LintReport::new();
 		self.warn_for_missing_presets(&mut report);
+		let gitignore_filter =
+			(!self.settings.disable_gitignore).then(|| build_gitignore_filter(workspace_root));
 
 		for (suite_id, suite) in &self.registry.suites {
 			if !self.selection.allows_suite(suite_id) {
@@ -194,6 +198,10 @@ impl Linter {
 			};
 
 			for target in &targets {
+				if !self.target_is_included(target, gitignore_filter.as_ref()) {
+					continue;
+				}
+
 				let target_report = self.lint_target(target);
 				report.merge(target_report);
 			}
@@ -307,6 +315,78 @@ impl Linter {
 			}
 		}
 	}
+
+	fn target_is_included(
+		&self,
+		target: &LintTarget,
+		gitignore_filter: Option<&Gitignore>,
+	) -> bool {
+		if gitignore_filter.is_some_and(|filter| {
+			gitignore_path_is_excluded(filter, &target.workspace_root, &target.manifest_path)
+		}) {
+			return false;
+		}
+
+		let relative = target.metadata.relative_path.to_string_lossy();
+		if !self.settings.include.is_empty()
+			&& !self
+				.settings
+				.include
+				.iter()
+				.any(|pattern| lint_path_pattern_matches(pattern, relative.as_ref(), "include"))
+		{
+			return false;
+		}
+
+		if self
+			.settings
+			.exclude
+			.iter()
+			.any(|pattern| lint_path_pattern_matches(pattern, relative.as_ref(), "exclude"))
+		{
+			return false;
+		}
+
+		true
+	}
+}
+
+fn lint_path_pattern_matches(pattern: &str, relative_path: &str, kind: &str) -> bool {
+	Pattern::new(pattern).map_or_else(
+		|error| {
+			tracing::warn!(pattern, kind, error = %error, "invalid lint path pattern");
+			false
+		},
+		|pattern| pattern.matches(relative_path),
+	)
+}
+
+fn build_gitignore_filter(workspace_root: &Path) -> Gitignore {
+	let mut builder = GitignoreBuilder::new(workspace_root);
+	for path in [
+		workspace_root.join(".gitignore"),
+		workspace_root.join(".git/info/exclude"),
+	] {
+		if path.is_file() {
+			let _ = builder.add(path);
+		}
+	}
+	builder.build().unwrap_or_else(|_| Gitignore::empty())
+}
+
+fn gitignore_path_is_excluded(
+	filter: &Gitignore,
+	workspace_root: &Path,
+	manifest_path: &Path,
+) -> bool {
+	manifest_path
+		.strip_prefix(workspace_root)
+		.ok()
+		.is_some_and(|relative| {
+			filter
+				.matched_path_or_any_parents(relative, false)
+				.is_ignore()
+		})
 }
 
 fn merge_config(
@@ -621,6 +701,7 @@ mod tests {
 				)]),
 			}],
 			rules: BTreeMap::new(),
+			..WorkspaceLintSettings::default()
 		};
 		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
 		let report = linter.lint_workspace(root.path(), &configuration);
@@ -643,6 +724,60 @@ mod tests {
 				.iter()
 				.any(|warning| warning.contains("missing/preset"))
 		);
+	}
+
+	#[test]
+	fn gitignored_targets_are_excluded_by_default() {
+		let root = tempfile::tempdir().unwrap();
+		std::fs::write(root.path().join(".gitignore"), "example.txt\n")
+			.unwrap_or_else(|error| panic!("write .gitignore: {error}"));
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			..WorkspaceLintSettings::default()
+		};
+		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
+		let report = linter.lint_workspace(root.path(), &configuration);
+		assert!(report.results.is_empty());
+	}
+
+	#[test]
+	fn disable_gitignore_allows_linting_gitignored_targets() {
+		let root = tempfile::tempdir().unwrap();
+		std::fs::write(root.path().join(".gitignore"), "example.txt\n")
+			.unwrap_or_else(|error| panic!("write .gitignore: {error}"));
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			disable_gitignore: true,
+			..WorkspaceLintSettings::default()
+		};
+		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
+		let report = linter.lint_workspace(root.path(), &configuration);
+		assert_eq!(report.error_count, 1);
+	}
+
+	#[test]
+	fn include_and_exclude_patterns_filter_targets() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let include_filtered = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			include: vec!["other/**".to_string()],
+			..WorkspaceLintSettings::default()
+		};
+		let include_report = Linter::new(vec![Box::new(ExampleSuite)], include_filtered)
+			.lint_workspace(root.path(), &configuration);
+		assert!(include_report.results.is_empty());
+
+		let exclude_filtered = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			exclude: vec!["example.*".to_string()],
+			..WorkspaceLintSettings::default()
+		};
+		let exclude_report = Linter::new(vec![Box::new(ExampleSuite)], exclude_filtered)
+			.lint_workspace(root.path(), &configuration);
+		assert!(exclude_report.results.is_empty());
 	}
 
 	#[test]
@@ -743,6 +878,11 @@ mod tests {
 	#[test]
 	fn merge_config_and_selector_helpers_cover_edge_cases() {
 		assert!(merge_config(None, None).is_none());
+		assert!(!lint_path_pattern_matches(
+			"[",
+			"packages/example/package.json",
+			"include"
+		));
 		assert_eq!(
 			merge_config(None, Some(&LintRuleConfig::Severity(LintSeverity::Warning)))
 				.expect("config")

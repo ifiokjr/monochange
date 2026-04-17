@@ -486,6 +486,12 @@ pub struct WorkspaceLintSettings {
 	#[serde(default, rename = "use")]
 	pub presets: Vec<String>,
 	#[serde(default)]
+	pub include: Vec<String>,
+	#[serde(default)]
+	pub exclude: Vec<String>,
+	#[serde(default)]
+	pub disable_gitignore: bool,
+	#[serde(default)]
 	pub rules: BTreeMap<String, LintRuleConfig>,
 	#[serde(default)]
 	pub scopes: Vec<LintScopeConfig>,

@@ -426,6 +426,19 @@ version_format = "primary"
 #
 # [lints]
 # use = ["cargo/recommended", "npm/recommended"]
+# include = ["crates/**", "packages/**"]
+# exclude = ["examples/**"]
+# disable_gitignore = false
+#
+# Fields:
+#   use               — preset ids enabled globally
+#   include           — optional glob patterns that opt specific manifest paths
+#                       into linting; when omitted, every non-gitignored
+#                       manifest is considered
+#   exclude           — glob patterns removed from linting after include/default
+#                       selection
+#   disable_gitignore — set true to lint gitignored manifests too; this is not
+#                       recommended for normal repositories
 #
 # [lints.rules]
 # "cargo/internal-dependency-workspace" = "error"
@@ -434,7 +447,17 @@ version_format = "primary"
 # [[lints.scopes]]
 # name = "published cargo packages"
 # match = { ecosystems = ["cargo"], managed = true, publishable = true }
+# use = ["cargo/recommended"]
 # rules = { "cargo/required-package-fields" = "error" }
+#
+# Scope selector fields inside `match`:
+#   ecosystems  — ecosystem ids like cargo, npm, or dart
+#   paths       — glob patterns against manifest paths relative to the workspace root
+#   package_ids — configured package ids to target directly
+#   group_ids   — configured group ids to target via group membership
+#   managed     — include only managed/unmanaged packages when set
+#   private     — include only private/public packages when set
+#   publishable — include only publishable/non-publishable packages when set
 
 {% if has_cargo %}
 [ecosystems.cargo]

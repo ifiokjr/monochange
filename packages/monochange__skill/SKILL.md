@@ -7,7 +7,7 @@ description: Guides agents through monochange adoption planning, discovery, chan
 
 ## Quick start
 
-If the user is still deciding how deeply to adopt monochange, start with [skills/adoption.md](skills/adoption.md) and [examples/README.md](examples/README.md) before generating files.
+If the user is still deciding how deeply to adopt monochange, start with [skills/adoption.md](skills/adoption.md) and [examples/readme.md](examples/readme.md) before generating files.
 
 1. If `monochange.toml` does not exist yet, run `mc init`. If it exists but you want editable built-in command definitions, run `mc populate`.
 2. Read `monochange.toml` first — it is the single source of truth.
@@ -53,17 +53,17 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 
 ## Deep dives
 
-- [REFERENCE.md](REFERENCE.md) — high-context reference with more examples
-- [skills/README.md](skills/README.md) — index of focused skill modules
+- [skills/reference.md](skills/reference.md) — high-context reference with more examples
+- [skills/readme.md](skills/readme.md) — index of focused skill modules
 - [skills/adoption.md](skills/adoption.md) — interactive setup planning, migration questions, and recommendation patterns
 - [skills/changesets.md](skills/changesets.md) — creating, auditing, cleaning up, and managing changesets
 - [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
 - [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
 - [skills/linting.md](skills/linting.md) — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
-- [examples/README.md](examples/README.md) — condensed setup examples for quick recommendations
-- [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) — patterns for publishing multiple public packages from one repository
-- [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) — full lifecycle guidance
-- [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) — package-type-specific release-note guidance
+- [examples/readme.md](examples/readme.md) — condensed setup examples for quick recommendations
+- [skills/multi-package-publishing.md](skills/multi-package-publishing.md) — patterns for publishing multiple public packages from one repository
+- [skills/changeset-guide.md](skills/changeset-guide.md) — full lifecycle guidance
+- [skills/artifact-types.md](skills/artifact-types.md) — package-type-specific release-note guidance
 
 ## CLI commands
 
@@ -165,8 +165,8 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, and monochange verifies the trust state before changing it.
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
 - Prefer the official GitHub publishing workflows for manual registries when they exist: `rust-lang/crates-io-auth-action@v1` for `crates.io` and `dart-lang/setup-dart/.github/workflows/publish.yml@v1` for `pub.dev`.
-- See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
-- See [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) when one repository publishes multiple packages and you need to choose between shared `mc publish` flows, package-specific jobs, or external workflows.
+- See [skills/trusted-publishing.md](skills/trusted-publishing.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
+- See [skills/multi-package-publishing.md](skills/multi-package-publishing.md) when one repository publishes multiple packages and you need to choose between shared `mc publish` flows, package-specific jobs, or external workflows.
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
 
 ### Release titles
@@ -210,7 +210,7 @@ Groups synchronize versions across packages. Group changelogs can filter include
 3. Choose bump level and section type based on artifact type (library, application, CLI, LSP/MCP)
 4. Validate with `mc validate` or `mc diagnostics --format json`
 
-See [CHANGESET-GUIDE.md](CHANGESET-GUIDE.md) for the full lifecycle management guide.
+See [skills/changeset-guide.md](skills/changeset-guide.md) for the full lifecycle management guide.
 
 ## Artifact types
 
@@ -218,7 +218,7 @@ Different package types have different user-facing boundaries. Libraries expose 
 
 Applications and websites should use the `ux` changelog section type for visual and interaction changes, with screenshots when configured.
 
-See [ARTIFACT-TYPES.md](ARTIFACT-TYPES.md) for per-type rules, templates, examples, and configuration.
+See [skills/artifact-types.md](skills/artifact-types.md) for per-type rules, templates, examples, and configuration.
 
 ### Lint configuration
 
@@ -249,12 +249,12 @@ Use `mc check --fix` to auto-fix issues where possible. Today the built-in rule 
 
 ## Guidance
 
-Start with [REFERENCE.md](REFERENCE.md) for the broad reference.
+Start with [skills/reference.md](skills/reference.md) for the broad reference.
 
-Open [skills/README.md](skills/README.md) when you need the focused deep dives for adoption planning, changesets, commands, configuration, or linting.
+Open [skills/readme.md](skills/readme.md) when you need the focused deep dives for adoption planning, changesets, commands, configuration, or linting.
 
-Open [examples/README.md](examples/README.md) when a short scenario-based recommendation is more useful than a long reference document.
+Open [examples/readme.md](examples/readme.md) when a short scenario-based recommendation is more useful than a long reference document.
 
-See [TRUSTED-PUBLISHING.md](TRUSTED-PUBLISHING.md) for GitHub/OIDC trusted-publishing setup details across the registries that monochange supports.
+See [skills/trusted-publishing.md](skills/trusted-publishing.md) for GitHub/OIDC trusted-publishing setup details across the registries that monochange supports.
 
-See [MULTI-PACKAGE-PUBLISHING.md](MULTI-PACKAGE-PUBLISHING.md) for monorepo publishing patterns when one repository ships multiple public packages.
+See [skills/multi-package-publishing.md](skills/multi-package-publishing.md) for monorepo publishing patterns when one repository ships multiple public packages.

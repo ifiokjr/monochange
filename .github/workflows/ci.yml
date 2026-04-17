@@ -42,7 +42,7 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: manifest lint
-        run: lint:check
+        run: lint:monochange
         shell: devenv shell -- bash -e {0}
 
   test:

@@ -85,7 +85,7 @@ in
         pass_filenames = false;
         name = "lint and test";
         description = "Run the local CI lint rules and test suite before push.";
-        entry = "${pkgs.bash}/bin/bash -lc 'local_git_env_vars=$(git rev-parse --local-env-vars); if [ -n \"$local_git_env_vars\" ]; then unset $local_git_env_vars; fi; trap \"git restore --source=HEAD --worktree --staged -- Cargo.lock >/dev/null 2>&1 || true\" EXIT; ${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all'";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all";
         stages = [ "pre-push" ];
       };
     };
@@ -111,8 +111,6 @@ in
     "install:all" = {
       exec = ''
         set -e
-        clean:mc
-        install:toolchains
         install:cargo:bin
       '';
       description = "Install all packages.";
@@ -130,6 +128,7 @@ in
     "install:cargo:bin" = {
       exec = ''
         set -e
+        clean:mc
         cargo bin --install
       '';
       description = "Install cargo binaries locally.";
@@ -299,10 +298,9 @@ in
       exec = ''
         set -e
         fix:clippy
-        docs:update # runs `mdt update`
+        docs:update
+        fix:monochange
         fix:format
-        mc validate
-        cargo run --bin mc -- check --fix
         publish:check
       '';
       description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
@@ -324,6 +322,15 @@ in
       description = "Fix clippy lints for rust.";
       binary = "bash";
     };
+    "fix:monochange" = {
+      exec = ''
+        set -e
+        mc validate
+        mc check --fix
+      '';
+      description = "Fix clippy lints for rust.";
+      binary = "bash";
+    };
     "deny:check" = {
       exec = ''
         set -e
@@ -339,8 +346,7 @@ in
         lint:format
         deny:check
         docs:check
-        mc validate
-        lint:check
+        lint:monochange
         publish:check
       '';
       description = "Run all checks.";
@@ -354,10 +360,11 @@ in
       description = "Check that all files are formatted.";
       binary = "bash";
     };
-    "lint:check" = {
+    "lint:monochange" = {
       exec = ''
         set -e
-        cargo run --bin mc -- check
+        mc validate
+        mc check
       '';
       description = "Run manifest lint rules across all ecosystems.";
       binary = "bash";
