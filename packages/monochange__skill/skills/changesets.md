@@ -100,6 +100,8 @@ Use object syntax when you need:
 - `type` for a custom changelog section
 - `caused_by` for dependency propagation context
 
+`caused_by` always uses the object form and can point at package ids or group ids.
+
 ## `caused_by` and dependency propagation
 
 Without `caused_by`, a dependent package gets an automatic dependency-bump record with little context.
@@ -127,6 +129,10 @@ Bumps `monochange_core` after the `ChangelogFormat` API change.
 ```
 
 Use `bump: none` when the package is affected but users do not need a version bump.
+
+`caused_by` suppresses only the matching automatic propagation. Other unrelated upstream changes can still propagate normally.
+
+CLI authoring accepts repeated `--caused-by <id>` flags when more than one upstream package or group explains the follow-up change.
 
 ## Create vs. update vs. replace vs. remove
 

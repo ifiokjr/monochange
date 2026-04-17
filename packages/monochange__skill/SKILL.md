@@ -23,7 +23,8 @@ If the user is still deciding how deeply to adopt monochange, start with [skills
 - Treat `monochange.toml` as the source of truth for packages, groups, source providers, ecosystems, `[cli.<command>]` entries, and lint configuration.
 - Prefer configured package or group ids over guessing manifest names.
 - Use `.changeset/*.md` files for explicit release intent — each targets one or more package/group ids with a bump severity, optional `type`, optional explicit `version`, and a human-readable summary.
-- Use `caused_by` in changeset frontmatter when a dependent package is updating because of a dependency change — this provides context and replaces the automatic "dependency changed → patch" propagation.
+- Use `caused_by` in changeset frontmatter when a dependent package is updating because of a dependency change — this provides context and replaces the matching automatic "dependency changed → patch" propagation.
+- `caused_by` uses object syntax in markdown changesets and can reference package ids or group ids; in CLI form, pass one or more `--caused-by <id>` flags.
 - When `mc affected` flags a package that has no meaningful change, create a changeset with `bump: none` and `caused_by` listing the root cause package(s).
 - Review existing `.changeset/*.md` files before creating a new one so you can decide whether the right lifecycle action is create, update, replace, or remove.
 - Keep changesets package-centric and granular. Distinct features should get distinct changesets even when they land in the same package; only expand an existing changeset when the new work is clearly the same feature growing in scope.

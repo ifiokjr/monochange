@@ -40,7 +40,7 @@ The bundled skill explains how to:
 - plan adoption in `quickstart`, `standard`, `full`, or `migration` mode
 - create or refine `monochange.toml` with `mc init`, `mc populate`, and `mc validate`
 - inspect the normalized model with `mc discover --format json`
-- create, update, and audit explicit change files with `mc change` and `mc diagnostics`
+- create, update, and audit explicit change files with `mc change` and `mc diagnostics`, including dependency-follow-up notes with `caused_by`
 - preview release effects with `mc release --dry-run --format json` and `mc release --dry-run --diff`
 - inspect durable release history with `mc release-record`
 - understand groups, package ids, changelogs, linting policy, package publishing, and source-provider release flows

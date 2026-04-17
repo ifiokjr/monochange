@@ -78,11 +78,27 @@ choices = ["none", "patch", "minor", "major"]
 default = "patch"
 
 [[cli.change.inputs]]
+name = "version"
+type = "string"
+
+[[cli.change.inputs]]
+name = "type"
+type = "string"
+
+[[cli.change.inputs]]
+name = "caused_by"
+type = "string_list"
+
+[[cli.change.inputs]]
 name = "reason"
 type = "string"
 
 [[cli.change.inputs]]
 name = "details"
+type = "string"
+
+[[cli.change.inputs]]
+name = "output"
 type = "string"
 
 [[cli.change.steps]]

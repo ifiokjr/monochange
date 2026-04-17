@@ -156,7 +156,7 @@ These tools integrate with the changeset lifecycle:
 
 When a dependency changes, monochange automatically patches all dependents. This creates release notes with no context for _why_ the dependent is being updated.
 
-The `caused_by` field in changeset frontmatter provides that context. It lists the root package(s) or group(s) that triggered this dependent change:
+The `caused_by` field in changeset frontmatter provides that context. It lists the root package(s) or group(s) that triggered this dependent change. Because `caused_by` is part of the object form, use table syntax instead of scalar shorthand whenever you need it:
 
 ```markdown
 ---
@@ -173,9 +173,10 @@ Bumps `monochange_core` dependency to v2.1.0 after the public API change to `Cha
 **How it works:**
 
 1. Without `caused_by`: a dependent gets an automatic "dependency changed → patch" record with no explanation
-2. With `caused_by`: the authored changeset **replaces** the automatic propagation — it provides human-readable context instead
-3. A changeset with `caused_by` and `bump: patch` suppresses the automatic "dependency changed → patch" record for that package
-4. A changeset with `caused_by` and `bump: none` suppresses propagation entirely — the package is acknowledged as affected but no version bump is warranted
+2. With `caused_by`: the authored changeset **replaces** the matching automatic propagation — it provides human-readable context instead
+3. A changeset with `caused_by` and `bump: patch` suppresses the automatic "dependency changed → patch" record for that package when the same upstream package or group triggered it
+4. A changeset with `caused_by` and `bump: none` suppresses that matching propagation entirely — the package is acknowledged as affected but no version bump is warranted
+5. Unrelated upstream sources can still propagate normally; `caused_by` is not a global opt-out for every dependency edge
 
 **`none` bump with `caused_by` — the "nothing meaningful changed" case:**
 
@@ -194,9 +195,12 @@ monochange_config:
 No user-facing changes. Dependency version updated to match the group release.
 ```
 
-This tells monochange: "this package is affected, but the change doesn't warrant a version bump for consumers. Suppress the automatic patch propagation entirely."
+This tells monochange: "this package is affected, but the change doesn't warrant a version bump for consumers. Suppress the matching automatic patch propagation entirely."
 
-CLI flag: `mc change --package <id> --bump patch --caused-by monochange_core --reason "update dependency"`
+CLI authoring supports one or more `--caused-by` flags:
+
+- `mc change --package <id> --bump patch --caused-by monochange_core --reason "update dependency"`
+- `mc change --package <id> --bump none --caused-by sdk --reason "dependency-only follow-up"`
 
 <!-- {/changesetCausedByField} -->
 

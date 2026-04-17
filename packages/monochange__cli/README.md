@@ -80,6 +80,12 @@ mc change --package <id> --bump patch --reason "describe the change"
 
 Most changes should target a package id. Use group ids only when the change is intentionally owned by the whole group.
 
+When a package is only changing because another dependency or version group moved first, author that context explicitly instead of relying on anonymous propagation:
+
+```bash
+mc change --package <dependent-id> --bump none --caused-by <upstream-id> --reason "dependency-only follow-up"
+```
+
 Preview the release plan safely:
 
 ```bash

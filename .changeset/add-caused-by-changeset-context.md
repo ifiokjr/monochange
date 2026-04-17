@@ -6,6 +6,8 @@ monochange_graph: minor
 monochange_cargo: none
 monochange_semver: none
 monochange_lint_testing: none
+"@monochange/cli": none
+"@monochange/skill": none
 ---
 
 #### add `caused_by` changeset context for dependency propagation
