@@ -3,7 +3,8 @@ monochange: patch
 monochange_analysis: patch
 monochange_npm: patch
 monochange_deno: patch
-monochange_ecmascript: patch
+monochange_ecmascript: major
+"@monochange/skill": patch
 ---
 
 #### improve npm and Deno semantic analysis with parser-backed JS/TS export extraction
@@ -19,4 +20,6 @@ This improves semantic diff accuracy for cases such as:
 
 The MCP output shape stays the same, but the semantic evidence for npm and Deno packages is now more robust and closer to the actual module structure.
 
-This work also extracts the shared JavaScript and TypeScript export-analysis logic into `monochange_ecmascript`, so npm and Deno keep their ecosystem-specific manifest analysis while reusing one parser-backed module analyzer.
+This work also extracts the shared JavaScript and TypeScript export-analysis logic into the new `monochange_ecmascript` crate, so npm and Deno keep their ecosystem-specific manifest analysis while reusing one parser-backed module analyzer.
+
+The monochange skill documentation now also teaches the new-package rule: the first changeset for a newly introduced published package or crate should use a `major` bump for that new package entry.

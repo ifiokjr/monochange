@@ -34,6 +34,7 @@ Libraries expose a public API surface. Changesets should focus on what consumers
 
 **Breaking changes (major bump):**
 
+- New published library package or crate is introduced
 - Public function removed or renamed
 - Public type removed or has fields removed
 - Public trait signature changed
@@ -57,6 +58,7 @@ Libraries expose a public API surface. Changesets should focus on what consumers
 **When to create vs. update:**
 
 - Each new public addition → create a new changeset
+- Each new published package or crate → create a new changeset with a `major` bump for that new package
 - If a function was added then modified before release → update the existing changeset
 - If a function was added then removed before release → delete the changeset
 

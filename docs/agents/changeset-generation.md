@@ -89,6 +89,8 @@ As features are added and removed, changesets must be actively managed throughou
 
 **Golden rule:** Err on the side of creating a new changeset. It's easier to consolidate later than to split apart.
 
+**New package rule:** When a PR introduces a new published package or crate, the first changeset for that package must use a `major` bump for the new package entry.
+
 <!-- {/changesetLifecycleRules} -->
 
 #### Decision matrix
@@ -98,6 +100,7 @@ As features are added and removed, changesets must be actively managed throughou
 | Scenario                          | Action                   | Rationale                                       |
 | --------------------------------- | ------------------------ | ----------------------------------------------- |
 | New feature added                 | **Create new**           | Granular tracking of distinct changes           |
+| New published package or crate    | **Create new**           | First release note should use a `major` bump    |
 | Existing feature expanded         | **Update existing**      | Keep related changes together                   |
 | Feature removed or reverted       | **Remove changeset**     | Don't release notes for removed features        |
 | Same change, different approach   | **Replace changeset**    | Document the actual implementation              |
@@ -109,6 +112,8 @@ As features are added and removed, changesets must be actively managed throughou
 <!-- {/changesetLifecycleDecisionMatrix} -->
 
 **Golden rule:** Create a new changeset for a genuinely new user-facing change, but collapse near-duplicate notes before finalizing. If several packages changed for the same outward reason and would otherwise produce the same release note with different names, combine them into one related multi-package changeset.
+
+**New package rule:** When a PR introduces a new published package or crate, the first changeset for that package must use a `major` bump for the new package entry.
 
 #### Similar-note consolidation
 

@@ -30,6 +30,8 @@ As features are added and removed, changesets must be actively managed throughou
 
 **Golden rule:** Err on the side of creating a new changeset. It's easier to consolidate later than to split apart.
 
+**New package rule:** When a PR introduces a new published package or crate, the first changeset for that package must use a `major` bump for the new package entry.
+
 <!-- {/changesetLifecycleRules} -->
 
 <!-- {@changesetLifecycleDecisionMatrix} -->
@@ -37,6 +39,7 @@ As features are added and removed, changesets must be actively managed throughou
 | Scenario                          | Action                   | Rationale                                       |
 | --------------------------------- | ------------------------ | ----------------------------------------------- |
 | New feature added                 | **Create new**           | Granular tracking of distinct changes           |
+| New published package or crate    | **Create new**           | First release note should use a `major` bump    |
 | Existing feature expanded         | **Update existing**      | Keep related changes together                   |
 | Feature removed or reverted       | **Remove changeset**     | Don't release notes for removed features        |
 | Same change, different approach   | **Replace changeset**    | Document the actual implementation              |
@@ -53,6 +56,7 @@ Libraries expose a public API surface. Changesets should focus on what consumers
 
 **Breaking changes (major bump):**
 
+- New published library package or crate is introduced
 - Public function removed or renamed
 - Public type removed or has fields removed
 - Public trait signature changed
@@ -76,6 +80,7 @@ Libraries expose a public API surface. Changesets should focus on what consumers
 **When to create vs. update:**
 
 - Each new public addition → create a new changeset
+- Each new published package or crate → create a new changeset with a `major` bump for that new package
 - If a function was added then modified before release → update the existing changeset
 - If a function was added then removed before release → delete the changeset
 
