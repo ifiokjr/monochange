@@ -946,6 +946,7 @@ mod __tests {
 				notes: None,
 				details: None,
 				change_type: None,
+				caused_by: Vec::new(),
 				source_path: PathBuf::from(".changeset/test.md"),
 			}],
 		}
