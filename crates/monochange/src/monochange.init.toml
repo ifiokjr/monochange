@@ -760,6 +760,7 @@ inputs = [
 	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
 	{ name = "reason", type = "string", required = true },
 	{ name = "type", type = "string" },
+	{ name = "caused_by", type = "string_list" },
 	{ name = "details", type = "string" },
 	{ name = "output", type = "path" },
 ]

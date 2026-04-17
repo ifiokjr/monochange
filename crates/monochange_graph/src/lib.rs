@@ -170,6 +170,8 @@ pub fn build_release_plan(
 		change_signals,
 		strict_version_conflicts,
 	)?;
+	let propagation_suppression =
+		build_propagation_suppression(change_signals, &package_by_id, &group_by_id);
 
 	let mut states = packages
 		.iter()
@@ -195,7 +197,8 @@ pub fn build_release_plan(
 			.notes
 			.clone()
 			.unwrap_or_else(|| "explicit change input".to_string());
-		let upstream_sources = BTreeSet::from([change_signal.package_id.clone()]);
+		let upstream_sources =
+			resolved_upstream_sources(change_signal, &package_by_id, &group_by_id);
 
 		apply_decision(
 			&mut states,
@@ -227,6 +230,13 @@ pub fn build_release_plan(
 
 		if propagated_severity.is_release() {
 			for dependent_id in graph.direct_dependents(source_package_id) {
+				if propagation_is_suppressed(
+					dependent_id,
+					&source_state.upstream_sources,
+					&propagation_suppression,
+				) {
+					continue;
+				}
 				let reason = format!("depends on `{source_package_id}`");
 				apply_decision(
 					&mut states,
@@ -344,6 +354,8 @@ type ExplicitVersionResolution = (
 	BTreeMap<String, Version>,
 	Vec<String>,
 );
+
+type PropagationSuppression = BTreeMap<String, BTreeSet<String>>;
 
 fn resolve_explicit_versions(
 	package_by_id: &BTreeMap<&str, &PackageRecord>,
@@ -486,6 +498,81 @@ struct ExplicitVersionInput {
 	package_id: String,
 	source_path: PathBuf,
 	version: Version,
+}
+
+fn build_propagation_suppression(
+	change_signals: &[ChangeSignal],
+	package_by_id: &BTreeMap<&str, &PackageRecord>,
+	group_by_id: &BTreeMap<&str, &VersionGroup>,
+) -> PropagationSuppression {
+	let mut suppression = BTreeMap::<String, BTreeSet<String>>::new();
+
+	for signal in change_signals
+		.iter()
+		.filter(|signal| !signal.caused_by.is_empty())
+	{
+		let resolved = resolve_caused_by_sources(&signal.caused_by, package_by_id, group_by_id);
+		if resolved.is_empty() {
+			continue;
+		}
+		suppression
+			.entry(signal.package_id.clone())
+			.or_default()
+			.extend(resolved);
+	}
+
+	suppression
+}
+
+fn resolved_upstream_sources(
+	signal: &ChangeSignal,
+	package_by_id: &BTreeMap<&str, &PackageRecord>,
+	group_by_id: &BTreeMap<&str, &VersionGroup>,
+) -> BTreeSet<String> {
+	if signal.caused_by.is_empty() {
+		return BTreeSet::from([signal.package_id.clone()]);
+	}
+
+	let resolved = resolve_caused_by_sources(&signal.caused_by, package_by_id, group_by_id);
+	if resolved.is_empty() {
+		return BTreeSet::from([signal.package_id.clone()]);
+	}
+
+	resolved
+}
+
+fn resolve_caused_by_sources(
+	caused_by: &[String],
+	package_by_id: &BTreeMap<&str, &PackageRecord>,
+	group_by_id: &BTreeMap<&str, &VersionGroup>,
+) -> BTreeSet<String> {
+	let mut resolved = BTreeSet::new();
+
+	for reference in caused_by {
+		if package_by_id.contains_key(reference.as_str()) {
+			resolved.insert(reference.clone());
+			continue;
+		}
+		if let Some(group) = group_by_id.get(reference.as_str()) {
+			resolved.extend(group.members.iter().cloned());
+		}
+	}
+
+	resolved
+}
+
+fn propagation_is_suppressed(
+	dependent_id: &str,
+	upstream_sources: &BTreeSet<String>,
+	propagation_suppression: &PropagationSuppression,
+) -> bool {
+	propagation_suppression
+		.get(dependent_id)
+		.is_some_and(|suppressed_sources| {
+			suppressed_sources
+				.iter()
+				.any(|source| upstream_sources.contains(source))
+		})
 }
 
 fn apply_decision<'a>(

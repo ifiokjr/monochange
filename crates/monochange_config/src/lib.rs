@@ -454,6 +454,8 @@ struct RawChangeEntry {
 	details: Option<String>,
 	#[serde(rename = "type", default)]
 	change_type: Option<String>,
+	#[serde(default)]
+	caused_by: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -465,6 +467,7 @@ pub struct LoadedChangesetTarget {
 	pub origin: String,
 	pub evidence_refs: Vec<String>,
 	pub change_type: Option<String>,
+	pub caused_by: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -1493,6 +1496,7 @@ pub fn load_changeset_contents_with_context(
 	for change in raw.changes {
 		if let Some(group) = context.groups_by_id.get(change.package.as_str()) {
 			let explicit_version = change.version.clone();
+			let caused_by = change.caused_by.clone();
 			let inferred_bump = match change.bump {
 				Some(bump) => Some(bump),
 				None => {
@@ -1511,6 +1515,7 @@ pub fn load_changeset_contents_with_context(
 				origin: "direct-change".to_string(),
 				evidence_refs: Vec::new(),
 				change_type: change.change_type.clone(),
+				caused_by: caused_by.clone(),
 			});
 			for member_id in &group.packages {
 				if referenced_packages.contains(member_id.as_str()) {
@@ -1542,12 +1547,14 @@ pub fn load_changeset_contents_with_context(
 					notes: change.reason.clone(),
 					details: change.details.clone(),
 					change_type: change.change_type.clone(),
+					caused_by: caused_by.clone(),
 					source_path: changes_path.to_path_buf(),
 				});
 			}
 		} else {
 			let package_id = resolve_package_reference_with_context(&change.package, context)?;
 			let explicit_version = change.version;
+			let caused_by = change.caused_by;
 			let inferred_bump = change.bump.or_else(|| {
 				infer_package_bump_from_explicit_version_with_context(
 					&package_id,
@@ -1563,6 +1570,7 @@ pub fn load_changeset_contents_with_context(
 				origin: "direct-change".to_string(),
 				evidence_refs: Vec::new(),
 				change_type: change.change_type.clone(),
+				caused_by: caused_by.clone(),
 			});
 			if !seen_package_ids.insert(package_id.clone()) {
 				return Err(changeset_diagnostic(
@@ -1589,6 +1597,7 @@ pub fn load_changeset_contents_with_context(
 				notes: change.reason,
 				details: change.details,
 				change_type: change.change_type,
+				caused_by,
 				source_path: changes_path.to_path_buf(),
 			});
 		}
@@ -1714,7 +1723,7 @@ fn parse_markdown_change_file_with_context(
 		let Some(package) = key.as_str() else {
 			continue;
 		};
-		let (requested_bump, explicit_version, change_type) =
+		let (requested_bump, explicit_version, change_type, caused_by) =
 			parse_markdown_change_target_with_context(value, changes_path, package, context)?;
 		changes.push(RawChangeEntry {
 			package: package.to_string(),
@@ -1723,30 +1732,43 @@ fn parse_markdown_change_file_with_context(
 			reason: reason.clone(),
 			details: details.clone(),
 			change_type,
+			caused_by,
 		});
 	}
 
 	Ok(RawChangeFile { changes })
 }
 
+type ParsedMarkdownChangeTarget = (
+	Option<BumpSeverity>,
+	Option<Version>,
+	Option<String>,
+	Vec<String>,
+);
+
 fn parse_markdown_change_target_with_context(
 	value: &serde_yaml_ng::Value,
 	changes_path: &Path,
 	package: &str,
 	context: &ChangesetLoadContext<'_>,
-) -> MonochangeResult<(Option<BumpSeverity>, Option<Version>, Option<String>)> {
+) -> MonochangeResult<ParsedMarkdownChangeTarget> {
 	if let Some(token) = value
 		.as_str()
 		.map(str::trim)
 		.filter(|value| !value.is_empty())
 	{
 		if let Some(bump) = parse_bump_severity(token) {
-			return Ok((Some(bump), None, None));
+			return Ok((Some(bump), None, None, Vec::new()));
 		}
 		if let Some(default_bump) =
 			configured_change_type_default_bump_with_context(context, package, token)
 		{
-			return Ok((Some(default_bump), None, Some(token.to_string())));
+			return Ok((
+				Some(default_bump),
+				None,
+				Some(token.to_string()),
+				Vec::new(),
+			));
 		}
 		if context.package_ids.contains(package) || context.groups_by_id.contains_key(package) {
 			let valid_types = configured_change_types_with_context(context, package);
@@ -1763,17 +1785,17 @@ fn parse_markdown_change_target_with_context(
 				changes_path.display()
 			)));
 		}
-		return Ok((None, None, Some(token.to_string())));
+		return Ok((None, None, Some(token.to_string()), Vec::new()));
 	}
 
 	let Some(mapping) = value.as_mapping() else {
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, and/or `type`",
+			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, `type`, and/or `caused_by`",
 			changes_path.display()
 		)));
 	};
 
-	let allowed_keys = ["bump", "version", "type"];
+	let allowed_keys = ["bump", "version", "type", "caused_by"];
 	let unknown_keys = mapping
 		.keys()
 		.filter_map(serde_yaml_ng::Value::as_str)
@@ -1820,6 +1842,10 @@ fn parse_markdown_change_target_with_context(
 	if let Some(change_type) = change_type.as_deref() {
 		validate_configured_change_type_with_context(context, changes_path, package, change_type)?;
 	}
+	let caused_by_value = mapping.get(serde_yaml_ng::Value::String("caused_by".to_string()));
+	let caused_by = parse_caused_by_refs(caused_by_value, changes_path, package, |reference| {
+		context.package_ids.contains(reference) || context.groups_by_id.contains_key(reference)
+	})?;
 	let requested_bump = requested_bump.or_else(|| {
 		change_type.as_deref().and_then(|change_type| {
 			configured_change_type_default_bump_with_context(context, package, change_type)
@@ -1834,13 +1860,78 @@ fn parse_markdown_change_target_with_context(
 	if requested_bump == Some(BumpSeverity::None)
 		&& explicit_version.is_none()
 		&& change_type.is_none()
+		&& caused_by.is_empty()
 	{
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: target `{package}` must not use `bump = \"none\"` without also declaring `type` or `version`",
+			"failed to parse {}: target `{package}` must not use `bump = \"none\"` without also declaring `type`, `version`, or `caused_by`",
 			changes_path.display()
 		)));
 	}
-	Ok((requested_bump, explicit_version, change_type))
+	Ok((requested_bump, explicit_version, change_type, caused_by))
+}
+
+fn parse_caused_by_refs(
+	value: Option<&serde_yaml_ng::Value>,
+	changes_path: &Path,
+	target: &str,
+	is_valid_reference: impl Fn(&str) -> bool,
+) -> MonochangeResult<Vec<String>> {
+	let Some(value) = value else {
+		return Ok(Vec::new());
+	};
+
+	let references = match value {
+		serde_yaml_ng::Value::String(reference) => {
+			let reference = reference.trim();
+			if reference.is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {}: target `{target}` must not use an empty `caused_by` reference",
+					changes_path.display()
+				)));
+			}
+			vec![reference.to_string()]
+		}
+		serde_yaml_ng::Value::Sequence(sequence) => {
+			if sequence.is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"failed to parse {}: target `{target}` must list at least one `caused_by` reference",
+					changes_path.display()
+				)));
+			}
+			let mut references = Vec::with_capacity(sequence.len());
+			for item in sequence {
+				let Some(reference) = item
+					.as_str()
+					.map(str::trim)
+					.filter(|value| !value.is_empty())
+				else {
+					return Err(MonochangeError::Config(format!(
+						"failed to parse {}: target `{target}` must use string package or group ids in `caused_by`",
+						changes_path.display()
+					)));
+				};
+				references.push(reference.to_string());
+			}
+			references
+		}
+		_ => {
+			return Err(MonochangeError::Config(format!(
+				"failed to parse {}: target `{target}` must use a string or list of strings for `caused_by`",
+				changes_path.display()
+			)));
+		}
+	};
+
+	for reference in &references {
+		if !is_valid_reference(reference) {
+			return Err(MonochangeError::Config(format!(
+				"failed to parse {}: target `{target}` references unknown `caused_by` package or group `{reference}`",
+				changes_path.display()
+			)));
+		}
+	}
+
+	Ok(references)
 }
 
 fn validate_configured_change_type_with_context(
@@ -1985,7 +2076,7 @@ fn parse_markdown_change_file(
 		let Some(package) = key.as_str() else {
 			continue;
 		};
-		let (requested_bump, explicit_version, change_type) =
+		let (requested_bump, explicit_version, change_type, caused_by) =
 			parse_markdown_change_target(value, changes_path, package, configuration)?;
 		changes.push(RawChangeEntry {
 			package: package.to_string(),
@@ -1994,6 +2085,7 @@ fn parse_markdown_change_file(
 			reason: reason.clone(),
 			details: details.clone(),
 			change_type,
+			caused_by,
 		});
 	}
 
@@ -2199,19 +2291,24 @@ fn parse_markdown_change_target(
 	changes_path: &Path,
 	package: &str,
 	configuration: &WorkspaceConfiguration,
-) -> MonochangeResult<(Option<BumpSeverity>, Option<Version>, Option<String>)> {
+) -> MonochangeResult<ParsedMarkdownChangeTarget> {
 	if let Some(token) = value
 		.as_str()
 		.map(str::trim)
 		.filter(|value| !value.is_empty())
 	{
 		if let Some(bump) = parse_bump_severity(token) {
-			return Ok((Some(bump), None, None));
+			return Ok((Some(bump), None, None, Vec::new()));
 		}
 		if let Some(default_bump) =
 			configured_change_type_default_bump(configuration, package, token)
 		{
-			return Ok((Some(default_bump), None, Some(token.to_string())));
+			return Ok((
+				Some(default_bump),
+				None,
+				Some(token.to_string()),
+				Vec::new(),
+			));
 		}
 		if configuration.package_by_id(package).is_some()
 			|| configuration.group_by_id(package).is_some()
@@ -2230,17 +2327,17 @@ fn parse_markdown_change_target(
 				changes_path.display()
 			)));
 		}
-		return Ok((None, None, Some(token.to_string())));
+		return Ok((None, None, Some(token.to_string()), Vec::new()));
 	}
 
 	let Some(mapping) = value.as_mapping() else {
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, and/or `type`",
+			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, `type`, and/or `caused_by`",
 			changes_path.display()
 		)));
 	};
 
-	let allowed_keys = ["bump", "version", "type"];
+	let allowed_keys = ["bump", "version", "type", "caused_by"];
 	let unknown_keys = mapping
 		.keys()
 		.filter_map(serde_yaml_ng::Value::as_str)
@@ -2284,6 +2381,15 @@ fn parse_markdown_change_target(
 		.map(str::trim)
 		.filter(|value| !value.is_empty())
 		.map(ToString::to_string);
+	let caused_by = parse_caused_by_refs(
+		mapping.get(serde_yaml_ng::Value::String("caused_by".to_string())),
+		changes_path,
+		package,
+		|reference| {
+			configuration.package_by_id(reference).is_some()
+				|| configuration.group_by_id(reference).is_some()
+		},
+	)?;
 
 	if let Some(change_type) = change_type.as_deref() {
 		validate_configured_change_type(configuration, changes_path, package, change_type)?;
@@ -2296,14 +2402,18 @@ fn parse_markdown_change_target(
 		)));
 	}
 
-	if bump == Some(BumpSeverity::None) && version.is_none() && change_type.is_none() {
+	if bump == Some(BumpSeverity::None)
+		&& version.is_none()
+		&& change_type.is_none()
+		&& caused_by.is_empty()
+	{
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: target `{package}` must not use `bump = \"none\"` without also declaring `type` or `version`",
+			"failed to parse {}: target `{package}` must not use `bump = \"none\"` without also declaring `type`, `version`, or `caused_by`",
 			changes_path.display()
 		)));
 	}
 
-	Ok((bump, version, change_type))
+	Ok((bump, version, change_type, caused_by))
 }
 
 fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {

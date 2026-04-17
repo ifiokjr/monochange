@@ -1,0 +1,5 @@
+---
+source: crates/monochange_graph/src/__tests.rs
+expression: error.to_string()
+---
+config error: explicit version `1.0.0` for package `cargo:core` must be greater than current version `1.0.0`

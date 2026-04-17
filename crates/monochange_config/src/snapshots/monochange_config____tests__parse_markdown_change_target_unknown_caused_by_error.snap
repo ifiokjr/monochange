@@ -1,0 +1,5 @@
+---
+source: crates/monochange_config/src/__tests.rs
+expression: unknown_caused_by_error.to_string()
+---
+config error: failed to parse change.md: target `core` references unknown `caused_by` package or group `missing`

@@ -177,7 +177,7 @@ Redesign the public API surface.
 
 ### Dependency propagation with `caused_by`
 
-When a dependency changes, monochange automatically patches all dependents with no context. The `caused_by` field provides that context and suppresses the automatic propagation:
+When a dependency changes, monochange automatically patches all dependents with no context. The `caused_by` field provides that context and suppresses the matching automatic propagation. Because `caused_by` is part of the object form, use table syntax when you need it:
 
 ```markdown
 ---
@@ -206,7 +206,12 @@ monochange_config:
 No user-facing changes. Dependency version updated to match the group release.
 ```
 
-CLI flag: `mc change --package <id> --bump patch --caused-by monochange_core --reason "update dependency"`
+`caused_by` can reference package ids or group ids. It suppresses only the matching propagated entry, so unrelated upstream dependency changes can still propagate normally.
+
+CLI authoring accepts one or more `--caused-by <id>` flags:
+
+- `mc change --package <id> --bump patch --caused-by monochange_core --reason "update dependency"`
+- `mc change --package <id> --bump none --caused-by sdk --reason "dependency-only follow-up"`
 
 ### Granularity and lifecycle rules
 

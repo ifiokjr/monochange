@@ -24,6 +24,9 @@
 - Prefer **external `insta` snapshots** over inline snapshots when comparing output.
 - This applies to human-readable output such as CLI help, stdout/stderr text, changelog text, markdown, and rendered release bodies **and** to structured machine-readable output such as JSON manifests or dry-run payloads.
 - For Rust tests, prefer built-in snapshot generation via `insta::assert_snapshot!`, `insta::assert_json_snapshot!`, or `insta_cmd::assert_cmd_snapshot!` instead of maintaining parallel hand-authored `expected` files.
+- Treat `String::contains(...)` assertions on rendered output as a code smell. When the output matters enough to assert, snapshot the full rendered value instead of checking a few substrings.
+- Prefer **insta redactions** over **insta filters** when stabilizing dynamic output. Redactions preserve the structural assertion while replacing environment-, time-, or input-dependent fields with stable placeholders.
+- Use filters only when the snapshot target is effectively unstructured text and selector-based redactions are not practical.
 - When using `rstest`, give each parametrized case a stable snapshot suffix so every case gets its own external snapshot file.
 - If a test can be expressed as “copy scenario workspace, run command, snapshot the output”, prefer that pattern over large in-test `assert_eq!` trees.
 - Keep imperative assertions for scenarios that are genuinely stateful or easier to understand as focused semantic checks (for example multi-step git history setup, partial property assertions, or intentionally dynamic output).

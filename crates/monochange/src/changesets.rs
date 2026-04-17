@@ -131,6 +131,10 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 					target.kind, target.id, bump, target.origin,
 				));
 
+				if !target.caused_by.is_empty() {
+					lines.push(format!("    caused by: {}", target.caused_by.join(", ")));
+				}
+
 				if !target.evidence_refs.is_empty() {
 					lines.push(format!("    evidence: {}", target.evidence_refs.join(", ")));
 				}
@@ -259,6 +263,7 @@ pub(crate) fn build_prepared_changesets(
 							origin: target.origin.clone(),
 							evidence_refs: target.evidence_refs.clone(),
 							change_type: target.change_type.clone(),
+							caused_by: target.caused_by.clone(),
 						}
 					})
 					.collect(),
@@ -411,6 +416,7 @@ mod diagnostics_tests {
 					origin: "manual".to_string(),
 					evidence_refs: vec!["src/lib.rs".to_string()],
 					change_type: Some("feature".to_string()),
+					caused_by: vec!["core".to_string()],
 				}],
 				context: Some(ChangesetContext {
 					provider: HostingProviderKind::GitHub,
@@ -473,6 +479,7 @@ mod diagnostics_tests {
 		assert!(rendered.contains("summary: ship feature"));
 		assert!(rendered.contains("details: long details"));
 		assert!(rendered.contains("- package core (bump: minor, origin: manual)"));
+		assert!(rendered.contains("caused by: core"));
 		assert!(rendered.contains("evidence: src/lib.rs"));
 		assert!(rendered.contains("introduced: abc1234"));
 		assert!(rendered.contains("last-updated: def1234"));
@@ -535,6 +542,7 @@ mod diagnostics_tests {
 				origin: "manual".to_string(),
 				evidence_refs: vec!["src/lib.rs".to_string()],
 				change_type: Some("fix".to_string()),
+				caused_by: Vec::new(),
 			}],
 			signals: Vec::new(),
 		}];
@@ -895,6 +903,7 @@ pub(crate) fn default_change_path(root: &Path, package_refs: &[String]) -> PathB
 		.join(format!("{timestamp}-{slug}.md"))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_changeset_markdown(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	package_refs: &[String],
@@ -902,6 +911,7 @@ pub(crate) fn render_changeset_markdown(
 	version: Option<&str>,
 	reason: &str,
 	change_type: Option<&str>,
+	caused_by: &[String],
 	details: Option<&str>,
 ) -> MonochangeResult<String> {
 	let mut lines = vec!["---".to_string()];
@@ -912,6 +922,7 @@ pub(crate) fn render_changeset_markdown(
 			bump,
 			version,
 			change_type,
+			caused_by,
 		)?);
 	}
 	lines.push("---".to_string());

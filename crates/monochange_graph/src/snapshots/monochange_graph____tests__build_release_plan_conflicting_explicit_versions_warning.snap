@@ -1,0 +1,5 @@
+---
+source: crates/monochange_graph/src/__tests.rs
+expression: warning
+---
+conflicting explicit versions for package `cargo:core`; using highest version `2.0.0` from: 1.1.0 @ .changeset/001-first.md [cargo:core], 2.0.0 @ .changeset/002-second.md [cargo:core]

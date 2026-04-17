@@ -226,6 +226,7 @@ fn collect_assessments_gathers_from_matching_packages() {
 		evidence_refs: Vec::new(),
 		notes: None,
 		details: None,
+		caused_by: Vec::new(),
 		source_path: PathBuf::from(".changeset/feature.md"),
 	}];
 	let provider = TestProvider {
@@ -258,6 +259,7 @@ fn collect_assessments_returns_empty_for_unmatched_signals() {
 		evidence_refs: Vec::new(),
 		notes: None,
 		details: None,
+		caused_by: Vec::new(),
 		source_path: PathBuf::from(".changeset/fix.md"),
 	}];
 	let provider = TestProvider {
@@ -287,6 +289,7 @@ fn collect_assessments_returns_empty_without_providers() {
 		evidence_refs: Vec::new(),
 		notes: None,
 		details: None,
+		caused_by: Vec::new(),
 		source_path: PathBuf::from(".changeset/fix.md"),
 	}];
 	let providers: Vec<&dyn CompatibilityProvider> = vec![];

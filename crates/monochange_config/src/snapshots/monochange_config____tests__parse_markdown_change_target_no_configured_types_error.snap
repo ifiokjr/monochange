@@ -1,0 +1,5 @@
+---
+source: crates/monochange_config/src/__tests.rs
+expression: no_types_error.to_string()
+---
+config error: failed to parse change.md: target `core` has invalid type `docs`; no configured types are available for this target

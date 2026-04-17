@@ -1460,6 +1460,7 @@ mod tests {
 				origin: "manual".to_string(),
 				evidence_refs: Vec::new(),
 				change_type: Some("note".to_string()),
+				caused_by: Vec::new(),
 			}],
 			context: Some(ChangesetContext {
 				provider: HostingProviderKind::GitHub,
@@ -1590,6 +1591,7 @@ mod tests {
 			notes: Some("Added release note support".to_string()),
 			details: Some("Detailed explanation".to_string()),
 			change_type: Some("note".to_string()),
+			caused_by: Vec::new(),
 			source_path: changeset_path.clone(),
 		};
 		let source_path = root_relative(tempdir.path(), &changeset.path);
@@ -1900,6 +1902,7 @@ mod tests {
 					origin: "changeset".to_string(),
 					evidence_refs: Vec::new(),
 					change_type: None,
+					caused_by: Vec::new(),
 				},
 				PreparedChangesetTarget {
 					id: "pkg-b".to_string(),
@@ -1908,6 +1911,7 @@ mod tests {
 					origin: "changeset".to_string(),
 					evidence_refs: Vec::new(),
 					change_type: None,
+					caused_by: Vec::new(),
 				},
 			],
 		)]);
@@ -1989,6 +1993,7 @@ mod tests {
 				origin: "changeset".to_string(),
 				evidence_refs: Vec::new(),
 				change_type: None,
+				caused_by: Vec::new(),
 			}],
 		)]);
 		let group_target_change = sample_change("pkg-a", "pkg-a", ".changeset/group.md");
