@@ -1092,6 +1092,87 @@ mod tests {
 	}
 
 	#[test]
+	fn legacy_scanner_and_snapshot_helpers_cover_remaining_patch_lines() {
+		let file = PackageSnapshotFile {
+			path: PathBuf::from("exports.unknown"),
+			contents: concat!(
+				"const hidden = true;\n",
+				"export * from './types';\n",
+				"export { foo as bar, baz } from './shared';\n",
+				"export async function load() {}\n",
+				"export abstract class Base {}\n",
+			)
+			.to_string(),
+		};
+
+		let symbols = collect_public_symbols_with_legacy_scanner(&file, &NPM_CONFIG);
+		assert!(symbols.iter().any(|symbol| {
+			symbol.item_kind == "wildcard_reexport" && symbol.item_path == "exports::./types"
+		}));
+		assert!(symbols.iter().any(|symbol| {
+			symbol.item_kind == "reexport" && symbol.item_path == "exports::bar"
+		}));
+		assert!(symbols.iter().any(|symbol| {
+			symbol.item_kind == "reexport" && symbol.item_path == "exports::baz"
+		}));
+		assert!(symbols.iter().any(|symbol| {
+			symbol.item_kind == "function" && symbol.item_path == "exports::load"
+		}));
+		assert!(
+			symbols.iter().any(|symbol| {
+				symbol.item_kind == "class" && symbol.item_path == "exports::Base"
+			})
+		);
+
+		let skipped_symbols = snapshot_exported_symbols(
+			None,
+			&[
+				AnalyzedFileChange {
+					path: PathBuf::from("src/empty.ts"),
+					package_path: PathBuf::from("src/empty.ts"),
+					kind: FileChangeKind::Modified,
+					before_contents: None,
+					after_contents: None,
+				},
+				AnalyzedFileChange {
+					path: PathBuf::from("README.md"),
+					package_path: PathBuf::from("README.md"),
+					kind: FileChangeKind::Modified,
+					before_contents: None,
+					after_contents: Some("ignored".to_string()),
+				},
+			],
+			&NPM_CONFIG,
+		);
+		assert!(skipped_symbols.is_empty());
+
+		let unchanged_before = BTreeMap::from([(
+			("function".to_string(), "same".to_string()),
+			ExportedSymbol {
+				item_kind: "function".to_string(),
+				item_path: "same".to_string(),
+				signature: "export function same() {}".to_string(),
+				file_path: PathBuf::from("src/index.ts"),
+			},
+		)]);
+		let unchanged_after = unchanged_before.clone();
+		assert!(diff_public_symbols(&unchanged_before, &unchanged_after).is_empty());
+
+		assert_eq!(
+			parse_wildcard_reexport("export * from './types';"),
+			Some("./types".to_string())
+		);
+		assert_eq!(
+			parse_declaration_export("export async function load() {}", &NPM_CONFIG),
+			Some(("function", "load".to_string()))
+		);
+		assert_eq!(
+			parse_declaration_export("export abstract class Base {}", &NPM_CONFIG),
+			Some(("class", "Base".to_string()))
+		);
+	}
+
+	#[test]
 	fn diff_public_symbols_reports_added_modified_and_removed_entries() {
 		let before = BTreeMap::from([
 			(
