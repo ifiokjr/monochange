@@ -32,12 +32,16 @@
 //! - normalized dependency extraction
 //! <!-- {/monochangeDartCrateDocs} -->
 
+pub mod analysis;
+
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use analysis::DartSemanticAnalyzer;
+pub use analysis::semantic_analyzer;
 use glob::glob;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;

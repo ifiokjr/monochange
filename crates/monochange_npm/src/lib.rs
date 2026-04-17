@@ -32,6 +32,7 @@
 //! - normalized dependency extraction
 //! <!-- {/monochangeNpmCrateDocs} -->
 
+pub mod analysis;
 pub mod lints;
 
 use std::collections::BTreeMap;
@@ -41,6 +42,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use analysis::NpmSemanticAnalyzer;
+pub use analysis::semantic_analyzer;
 use glob::glob;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;

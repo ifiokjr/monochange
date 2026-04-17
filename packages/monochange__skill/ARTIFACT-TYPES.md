@@ -374,11 +374,12 @@ monochange: minor
 
 #### add `monochange_validate_changeset` MCP tool
 
-Introduces a new MCP tool for validating changeset content against actual code changes.
+Introduces a new MCP tool for validating changeset content against the current semantic diff.
 
 - **Tool name:** `monochange_validate_changeset`
 - **New parameters:** `path`, `changeset_path`
-- **Returns:** validation result with severity-tagged issues
+- **Returns:** validation result with severity-tagged issues and lifecycle status
+- **Current semantic support:** Cargo, npm, Deno, and Dart/Flutter packages
 - **Backward compatible:** existing tools unchanged
 ```
 

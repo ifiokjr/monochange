@@ -1,0 +1,23 @@
+name: mobile_app
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  riverpod: ^2.5.0
+
+executables:
+  mobile-app:
+  mobile-admin:
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.example.mobile
+      ios:
+        pluginClass: MobilePlugin

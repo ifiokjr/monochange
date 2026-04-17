@@ -99,8 +99,8 @@ impl ChangeFrame {
 	///
 	/// Returns an error if git state cannot be determined.
 	pub fn detect(repo_root: &Path) -> Result<Self, FrameError> {
-		// Check for PR environment variables first
-		if let Some(pr_info) = detect_pr_environment() {
+		// Check for PR environment variables first.
+		if let Some(pr_info) = detect_pr_environment(repo_root) {
 			return Ok(Self::PullRequest {
 				target: pr_info.target_branch,
 				pr_branch: pr_info.source_branch,
@@ -222,7 +222,20 @@ pub struct PrEnvironment {
 }
 
 /// Detect PR environment from common CI/CD variables.
-fn detect_pr_environment() -> Option<PrEnvironment> {
+fn detect_pr_environment(repo_root: &Path) -> Option<PrEnvironment> {
+	let pr_info = detect_raw_pr_environment()?;
+	let target_branch = resolve_pr_target_branch(repo_root, &pr_info.target_branch)?;
+	let source_branch = resolve_pr_source_branch(repo_root, &pr_info.source_branch)?;
+
+	Some(PrEnvironment {
+		source_branch,
+		target_branch,
+		pr_number: pr_info.pr_number,
+		provider: pr_info.provider,
+	})
+}
+
+fn detect_raw_pr_environment() -> Option<PrEnvironment> {
 	// GitHub Actions
 	if let Ok(event_name) = env::var("GITHUB_EVENT_NAME")
 		&& (event_name == "pull_request" || event_name == "pull_request_target")
@@ -311,6 +324,54 @@ fn detect_pr_environment() -> Option<PrEnvironment> {
 	}
 
 	None
+}
+
+fn resolve_pr_target_branch(repo_root: &Path, branch: &str) -> Option<String> {
+	resolve_revision_alias(repo_root, &[branch.to_string(), format!("origin/{branch}")])
+}
+
+fn resolve_pr_source_branch(repo_root: &Path, branch: &str) -> Option<String> {
+	let mut candidates = vec![branch.to_string(), format!("origin/{branch}")];
+
+	if is_detached_head(repo_root) {
+		candidates.push("HEAD".to_string());
+	}
+
+	resolve_revision_alias(repo_root, &candidates)
+}
+
+fn resolve_revision_alias(repo_root: &Path, candidates: &[String]) -> Option<String> {
+	for candidate in candidates {
+		if revision_exists(repo_root, candidate) {
+			return Some(candidate.clone());
+		}
+	}
+
+	None
+}
+
+fn revision_exists(repo_root: &Path, revision: &str) -> bool {
+	let Ok(output) = Command::new("git")
+		.current_dir(repo_root)
+		.args(["rev-parse", "--verify", revision])
+		.output()
+	else {
+		return false;
+	};
+
+	output.status.success()
+}
+
+fn is_detached_head(repo_root: &Path) -> bool {
+	let Ok(output) = Command::new("git")
+		.current_dir(repo_root)
+		.args(["branch", "--show-current"])
+		.output()
+	else {
+		return false;
+	};
+
+	output.status.success() && String::from_utf8_lossy(&output.stdout).trim().is_empty()
 }
 
 /// Get the current git branch name.
@@ -472,7 +533,96 @@ fn run_git_diff_name_only(
 
 #[cfg(test)]
 mod tests {
+	use std::fs;
+
+	use monochange_test_helpers::git::git;
+	use monochange_test_helpers::git_output_trimmed;
+	use temp_env::with_vars;
+	use tempfile::tempdir;
+
 	use super::*;
+
+	fn init_repo() -> tempfile::TempDir {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		fs::write(tempdir.path().join("README.md"), "hello\n")
+			.unwrap_or_else(|error| panic!("write fixture: {error}"));
+
+		git(tempdir.path(), &["init"]);
+		git(tempdir.path(), &["config", "user.name", "monochange-tests"]);
+		git(
+			tempdir.path(),
+			&["config", "user.email", "monochange-tests@example.com"],
+		);
+		git(tempdir.path(), &["add", "."]);
+		git(tempdir.path(), &["commit", "-m", "initial"]);
+		git(tempdir.path(), &["branch", "-M", "main"]);
+
+		tempdir
+	}
+
+	#[test]
+	fn detect_uses_github_pr_environment_when_refs_exist() {
+		let tempdir = init_repo();
+		git(tempdir.path(), &["branch", "feature-branch"]);
+
+		let frame = with_vars(
+			[
+				("GITHUB_EVENT_NAME", Some("pull_request")),
+				("GITHUB_HEAD_REF", Some("feature-branch")),
+				("GITHUB_BASE_REF", Some("main")),
+			],
+			|| ChangeFrame::detect(tempdir.path()),
+		)
+		.unwrap_or_else(|error| panic!("detect frame: {error}"));
+
+		assert_eq!(
+			frame,
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "feature-branch".to_string(),
+			}
+		);
+	}
+
+	#[test]
+	fn detect_ignores_unresolvable_pr_environment_for_local_repos() {
+		let tempdir = init_repo();
+
+		let frame = with_vars(
+			[
+				("GITHUB_EVENT_NAME", Some("pull_request")),
+				("GITHUB_HEAD_REF", Some("feature-branch")),
+				("GITHUB_BASE_REF", Some("main")),
+			],
+			|| ChangeFrame::detect(tempdir.path()),
+		)
+		.unwrap_or_else(|error| panic!("detect frame: {error}"));
+
+		assert_eq!(frame, ChangeFrame::WorkingDirectory);
+	}
+
+	#[test]
+	fn resolve_pr_source_branch_falls_back_to_head_for_detached_repos() {
+		let tempdir = init_repo();
+		let head = git_output_trimmed(tempdir.path(), &["rev-parse", "HEAD"]);
+		git(tempdir.path(), &["checkout", &head]);
+
+		assert_eq!(
+			resolve_pr_source_branch(tempdir.path(), "missing-branch"),
+			Some("HEAD".to_string())
+		);
+	}
+
+	#[test]
+	fn revision_helpers_return_false_for_missing_repositories() {
+		let missing = tempdir()
+			.unwrap_or_else(|error| panic!("tempdir: {error}"))
+			.path()
+			.join("missing");
+
+		assert!(!revision_exists(&missing, "HEAD"));
+		assert!(!is_detached_head(&missing));
+	}
 
 	#[test]
 	fn change_frame_display() {

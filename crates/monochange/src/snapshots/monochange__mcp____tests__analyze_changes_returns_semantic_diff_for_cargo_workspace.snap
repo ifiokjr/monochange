@@ -1,0 +1,91 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "analyze_changes",
+  "analysis": {
+    "detectionLevel": "signature",
+    "frame": "WorkingDirectory",
+    "packageAnalyses": {
+      "core": {
+        "analyzerId": "cargo/public-api",
+        "changedFiles": [
+          "Cargo.toml",
+          "src/lib.rs"
+        ],
+        "ecosystem": "cargo",
+        "packageId": "core",
+        "packageName": "core",
+        "packageRecordId": "cargo:crates/core/Cargo.toml",
+        "semanticChanges": [
+          {
+            "afterSignature": "pub struct Greeter ;",
+            "beforeSignature": null,
+            "category": "public_api",
+            "filePath": "src/lib.rs",
+            "itemKind": "struct",
+            "itemPath": "Greeter",
+            "kind": "added",
+            "summary": "struct `Greeter` added"
+          },
+          {
+            "afterSignature": "fn greet (name : & str) -> String",
+            "beforeSignature": "fn greet () -> & 'static str",
+            "category": "public_api",
+            "filePath": "src/lib.rs",
+            "itemKind": "function",
+            "itemPath": "greet",
+            "kind": "modified",
+            "summary": "function `greet` modified"
+          },
+          {
+            "afterSignature": "[dependencies] 0.1",
+            "beforeSignature": null,
+            "category": "dependency",
+            "filePath": "Cargo.toml",
+            "itemKind": "dependency",
+            "itemPath": "tracing",
+            "kind": "added",
+            "summary": "dependency `tracing` added"
+          },
+          {
+            "afterSignature": "",
+            "beforeSignature": null,
+            "category": "metadata",
+            "filePath": "Cargo.toml",
+            "itemKind": "feature",
+            "itemPath": "feature.cli",
+            "kind": "added",
+            "summary": "feature `feature.cli` added"
+          },
+          {
+            "afterSignature": "cli",
+            "beforeSignature": "",
+            "category": "metadata",
+            "filePath": "Cargo.toml",
+            "itemKind": "feature",
+            "itemPath": "feature.default",
+            "kind": "modified",
+            "summary": "feature `feature.default` modified"
+          },
+          {
+            "afterSignature": "2024",
+            "beforeSignature": "2021",
+            "category": "metadata",
+            "filePath": "Cargo.toml",
+            "itemKind": "manifest_field",
+            "itemPath": "package.edition",
+            "kind": "modified",
+            "summary": "manifest_field `package.edition` modified"
+          }
+        ],
+        "warnings": []
+      }
+    },
+    "warnings": []
+  },
+  "frame": "working directory",
+  "ok": true,
+  "summary": "Analyzed 1 package(s) and found 6 semantic change(s)"
+}

@@ -1,0 +1,25 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "validate_changeset",
+  "changeset_path": ".changeset/feature.md",
+  "frame": "working directory",
+  "issues": [
+    {
+      "message": "changeset does not mention any detected semantic item for `core`",
+      "severity": "warning",
+      "suggestion": "mention one or more changed items such as `Greeter`, `feature.cli`, `feature.default`"
+    },
+    {
+      "message": "changeset references `OldGreeter` but that item was not found in the current semantic diff",
+      "severity": "error",
+      "suggestion": "remove the stale reference or update it to match the current code change"
+    }
+  ],
+  "lifecycle_status": "stale",
+  "ok": false,
+  "summary": "Found 2 validation issue(s)",
+  "valid": false
+}

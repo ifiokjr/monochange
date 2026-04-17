@@ -1,0 +1,327 @@
+---
+source: crates/monochange_analysis/tests/cargo_semantic_analysis.rs
+expression: analysis
+---
+{
+  "frame": "WorkingDirectory",
+  "detectionLevel": "signature",
+  "packageAnalyses": {
+    "core": {
+      "packageId": "core",
+      "packageRecordId": "cargo:crates/core/Cargo.toml",
+      "packageName": "core",
+      "ecosystem": "cargo",
+      "analyzerId": "cargo/public-api",
+      "changedFiles": [
+        "Cargo.toml",
+        "src/lib.rs"
+      ],
+      "semanticChanges": [
+        {
+          "category": "public_api",
+          "kind": "added",
+          "itemKind": "struct",
+          "itemPath": "Greeter",
+          "summary": "struct `Greeter` added",
+          "filePath": "src/lib.rs",
+          "beforeSignature": null,
+          "afterSignature": "pub struct Greeter ;"
+        },
+        {
+          "category": "public_api",
+          "kind": "modified",
+          "itemKind": "function",
+          "itemPath": "greet",
+          "summary": "function `greet` modified",
+          "filePath": "src/lib.rs",
+          "beforeSignature": "fn greet () -> & 'static str",
+          "afterSignature": "fn greet (name : & str) -> String"
+        },
+        {
+          "category": "dependency",
+          "kind": "added",
+          "itemKind": "dependency",
+          "itemPath": "tracing",
+          "summary": "dependency `tracing` added",
+          "filePath": "Cargo.toml",
+          "beforeSignature": null,
+          "afterSignature": "[dependencies] 0.1"
+        },
+        {
+          "category": "metadata",
+          "kind": "modified",
+          "itemKind": "manifest_field",
+          "itemPath": "package.edition",
+          "summary": "manifest_field `package.edition` modified",
+          "filePath": "Cargo.toml",
+          "beforeSignature": "2021",
+          "afterSignature": "2024"
+        }
+      ],
+      "warnings": []
+    },
+    "mobile": {
+      "packageId": "mobile",
+      "packageRecordId": "flutter:packages/mobile/pubspec.yaml",
+      "packageName": "mobile_app",
+      "ecosystem": "flutter",
+      "analyzerId": "dart/pubspec",
+      "changedFiles": [
+        "lib/mobile_app.dart",
+        "pubspec.yaml"
+      ],
+      "semanticChanges": [
+        {
+          "category": "public_api",
+          "kind": "added",
+          "itemKind": "class",
+          "itemPath": "mobile_app::MobileAdmin",
+          "summary": "class `mobile_app::MobileAdmin` added",
+          "filePath": "lib/mobile_app.dart",
+          "beforeSignature": null,
+          "afterSignature": "class MobileAdmin {}"
+        },
+        {
+          "category": "public_api",
+          "kind": "modified",
+          "itemKind": "function",
+          "itemPath": "mobile_app::greet",
+          "summary": "function `mobile_app::greet` modified",
+          "filePath": "lib/mobile_app.dart",
+          "beforeSignature": "String greet() => 'hello';",
+          "afterSignature": "String greet(String name) => 'hello $name';"
+        },
+        {
+          "category": "export",
+          "kind": "added",
+          "itemKind": "command",
+          "itemPath": "mobile-admin",
+          "summary": "command `mobile-admin` added",
+          "filePath": "pubspec.yaml",
+          "beforeSignature": null,
+          "afterSignature": "null"
+        },
+        {
+          "category": "dependency",
+          "kind": "added",
+          "itemKind": "dependency",
+          "itemPath": "riverpod",
+          "summary": "dependency `riverpod` added",
+          "filePath": "pubspec.yaml",
+          "beforeSignature": null,
+          "afterSignature": "[dependencies] ^2.5.0"
+        },
+        {
+          "category": "metadata",
+          "kind": "added",
+          "itemKind": "manifest_field",
+          "itemPath": "publish_to",
+          "summary": "manifest_field `publish_to` added",
+          "filePath": "pubspec.yaml",
+          "beforeSignature": null,
+          "afterSignature": "none"
+        },
+        {
+          "category": "metadata",
+          "kind": "added",
+          "itemKind": "plugin_platform",
+          "itemPath": "flutter.plugin.platform.ios",
+          "summary": "plugin_platform `flutter.plugin.platform.ios` added",
+          "filePath": "pubspec.yaml",
+          "beforeSignature": null,
+          "afterSignature": "pluginClass=MobilePlugin"
+        },
+        {
+          "category": "metadata",
+          "kind": "modified",
+          "itemKind": "environment",
+          "itemPath": "environment.sdk",
+          "summary": "environment `environment.sdk` modified",
+          "filePath": "pubspec.yaml",
+          "beforeSignature": "^3.4.0",
+          "afterSignature": "^3.5.0"
+        }
+      ],
+      "warnings": []
+    },
+    "runtime": {
+      "packageId": "runtime",
+      "packageRecordId": "deno:packages/runtime/deno.json",
+      "packageName": "runtime",
+      "ecosystem": "deno",
+      "analyzerId": "deno/manifest",
+      "changedFiles": [
+        "deno.json",
+        "mod.ts"
+      ],
+      "semanticChanges": [
+        {
+          "category": "public_api",
+          "kind": "added",
+          "itemKind": "class",
+          "itemPath": "Runner",
+          "summary": "class `Runner` added",
+          "filePath": "mod.ts",
+          "beforeSignature": null,
+          "afterSignature": "export class Runner {}"
+        },
+        {
+          "category": "public_api",
+          "kind": "added",
+          "itemKind": "function",
+          "itemPath": "cli::cli",
+          "summary": "function `cli::cli` added",
+          "filePath": "cli.ts",
+          "beforeSignature": null,
+          "afterSignature": "export function cli() {"
+        },
+        {
+          "category": "public_api",
+          "kind": "modified",
+          "itemKind": "function",
+          "itemPath": "run",
+          "summary": "function `run` modified",
+          "filePath": "mod.ts",
+          "beforeSignature": "export function run(): string {",
+          "afterSignature": "export function run(name: string): string {"
+        },
+        {
+          "category": "export",
+          "kind": "added",
+          "itemKind": "export",
+          "itemPath": "./cli",
+          "summary": "export `./cli` added",
+          "filePath": "deno.json",
+          "beforeSignature": null,
+          "afterSignature": "./cli.ts"
+        },
+        {
+          "category": "dependency",
+          "kind": "added",
+          "itemKind": "import_alias",
+          "itemPath": "npm:zod",
+          "summary": "import_alias `npm:zod` added",
+          "filePath": "deno.json",
+          "beforeSignature": null,
+          "afterSignature": "npm:zod@3.24.0"
+        },
+        {
+          "category": "metadata",
+          "kind": "added",
+          "itemKind": "compiler_option",
+          "itemPath": "compiler_options.jsx",
+          "summary": "compiler_option `compiler_options.jsx` added",
+          "filePath": "deno.json",
+          "beforeSignature": null,
+          "afterSignature": "react-jsx"
+        },
+        {
+          "category": "metadata",
+          "kind": "added",
+          "itemKind": "task",
+          "itemPath": "task.lint",
+          "summary": "task `task.lint` added",
+          "filePath": "deno.json",
+          "beforeSignature": null,
+          "afterSignature": "deno lint"
+        }
+      ],
+      "warnings": []
+    },
+    "web": {
+      "packageId": "web",
+      "packageRecordId": "npm:packages/web/package.json",
+      "packageName": "@acme/web",
+      "ecosystem": "npm",
+      "analyzerId": "npm/package-json",
+      "changedFiles": [
+        "package.json",
+        "src/index.ts"
+      ],
+      "semanticChanges": [
+        {
+          "category": "public_api",
+          "kind": "added",
+          "itemKind": "class",
+          "itemPath": "Greeter",
+          "summary": "class `Greeter` added",
+          "filePath": "src/index.ts",
+          "beforeSignature": null,
+          "afterSignature": "export class Greeter {}"
+        },
+        {
+          "category": "public_api",
+          "kind": "modified",
+          "itemKind": "function",
+          "itemPath": "greet",
+          "summary": "function `greet` modified",
+          "filePath": "src/index.ts",
+          "beforeSignature": "export function greet(): string {",
+          "afterSignature": "export function greet(name: string): string {"
+        },
+        {
+          "category": "export",
+          "kind": "added",
+          "itemKind": "command",
+          "itemPath": "acme-web",
+          "summary": "command `acme-web` added",
+          "filePath": "package.json",
+          "beforeSignature": null,
+          "afterSignature": "./dist/cli.js"
+        },
+        {
+          "category": "export",
+          "kind": "added",
+          "itemKind": "export",
+          "itemPath": "./cli",
+          "summary": "export `./cli` added",
+          "filePath": "package.json",
+          "beforeSignature": null,
+          "afterSignature": "./dist/cli.js"
+        },
+        {
+          "category": "export",
+          "kind": "modified",
+          "itemKind": "export",
+          "itemPath": ".",
+          "summary": "export `.` modified",
+          "filePath": "package.json",
+          "beforeSignature": "./src/index.ts",
+          "afterSignature": "default=./dist/index.js, types=./dist/index.d.ts"
+        },
+        {
+          "category": "dependency",
+          "kind": "added",
+          "itemKind": "dependency",
+          "itemPath": "zod",
+          "summary": "dependency `zod` added",
+          "filePath": "package.json",
+          "beforeSignature": null,
+          "afterSignature": "[dependencies] 3.24.0"
+        },
+        {
+          "category": "metadata",
+          "kind": "added",
+          "itemKind": "script",
+          "itemPath": "script.build",
+          "summary": "script `script.build` added",
+          "filePath": "package.json",
+          "beforeSignature": null,
+          "afterSignature": "tsup"
+        },
+        {
+          "category": "metadata",
+          "kind": "modified",
+          "itemKind": "manifest_field",
+          "itemPath": "type",
+          "summary": "manifest_field `type` modified",
+          "filePath": "package.json",
+          "beforeSignature": "module",
+          "afterSignature": "commonjs"
+        }
+      ],
+      "warnings": []
+    }
+  },
+  "warnings": []
+}

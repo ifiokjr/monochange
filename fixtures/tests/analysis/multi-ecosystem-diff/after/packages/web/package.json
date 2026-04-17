@@ -1,0 +1,22 @@
+{
+  "name": "@acme/web",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "exports": {
+    ".": {
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./cli": "./dist/cli.js"
+  },
+  "bin": {
+    "acme-web": "./dist/cli.js"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "zod": "3.24.0"
+  },
+  "scripts": {
+    "build": "tsup"
+  }
+}
