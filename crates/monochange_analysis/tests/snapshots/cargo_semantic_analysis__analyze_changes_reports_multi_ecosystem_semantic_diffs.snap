@@ -1,5 +1,6 @@
 ---
 source: crates/monochange_analysis/tests/cargo_semantic_analysis.rs
+assertion_line: 70
 expression: analysis
 ---
 {
@@ -173,7 +174,7 @@ expression: analysis
           "summary": "function `cli::cli` added",
           "filePath": "cli.ts",
           "beforeSignature": null,
-          "afterSignature": "export function cli() {"
+          "afterSignature": "export function cli() { return 'cli'; }"
         },
         {
           "category": "public_api",
@@ -182,8 +183,8 @@ expression: analysis
           "itemPath": "run",
           "summary": "function `run` modified",
           "filePath": "mod.ts",
-          "beforeSignature": "export function run(): string {",
-          "afterSignature": "export function run(name: string): string {"
+          "beforeSignature": "export function run(): string { return 'ok'; }",
+          "afterSignature": "export function run(name: string): string { return `ok ${name}`; }"
         },
         {
           "category": "export",
@@ -256,8 +257,8 @@ expression: analysis
           "itemPath": "greet",
           "summary": "function `greet` modified",
           "filePath": "src/index.ts",
-          "beforeSignature": "export function greet(): string {",
-          "afterSignature": "export function greet(name: string): string {"
+          "beforeSignature": "export function greet(): string { return 'hi'; }",
+          "afterSignature": "export function greet(name: string): string { return `hi ${name}`; }"
         },
         {
           "category": "export",

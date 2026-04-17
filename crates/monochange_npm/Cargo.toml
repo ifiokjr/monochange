@@ -16,6 +16,10 @@ description = "Manage versions and releases for your multiplatform, multilanguag
 glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
 monochange_linting = { workspace = true }
+oxc_allocator = { workspace = true }
+oxc_ast = { workspace = true }
+oxc_parser = { workspace = true }
+oxc_span = { workspace = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }

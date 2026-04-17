@@ -15,6 +15,15 @@ use monochange_core::SemanticAnalyzer;
 use monochange_core::SemanticChange;
 use monochange_core::SemanticChangeCategory;
 use monochange_core::SemanticChangeKind;
+use oxc_allocator::Allocator;
+use oxc_ast::ast::Declaration;
+use oxc_ast::ast::ExportDefaultDeclarationKind;
+use oxc_ast::ast::ImportOrExportKind;
+use oxc_ast::ast::ModuleDeclaration;
+use oxc_ast::ast::ModuleExportName;
+use oxc_ast::ast::TSModuleDeclarationName;
+use oxc_parser::Parser;
+use oxc_span::SourceType;
 use serde_json::Value;
 
 /// Deno analyzer that extracts exported JS/TS symbols and `deno.json` semantic diffs.
@@ -168,6 +177,290 @@ fn is_manifest_file(path: &Path) -> bool {
 }
 
 fn collect_public_symbols(file: &PackageSnapshotFile) -> Vec<PublicSymbol> {
+	parse_public_symbols(file).unwrap_or_else(|| collect_public_symbols_with_legacy_scanner(file))
+}
+
+fn parse_public_symbols(file: &PackageSnapshotFile) -> Option<Vec<PublicSymbol>> {
+	let source_type = SourceType::from_path(&file.path).ok()?;
+	let allocator = Allocator::default();
+	let parser_return = Parser::new(&allocator, &file.contents, source_type).parse();
+	let module_prefix = module_prefix_for_file(&file.path);
+	let mut symbols = Vec::new();
+	for statement in &parser_return.program.body {
+		let Some(declaration) = statement.as_module_declaration() else {
+			continue;
+		};
+		collect_public_symbols_from_module_declaration(
+			declaration,
+			&module_prefix,
+			&file.path,
+			&file.contents,
+			&mut symbols,
+		);
+	}
+
+	Some(symbols)
+}
+
+fn collect_public_symbols_from_module_declaration(
+	declaration: &ModuleDeclaration<'_>,
+	module_prefix: &[String],
+	file_path: &Path,
+	source_text: &str,
+	output: &mut Vec<PublicSymbol>,
+) {
+	match declaration {
+		ModuleDeclaration::ExportNamedDeclaration(export) => {
+			let signature = normalize_signature(export.span.source_text(source_text));
+			if let Some(declaration) = &export.declaration {
+				collect_public_symbols_from_declaration(
+					declaration,
+					module_prefix,
+					file_path,
+					&signature,
+					output,
+				);
+				return;
+			}
+
+			for specifier in &export.specifiers {
+				let item_kind = if matches!(export.export_kind, ImportOrExportKind::Type)
+					|| matches!(specifier.export_kind, ImportOrExportKind::Type)
+				{
+					"type_reexport"
+				} else {
+					"reexport"
+				};
+				push_symbol(
+					output,
+					item_kind,
+					module_prefix,
+					module_export_name(&specifier.exported),
+					&signature,
+					file_path,
+				);
+			}
+		}
+		ModuleDeclaration::ExportAllDeclaration(export) => {
+			let signature = normalize_signature(export.span.source_text(source_text));
+			if let Some(exported) = &export.exported {
+				push_symbol(
+					output,
+					"namespace_reexport",
+					module_prefix,
+					module_export_name(exported),
+					&signature,
+					file_path,
+				);
+				return;
+			}
+
+			push_symbol(
+				output,
+				"wildcard_reexport",
+				module_prefix,
+				export.source.value.to_string(),
+				&signature,
+				file_path,
+			);
+		}
+		ModuleDeclaration::ExportDefaultDeclaration(export) => {
+			let signature = normalize_signature(export.span.source_text(source_text));
+			collect_public_symbols_from_default_export(
+				&export.declaration,
+				module_prefix,
+				file_path,
+				&signature,
+				output,
+			);
+		}
+		_ => {}
+	}
+}
+
+fn collect_public_symbols_from_declaration(
+	declaration: &Declaration<'_>,
+	module_prefix: &[String],
+	file_path: &Path,
+	signature: &str,
+	output: &mut Vec<PublicSymbol>,
+) {
+	match declaration {
+		Declaration::FunctionDeclaration(function) => {
+			if let Some(identifier) = &function.id {
+				push_symbol(
+					output,
+					"function",
+					module_prefix,
+					identifier.name.to_string(),
+					signature,
+					file_path,
+				);
+			}
+		}
+		Declaration::ClassDeclaration(class) => {
+			if let Some(identifier) = &class.id {
+				push_symbol(
+					output,
+					"class",
+					module_prefix,
+					identifier.name.to_string(),
+					signature,
+					file_path,
+				);
+			}
+		}
+		Declaration::VariableDeclaration(variable) => {
+			let item_kind = variable_item_kind(variable.kind);
+			for declarator in &variable.declarations {
+				for identifier in declarator.id.get_binding_identifiers() {
+					push_symbol(
+						output,
+						item_kind,
+						module_prefix,
+						identifier.name.to_string(),
+						signature,
+						file_path,
+					);
+				}
+			}
+		}
+		Declaration::TSInterfaceDeclaration(interface) => {
+			push_symbol(
+				output,
+				"interface",
+				module_prefix,
+				interface.id.name.to_string(),
+				signature,
+				file_path,
+			);
+		}
+		Declaration::TSTypeAliasDeclaration(alias) => {
+			push_symbol(
+				output,
+				"type_alias",
+				module_prefix,
+				alias.id.name.to_string(),
+				signature,
+				file_path,
+			);
+		}
+		Declaration::TSEnumDeclaration(declaration) => {
+			push_symbol(
+				output,
+				"enum",
+				module_prefix,
+				declaration.id.name.to_string(),
+				signature,
+				file_path,
+			);
+		}
+		Declaration::TSModuleDeclaration(namespace) => {
+			push_symbol(
+				output,
+				"namespace",
+				module_prefix,
+				ts_module_name(&namespace.id),
+				signature,
+				file_path,
+			);
+		}
+		Declaration::TSGlobalDeclaration(_) | Declaration::TSImportEqualsDeclaration(_) => {}
+	}
+}
+
+fn collect_public_symbols_from_default_export(
+	declaration: &ExportDefaultDeclarationKind<'_>,
+	module_prefix: &[String],
+	file_path: &Path,
+	signature: &str,
+	output: &mut Vec<PublicSymbol>,
+) {
+	match declaration {
+		ExportDefaultDeclarationKind::FunctionDeclaration(function) => {
+			if let Some(identifier) = &function.id {
+				push_symbol(
+					output,
+					"function",
+					module_prefix,
+					identifier.name.to_string(),
+					signature,
+					file_path,
+				);
+			} else {
+				push_symbol(
+					output,
+					"default_export",
+					module_prefix,
+					"default".to_string(),
+					signature,
+					file_path,
+				);
+			}
+		}
+		ExportDefaultDeclarationKind::ClassDeclaration(class) => {
+			if let Some(identifier) = &class.id {
+				push_symbol(
+					output,
+					"class",
+					module_prefix,
+					identifier.name.to_string(),
+					signature,
+					file_path,
+				);
+			} else {
+				push_symbol(
+					output,
+					"default_export",
+					module_prefix,
+					"default".to_string(),
+					signature,
+					file_path,
+				);
+			}
+		}
+		ExportDefaultDeclarationKind::TSInterfaceDeclaration(interface) => {
+			push_symbol(
+				output,
+				"interface",
+				module_prefix,
+				interface.id.name.to_string(),
+				signature,
+				file_path,
+			);
+		}
+		_ => {
+			push_symbol(
+				output,
+				"default_export",
+				module_prefix,
+				"default".to_string(),
+				signature,
+				file_path,
+			);
+		}
+	}
+}
+
+fn module_export_name(name: &ModuleExportName<'_>) -> String {
+	name.to_string()
+}
+
+fn ts_module_name(name: &TSModuleDeclarationName<'_>) -> String {
+	name.to_string()
+}
+
+fn variable_item_kind(kind: oxc_ast::ast::VariableDeclarationKind) -> &'static str {
+	match kind {
+		oxc_ast::ast::VariableDeclarationKind::Const => "constant",
+		oxc_ast::ast::VariableDeclarationKind::Var
+		| oxc_ast::ast::VariableDeclarationKind::Let
+		| oxc_ast::ast::VariableDeclarationKind::Using
+		| oxc_ast::ast::VariableDeclarationKind::AwaitUsing => "variable",
+	}
+}
+
+fn collect_public_symbols_with_legacy_scanner(file: &PackageSnapshotFile) -> Vec<PublicSymbol> {
 	let module_prefix = module_prefix_for_file(&file.path);
 	let mut symbols = Vec::new();
 
@@ -341,15 +634,15 @@ fn module_prefix_for_file(path: &Path) -> Vec<String> {
 	components
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn push_symbol(
+fn push_symbol<S: Into<String>>(
 	output: &mut Vec<PublicSymbol>,
 	item_kind: &str,
 	module_prefix: &[String],
-	item_name: String,
+	item_name: S,
 	signature: &str,
 	file_path: &Path,
 ) {
+	let item_name = item_name.into();
 	let item_path = if module_prefix.is_empty() {
 		item_name.clone()
 	} else {
@@ -760,6 +1053,128 @@ mod tests {
 		assert!(symbols.iter().any(|symbol| {
 			symbol.item_kind == "wildcard_reexport" && symbol.item_path == "./types.ts"
 		}));
+	}
+
+	#[test]
+	fn parser_backed_symbol_collection_handles_multiline_and_namespace_exports() {
+		let file = PackageSnapshotFile {
+			path: PathBuf::from("mod.ts"),
+			contents: concat!(
+				"export {\n",
+				"  run as renamedRun,\n",
+				"  config,\n",
+				"} from './shared.ts';\n",
+				"export * as toolkit from './toolkit.ts';\n",
+				"export default async function () { return 'ok'; }\n",
+			)
+			.to_string(),
+		};
+
+		let symbols = collect_public_symbols(&file);
+
+		assert!(
+			symbols
+				.iter()
+				.any(|symbol| symbol.item_path == "renamedRun")
+		);
+		assert!(symbols.iter().any(|symbol| symbol.item_path == "config"));
+		assert!(symbols.iter().any(|symbol| {
+			symbol.item_kind == "namespace_reexport" && symbol.item_path == "toolkit"
+		}));
+		assert!(symbols.iter().any(|symbol| {
+			symbol.item_kind == "default_export" && symbol.item_path == "default"
+		}));
+	}
+
+	#[test]
+	fn parser_backed_symbol_collection_handles_type_reexports_and_ts_declarations() {
+		let file = PackageSnapshotFile {
+			path: PathBuf::from("mod.ts"),
+			contents: concat!(
+				"const hidden = true;\n",
+				"import { hiddenImport } from './hidden.ts';\n",
+				"export { type Foo as Bar } from './types.ts';\n",
+				"export interface Greeting {}\n",
+				"export type GreetingValue = string;\n",
+				"export enum Mode { Light }\n",
+				"export namespace Toolkit {}\n",
+				"export import Legacy = Toolkit;\n",
+				"export default {};\n",
+			)
+			.to_string(),
+		};
+
+		let symbols = collect_public_symbols(&file);
+
+		assert!(
+			symbols
+				.iter()
+				.any(|symbol| { symbol.item_kind == "type_reexport" && symbol.item_path == "Bar" })
+		);
+		assert!(symbols.iter().any(|symbol| symbol.item_path == "Greeting"));
+		assert!(
+			symbols
+				.iter()
+				.any(|symbol| symbol.item_path == "GreetingValue")
+		);
+		assert!(symbols.iter().any(|symbol| symbol.item_path == "Mode"));
+		assert!(symbols.iter().any(|symbol| symbol.item_path == "Toolkit"));
+		assert!(symbols.iter().any(|symbol| {
+			symbol.item_kind == "default_export" && symbol.item_path == "default"
+		}));
+		assert!(!symbols.iter().any(|symbol| symbol.item_path == "hidden"));
+		assert!(!symbols.iter().any(|symbol| symbol.item_path == "Legacy"));
+	}
+
+	#[test]
+	fn parser_backed_symbol_collection_handles_named_default_exports() {
+		let default_class = PackageSnapshotFile {
+			path: PathBuf::from("mod.ts"),
+			contents: "export default class NamedRunner {}\n".to_string(),
+		};
+		let anonymous_default_class = PackageSnapshotFile {
+			path: PathBuf::from("mod.ts"),
+			contents: "export default class {}\n".to_string(),
+		};
+		let default_interface = PackageSnapshotFile {
+			path: PathBuf::from("mod.ts"),
+			contents: "export default interface RunnerContract {}\n".to_string(),
+		};
+
+		let class_symbols = collect_public_symbols(&default_class);
+		let anonymous_class_symbols = collect_public_symbols(&anonymous_default_class);
+		let interface_symbols = collect_public_symbols(&default_interface);
+
+		assert!(
+			class_symbols
+				.iter()
+				.any(|symbol| { symbol.item_kind == "class" && symbol.item_path == "NamedRunner" })
+		);
+		assert!(anonymous_class_symbols.iter().any(|symbol| {
+			symbol.item_kind == "default_export" && symbol.item_path == "default"
+		}));
+		assert!(interface_symbols.iter().any(|symbol| {
+			symbol.item_kind == "interface" && symbol.item_path == "RunnerContract"
+		}));
+	}
+
+	#[test]
+	fn variable_item_kind_maps_non_const_bindings_to_variable() {
+		assert_eq!(
+			variable_item_kind(oxc_ast::ast::VariableDeclarationKind::Let),
+			"variable"
+		);
+	}
+
+	#[test]
+	fn legacy_scanner_collects_single_line_exports() {
+		let file = PackageSnapshotFile {
+			path: PathBuf::from("mod.ts"),
+			contents: "export const version = '1.0.0';\n".to_string(),
+		};
+
+		let symbols = collect_public_symbols_with_legacy_scanner(&file);
+		assert!(symbols.iter().any(|symbol| symbol.item_path == "version"));
 	}
 
 	#[test]
