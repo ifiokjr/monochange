@@ -1942,6 +1942,7 @@ dependencies = [
  "monochange_test_helpers",
  "serde",
  "serde_json",
+ "temp-env",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",

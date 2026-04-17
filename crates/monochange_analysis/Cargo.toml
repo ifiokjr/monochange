@@ -35,6 +35,7 @@ walkdir = { workspace = true, default-features = true }
 insta = { workspace = true, default-features = true }
 monochange_test_helpers = { workspace = true }
 serde_json = { workspace = true, default-features = true }
+temp-env = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 
 [lints]

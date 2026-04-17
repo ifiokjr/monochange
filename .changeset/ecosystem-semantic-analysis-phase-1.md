@@ -6,6 +6,7 @@ monochange_cargo: minor
 monochange_npm: minor
 monochange_deno: minor
 monochange_dart: minor
+"@monochange/skill": patch
 ---
 
 #### add ecosystem-specific semantic analysis for MCP changeset workflows
@@ -87,3 +88,5 @@ Current analyzer coverage includes:
 ```
 
 `monochange_core` now exposes shared semantic-analysis contracts and diff record types so ecosystem crates can own their analyzers without moving parser logic into the CLI crate.
+
+`@monochange/skill` now documents the semantic-analysis-backed MCP workflows and the expanded cross-ecosystem validation guidance for assistant consumers.
