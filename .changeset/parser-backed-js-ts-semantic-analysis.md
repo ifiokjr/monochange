@@ -17,3 +17,5 @@ This improves semantic diff accuracy for cases such as:
 - more complex TypeScript and module export syntax
 
 The MCP output shape stays the same, but the semantic evidence for npm and Deno packages is now more robust and closer to the actual module structure.
+
+This work also extracts the shared JavaScript and TypeScript export-analysis logic into `monochange_ecmascript`, so npm and Deno keep their ecosystem-specific manifest analysis while reusing one parser-backed module analyzer.

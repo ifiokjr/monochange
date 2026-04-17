@@ -15,10 +15,7 @@ description = "Deno workspace and package discovery for monochange"
 [dependencies]
 glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
-oxc_allocator = { workspace = true }
-oxc_ast = { workspace = true }
-oxc_parser = { workspace = true }
-oxc_span = { workspace = true }
+monochange_ecmascript = { workspace = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }

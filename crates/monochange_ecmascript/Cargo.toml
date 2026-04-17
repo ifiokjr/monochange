@@ -1,0 +1,23 @@
+[package]
+name = "monochange_ecmascript"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_ecmascript"
+edition = { workspace = true }
+include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+keywords = ["javascript", "typescript", "ecmascript", "analysis", "monorepo"]
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Shared ECMAScript semantic analysis helpers for monochange adapters"
+
+[dependencies]
+monochange_core = { workspace = true }
+oxc_allocator = { workspace = true }
+oxc_ast = { workspace = true }
+oxc_parser = { workspace = true }
+oxc_span = { workspace = true }
+
+[lints]
+workspace = true

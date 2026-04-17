@@ -2120,10 +2120,7 @@ dependencies = [
  "glob",
  "insta",
  "monochange_core",
- "oxc_allocator",
- "oxc_ast",
- "oxc_parser",
- "oxc_span",
+ "monochange_ecmascript",
  "rstest",
  "semver",
  "serde",
@@ -2132,6 +2129,17 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "monochange_ecmascript"
+version = "0.1.0"
+dependencies = [
+ "monochange_core",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_parser",
+ "oxc_span",
 ]
 
 [[package]]
@@ -2252,13 +2260,10 @@ dependencies = [
  "insta",
  "monochange_config",
  "monochange_core",
+ "monochange_ecmascript",
  "monochange_lint_testing",
  "monochange_linting",
  "monochange_test_helpers",
- "oxc_allocator",
- "oxc_ast",
- "oxc_parser",
- "oxc_span",
  "rstest",
  "semver",
  "serde",

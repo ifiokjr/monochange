@@ -72,6 +72,7 @@ monochange_config = { version = "0.1.0", path = "./crates/monochange_config" }
 monochange_core = { version = "0.1.0", path = "./crates/monochange_core" }
 monochange_dart = { version = "0.1.0", path = "./crates/monochange_dart" }
 monochange_deno = { version = "0.1.0", path = "./crates/monochange_deno" }
+monochange_ecmascript = { version = "0.1.0", path = "./crates/monochange_ecmascript" }
 monochange_gitea = { version = "0.1.0", path = "./crates/monochange_gitea" }
 monochange_github = { version = "0.1.0", path = "./crates/monochange_github" }
 monochange_gitlab = { version = "0.1.0", path = "./crates/monochange_gitlab" }
