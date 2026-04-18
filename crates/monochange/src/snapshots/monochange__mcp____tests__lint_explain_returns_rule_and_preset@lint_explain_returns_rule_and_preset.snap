@@ -1,0 +1,51 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: "serde_json::to_string_pretty(&combined).unwrap_or_else(|error|\n{ panic!(\"serialize combined lint explanation snapshot: {error}\") })"
+---
+{
+  "preset": {
+    "action": "lint_explain",
+    "entry": {
+      "description": "Balanced Cargo manifest linting for most workspaces",
+      "id": "cargo/recommended",
+      "maturity": "stable",
+      "name": "Cargo recommended",
+      "rules": {
+        "cargo/dependency-field-order": "warning",
+        "cargo/internal-dependency-workspace": "error",
+        "cargo/required-package-fields": "error",
+        "cargo/sorted-dependencies": "warning",
+        "cargo/unlisted-package-private": "warning"
+      }
+    },
+    "kind": "preset",
+    "ok": true,
+    "summary": "Loaded lint preset `cargo/recommended`."
+  },
+  "rule": {
+    "action": "lint_explain",
+    "entry": {
+      "autofixable": true,
+      "category": "correctness",
+      "description": "Requires workspace = true for internal Cargo dependencies",
+      "id": "cargo/internal-dependency-workspace",
+      "maturity": "stable",
+      "name": "Internal dependency workspace",
+      "options": [
+        {
+          "description": "require internal dependencies to use workspace = true",
+          "kind": "boolean",
+          "name": "require_workspace"
+        },
+        {
+          "description": "apply an autofix when a dependency can be rewritten safely",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    "kind": "rule",
+    "ok": true,
+    "summary": "Loaded lint rule `cargo/internal-dependency-workspace`."
+  }
+}

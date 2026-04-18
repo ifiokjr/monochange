@@ -28,6 +28,24 @@ pub struct PathParam {
 	pub path: Option<String>,
 }
 
+/// Empty payload for tools that do not need arguments.
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
+pub struct EmptyParam {}
+
+/// Input payload for the MCP changeset diagnostics tool.
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DiagnosticsParam {
+	pub path: Option<String>,
+	#[serde(default)]
+	pub changeset: Vec<String>,
+}
+
+/// Input payload for the MCP lint explanation tool.
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct LintExplainParam {
+	pub id: String,
+}
+
 /// Input payload for the MCP change-file creation tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ChangeParam {
@@ -455,6 +473,40 @@ impl MonochangeMcpServer {
 	}
 
 	#[tool(
+		name = "monochange_diagnostics",
+		description = "Inspect pending changesets with git and review context as structured JSON."
+	)]
+	async fn diagnostics(
+		&self,
+		Parameters(params): Parameters<DiagnosticsParam>,
+	) -> Result<CallToolResult, McpError> {
+		let root = resolve_root(params.path.as_deref());
+
+		let report = match crate::changesets::diagnose_changesets(&root, &params.changeset) {
+			Ok(report) => report,
+			Err(error) => {
+				return Ok(json_error_result(json!({
+					"ok": false,
+					"action": "diagnostics",
+					"root": root,
+					"summary": error.render(),
+					"error": error.render()
+				})));
+			}
+		};
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "diagnostics",
+			"summary": format!(
+				"Loaded {} changeset diagnostic record(s).",
+				report.changesets.len()
+			),
+			"report": report,
+		})))
+	}
+
+	#[tool(
 		name = "monochange_change",
 		description = "Write a .changeset markdown file for one or more package or group ids."
 	)]
@@ -598,6 +650,66 @@ impl MonochangeMcpServer {
 			"action": "affected_packages",
 			"summary": evaluation.summary,
 			"evaluation": evaluation,
+		})))
+	}
+
+	#[tool(
+		name = "monochange_lint_catalog",
+		description = "List registered manifest lint rules and presets as structured JSON."
+	)]
+	async fn lint_catalog(
+		&self,
+		Parameters(_params): Parameters<EmptyParam>,
+	) -> Result<CallToolResult, McpError> {
+		let rules = crate::lint::available_lint_rules();
+		let presets = crate::lint::available_lint_presets();
+
+		Ok(json_result(json!({
+			"ok": true,
+			"action": "lint_catalog",
+			"summary": format!(
+				"Loaded {} lint rule(s) and {} preset(s).",
+				rules.len(),
+				presets.len()
+			),
+			"rules": rules,
+			"presets": presets,
+		})))
+	}
+
+	#[tool(
+		name = "monochange_lint_explain",
+		description = "Explain one manifest lint rule or preset as structured JSON."
+	)]
+	async fn lint_explain(
+		&self,
+		Parameters(params): Parameters<LintExplainParam>,
+	) -> Result<CallToolResult, McpError> {
+		if let Some(rule) = crate::lint::explain_lint_rule(&params.id) {
+			return Ok(json_result(json!({
+				"ok": true,
+				"action": "lint_explain",
+				"kind": "rule",
+				"summary": format!("Loaded lint rule `{}`.", rule.id),
+				"entry": rule,
+			})));
+		}
+
+		if let Some(preset) = crate::lint::explain_lint_preset(&params.id) {
+			return Ok(json_result(json!({
+				"ok": true,
+				"action": "lint_explain",
+				"kind": "preset",
+				"summary": format!("Loaded lint preset `{}`.", preset.id),
+				"entry": preset,
+			})));
+		}
+
+		Ok(json_error_result(json!({
+			"ok": false,
+			"action": "lint_explain",
+			"summary": format!("Unknown lint rule or preset `{}`.", params.id),
+			"error": format!("unknown lint rule or preset `{}`", params.id)
 		})))
 	}
 
@@ -842,6 +954,9 @@ mod __tests {
 
 	use super::AffectedParam;
 	use super::ChangeParam;
+	use super::DiagnosticsParam;
+	use super::EmptyParam;
+	use super::LintExplainParam;
 	use super::McpChangeBump;
 	use super::MonochangeMcpServer;
 	use super::PathParam;
@@ -1228,6 +1343,42 @@ mod __tests {
 	}
 
 	#[tokio::test]
+	async fn diagnostics_returns_changeset_context() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/diagnostics-base");
+
+		let result = MonochangeMcpServer::new()
+			.diagnostics(Parameters(DiagnosticsParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset: Vec::new(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("diagnostics: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn diagnostics_reports_missing_requested_changesets() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/diagnostics-base");
+
+		let result = MonochangeMcpServer::new()
+			.diagnostics(Parameters(DiagnosticsParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset: vec!["missing.md".to_string()],
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("diagnostics: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
 	async fn change_reports_errors_for_unknown_package_ids() {
 		let mut settings = snapshot_settings();
 		settings.set_snapshot_suffix(current_test_name());
@@ -1375,6 +1526,97 @@ mod __tests {
 			rendered.contains("unknown")
 				|| rendered.contains("empty id")
 				|| rendered.contains("step")
+		);
+	}
+
+	#[tokio::test]
+	async fn lint_catalog_lists_rules_and_presets() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+
+		let result = MonochangeMcpServer::new()
+			.lint_catalog(Parameters(EmptyParam::default()))
+			.await
+			.unwrap_or_else(|error| panic!("lint catalog: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
+	async fn lint_explain_returns_rule_and_preset() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+
+		let server = MonochangeMcpServer::new();
+		let rule = server
+			.lint_explain(Parameters(LintExplainParam {
+				id: "cargo/internal-dependency-workspace".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("lint explain rule: {error}"));
+		let preset = server
+			.lint_explain(Parameters(LintExplainParam {
+				id: "cargo/recommended".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("lint explain preset: {error}"));
+
+		let combined = serde_json::json!({
+			"rule": serde_json::from_str::<serde_json::Value>(&content_text(&rule))
+				.unwrap_or_else(|error| panic!("parse rule result: {error}")),
+			"preset": serde_json::from_str::<serde_json::Value>(&content_text(&preset))
+				.unwrap_or_else(|error| panic!("parse preset result: {error}")),
+		});
+
+		assert_snapshot!(
+			serde_json::to_string_pretty(&combined).unwrap_or_else(|error| {
+				panic!("serialize combined lint explanation snapshot: {error}")
+			})
+		);
+	}
+
+	#[tokio::test]
+	async fn agent_eval_release_workflow_stays_machine_readable() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+		let tempdir = setup_fixture("monochange/diagnostics-base");
+		let server = MonochangeMcpServer::new();
+
+		let discover = server
+			.discover(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("discover: {error}"));
+		let diagnostics = server
+			.diagnostics(Parameters(DiagnosticsParam {
+				path: Some(tempdir.path().display().to_string()),
+				changeset: Vec::new(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("diagnostics: {error}"));
+		let manifest = server
+			.release_manifest(Parameters(PathParam {
+				path: Some(tempdir.path().display().to_string()),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("release manifest: {error}"));
+
+		let eval = serde_json::json!({
+			"discover": serde_json::from_str::<serde_json::Value>(&content_text(&discover))
+				.unwrap_or_else(|error| panic!("parse discover result: {error}")),
+			"diagnostics": serde_json::from_str::<serde_json::Value>(&content_text(&diagnostics))
+				.unwrap_or_else(|error| panic!("parse diagnostics result: {error}")),
+			"releaseManifest": serde_json::from_str::<serde_json::Value>(&content_text(&manifest))
+				.unwrap_or_else(|error| panic!("parse release manifest result: {error}")),
+		});
+
+		assert_snapshot!(
+			serde_json::to_string_pretty(&eval)
+				.unwrap_or_else(|error| { panic!("serialize agent eval snapshot: {error}") })
 		);
 	}
 

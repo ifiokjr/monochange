@@ -1,0 +1,177 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: "serde_json::to_string_pretty(&eval).unwrap_or_else(|error|\n{ panic!(\"serialize agent eval snapshot: {error}\") })"
+---
+{
+  "diagnostics": {
+    "action": "diagnostics",
+    "ok": true,
+    "report": {
+      "changesets": [
+        {
+          "context": {
+            "capabilities": {
+              "actorProfiles": false,
+              "commitWebUrls": false,
+              "issueComments": false,
+              "relatedIssues": false,
+              "reviewRequestLookup": false
+            },
+            "host": null,
+            "introduced": null,
+            "lastUpdated": null,
+            "provider": "generic_git",
+            "relatedIssues": []
+          },
+          "details": null,
+          "path": ".changeset/feature.md",
+          "summary": "Add feature",
+          "targets": [
+            {
+              "bump": "patch",
+              "changeType": null,
+              "evidenceRefs": [],
+              "id": "core",
+              "kind": "package",
+              "origin": "direct-change"
+            }
+          ]
+        }
+      ],
+      "requestedChangesets": [
+        ".changeset/feature.md"
+      ]
+    },
+    "summary": "Loaded 1 changeset diagnostic record(s)."
+  },
+  "discover": {
+    "action": "discover",
+    "ok": true,
+    "report": {
+      "dependencies": [],
+      "packages": [
+        {
+          "current_version": "1.0.0",
+          "declared_dependencies": [],
+          "ecosystem": "cargo",
+          "id": "cargo:crates/core/Cargo.toml",
+          "manifest_path": "[ROOT]/crates/core/Cargo.toml",
+          "metadata": {
+            "config_id": "core"
+          },
+          "name": "core",
+          "publish_state": "public",
+          "version_group_id": null,
+          "workspace_root": "[ROOT]
+        }
+      ],
+      "version_groups": [],
+      "warnings": [],
+      "workspace_root": "[ROOT]
+    },
+    "summary": "Discovered 1 package(s) and 0 dependency edge(s)."
+  },
+  "releaseManifest": {
+    "action": "release_manifest",
+    "manifest": {
+      "changedFiles": [
+        "Cargo.toml",
+        "crates/core/Cargo.toml"
+      ],
+      "changelogs": [],
+      "changesets": [
+        {
+          "context": {
+            "capabilities": {
+              "actorProfiles": false,
+              "commitWebUrls": false,
+              "issueComments": false,
+              "relatedIssues": false,
+              "reviewRequestLookup": false
+            },
+            "host": null,
+            "introduced": null,
+            "lastUpdated": null,
+            "provider": "generic_git",
+            "relatedIssues": []
+          },
+          "details": null,
+          "path": ".changeset/feature.md",
+          "summary": "Add feature",
+          "targets": [
+            {
+              "bump": "patch",
+              "changeType": null,
+              "evidenceRefs": [],
+              "id": "core",
+              "kind": "package",
+              "origin": "direct-change"
+            }
+          ]
+        }
+      ],
+      "command": "release-manifest",
+      "deletedChangesets": [],
+      "dryRun": true,
+      "groupVersion": null,
+      "packagePublications": [
+        {
+          "ecosystem": "cargo",
+          "mode": "builtin",
+          "package": "core",
+          "registry": "crates_io",
+          "trustedPublishing": {
+            "enabled": true,
+            "environment": null,
+            "repository": null,
+            "workflow": null
+          },
+          "version": "1.0.1"
+        }
+      ],
+      "plan": {
+        "compatibilityEvidence": [],
+        "decisions": [
+          {
+            "bump": "patch",
+            "package": "cargo:crates/core/Cargo.toml",
+            "plannedVersion": "1.0.1",
+            "reasons": [
+              "Add feature"
+            ],
+            "trigger": "direct-change",
+            "upstreamSources": [
+              "cargo:crates/core/Cargo.toml"
+            ]
+          }
+        ],
+        "groups": [],
+        "unresolvedItems": [],
+        "warnings": [],
+        "workspaceRoot": "."
+      },
+      "releaseTargets": [
+        {
+          "id": "core",
+          "kind": "package",
+          "members": [
+            "core"
+          ],
+          "release": false,
+          "renderedChangelogTitle": "core 1.0.1 ([DATE])",
+          "renderedTitle": "core 1.0.1 ([DATE])",
+          "tag": false,
+          "tagName": "core/v1.0.1",
+          "version": "1.0.1",
+          "versionFormat": "namespaced"
+        }
+      ],
+      "releasedPackages": [
+        "core"
+      ],
+      "version": "1.0.1"
+    },
+    "ok": true,
+    "summary": "Generated dry-run release manifest with 1 release target(s)."
+  }
+}

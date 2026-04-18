@@ -1,0 +1,45 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "diagnostics",
+  "ok": true,
+  "report": {
+    "changesets": [
+      {
+        "context": {
+          "capabilities": {
+            "actorProfiles": false,
+            "commitWebUrls": false,
+            "issueComments": false,
+            "relatedIssues": false,
+            "reviewRequestLookup": false
+          },
+          "host": null,
+          "introduced": null,
+          "lastUpdated": null,
+          "provider": "generic_git",
+          "relatedIssues": []
+        },
+        "details": null,
+        "path": ".changeset/feature.md",
+        "summary": "Add feature",
+        "targets": [
+          {
+            "bump": "patch",
+            "changeType": null,
+            "evidenceRefs": [],
+            "id": "core",
+            "kind": "package",
+            "origin": "direct-change"
+          }
+        ]
+      }
+    ],
+    "requestedChangesets": [
+      ".changeset/feature.md"
+    ]
+  },
+  "summary": "Loaded 1 changeset diagnostic record(s)."
+}

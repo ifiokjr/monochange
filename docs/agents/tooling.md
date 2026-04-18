@@ -14,7 +14,9 @@
 - `mc validate`
 - `build:all`
 - `lint:all`
+- `lint:architecture`
 - `test:all`
+- `test:agent-evals`
 - `test:node`
 - `coverage:all`
 - `coverage:patch`

@@ -488,9 +488,9 @@ enum BuiltinReleaseSection {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ChangesetDiagnosticsReport {
-	requested_changesets: Vec<PathBuf>,
-	changesets: Vec<PreparedChangeset>,
+pub(crate) struct ChangesetDiagnosticsReport {
+	pub(crate) requested_changesets: Vec<PathBuf>,
+	pub(crate) changesets: Vec<PreparedChangeset>,
 }
 
 #[allow(clippy::struct_excessive_bools)]

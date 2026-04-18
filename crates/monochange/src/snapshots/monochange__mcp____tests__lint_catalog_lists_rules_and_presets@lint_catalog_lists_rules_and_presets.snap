@@ -1,0 +1,434 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "lint_catalog",
+  "ok": true,
+  "presets": [
+    {
+      "description": "Balanced Cargo manifest linting for most workspaces",
+      "id": "cargo/recommended",
+      "maturity": "stable",
+      "name": "Cargo recommended",
+      "rules": {
+        "cargo/dependency-field-order": "warning",
+        "cargo/internal-dependency-workspace": "error",
+        "cargo/required-package-fields": "error",
+        "cargo/sorted-dependencies": "warning",
+        "cargo/unlisted-package-private": "warning"
+      }
+    },
+    {
+      "description": "Opinionated Cargo manifest linting with style rules promoted to errors",
+      "id": "cargo/strict",
+      "maturity": "strict",
+      "name": "Cargo strict",
+      "rules": {
+        "cargo/dependency-field-order": "error",
+        "cargo/internal-dependency-workspace": "error",
+        "cargo/required-package-fields": "error",
+        "cargo/sorted-dependencies": "error",
+        "cargo/unlisted-package-private": "warning"
+      }
+    },
+    {
+      "description": "Balanced Dart manifest linting for metadata, publishability, and baseline SDK hygiene",
+      "id": "dart/recommended",
+      "maturity": "stable",
+      "name": "Dart recommended",
+      "rules": {
+        "dart/dependency-sorted": "warning",
+        "dart/no-git-dependencies-in-published-packages": "error",
+        "dart/required-package-fields": "error",
+        "dart/sdk-constraint-present": "error",
+        "dart/unlisted-package-private": "error"
+      }
+    },
+    {
+      "description": "Opinionated Dart manifest linting with workspace and Flutter policy rules enforced",
+      "id": "dart/strict",
+      "maturity": "strict",
+      "name": "Dart strict",
+      "rules": {
+        "dart/assets-sorted": "error",
+        "dart/dependency-sorted": "error",
+        "dart/flutter-package-metadata-consistent": "error",
+        "dart/internal-path-dependency-policy": {
+          "level": "error",
+          "mode": "path"
+        },
+        "dart/no-git-dependencies-in-published-packages": "error",
+        "dart/no-unexpected-dependency-overrides": "error",
+        "dart/required-package-fields": "error",
+        "dart/sdk-constraint-modern": "error",
+        "dart/sdk-constraint-present": "error",
+        "dart/unlisted-package-private": "error",
+        "dart/workspace-internal-version-consistency": "error"
+      }
+    },
+    {
+      "description": "Balanced npm-family manifest linting for typical JavaScript workspaces",
+      "id": "npm/recommended",
+      "maturity": "stable",
+      "name": "npm recommended",
+      "rules": {
+        "npm/no-duplicate-dependencies": "error",
+        "npm/required-package-fields": "error",
+        "npm/root-no-prod-deps": "error",
+        "npm/sorted-dependencies": "warning",
+        "npm/unlisted-package-private": "warning",
+        "npm/workspace-protocol": "error"
+      }
+    },
+    {
+      "description": "Opinionated npm-family manifest linting with style rules promoted to errors",
+      "id": "npm/strict",
+      "maturity": "strict",
+      "name": "npm strict",
+      "rules": {
+        "npm/no-duplicate-dependencies": "error",
+        "npm/required-package-fields": "error",
+        "npm/root-no-prod-deps": "error",
+        "npm/sorted-dependencies": "error",
+        "npm/unlisted-package-private": "warning",
+        "npm/workspace-protocol": "error"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "autofixable": true,
+      "category": "style",
+      "description": "Enforces consistent ordering inside Cargo dependency tables",
+      "id": "cargo/dependency-field-order",
+      "maturity": "stable",
+      "name": "Dependency field order",
+      "options": [
+        {
+          "description": "apply an autofix that rewrites the dependency entry",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "correctness",
+      "description": "Requires workspace = true for internal Cargo dependencies",
+      "id": "cargo/internal-dependency-workspace",
+      "maturity": "stable",
+      "name": "Internal dependency workspace",
+      "options": [
+        {
+          "description": "require internal dependencies to use workspace = true",
+          "kind": "boolean",
+          "name": "require_workspace"
+        },
+        {
+          "description": "apply an autofix when a dependency can be rewritten safely",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires selected fields in the [package] table",
+      "id": "cargo/required-package-fields",
+      "maturity": "stable",
+      "name": "Required package fields",
+      "options": [
+        {
+          "description": "list of package fields that must be present",
+          "kind": "string_list",
+          "name": "fields"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "style",
+      "description": "Requires Cargo dependency tables to be alphabetically sorted",
+      "id": "cargo/sorted-dependencies",
+      "maturity": "stable",
+      "name": "Sorted dependencies",
+      "options": [
+        {
+          "description": "apply an autofix that rewrites the dependency section",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "correctness",
+      "description": "Requires unmanaged Cargo packages to declare publish = false",
+      "id": "cargo/unlisted-package-private",
+      "maturity": "stable",
+      "name": "Unlisted package must be private",
+      "options": [
+        {
+          "description": "apply an autofix that inserts publish = false",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "style",
+      "description": "Requires Flutter asset and font lists to use a stable alphabetical order",
+      "id": "dart/assets-sorted",
+      "maturity": "stable",
+      "name": "Flutter assets sorted",
+      "options": [
+        {
+          "description": "apply an autofix that rewrites Flutter assets and fonts in sorted order",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "style",
+      "description": "Requires Dart dependency sections to be alphabetically sorted",
+      "id": "dart/dependency-sorted",
+      "maturity": "stable",
+      "name": "Dependency sections sorted",
+      "options": [
+        {
+          "description": "apply an autofix that rewrites dependency sections in sorted order",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires packages with a flutter section to declare the Flutter SDK dependency consistently",
+      "id": "dart/flutter-package-metadata-consistent",
+      "maturity": "stable",
+      "name": "Flutter package metadata consistent",
+      "options": []
+    },
+    {
+      "autofixable": false,
+      "category": "best_practice",
+      "description": "Enforces how internal Dart workspace packages reference each other",
+      "id": "dart/internal-path-dependency-policy",
+      "maturity": "stable",
+      "name": "Internal path dependency policy",
+      "options": [
+        {
+          "description": "dependency policy mode: `path` or `hosted`",
+          "kind": "string",
+          "name": "mode"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Prevents published Dart packages from using git: dependencies unless explicitly allowed",
+      "id": "dart/no-git-dependencies-in-published-packages",
+      "maturity": "stable",
+      "name": "No git dependencies in published packages",
+      "options": [
+        {
+          "description": "list of dependency names that may use git: sources",
+          "kind": "string_list",
+          "name": "allow"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "best_practice",
+      "description": "Warns when dependency_overrides appear outside explicitly allowed Dart packages",
+      "id": "dart/no-unexpected-dependency-overrides",
+      "maturity": "stable",
+      "name": "No unexpected dependency overrides",
+      "options": [
+        {
+          "description": "allow dependency_overrides in private packages",
+          "kind": "boolean",
+          "name": "allow_for_private"
+        },
+        {
+          "description": "list of package names that may declare dependency_overrides",
+          "kind": "string_list",
+          "name": "allow_packages"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires selected pubspec.yaml fields for managed publishable Dart packages",
+      "id": "dart/required-package-fields",
+      "maturity": "stable",
+      "name": "Required package fields",
+      "options": [
+        {
+          "description": "list of pubspec.yaml fields that must be present",
+          "kind": "string_list",
+          "name": "fields"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "best_practice",
+      "description": "Requires Dart packages to use a modern environment.sdk lower bound and, by default, an upper bound",
+      "id": "dart/sdk-constraint-modern",
+      "maturity": "stable",
+      "name": "SDK constraint modern",
+      "options": [
+        {
+          "description": "minimum supported SDK version, such as 3.0.0 or 3.6.0",
+          "kind": "string",
+          "name": "minimum"
+        },
+        {
+          "description": "require environment.sdk to include an upper bound",
+          "kind": "boolean",
+          "name": "require_upper_bound"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires an explicit environment.sdk constraint in pubspec.yaml",
+      "id": "dart/sdk-constraint-present",
+      "maturity": "stable",
+      "name": "SDK constraint present",
+      "options": []
+    },
+    {
+      "autofixable": true,
+      "category": "correctness",
+      "description": "Requires unmanaged Dart packages to declare publish_to: none",
+      "id": "dart/unlisted-package-private",
+      "maturity": "stable",
+      "name": "Unlisted package must be private",
+      "options": [
+        {
+          "description": "apply an autofix that inserts publish_to: none",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires internal Dart dependency version references to match the current workspace package version",
+      "id": "dart/workspace-internal-version-consistency",
+      "maturity": "stable",
+      "name": "Workspace internal version consistency",
+      "options": []
+    },
+    {
+      "autofixable": true,
+      "category": "correctness",
+      "description": "Prevents one dependency from appearing in multiple npm-family dependency sections",
+      "id": "npm/no-duplicate-dependencies",
+      "maturity": "stable",
+      "name": "No duplicate dependencies",
+      "options": [
+        {
+          "description": "apply an autofix that removes duplicate entries from later sections",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires selected package.json fields to be present",
+      "id": "npm/required-package-fields",
+      "maturity": "stable",
+      "name": "Required package fields",
+      "options": [
+        {
+          "description": "list of package.json fields that must be present",
+          "kind": "string_list",
+          "name": "fields"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "best_practice",
+      "description": "Requires the root package.json to keep production dependencies out of dependencies",
+      "id": "npm/root-no-prod-deps",
+      "maturity": "stable",
+      "name": "Root no production dependencies",
+      "options": [
+        {
+          "description": "apply an autofix that moves dependencies into devDependencies",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "style",
+      "description": "Requires npm-family dependency sections to be alphabetically sorted",
+      "id": "npm/sorted-dependencies",
+      "maturity": "stable",
+      "name": "Sorted dependencies",
+      "options": [
+        {
+          "description": "apply an autofix that rewrites the manifest with sorted dependency sections",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "correctness",
+      "description": "Requires unmanaged npm-family packages to declare private: true",
+      "id": "npm/unlisted-package-private",
+      "maturity": "stable",
+      "name": "Unlisted package must be private",
+      "options": [
+        {
+          "description": "apply an autofix that inserts private: true",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    },
+    {
+      "autofixable": true,
+      "category": "correctness",
+      "description": "Requires internal npm-family dependencies to use the workspace: protocol",
+      "id": "npm/workspace-protocol",
+      "maturity": "stable",
+      "name": "Workspace protocol",
+      "options": [
+        {
+          "description": "also enforce the rule for private packages",
+          "kind": "boolean",
+          "name": "require_for_private"
+        },
+        {
+          "description": "apply an autofix that rewrites the dependency value",
+          "kind": "boolean",
+          "name": "fix"
+        }
+      ]
+    }
+  ],
+  "summary": "Loaded 22 lint rule(s) and 6 preset(s)."
+}
