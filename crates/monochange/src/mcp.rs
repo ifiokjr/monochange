@@ -1578,6 +1578,22 @@ mod __tests {
 	}
 
 	#[tokio::test]
+	async fn lint_explain_reports_unknown_ids() {
+		let mut settings = snapshot_settings();
+		settings.set_snapshot_suffix(current_test_name());
+		let _guard = settings.bind_to_scope();
+
+		let result = MonochangeMcpServer::new()
+			.lint_explain(Parameters(LintExplainParam {
+				id: "cargo/does-not-exist".to_string(),
+			}))
+			.await
+			.unwrap_or_else(|error| panic!("lint explain missing id: {error}"));
+
+		assert_snapshot!(content_text(&result));
+	}
+
+	#[tokio::test]
 	async fn agent_eval_release_workflow_stays_machine_readable() {
 		let mut settings = snapshot_settings();
 		settings.set_snapshot_suffix(current_test_name());
