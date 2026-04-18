@@ -92,7 +92,8 @@ Keep instructions like these close to your project guidance:
 - Read `monochange.toml` before proposing release workflow changes.
 - Run `mc validate` before and after release-affecting edits.
 - Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
-- Use `mc diagnostics --format json` for a structured view of all pending changesets with git and review context.
+- Use `mc diagnostics --format json` or `monochange_diagnostics` for a structured view of all pending changesets with git and review context.
+- Use `monochange_lint_catalog` and `monochange_lint_explain` when you need lint metadata without shelling out.
 - Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
 - Use `mc release --dry-run --format json` before mutating release state.
 
@@ -106,10 +107,15 @@ The MCP server is JSON-first and focuses on reviewable operations:
 
 - `monochange_validate` — validate `monochange.toml` and `.changeset` targets
 - `monochange_discover` — discover packages, dependencies, and groups across the repository
+- `monochange_diagnostics` — inspect pending changesets with git and review context as structured JSON
 - `monochange_change` — write a `.changeset` markdown file for one or more package or group ids
 - `monochange_release_preview` — prepare a dry-run release preview from discovered `.changeset` files
 - `monochange_release_manifest` — generate a dry-run release manifest JSON document for downstream automation
 - `monochange_affected_packages` — evaluate changeset policy from changed paths and optional labels
+- `monochange_lint_catalog` — list registered manifest lint rules and presets
+- `monochange_lint_explain` — explain one manifest lint rule or preset
+- `monochange_analyze_changes` — analyze git diff state and return ecosystem-specific semantic changes
+- `monochange_validate_changeset` — validate one changeset against the current semantic diff
 
 <!-- {/mcpToolsList} -->
 

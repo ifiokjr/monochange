@@ -96,7 +96,7 @@ type = "DiagnoseChangesets"
 
 ## AI agent and MCP usage
 
-`mc diagnostics --format json` is designed to be called by AI agents to get a structured overview of all pending changes before planning a release, reviewing a PR, or proposing follow-up work.
+`mc diagnostics --format json` and the MCP tool `monochange_diagnostics` are designed to give AI agents a structured overview of all pending changes before planning a release, reviewing a PR, or proposing follow-up work.
 
 A typical agent workflow looks like this:
 
@@ -106,7 +106,7 @@ A typical agent workflow looks like this:
 4. `mc change ...` — add, update, or remove changesets as needed
 5. `mc release` — execute the release when everything looks correct
 
-Because `mc diagnostics` returns stable, workspace-relative paths and structured JSON, agents can parse the output without needing to read raw markdown files directly. Each changeset record includes enough context — who introduced it, which PR it belongs to, which issues it closes — for an agent to make targeted decisions about whether to proceed with a release or request changes.
+Because `mc diagnostics` and `monochange_diagnostics` return stable, workspace-relative paths and structured JSON, agents can parse the output without needing to read raw markdown files directly. Each changeset record includes enough context — who introduced it, which PR it belongs to, which issues it closes — for an agent to make targeted decisions about whether to proceed with a release or request changes.
 
 ### Example: check for undocumented packages before a release
 

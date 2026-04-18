@@ -262,6 +262,14 @@ in
       description = "Run npm helper, launcher, and repository utility tests with the built-in Node test runner.";
       binary = "bash";
     };
+    "test:agent-evals" = {
+      exec = ''
+        set -e
+        cargo test --package monochange --all-features agent_eval_
+      '';
+      description = "Run the focused agent-style eval coverage for machine-readable workflows.";
+      binary = "bash";
+    };
     "coverage:all" = {
       exec = ''
         set -euo pipefail
@@ -344,6 +352,7 @@ in
         set -e
         lint:clippy
         lint:format
+        lint:architecture
         deny:check
         docs:check
         lint:monochange
@@ -379,12 +388,21 @@ in
       description = "Check that all rust lints are passing with warnings denied.";
       binary = "bash";
     };
+    "lint:architecture" = {
+      exec = ''
+        set -e
+        node scripts/check-architecture-boundaries.mjs
+      '';
+      description = "Check that provider and ecosystem dispatch stays inside the documented allowlist.";
+      binary = "bash";
+    };
     "docs:check" = {
       exec = ''
         set -e
         mdt check
+        node scripts/check-agent-surface.mjs
       '';
-      description = "Check that shared documentation blocks are synchronized.";
+      description = "Check that shared documentation blocks are synchronized and agent-facing docs stay aligned with the repo surface.";
       binary = "bash";
     };
     "docs:update" = {

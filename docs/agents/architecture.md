@@ -23,3 +23,16 @@ Before merging architecture-sensitive work, check:
 - Introduce new capabilities in core first.
 - Implement those capabilities in the relevant adapter crate.
 - Reject unsupported configuration shapes at the parse boundary rather than leaking compatibility concerns into the shared domain model.
+
+## Explicit dispatch points
+
+- Provider dispatch in `crates/monochange` should stay concentrated in small orchestration modules such as `src/hosted_sources.rs`, `src/release_artifacts.rs`, and narrowly-scoped release helpers.
+- Ecosystem dispatch in `crates/monochange` should stay concentrated in shared orchestration helpers such as `src/versioned_files.rs` until the behavior can move behind adapter contracts.
+- `crates/monochange_config` may validate configuration against adapter capabilities, but it should not reimplement adapter behavior.
+- New direct `SourceProvider` or `EcosystemType` branching outside those explicit files is a review blocker unless the exception is documented in `ARCHITECTURE.md` and covered by tests.
+
+## Mechanical enforcement
+
+- `docs:check` verifies that agent-facing documentation stays aligned with the exported MCP surface and repo map.
+- `lint:architecture` verifies that new provider/ecosystem dispatch points do not quietly spread beyond the documented allowlist.
+- When either check needs a new exception, update the docs and the check in the same change so architecture drift stays reviewable.

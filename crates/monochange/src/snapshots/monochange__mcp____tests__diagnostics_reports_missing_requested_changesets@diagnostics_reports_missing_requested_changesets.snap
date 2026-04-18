@@ -1,0 +1,11 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: content_text(&result)
+---
+{
+  "action": "diagnostics",
+  "error": "config error: requested changeset `missing.md` does not exist",
+  "ok": false,
+  "root": "[ROOT]
+  "summary": "config error: requested changeset `missing.md` does not exist"
+}

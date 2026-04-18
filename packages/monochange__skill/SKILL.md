@@ -122,10 +122,15 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 
 - `monochange_validate` — validate `monochange.toml` and `.changeset` targets
 - `monochange_discover` — discover packages, dependencies, and groups across the repository
+- `monochange_diagnostics` — inspect pending changesets with git and review context as structured JSON
 - `monochange_change` — write a `.changeset` markdown file for one or more package or group ids
 - `monochange_release_preview` — prepare a dry-run release preview from discovered `.changeset` files
 - `monochange_release_manifest` — generate a dry-run release manifest JSON document for downstream automation
 - `monochange_affected_packages` — evaluate changeset policy from changed paths and optional labels
+- `monochange_lint_catalog` — list registered manifest lint rules and presets
+- `monochange_lint_explain` — explain one manifest lint rule or preset
+- `monochange_analyze_changes` — analyze git diff state and return ecosystem-specific semantic changes
+- `monochange_validate_changeset` — validate one changeset against the current semantic diff
 
 <!-- {/mcpToolsList} -->
 

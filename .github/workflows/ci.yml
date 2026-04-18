@@ -33,6 +33,10 @@ jobs:
         run: lint:format
         shell: devenv shell -- bash -e {0}
 
+      - name: check architecture boundaries
+        run: lint:architecture
+        shell: devenv shell -- bash -e {0}
+
       - name: check documentation sync
         run: docs:check
         shell: devenv shell -- bash -e {0}

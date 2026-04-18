@@ -6,6 +6,7 @@
 - Handle merge conflicts with a rebase onto `main` before merging, then rerun relevant validation.
 - Only use squash merging.
 - When creating or updating a PR, manage failing checks proactively and use the scheduler to keep monitoring follow-up CI work until it is green.
+- For complex or multi-step changes, start by creating or updating a plan under `docs/plans/active/` so the repo keeps a versioned execution record.
 - For non-trivial behavior changes, start with a failing test.
 - Implement the smallest change that makes the tests pass.
 - After making changes, run `fix:all` so formatting and clippy autofixes are applied before final validation.
