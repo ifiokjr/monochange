@@ -1,0 +1,232 @@
+---
+source: crates/monochange_analysis/tests/cargo_semantic_analysis.rs
+assertion_line: 116
+expression: analysis
+---
+{
+  "refs": {
+    "releaseRef": "v1.0.0",
+    "mainRef": "main",
+    "headRef": "feature"
+  },
+  "frames": {
+    "releaseToMain": {
+      "frame": {
+        "CustomRange": {
+          "base": "v1.0.0",
+          "head": "main"
+        }
+      },
+      "detectionLevel": "signature",
+      "packageAnalyses": {
+        "core": {
+          "packageId": "core",
+          "packageRecordId": "cargo:crates/core/Cargo.toml",
+          "packageName": "core",
+          "ecosystem": "cargo",
+          "analyzerId": "cargo/public-api",
+          "changedFiles": [
+            "Cargo.toml",
+            "src/lib.rs"
+          ],
+          "semanticChanges": [
+            {
+              "category": "public_api",
+              "kind": "added",
+              "itemKind": "struct",
+              "itemPath": "Greeter",
+              "summary": "struct `Greeter` added",
+              "filePath": "src/lib.rs",
+              "beforeSignature": null,
+              "afterSignature": "pub struct Greeter ;"
+            },
+            {
+              "category": "public_api",
+              "kind": "modified",
+              "itemKind": "function",
+              "itemPath": "greet",
+              "summary": "function `greet` modified",
+              "filePath": "src/lib.rs",
+              "beforeSignature": "fn greet () -> & 'static str",
+              "afterSignature": "fn greet (name : & str) -> String"
+            },
+            {
+              "category": "dependency",
+              "kind": "added",
+              "itemKind": "dependency",
+              "itemPath": "tracing",
+              "summary": "dependency `tracing` added",
+              "filePath": "Cargo.toml",
+              "beforeSignature": null,
+              "afterSignature": "[dependencies] 0.1"
+            },
+            {
+              "category": "metadata",
+              "kind": "added",
+              "itemKind": "feature",
+              "itemPath": "feature.cli",
+              "summary": "feature `feature.cli` added",
+              "filePath": "Cargo.toml",
+              "beforeSignature": null,
+              "afterSignature": ""
+            },
+            {
+              "category": "metadata",
+              "kind": "modified",
+              "itemKind": "feature",
+              "itemPath": "feature.default",
+              "summary": "feature `feature.default` modified",
+              "filePath": "Cargo.toml",
+              "beforeSignature": "",
+              "afterSignature": "cli"
+            },
+            {
+              "category": "metadata",
+              "kind": "modified",
+              "itemKind": "manifest_field",
+              "itemPath": "package.edition",
+              "summary": "manifest_field `package.edition` modified",
+              "filePath": "Cargo.toml",
+              "beforeSignature": "2021",
+              "afterSignature": "2024"
+            }
+          ],
+          "warnings": []
+        }
+      },
+      "warnings": []
+    },
+    "mainToHead": {
+      "frame": {
+        "CustomRange": {
+          "base": "main",
+          "head": "feature"
+        }
+      },
+      "detectionLevel": "signature",
+      "packageAnalyses": {
+        "core": {
+          "packageId": "core",
+          "packageRecordId": "cargo:crates/core/Cargo.toml",
+          "packageName": "core",
+          "ecosystem": "cargo",
+          "analyzerId": "cargo/public-api",
+          "changedFiles": [
+            "src/lib.rs"
+          ],
+          "semanticChanges": [
+            {
+              "category": "public_api",
+              "kind": "added",
+              "itemKind": "function",
+              "itemPath": "shout",
+              "summary": "function `shout` added",
+              "filePath": "src/lib.rs",
+              "beforeSignature": null,
+              "afterSignature": "fn shout (name : & str) -> String"
+            }
+          ],
+          "warnings": []
+        }
+      },
+      "warnings": []
+    },
+    "releaseToHead": {
+      "frame": {
+        "CustomRange": {
+          "base": "v1.0.0",
+          "head": "feature"
+        }
+      },
+      "detectionLevel": "signature",
+      "packageAnalyses": {
+        "core": {
+          "packageId": "core",
+          "packageRecordId": "cargo:crates/core/Cargo.toml",
+          "packageName": "core",
+          "ecosystem": "cargo",
+          "analyzerId": "cargo/public-api",
+          "changedFiles": [
+            "Cargo.toml",
+            "src/lib.rs"
+          ],
+          "semanticChanges": [
+            {
+              "category": "public_api",
+              "kind": "added",
+              "itemKind": "function",
+              "itemPath": "shout",
+              "summary": "function `shout` added",
+              "filePath": "src/lib.rs",
+              "beforeSignature": null,
+              "afterSignature": "fn shout (name : & str) -> String"
+            },
+            {
+              "category": "public_api",
+              "kind": "added",
+              "itemKind": "struct",
+              "itemPath": "Greeter",
+              "summary": "struct `Greeter` added",
+              "filePath": "src/lib.rs",
+              "beforeSignature": null,
+              "afterSignature": "pub struct Greeter ;"
+            },
+            {
+              "category": "public_api",
+              "kind": "modified",
+              "itemKind": "function",
+              "itemPath": "greet",
+              "summary": "function `greet` modified",
+              "filePath": "src/lib.rs",
+              "beforeSignature": "fn greet () -> & 'static str",
+              "afterSignature": "fn greet (name : & str) -> String"
+            },
+            {
+              "category": "dependency",
+              "kind": "added",
+              "itemKind": "dependency",
+              "itemPath": "tracing",
+              "summary": "dependency `tracing` added",
+              "filePath": "Cargo.toml",
+              "beforeSignature": null,
+              "afterSignature": "[dependencies] 0.1"
+            },
+            {
+              "category": "metadata",
+              "kind": "added",
+              "itemKind": "feature",
+              "itemPath": "feature.cli",
+              "summary": "feature `feature.cli` added",
+              "filePath": "Cargo.toml",
+              "beforeSignature": null,
+              "afterSignature": ""
+            },
+            {
+              "category": "metadata",
+              "kind": "modified",
+              "itemKind": "feature",
+              "itemPath": "feature.default",
+              "summary": "feature `feature.default` modified",
+              "filePath": "Cargo.toml",
+              "beforeSignature": "",
+              "afterSignature": "cli"
+            },
+            {
+              "category": "metadata",
+              "kind": "modified",
+              "itemKind": "manifest_field",
+              "itemPath": "package.edition",
+              "summary": "manifest_field `package.edition` modified",
+              "filePath": "Cargo.toml",
+              "beforeSignature": "2021",
+              "afterSignature": "2024"
+            }
+          ],
+          "warnings": []
+        }
+      },
+      "warnings": []
+    }
+  },
+  "warnings": []
+}
