@@ -109,7 +109,7 @@ impl ChangeFrame {
 
 		// Get current branch
 		let current = get_current_branch(repo_root)?;
-		let default = get_default_branch(repo_root).unwrap_or_else(|_| "main".to_string());
+		let default = default_branch_name(repo_root).unwrap_or_else(|_| "main".to_string());
 
 		// If we're not on the default branch, compare against it
 		if current != default {
@@ -399,8 +399,8 @@ fn get_current_branch(repo_root: &Path) -> Result<String, FrameError> {
 	Ok(branch)
 }
 
-/// Get the default branch (usually "main" or "master").
-fn get_default_branch(repo_root: &Path) -> Result<String, FrameError> {
+/// Get the default branch (usually `main` or `master`).
+pub(crate) fn default_branch_name(repo_root: &Path) -> Result<String, FrameError> {
 	// Try to get from git config
 	let output = Command::new("git")
 		.current_dir(repo_root)

@@ -35,6 +35,7 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageAnalysisContext;
 use monochange_core::PackageRecord;
 use monochange_core::SemanticAnalyzer;
+use monochange_core::git;
 use monochange_core::normalize_path;
 use monochange_core::relative_to_root;
 #[cfg(feature = "dart")]
@@ -132,6 +133,42 @@ pub struct ChangeAnalysis {
 	/// Semantic diffs grouped by package id.
 	pub package_analyses: BTreeMap<String, PackageChangeAnalysis>,
 	/// Root-level warnings such as unmatched paths or missing analyzers.
+	pub warnings: Vec<String>,
+}
+
+/// Explicit refs used for release-aware multi-frame semantic analysis.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseTrajectoryRefs {
+	/// Release baseline ref, usually a workspace tag.
+	pub release_ref: String,
+	/// Default branch ref representing current `main`.
+	pub main_ref: String,
+	/// Head ref representing the current branch or PR head.
+	pub head_ref: String,
+}
+
+/// Release-aware semantic analyses for three comparison frames.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseTrajectoryFrames {
+	/// Semantic analysis between the last release baseline and current `main`.
+	pub release_to_main: ChangeAnalysis,
+	/// Semantic analysis between current `main` and the current head/branch.
+	pub main_to_head: ChangeAnalysis,
+	/// Semantic analysis between the last release baseline and the current head/branch.
+	pub release_to_head: ChangeAnalysis,
+}
+
+/// Raw multi-frame semantic evidence for release-aware compatibility reasoning.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseTrajectoryAnalysis {
+	/// Resolved refs used for the three comparison frames.
+	pub refs: ReleaseTrajectoryRefs,
+	/// Per-frame semantic analyses.
+	pub frames: ReleaseTrajectoryFrames,
+	/// Root-level warnings about baseline resolution.
 	pub warnings: Vec<String>,
 }
 
@@ -269,12 +306,110 @@ pub fn analyze_changes(
 	})
 }
 
+/// Analyze three release-aware semantic frames using explicit refs.
+///
+/// # Errors
+///
+/// Returns an error if any frame analysis or ref resolution fails.
+pub fn analyze_release_trajectory_for_refs(
+	repo_root: &Path,
+	refs: &ReleaseTrajectoryRefs,
+	config: &AnalysisConfig,
+) -> MonochangeResult<ReleaseTrajectoryAnalysis> {
+	let release_to_main =
+		analyze_custom_range(repo_root, &refs.release_ref, &refs.main_ref, config)?;
+	let main_to_head = analyze_custom_range(repo_root, &refs.main_ref, &refs.head_ref, config)?;
+	let release_to_head =
+		analyze_custom_range(repo_root, &refs.release_ref, &refs.head_ref, config)?;
+	let mut warnings = Vec::new();
+
+	if refs.main_ref == refs.head_ref {
+		warnings.push(
+			"release trajectory head matches main; `main_to_head` only reflects changes currently on the default branch"
+				.to_string(),
+		);
+	}
+
+	Ok(ReleaseTrajectoryAnalysis {
+		refs: refs.clone(),
+		frames: ReleaseTrajectoryFrames {
+			release_to_main,
+			main_to_head,
+			release_to_head,
+		},
+		warnings,
+	})
+}
+
+/// Analyze three release-aware semantic frames using the latest workspace tag,
+/// the detected default branch, and the current branch.
+///
+/// # Errors
+///
+/// Returns an error if release-baseline or branch resolution fails.
+pub fn analyze_release_trajectory(
+	repo_root: &Path,
+	config: &AnalysisConfig,
+) -> MonochangeResult<ReleaseTrajectoryAnalysis> {
+	let repo_root = normalize_path(repo_root);
+	let refs = ReleaseTrajectoryRefs {
+		release_ref: latest_workspace_release_tag(&repo_root)?,
+		main_ref: default_branch_ref(&repo_root)?,
+		head_ref: git::git_current_branch(&repo_root)?,
+	};
+
+	analyze_release_trajectory_for_refs(&repo_root, &refs, config)
+}
+
+fn analyze_custom_range(
+	repo_root: &Path,
+	base: &str,
+	head: &str,
+	config: &AnalysisConfig,
+) -> MonochangeResult<ChangeAnalysis> {
+	analyze_changes(
+		repo_root,
+		&ChangeFrame::CustomRange {
+			base: base.to_string(),
+			head: head.to_string(),
+		},
+		config,
+	)
+}
+
 fn preferred_package_id(package: &PackageRecord) -> String {
 	package
 		.metadata
 		.get("config_id")
 		.cloned()
 		.unwrap_or_else(|| package.id.clone())
+}
+
+fn latest_workspace_release_tag(repo_root: &Path) -> MonochangeResult<String> {
+	let output = git::git_command_output(repo_root, &["tag", "--list", "--sort=-v:refname"])
+		.map_err(|error| MonochangeError::Io(format!("failed to list git tags: {error}")))?;
+
+	if !output.status.success() {
+		return Err(MonochangeError::Config(format!(
+			"failed to list git tags: {}",
+			git::git_error_detail(&output)
+		)));
+	}
+
+	String::from_utf8_lossy(&output.stdout)
+		.lines()
+		.map(str::trim)
+		.find(|tag| tag.starts_with('v') && !tag.contains('/'))
+		.map(ToString::to_string)
+		.ok_or_else(|| {
+			MonochangeError::Config(
+				"failed to resolve a workspace release baseline from git tags".to_string(),
+			)
+		})
+}
+
+fn default_branch_ref(repo_root: &Path) -> MonochangeResult<String> {
+	frame::default_branch_name(repo_root).map_err(Into::into)
 }
 
 fn discover_analysis_workspace(root: &Path) -> MonochangeResult<AnalysisWorkspace> {
@@ -1010,6 +1145,151 @@ mod tests {
 				.unwrap_or_else(|| panic!("expected one built snapshot file"))
 				.path,
 			PathBuf::from("src/lib.rs")
+		);
+	}
+
+	#[test]
+	fn analyze_release_trajectory_for_refs_uses_explicit_ranges_and_warns_when_head_matches_main() {
+		let release = fixture_path("analysis/release-trajectory/release");
+		let main = fixture_path("analysis/release-trajectory/main");
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+
+		copy_directory(&release, root);
+		git(root, &["init"]);
+		git(root, &["config", "user.name", "monochange-tests"]);
+		git(
+			root,
+			&["config", "user.email", "monochange-tests@example.com"],
+		);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "release"]);
+		git(root, &["branch", "-M", "main"]);
+		git(root, &["tag", "v1.0.0"]);
+
+		copy_directory(&main, root);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "main evolution"]);
+
+		let analysis = analyze_release_trajectory_for_refs(
+			root,
+			&ReleaseTrajectoryRefs {
+				release_ref: "v1.0.0".to_string(),
+				main_ref: "main".to_string(),
+				head_ref: "main".to_string(),
+			},
+			&AnalysisConfig::default(),
+		)
+		.unwrap_or_else(|error| panic!("release trajectory refs: {error}"));
+
+		assert_eq!(
+			analysis.frames.release_to_main.frame.revision_range(),
+			"v1.0.0...main"
+		);
+		assert_eq!(
+			analysis.frames.main_to_head.frame.revision_range(),
+			"main...main"
+		);
+		assert_eq!(
+			analysis.frames.release_to_head.frame.revision_range(),
+			"v1.0.0...main"
+		);
+		assert_eq!(analysis.warnings.len(), 1);
+		assert!(
+			analysis
+				.warnings
+				.first()
+				.unwrap_or_else(|| panic!("expected release trajectory warning"))
+				.contains("head matches main")
+		);
+		assert!(
+			analysis
+				.frames
+				.release_to_main
+				.package_analyses
+				.contains_key("core")
+		);
+	}
+
+	#[test]
+	fn latest_workspace_release_tag_reports_missing_tags_and_git_failures() {
+		let missing_repo = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let missing_repo_error = latest_workspace_release_tag(missing_repo.path())
+			.unwrap_err()
+			.render();
+		assert!(missing_repo_error.contains("failed to list git tags"));
+
+		let repo_without_tags = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = repo_without_tags.path();
+		copy_directory(&fixture_path("analysis/release-trajectory/release"), root);
+		git(root, &["init"]);
+		git(root, &["config", "user.name", "monochange-tests"]);
+		git(
+			root,
+			&["config", "user.email", "monochange-tests@example.com"],
+		);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "release"]);
+		git(root, &["branch", "-M", "main"]);
+
+		let no_tag_error = latest_workspace_release_tag(root).unwrap_err().render();
+		assert!(no_tag_error.contains("failed to resolve a workspace release baseline"));
+	}
+
+	#[test]
+	fn auto_release_trajectory_resolution_uses_latest_workspace_tag_and_branch_refs() {
+		let release = fixture_path("analysis/release-trajectory/release");
+		let main = fixture_path("analysis/release-trajectory/main");
+		let head = fixture_path("analysis/release-trajectory/head");
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+
+		copy_directory(&release, root);
+		git(root, &["init"]);
+		git(root, &["config", "user.name", "monochange-tests"]);
+		git(
+			root,
+			&["config", "user.email", "monochange-tests@example.com"],
+		);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "release"]);
+		git(root, &["branch", "-M", "main"]);
+		git(root, &["tag", "pkg-a/v9.9.9"]);
+		git(root, &["tag", "v1.0.0"]);
+
+		copy_directory(&main, root);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "main evolution"]);
+		git(root, &["checkout", "-b", "feature"]);
+
+		copy_directory(&head, root);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "feature changes"]);
+
+		let latest_tag = latest_workspace_release_tag(root)
+			.unwrap_or_else(|error| panic!("latest workspace tag: {error}"));
+		assert_eq!(latest_tag, "v1.0.0");
+		assert_eq!(
+			default_branch_ref(root).unwrap_or_else(|error| panic!("default branch: {error}")),
+			"main"
+		);
+
+		let analysis = analyze_release_trajectory(root, &AnalysisConfig::default())
+			.unwrap_or_else(|error| panic!("release trajectory: {error}"));
+		assert_eq!(analysis.refs.release_ref, "v1.0.0");
+		assert_eq!(analysis.refs.main_ref, "main");
+		assert_eq!(analysis.refs.head_ref, "feature");
+		assert!(analysis.warnings.is_empty());
+		assert!(
+			analysis
+				.frames
+				.main_to_head
+				.package_analyses
+				.get("core")
+				.unwrap_or_else(|| panic!("missing core package analysis"))
+				.semantic_changes
+				.iter()
+				.any(|change| change.item_path == "shout")
 		);
 	}
 
