@@ -1,0 +1,42 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: output
+---
+Generate repo-local monochange subagents and agent guidance files
+
+Usage: mc subagents [OPTIONS] [TARGET]...
+
+Arguments:
+  [TARGET]...  Subagent target(s) to generate [possible values: claude, vscode, copilot, pi, codex, cursor]
+
+Options:
+      --all                       Generate files for all supported targets
+      --force                     Overwrite generated files that already exist with different contents
+  -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
+      --dry-run                   Preview the generated files without writing them
+      --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
+      --format <format>           Output format for the generated subagent plan [default: text] [possible values: text, json]
+      --no-mcp                    Skip repo-local MCP config files for supported targets
+  -h, --help                      Print help
+
+Examples:
+  mc help subagents
+  mc subagents claude
+  mc subagents pi codex
+  mc subagents --all --dry-run --format json
+  mc subagents vscode copilot --no-mcp
+
+Targets:
+  - claude  -> .claude/agents/*.md and .mcp.json
+  - vscode  -> .github/agents/*.agent.md and .vscode/mcp.json
+  - copilot -> .github/agents/*.agent.md and .vscode/mcp.json
+  - pi      -> .pi/agents/*.md
+  - codex   -> .codex/agents/*.toml
+  - cursor  -> .cursor/rules/*.mdc
+
+Generated agents are CLI-first. They should prefer:
+  1. mc
+  2. monochange
+  3. npx -y @monochange/cli
+
+Use `--no-mcp` to skip MCP config files for targets that support repo-local MCP config.

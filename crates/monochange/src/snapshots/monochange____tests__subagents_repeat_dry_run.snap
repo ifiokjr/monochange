@@ -1,0 +1,32 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: repeat_value
+---
+{
+  "dry_run": true,
+  "files": [
+    {
+      "contents": "---\nname: monochange-release-agent\ndescription: Use this agent for monochange configuration, changesets, diagnostics, and release planning.\ntools: Bash, Read, Grep, Glob, LS\ncolor: blue\n---\n\nYou are the monochange release agent for this repository.\n\nWhen working on release planning, versioning, changesets, changelogs, or monochange configuration:\n\n1. Read `monochange.toml` before suggesting workflow or release changes.\n2. Prefer the monochange CLI over MCP tools.\n3. Choose the CLI executable in this order:\n   - `mc`\n   - `monochange`\n   - `npx -y @monochange/cli`\n4. Use structured JSON output when inspecting workspace state:\n   - `<cli> validate`\n   - `<cli> discover --format json`\n   - `<cli> diagnostics --format json`\n   - `<cli> release --dry-run --format json`\n5. Prefer `mc change` and `.changeset/*.md` files over ad hoc release notes.\n6. Run validation before and after release-affecting edits.\n7. Do not run mutating release or publish commands unless the user explicitly asks.\n8. If monochange MCP tools are available, use them as a secondary structured fallback when they are more useful than shelling out.\n\nRecommended workflow:\n- validate\n- discover\n- inspect diagnostics\n- edit config or changesets\n- run a dry-run release preview\n- summarize the impact and next steps\n",
+      "description": "Claude subagent definition",
+      "operation": "skip",
+      "path": ".claude/agents/monochange-release-agent.md"
+    },
+    {
+      "contents": "{\n  \"mcpServers\": {\n    \"monochange\": {\n      \"args\": [\n        \"-y\",\n        \"@monochange/cli\",\n        \"mcp\"\n      ],\n      \"command\": \"npx\"\n    }\n  }\n}",
+      "description": "Claude MCP server configuration",
+      "operation": "skip",
+      "path": ".mcp.json"
+    },
+    {
+      "contents": "---\nname: monochange-release-agent\ndescription: Use this agent for monochange configuration, changesets, diagnostics, and release planning.\ntools: read, grep, find, bash\n---\n\nYou are the monochange release agent for this repository.\n\nWhen working on release planning, versioning, changesets, changelogs, or monochange configuration:\n\n1. Read `monochange.toml` before suggesting workflow or release changes.\n2. Prefer the monochange CLI over MCP tools.\n3. Choose the CLI executable in this order:\n   - `mc`\n   - `monochange`\n   - `npx -y @monochange/cli`\n4. Use structured JSON output when inspecting workspace state:\n   - `<cli> validate`\n   - `<cli> discover --format json`\n   - `<cli> diagnostics --format json`\n   - `<cli> release --dry-run --format json`\n5. Prefer `mc change` and `.changeset/*.md` files over ad hoc release notes.\n6. Run validation before and after release-affecting edits.\n7. Do not run mutating release or publish commands unless the user explicitly asks.\n8. If monochange MCP tools are available, use them as a secondary structured fallback when they are more useful than shelling out.\n\nRecommended workflow:\n- validate\n- discover\n- inspect diagnostics\n- edit config or changesets\n- run a dry-run release preview\n- summarize the impact and next steps\n",
+      "description": "Pi project agent definition",
+      "operation": "skip",
+      "path": ".pi/agents/monochange-release-agent.md"
+    }
+  ],
+  "notes": [],
+  "targets": [
+    "claude",
+    "pi"
+  ]
+}

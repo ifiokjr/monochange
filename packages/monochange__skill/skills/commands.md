@@ -102,17 +102,17 @@ mc repair-release --from v1.2.3 --target HEAD --dry-run
 
 ### Assistant workflows
 
-| Goal                                              | Command                 | When to use it                             |
-| ------------------------------------------------- | ----------------------- | ------------------------------------------ |
-| Print install/setup instructions for an assistant | `mc assist <assistant>` | You want an install recipe plus MCP config |
-| Start the MCP server                              | `mc mcp`                | The client launches monochange over stdio  |
+| Goal                                  | Command                 | When to use it                                        |
+| ------------------------------------- | ----------------------- | ----------------------------------------------------- |
+| Generate repo-local agent setup files | `mc subagents <target>` | You want monochange-aware agents, subagents, or rules |
+| Start the MCP server                  | `mc mcp`                | The client launches monochange over stdio             |
 
 Examples:
 
 ```bash
-mc assist generic
-mc assist pi
-mc assist claude --format json
+mc help subagents
+mc subagents claude
+mc subagents pi codex
 mc mcp
 ```
 

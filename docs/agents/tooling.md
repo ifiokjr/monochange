@@ -9,7 +9,8 @@
 
 - `monochange --help`
 - `mc --help`
-- `mc assist pi`
+- `mc help subagents`
+- `mc subagents pi`
 - `mc mcp`
 - `mc validate`
 - `build:all`

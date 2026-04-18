@@ -17,7 +17,7 @@ Usage: monochange [OPTIONS] <COMMAND>
 Commands:
   init                 Generate monochange.toml with detected packages, groups, and default CLI commands
   populate             Add any missing built-in CLI commands to monochange.toml so you can customize them
-  assist               Print assistant setup guidance, install steps, and MCP configuration
+  subagents            Generate repo-local monochange subagents and agent guidance files
   release-record       Inspect the monochange release record associated with a tag or commit
   tag-release          Create and push release tags from the monochange release record on a commit
   lint                 Inspect and scaffold manifest lint rules

@@ -1,0 +1,5 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: error.to_string()
+---
+config error: refusing to overwrite existing subagent files without --force: .mcp.json

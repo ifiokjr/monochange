@@ -52,11 +52,6 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-#[cfg(test)]
-pub(crate) use assist::assistant_display_name;
-#[cfg(test)]
-pub(crate) use assist::assistant_setup_payload;
-use assist::run_assist;
 pub(crate) use changelog::*;
 pub use changeset_policy::affected_packages;
 pub(crate) use changeset_policy::compute_changed_paths_since;
@@ -72,8 +67,6 @@ pub(crate) use cli::apply_runtime_change_type_choices;
 #[cfg(test)]
 pub(crate) use cli::apply_runtime_prepare_release_markdown_defaults;
 #[cfg(test)]
-pub(crate) use cli::build_assist_subcommand;
-#[cfg(test)]
 pub(crate) use cli::build_cli_command_subcommand;
 pub use cli::build_command;
 #[cfg(test)]
@@ -81,6 +74,8 @@ pub(crate) use cli::build_command_for_root;
 use cli::build_command_with_cli;
 #[cfg(test)]
 pub(crate) use cli::build_release_record_subcommand;
+#[cfg(test)]
+pub(crate) use cli::build_subagents_subcommand;
 #[cfg(test)]
 pub(crate) use cli::cli_command_after_help;
 #[cfg(test)]
@@ -225,6 +220,8 @@ pub use release_record::retarget_release;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use subagents::SubagentOptions;
+use subagents::run_subagents;
 pub(crate) use versioned_files::*;
 pub use workspace_ops::AddChangeFileRequest;
 pub use workspace_ops::add_change_file;
@@ -249,7 +246,6 @@ pub(crate) use workspace_ops::render_interactive_changeset_markdown;
 #[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
-mod assist;
 mod changelog;
 mod changeset_policy;
 mod changesets;
@@ -266,6 +262,7 @@ mod prepared_release_cache;
 mod publish_rate_limits;
 mod release_artifacts;
 mod release_record;
+mod subagents;
 mod tracing_setup;
 mod versioned_files;
 mod workspace_ops;
@@ -302,38 +299,84 @@ impl From<ChangeBump> for BumpSeverity {
 	}
 }
 
-/// Assistant profile understood by `mc assist`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-pub enum Assistant {
-	Generic,
+/// Repo-local subagent target understood by `mc subagents`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubagentTarget {
 	Claude,
-	Cursor,
+	Vscode,
 	Copilot,
 	Pi,
+	Codex,
+	Cursor,
 }
 
-/// Output renderer for assistant setup payloads.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-pub enum AssistOutputFormat {
+impl SubagentTarget {
+	fn all() -> Vec<Self> {
+		vec![
+			Self::Claude,
+			Self::Vscode,
+			Self::Copilot,
+			Self::Pi,
+			Self::Codex,
+			Self::Cursor,
+		]
+	}
+
+	fn from_cli_value(value: &str) -> Option<Self> {
+		match value {
+			"claude" => Some(Self::Claude),
+			"vscode" => Some(Self::Vscode),
+			"copilot" => Some(Self::Copilot),
+			"pi" => Some(Self::Pi),
+			"codex" => Some(Self::Codex),
+			"cursor" => Some(Self::Cursor),
+			_ => None,
+		}
+	}
+}
+
+/// Output renderer for `mc subagents`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SubagentOutputFormat {
 	Text,
 	Json,
 }
 
-fn parse_assistant_or_default(value: Option<&String>) -> Assistant {
-	match value.map_or("generic", String::as_str) {
-		"claude" => Assistant::Claude,
-		"cursor" => Assistant::Cursor,
-		"copilot" => Assistant::Copilot,
-		"pi" => Assistant::Pi,
-		_ => Assistant::Generic,
+fn parse_subagent_output_format_or_default(value: Option<&String>) -> SubagentOutputFormat {
+	match value.map_or("text", String::as_str) {
+		"json" => SubagentOutputFormat::Json,
+		_ => SubagentOutputFormat::Text,
 	}
 }
 
-fn parse_assist_output_format_or_default(value: Option<&String>) -> AssistOutputFormat {
-	match value.map_or("text", String::as_str) {
-		"json" => AssistOutputFormat::Json,
-		_ => AssistOutputFormat::Text,
+fn parse_subagent_targets<'value, I>(values: Option<I>) -> MonochangeResult<Vec<SubagentTarget>>
+where
+	I: IntoIterator<Item = &'value String>,
+{
+	let mut targets = Vec::new();
+
+	for value in values.into_iter().flatten() {
+		let Some(target) = SubagentTarget::from_cli_value(value) else {
+			return Err(MonochangeError::Config(format!(
+				"unsupported subagent target `{value}`"
+			)));
+		};
+
+		if targets.contains(&target) {
+			continue;
+		}
+
+		targets.push(target);
 	}
+
+	if targets.is_empty() {
+		return Err(MonochangeError::Config(
+			"expected at least one subagent target or `--all`".to_string(),
+		));
+	}
+
+	Ok(targets)
 }
 
 /// Outward release target derived from a prepared release.
@@ -685,12 +728,24 @@ where
 				))
 			}
 		}
-		Some(("assist", assist_matches)) => {
-			let assistant =
-				parse_assistant_or_default(assist_matches.get_one::<String>("assistant"));
-			let format =
-				parse_assist_output_format_or_default(assist_matches.get_one::<String>("format"));
-			run_assist(assistant, format)
+		Some(("subagents", subagent_matches)) => {
+			let targets = if subagent_matches.get_flag("all") {
+				SubagentTarget::all()
+			} else {
+				parse_subagent_targets(subagent_matches.get_many::<String>("target"))?
+			};
+			let format = parse_subagent_output_format_or_default(
+				subagent_matches.get_one::<String>("format"),
+			);
+			let options = SubagentOptions {
+				targets,
+				force: subagent_matches.get_flag("force"),
+				dry_run: quiet || subagent_matches.get_flag("dry-run"),
+				format,
+				generate_mcp: !subagent_matches.get_flag("no-mcp"),
+			};
+			let output = run_subagents(root, &options)?;
+			if quiet { Ok(String::new()) } else { Ok(output) }
 		}
 		Some(("mcp", _)) => {
 			if quiet {
