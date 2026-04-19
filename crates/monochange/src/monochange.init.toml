@@ -680,7 +680,8 @@ comment_on_failure = true
 # default for that command. You can delete unchanged built-in command tables
 # from your real monochange.toml and keep only the overrides you care about.
 #
-# Reserved names that cannot be used: "init", "help", "version"
+# Reserved names that cannot be used include built-in commands such as
+# "analyze", "assist", "init", "mcp", "help", and "version"
 #
 # Fields:
 #   help_text — description shown in `mc --help`

@@ -191,6 +191,8 @@ When provided, the generated config includes:\n\
 				"Add any missing built-in CLI commands to monochange.toml so you can customize them",
 			))
 			.subcommand(build_subagents_subcommand())
+			.subcommand(build_analyze_subcommand())
+			.subcommand(build_assist_subcommand())
 			.subcommand(build_release_record_subcommand())
 			.subcommand(build_tag_release_subcommand())
 			.subcommand(build_lint_subcommand())
@@ -271,6 +273,80 @@ Use `--no-mcp` to skip MCP config files for targets that support repo-local MCP 
 				.long("no-mcp")
 				.help("Skip repo-local MCP config files for supported targets")
 				.action(ArgAction::SetTrue),
+		)
+}
+
+pub(crate) fn build_analyze_subcommand() -> Command {
+	Command::new("analyze")
+		.about("Analyze semantic changes for one package across main, head, and optional release baselines")
+		.after_help(
+			r"Examples:
+  mc analyze --package core
+  mc analyze --package core --format json
+  mc analyze --package core --release-ref core/v1.2.3
+  mc analyze --package core --main-ref main --head-ref HEAD
+
+Analysis notes:
+  - Runs package-scoped semantic analysis using the selected package's configured release identity.
+  - Defaults `--release-ref` to the newest tag for the package or the version group that owns it.
+  - If no prior release tag exists, falls back to first-release analysis using only `main -> head`.",
+		)
+		.arg(
+			Arg::new("package")
+				.long("package")
+				.required(true)
+				.value_name("PACKAGE")
+				.help("Configured package id, discovered package id, package name, manifest path, or package directory"),
+		)
+		.arg(
+			Arg::new("release-ref")
+				.long("release-ref")
+				.value_name("REF")
+				.help("Explicit release baseline ref. Defaults to the latest tag for the package or owning version group"),
+		)
+		.arg(
+			Arg::new("main-ref")
+				.long("main-ref")
+				.value_name("REF")
+				.help("Base branch or ref to compare against. Defaults to the detected default branch"),
+		)
+		.arg(
+			Arg::new("head-ref")
+				.long("head-ref")
+				.value_name("REF")
+				.help("Head ref to analyze. Defaults to HEAD"),
+		)
+		.arg(
+			Arg::new("detection-level")
+				.long("detection-level")
+				.default_value("signature")
+				.value_parser(["basic", "signature", "semantic"])
+				.help("Level of semantic detail to request from analyzers"),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.default_value("text")
+				.value_parser(["text", "json"])
+				.help("Output format"),
+		)
+}
+
+pub(crate) fn build_assist_subcommand() -> Command {
+	Command::new("assist")
+		.about("Print assistant setup guidance, install steps, and MCP configuration")
+		.arg(
+			Arg::new("assistant")
+				.help("Assistant profile to print")
+				.required(true)
+				.value_parser(["generic", "claude", "cursor", "copilot", "pi"]),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format for the assistant setup profile")
+				.default_value("text")
+				.value_parser(["text", "json"]),
 		)
 }
 

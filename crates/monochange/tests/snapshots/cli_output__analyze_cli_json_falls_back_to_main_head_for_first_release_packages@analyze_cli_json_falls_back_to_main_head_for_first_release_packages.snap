@@ -1,0 +1,91 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 189
+info:
+  program: mc
+  args:
+    - analyze
+    - "--package"
+    - core
+    - "--format"
+    - json
+  env:
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+{
+  "package": {
+    "requestedReference": "core",
+    "packageId": "core",
+    "packageRecordId": "cargo:crates/core/Cargo.toml",
+    "packageName": "core",
+    "ecosystem": "cargo",
+    "manifestPath": "crates/core/Cargo.toml",
+    "versionGroupId": "sdk"
+  },
+  "releaseIdentity": {
+    "owner_id": "sdk",
+    "owner_kind": "group",
+    "group_id": "sdk",
+    "tag": true,
+    "release": true,
+    "version_format": "primary",
+    "members": [
+      "core",
+      "app"
+    ]
+  },
+  "firstRelease": true,
+  "refs": {
+    "release": null,
+    "main": "main",
+    "head": "HEAD"
+  },
+  "frames": {
+    "releaseToMain": null,
+    "mainToHead": {
+      "frame": {
+        "CustomRange": {
+          "base": "main",
+          "head": "HEAD"
+        }
+      },
+      "detectionLevel": "signature",
+      "packageAnalyses": {
+        "core": {
+          "packageId": "core",
+          "packageRecordId": "cargo:crates/core/Cargo.toml",
+          "packageName": "core",
+          "ecosystem": "cargo",
+          "analyzerId": "cargo/public-api",
+          "changedFiles": [
+            "src/lib.rs"
+          ],
+          "semanticChanges": [
+            {
+              "category": "public_api",
+              "kind": "added",
+              "itemKind": "function",
+              "itemPath": "shout",
+              "summary": "function `shout` added",
+              "filePath": "src/lib.rs",
+              "beforeSignature": null,
+              "afterSignature": "fn shout (name : & str) -> String"
+            }
+          ],
+          "warnings": []
+        }
+      },
+      "warnings": []
+    },
+    "releaseToHead": null
+  },
+  "warnings": [
+    "no prior release tag found for group `sdk`; treating `core` as a first release and analyzing only `main -> HEAD`"
+  ]
+}
+
+----- stderr -----

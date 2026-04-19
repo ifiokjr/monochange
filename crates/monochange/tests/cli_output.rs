@@ -4,15 +4,52 @@ use httpmock::Method::GET;
 use httpmock::MockServer;
 use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
+use monochange_test_helpers::git::git;
 
 mod test_support;
+use test_support::copy_directory;
 use test_support::current_test_name;
+use test_support::fixture_path;
 use test_support::monochange_command;
 use test_support::setup_scenario_workspace;
 use test_support::snapshot_settings;
 
 fn release_cli_command() -> std::process::Command {
 	monochange_command(Some("2026-04-06"))
+}
+
+fn setup_analyze_cli_repo(first_release: bool) -> tempfile::TempDir {
+	let scenario_root = fixture_path("cli-output/analyze-group-release-trajectory");
+	let release = scenario_root.join("release");
+	let main = scenario_root.join("main");
+	let head = scenario_root.join("head");
+	let tempdir = tempfile::TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	copy_directory(&release, root);
+	git(root, &["init"]);
+	git(root, &["config", "user.name", "monochange-tests"]);
+	git(
+		root,
+		&["config", "user.email", "monochange-tests@example.com"],
+	);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "release"]);
+	git(root, &["branch", "-M", "main"]);
+	if !first_release {
+		git(root, &["tag", "v1.0.0"]);
+	}
+
+	copy_directory(&main, root);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "main evolution"]);
+	git(root, &["checkout", "-b", "feature"]);
+
+	copy_directory(&head, root);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "head evolution"]);
+
+	tempdir
 }
 
 fn mock_missing_publish_versions(server: &MockServer) {
@@ -121,6 +158,40 @@ fn discover_cli_json_reports_relative_paths_and_stable_ids() {
 		monochange_command(None)
 			.current_dir(tempdir.path())
 			.arg("discover")
+			.arg("--format")
+			.arg("json")
+	);
+}
+
+#[test]
+fn analyze_cli_text_defaults_to_group_release_tag_for_selected_package() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_analyze_cli_repo(false);
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("analyze")
+			.arg("--package")
+			.arg("core")
+	);
+}
+
+#[test]
+fn analyze_cli_json_falls_back_to_main_head_for_first_release_packages() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_analyze_cli_repo(true);
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("analyze")
+			.arg("--package")
+			.arg("core")
 			.arg("--format")
 			.arg("json")
 	);

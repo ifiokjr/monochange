@@ -52,6 +52,8 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use analyze::render_analyze_report;
+use assist::run_assist;
 pub(crate) use changelog::*;
 pub use changeset_policy::affected_packages;
 pub(crate) use changeset_policy::compute_changed_paths_since;
@@ -246,6 +248,8 @@ pub(crate) use workspace_ops::render_interactive_changeset_markdown;
 #[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
+mod analyze;
+mod assist;
 mod changelog;
 mod changeset_policy;
 mod changesets;
@@ -296,6 +300,40 @@ impl From<ChangeBump> for BumpSeverity {
 			ChangeBump::Minor => Self::Minor,
 			ChangeBump::Major => Self::Major,
 		}
+	}
+}
+
+/// Assistant profile understood by `mc assist`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum Assistant {
+	Generic,
+	Claude,
+	Cursor,
+	Copilot,
+	Pi,
+}
+
+/// Output renderer for assistant setup payloads.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum AssistOutputFormat {
+	Text,
+	Json,
+}
+
+fn parse_assistant_or_default(value: Option<&String>) -> Assistant {
+	match value.map_or("generic", String::as_str) {
+		"claude" => Assistant::Claude,
+		"cursor" => Assistant::Cursor,
+		"copilot" => Assistant::Copilot,
+		"pi" => Assistant::Pi,
+		_ => Assistant::Generic,
+	}
+}
+
+fn parse_assist_output_format_or_default(value: Option<&String>) -> AssistOutputFormat {
+	match value.map_or("text", String::as_str) {
+		"json" => AssistOutputFormat::Json,
+		_ => AssistOutputFormat::Text,
 	}
 }
 
@@ -746,6 +784,51 @@ where
 			};
 			let output = run_subagents(root, &options)?;
 			if quiet { Ok(String::new()) } else { Ok(output) }
+		}
+		Some(("analyze", analyze_matches)) => {
+			if quiet {
+				return Ok(String::new());
+			}
+			let package = analyze_matches
+				.get_one::<String>("package")
+				.map(String::as_str)
+				.ok_or_else(|| MonochangeError::Config("missing analyze package".to_string()))?;
+			let release_ref = analyze_matches
+				.get_one::<String>("release-ref")
+				.map(String::as_str);
+			let main_ref = analyze_matches
+				.get_one::<String>("main-ref")
+				.map(String::as_str);
+			let head_ref = analyze_matches
+				.get_one::<String>("head-ref")
+				.map(String::as_str);
+			let detection_level = analyze_matches
+				.get_one::<String>("detection-level")
+				.map_or("signature", String::as_str);
+			let format = if analyze_matches
+				.get_one::<String>("format")
+				.is_some_and(|value| value == "json")
+			{
+				OutputFormat::Json
+			} else {
+				OutputFormat::Text
+			};
+			render_analyze_report(
+				root,
+				package,
+				release_ref,
+				main_ref,
+				head_ref,
+				detection_level,
+				format,
+			)
+		}
+		Some(("assist", assist_matches)) => {
+			let assistant =
+				parse_assistant_or_default(assist_matches.get_one::<String>("assistant"));
+			let format =
+				parse_assist_output_format_or_default(assist_matches.get_one::<String>("format"));
+			run_assist(assistant, format)
 		}
 		Some(("mcp", _)) => {
 			if quiet {
