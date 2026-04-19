@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/benchmark_cli_comment.rs
-assertion_line: 48
 expression: rendered
 ---
 ## Binary Benchmark: main vs PR
@@ -14,7 +13,7 @@ Commands:
 - `mc release`
 
 <details>
-<summary><strong>Baseline fixture</strong> — 20 packages, 50 changesets, 50 commits</summary>
+<summary><strong>Baseline fixture</strong> — 20 packages, 50 changesets, 50 commits &nbsp; 🔴 validate 🟢 discover 🔴 dry-run 🔴 release</summary>
 
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 |:---|---:|---:|---:|---:|
@@ -52,7 +51,7 @@ Commands:
 </details>
 
 <details>
-<summary><strong>Large history fixture</strong> — 200 packages, 500 changesets, 500 commits</summary>
+<summary><strong>Large history fixture</strong> — 200 packages, 500 changesets, 500 commits &nbsp; 🔴 validate 🟢 discover 🔴 dry-run 🔴 release</summary>
 
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 |:---|---:|---:|---:|---:|
