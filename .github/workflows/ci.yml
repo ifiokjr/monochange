@@ -117,15 +117,19 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: verify 100% patch coverage
+        id: verify-patch-coverage
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         env:
           MONOCHANGE_PATCH_COVERAGE_BASE: ${{ github.event.pull_request.base.sha }}
           MONOCHANGE_PATCH_COVERAGE_HEAD: ${{ github.sha }}
-        run: coverage:patch
+        run: |
+          coverage:patch | tee target/coverage/patch-coverage.txt
         shell: devenv shell -- bash -e {0}
 
       - name: prepare codecov flag reports
         id: prepare-codecov-flags
+        if: always()
         run: |
           node scripts/prepare-codecov-flags.mjs \
             --lcov target/coverage/lcov.info \
@@ -152,6 +156,11 @@ jobs:
           fail_ci_if_error: true
           name: monochange-rust-workspace
           verbose: true
+
+      - name: fail when patch coverage is below target
+        if: github.event_name == 'pull_request' && steps.verify-patch-coverage.outcome == 'failure'
+        run: exit 1
+        shell: devenv shell -- bash -e {0}
 
   coverage-flags:
     timeout-minutes: 30

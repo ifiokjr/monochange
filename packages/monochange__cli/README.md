@@ -154,9 +154,10 @@ Assistant tooling is optional.
 When you want AI-assisted workflows, monochange ships built-in setup guidance and an MCP server:
 
 ```bash
-npm install -g @monochange/skill
-monochange-skill --print-install
-mc assist pi
+mc help skill
+mc skill -a pi -y
+mc help subagents
+mc subagents pi
 mc mcp
 ```
 

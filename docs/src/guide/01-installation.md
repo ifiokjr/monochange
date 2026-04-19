@@ -26,13 +26,16 @@ mc --help
 
 You do not need assistant tooling to use monochange.
 
-When you want reusable agent guidance for Pi or other assistants, install the bundled skill package:
+When you want reusable agent guidance for Pi or other assistants, install the bundled skill into the current project with:
 
 ```bash
-npm install -g @monochange/skill
-monochange-skill --print-install
-monochange-skill --copy ~/.pi/agent/skills/monochange
+mc help skill
+mc skill
+mc skill --list
+mc skill -a pi -y
 ```
+
+`mc skill` forwards the remaining arguments to the upstream `skills add` flow, so you can keep the interactive prompts or pass the native `--agent`, `--skill`, `--copy`, `--all`, `--global`, and `--yes` flags directly.
 
 <!-- {=assistantSkillBundleContents} -->
 

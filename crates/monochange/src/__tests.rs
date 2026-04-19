@@ -3186,7 +3186,7 @@ fn make_executable(_path: &Path) {}
 
 fn with_path_prefixed<T>(root: &Path, action: impl FnOnce() -> T) -> T {
 	let bin_dir = root.join("tools/bin");
-	for tool in ["cargo", "npm", "pnpm", "bun", "custom-lock"] {
+	for tool in ["cargo", "npm", "npx", "pnpm", "bun", "bunx", "custom-lock"] {
 		let candidate = bin_dir.join(tool);
 		if candidate.exists() {
 			make_executable(&candidate);
@@ -3198,6 +3198,19 @@ fn with_path_prefixed<T>(root: &Path, action: impl FnOnce() -> T) -> T {
 	let new_path =
 		std::env::join_paths(combined).unwrap_or_else(|error| panic!("join PATH entries: {error}"));
 	temp_env::with_var("PATH", Some(new_path), action)
+}
+
+fn with_fixture_path_only<T>(root: &Path, action: impl FnOnce() -> T) -> T {
+	let bin_dir = root.join("tools/bin");
+	for tool in ["cargo", "npm", "npx", "pnpm", "bun", "bunx", "custom-lock"] {
+		let candidate = bin_dir.join(tool);
+		if candidate.exists() {
+			make_executable(&candidate);
+		}
+	}
+	let path = std::env::join_paths([bin_dir])
+		.unwrap_or_else(|error| panic!("join isolated PATH entries: {error}"));
+	temp_env::with_var("PATH", Some(path), action)
 }
 
 fn copy_fixture(fixture_relative: &str, dest: &Path) {
@@ -8370,6 +8383,7 @@ fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::G
 fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 	let command = crate::build_command("monochange");
 	assert_eq!(command.get_name(), "monochange");
+	assert!(command.clone().find_subcommand("skill").is_some());
 	assert!(command.clone().find_subcommand("subagents").is_some());
 	assert!(command.clone().find_subcommand("release-record").is_some());
 
@@ -8594,6 +8608,247 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 			.len(),
 		1
 	);
+}
+
+#[test]
+fn build_skill_subcommand_forwards_native_add_flags() {
+	let command = clap::Command::new("mc").subcommand(crate::build_skill_subcommand());
+	let matches = command
+		.clone()
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("skill"),
+			OsString::from("--list"),
+			OsString::from("--copy"),
+			OsString::from("-a"),
+			OsString::from("pi"),
+			OsString::from("-y"),
+		])
+		.unwrap_or_else(|error| panic!("skill matches: {error}"));
+	let (_, skill_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected skill subcommand"));
+	assert_eq!(
+		skill_matches
+			.get_many::<String>("args")
+			.unwrap_or_else(|| panic!("missing forwarded skill args"))
+			.map(String::as_str)
+			.collect::<Vec<_>>(),
+		vec!["--list", "--copy", "-a", "pi", "-y"]
+	);
+
+	let help = command
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("skill"),
+			OsString::from("--help"),
+		])
+		.err()
+		.unwrap_or_else(|| panic!("expected skill help output"));
+	assert_eq!(help.kind(), clap::error::ErrorKind::DisplayHelp);
+	assert!(help.to_string().contains("skills add <monochange-source>"));
+}
+
+#[test]
+fn skill_command_runs_skills_add_with_npx_by_default() {
+	let fixture = setup_scenario_workspace("skill/basic");
+	let source = fixture.path().join("skill-source");
+	let output = with_path_prefixed(fixture.path(), || {
+		temp_env::with_var(
+			"MONOCHANGE_SKILL_SOURCE",
+			Some(source.to_string_lossy().to_string()),
+			|| {
+				run_cli(
+					fixture.path(),
+					[
+						OsString::from("mc"),
+						OsString::from("skill"),
+						OsString::from("--list"),
+						OsString::from("--copy"),
+					],
+				)
+			},
+		)
+	})
+	.unwrap_or_else(|error| panic!("run skill through npx: {error}"));
+	assert_eq!(output, "");
+	let log = fs::read_to_string(fixture.path().join(".skill-command.log"))
+		.unwrap_or_else(|error| panic!("read skill command log: {error}"));
+	assert_eq!(
+		log.lines().collect::<Vec<_>>(),
+		vec![
+			"runner=npx",
+			"arg=-y",
+			"arg=skills",
+			"arg=add",
+			&format!("arg={}", source.display()),
+			"arg=--list",
+			"arg=--copy",
+		]
+	);
+}
+
+#[test]
+fn skill_command_falls_back_to_pnpm_dlx_when_npx_is_missing() {
+	let fixture = setup_scenario_workspace("skill/basic");
+	let npx = fixture.path().join("tools/bin/npx");
+	fs::remove_file(&npx)
+		.unwrap_or_else(|error| panic!("remove fake npx {}: {error}", npx.display()));
+	let source = fixture.path().join("skill-source");
+	with_path_prefixed(fixture.path(), || {
+		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("pnpm"), || {
+			temp_env::with_var(
+				"MONOCHANGE_SKILL_SOURCE",
+				Some(source.to_string_lossy().to_string()),
+				|| {
+					run_cli(
+						fixture.path(),
+						[
+							OsString::from("mc"),
+							OsString::from("skill"),
+							OsString::from("-y"),
+						],
+					)
+				},
+			)
+		})
+	})
+	.unwrap_or_else(|error| panic!("run skill through pnpm dlx: {error}"));
+	let log = fs::read_to_string(fixture.path().join(".skill-command.log"))
+		.unwrap_or_else(|error| panic!("read skill command log after pnpm fallback: {error}"));
+	assert_eq!(
+		log.lines().collect::<Vec<_>>(),
+		vec![
+			"runner=pnpm",
+			"arg=dlx",
+			"arg=skills",
+			"arg=add",
+			&format!("arg={}", source.display()),
+			"arg=-y",
+		]
+	);
+}
+
+#[test]
+fn skill_command_reports_invalid_runner_override() {
+	let fixture = setup_scenario_workspace("skill/basic");
+	let source = fixture.path().join("skill-source");
+	let error = with_path_prefixed(fixture.path(), || {
+		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("nope"), || {
+			temp_env::with_var(
+				"MONOCHANGE_SKILL_SOURCE",
+				Some(source.to_string_lossy().to_string()),
+				|| {
+					run_cli(
+						fixture.path(),
+						[OsString::from("mc"), OsString::from("skill")],
+					)
+				},
+			)
+		})
+	})
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid skill runner override error"));
+	assert!(
+		error
+			.to_string()
+			.contains("unsupported skill runner `nope`")
+	);
+}
+
+#[test]
+fn skill_command_reports_missing_forced_runner() {
+	let fixture = setup_scenario_workspace("skill/basic");
+	let npx = fixture.path().join("tools/bin/npx");
+	fs::remove_file(&npx)
+		.unwrap_or_else(|error| panic!("remove fake npx {}: {error}", npx.display()));
+	let source = fixture.path().join("skill-source");
+	let error = with_fixture_path_only(fixture.path(), || {
+		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("npx"), || {
+			temp_env::with_var(
+				"MONOCHANGE_SKILL_SOURCE",
+				Some(source.to_string_lossy().to_string()),
+				|| {
+					run_cli(
+						fixture.path(),
+						[OsString::from("mc"), OsString::from("skill")],
+					)
+				},
+			)
+		})
+	})
+	.err()
+	.unwrap_or_else(|| panic!("expected missing forced skill runner error"));
+	assert!(
+		error
+			.to_string()
+			.contains("configured skill runner `npx` was not found in PATH")
+	);
+}
+
+#[test]
+fn skill_command_runs_skills_add_with_bunx_when_forced() {
+	let fixture = setup_scenario_workspace("skill/basic");
+	let source = fixture.path().join("skill-source");
+	with_path_prefixed(fixture.path(), || {
+		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("bunx"), || {
+			temp_env::with_var(
+				"MONOCHANGE_SKILL_SOURCE",
+				Some(source.to_string_lossy().to_string()),
+				|| {
+					run_cli(
+						fixture.path(),
+						[
+							OsString::from("mc"),
+							OsString::from("skill"),
+							OsString::from("--list"),
+						],
+					)
+				},
+			)
+		})
+	})
+	.unwrap_or_else(|error| panic!("run skill through bunx: {error}"));
+	let log = fs::read_to_string(fixture.path().join(".skill-command.log"))
+		.unwrap_or_else(|error| panic!("read skill command log after bunx override: {error}"));
+	assert_eq!(
+		log.lines().collect::<Vec<_>>(),
+		vec![
+			"runner=bunx",
+			"arg=skills",
+			"arg=add",
+			&format!("arg={}", source.display()),
+			"arg=--list",
+		]
+	);
+}
+
+#[test]
+fn skill_command_reports_nonzero_exit_status_from_runner() {
+	let fixture = setup_scenario_workspace("skill/basic");
+	let source = fixture.path().join("skill-source");
+	let error = with_path_prefixed(fixture.path(), || {
+		temp_env::with_var(
+			"MONOCHANGE_SKILL_SOURCE",
+			Some(source.to_string_lossy().to_string()),
+			|| {
+				temp_env::with_var("MONOCHANGE_SKILL_FAKE_EXIT", Some("7"), || {
+					run_cli(
+						fixture.path(),
+						[
+							OsString::from("mc"),
+							OsString::from("skill"),
+							OsString::from("--list"),
+						],
+					)
+				})
+			},
+		)
+	})
+	.err()
+	.unwrap_or_else(|| panic!("expected non-zero skill runner error"));
+	assert!(error.to_string().contains("`npx -y skills add"));
+	assert!(error.to_string().contains("exit status: 7"));
 }
 
 #[test]
