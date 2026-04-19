@@ -44,7 +44,7 @@ Reach for this crate when you want one adapter for npm, pnpm, and Bun workspaces
 
 <!-- {=crateBadgeLinks:"monochange_npm"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__npm-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_npm [docs-image]: https://img.shields.io/badge/docs.rs-monochange__npm-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_npm/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__npm-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_npm [docs-image]: https://img.shields.io/badge/docs.rs-monochange__npm-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_npm/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_npm [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_npm
 
 <!-- {/crateBadgeLinks} -->
 
@@ -52,8 +52,6 @@ Reach for this crate when you want one adapter for npm, pnpm, and Bun workspaces
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

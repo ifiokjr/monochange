@@ -64,7 +64,7 @@ assert!(rendered.contains("- add keep-a-changelog output"));
 
 <!-- {=crateBadgeLinks:"monochange_core"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_core [docs-image]: https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_core/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_core [docs-image]: https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_core/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_core [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_core
 
 <!-- {/crateBadgeLinks} -->
 
@@ -72,8 +72,6 @@ assert!(rendered.contains("- add keep-a-changelog output"));
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

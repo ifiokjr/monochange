@@ -45,7 +45,7 @@ Reach for this crate when you want to scan Cargo workspaces into normalized `mon
 
 <!-- {=crateBadgeLinks:"monochange_cargo"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__cargo-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_cargo [docs-image]: https://img.shields.io/badge/docs.rs-monochange__cargo-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_cargo/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__cargo-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_cargo [docs-image]: https://img.shields.io/badge/docs.rs-monochange__cargo-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_cargo/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_cargo [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_cargo
 
 <!-- {/crateBadgeLinks} -->
 
@@ -53,8 +53,6 @@ Reach for this crate when you want to scan Cargo workspaces into normalized `mon
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

@@ -339,7 +339,7 @@ See `docs/` for user-facing guides and `CONTRIBUTING.md` for contribution expect
 
 <!-- {=crateBadgeLinks:"monochange"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange-orange?logo=rust [crate-link]: https://crates.io/crates/monochange [docs-image]: https://img.shields.io/badge/docs.rs-monochange-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange-orange?logo=rust [crate-link]: https://crates.io/crates/monochange [docs-image]: https://img.shields.io/badge/docs.rs-monochange-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange
 
 <!-- {/crateBadgeLinks} -->
 
@@ -347,8 +347,6 @@ See `docs/` for user-facing guides and `CONTRIBUTING.md` for contribution expect
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

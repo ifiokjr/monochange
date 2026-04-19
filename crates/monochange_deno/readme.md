@@ -43,7 +43,7 @@ Reach for this crate when you need to scan `deno.json` or `deno.jsonc` files, ex
 
 <!-- {=crateBadgeLinks:"monochange_deno"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_deno [docs-image]: https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_deno/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_deno [docs-image]: https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_deno/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_deno [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_deno
 
 <!-- {/crateBadgeLinks} -->
 
@@ -51,8 +51,6 @@ Reach for this crate when you need to scan `deno.json` or `deno.jsonc` files, ex
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 
