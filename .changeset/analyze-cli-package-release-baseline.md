@@ -1,4 +1,5 @@
 ---
+"@monochange/cli": patch
 monochange: minor
 monochange_config: patch
 ---
