@@ -3004,9 +3004,6 @@ fn validate_changelog_sections(
 	for section in sections {
 		for change_type in &section.types {
 			let normalized = change_type.trim().to_string();
-			if normalized.is_empty() {
-				continue;
-			}
 			if let Some(previous_section) = seen_types.get(&normalized) {
 				return Err(config_diagnostic(
 					contents,
