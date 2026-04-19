@@ -11,6 +11,7 @@ use tempfile::tempdir;
 
 use crate::BumpSeverity;
 use crate::ChangelogFormat;
+use crate::ChangelogSection;
 use crate::ChangelogTarget;
 use crate::ChangesetPolicyStatus;
 use crate::ChangesetVerificationSettings;
@@ -18,7 +19,6 @@ use crate::CliStepDefinition;
 use crate::DependencyKind;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
-use crate::ChangelogSection;
 use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
 use crate::HostedIssueCommentPlan;
@@ -564,11 +564,7 @@ fn versioned_file_definition_uses_regex_returns_false_when_unset() {
 
 #[test]
 fn workspace_defaults_default_has_changelog_sections() {
-	assert!(
-		!WorkspaceDefaults::default()
-			.changelog_sections
-			.is_empty()
-	);
+	assert!(!WorkspaceDefaults::default().changelog_sections.is_empty());
 }
 
 #[test]

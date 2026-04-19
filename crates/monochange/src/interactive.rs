@@ -357,9 +357,9 @@ mod __tests {
 	use inquire::validator::Validation;
 	use monochange_config::load_workspace_configuration;
 	use monochange_core::BumpSeverity;
+	use monochange_core::ChangelogSection;
 	use monochange_core::ChangesetSettings;
 	use monochange_core::EcosystemSettings;
-	use monochange_core::ChangelogSection;
 	use monochange_core::GroupChangelogInclude;
 	use monochange_core::GroupDefinition;
 	use monochange_core::MonochangeError;
@@ -907,14 +907,14 @@ mod __tests {
 						types: vec!["test".to_string(), "docs".to_string()],
 						bump: BumpSeverity::None,
 						description: None,
-				priority: 100,
+						priority: 100,
 					},
 					ChangelogSection {
 						name: "More".to_string(),
 						types: vec!["docs".to_string(), "security".to_string()],
 						bump: BumpSeverity::None,
 						description: None,
-				priority: 100,
+						priority: 100,
 					},
 				],
 				empty_update_message: None,

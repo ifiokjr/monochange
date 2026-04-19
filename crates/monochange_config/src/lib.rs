@@ -92,6 +92,7 @@ use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogSection;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetSettings;
 use monochange_core::ChangesetTargetKind;
@@ -103,7 +104,6 @@ use monochange_core::CliStepInputValue;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
-use monochange_core::ChangelogSection;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::GroupDefinition;
 use monochange_core::LockfileCommandDefinition;
@@ -1144,11 +1144,11 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	let cli = merge_cli_commands(cli);
 	let default_package_type = defaults.package_type;
 	let default_package_changelog = defaults.changelog.clone();
-		let default_changelog_sections = if defaults.changelog_sections.is_empty() {
-			ChangelogSection::defaults()
-		} else {
-			defaults.changelog_sections.clone()
-		};
+	let default_changelog_sections = if defaults.changelog_sections.is_empty() {
+		ChangelogSection::defaults()
+	} else {
+		defaults.changelog_sections.clone()
+	};
 	let cargo_ecosystem =
 		normalize_ecosystem_settings(&contents, "cargo", EcosystemType::Cargo, ecosystems.cargo)?;
 	let npm_ecosystem =
@@ -1346,12 +1346,10 @@ fn build_change_type_lookup(sections: &[ChangelogSection]) -> ChangeTypeLookup {
 	let default_bumps = sections
 		.iter()
 		.flat_map(|section| {
-			section.types.iter().map(|change_type| {
-				(
-					change_type.trim().to_string(),
-					section.bump,
-				)
-			})
+			section
+				.types
+				.iter()
+				.map(|change_type| (change_type.trim().to_string(), section.bump))
 		})
 		.filter(|(change_type, _)| !change_type.is_empty())
 		.collect::<HashMap<_, _>>();
@@ -2924,12 +2922,7 @@ fn validate_release_notes_configuration(
 		)?;
 	}
 	for group in groups {
-		validate_changelog_sections(
-			contents,
-			"group",
-			&group.id,
-			&group.changelog_sections,
-		)?;
+		validate_changelog_sections(contents, "group", &group.id, &group.changelog_sections)?;
 	}
 	Ok(())
 }
@@ -2983,7 +2976,8 @@ fn validate_changelog_sections(
 				),
 			));
 		}
-		if section.types
+		if section
+			.types
 			.iter()
 			.any(|change_type| change_type.trim().is_empty())
 		{
@@ -3003,6 +2997,36 @@ fn validate_changelog_sections(
 					"remove empty values from `types` and keep only named change types".to_string(),
 				),
 			));
+		}
+	}
+	// Check for duplicate types across sections within the same owner.
+	let mut seen_types: BTreeMap<String, String> = BTreeMap::new();
+	for section in sections {
+		for change_type in &section.types {
+			let normalized = change_type.trim().to_string();
+			if normalized.is_empty() {
+				continue;
+			}
+			if let Some(previous_section) = seen_types.get(&normalized) {
+				return Err(config_diagnostic(
+					contents,
+					format!(
+						"{owner_label} changelog section `{}` reuses type `{}` already declared in section `{}`",
+						section.name, normalized, previous_section
+					),
+					vec![config_section_label(
+						contents,
+						section_kind,
+						section_id,
+						"duplicate changelog section type",
+					)],
+					Some(
+						"each type must appear in only one section; remove the duplicate or move it to the correct section"
+						.to_string(),
+					),
+				));
+			}
+			seen_types.insert(normalized, section.name.clone());
 		}
 	}
 	Ok(())

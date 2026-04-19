@@ -127,9 +127,7 @@ pub(crate) fn build_changelog_updates(
 			&package_id,
 			&changelog_title,
 			Vec::new(),
-			package_definition.map_or(&[][..], |package| {
-				package.changelog_sections.as_slice()
-			}),
+			package_definition.map_or(&[][..], |package| package.changelog_sections.as_slice()),
 			&context.configuration.release_notes.change_templates,
 			&changes,
 		);
@@ -1129,7 +1127,6 @@ fn config_package_id(package: &PackageRecord) -> String {
 		.unwrap_or_else(|| package.name.clone())
 }
 
-
 #[cfg(test)]
 mod tests {
 	use std::collections::BTreeMap;
@@ -1138,12 +1135,12 @@ mod tests {
 
 	use monochange_core::ChangeSignal;
 	use monochange_core::ChangelogFormat;
+	use monochange_core::ChangelogSection;
 	use monochange_core::ChangelogTarget;
 	use monochange_core::ChangesetContext;
 	use monochange_core::ChangesetRevision;
 	use monochange_core::ChangesetTargetKind;
 	use monochange_core::Ecosystem;
-	use monochange_core::ChangelogSection;
 	use monochange_core::GroupChangelogInclude;
 	use monochange_core::GroupDefinition;
 	use monochange_core::HostedActorRef;
@@ -1729,8 +1726,14 @@ mod tests {
 		assert_eq!(sections[0].title, "Highlights");
 		assert_eq!(sections[1].title, "Notes");
 		assert_eq!(sections[2].title, "Changed");
-		assert_eq!(sections[0].entries, vec!["- Added group support".to_string()]);
-		assert_eq!(sections[2].entries, vec!["- Breaking API".to_string(), "- Bug fix".to_string()]);
+		assert_eq!(
+			sections[0].entries,
+			vec!["- Added group support".to_string()]
+		);
+		assert_eq!(
+			sections[2].entries,
+			vec!["- Breaking API".to_string(), "- Bug fix".to_string()]
+		);
 
 		let fallback = render_release_note_sections("sdk", "1.2.3", &[], &[], &[]);
 		assert_eq!(fallback[0].title, "Changed");

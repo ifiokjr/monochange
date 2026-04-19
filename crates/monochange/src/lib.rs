@@ -138,6 +138,7 @@ use monochange_config::validate_workspace;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogSection;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetPolicyEvaluation;
@@ -151,7 +152,6 @@ use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
-use monochange_core::ChangelogSection;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
@@ -520,7 +520,6 @@ struct ResolvedSectionDefinition {
 	title: String,
 	types: Vec<String>,
 }
-
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -83,18 +83,19 @@ warn_on_group_mismatch = true
 #
 # Each entry maps one or more changeset `type` values into a named changelog
 # section, with semver bump and optional priority/description.
-# Example:
-# changelog_sections = [
-#     { name = "Breaking Change", types = ["breaking", "major"], bump = "major", description = "API changes requiring migration", priority = 10 },
-#     { name = "Added", types = ["feat", "minor"], bump = "minor", description = "New features added", priority = 20 },
-#     { name = "Changed", types = ["change"], bump = "minor", description = "Changes to existing functionality", priority = 25 },
-#     { name = "Fixed", types = ["fix"], bump = "patch", description = "Bug fixes", priority = 30 },
-#     { name = "Testing", types = ["test"], bump = "none", description = "Changes that only modify tests", priority = 40 },
-#     { name = "Documentation", types = ["docs"], bump = "none", description = "Changes that only modify documentation", priority = 50 },
-#     { name = "Security", types = ["security"], bump = "none", description = "Security-related changes", priority = 60 },
-#     { name = "Performance", types = ["perf"], bump = "none", description = "Performance improvements", priority = 70 },
-#     { name = "Refactor", types = ["refactor"], bump = "none", description = "Code refactoring without functional changes", priority = 80 },
-# ]
+# The `type` field in a changeset must match one of these declared types;
+# unknown types will produce a validation error.
+changelog_sections = [
+    { name = "Breaking Change", types = ["breaking", "major"], bump = "major", description = "API changes requiring migration", priority = 10 },
+    { name = "Added", types = ["feat", "minor"], bump = "minor", description = "New features added", priority = 20 },
+    { name = "Changed", types = ["change"], bump = "minor", description = "Changes to existing functionality", priority = 25 },
+    { name = "Fixed", types = ["fix"], bump = "patch", description = "Bug fixes", priority = 30 },
+    { name = "Testing", types = ["test"], bump = "none", description = "Changes that only modify tests", priority = 40 },
+    { name = "Documentation", types = ["docs"], bump = "none", description = "Changes that only modify documentation", priority = 50 },
+    { name = "Security", types = ["security"], bump = "none", description = "Security-related changes", priority = 60 },
+    { name = "Performance", types = ["perf"], bump = "none", description = "Performance improvements", priority = 70 },
+    { name = "Refactor", types = ["refactor"], bump = "none", description = "Code refactoring without functional changes", priority = 80 },
+]
 #
 # Each section can include:
 #   - name: The display name for the changelog section
@@ -213,7 +214,7 @@ warn_on_group_mismatch = true
 #                             (not needed when defaults.package_type is set)
 #   changelog               — true, false, "path/to/changelog.md", or a table
 #                             with { path, format }; overrides [defaults.changelog]
-#   changelog_sections — custom changelog sections with type routing
+#   changelog_sections — override default changelog sections with type routing and bump severity
 #   empty_update_message    — per-package fallback text for transitive bumps
 #   versioned_files         — additional files to update with the new version
 #                             package-scoped string entries infer the package ecosystem,
@@ -318,7 +319,7 @@ changelog = "{{ pkg.changelog }}"
 #                             member-targeted changesets appear in the group
 #                             changelog (direct group-targeted changesets are
 #                             always included; default: "all")
-#   changelog_sections — custom changelog sections with type routing
+#   changelog_sections — override default changelog sections with type routing and bump severity
 #   empty_update_message    — fallback text when the group bumps but a
 #                             specific member has no direct changeset entries
 #   versioned_files         — additional files to version-bump with the group

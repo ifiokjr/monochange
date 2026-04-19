@@ -1,0 +1,7 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+changelog_sections = [
+    { name = "Added", types = ["feat", "minor"], bump = "minor" },
+    { name = "Fixed", types = ["fix", "feat"], bump = "patch" },
+]

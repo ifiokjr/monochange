@@ -74,7 +74,7 @@ format = "keep_a_changelog"
 # section. Example:
 # changelog_sections = [{ name = "Security", types = ["security"] }]
 #
-# Default: []
+# Default: built-in sections matching changelog_sections below
 
 # Default empty_update_message applied when a package is bumped but has no
 # direct changeset entries (e.g. transitive dependency bumps or group

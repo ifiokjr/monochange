@@ -1406,7 +1406,9 @@ fn load_change_signals_reject_object_type_when_unknown_type_is_used() {
 		.unwrap_or_else(|| panic!("expected parse error"));
 	let rendered = error.to_string();
 	assert!(
-		rendered.contains("invalid") || rendered.contains("unknown") || rendered.contains("unsupported"),
+		rendered.contains("invalid")
+			|| rendered.contains("unknown")
+			|| rendered.contains("unsupported"),
 		"error message should indicate unknown/invalid type: {rendered}"
 	);
 }
@@ -2431,6 +2433,19 @@ fn load_workspace_configuration_rejects_empty_extra_changelog_section_type_value
 		.unwrap_or_else(|| panic!("expected config error"))
 		.render();
 	assert!(rendered.contains("must not include empty types"));
+}
+
+#[test]
+fn load_workspace_configuration_rejects_duplicate_changelog_section_types() {
+	let root = fixture_path("config/rejects-duplicate-section-types");
+	let rendered = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"))
+		.render();
+	assert!(
+		rendered.contains("reuses type"),
+		"expected duplicate type error, got: {rendered}"
+	);
 }
 
 #[test]
