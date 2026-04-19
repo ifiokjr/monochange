@@ -87,7 +87,23 @@ assertSetEquals("MCP tool list", templateTools, serverTools);
 
 assertExists("ARCHITECTURE.md");
 assertExists("docs/plans/README.md");
-assertExists("docs/plans/active/harness-engineering.md");
+
+const harnessPlanPaths = [
+	"docs/plans/active/harness-engineering.md",
+	"docs/plans/completed/harness-engineering.md",
+];
+
+if (
+	!harnessPlanPaths.some((relativePath) =>
+		fs.existsSync(path.join(repoRoot, relativePath))
+	)
+) {
+	throw new Error(
+		`missing required harness engineering plan file: ${
+			harnessPlanPaths.join(" or ")
+		}`,
+	);
+}
 
 assertContains("AGENTS.md", "docs/agents/architecture.md");
 assertContains("AGENTS.md", "docs/plans/README.md");
