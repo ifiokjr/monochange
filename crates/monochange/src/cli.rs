@@ -190,6 +190,7 @@ When provided, the generated config includes:\n\
 			.subcommand(Command::new("populate").about(
 				"Add any missing built-in CLI commands to monochange.toml so you can customize them",
 			))
+			.subcommand(build_skill_subcommand())
 			.subcommand(build_subagents_subcommand())
 			.subcommand(build_analyze_subcommand())
 			.subcommand(build_release_record_subcommand())
@@ -205,6 +206,45 @@ When provided, the generated config includes:\n\
 	}
 
 	command
+}
+
+pub(crate) fn build_skill_subcommand() -> Command {
+	Command::new("skill")
+		.about("Install the monochange skill bundle into the current project with the skills CLI")
+		.after_help(
+			r"Examples:
+  mc help skill
+  mc skill
+  mc skill --list
+  mc skill -a claude-code -a codex
+  mc skill --skill monochange --copy -y
+  mc skill -g -a pi -y
+
+This command forwards all remaining arguments to:
+  skills add <monochange-source>
+
+Common forwarded flags from the upstream `skills add` command include:
+  -g, --global            install to the user-level agent directories
+  -a, --agent <AGENT>     target specific agent harnesses
+  -s, --skill <SKILL>     install specific skills from the source
+  -l, --list              list the available skills without installing
+      --copy              copy files instead of symlinking
+  -y, --yes               skip confirmation prompts
+      --all               install all skills to all supported agents
+
+Runner selection is automatic. monochange prefers:
+  1. npx
+  2. pnpm dlx
+  3. bunx",
+		)
+		.arg(
+			Arg::new("args")
+				.help("Arguments forwarded to `skills add` after the monochange skill source")
+				.num_args(0..)
+				.action(ArgAction::Append)
+				.trailing_var_arg(true)
+				.allow_hyphen_values(true),
+		)
 }
 
 pub(crate) fn build_subagents_subcommand() -> Command {

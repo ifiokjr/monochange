@@ -19,6 +19,16 @@ This package bundles:
 
 ## Install
 
+For project-local installation through the upstream `skills add` flow, prefer:
+
+```bash
+mc help skill
+mc skill
+mc skill -a pi -y
+```
+
+If you need the lower-level package helper directly, install it with:
+
 ```bash
 npm install -g @monochange/skill
 ```

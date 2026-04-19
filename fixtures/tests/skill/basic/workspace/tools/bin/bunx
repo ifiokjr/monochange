@@ -1,0 +1,8 @@
+#!/bin/sh
+log_file="${PWD}/.skill-command.log"
+: > "$log_file"
+printf 'runner=bunx\n' >> "$log_file"
+for arg in "$@"; do
+  printf 'arg=%s\n' "$arg" >> "$log_file"
+done
+exit "${MONOCHANGE_SKILL_FAKE_EXIT:-0}"

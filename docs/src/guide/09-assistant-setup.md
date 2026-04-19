@@ -15,13 +15,16 @@ monochange --help
 mc --help
 ```
 
-Install the bundled skill:
+Install the bundled skill into the current project:
 
 ```bash
-npm install -g @monochange/skill
-monochange-skill --print-install
-monochange-skill --copy ~/.pi/agent/skills/monochange
+mc help skill
+mc skill
+mc skill --list
+mc skill -a pi -y
 ```
+
+`mc skill` forwards the remaining arguments to the upstream `skills add` workflow, so you can either keep its interactive prompts or pass the native `--agent`, `--skill`, `--copy`, `--all`, `--global`, and `--yes` flags directly.
 
 <!-- {=assistantSkillBundleContents} -->
 
