@@ -1088,11 +1088,11 @@ pub(crate) fn change_type_default_bump(
 ) -> Option<BumpSeverity> {
 	let sections = configuration
 		.package_by_id(target_id)
-		.map(|package| package.extra_changelog_sections.as_slice())
+		.map(|package| package.changelog_sections.as_slice())
 		.or_else(|| {
 			configuration
 				.group_by_id(target_id)
-				.map(|group| group.extra_changelog_sections.as_slice())
+				.map(|group| group.changelog_sections.as_slice())
 		})?;
 
 	sections.iter().find_map(|section| {
@@ -1100,7 +1100,7 @@ pub(crate) fn change_type_default_bump(
 			.types
 			.iter()
 			.any(|candidate| candidate.trim() == change_type)
-			.then_some(section.default_bump.unwrap_or(BumpSeverity::None))
+			.then_some(section.bump)
 	})
 }
 
@@ -2208,7 +2208,7 @@ mod workspace_ops_tests {
 				path: PathBuf::from("missing"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -2247,7 +2247,7 @@ mod workspace_ops_tests {
 				path: PathBuf::from("empty-package"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -2296,7 +2296,7 @@ mod workspace_ops_tests {
 				path: PathBuf::from("packages/pkg"),
 				package_type: PackageType::Npm,
 				changelog: None,
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,

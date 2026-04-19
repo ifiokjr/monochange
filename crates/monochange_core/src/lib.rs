@@ -1039,17 +1039,106 @@ pub struct ReleaseNotesDocument {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ExtraChangelogSection {
+pub struct ChangelogSection {
 	pub name: String,
 	#[serde(default)]
 	pub types: Vec<String>,
-	#[serde(default)]
-	pub default_bump: Option<BumpSeverity>,
+	#[serde(default = "default_changelog_section_bump")]
+	pub bump: BumpSeverity,
 	/// Description of when this change type should be used.
 	/// Helpful for LLMs and users to understand the purpose of this section.
 	#[serde(default)]
 	pub description: Option<String>,
+	/// Ordering priority for changelog rendering. Lower values appear first.
+	/// When omitted, defaults to 100.
+	#[serde(default = "default_changelog_section_priority")]
+	pub priority: i8,
 }
+
+fn default_changelog_section_priority() -> i8 {
+	100
+}
+
+fn default_changelog_section_bump() -> BumpSeverity {
+	BumpSeverity::None
+}
+
+impl ChangelogSection {
+	/// Return the default changelog sections that replace the old built-in
+	/// major / minor / patch / note sections.
+	#[must_use]
+	pub fn defaults() -> Vec<Self> {
+		vec![
+			Self {
+				name: "Breaking Change".to_string(),
+				types: vec!["breaking".to_string(), "major".to_string()],
+				bump: BumpSeverity::Major,
+				description: Some("API changes requiring migration".to_string()),
+				priority: 10,
+			},
+			Self {
+				name: "Added".to_string(),
+				types: vec!["feat".to_string(), "minor".to_string()],
+				bump: BumpSeverity::Minor,
+				description: Some("New features added".to_string()),
+				priority: 20,
+			},
+			Self {
+				name: "Changed".to_string(),
+				types: vec!["change".to_string()],
+				bump: BumpSeverity::Minor,
+				description: Some("Changes to existing functionality".to_string()),
+				priority: 25,
+			},
+			Self {
+				name: "Fixed".to_string(),
+				types: vec!["fix".to_string()],
+				bump: BumpSeverity::Patch,
+				description: Some("Bug fixes".to_string()),
+				priority: 30,
+			},
+			Self {
+				name: "Testing".to_string(),
+				types: vec!["test".to_string()],
+				bump: BumpSeverity::None,
+				description: Some("Changes that only modify tests".to_string()),
+				priority: 40,
+			},
+			Self {
+				name: "Documentation".to_string(),
+				types: vec!["docs".to_string()],
+				bump: BumpSeverity::None,
+				description: Some("Changes that only modify documentation".to_string()),
+				priority: 50,
+			},
+			Self {
+				name: "Security".to_string(),
+				types: vec!["security".to_string()],
+				bump: BumpSeverity::None,
+				description: Some("Security-related changes".to_string()),
+				priority: 60,
+			},
+			Self {
+				name: "Performance".to_string(),
+				types: vec!["perf".to_string()],
+				bump: BumpSeverity::None,
+				description: Some("Performance improvements".to_string()),
+				priority: 70,
+			},
+			Self {
+				name: "Refactor".to_string(),
+				types: vec!["refactor".to_string()],
+				bump: BumpSeverity::None,
+				description: Some("Code refactoring without functional changes".to_string()),
+				priority: 80,
+			},
+		]
+	}
+}
+
+/// Backwards-compatible type alias for the renamed `ChangelogSection`.
+#[deprecated(note = "Use `ChangelogSection` instead. Will be removed in a future release.")]
+pub type ExtraChangelogSection = ChangelogSection;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct ReleaseNotesSettings {
@@ -1192,7 +1281,7 @@ pub struct PackageDefinition {
 	pub path: PathBuf,
 	pub package_type: PackageType,
 	pub changelog: Option<ChangelogTarget>,
-	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub changelog_sections: Vec<ChangelogSection>,
 	pub empty_update_message: Option<String>,
 	#[serde(default)]
 	pub release_title: Option<String>,
@@ -1227,7 +1316,7 @@ pub struct GroupDefinition {
 	pub changelog: Option<ChangelogTarget>,
 	#[serde(default)]
 	pub changelog_include: GroupChangelogInclude,
-	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub changelog_sections: Vec<ChangelogSection>,
 	pub empty_update_message: Option<String>,
 	#[serde(default)]
 	pub release_title: Option<String>,
@@ -1248,7 +1337,7 @@ pub struct WorkspaceDefaults {
 	pub package_type: Option<PackageType>,
 	pub changelog: Option<ChangelogDefinition>,
 	pub changelog_format: ChangelogFormat,
-	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub changelog_sections: Vec<ChangelogSection>,
 	pub empty_update_message: Option<String>,
 	pub release_title: Option<String>,
 	pub changelog_version_title: Option<String>,
@@ -1264,7 +1353,7 @@ impl Default for WorkspaceDefaults {
 			package_type: None,
 			changelog: None,
 			changelog_format: ChangelogFormat::Monochange,
-			extra_changelog_sections: Vec::new(),
+			changelog_sections: ChangelogSection::defaults(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,

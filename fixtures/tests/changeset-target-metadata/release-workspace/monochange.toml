@@ -5,7 +5,7 @@ changelog = "{{ path }}/CHANGELOG.md"
 
 [package.core]
 path = "crates/core"
-extra_changelog_sections = [{ name = "Security", types = ["security"], default_bump = "patch" }]
+changelog_sections = [{ name = "Security", types = ["security"], bump = "patch" }]
 
 [package.app]
 path = "crates/app"
@@ -14,7 +14,7 @@ path = "crates/app"
 packages = ["core", "app"]
 changelog = "CHANGELOG.md"
 versioned_files = [{ path = "group.toml", type = "cargo" }]
-extra_changelog_sections = [{ name = "Testing", types = ["test"], default_bump = "minor" }]
+changelog_sections = [{ name = "Testing", types = ["test"], bump = "minor" }]
 tag = true
 release = true
 version_format = "primary"

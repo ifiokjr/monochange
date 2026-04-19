@@ -8229,7 +8229,7 @@ fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::G
 		packages: vec!["core".to_string(), "app".to_string()],
 		changelog: None,
 		changelog_include: include,
-		extra_changelog_sections: Vec::new(),
+		changelog_sections: Vec::new(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -8256,11 +8256,12 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 			path: PathBuf::from("crates/core"),
 			package_type: monochange_core::PackageType::Cargo,
 			changelog: None,
-			extra_changelog_sections: vec![monochange_core::ExtraChangelogSection {
+			changelog_sections: vec![monochange_core::ChangelogSection {
 				name: "Docs".to_string(),
 				types: vec![" docs ".to_string(), "test".to_string()],
-				default_bump: None,
+				bump: BumpSeverity::None,
 				description: None,
+				priority: 100,
 			}],
 			empty_update_message: None,
 			release_title: None,
@@ -8279,11 +8280,12 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 			packages: vec!["core".to_string()],
 			changelog: None,
 			changelog_include: GroupChangelogInclude::All,
-			extra_changelog_sections: vec![monochange_core::ExtraChangelogSection {
+			changelog_sections: vec![monochange_core::ChangelogSection {
 				name: "Security".to_string(),
 				types: vec!["security".to_string(), "docs".to_string()],
-				default_bump: None,
+				bump: BumpSeverity::None,
 				description: None,
+				priority: 100,
 			}],
 			empty_update_message: None,
 			release_title: None,
@@ -8348,11 +8350,12 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 			path: PathBuf::from("crates/core"),
 			package_type: monochange_core::PackageType::Cargo,
 			changelog: None,
-			extra_changelog_sections: vec![monochange_core::ExtraChangelogSection {
+			changelog_sections: vec![monochange_core::ChangelogSection {
 				name: "Docs".to_string(),
 				types: vec!["docs".to_string(), "test".to_string()],
-				default_bump: None,
+				bump: BumpSeverity::None,
 				description: None,
+				priority: 100,
 			}],
 			empty_update_message: None,
 			release_title: None,

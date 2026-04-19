@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/source_providers.rs
+assertion_line: 26
 expression: json
 ---
 {
@@ -19,7 +20,7 @@ expression: json
               "entries": [
                 "- add github fixture coverage"
               ],
-              "title": "Features"
+              "title": "Added"
             }
           ],
           "summary": [],
@@ -28,7 +29,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Features\n\n- add github fixture coverage"
+        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Added\n\n- add github fixture coverage"
       }
     ],
     "changesets": [

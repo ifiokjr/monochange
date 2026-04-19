@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 401
 expression: manifest
 ---
 {
@@ -51,14 +52,14 @@ expression: manifest
         ],
         "sections": [
           {
-            "title": "Features",
+            "title": "Added",
             "entries": [
               "- **core**: add feature"
             ]
           }
         ]
       },
-      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
+      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Added\n\n- **core**: add feature"
     },
     {
       "ownerId": "core",
@@ -70,14 +71,14 @@ expression: manifest
         "summary": [],
         "sections": [
           {
-            "title": "Features",
+            "title": "Added",
             "entries": [
               "- add feature"
             ]
           }
         ]
       },
-      "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add feature"
+      "rendered": "## 1.1.0 ([DATE])\n\n### Added\n\n- add feature"
     }
   ],
   "packagePublications": [

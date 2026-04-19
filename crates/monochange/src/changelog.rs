@@ -128,7 +128,7 @@ pub(crate) fn build_changelog_updates(
 			&changelog_title,
 			Vec::new(),
 			package_definition.map_or(&[][..], |package| {
-				package.extra_changelog_sections.as_slice()
+				package.changelog_sections.as_slice()
 			}),
 			&context.configuration.release_notes.change_templates,
 			&changes,
@@ -192,7 +192,7 @@ pub(crate) fn build_changelog_updates(
 			&planned_group.group_id,
 			&changelog_title,
 			group_release_summary(&planned_group.group_id, &member_ids, &changed_members),
-			group_definition.map_or(&[][..], |group| group.extra_changelog_sections.as_slice()),
+			group_definition.map_or(&[][..], |group| group.changelog_sections.as_slice()),
 			&context.configuration.release_notes.change_templates,
 			&changes,
 		);
@@ -888,7 +888,7 @@ fn build_release_notes_document(
 	target_id: &str,
 	version: &str,
 	summary: Vec<String>,
-	extra_sections: &[ExtraChangelogSection],
+	changelog_sections: &[ChangelogSection],
 	change_templates: &[String],
 	changes: &[ReleaseNoteChange],
 ) -> ReleaseNotesDocument {
@@ -898,7 +898,7 @@ fn build_release_notes_document(
 		sections: render_release_note_sections(
 			target_id,
 			version,
-			extra_sections,
+			changelog_sections,
 			change_templates,
 			changes,
 		),
@@ -908,20 +908,11 @@ fn build_release_notes_document(
 fn render_release_note_sections(
 	target_id: &str,
 	version: &str,
-	extra_sections: &[ExtraChangelogSection],
+	changelog_sections: &[ChangelogSection],
 	change_templates: &[String],
 	changes: &[ReleaseNoteChange],
 ) -> Vec<ReleaseNotesSection> {
-	let overridden_builtins = extra_sections
-		.iter()
-		.flat_map(|section| {
-			section
-				.types
-				.iter()
-				.map(|change_type| change_type.trim().to_string())
-		})
-		.collect::<BTreeSet<_>>();
-	let resolved_extra_sections = extra_sections
+	let resolved_sections = changelog_sections
 		.iter()
 		.map(|section| {
 			ResolvedSectionDefinition {
@@ -930,46 +921,37 @@ fn render_release_note_sections(
 			}
 		})
 		.collect::<Vec<_>>();
-	let mut builtin_entries = BTreeMap::<BuiltinReleaseSection, Vec<String>>::new();
-	let mut extra_entries = vec![Vec::<String>::new(); resolved_extra_sections.len()];
+	let mut section_entries = vec![Vec::<String>::new(); resolved_sections.len()];
+	let mut uncategorized = Vec::<String>::new();
 
 	for change in changes {
 		let rendered = render_change_entry(change, target_id, version, change_templates);
-		match classify_release_note_change(change, &resolved_extra_sections) {
-			ResolvedReleaseSectionTarget::Builtin(section) => {
-				push_unique_release_note_entry(
-					builtin_entries.entry(section).or_default(),
-					rendered,
-				);
+		match classify_release_note_change(change, &resolved_sections) {
+			ResolvedReleaseSectionTarget::Section(index) => {
+				push_unique_release_note_entry(&mut section_entries[index], rendered);
 			}
-			ResolvedReleaseSectionTarget::Extra(index) => {
-				push_unique_release_note_entry(&mut extra_entries[index], rendered);
+			ResolvedReleaseSectionTarget::Uncategorized => {
+				push_unique_release_note_entry(&mut uncategorized, rendered);
 			}
 		}
 	}
 
+	// Build sections in priority order (sections are already sorted by priority
+	// from the configuration; we preserve that ordering here).
 	let mut sections = Vec::new();
-	for builtin in builtin_release_sections() {
-		if overridden_builtins.contains(builtin.selector()) {
-			continue;
-		}
-		if let Some(entries) = builtin_entries
-			.remove(&builtin)
-			.filter(|entries| !entries.is_empty())
-		{
-			sections.push(ReleaseNotesSection {
-				title: builtin.title().to_string(),
-				entries,
-			});
-		}
-	}
-	for (index, section) in resolved_extra_sections.iter().enumerate() {
-		if extra_entries[index].is_empty() {
+	for (index, section) in resolved_sections.iter().enumerate() {
+		if section_entries[index].is_empty() {
 			continue;
 		}
 		sections.push(ReleaseNotesSection {
 			title: section.title.clone(),
-			entries: extra_entries[index].clone(),
+			entries: section_entries[index].clone(),
+		});
+	}
+	if !uncategorized.is_empty() {
+		sections.push(ReleaseNotesSection {
+			title: "Changed".to_string(),
+			entries: uncategorized,
 		});
 	}
 	if sections.is_empty() {
@@ -981,36 +963,35 @@ fn render_release_note_sections(
 	sections
 }
 
-#[allow(variant_size_differences)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum ResolvedReleaseSectionTarget {
-	Builtin(BuiltinReleaseSection),
-	Extra(usize),
+	Section(usize),
+	Uncategorized,
 }
 
 fn classify_release_note_change(
 	change: &ReleaseNoteChange,
-	extra_sections: &[ResolvedSectionDefinition],
+	sections: &[ResolvedSectionDefinition],
 ) -> ResolvedReleaseSectionTarget {
+	// First, try to match by explicit change_type (e.g. "feat", "fix", "security")
 	if let Some(change_type) = change.change_type.as_deref()
-		&& let Some(index) = extra_sections
+		&& let Some(index) = sections
 			.iter()
 			.position(|section| section_matches_resolved_type(section, change_type))
 	{
-		return ResolvedReleaseSectionTarget::Extra(index);
+		return ResolvedReleaseSectionTarget::Section(index);
 	}
 
-	if change.change_type.as_deref() == Some(BuiltinReleaseSection::Note.selector()) {
-		return ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note);
-	}
-	let builtin = BuiltinReleaseSection::from_bump(change.bump);
-	if let Some(index) = extra_sections
+	// Fall back to matching by bump severity selector ("major", "minor", "patch")
+	let bump_selector = change.bump.to_string();
+	if let Some(index) = sections
 		.iter()
-		.position(|section| section_matches_resolved_type(section, builtin.selector()))
+		.position(|section| section_matches_resolved_type(section, &bump_selector))
 	{
-		return ResolvedReleaseSectionTarget::Extra(index);
+		return ResolvedReleaseSectionTarget::Section(index);
 	}
-	ResolvedReleaseSectionTarget::Builtin(builtin)
+
+	ResolvedReleaseSectionTarget::Uncategorized
 }
 
 fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
@@ -1148,44 +1129,6 @@ fn config_package_id(package: &PackageRecord) -> String {
 		.unwrap_or_else(|| package.name.clone())
 }
 
-impl BuiltinReleaseSection {
-	#[allow(clippy::match_same_arms)]
-	fn from_bump(bump: BumpSeverity) -> Self {
-		match bump {
-			BumpSeverity::Major => Self::Major,
-			BumpSeverity::Minor => Self::Minor,
-			BumpSeverity::None | BumpSeverity::Patch => Self::Patch,
-			_ => Self::Patch,
-		}
-	}
-
-	fn selector(self) -> &'static str {
-		match self {
-			Self::Major => "major",
-			Self::Minor => "minor",
-			Self::Patch => "patch",
-			Self::Note => "note",
-		}
-	}
-
-	fn title(self) -> &'static str {
-		match self {
-			Self::Major => "Breaking changes",
-			Self::Minor => "Features",
-			Self::Patch => "Fixes",
-			Self::Note => "Notes",
-		}
-	}
-}
-
-fn builtin_release_sections() -> [BuiltinReleaseSection; 4] {
-	[
-		BuiltinReleaseSection::Major,
-		BuiltinReleaseSection::Minor,
-		BuiltinReleaseSection::Patch,
-		BuiltinReleaseSection::Note,
-	]
-}
 
 #[cfg(test)]
 mod tests {
@@ -1200,7 +1143,7 @@ mod tests {
 	use monochange_core::ChangesetRevision;
 	use monochange_core::ChangesetTargetKind;
 	use monochange_core::Ecosystem;
-	use monochange_core::ExtraChangelogSection;
+	use monochange_core::ChangelogSection;
 	use monochange_core::GroupChangelogInclude;
 	use monochange_core::GroupDefinition;
 	use monochange_core::HostedActorRef;
@@ -1277,7 +1220,7 @@ mod tests {
 				path: PathBuf::from(format!("packages/{config_id}/CHANGELOG.md")),
 				format: ChangelogFormat::Monochange,
 			}),
-			extra_changelog_sections: Vec::new(),
+			changelog_sections: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1301,7 +1244,7 @@ mod tests {
 				format: ChangelogFormat::Monochange,
 			}),
 			changelog_include: include,
-			extra_changelog_sections: Vec::new(),
+			changelog_sections: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1732,17 +1675,19 @@ mod tests {
 		);
 
 		let extra_sections = vec![
-			ExtraChangelogSection {
+			ChangelogSection {
 				name: "Highlights".to_string(),
 				types: vec!["minor".to_string()],
-				default_bump: None,
+				bump: BumpSeverity::Minor,
 				description: None,
+				priority: 20,
 			},
-			ExtraChangelogSection {
+			ChangelogSection {
 				name: "Notes".to_string(),
 				types: vec!["note".to_string()],
-				default_bump: None,
+				bump: BumpSeverity::None,
 				description: None,
+				priority: 100,
 			},
 		];
 		let sections = render_release_note_sections(
@@ -1781,15 +1726,11 @@ mod tests {
 				},
 			],
 		);
-		assert_eq!(sections[0].title, "Breaking changes");
-		assert_eq!(sections[1].title, "Fixes");
-		assert_eq!(sections[2].title, "Highlights");
-		assert_eq!(sections[3].title, "Notes");
-		assert_eq!(sections[1].entries, vec!["- Bug fix".to_string()]);
-		assert_eq!(
-			sections[2].entries,
-			vec!["- Added group support".to_string()]
-		);
+		assert_eq!(sections[0].title, "Highlights");
+		assert_eq!(sections[1].title, "Notes");
+		assert_eq!(sections[2].title, "Changed");
+		assert_eq!(sections[0].entries, vec!["- Added group support".to_string()]);
+		assert_eq!(sections[2].entries, vec!["- Breaking API".to_string(), "- Bug fix".to_string()]);
 
 		let fallback = render_release_note_sections("sdk", "1.2.3", &[], &[], &[]);
 		assert_eq!(fallback[0].title, "Changed");
@@ -2067,31 +2008,15 @@ mod tests {
 		assert_eq!(config_package_id(&configured), "pkg-a");
 		configured.metadata.clear();
 		assert_eq!(config_package_id(&configured), "package-a");
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::Major),
-			BuiltinReleaseSection::Major
-		);
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::Minor),
-			BuiltinReleaseSection::Minor
-		);
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::Patch),
-			BuiltinReleaseSection::Patch
-		);
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::None),
-			BuiltinReleaseSection::Patch
-		);
-		assert_eq!(BuiltinReleaseSection::Note.title(), "Notes");
-		assert_eq!(builtin_release_sections().len(), 4);
-
 		let selected = ResolvedSectionDefinition {
 			title: "Selected".to_string(),
 			types: vec!["custom".to_string(), " minor ".to_string()],
 		};
 		assert!(section_matches_resolved_type(&selected, "custom"));
 		assert!(section_matches_resolved_type(&selected, "minor"));
+
+		// When change_type is "note" and doesn't match any section, it falls to bump match.
+		// The sample_change has bump: Minor, which matches the selected section's " minor " type.
 		assert_eq!(
 			classify_release_note_change(
 				&ReleaseNoteChange {
@@ -2100,7 +2025,7 @@ mod tests {
 				},
 				std::slice::from_ref(&selected),
 			),
-			ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note)
+			ResolvedReleaseSectionTarget::Section(0)
 		);
 		assert_eq!(
 			classify_release_note_change(
@@ -2110,7 +2035,7 @@ mod tests {
 				},
 				std::slice::from_ref(&selected),
 			),
-			ResolvedReleaseSectionTarget::Extra(0)
+			ResolvedReleaseSectionTarget::Section(0)
 		);
 		assert_eq!(
 			classify_release_note_change(
@@ -2119,9 +2044,9 @@ mod tests {
 					bump: BumpSeverity::Minor,
 					..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
 				},
-				&[selected],
+				&[selected.clone()],
 			),
-			ResolvedReleaseSectionTarget::Extra(0)
+			ResolvedReleaseSectionTarget::Section(0)
 		);
 	}
 }

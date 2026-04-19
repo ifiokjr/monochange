@@ -27,12 +27,12 @@ pub(crate) fn configured_change_type_choices(
 	let all_sections = configuration
 		.packages
 		.iter()
-		.flat_map(|package| package.extra_changelog_sections.iter())
+		.flat_map(|package| package.changelog_sections.iter())
 		.chain(
 			configuration
 				.groups
 				.iter()
-				.flat_map(|group| group.extra_changelog_sections.iter()),
+				.flat_map(|group| group.changelog_sections.iter()),
 		);
 
 	all_sections

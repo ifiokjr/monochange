@@ -16,7 +16,7 @@ struct SelectableTarget {
 	id: String,
 	kind: TargetKind,
 	display: String,
-	/// Configured change types from `extra_changelog_sections` for this target.
+	/// Configured change types from `changelog_sections` for this target.
 	configured_types: Vec<String>,
 }
 
@@ -134,7 +134,7 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 	for group in &configuration.groups {
 		let members = group.packages.join(", ");
 		let configured_types = group
-			.extra_changelog_sections
+			.changelog_sections
 			.iter()
 			.flat_map(|section| section.types.iter().cloned())
 			.collect::<BTreeSet<_>>()
@@ -153,7 +153,7 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 	for package in &configuration.packages {
 		if !grouped_package_ids.contains(&package.id) {
 			let configured_types = package
-				.extra_changelog_sections
+				.changelog_sections
 				.iter()
 				.flat_map(|section| section.types.iter().cloned())
 				.collect::<BTreeSet<_>>()
@@ -177,7 +177,7 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				.map(|group| format!(" (member of group `{}`)", group.id))
 				.unwrap_or_default();
 			let configured_types = package
-				.extra_changelog_sections
+				.changelog_sections
 				.iter()
 				.flat_map(|section| section.types.iter().cloned())
 				.collect::<BTreeSet<_>>()
@@ -359,7 +359,7 @@ mod __tests {
 	use monochange_core::BumpSeverity;
 	use monochange_core::ChangesetSettings;
 	use monochange_core::EcosystemSettings;
-	use monochange_core::ExtraChangelogSection;
+	use monochange_core::ChangelogSection;
 	use monochange_core::GroupChangelogInclude;
 	use monochange_core::GroupDefinition;
 	use monochange_core::MonochangeError;
@@ -628,7 +628,7 @@ mod __tests {
 					path: std::path::PathBuf::from("crates/app"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					extra_changelog_sections: Vec::new(),
+					changelog_sections: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -646,7 +646,7 @@ mod __tests {
 					path: std::path::PathBuf::from("crates/core"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					extra_changelog_sections: Vec::new(),
+					changelog_sections: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -664,7 +664,7 @@ mod __tests {
 					path: std::path::PathBuf::from("packages/web"),
 					package_type: PackageType::Npm,
 					changelog: None,
-					extra_changelog_sections: Vec::new(),
+					changelog_sections: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -683,7 +683,7 @@ mod __tests {
 				packages: vec!["app".to_string(), "core".to_string()],
 				changelog: None,
 				changelog_include: GroupChangelogInclude::All,
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -760,7 +760,7 @@ mod __tests {
 				packages: Vec::new(),
 				changelog: None,
 				changelog_include: GroupChangelogInclude::All,
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -797,7 +797,7 @@ mod __tests {
 					path: std::path::PathBuf::from("crates/alpha"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					extra_changelog_sections: Vec::new(),
+					changelog_sections: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -815,7 +815,7 @@ mod __tests {
 					path: std::path::PathBuf::from("crates/beta"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					extra_changelog_sections: Vec::new(),
+					changelog_sections: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -901,18 +901,20 @@ mod __tests {
 				path: std::path::PathBuf::from("packages/web"),
 				package_type: PackageType::Npm,
 				changelog: None,
-				extra_changelog_sections: vec![
-					ExtraChangelogSection {
+				changelog_sections: vec![
+					ChangelogSection {
 						name: "Docs".to_string(),
 						types: vec!["test".to_string(), "docs".to_string()],
-						default_bump: None,
+						bump: BumpSeverity::None,
 						description: None,
+				priority: 100,
 					},
-					ExtraChangelogSection {
+					ChangelogSection {
 						name: "More".to_string(),
 						types: vec!["docs".to_string(), "security".to_string()],
-						default_bump: None,
+						bump: BumpSeverity::None,
 						description: None,
+				priority: 100,
 					},
 				],
 				empty_update_message: None,

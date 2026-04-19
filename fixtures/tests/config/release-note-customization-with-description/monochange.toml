@@ -3,4 +3,4 @@ package_type = "cargo"
 
 [package.core]
 path = "crates/core"
-extra_changelog_sections = [{ name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" }]
+changelog_sections = [{ name = "Testing", types = ["test"], bump = "none", description = "Changes that only modify tests" }]

@@ -72,7 +72,7 @@ format = "keep_a_changelog"
 #
 # Each entry maps one or more changeset `type` values into a named changelog
 # section. Example:
-# extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+# changelog_sections = [{ name = "Security", types = ["security"] }]
 #
 # Default: []
 
@@ -141,8 +141,8 @@ change_templates = [
 #                             (not needed when defaults.package_type is set)
 #   changelog               — true, false, "path/to/changelog.md", or a table
 #                             with { path, format }; overrides [defaults.changelog]
-#   extra_changelog_sections — custom changelog sections with type routing;
-#                              each section supports { name, types, default_bump? }
+#   changelog_sections — custom changelog sections with type routing;
+#                              each section supports { name, types, bump }
 #   empty_update_message    — per-package fallback text for transitive bumps
 #   versioned_files         — additional files to update with the new version
 #                             package-scoped string entries infer the package ecosystem,
@@ -312,8 +312,8 @@ type = "npm"
 #                             member-targeted changesets appear in the group
 #                             changelog (direct group-targeted changesets are
 #                             always included; default: "all")
-#   extra_changelog_sections — custom changelog sections with type routing;
-#                              each section supports { name, types, default_bump? }
+#   changelog_sections — custom changelog sections with type routing;
+#                              each section supports { name, types, bump }
 #   empty_update_message    — fallback text when the group bumps but a
 #                             specific member has no direct changeset entries
 #   versioned_files         — additional files to version-bump with the group
@@ -363,12 +363,12 @@ packages = [
 	"@monochange/cli-win32-x64-msvc",
 	"@monochange/cli-win32-arm64-msvc",
 ]
-extra_changelog_sections = [
-	{ name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" },
-	{ name = "Documentation", types = ["docs"], default_bump = "none", description = "Changes that only modify documentation" },
-	{ name = "Security", types = ["security"], default_bump = "none", description = "Security-related changes" },
-	{ name = "Performance", types = ["perf"], default_bump = "none", description = "Performance improvements" },
-	{ name = "Refactor", types = ["refactor"], default_bump = "none", description = "Code refactoring without functional changes" },
+changelog_sections = [
+	{ name = "Testing", types = ["test"], bump = "none", description = "Changes that only modify tests" },
+	{ name = "Documentation", types = ["docs"], bump = "none", description = "Changes that only modify documentation" },
+	{ name = "Security", types = ["security"], bump = "none", description = "Security-related changes" },
+	{ name = "Performance", types = ["perf"], bump = "none", description = "Performance improvements" },
+	{ name = "Refactor", types = ["refactor"], bump = "none", description = "Code refactoring without functional changes" },
 ]
 tag = true
 release = true

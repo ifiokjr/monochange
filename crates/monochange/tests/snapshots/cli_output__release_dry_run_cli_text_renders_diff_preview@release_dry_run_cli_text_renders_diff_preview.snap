@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 186
+assertion_line: 322
 info:
   program: mc
   args:
@@ -61,7 +61,7 @@ file diffs:
 +
 +Synchronized members: app
 +
-+### Features
++### Added
 +
 +- **core**: add feature
 
@@ -72,7 +72,7 @@ file diffs:
 +
 +## 1.1.0 ([DATE])
 +
-+### Features
++### Added
 +
 +- add feature
 

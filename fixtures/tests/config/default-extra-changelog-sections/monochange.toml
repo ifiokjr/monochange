@@ -1,6 +1,6 @@
 [defaults]
 package_type = "cargo"
-extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+changelog_sections = [{ name = "Security", types = ["security"] }]
 
 [release_notes]
 change_templates = [

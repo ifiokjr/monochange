@@ -1,6 +1,6 @@
 ---
 core:
-  type: docs
+  type: unknown_type
 ---
 
 # object type without config

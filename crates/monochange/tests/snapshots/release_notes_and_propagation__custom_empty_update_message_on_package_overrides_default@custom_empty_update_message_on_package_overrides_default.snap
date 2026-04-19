@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/release_notes_and_propagation.rs
+assertion_line: 111
 expression: changelog
 ---
 ## 1.1.0 ([DATE])
@@ -8,7 +9,7 @@ Grouped release for `sdk`.
 
 Changed members: core, app
 
-### Features
+### Added
 
 > [!NOTE]
 > *core*
@@ -18,7 +19,7 @@ This entry appears in changelog via `group.sdk.changelog.text`
 ### Features
 - **core**: add core feature
 
-### Fixes
+### Changed
 
 > [!NOTE]
 > *app*

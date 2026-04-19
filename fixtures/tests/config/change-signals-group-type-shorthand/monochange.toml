@@ -9,4 +9,4 @@ path = "crates/app"
 
 [group.sdk]
 packages = ["core", "app"]
-extra_changelog_sections = [{ name = "Testing", types = ["test"], default_bump = "minor" }]
+changelog_sections = [{ name = "Testing", types = ["test"], bump = "minor" }]

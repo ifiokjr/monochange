@@ -5,6 +5,7 @@ use miette::LabeledSpan;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogSection;
 use monochange_core::ChangelogTarget;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
@@ -1387,7 +1388,7 @@ fn load_change_signals_reject_unknown_object_type_with_valid_types_help() {
 }
 
 #[test]
-fn load_change_signals_reject_object_type_when_target_has_no_configured_sections() {
+fn load_change_signals_reject_object_type_when_unknown_type_is_used() {
 	let root = fixture_path("config/rejects-change-object-type-without-configured-sections");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -1403,10 +1404,10 @@ fn load_change_signals_reject_object_type_when_target_has_no_configured_sections
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
+	let rendered = error.to_string();
 	assert!(
-		error
-			.to_string()
-			.contains("no configured types are available for this target")
+		rendered.contains("invalid") || rendered.contains("unknown") || rendered.contains("unsupported"),
+		"error message should indicate unknown/invalid type: {rendered}"
 	);
 }
 
@@ -2340,14 +2341,14 @@ fn load_workspace_configuration_parses_release_note_customization() {
 		.unwrap_or_else(|| panic!("expected package"));
 
 	assert_eq!(configuration.release_notes.change_templates.len(), 3);
-	assert_eq!(package.extra_changelog_sections.len(), 1);
+	assert_eq!(package.changelog_sections.len(), 1);
 	let extra_section = package
-		.extra_changelog_sections
+		.changelog_sections
 		.first()
-		.unwrap_or_else(|| panic!("expected extra changelog section"));
+		.unwrap_or_else(|| panic!("expected changelog section"));
 	assert_eq!(extra_section.name, "Security");
 	assert_eq!(extra_section.types, vec!["security"]);
-	assert_eq!(extra_section.default_bump, Some(BumpSeverity::Patch));
+	assert_eq!(extra_section.bump, BumpSeverity::Patch);
 	assert_eq!(extra_section.description, None);
 }
 
@@ -2360,14 +2361,14 @@ fn load_workspace_configuration_parses_extra_changelog_section_with_description(
 		.package_by_id("core")
 		.unwrap_or_else(|| panic!("expected package"));
 
-	assert_eq!(package.extra_changelog_sections.len(), 1);
+	assert_eq!(package.changelog_sections.len(), 1);
 	let extra_section = package
-		.extra_changelog_sections
+		.changelog_sections
 		.first()
-		.unwrap_or_else(|| panic!("expected extra changelog section"));
+		.unwrap_or_else(|| panic!("expected changelog section"));
 	assert_eq!(extra_section.name, "Testing");
 	assert_eq!(extra_section.types, vec!["test"]);
-	assert_eq!(extra_section.default_bump, Some(BumpSeverity::None));
+	assert_eq!(extra_section.bump, BumpSeverity::None);
 	assert_eq!(
 		extra_section.description,
 		Some("Changes that only modify tests".to_string())
@@ -2383,7 +2384,7 @@ fn section_patterns_support_root_sections_without_ids() {
 }
 
 #[test]
-fn load_workspace_configuration_inherits_default_extra_changelog_sections() {
+fn load_workspace_configuration_inherits_default_changelog_sections() {
 	let root = fixture_path("config/default-extra-changelog-sections");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -2391,12 +2392,12 @@ fn load_workspace_configuration_inherits_default_extra_changelog_sections() {
 		.package_by_id("core")
 		.unwrap_or_else(|| panic!("expected package"));
 
-	assert_eq!(configuration.defaults.extra_changelog_sections.len(), 1);
-	assert_eq!(package.extra_changelog_sections.len(), 1);
+	assert_eq!(configuration.defaults.changelog_sections.len(), 1);
+	assert_eq!(package.changelog_sections.len(), 1);
 	let extra_section = package
-		.extra_changelog_sections
+		.changelog_sections
 		.first()
-		.unwrap_or_else(|| panic!("expected extra changelog section"));
+		.unwrap_or_else(|| panic!("expected changelog section"));
 	assert_eq!(extra_section.name, "Security");
 	assert_eq!(extra_section.types, vec!["security"]);
 }
@@ -2419,7 +2420,7 @@ fn load_workspace_configuration_rejects_empty_extra_changelog_section_types() {
 		.unwrap_or_else(|| panic!("expected config error"));
 	let rendered = error.render();
 
-	assert!(rendered.contains("extra changelog section `Security` must declare at least one type"));
+	assert!(rendered.contains("changelog section `Security` must declare at least one type"));
 }
 
 #[test]
@@ -2682,7 +2683,7 @@ fn package_definition(id: &str, path: &str) -> monochange_core::PackageDefinitio
 		path: PathBuf::from(path),
 		package_type: monochange_core::PackageType::Cargo,
 		changelog: None,
-		extra_changelog_sections: Vec::new(),
+		changelog_sections: ChangelogSection::defaults(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -3082,7 +3083,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		packages: vec![core.id.clone(), app.id.clone()],
 		changelog: None,
 		changelog_include: GroupChangelogInclude::All,
-		extra_changelog_sections: Vec::new(),
+		changelog_sections: ChangelogSection::defaults(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -3109,7 +3110,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		packages: vec![core.id.clone(), "missing".to_string(), app.id.clone()],
 		changelog: None,
 		changelog_include: GroupChangelogInclude::All,
-		extra_changelog_sections: Vec::new(),
+		changelog_sections: ChangelogSection::defaults(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -3964,7 +3965,7 @@ fn parse_markdown_change_target_and_validation_helpers_cover_remaining_error_pat
 		&no_types_configuration,
 		Path::new("change.md"),
 		"core",
-		"docs",
+		"custom_unknown_type",
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid type error"));
@@ -4396,7 +4397,7 @@ fn matching_package_helpers_cover_references_and_definitions() {
 		path: PathBuf::from("packages/web"),
 		package_type: monochange_core::PackageType::Npm,
 		changelog: None,
-		extra_changelog_sections: Vec::new(),
+		changelog_sections: ChangelogSection::defaults(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,

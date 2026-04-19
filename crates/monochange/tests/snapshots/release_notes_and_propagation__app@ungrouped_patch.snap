@@ -1,11 +1,10 @@
 ---
 source: crates/monochange/tests/release_notes_and_propagation.rs
+assertion_line: 43
 expression: app_changelog
 ---
 # Changelog
 
 ## app 1.0.1 ([DATE])
-
-### Fixes
 
 - No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.

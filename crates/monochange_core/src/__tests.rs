@@ -18,7 +18,7 @@ use crate::CliStepDefinition;
 use crate::DependencyKind;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
-use crate::ExtraChangelogSection;
+use crate::ChangelogSection;
 use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
 use crate::HostedIssueCommentPlan;
@@ -563,25 +563,26 @@ fn versioned_file_definition_uses_regex_returns_false_when_unset() {
 }
 
 #[test]
-fn workspace_defaults_default_has_no_extra_changelog_sections() {
+fn workspace_defaults_default_has_changelog_sections() {
 	assert!(
-		WorkspaceDefaults::default()
-			.extra_changelog_sections
+		!WorkspaceDefaults::default()
+			.changelog_sections
 			.is_empty()
 	);
 }
 
 #[test]
-fn extra_changelog_section_supports_description_field() {
-	let section = ExtraChangelogSection {
+fn changelog_section_supports_description_field() {
+	let section = ChangelogSection {
 		name: "Testing".to_string(),
 		types: vec!["test".to_string()],
-		default_bump: None,
+		bump: BumpSeverity::None,
 		description: Some("Changes that only modify tests".to_string()),
+		priority: 40,
 	};
 	assert_eq!(section.name, "Testing");
 	assert_eq!(section.types, vec!["test"]);
-	assert_eq!(section.default_bump, None);
+	assert_eq!(section.bump, BumpSeverity::None);
 	assert_eq!(
 		section.description,
 		Some("Changes that only modify tests".to_string())
@@ -589,12 +590,13 @@ fn extra_changelog_section_supports_description_field() {
 }
 
 #[test]
-fn extra_changelog_section_description_is_optional() {
-	let section = ExtraChangelogSection {
+fn changelog_section_description_is_optional() {
+	let section = ChangelogSection {
 		name: "Security".to_string(),
 		types: vec!["security".to_string()],
-		default_bump: Some(BumpSeverity::Patch),
+		bump: BumpSeverity::Patch,
 		description: None,
+		priority: 60,
 	};
 	assert_eq!(section.description, None);
 }
@@ -1717,7 +1719,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 					path: PathBuf::from("crates/monochange/changelog.md"),
 					format: ChangelogFormat::Monochange,
 				}),
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: ChangelogSection::defaults(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1738,7 +1740,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 					path: PathBuf::from("crates/monochange_core/changelog.md"),
 					format: ChangelogFormat::Monochange,
 				}),
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: ChangelogSection::defaults(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1756,7 +1758,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				path: PathBuf::from("crates/monochange_graph"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				extra_changelog_sections: Vec::new(),
+				changelog_sections: ChangelogSection::defaults(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1778,7 +1780,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				format: ChangelogFormat::Monochange,
 			}),
 			changelog_include: GroupChangelogInclude::All,
-			extra_changelog_sections: Vec::new(),
+			changelog_sections: ChangelogSection::defaults(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1804,7 +1806,7 @@ fn group_definition_defaults_changelog_include_when_omitted() {
 		"id": "sdk",
 		"packages": ["core", "app"],
 		"changelog": null,
-		"extra_changelog_sections": [],
+		"changelog_sections": [],
 		"empty_update_message": null,
 		"release_title": null,
 		"changelog_version_title": null,

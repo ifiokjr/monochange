@@ -1,9 +1,10 @@
 ---
 source: crates/monochange/tests/changelog_formats.rs
+assertion_line: 85
 expression: core_changelog
 ---
 ## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) (2026-04-06)
 
-### Features
+### Added
 
 - render linked keep a changelog titles
