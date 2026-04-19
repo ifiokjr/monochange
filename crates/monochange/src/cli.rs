@@ -192,7 +192,6 @@ When provided, the generated config includes:\n\
 			))
 			.subcommand(build_subagents_subcommand())
 			.subcommand(build_analyze_subcommand())
-			.subcommand(build_assist_subcommand())
 			.subcommand(build_release_record_subcommand())
 			.subcommand(build_tag_release_subcommand())
 			.subcommand(build_lint_subcommand())
@@ -329,24 +328,6 @@ Analysis notes:
 				.default_value("text")
 				.value_parser(["text", "json"])
 				.help("Output format"),
-		)
-}
-
-pub(crate) fn build_assist_subcommand() -> Command {
-	Command::new("assist")
-		.about("Print assistant setup guidance, install steps, and MCP configuration")
-		.arg(
-			Arg::new("assistant")
-				.help("Assistant profile to print")
-				.required(true)
-				.value_parser(["generic", "claude", "cursor", "copilot", "pi"]),
-		)
-		.arg(
-			Arg::new("format")
-				.long("format")
-				.help("Output format for the assistant setup profile")
-				.default_value("text")
-				.value_parser(["text", "json"]),
 		)
 }
 

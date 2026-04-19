@@ -20,7 +20,6 @@ Commands:
   populate             Add any missing built-in CLI commands to monochange.toml so you can customize them
   subagents            Generate repo-local monochange subagents and agent guidance files
   analyze              Analyze semantic changes for one package across main, head, and optional release baselines
-  assist               Print assistant setup guidance, install steps, and MCP configuration
   release-record       Inspect the monochange release record associated with a tag or commit
   tag-release          Create and push release tags from the monochange release record on a commit
   lint                 Inspect and scaffold manifest lint rules

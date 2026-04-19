@@ -154,7 +154,7 @@ Recent `monochange` improvements made package publishing guidance and diagnostic
 - repair a recent source/provider release by retargeting its release tags with `mc repair-release`
 - inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
 - apply Rust semver evidence when provided
-- expose built-in assistant setup guidance with `mc assist` and a stdio MCP server with `mc mcp`
+- expose a bundled assistant skill plus a stdio MCP server with `mc mcp`
 - publish the CLI as `@monochange/cli` and the bundled agent skill as `@monochange/skill`
 - publish end-user documentation through the mdBook in `docs/`
 

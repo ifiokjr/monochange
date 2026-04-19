@@ -21,7 +21,6 @@
 //!
 //! ```bash
 //! mc init
-//! mc assist pi
 //! mc discover --format json
 //! mc change --package monochange --bump patch --reason "describe the change"
 //! mc release --dry-run --format json
@@ -35,7 +34,7 @@
 //! - start from the built-in default CLI commands and let matching config entries replace them
 //! - resolve change input files
 //! - render discovery and release command output in text or JSON
-//! - execute configured CLI commands plus built-in assistant setup and MCP commands
+//! - execute configured CLI commands plus built-in MCP commands
 //! - preview or publish provider releases from prepared release data
 //! - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 //! - expose JSON-first MCP tools for assistant workflows
@@ -45,6 +44,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
+use std::future::Future;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
@@ -53,7 +53,6 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use analyze::render_analyze_report;
-use assist::run_assist;
 pub(crate) use changelog::*;
 pub use changeset_policy::affected_packages;
 pub(crate) use changeset_policy::compute_changed_paths_since;
@@ -249,7 +248,6 @@ pub(crate) use workspace_ops::render_interactive_changeset_markdown;
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
 mod analyze;
-mod assist;
 mod changelog;
 mod changeset_policy;
 mod changesets;
@@ -300,40 +298,6 @@ impl From<ChangeBump> for BumpSeverity {
 			ChangeBump::Minor => Self::Minor,
 			ChangeBump::Major => Self::Major,
 		}
-	}
-}
-
-/// Assistant profile understood by `mc assist`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-pub enum Assistant {
-	Generic,
-	Claude,
-	Cursor,
-	Copilot,
-	Pi,
-}
-
-/// Output renderer for assistant setup payloads.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-pub enum AssistOutputFormat {
-	Text,
-	Json,
-}
-
-fn parse_assistant_or_default(value: Option<&String>) -> Assistant {
-	match value.map_or("generic", String::as_str) {
-		"claude" => Assistant::Claude,
-		"cursor" => Assistant::Cursor,
-		"copilot" => Assistant::Copilot,
-		"pi" => Assistant::Pi,
-		_ => Assistant::Generic,
-	}
-}
-
-fn parse_assist_output_format_or_default(value: Option<&String>) -> AssistOutputFormat {
-	match value.map_or("text", String::as_str) {
-		"json" => AssistOutputFormat::Json,
-		_ => AssistOutputFormat::Text,
 	}
 }
 
@@ -823,22 +787,7 @@ where
 				format,
 			)
 		}
-		Some(("assist", assist_matches)) => {
-			let assistant =
-				parse_assistant_or_default(assist_matches.get_one::<String>("assistant"));
-			let format =
-				parse_assist_output_format_or_default(assist_matches.get_one::<String>("format"));
-			run_assist(assistant, format)
-		}
-		Some(("mcp", _)) => {
-			if quiet {
-				return Ok(String::new());
-			}
-			let runtime = tokio::runtime::Runtime::new()
-				.map_err(|error| MonochangeError::Config(error.to_string()))?;
-			runtime.block_on(mcp::run_server());
-			Ok(String::new())
-		}
+		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server),
 		Some(("release-record", release_record_matches)) => {
 			let from = release_record_matches
 				.get_one::<String>("from")
@@ -914,6 +863,21 @@ where
 		}
 		None => Err(MonochangeError::Config("Usage: mc".to_string())),
 	}
+}
+
+fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
+where
+	F: FnOnce() -> Fut,
+	Fut: Future<Output = ()>,
+{
+	if quiet {
+		return Ok(String::new());
+	}
+
+	let runtime = tokio::runtime::Runtime::new()
+		.map_err(|error| MonochangeError::Config(error.to_string()))?;
+	runtime.block_on(run_server());
+	Ok(String::new())
 }
 
 fn format_publish_state(publish_state: monochange_core::PublishState) -> &'static str {

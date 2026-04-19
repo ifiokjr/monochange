@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
@@ -121,7 +122,7 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("Usage: mc"));
 	assert!(output.contains("subagents"));
 	assert!(output.contains("analyze"));
-	assert!(output.contains("assist"));
+	assert!(!output.contains("assist"));
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
 	assert!(output.contains("diagnostics"));
@@ -5230,6 +5231,34 @@ fn parse_boolean_step_input_rejects_invalid_values() {
 }
 
 #[test]
+fn run_mcp_command_with_skips_server_when_quiet() {
+	let called = Cell::new(false);
+	let output = crate::run_mcp_command_with(true, || {
+		async {
+			called.set(true);
+		}
+	})
+	.unwrap_or_else(|error| panic!("quiet mcp helper: {error}"));
+
+	assert!(output.is_empty());
+	assert!(!called.get());
+}
+
+#[test]
+fn run_mcp_command_with_runs_server_when_not_quiet() {
+	let called = Cell::new(false);
+	let output = crate::run_mcp_command_with(false, || {
+		async {
+			called.set(true);
+		}
+	})
+	.unwrap_or_else(|error| panic!("non-quiet mcp helper: {error}"));
+
+	assert!(output.is_empty());
+	assert!(called.get());
+}
+
+#[test]
 fn quiet_builtin_commands_return_empty_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -5280,6 +5309,17 @@ fn quiet_builtin_commands_return_empty_output() {
 	)
 	.unwrap_or_else(|error| panic!("quiet mcp output: {error}"));
 	assert!(mcp_output.is_empty());
+
+	let check_output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("check"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet check output: {error}"));
+	assert!(check_output.is_empty());
 }
 
 #[test]
