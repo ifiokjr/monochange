@@ -39,7 +39,7 @@ Reach for this crate when you want to preview or publish Gitea releases and rele
 
 <!-- {=crateBadgeLinks:"monochange_gitea"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitea-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_gitea [docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitea-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_gitea/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__gitea-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_gitea [docs-image]: https://img.shields.io/badge/docs.rs-monochange__gitea-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_gitea/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_gitea [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_gitea
 
 <!-- {/crateBadgeLinks} -->
 
@@ -47,8 +47,6 @@ Reach for this crate when you want to preview or publish Gitea releases and rele
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

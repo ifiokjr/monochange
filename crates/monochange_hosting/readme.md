@@ -40,7 +40,7 @@ Reach for this crate when you are implementing GitHub, Gitea, or GitLab release 
 
 <!-- {=crateBadgeLinks:"monochange_hosting"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__hosting-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_hosting [docs-image]: https://img.shields.io/badge/docs.rs-monochange__hosting-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_hosting/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__hosting-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_hosting [docs-image]: https://img.shields.io/badge/docs.rs-monochange__hosting-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_hosting/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_hosting [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_hosting
 
 <!-- {/crateBadgeLinks} -->
 
@@ -48,8 +48,6 @@ Reach for this crate when you are implementing GitHub, Gitea, or GitLab release 
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

@@ -44,7 +44,7 @@ Reach for this crate when you need to scan `pubspec.yaml` files, expand Dart or 
 
 <!-- {=crateBadgeLinks:"monochange_dart"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_dart [docs-image]: https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_dart/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_dart [docs-image]: https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_dart/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_dart [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_dart
 
 <!-- {/crateBadgeLinks} -->
 
@@ -52,8 +52,6 @@ Reach for this crate when you need to scan `pubspec.yaml` files, expand Dart or 
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

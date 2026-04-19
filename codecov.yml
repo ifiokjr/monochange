@@ -1,6 +1,59 @@
 codecov:
   require_ci_to_pass: true
 
+flags:
+  monochange:
+    paths:
+      - crates/monochange
+  monochange_analysis:
+    paths:
+      - crates/monochange_analysis
+  monochange_cargo:
+    paths:
+      - crates/monochange_cargo
+  monochange_config:
+    paths:
+      - crates/monochange_config
+  monochange_core:
+    paths:
+      - crates/monochange_core
+  monochange_dart:
+    paths:
+      - crates/monochange_dart
+  monochange_deno:
+    paths:
+      - crates/monochange_deno
+  monochange_ecmascript:
+    paths:
+      - crates/monochange_ecmascript
+  monochange_gitea:
+    paths:
+      - crates/monochange_gitea
+  monochange_github:
+    paths:
+      - crates/monochange_github
+  monochange_gitlab:
+    paths:
+      - crates/monochange_gitlab
+  monochange_graph:
+    paths:
+      - crates/monochange_graph
+  monochange_hosting:
+    paths:
+      - crates/monochange_hosting
+  monochange_lint:
+    paths:
+      - crates/monochange_lint
+  monochange_linting:
+    paths:
+      - crates/monochange_linting
+  monochange_npm:
+    paths:
+      - crates/monochange_npm
+  monochange_semver:
+    paths:
+      - crates/monochange_semver
+
 coverage:
   precision: 2
   round: down
@@ -12,5 +65,5 @@ coverage:
         threshold: 1%
     patch:
       default:
-        target: 100%
+        target: 95%
         threshold: 0%

@@ -53,7 +53,7 @@ assert_eq!(direct, BumpSeverity::Minor);
 
 <!-- {=crateBadgeLinks:"monochange_semver"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_semver [docs-image]: https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_semver/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_semver [docs-image]: https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_semver/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_semver [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_semver
 
 <!-- {/crateBadgeLinks} -->
 
@@ -61,8 +61,6 @@ assert_eq!(direct, BumpSeverity::Minor);
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 

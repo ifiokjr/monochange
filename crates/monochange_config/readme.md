@@ -86,7 +86,7 @@ let _ = std::fs::remove_dir_all(&root);
 
 <!-- {=crateBadgeLinks:"monochange_config"} -->
 
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_config [docs-image]: https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_config/
+[crate-image]: https://img.shields.io/badge/crates.io-monochange__config-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_config [docs-image]: https://img.shields.io/badge/docs.rs-monochange__config-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_config/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_config [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_config
 
 <!-- {/crateBadgeLinks} -->
 
@@ -94,8 +94,6 @@ let _ = std::fs::remove_dir_all(&root);
 
 [ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
 [ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg
-[coverage-link]: https://codecov.io/gh/ifiokjr/monochange
 [license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
 [license-link]: https://opensource.org/license/unlicense
 
