@@ -2047,7 +2047,7 @@ mod tests {
 					bump: BumpSeverity::Minor,
 					..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
 				},
-				&[selected.clone()],
+				std::slice::from_ref(&selected),
 			),
 			ResolvedReleaseSectionTarget::Section(0)
 		);

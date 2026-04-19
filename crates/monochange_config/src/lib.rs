@@ -3022,7 +3022,7 @@ fn validate_changelog_sections(
 					)],
 					Some(
 						"each type must appear in only one section; remove the duplicate or move it to the correct section"
-						.to_string(),
+							.to_string(),
 					),
 				));
 			}
