@@ -26,7 +26,6 @@ Reach for this crate when you want one API and CLI surface that discovers packag
 
 ```bash
 mc init
-mc assist pi
 mc discover --format json
 mc change --package monochange --bump patch --reason "describe the change"
 mc release --dry-run --format json
@@ -40,7 +39,7 @@ mc mcp
 - start from the built-in default CLI commands and let matching config entries replace them
 - resolve change input files
 - render discovery and release command output in text or JSON
-- execute configured CLI commands plus built-in assistant setup and MCP commands
+- execute configured CLI commands plus built-in MCP commands
 - preview or publish provider releases from prepared release data
 - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 - expose JSON-first MCP tools for assistant workflows

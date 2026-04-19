@@ -1,0 +1,67 @@
+---
+source: crates/monochange/tests/cli_output.rs
+assertion_line: 173
+info:
+  program: mc
+  args:
+    - analyze
+    - "--package"
+    - core
+  env:
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+analyze:
+  package: core (core)
+  package record: cargo:crates/core/Cargo.toml
+  ecosystem: cargo
+  manifest: crates/core/Cargo.toml
+  version group: sdk
+  release identity: group sdk
+  refs:
+    release: v1.0.0
+    main: main
+    head: HEAD
+  first release: no
+
+main -> head:
+  frame: main...HEAD
+  semantic changes: 1
+  changed files:
+  - src/lib.rs
+  changes:
+  - function `shout` added (src/lib.rs)
+
+release -> main:
+  frame: v1.0.0...main
+  semantic changes: 6
+  changed files:
+  - Cargo.toml
+  - src/lib.rs
+  changes:
+  - struct `Greeter` added (src/lib.rs)
+  - function `greet` modified (src/lib.rs)
+  - dependency `tracing` added (Cargo.toml)
+  - feature `feature.cli` added (Cargo.toml)
+  - feature `feature.default` modified (Cargo.toml)
+  - manifest_field `package.edition` modified (Cargo.toml)
+
+release -> head:
+  frame: v1.0.0...HEAD
+  semantic changes: 7
+  changed files:
+  - Cargo.toml
+  - src/lib.rs
+  changes:
+  - function `shout` added (src/lib.rs)
+  - struct `Greeter` added (src/lib.rs)
+  - function `greet` modified (src/lib.rs)
+  - dependency `tracing` added (Cargo.toml)
+  - feature `feature.cli` added (Cargo.toml)
+  - feature `feature.default` modified (Cargo.toml)
+  - manifest_field `package.edition` modified (Cargo.toml)
+
+----- stderr -----

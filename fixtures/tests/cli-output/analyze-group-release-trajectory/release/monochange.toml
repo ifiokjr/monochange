@@ -1,0 +1,13 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.app]
+path = "crates/app"
+type = "cargo"
+
+[group.sdk]
+packages = ["core", "app"]
+tag = true
+release = true
+version_format = "primary"

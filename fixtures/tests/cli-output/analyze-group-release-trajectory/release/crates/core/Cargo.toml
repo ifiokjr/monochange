@@ -1,0 +1,10 @@
+[package]
+name = "core"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+serde = "1"
+
+[features]
+default = []

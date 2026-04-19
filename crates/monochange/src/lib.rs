@@ -21,7 +21,6 @@
 //!
 //! ```bash
 //! mc init
-//! mc assist pi
 //! mc discover --format json
 //! mc change --package monochange --bump patch --reason "describe the change"
 //! mc release --dry-run --format json
@@ -35,7 +34,7 @@
 //! - start from the built-in default CLI commands and let matching config entries replace them
 //! - resolve change input files
 //! - render discovery and release command output in text or JSON
-//! - execute configured CLI commands plus built-in assistant setup and MCP commands
+//! - execute configured CLI commands plus built-in MCP commands
 //! - preview or publish provider releases from prepared release data
 //! - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 //! - expose JSON-first MCP tools for assistant workflows
@@ -45,6 +44,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
+use std::future::Future;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
@@ -52,6 +52,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use analyze::render_analyze_report;
 pub(crate) use changelog::*;
 pub use changeset_policy::affected_packages;
 pub(crate) use changeset_policy::compute_changed_paths_since;
@@ -246,6 +247,7 @@ pub(crate) use workspace_ops::render_interactive_changeset_markdown;
 #[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
+mod analyze;
 mod changelog;
 mod changeset_policy;
 mod changesets;
@@ -747,15 +749,45 @@ where
 			let output = run_subagents(root, &options)?;
 			if quiet { Ok(String::new()) } else { Ok(output) }
 		}
-		Some(("mcp", _)) => {
+		Some(("analyze", analyze_matches)) => {
 			if quiet {
 				return Ok(String::new());
 			}
-			let runtime = tokio::runtime::Runtime::new()
-				.map_err(|error| MonochangeError::Config(error.to_string()))?;
-			runtime.block_on(mcp::run_server());
-			Ok(String::new())
+			let package = analyze_matches
+				.get_one::<String>("package")
+				.map(String::as_str)
+				.ok_or_else(|| MonochangeError::Config("missing analyze package".to_string()))?;
+			let release_ref = analyze_matches
+				.get_one::<String>("release-ref")
+				.map(String::as_str);
+			let main_ref = analyze_matches
+				.get_one::<String>("main-ref")
+				.map(String::as_str);
+			let head_ref = analyze_matches
+				.get_one::<String>("head-ref")
+				.map(String::as_str);
+			let detection_level = analyze_matches
+				.get_one::<String>("detection-level")
+				.map_or("signature", String::as_str);
+			let format = if analyze_matches
+				.get_one::<String>("format")
+				.is_some_and(|value| value == "json")
+			{
+				OutputFormat::Json
+			} else {
+				OutputFormat::Text
+			};
+			render_analyze_report(
+				root,
+				package,
+				release_ref,
+				main_ref,
+				head_ref,
+				detection_level,
+				format,
+			)
 		}
+		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server),
 		Some(("release-record", release_record_matches)) => {
 			let from = release_record_matches
 				.get_one::<String>("from")
@@ -831,6 +863,21 @@ where
 		}
 		None => Err(MonochangeError::Config("Usage: mc".to_string())),
 	}
+}
+
+fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
+where
+	F: FnOnce() -> Fut,
+	Fut: Future<Output = ()>,
+{
+	if quiet {
+		return Ok(String::new());
+	}
+
+	let runtime = tokio::runtime::Runtime::new()
+		.map_err(|error| MonochangeError::Config(error.to_string()))?;
+	runtime.block_on(run_server());
+	Ok(String::new())
 }
 
 fn format_publish_state(publish_state: monochange_core::PublishState) -> &'static str {

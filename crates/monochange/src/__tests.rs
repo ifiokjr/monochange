@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
@@ -120,6 +121,7 @@ fn cli_help_returns_success_output() {
 
 	assert!(output.contains("Usage: mc"));
 	assert!(output.contains("subagents"));
+	assert!(output.contains("analyze"));
 	assert!(!output.contains("assist"));
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
@@ -171,6 +173,78 @@ fn boolean_cli_inputs_support_explicit_false_values() {
 			.get_one::<String>("sync_provider")
 			.map(String::as_str),
 		Some("false")
+	);
+}
+
+#[test]
+fn analyze_help_documents_package_scoped_release_trajectory_defaults() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("analyze"),
+			OsString::from("--help"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("analyze help: {error}"));
+
+	assert!(output.contains("Analyze semantic changes for one package"));
+	assert!(output.contains("mc analyze --package core"));
+	assert!(output.contains("Defaults `--release-ref` to the newest tag"));
+	assert!(output.contains("--detection-level"));
+}
+
+#[test]
+fn analyze_matches_capture_package_refs_and_detection_level() {
+	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
+	let matches = build_command_for_root("mc", &fixture_root)
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("analyze"),
+			OsString::from("--package"),
+			OsString::from("core"),
+			OsString::from("--main-ref"),
+			OsString::from("main"),
+			OsString::from("--head-ref"),
+			OsString::from("HEAD~1"),
+			OsString::from("--detection-level"),
+			OsString::from("semantic"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		])
+		.unwrap_or_else(|error| panic!("analyze matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected analyze subcommand"));
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("package")
+			.map(String::as_str),
+		Some("core")
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("main-ref")
+			.map(String::as_str),
+		Some("main")
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("head-ref")
+			.map(String::as_str),
+		Some("HEAD~1")
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("detection-level")
+			.map(String::as_str),
+		Some("semantic")
+	);
+	assert_eq!(
+		subcommand_matches
+			.get_one::<String>("format")
+			.map(String::as_str),
+		Some("json")
 	);
 }
 
@@ -5157,6 +5231,34 @@ fn parse_boolean_step_input_rejects_invalid_values() {
 }
 
 #[test]
+fn run_mcp_command_with_skips_server_when_quiet() {
+	let called = Cell::new(false);
+	let output = crate::run_mcp_command_with(true, || {
+		async {
+			called.set(true);
+		}
+	})
+	.unwrap_or_else(|error| panic!("quiet mcp helper: {error}"));
+
+	assert!(output.is_empty());
+	assert!(!called.get());
+}
+
+#[test]
+fn run_mcp_command_with_runs_server_when_not_quiet() {
+	let called = Cell::new(false);
+	let output = crate::run_mcp_command_with(false, || {
+		async {
+			called.set(true);
+		}
+	})
+	.unwrap_or_else(|error| panic!("non-quiet mcp helper: {error}"));
+
+	assert!(output.is_empty());
+	assert!(called.get());
+}
+
+#[test]
 fn quiet_builtin_commands_return_empty_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -5184,6 +5286,19 @@ fn quiet_builtin_commands_return_empty_output() {
 	.unwrap_or_else(|error| panic!("quiet populate output: {error}"));
 	assert!(populate_output.is_empty());
 
+	let analyze_output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("analyze"),
+			OsString::from("--package"),
+			OsString::from("core"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet analyze output: {error}"));
+	assert!(analyze_output.is_empty());
+
 	let mcp_output = run_cli(
 		root,
 		[
@@ -5194,6 +5309,17 @@ fn quiet_builtin_commands_return_empty_output() {
 	)
 	.unwrap_or_else(|error| panic!("quiet mcp output: {error}"));
 	assert!(mcp_output.is_empty());
+
+	let check_output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("check"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet check output: {error}"));
+	assert!(check_output.is_empty());
 }
 
 #[test]

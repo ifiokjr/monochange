@@ -211,12 +211,11 @@ monochange can promote one prepared release into several source-provider automat
 
 Assistant tooling is optional.
 
-When you want AI-assisted workflows, monochange ships built-in setup guidance and an MCP server:
+When you want AI-assisted workflows, monochange ships a bundled skill and an MCP server:
 
 ```bash
 npm install -g @monochange/skill
 monochange-skill --print-install
-mc assist pi
 mc mcp
 ```
 
@@ -258,7 +257,7 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
 - repair a recent source/provider release by retargeting its release tags with `mc repair-release`
 - inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
 - apply Rust semver evidence when provided
-- expose built-in assistant setup guidance with `mc assist` and a stdio MCP server with `mc mcp`
+- expose a bundled assistant skill plus a stdio MCP server with `mc mcp`
 - publish the CLI as `@monochange/cli` and the bundled agent skill as `@monochange/skill`
 - publish end-user documentation through the mdBook in `docs/`
 
