@@ -2,9 +2,9 @@
 
 <br />
 
-<!-- {=crateReadmeBadgeRow} -->
+<!-- {=crateReadmeBadgeRow:"monochange_core"} -->
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![Coverage][coverage-image]][coverage-link] [![License][license-image]][license-link]
+[![Crates.io](https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust)](https://crates.io/crates/monochange_core) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs)](https://docs.rs/monochange_core/) [![CI](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_core)](https://codecov.io/gh/ifiokjr/monochange?flag=monochange_core) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
 
 <!-- {/crateReadmeBadgeRow} -->
 
@@ -61,18 +61,3 @@ assert!(rendered.contains("- add keep-a-changelog output"));
 ```
 
 <!-- {/monochangeCoreCrateDocs} -->
-
-<!-- {=crateBadgeLinks:"monochange_core"} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__core-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_core [docs-image]: https://img.shields.io/badge/docs.rs-monochange__core-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_core/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_core [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_core
-
-<!-- {/crateBadgeLinks} -->
-
-<!-- {=repoStatusBadgeLinks} -->
-
-[ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
-[ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
-[license-link]: https://opensource.org/license/unlicense
-
-<!-- {/repoStatusBadgeLinks} -->

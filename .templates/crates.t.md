@@ -1,23 +1,8 @@
-<!-- {@crateReadmeBadgeRow} -->
+<!-- {@crateReadmeBadgeRow:"crate_name"} -->
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![Coverage][coverage-image]][coverage-link] [![License][license-image]][license-link]
+[![Crates.io](https://img.shields.io/badge/crates.io-{{ crate_name|replace("_", "__") }}-orange?logo=rust)](https://crates.io/crates/{{ crate_name }}) [![Docs.rs](https://img.shields.io/badge/docs.rs-{{ crate_name|replace("_", "__") }}-1f425f?logo=docs.rs)](https://docs.rs/{{ crate_name }}/) [![CI](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag={{ crate_name }})](https://codecov.io/gh/ifiokjr/monochange?flag={{ crate_name }}) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
 
 <!-- {/crateReadmeBadgeRow} -->
-
-<!-- {@repoStatusBadgeLinks} -->
-
-[ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
-[ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
-[license-link]: https://opensource.org/license/unlicense
-
-<!-- {/repoStatusBadgeLinks} -->
-
-<!-- {@crateBadgeLinks:"crate_name"} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-{{ crate_name|replace("_", "__") }}-orange?logo=rust [crate-link]: https://crates.io/crates/{{ crate_name }} [docs-image]: https://img.shields.io/badge/docs.rs-{{ crate_name|replace("_", "__") }}-1f425f?logo=docs.rs [docs-link]: https://docs.rs/{{ crate_name }}/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag={{ crate_name }} [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag={{ crate_name }}
-
-<!-- {/crateBadgeLinks} -->
 
 <!-- {@monochangeCrateDocs} -->
 

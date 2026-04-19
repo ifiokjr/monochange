@@ -2,9 +2,9 @@
 
 <br />
 
-<!-- {=crateReadmeBadgeRow} -->
+<!-- {=crateReadmeBadgeRow:"monochange_deno"} -->
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![Coverage][coverage-image]][coverage-link] [![License][license-image]][license-link]
+[![Crates.io](https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust)](https://crates.io/crates/monochange_deno) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs)](https://docs.rs/monochange_deno/) [![CI](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_deno)](https://codecov.io/gh/ifiokjr/monochange?flag=monochange_deno) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
 
 <!-- {/crateReadmeBadgeRow} -->
 
@@ -40,18 +40,3 @@ Reach for this crate when you need to scan `deno.json` or `deno.jsonc` files, ex
 - normalized dependency and import extraction
 
 <!-- {/monochangeDenoCrateDocs} -->
-
-<!-- {=crateBadgeLinks:"monochange_deno"} -->
-
-[crate-image]: https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust [crate-link]: https://crates.io/crates/monochange_deno [docs-image]: https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs [docs-link]: https://docs.rs/monochange_deno/ [coverage-image]: https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_deno [coverage-link]: https://codecov.io/gh/ifiokjr/monochange?flag=monochange_deno
-
-<!-- {/crateBadgeLinks} -->
-
-<!-- {=repoStatusBadgeLinks} -->
-
-[ci-status-image]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg
-[ci-status-link]: https://github.com/ifiokjr/monochange/actions/workflows/ci.yml
-[license-image]: https://img.shields.io/badge/license-Unlicense-blue.svg
-[license-link]: https://opensource.org/license/unlicense
-
-<!-- {/repoStatusBadgeLinks} -->
