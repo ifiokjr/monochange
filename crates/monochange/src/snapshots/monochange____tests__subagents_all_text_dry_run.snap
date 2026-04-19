@@ -1,0 +1,27 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: output
+---
+monochange subagents
+
+Targets:
+- claude
+- vscode
+- copilot
+- pi
+- codex
+- cursor
+
+Files:
+- create .claude/agents/monochange-release-agent.md
+- create .mcp.json
+- create .github/agents/monochange-release-agent.agent.md
+- create .vscode/mcp.json
+- create .pi/agents/monochange-release-agent.md
+- create .codex/agents/monochange-release-agent.toml
+- create .cursor/rules/monochange.mdc
+
+Notes:
+- Cursor generation currently emits a repo-local workspace rule instead of a native custom subagent manifest.
+
+Dry run only. No files were written.

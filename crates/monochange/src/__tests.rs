@@ -8539,6 +8539,103 @@ fn build_subagents_subcommand_parses_valid_inputs_and_rejects_invalid_targets() 
 }
 
 #[test]
+fn subagent_parsing_helpers_cover_defaults_deduplication_and_errors() {
+	assert_eq!(
+		crate::SubagentTarget::all(),
+		vec![
+			crate::SubagentTarget::Claude,
+			crate::SubagentTarget::Vscode,
+			crate::SubagentTarget::Copilot,
+			crate::SubagentTarget::Pi,
+			crate::SubagentTarget::Codex,
+			crate::SubagentTarget::Cursor,
+		]
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("claude"),
+		Some(crate::SubagentTarget::Claude)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("vscode"),
+		Some(crate::SubagentTarget::Vscode)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("copilot"),
+		Some(crate::SubagentTarget::Copilot)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("pi"),
+		Some(crate::SubagentTarget::Pi)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("codex"),
+		Some(crate::SubagentTarget::Codex)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("cursor"),
+		Some(crate::SubagentTarget::Cursor)
+	);
+	assert_eq!(crate::SubagentTarget::from_cli_value("unknown"), None);
+
+	let json = String::from("json");
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(Some(&json)),
+		crate::SubagentOutputFormat::Json
+	);
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(None),
+		crate::SubagentOutputFormat::Text
+	);
+
+	let claude = String::from("claude");
+	let pi = String::from("pi");
+	let targets = crate::parse_subagent_targets(Some(vec![&claude, &pi, &claude]))
+		.unwrap_or_else(|error| panic!("parse subagent targets: {error}"));
+	assert_eq!(
+		targets,
+		vec![crate::SubagentTarget::Claude, crate::SubagentTarget::Pi]
+	);
+
+	let invalid = String::from("nope");
+	let invalid_error = crate::parse_subagent_targets(Some(vec![&invalid]))
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid subagent target error"));
+	assert!(
+		invalid_error
+			.to_string()
+			.contains("unsupported subagent target `nope`")
+	);
+
+	let empty_values: Option<Vec<&String>> = None;
+	let empty_error = crate::parse_subagent_targets(empty_values)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing subagent targets error"));
+	assert!(
+		empty_error
+			.to_string()
+			.contains("expected at least one subagent target or `--all`")
+	);
+}
+
+#[test]
+fn subagents_command_supports_all_targets_in_default_text_output() {
+	let _guard = snapshot_settings().bind_to_scope();
+	let fixture = setup_scenario_workspace("subagents/basic");
+	let output = run_cli(
+		fixture.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("--all"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("subagents all dry-run text: {error}"));
+
+	insta::assert_snapshot!("subagents_all_text_dry_run", output);
+}
+
+#[test]
 fn build_release_record_subcommand_requires_from_and_supports_json_output() {
 	let command = clap::Command::new("mc").subcommand(crate::build_release_record_subcommand());
 	let matches = command
