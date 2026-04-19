@@ -32,6 +32,128 @@ COMMAND_ARGS=(
 	"release"
 )
 
+summarize_scenario_status() {
+	local table_path="$1"
+	local phase_table_path="$2"
+
+	python3 - "$table_path" "$phase_table_path" <<'PY'
+import re
+import sys
+
+(
+    table_path,
+    phase_table_path,
+) = sys.argv[1:]
+
+IMPROVED = "\U0001f7e2"
+REGRESSED = "\U0001f534"
+FLAT = "\u26aa"
+
+
+def parse_hyperfine_table(path):
+    """Parse a hyperfine markdown table and return per-command status."""
+    results = []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except OSError:
+        return results
+
+    has_relative = False
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("|") and line.startswith("| Com"):
+            if "Relative" in line:
+                has_relative = True
+            continue
+        if line.startswith("|:"):
+            continue
+        if not line.startswith("|"):
+            continue
+        cols = [c.strip() for c in line.split("|")]
+        cols = [c for c in cols if c]
+        if not cols:
+            continue
+        command = cols[0].strip("`").strip()
+        if not command:
+            continue
+        label = command
+        if has_relative and len(cols) >= 5:
+            relative_str = cols[-1]
+            relative_str = re.sub(r"\\u00b1.*", "", relative_str).strip()
+            relative_str = re.sub(r"\u00b1.*", "", relative_str).strip()
+            relative_str = re.sub(r"±.*", "", relative_str).strip()
+            try:
+                relative = float(relative_str)
+            except (ValueError, TypeError):
+                continue
+            if not label.startswith("main"):
+                if relative < 0.98:
+                    results.append((label, "improved", relative))
+                elif relative > 1.02:
+                    results.append((label, "regressed", relative))
+                else:
+                    results.append((label, "flat", relative))
+
+    return results, has_relative
+
+
+def parse_phase_status(path):
+    """Parse phase timing markdown and count statuses."""
+    counts = {"improved": 0, "regressed": 0, "flat": 0, "over budget": 0}
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError:
+        return counts
+
+    for line in text.splitlines():
+        line = line.strip()
+        if "| regressed |" in line:
+            counts["regressed"] += 1
+        elif "| improved |" in line:
+            counts["improved"] += 1
+        elif "| flat |" in line:
+            counts["flat"] += 1
+        elif "| over budget |" in line:
+            counts["over budget"] += 1
+    return counts
+
+
+short_names = {
+    "mc validate": "validate",
+    "mc discover --format json": "discover",
+    "mc release --dry-run": "dry-run",
+    "mc release": "release",
+}
+
+hyperfine, has_relative = parse_hyperfine_table(table_path)
+phases = parse_phase_status(phase_table_path)
+
+if not hyperfine and not any(v > 0 for v in phases.values()):
+    sys.exit(0)
+
+parts = []
+for _label, status, _relative in hyperfine:
+    short = _label
+    for full, abbr in short_names.items():
+        if full in _label:
+            short = abbr
+            break
+    icon = IMPROVED if status == "improved" else REGRESSED if status == "regressed" else FLAT
+    parts.append(f"{icon} {short}")
+
+if phases.get("improved", 0) > 0 and not has_relative:
+    parts.append(f"{IMPROVED} phases improved")
+if phases.get("regressed", 0) > 0 and not has_relative:
+    parts.append(f"{REGRESSED} phases regressed")
+if phases.get("over budget", 0) > 0:
+    parts.append("\U0001f6a8 over budget")
+
+print(" ".join(parts))
+PY
+}
+
 render_comment() {
 	local output_path="$1"
 	shift
@@ -55,9 +177,16 @@ render_comment() {
 			local phase_table_path="$4"
 			shift 4
 
+			local status_summary
+			status_summary="$(summarize_scenario_status "$table_path" "$phase_table_path")"
+
 			echo
 			echo "<details>"
-			echo "<summary><strong>${scenario_name}</strong> — ${scenario_description}</summary>"
+			if [ -n "$status_summary" ]; then
+				echo "<summary><strong>${scenario_name}</strong> — ${scenario_description} &nbsp; ${status_summary}</summary>"
+			else
+				echo "<summary><strong>${scenario_name}</strong> — ${scenario_description}</summary>"
+			fi
 			echo
 			cat "$table_path"
 			if [ -f "$phase_table_path" ] && [ -s "$phase_table_path" ]; then

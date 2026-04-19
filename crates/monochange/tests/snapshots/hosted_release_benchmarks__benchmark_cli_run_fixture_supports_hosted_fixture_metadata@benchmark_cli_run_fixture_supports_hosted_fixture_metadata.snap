@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/hosted_release_benchmarks.rs
-assertion_line: 323
 expression: rendered
 ---
 ## Binary Benchmark: main vs PR
@@ -14,7 +13,7 @@ Commands:
 - `mc release`
 
 <details>
-<summary><strong>Hosted GitHub fixture</strong> — 2 packages, local clone of the hosted fixture repo</summary>
+<summary><strong>Hosted GitHub fixture</strong> — 2 packages, local clone of the hosted fixture repo &nbsp; 🟢 phases improved</summary>
 
 | Command | Mean [ms] | Min [ms] | Max [ms] |
 |:---|---:|---:|---:|
