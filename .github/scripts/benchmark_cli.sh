@@ -56,15 +56,16 @@ render_comment() {
 			shift 4
 
 			echo
-			echo "### ${scenario_name}"
-			echo
-			echo "Fixture: ${scenario_description}"
+			echo "<details>"
+			echo "<summary><strong>${scenario_name}</strong> — ${scenario_description}</summary>"
 			echo
 			cat "$table_path"
 			if [ -f "$phase_table_path" ] && [ -s "$phase_table_path" ]; then
 				echo
 				cat "$phase_table_path"
 			fi
+			echo
+			echo "</details>"
 		done
 	} >"$output_path"
 }

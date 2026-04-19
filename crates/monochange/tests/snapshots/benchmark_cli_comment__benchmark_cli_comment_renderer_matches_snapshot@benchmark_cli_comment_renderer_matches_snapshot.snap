@@ -13,9 +13,8 @@ Commands:
 - `mc release --dry-run`
 - `mc release`
 
-### Baseline fixture
-
-Fixture: 20 packages, 50 changesets, 50 commits
+<details>
+<summary><strong>Baseline fixture</strong> — 20 packages, 50 changesets, 50 commits</summary>
 
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 |:---|---:|---:|---:|---:|
@@ -50,9 +49,10 @@ Fixture: 20 packages, 50 changesets, 50 commits
 | `apply release changes` | 160 | 58 | 63 | +5 | regressed |
 | `build manifest updates` | 80 | 18 | 20 | +2 | regressed |
 
-### Large history fixture
+</details>
 
-Fixture: 200 packages, 500 changesets, 500 commits
+<details>
+<summary><strong>Large history fixture</strong> — 200 packages, 500 changesets, 500 commits</summary>
 
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 |:---|---:|---:|---:|---:|
@@ -86,3 +86,5 @@ Fixture: 200 packages, 500 changesets, 500 commits
 | `parse changeset files` | 320 | 186 | 201 | +15 | regressed |
 | `apply release changes` | 260 | 132 | 146 | +14 | regressed |
 | `build manifest updates` | 180 | 81 | 88 | +7 | regressed |
+
+</details>
