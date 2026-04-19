@@ -13,7 +13,7 @@ use monochange_core::default_cli_commands;
 
 /// Build the top-level Clap command for the `monochange` binary.
 ///
-/// The returned command includes built-in subcommands such as `init`, `assist`,
+/// The returned command includes built-in subcommands such as `init`, `subagents`,
 /// `mcp`, and `release-record`, plus any config-defined commands resolved from
 /// the current working directory.
 pub fn build_command(bin_name: &'static str) -> Command {
@@ -190,7 +190,7 @@ When provided, the generated config includes:\n\
 			.subcommand(Command::new("populate").about(
 				"Add any missing built-in CLI commands to monochange.toml so you can customize them",
 			))
-			.subcommand(build_assist_subcommand())
+			.subcommand(build_subagents_subcommand())
 			.subcommand(build_release_record_subcommand())
 			.subcommand(build_tag_release_subcommand())
 			.subcommand(build_lint_subcommand())
@@ -206,21 +206,71 @@ When provided, the generated config includes:\n\
 	command
 }
 
-pub(crate) fn build_assist_subcommand() -> Command {
-	Command::new("assist")
-		.about("Print assistant setup guidance, install steps, and MCP configuration")
+pub(crate) fn build_subagents_subcommand() -> Command {
+	Command::new("subagents")
+		.about("Generate repo-local monochange subagents and agent guidance files")
+		.after_help(
+			r"Examples:
+  mc help subagents
+  mc subagents claude
+  mc subagents pi codex
+  mc subagents --all --dry-run --format json
+  mc subagents vscode copilot --no-mcp
+
+Targets:
+  - claude  -> .claude/agents/*.md and .mcp.json
+  - vscode  -> .github/agents/*.agent.md and .vscode/mcp.json
+  - copilot -> .github/agents/*.agent.md and .vscode/mcp.json
+  - pi      -> .pi/agents/*.md
+  - codex   -> .codex/agents/*.toml
+  - cursor  -> .cursor/rules/*.mdc
+
+Generated agents are CLI-first. They should prefer:
+  1. mc
+  2. monochange
+  3. npx -y @monochange/cli
+
+Use `--no-mcp` to skip MCP config files for targets that support repo-local MCP config.",
+		)
 		.arg(
-			Arg::new("assistant")
-				.help("Assistant profile to print")
-				.required(true)
-				.value_parser(["generic", "claude", "cursor", "copilot", "pi"]),
+			Arg::new("target")
+				.help("Subagent target(s) to generate")
+				.value_name("TARGET")
+				.num_args(1..)
+				.required_unless_present("all")
+				.value_parser(["claude", "vscode", "copilot", "pi", "codex", "cursor"]),
+		)
+		.arg(
+			Arg::new("all")
+				.long("all")
+				.help("Generate files for all supported targets")
+				.conflicts_with("target")
+				.action(ArgAction::SetTrue),
+		)
+		.arg(
+			Arg::new("force")
+				.long("force")
+				.help("Overwrite generated files that already exist with different contents")
+				.action(ArgAction::SetTrue),
+		)
+		.arg(
+			Arg::new("dry-run")
+				.long("dry-run")
+				.help("Preview the generated files without writing them")
+				.action(ArgAction::SetTrue),
 		)
 		.arg(
 			Arg::new("format")
 				.long("format")
-				.help("Output format for the assistant setup profile")
+				.help("Output format for the generated subagent plan")
 				.default_value("text")
 				.value_parser(["text", "json"]),
+		)
+		.arg(
+			Arg::new("no-mcp")
+				.long("no-mcp")
+				.help("Skip repo-local MCP config files for supported targets")
+				.action(ArgAction::SetTrue),
 		)
 }
 

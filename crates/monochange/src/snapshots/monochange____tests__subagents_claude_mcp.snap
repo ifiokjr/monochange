@@ -1,0 +1,16 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: "fs::read_to_string(root.join(\".mcp.json\")).unwrap_or_else(|error|\npanic!(\"read claude mcp: {error}\"))"
+---
+{
+  "mcpServers": {
+    "monochange": {
+      "args": [
+        "-y",
+        "@monochange/cli",
+        "mcp"
+      ],
+      "command": "npx"
+    }
+  }
+}

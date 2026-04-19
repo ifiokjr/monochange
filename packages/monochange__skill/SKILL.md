@@ -86,7 +86,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 | `mc diagnostics`         | Show changeset context with git and review metadata                    |
 | `mc release-record`      | Inspect a durable release declaration from git history                 |
 | `mc repair-release`      | Repair a recent release by retargeting tags                            |
-| `mc assist`              | Print assistant install and MCP setup guidance                         |
+| `mc subagents`           | Generate repo-local monochange agent, subagent, and rule files         |
 | `mc mcp`                 | Start the stdio MCP server                                             |
 
 ## CLI step types

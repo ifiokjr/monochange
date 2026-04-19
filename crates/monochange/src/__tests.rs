@@ -25,8 +25,6 @@ use monochange_test_helpers::snapshot_settings;
 use semver::Version;
 use tempfile::tempdir;
 
-use crate::AssistOutputFormat;
-use crate::Assistant;
 use crate::CliContext;
 use crate::PreparedFileDiff;
 use crate::add_change_file;
@@ -39,8 +37,6 @@ use crate::cli_runtime::should_execute_cli_step;
 use crate::discover_workspace;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
-use crate::parse_assist_output_format_or_default;
-use crate::parse_assistant_or_default;
 use crate::parse_change_bump;
 use crate::plan_release;
 use crate::prepare_release_execution;
@@ -123,7 +119,8 @@ fn cli_help_returns_success_output() {
 		.unwrap_or_else(|error| panic!("help output: {error}"));
 
 	assert!(output.contains("Usage: mc"));
-	assert!(output.contains("assist"));
+	assert!(output.contains("subagents"));
+	assert!(!output.contains("assist"));
 	assert!(output.contains("mcp"));
 	assert!(output.contains("change"));
 	assert!(output.contains("diagnostics"));
@@ -265,95 +262,166 @@ fn tag_release_help_describes_post_merge_tagging_workflow() {
 }
 
 #[test]
-fn assist_command_prints_install_and_mcp_guidance() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let output = run_cli(
-		tempdir.path(),
+fn subagents_help_describes_supported_targets() {
+	let _guard = snapshot_settings().bind_to_scope();
+	let output = run_with_args(
+		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("assist"),
-			OsString::from("pi"),
+			OsString::from("subagents"),
+			OsString::from("--help"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("assist output: {error}"));
+	.unwrap_or_else(|error| panic!("subagents help output: {error}"));
 
-	assert!(output.contains("@monochange/cli"));
-	assert!(output.contains("@monochange/skill"));
-	assert!(output.contains("monochange mcp"));
-	assert!(output.contains("mc validate"));
+	insta::assert_snapshot!(output);
 }
 
 #[test]
-fn assist_command_supports_json_output() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+fn subagents_command_supports_dry_run_json_output() {
+	let _guard = snapshot_settings().bind_to_scope();
+	let fixture = setup_scenario_workspace("subagents/basic");
 	let output = run_cli(
-		tempdir.path(),
+		fixture.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("assist"),
-			OsString::from("generic"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
+			OsString::from("pi"),
+			OsString::from("codex"),
+			OsString::from("cursor"),
+			OsString::from("--dry-run"),
 			OsString::from("--format"),
 			OsString::from("json"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("assist json output: {error}"));
+	.unwrap_or_else(|error| panic!("subagents dry-run json: {error}"));
+	let value: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
 
-	assert!(output.contains("\"mcp_config\""));
-	assert!(output.contains("\"install\""));
-	assert!(output.contains("@monochange/skill"));
+	insta::assert_json_snapshot!(value);
 }
 
 #[test]
-fn assist_command_requires_assistant_and_valid_format() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-
-	let missing_assistant = run_cli(
-		tempdir.path(),
-		[OsString::from("mc"), OsString::from("assist")],
-	)
-	.expect_err("assist without assistant should fail");
-	assert!(
-		missing_assistant
-			.to_string()
-			.contains("required arguments were not provided")
-	);
-
-	let invalid_format = run_cli(
-		tempdir.path(),
+fn subagents_command_supports_no_mcp_dry_run_json_output() {
+	let _guard = snapshot_settings().bind_to_scope();
+	let fixture = setup_scenario_workspace("subagents/basic");
+	let output = run_cli(
+		fixture.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("assist"),
-			OsString::from("pi"),
+			OsString::from("subagents"),
+			OsString::from("vscode"),
+			OsString::from("copilot"),
+			OsString::from("--no-mcp"),
+			OsString::from("--dry-run"),
 			OsString::from("--format"),
-			OsString::from("yaml"),
+			OsString::from("json"),
 		],
 	)
-	.expect_err("invalid assist format should fail");
-	assert!(invalid_format.to_string().contains("invalid value 'yaml'"));
+	.unwrap_or_else(|error| panic!("subagents no-mcp dry-run json: {error}"));
+	let value: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
+
+	insta::assert_json_snapshot!(value);
 }
 
 #[test]
-fn assist_parsing_helpers_cover_defaults_and_unknown_values() {
-	assert_eq!(parse_assistant_or_default(None), Assistant::Generic);
-	assert_eq!(
-		parse_assistant_or_default(Some(&"cursor".to_string())),
-		Assistant::Cursor
+fn subagents_command_writes_expected_files_and_reports_skips_on_repeat_runs() {
+	let _guard = snapshot_settings().bind_to_scope();
+	let fixture = setup_scenario_workspace("subagents/basic");
+	let root = fixture.path();
+
+	run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
+			OsString::from("pi"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("write subagents: {error}"));
+
+	insta::assert_snapshot!(
+		"subagents_claude_agent",
+		fs::read_to_string(root.join(".claude/agents/monochange-release-agent.md"))
+			.unwrap_or_else(|error| panic!("read claude agent: {error}"))
 	);
-	assert_eq!(
-		parse_assistant_or_default(Some(&"unknown".to_string())),
-		Assistant::Generic
+	insta::assert_snapshot!(
+		"subagents_claude_mcp",
+		fs::read_to_string(root.join(".mcp.json"))
+			.unwrap_or_else(|error| panic!("read claude mcp: {error}"))
 	);
-	assert_eq!(
-		parse_assist_output_format_or_default(None),
-		AssistOutputFormat::Text
+	insta::assert_snapshot!(
+		"subagents_pi_agent",
+		fs::read_to_string(root.join(".pi/agents/monochange-release-agent.md"))
+			.unwrap_or_else(|error| panic!("read pi agent: {error}"))
 	);
-	assert_eq!(
-		parse_assist_output_format_or_default(Some(&"json".to_string())),
-		AssistOutputFormat::Json
-	);
-	assert_eq!(
-		parse_assist_output_format_or_default(Some(&"yaml".to_string())),
-		AssistOutputFormat::Text
+
+	let repeat_output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
+			OsString::from("pi"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("repeat dry-run subagents: {error}"));
+	let repeat_value: serde_json::Value = serde_json::from_str(&repeat_output)
+		.unwrap_or_else(|error| panic!("parse repeat json: {error}"));
+
+	insta::assert_json_snapshot!("subagents_repeat_dry_run", repeat_value);
+}
+
+#[test]
+fn subagents_command_requires_force_to_overwrite_existing_files() {
+	let _guard = snapshot_settings().bind_to_scope();
+	let fixture = setup_scenario_workspace("subagents/basic");
+	let root = fixture.path();
+
+	run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("write initial subagents: {error}"));
+	fs::write(root.join(".mcp.json"), "custom\n")
+		.unwrap_or_else(|error| panic!("overwrite test mcp config: {error}"));
+
+	let error = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
+		],
+	)
+	.expect_err("subagents should refuse to overwrite without --force");
+	insta::assert_snapshot!("subagents_overwrite_error", error.to_string());
+
+	run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
+			OsString::from("--force"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("force overwrite subagents: {error}"));
+
+	insta::assert_snapshot!(
+		"subagents_forced_claude_mcp",
+		fs::read_to_string(root.join(".mcp.json"))
+			.unwrap_or_else(|error| panic!("read overwritten mcp: {error}"))
 	);
 }
 
@@ -8173,69 +8241,10 @@ fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::G
 }
 
 #[test]
-fn assistant_display_name_covers_all_variants() {
-	assert_eq!(
-		crate::assistant_display_name(Assistant::Generic),
-		"Generic MCP client"
-	);
-	assert_eq!(crate::assistant_display_name(Assistant::Claude), "Claude");
-	assert_eq!(crate::assistant_display_name(Assistant::Cursor), "Cursor");
-	assert_eq!(
-		crate::assistant_display_name(Assistant::Copilot),
-		"GitHub Copilot"
-	);
-	assert_eq!(crate::assistant_display_name(Assistant::Pi), "Pi");
-}
-
-#[test]
-fn assistant_setup_payload_contains_mcp_config_and_guidance() {
-	let payload = crate::assistant_setup_payload(Assistant::Pi);
-	assert_eq!(payload["assistant"].as_str(), Some("Pi"));
-	assert_eq!(
-		payload["mcp_config"]["mcpServers"]["monochange"]["command"],
-		"monochange"
-	);
-	let repo_guidance = payload["repo_guidance"]
-		.as_array()
-		.unwrap_or_else(|| panic!("missing repo guidance array"));
-	assert!(repo_guidance.len() >= 5);
-	let notes = payload["notes"]
-		.as_array()
-		.unwrap_or_else(|| panic!("missing notes array"));
-	assert!(notes.iter().any(|item| {
-		item.as_str()
-			.is_some_and(|text| text.contains("monochange mcp"))
-	}));
-}
-
-#[test]
-fn assistant_setup_payload_includes_variant_specific_notes() {
-	let cases = [
-		(Assistant::Generic, "supports stdio MCP servers"),
-		(Assistant::Claude, "Claude's MCP configuration"),
-		(Assistant::Cursor, "Configure the MCP server in Cursor"),
-		(
-			Assistant::Copilot,
-			"support MCP-compatible server definitions",
-		),
-	];
-	for (assistant, expected_note) in cases {
-		let payload = crate::assistant_setup_payload(assistant);
-		let notes = payload["notes"]
-			.as_array()
-			.unwrap_or_else(|| panic!("missing notes array"));
-		assert!(notes.iter().any(|item| {
-			item.as_str()
-				.is_some_and(|text| text.contains(expected_note))
-		}));
-	}
-}
-
-#[test]
 fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 	let command = crate::build_command("monochange");
 	assert_eq!(command.get_name(), "monochange");
-	assert!(command.clone().find_subcommand("assist").is_some());
+	assert!(command.clone().find_subcommand("subagents").is_some());
 	assert!(command.clone().find_subcommand("release-record").is_some());
 
 	let configuration = monochange_core::WorkspaceConfiguration {
@@ -8462,41 +8471,168 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 }
 
 #[test]
-fn build_assist_subcommand_parses_valid_inputs_and_rejects_unknown_assistants() {
-	let command = clap::Command::new("mc").subcommand(crate::build_assist_subcommand());
+fn build_subagents_subcommand_parses_valid_inputs_and_rejects_invalid_targets() {
+	let command = clap::Command::new("mc").subcommand(crate::build_subagents_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
 			OsString::from("mc"),
-			OsString::from("assist"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
 			OsString::from("pi"),
+			OsString::from("--format"),
+			OsString::from("json"),
 		])
-		.unwrap_or_else(|error| panic!("assist matches: {error}"));
-	let (_, assist_matches) = matches
+		.unwrap_or_else(|error| panic!("subagents matches: {error}"));
+	let (_, subagent_matches) = matches
 		.subcommand()
-		.unwrap_or_else(|| panic!("expected assist subcommand"));
+		.unwrap_or_else(|| panic!("expected subagents subcommand"));
 	assert_eq!(
-		assist_matches
-			.get_one::<String>("assistant")
-			.map(String::as_str),
-		Some("pi")
+		subagent_matches
+			.get_many::<String>("target")
+			.unwrap_or_else(|| panic!("missing targets"))
+			.map(String::as_str)
+			.collect::<Vec<_>>(),
+		vec!["claude", "pi"]
 	);
 	assert_eq!(
-		assist_matches
+		subagent_matches
 			.get_one::<String>("format")
 			.map(String::as_str),
-		Some("text")
+		Some("json")
 	);
 
-	let error = command
+	let invalid_target = command
+		.clone()
 		.try_get_matches_from([
 			OsString::from("mc"),
-			OsString::from("assist"),
+			OsString::from("subagents"),
 			OsString::from("unknown"),
 		])
 		.err()
-		.unwrap_or_else(|| panic!("expected invalid assistant error"));
-	assert_eq!(error.kind(), clap::error::ErrorKind::InvalidValue);
+		.unwrap_or_else(|| panic!("expected invalid subagent target error"));
+	assert_eq!(invalid_target.kind(), clap::error::ErrorKind::InvalidValue);
+
+	let missing_target = command
+		.clone()
+		.try_get_matches_from([OsString::from("mc"), OsString::from("subagents")])
+		.err()
+		.unwrap_or_else(|| panic!("expected missing target error"));
+	assert_eq!(
+		missing_target.kind(),
+		clap::error::ErrorKind::MissingRequiredArgument
+	);
+
+	let conflicting_all = command
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("claude"),
+			OsString::from("--all"),
+		])
+		.err()
+		.unwrap_or_else(|| panic!("expected target conflict error"));
+	assert_eq!(
+		conflicting_all.kind(),
+		clap::error::ErrorKind::ArgumentConflict
+	);
+}
+
+#[test]
+fn subagent_parsing_helpers_cover_defaults_deduplication_and_errors() {
+	assert_eq!(
+		crate::SubagentTarget::all(),
+		vec![
+			crate::SubagentTarget::Claude,
+			crate::SubagentTarget::Vscode,
+			crate::SubagentTarget::Copilot,
+			crate::SubagentTarget::Pi,
+			crate::SubagentTarget::Codex,
+			crate::SubagentTarget::Cursor,
+		]
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("claude"),
+		Some(crate::SubagentTarget::Claude)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("vscode"),
+		Some(crate::SubagentTarget::Vscode)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("copilot"),
+		Some(crate::SubagentTarget::Copilot)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("pi"),
+		Some(crate::SubagentTarget::Pi)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("codex"),
+		Some(crate::SubagentTarget::Codex)
+	);
+	assert_eq!(
+		crate::SubagentTarget::from_cli_value("cursor"),
+		Some(crate::SubagentTarget::Cursor)
+	);
+	assert_eq!(crate::SubagentTarget::from_cli_value("unknown"), None);
+
+	let json = String::from("json");
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(Some(&json)),
+		crate::SubagentOutputFormat::Json
+	);
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(None),
+		crate::SubagentOutputFormat::Text
+	);
+
+	let claude = String::from("claude");
+	let pi = String::from("pi");
+	let targets = crate::parse_subagent_targets(Some(vec![&claude, &pi, &claude]))
+		.unwrap_or_else(|error| panic!("parse subagent targets: {error}"));
+	assert_eq!(
+		targets,
+		vec![crate::SubagentTarget::Claude, crate::SubagentTarget::Pi]
+	);
+
+	let invalid = String::from("nope");
+	let invalid_error = crate::parse_subagent_targets(Some(vec![&invalid]))
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid subagent target error"));
+	assert!(
+		invalid_error
+			.to_string()
+			.contains("unsupported subagent target `nope`")
+	);
+
+	let empty_values: Option<Vec<&String>> = None;
+	let empty_error = crate::parse_subagent_targets(empty_values)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing subagent targets error"));
+	assert!(
+		empty_error
+			.to_string()
+			.contains("expected at least one subagent target or `--all`")
+	);
+}
+
+#[test]
+fn subagents_command_supports_all_targets_in_default_text_output() {
+	let _guard = snapshot_settings().bind_to_scope();
+	let fixture = setup_scenario_workspace("subagents/basic");
+	let output = run_cli(
+		fixture.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("subagents"),
+			OsString::from("--all"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("subagents all dry-run text: {error}"));
+
+	insta::assert_snapshot!("subagents_all_text_dry_run", output);
 }
 
 #[test]
@@ -8713,20 +8849,6 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 			.map(String::as_str),
 		Some("docs")
 	);
-}
-
-#[test]
-fn run_assist_renders_json_and_text_outputs() {
-	let json_output = crate::run_assist(Assistant::Cursor, AssistOutputFormat::Json)
-		.unwrap_or_else(|error| panic!("assist json: {error}"));
-	assert!(json_output.contains("\"assistant\": \"Cursor\""));
-	assert!(json_output.contains("\"mcp_config\""));
-
-	let text_output = crate::run_assist(Assistant::Copilot, AssistOutputFormat::Text)
-		.unwrap_or_else(|error| panic!("assist text: {error}"));
-	assert!(text_output.contains("monochange assist"));
-	assert!(text_output.contains("Notes for GitHub Copilot:"));
-	assert!(text_output.contains("Suggested repo-local guidance:"));
 }
 
 #[test]

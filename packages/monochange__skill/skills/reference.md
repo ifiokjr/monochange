@@ -133,16 +133,16 @@ mc repair-release --from v1.2.3 --target HEAD --dry-run
 
 Use the dry-run forms first. They are the safest way to audit release behavior before mutating files, git state, registries, or provider releases.
 
-### Assistant setup and MCP
+### Subagents and MCP
 
 ```bash
-mc assist pi
-mc assist generic
-mc assist claude --format json
+mc help subagents
+mc subagents pi
+mc subagents claude codex
 mc mcp
 ```
 
-Use `mc assist` when you need install instructions and client-specific MCP configuration. Use `mc mcp` when the client actually needs the stdio server process.
+Use `mc subagents` when you need repo-local monochange-aware agent files. Use `mc mcp` when the client actually needs the stdio server process.
 
 For a shorter command-only guide, see [commands.md](./commands.md).
 
@@ -626,7 +626,7 @@ The MCP server exposes reviewable, JSON-first tools for workspace inspection and
 
 Start the server manually: `mc mcp`
 
-Print assistant-specific setup guidance: `mc assist claude`, `mc assist generic`, `mc assist pi`
+Generate repo-local setup files with `mc subagents claude`, `mc subagents pi`, or `mc subagents codex`
 
 ## Repo-local guidance for assistants
 

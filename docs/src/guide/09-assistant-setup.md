@@ -1,8 +1,8 @@
-# Assistant setup and MCP
+# Subagents and MCP
 
 monochange ships two assistant-facing surfaces:
 
-- `mc assist <assistant>` prints install instructions, MCP configuration, and repo-local guidance
+- `mc subagents <target...>` generates repo-local agent, subagent, or rule files for supported harnesses
 - `mc mcp` starts a stdio MCP server so assistants can call monochange tools directly
 
 ## Install the CLI and skill
@@ -41,22 +41,33 @@ This layout keeps the top-level skill small while still making the richer guidan
 
 <!-- {/assistantSkillBundleContents} -->
 
-## Print an assistant profile
+## Generate repo-local subagents
 
-Examples:
+Start with:
 
 ```bash
-mc assist generic
-mc assist pi
-mc assist claude --format json
+mc help subagents
+mc subagents claude
+mc subagents pi codex
+mc subagents --all --dry-run --format json
 ```
 
-The profile includes:
+Supported targets currently include:
 
-- install commands for `@monochange/cli` and `@monochange/skill`
-- an MCP server config snippet that runs `monochange mcp`
-- repo-local guidance for how agents should use monochange
-- assistant-specific notes
+- `claude`
+- `vscode`
+- `copilot`
+- `pi`
+- `codex`
+- `cursor`
+
+Generated subagents are CLI-first. They should prefer:
+
+1. `mc`
+2. `monochange`
+3. `npx -y @monochange/cli`
+
+MCP config generation is optional and only emitted for targets with a stable repo-local MCP config format.
 
 ## MCP configuration
 
@@ -82,6 +93,8 @@ Start the server manually with:
 ```bash
 mc mcp
 ```
+
+`mc subagents` keeps MCP secondary. The generated files tell agents to prefer the CLI first and use MCP as an optional structured fallback.
 
 ## Recommended repo-local guidance
 
