@@ -165,6 +165,211 @@ fn release_keeps_direct_group_targeted_notes_even_when_group_include_is_group_on
 }
 
 #[test]
+fn changelog_sections_produce_custom_headings_for_types() {
+	let tempdir = setup_scenario_workspace("changelog-formats/custom-changelog-sections");
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+
+	// Verify section headings appear in priority order
+	let breaking_pos = group_changelog.find("### Breaking Changes");
+	let features_pos = group_changelog.find("### Features");
+	let fixes_pos = group_changelog.find("### Bug Fixes");
+	assert!(
+		breaking_pos.is_some(),
+		"expected ### Breaking Changes heading"
+	);
+	assert!(features_pos.is_some(), "expected ### Features heading");
+	assert!(fixes_pos.is_some(), "expected ### Bug Fixes heading");
+	assert!(
+		breaking_pos.unwrap() < features_pos.unwrap(),
+		"Breaking Changes should appear before Features (lower priority)"
+	);
+	assert!(
+		features_pos.unwrap() < fixes_pos.unwrap(),
+		"Features should appear before Bug Fixes (lower priority)"
+	);
+
+	// Verify entries appear under correct sections
+	assert!(
+		group_changelog.contains("### Features"),
+		"expected ### Features heading"
+	);
+	assert!(
+		group_changelog.contains("### Bug Fixes"),
+		"expected ### Bug Fixes heading"
+	);
+	assert!(
+		group_changelog.contains("### Breaking Changes"),
+		"expected ### Breaking Changes heading"
+	);
+}
+
+#[test]
+fn default_changelog_sections_render_heading_for_routed_types() {
+	let tempdir = setup_scenario_workspace("changelog-formats/default-sections-mixed-types");
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+
+	// Default sections: "feat" routes to section with heading "Added",
+	// "fix" routes to "Fixed", "docs" routes to "Documentation"
+	assert!(
+		group_changelog.contains("### Added"),
+		"expected ### Added heading for minor/feat types"
+	);
+	assert!(
+		group_changelog.contains("### Fixed"),
+		"expected ### Fixed heading for fix type"
+	);
+	assert!(
+		group_changelog.contains("### Documentation"),
+		"expected ### Documentation heading for docs type"
+	);
+
+	// Verify entries are grouped under headings
+	// Core changelog has entries under Added heading
+	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+	assert!(
+		core_changelog.contains("### Added"),
+		"expected ### Added heading in core changelog"
+	);
+	assert!(
+		core_changelog.contains("add release command"),
+		"feat entry should appear in core changelog"
+	);
+}
+
+#[test]
+fn excluded_changelog_types_filters_types_from_package() {
+	let tempdir = setup_scenario_workspace("changelog-formats/excluded-changelog-types");
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	// Core package has excluded_changelog_types = ["test"],
+	// so the "test" type cannot be used in changesets targeting core.
+	// App has no exclusion, so app: test is valid.
+	// Verify that core's changelog has feat entries but not test entries.
+	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("core changelog: {error}"));
+	assert!(
+		core_changelog.contains("### Features"),
+		"core should have Features section for feat type"
+	);
+	assert!(
+		!core_changelog.contains("integration tests"),
+		"core should not contain test entry from other package"
+	);
+	assert!(
+		core_changelog.contains("add new command"),
+		"core should contain feat entry"
+	);
+
+	// The test-type entry SHOULD appear in app's changelog and the group changelog
+	let app_changelog = fs::read_to_string(tempdir.path().join("crates/app/CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("app changelog: {error}"));
+	assert!(
+		app_changelog.contains("add integration tests"),
+		"app should contain test entry"
+	);
+
+	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+	assert!(
+		group_changelog.contains("add integration tests"),
+		"group changelog should contain test entry from app"
+	);
+}
+
+#[test]
+fn keep_a_changelog_format_includes_section_headings() {
+	let tempdir = setup_scenario_workspace("changelog-formats/keep-a-changelog-with-sections");
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+
+	// Keep-a-changelog format always includes section headings
+	assert!(
+		group_changelog.contains("### Features"),
+		"expected ### Features heading in keep-a-changelog format"
+	);
+	assert!(
+		group_changelog.contains("### Bug Fixes"),
+		"expected ### Bug Fixes heading in keep-a-changelog format"
+	);
+}
+
+#[test]
+fn section_priority_controls_heading_order() {
+	let tempdir = setup_scenario_workspace("changelog-formats/section-priority-ordering");
+	let output = monochange_command(Some("2026-04-06"))
+		.current_dir(tempdir.path())
+		.arg("release")
+		.output()
+		.unwrap_or_else(|error| panic!("release output: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
+		.unwrap_or_else(|error| panic!("group changelog: {error}"));
+
+	// Fixes has priority 10, Features has priority 20,
+	// so Bug Fixes should appear BEFORE Features
+	let fixes_pos = group_changelog
+		.find("### Bug Fixes")
+		.expect("expected ### Bug Fixes heading");
+	let features_pos = group_changelog
+		.find("### Features")
+		.expect("expected ### Features heading");
+	assert!(
+		fixes_pos < features_pos,
+		"Bug Fixes (priority 10) should appear before Features (priority 20)"
+	);
+}
+
+#[test]
 fn release_excludes_allowlisted_group_notes_when_a_changeset_targets_disallowed_members_too() {
 	let tempdir = setup_scenario_workspace("changelog-formats/group-include-multi-target-blocked");
 

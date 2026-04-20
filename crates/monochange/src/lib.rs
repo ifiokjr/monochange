@@ -142,6 +142,7 @@ use monochange_config::validate_workspace;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetPolicyEvaluation;
@@ -155,7 +156,6 @@ use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
-use monochange_core::ExtraChangelogSection;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
@@ -521,20 +521,6 @@ struct GroupReleaseNoteKey {
 	bump: BumpSeverity,
 	change_type: Option<String>,
 	context: Option<String>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct ResolvedSectionDefinition {
-	title: String,
-	types: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-enum BuiltinReleaseSection {
-	Major,
-	Minor,
-	Patch,
-	Note,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]

@@ -1,6 +1,12 @@
 [defaults]
 package_type = "cargo"
 
+[changelog.sections.""]
+heading = ""
+priority = 40
+
+[changelog.types.security]
+section = ""
+
 [package.core]
 path = "crates/core"
-extra_changelog_sections = [{ name = "", types = ["security"] }]

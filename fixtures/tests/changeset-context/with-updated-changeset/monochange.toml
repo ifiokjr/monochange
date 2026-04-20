@@ -5,8 +5,8 @@ package_type = "cargo"
 path = "{{ path }}/CHANGELOG.md"
 format = "monochange"
 
-[release_notes]
-change_templates = ["#### {{ summary }}\n\n{{ details }}\n\n{{ context }}", "#### {{ summary }}\n\n{{ context }}", "- {{ summary }}"]
+[changelog]
+templates = ["#### {{ summary }}\n\n{{ details }}\n\n{{ context }}", "#### {{ summary }}\n\n{{ context }}", "- {{ summary }}"]
 
 [package.core]
 path = "crates/core"

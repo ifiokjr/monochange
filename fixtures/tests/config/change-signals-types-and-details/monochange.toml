@@ -1,4 +1,11 @@
 [package.core]
 path = "crates/core"
 type = "cargo"
-extra_changelog_sections = [{ name = "Security", types = ["security"], default_bump = "patch" }]
+
+[changelog.sections.security]
+heading = "Security"
+priority = 40
+
+[changelog.types.security]
+section = "security"
+bump = "patch"

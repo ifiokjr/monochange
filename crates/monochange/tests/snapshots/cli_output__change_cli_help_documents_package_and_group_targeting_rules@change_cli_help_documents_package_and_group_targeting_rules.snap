@@ -25,7 +25,7 @@ Options:
       --bump <BUMP>               Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
       --version <VERSION>         Pin an explicit version for this release
       --reason <REASON>           Short release-note summary for this change
-      --type <TYPE>               Optional release-note type such as `security` or `note`
+      --type <TYPE>               Optional release-note type such as `security` or `note` [possible values: breaking, change, docs, feat, fix, major, minor, none, patch, refactor, security, test]
       --caused-by <CAUSED_BY>     Package or group ids that caused this dependent change
       --details <DETAILS>         Optional multi-line release-note details
       --output <PATH>             Write the generated change file to a specific path

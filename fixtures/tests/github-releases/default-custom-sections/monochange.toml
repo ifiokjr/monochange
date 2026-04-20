@@ -2,10 +2,17 @@
 parent_bump = "patch"
 package_type = "cargo"
 changelog = "{{ path }}/CHANGELOG.md"
-extra_changelog_sections = [{ name = "Security", types = ["security"] }]
 
-[release_notes]
-change_templates = ["#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details }}", "- {{ summary }}"]
+[changelog]
+templates = ["#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details }}", "- {{ summary }}"]
+
+[changelog.sections.security]
+heading = "Security"
+priority = 40
+
+[changelog.types.security]
+section = "security"
+bump = "patch"
 
 [package.core]
 path = "crates/core"

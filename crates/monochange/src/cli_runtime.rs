@@ -3200,7 +3200,7 @@ mod tests {
 		monochange_core::WorkspaceConfiguration {
 			root_path: root.to_path_buf(),
 			defaults: monochange_core::WorkspaceDefaults::default(),
-			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),
@@ -4453,7 +4453,7 @@ path = "crates/core"
 		let configuration = monochange_core::WorkspaceConfiguration {
 			root_path: tempdir.path().to_path_buf(),
 			defaults: monochange_core::WorkspaceDefaults::default(),
-			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),

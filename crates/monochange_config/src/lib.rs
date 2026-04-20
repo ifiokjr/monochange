@@ -92,6 +92,7 @@ use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetSettings;
 use monochange_core::ChangesetTargetKind;
@@ -103,7 +104,6 @@ use monochange_core::CliStepInputValue;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
-use monochange_core::ExtraChangelogSection;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::GroupDefinition;
 use monochange_core::LockfileCommandDefinition;
@@ -119,7 +119,6 @@ use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishSettings;
 use monochange_core::RegistryKind;
-use monochange_core::ReleaseNotesSettings;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::TrustedPublishingSettings;
@@ -176,7 +175,7 @@ struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	defaults: RawWorkspaceDefaults,
 	#[serde(default)]
-	release_notes: RawReleaseNotesSettings,
+	changelog: RawChangelogSettings,
 	#[serde(default)]
 	package: BTreeMap<String, RawPackageDefinition>,
 	#[serde(default)]
@@ -208,8 +207,6 @@ struct RawWorkspaceDefaults {
 	#[serde(default)]
 	changelog: Option<RawChangelogConfig>,
 	#[serde(default)]
-	extra_changelog_sections: Vec<ExtraChangelogSection>,
-	#[serde(default)]
 	empty_update_message: Option<String>,
 	#[serde(default)]
 	release_title: Option<String>,
@@ -226,7 +223,6 @@ impl Default for RawWorkspaceDefaults {
 			strict_version_conflicts: false,
 			package_type: None,
 			changelog: None,
-			extra_changelog_sections: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -275,7 +271,7 @@ struct RawPackageDefinition {
 	#[serde(default)]
 	changelog: Option<RawChangelogConfig>,
 	#[serde(default)]
-	extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub excluded_changelog_types: Vec<String>,
 	#[serde(default)]
 	empty_update_message: Option<String>,
 	#[serde(default)]
@@ -306,7 +302,7 @@ struct RawGroupDefinition {
 	#[serde(default)]
 	changelog: Option<RawChangelogConfig>,
 	#[serde(default)]
-	extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub excluded_changelog_types: Vec<String>,
 	#[serde(default)]
 	empty_update_message: Option<String>,
 	#[serde(default)]
@@ -420,9 +416,13 @@ enum RawVersionedFileDefinition {
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct RawReleaseNotesSettings {
+struct RawChangelogSettings {
 	#[serde(default)]
-	change_templates: Vec<String>,
+	pub templates: Vec<String>,
+	#[serde(default)]
+	pub sections: BTreeMap<String, monochange_core::ChangelogSectionDef>,
+	#[serde(default)]
+	pub types: BTreeMap<String, monochange_core::ChangelogType>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -934,7 +934,6 @@ fn build_package_definitions(
 	packages: BTreeMap<String, RawPackageDefinition>,
 	default_package_type: Option<PackageType>,
 	default_package_changelog: Option<&RawChangelogConfig>,
-	default_extra_changelog_sections: &[ExtraChangelogSection],
 	default_changelog_format: ChangelogFormat,
 	cargo_ecosystem: &EcosystemSettings,
 	npm_ecosystem: &EcosystemSettings,
@@ -1024,10 +1023,7 @@ fn build_package_definitions(
 				path: package.path,
 				package_type,
 				changelog,
-				extra_changelog_sections: merge_extra_changelog_sections(
-					default_extra_changelog_sections,
-					package.extra_changelog_sections,
-				),
+				excluded_changelog_types: package.excluded_changelog_types,
 				empty_update_message: package.empty_update_message,
 				release_title: package.release_title,
 				changelog_version_title: package.changelog_version_title,
@@ -1047,7 +1043,6 @@ fn build_package_definitions(
 fn build_group_definitions(
 	contents: &str,
 	groups: BTreeMap<String, RawGroupDefinition>,
-	default_extra_changelog_sections: &[ExtraChangelogSection],
 	default_changelog_format: ChangelogFormat,
 ) -> MonochangeResult<Vec<GroupDefinition>> {
 	groups
@@ -1092,10 +1087,7 @@ fn build_group_definitions(
 				packages: group.packages,
 				changelog,
 				changelog_include,
-				extra_changelog_sections: merge_extra_changelog_sections(
-					default_extra_changelog_sections,
-					group.extra_changelog_sections,
-				),
+				excluded_changelog_types: group.excluded_changelog_types,
 				empty_update_message: group.empty_update_message,
 				release_title: group.release_title,
 				changelog_version_title: group.changelog_version_title,
@@ -1140,7 +1132,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 
 	let RawWorkspaceConfiguration {
 		defaults,
-		release_notes,
+		changelog,
 		package,
 		group,
 		cli,
@@ -1152,7 +1144,6 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	let cli = merge_cli_commands(cli);
 	let default_package_type = defaults.package_type;
 	let default_package_changelog = defaults.changelog.clone();
-	let default_extra_changelog_sections = defaults.extra_changelog_sections.clone();
 	let cargo_ecosystem =
 		normalize_ecosystem_settings(&contents, "cargo", EcosystemType::Cargo, ecosystems.cargo)?;
 	let npm_ecosystem =
@@ -1175,29 +1166,17 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		package,
 		default_package_type,
 		default_package_changelog.as_ref(),
-		&default_extra_changelog_sections,
 		default_changelog_format,
 		&cargo_ecosystem,
 		&npm_ecosystem,
 		&deno_ecosystem,
 		&dart_ecosystem,
 	)?;
-	let groups = build_group_definitions(
-		&contents,
-		group,
-		&default_extra_changelog_sections,
-		default_changelog_format,
-	)?;
+	let groups = build_group_definitions(&contents, group, default_changelog_format)?;
 	let source = resolve_source_configuration(source);
 
 	validate_cli(&cli)?;
-	validate_release_notes_configuration(
-		&contents,
-		&release_notes,
-		&defaults.extra_changelog_sections,
-		&packages,
-		&groups,
-	)?;
+	validate_changelog_configuration(&contents, &changelog, &packages, &groups)?;
 	validate_changesets_configuration(&changesets, &packages)?;
 	validate_source_configuration(source.as_ref())?;
 	for (ecosystem_id, ecosystem_settings) in [
@@ -1233,14 +1212,12 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			package_type: defaults.package_type,
 			changelog: defaults_changelog_policy,
 			changelog_format: default_changelog_format,
-			extra_changelog_sections: defaults.extra_changelog_sections,
+
 			empty_update_message: defaults.empty_update_message,
 			release_title: defaults.release_title,
 			changelog_version_title: defaults.changelog_version_title,
 		},
-		release_notes: ReleaseNotesSettings {
-			change_templates: release_notes.change_templates,
-		},
+		changelog: build_changelog_settings(changelog),
 		packages,
 		groups,
 		cli,
@@ -1319,13 +1296,13 @@ pub fn build_changeset_load_context<'a>(
 	for package in &configuration.packages {
 		change_types_by_target.insert(
 			package.id.as_str(),
-			build_change_type_lookup(&package.extra_changelog_sections),
+			build_change_type_lookup(&configuration.changelog, &package.excluded_changelog_types),
 		);
 	}
 	for group in &configuration.groups {
 		change_types_by_target.insert(
 			group.id.as_str(),
-			build_change_type_lookup(&group.extra_changelog_sections),
+			build_change_type_lookup(&configuration.changelog, &group.excluded_changelog_types),
 		);
 	}
 	ChangesetLoadContext {
@@ -1337,27 +1314,23 @@ pub fn build_changeset_load_context<'a>(
 	}
 }
 
-fn build_change_type_lookup(sections: &[ExtraChangelogSection]) -> ChangeTypeLookup {
-	let mut valid_types = sections
-		.iter()
-		.flat_map(|section| section.types.iter())
-		.map(|value| value.trim())
-		.filter(|value| !value.is_empty())
+fn build_change_type_lookup(
+	changelog: &ChangelogSettings,
+	excluded_types: &[String],
+) -> ChangeTypeLookup {
+	let excluded: BTreeSet<&str> = excluded_types.iter().map(String::as_str).collect();
+	let mut valid_types = changelog
+		.types
+		.keys()
+		.filter(|key| !excluded.contains(key.as_str()))
 		.map(ToString::to_string)
 		.collect::<Vec<_>>();
 	valid_types.sort();
-	valid_types.dedup();
-	let default_bumps = sections
+	let default_bumps = changelog
+		.types
 		.iter()
-		.flat_map(|section| {
-			section.types.iter().map(|change_type| {
-				(
-					change_type.trim().to_string(),
-					section.default_bump.unwrap_or(BumpSeverity::None),
-				)
-			})
-		})
-		.filter(|(change_type, _)| !change_type.is_empty())
+		.filter(|(key, _)| !excluded.contains(key.as_str()))
+		.map(|(change_type, typ)| (change_type.clone(), typ.bump))
 		.collect::<HashMap<_, _>>();
 	ChangeTypeLookup {
 		valid_types,
@@ -2228,15 +2201,9 @@ fn markdown_change_text(body: &str) -> (Option<String>, Option<String>) {
 
 fn configured_change_sections<'config>(
 	configuration: &'config WorkspaceConfiguration,
-	target: &str,
-) -> &'config [ExtraChangelogSection] {
-	if let Some(package) = configuration.package_by_id(target) {
-		return package.extra_changelog_sections.as_slice();
-	}
-	if let Some(group) = configuration.group_by_id(target) {
-		return group.extra_changelog_sections.as_slice();
-	}
-	&[]
+	_target: &str,
+) -> &'config ChangelogSettings {
+	&configuration.changelog
 }
 
 fn configured_change_type_default_bump(
@@ -2245,25 +2212,42 @@ fn configured_change_type_default_bump(
 	change_type: &str,
 ) -> Option<BumpSeverity> {
 	configured_change_sections(configuration, target)
-		.iter()
-		.find(|section| {
-			section
-				.types
-				.iter()
-				.any(|candidate| candidate.trim() == change_type)
-		})
-		.map(|section| section.default_bump.unwrap_or(BumpSeverity::None))
+		.types
+		.get(change_type)
+		.map(|typ| typ.bump)
 }
 
 fn configured_change_types(configuration: &WorkspaceConfiguration, target: &str) -> Vec<String> {
+	let excluded = configured_excluded_types(configuration, target);
 	configured_change_sections(configuration, target)
-		.iter()
-		.flat_map(|section| section.types.iter())
-		.map(|value| value.trim().to_string())
-		.filter(|value| !value.is_empty())
+		.types
+		.keys()
+		.filter(|key| !excluded.contains(&key.as_str()))
+		.cloned()
 		.collect::<BTreeSet<_>>()
 		.into_iter()
 		.collect()
+}
+
+fn configured_excluded_types<'a>(
+	configuration: &'a WorkspaceConfiguration,
+	target: &str,
+) -> Vec<&'a str> {
+	if let Some(package) = configuration.package_by_id(target) {
+		return package
+			.excluded_changelog_types
+			.iter()
+			.map(String::as_str)
+			.collect();
+	}
+	if let Some(group) = configuration.group_by_id(target) {
+		return group
+			.excluded_changelog_types
+			.iter()
+			.map(String::as_str)
+			.collect();
+	}
+	Vec::new()
 }
 
 fn validate_configured_change_type(
@@ -2878,26 +2862,28 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 	}
 }
 
-fn merge_extra_changelog_sections(
-	defaults: &[ExtraChangelogSection],
-	specific: Vec<ExtraChangelogSection>,
-) -> Vec<ExtraChangelogSection> {
-	let mut sections = specific;
-	sections.extend_from_slice(defaults);
-	sections
+fn build_changelog_settings(raw: RawChangelogSettings) -> ChangelogSettings {
+	if raw.sections.is_empty() && raw.types.is_empty() && raw.templates.is_empty() {
+		ChangelogSettings::defaults()
+	} else {
+		ChangelogSettings {
+			templates: raw.templates,
+			sections: raw.sections,
+			types: raw.types,
+		}
+	}
 }
 
-fn validate_release_notes_configuration(
+fn validate_changelog_configuration(
 	contents: &str,
-	release_notes: &RawReleaseNotesSettings,
-	defaults: &[ExtraChangelogSection],
+	changelog: &RawChangelogSettings,
 	packages: &[PackageDefinition],
 	groups: &[GroupDefinition],
 ) -> MonochangeResult<()> {
-	for template in &release_notes.change_templates {
+	for template in &changelog.templates {
 		if template.trim().is_empty() {
 			return Err(MonochangeError::Config(
-				"[release_notes].change_templates must not include empty templates".to_string(),
+				"[changelog].templates must not include empty templates".to_string(),
 			));
 		}
 		let unsupported_variables = change_template_variables(template)
@@ -2906,7 +2892,7 @@ fn validate_release_notes_configuration(
 			.collect::<BTreeSet<_>>();
 		if !unsupported_variables.is_empty() {
 			return Err(MonochangeError::Config(format!(
-				"[release_notes].change_templates uses unsupported variables: {}",
+				"[changelog].templates uses unsupported variables: {}",
 				unsupported_variables
 					.into_iter()
 					.collect::<Vec<_>>()
@@ -2914,97 +2900,96 @@ fn validate_release_notes_configuration(
 			)));
 		}
 	}
-	validate_extra_changelog_sections(contents, "defaults", "", defaults)?;
+	validate_changelog_keys(contents, "section", &changelog.sections)?;
+	validate_changelog_keys(contents, "type", &changelog.types)?;
+	// Validate that each type references an existing section
+	for (type_key, typ) in &changelog.types {
+		if !changelog.sections.contains_key(&typ.section) {
+			return Err(MonochangeError::Config(format!(
+				"[changelog].types.{type_key} references section `{}` which does not exist in [changelog.sections]",
+				typ.section
+			)));
+		}
+	}
+	// Validate excluded_changelog_types reference existing type keys
 	for package in packages {
-		validate_extra_changelog_sections(
-			contents,
-			"package",
-			&package.id,
-			&package.extra_changelog_sections,
-		)?;
+		for excluded in &package.excluded_changelog_types {
+			if !changelog.types.contains_key(excluded) {
+				return Err(MonochangeError::Config(format!(
+					"package `{}` excludes changelog type `{}` which does not exist in [changelog.types]",
+					package.id, excluded
+				)));
+			}
+		}
 	}
 	for group in groups {
-		validate_extra_changelog_sections(
-			contents,
-			"group",
-			&group.id,
-			&group.extra_changelog_sections,
-		)?;
+		for excluded in &group.excluded_changelog_types {
+			if !changelog.types.contains_key(excluded) {
+				return Err(MonochangeError::Config(format!(
+					"group `{}` excludes changelog type `{}` which does not exist in [changelog.types]",
+					group.id, excluded
+				)));
+			}
+		}
 	}
 	Ok(())
 }
 
-fn validate_extra_changelog_sections(
+fn validate_changelog_keys<K, V>(
 	contents: &str,
-	section_kind: &str,
-	section_id: &str,
-	extra_sections: &[ExtraChangelogSection],
-) -> MonochangeResult<()> {
-	let owner_label = if section_id.is_empty() {
-		section_kind.to_string()
-	} else {
-		format!("{section_kind} `{section_id}`")
-	};
-	for extra_section in extra_sections {
-		if extra_section.name.trim().is_empty() {
-			return Err(config_diagnostic(
-				contents,
-				format!(
-					"{owner_label} has an extra changelog section with an empty `name`"
-				),
-				vec![config_section_label(
-					contents,
-					section_kind,
-					section_id,
-					"extra changelog section missing name",
-				)],
-				Some(
-					"set `extra_changelog_sections = [{ name = \"Security\", types = [\"security\"] }]` or remove the empty section definition"
-						.to_string(),
-				),
-			));
+	key_kind: &str,
+	map: &BTreeMap<K, V>,
+) -> MonochangeResult<()>
+where
+	K: AsRef<str>,
+{
+	for key in map.keys() {
+		let key_str = key.as_ref();
+		validate_identifier_key(contents, key_kind, key_str)?;
+	}
+	Ok(())
+}
+
+fn validate_identifier_key(_contents: &str, key_kind: &str, key: &str) -> MonochangeResult<()> {
+	// Must not be empty
+	if key.is_empty() {
+		return Err(MonochangeError::Config(format!(
+			"[changelog].{key_kind}s key must not be empty"
+		)));
+	}
+	// Must start with a letter
+	let first = key.chars().next().unwrap();
+	if !first.is_ascii_lowercase() {
+		if first.is_ascii_uppercase() {
+			return Err(MonochangeError::Config(format!(
+				"[changelog].{key_kind}s key `{key}` must be lowercase; use `{}` instead",
+				key.to_ascii_lowercase()
+			)));
 		}
-		if extra_section.types.is_empty() {
-			return Err(config_diagnostic(
-				contents,
-				format!(
-					"{owner_label} extra changelog section `{}` must declare at least one type",
-					extra_section.name
-				),
-				vec![config_section_label(
-					contents,
-					section_kind,
-					section_id,
-					"extra changelog section missing types",
-				)],
-				Some(
-					"add one or more `types = [\"security\"]` entries so monochange knows which changes belong in that section"
-						.to_string(),
-				),
-			));
+		return Err(MonochangeError::Config(format!(
+			"[changelog].{key_kind}s key `{key}` must start with a letter (a-z)"
+		)));
+	}
+	// Must be all lowercase alphanumeric or underscore
+	for ch in key.chars() {
+		if !ch.is_ascii_lowercase() && !ch.is_ascii_digit() && ch != '_' {
+			if ch.is_ascii_uppercase() {
+				return Err(MonochangeError::Config(format!(
+					"[changelog].{key_kind}s key `{key}` must be lowercase; use `{}` instead",
+					key.to_ascii_lowercase()
+				)));
+			}
+			return Err(MonochangeError::Config(format!(
+				"[changelog].{key_kind}s key `{key}` contains invalid character `{ch}`; only lowercase letters, digits, and underscores are allowed"
+			)));
 		}
-		if extra_section
-			.types
-			.iter()
-			.any(|change_type| change_type.trim().is_empty())
-		{
-			return Err(config_diagnostic(
-				contents,
-				format!(
-					"{owner_label} extra changelog section `{}` must not include empty types",
-					extra_section.name
-				),
-				vec![config_section_label(
-					contents,
-					section_kind,
-					section_id,
-					"extra changelog section has an empty type",
-				)],
-				Some(
-					"remove empty values from `types` and keep only named change types".to_string(),
-				),
-			));
-		}
+	}
+	// At most one underscore
+	let underscore_count = key.chars().filter(|c| *c == '_').count();
+	if underscore_count > 1 {
+		return Err(MonochangeError::Config(format!(
+			"[changelog].{key_kind}s key `{key}` must contain at most one underscore; use a single word or `word_word` format"
+		)));
 	}
 	Ok(())
 }

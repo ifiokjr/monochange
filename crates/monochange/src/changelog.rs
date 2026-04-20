@@ -127,10 +127,7 @@ pub(crate) fn build_changelog_updates(
 			&package_id,
 			&changelog_title,
 			Vec::new(),
-			package_definition.map_or(&[][..], |package| {
-				package.extra_changelog_sections.as_slice()
-			}),
-			&context.configuration.release_notes.change_templates,
+			&context.configuration.changelog,
 			&changes,
 		);
 		let rendered = render_release_notes(changelog_target.format, &document);
@@ -192,8 +189,7 @@ pub(crate) fn build_changelog_updates(
 			&planned_group.group_id,
 			&changelog_title,
 			group_release_summary(&planned_group.group_id, &member_ids, &changed_members),
-			group_definition.map_or(&[][..], |group| group.extra_changelog_sections.as_slice()),
-			&context.configuration.release_notes.change_templates,
+			&context.configuration.changelog,
 			&changes,
 		);
 		let rendered = render_release_notes(changelog_target.format, &document);
@@ -888,88 +884,63 @@ fn build_release_notes_document(
 	target_id: &str,
 	version: &str,
 	summary: Vec<String>,
-	extra_sections: &[ExtraChangelogSection],
-	change_templates: &[String],
+	changelog: &ChangelogSettings,
 	changes: &[ReleaseNoteChange],
 ) -> ReleaseNotesDocument {
 	ReleaseNotesDocument {
 		title: version.to_string(),
 		summary,
-		sections: render_release_note_sections(
-			target_id,
-			version,
-			extra_sections,
-			change_templates,
-			changes,
-		),
+		sections: render_release_note_sections(target_id, version, changelog, changes),
 	}
 }
 
 fn render_release_note_sections(
 	target_id: &str,
 	version: &str,
-	extra_sections: &[ExtraChangelogSection],
-	change_templates: &[String],
+	changelog: &ChangelogSettings,
 	changes: &[ReleaseNoteChange],
 ) -> Vec<ReleaseNotesSection> {
-	let overridden_builtins = extra_sections
+	// Sort sections by priority (lower = earlier)
+	let mut sorted_sections: Vec<(&str, &str, i8)> = changelog
+		.sections
 		.iter()
-		.flat_map(|section| {
-			section
-				.types
-				.iter()
-				.map(|change_type| change_type.trim().to_string())
-		})
-		.collect::<BTreeSet<_>>();
-	let resolved_extra_sections = extra_sections
-		.iter()
-		.map(|section| {
-			ResolvedSectionDefinition {
-				title: section.name.clone(),
-				types: section.types.clone(),
-			}
-		})
+		.map(|(key, def)| (key.as_str(), def.heading.as_str(), def.priority))
 		.collect::<Vec<_>>();
-	let mut builtin_entries = BTreeMap::<BuiltinReleaseSection, Vec<String>>::new();
-	let mut extra_entries = vec![Vec::<String>::new(); resolved_extra_sections.len()];
+	sorted_sections.sort_by_key(|(_, _, priority)| *priority);
+
+	let mut section_entries: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+	let mut uncategorized = Vec::<String>::new();
 
 	for change in changes {
-		let rendered = render_change_entry(change, target_id, version, change_templates);
-		match classify_release_note_change(change, &resolved_extra_sections) {
-			ResolvedReleaseSectionTarget::Builtin(section) => {
-				push_unique_release_note_entry(
-					builtin_entries.entry(section).or_default(),
-					rendered,
-				);
-			}
-			ResolvedReleaseSectionTarget::Extra(index) => {
-				push_unique_release_note_entry(&mut extra_entries[index], rendered);
-			}
+		let rendered = render_change_entry(change, target_id, version, &changelog.templates);
+		let change_type = change.change_type.as_deref().unwrap_or("");
+		if let Some(typ) = changelog.types.get(change_type) {
+			let section_key = typ.section.as_str();
+			let entries = section_entries.entry(section_key).or_default();
+			push_unique_release_note_entry(entries, rendered);
+		} else {
+			push_unique_release_note_entry(&mut uncategorized, rendered);
 		}
 	}
 
+	// Build sections in priority order
 	let mut sections = Vec::new();
-	for builtin in builtin_release_sections() {
-		if overridden_builtins.contains(builtin.selector()) {
-			continue;
-		}
-		if let Some(entries) = builtin_entries
-			.remove(&builtin)
-			.filter(|entries| !entries.is_empty())
+	let mut used_keys = BTreeSet::new();
+	for (section_key, heading, _priority) in &sorted_sections {
+		if let Some(entries) = section_entries.remove(*section_key)
+			&& !entries.is_empty()
 		{
 			sections.push(ReleaseNotesSection {
-				title: builtin.title().to_string(),
+				title: heading.to_string(),
 				entries,
 			});
+			used_keys.insert(*section_key);
 		}
 	}
-	for (index, section) in resolved_extra_sections.iter().enumerate() {
-		if extra_entries[index].is_empty() {
-			continue;
-		}
+	if !uncategorized.is_empty() {
 		sections.push(ReleaseNotesSection {
-			title: section.title.clone(),
-			entries: extra_entries[index].clone(),
+			title: "Changed".to_string(),
+			entries: uncategorized,
 		});
 	}
 	if sections.is_empty() {
@@ -981,43 +952,12 @@ fn render_release_note_sections(
 	sections
 }
 
-#[allow(variant_size_differences)]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum ResolvedReleaseSectionTarget {
-	Builtin(BuiltinReleaseSection),
-	Extra(usize),
-}
-
-fn classify_release_note_change(
-	change: &ReleaseNoteChange,
-	extra_sections: &[ResolvedSectionDefinition],
-) -> ResolvedReleaseSectionTarget {
-	if let Some(change_type) = change.change_type.as_deref()
-		&& let Some(index) = extra_sections
-			.iter()
-			.position(|section| section_matches_resolved_type(section, change_type))
-	{
-		return ResolvedReleaseSectionTarget::Extra(index);
-	}
-
-	if change.change_type.as_deref() == Some(BuiltinReleaseSection::Note.selector()) {
-		return ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note);
-	}
-	let builtin = BuiltinReleaseSection::from_bump(change.bump);
-	if let Some(index) = extra_sections
-		.iter()
-		.position(|section| section_matches_resolved_type(section, builtin.selector()))
-	{
-		return ResolvedReleaseSectionTarget::Extra(index);
-	}
-	ResolvedReleaseSectionTarget::Builtin(builtin)
-}
-
-fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
-	section
-		.types
-		.iter()
-		.any(|candidate| candidate.trim() == change_type)
+fn config_package_id(package: &PackageRecord) -> String {
+	package
+		.metadata
+		.get("config_id")
+		.cloned()
+		.unwrap_or_else(|| package.name.clone())
 }
 
 fn render_change_entry(
@@ -1140,51 +1080,46 @@ fn push_unique_release_note_entry(entries: &mut Vec<String>, entry: String) {
 	}
 }
 
-fn config_package_id(package: &PackageRecord) -> String {
-	package
-		.metadata
-		.get("config_id")
-		.cloned()
-		.unwrap_or_else(|| package.name.clone())
+#[cfg(test)]
+struct ResolvedSectionDefinition {
+	types: Vec<String>,
 }
 
-impl BuiltinReleaseSection {
-	#[allow(clippy::match_same_arms)]
-	fn from_bump(bump: BumpSeverity) -> Self {
-		match bump {
-			BumpSeverity::Major => Self::Major,
-			BumpSeverity::Minor => Self::Minor,
-			BumpSeverity::None | BumpSeverity::Patch => Self::Patch,
-			_ => Self::Patch,
-		}
-	}
-
-	fn selector(self) -> &'static str {
-		match self {
-			Self::Major => "major",
-			Self::Minor => "minor",
-			Self::Patch => "patch",
-			Self::Note => "note",
-		}
-	}
-
-	fn title(self) -> &'static str {
-		match self {
-			Self::Major => "Breaking changes",
-			Self::Minor => "Features",
-			Self::Patch => "Fixes",
-			Self::Note => "Notes",
-		}
-	}
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum ResolvedReleaseSectionTarget {
+	Section(usize),
+	Uncategorized,
 }
 
-fn builtin_release_sections() -> [BuiltinReleaseSection; 4] {
-	[
-		BuiltinReleaseSection::Major,
-		BuiltinReleaseSection::Minor,
-		BuiltinReleaseSection::Patch,
-		BuiltinReleaseSection::Note,
-	]
+#[cfg(test)]
+fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
+	section
+		.types
+		.iter()
+		.any(|candidate| candidate.trim() == change_type)
+}
+
+#[cfg(test)]
+fn classify_release_note_change(
+	change: &ReleaseNoteChange,
+	sections: &[ResolvedSectionDefinition],
+) -> ResolvedReleaseSectionTarget {
+	if let Some(change_type) = change.change_type.as_deref()
+		&& let Some(index) = sections
+			.iter()
+			.position(|section| section_matches_resolved_type(section, change_type))
+	{
+		return ResolvedReleaseSectionTarget::Section(index);
+	}
+	let bump_selector = change.bump.to_string();
+	if let Some(index) = sections
+		.iter()
+		.position(|section| section_matches_resolved_type(section, &bump_selector))
+	{
+		return ResolvedReleaseSectionTarget::Section(index);
+	}
+	ResolvedReleaseSectionTarget::Uncategorized
 }
 
 #[cfg(test)]
@@ -1195,12 +1130,14 @@ mod tests {
 
 	use monochange_core::ChangeSignal;
 	use monochange_core::ChangelogFormat;
+	use monochange_core::ChangelogSectionDef;
+	use monochange_core::ChangelogSettings;
 	use monochange_core::ChangelogTarget;
+	use monochange_core::ChangelogType;
 	use monochange_core::ChangesetContext;
 	use monochange_core::ChangesetRevision;
 	use monochange_core::ChangesetTargetKind;
 	use monochange_core::Ecosystem;
-	use monochange_core::ExtraChangelogSection;
 	use monochange_core::GroupChangelogInclude;
 	use monochange_core::GroupDefinition;
 	use monochange_core::HostedActorRef;
@@ -1219,7 +1156,6 @@ mod tests {
 	use monochange_core::PreparedChangesetTarget;
 	use monochange_core::PublishState;
 	use monochange_core::ReleaseDecision;
-	use monochange_core::ReleaseNotesSettings;
 	use monochange_core::VersionFormat;
 	use monochange_core::WorkspaceConfiguration;
 	use monochange_core::WorkspaceDefaults;
@@ -1232,7 +1168,7 @@ mod tests {
 		WorkspaceConfiguration {
 			root_path: root.to_path_buf(),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),
@@ -1277,7 +1213,7 @@ mod tests {
 				path: PathBuf::from(format!("packages/{config_id}/CHANGELOG.md")),
 				format: ChangelogFormat::Monochange,
 			}),
-			extra_changelog_sections: Vec::new(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1301,7 +1237,7 @@ mod tests {
 				format: ChangelogFormat::Monochange,
 			}),
 			changelog_include: include,
-			extra_changelog_sections: Vec::new(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1731,25 +1667,46 @@ mod tests {
 			.is_none()
 		);
 
-		let extra_sections = vec![
-			ExtraChangelogSection {
-				name: "Highlights".to_string(),
-				types: vec!["minor".to_string()],
-				default_bump: None,
+		let mut extra_settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		extra_settings.sections.insert(
+			"highlights".to_string(),
+			ChangelogSectionDef {
+				heading: "Highlights".to_string(),
+				description: None,
+				priority: 20,
+			},
+		);
+		extra_settings.sections.insert(
+			"notes".to_string(),
+			ChangelogSectionDef {
+				heading: "Notes".to_string(),
+				description: None,
+				priority: 100,
+			},
+		);
+		extra_settings.types.insert(
+			"minor".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "highlights".to_string(),
 				description: None,
 			},
-			ExtraChangelogSection {
-				name: "Notes".to_string(),
-				types: vec!["note".to_string()],
-				default_bump: None,
+		);
+		extra_settings.types.insert(
+			"note".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "notes".to_string(),
 				description: None,
 			},
-		];
+		);
 		let sections = render_release_note_sections(
 			"sdk",
 			"1.2.3",
-			&extra_sections,
-			&["- {{ summary }}".to_string()],
+			&extra_settings,
 			&[
 				ReleaseNoteChange {
 					change_type: Some("note".to_string()),
@@ -1781,17 +1738,20 @@ mod tests {
 				},
 			],
 		);
-		assert_eq!(sections[0].title, "Breaking changes");
-		assert_eq!(sections[1].title, "Fixes");
-		assert_eq!(sections[2].title, "Highlights");
-		assert_eq!(sections[3].title, "Notes");
-		assert_eq!(sections[1].entries, vec!["- Bug fix".to_string()]);
+		assert_eq!(sections[0].title, "Highlights");
+		assert_eq!(sections[1].title, "Notes");
+		assert_eq!(sections[2].title, "Changed");
 		assert_eq!(
-			sections[2].entries,
+			sections[0].entries,
 			vec!["- Added group support".to_string()]
 		);
+		assert_eq!(
+			sections[2].entries,
+			vec!["- Breaking API".to_string(), "- Bug fix".to_string()]
+		);
 
-		let fallback = render_release_note_sections("sdk", "1.2.3", &[], &[], &[]);
+		let fallback =
+			render_release_note_sections("sdk", "1.2.3", &ChangelogSettings::default(), &[]);
 		assert_eq!(fallback[0].title, "Changed");
 		assert_eq!(fallback[0].entries, vec!["- prepare release".to_string()]);
 
@@ -1799,8 +1759,7 @@ mod tests {
 			"sdk",
 			"1.2.3",
 			vec!["Summary".to_string()],
-			&extra_sections,
-			&["- {{ summary }}".to_string()],
+			&extra_settings,
 			&[sample_change("pkg-a", "pkg-a", ".changeset/a.md")],
 		);
 		assert_eq!(document.title, "1.2.3");
@@ -2067,31 +2026,14 @@ mod tests {
 		assert_eq!(config_package_id(&configured), "pkg-a");
 		configured.metadata.clear();
 		assert_eq!(config_package_id(&configured), "package-a");
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::Major),
-			BuiltinReleaseSection::Major
-		);
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::Minor),
-			BuiltinReleaseSection::Minor
-		);
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::Patch),
-			BuiltinReleaseSection::Patch
-		);
-		assert_eq!(
-			BuiltinReleaseSection::from_bump(BumpSeverity::None),
-			BuiltinReleaseSection::Patch
-		);
-		assert_eq!(BuiltinReleaseSection::Note.title(), "Notes");
-		assert_eq!(builtin_release_sections().len(), 4);
-
 		let selected = ResolvedSectionDefinition {
-			title: "Selected".to_string(),
 			types: vec!["custom".to_string(), " minor ".to_string()],
 		};
 		assert!(section_matches_resolved_type(&selected, "custom"));
 		assert!(section_matches_resolved_type(&selected, "minor"));
+
+		// When change_type is "note" and doesn't match any section, it falls to bump match.
+		// The sample_change has bump: Minor, which matches the selected section's " minor " type.
 		assert_eq!(
 			classify_release_note_change(
 				&ReleaseNoteChange {
@@ -2100,7 +2042,7 @@ mod tests {
 				},
 				std::slice::from_ref(&selected),
 			),
-			ResolvedReleaseSectionTarget::Builtin(BuiltinReleaseSection::Note)
+			ResolvedReleaseSectionTarget::Section(0)
 		);
 		assert_eq!(
 			classify_release_note_change(
@@ -2110,7 +2052,7 @@ mod tests {
 				},
 				std::slice::from_ref(&selected),
 			),
-			ResolvedReleaseSectionTarget::Extra(0)
+			ResolvedReleaseSectionTarget::Section(0)
 		);
 		assert_eq!(
 			classify_release_note_change(
@@ -2119,9 +2061,418 @@ mod tests {
 					bump: BumpSeverity::Minor,
 					..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
 				},
-				&[selected],
+				std::slice::from_ref(&selected),
 			),
-			ResolvedReleaseSectionTarget::Extra(0)
+			ResolvedReleaseSectionTarget::Section(0)
+		);
+	}
+
+	#[test]
+	fn render_sections_groups_entries_by_type_section_key() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"breaking_change".to_string(),
+			ChangelogSectionDef {
+				heading: "Breaking Changes".to_string(),
+				description: None,
+				priority: 5,
+			},
+		);
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.sections.insert(
+			"bug_fixes".to_string(),
+			ChangelogSectionDef {
+				heading: "Bug Fixes".to_string(),
+				description: None,
+				priority: 20,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"fix".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "bug_fixes".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"breaking".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Major,
+				section: "breaking_change".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![
+			ReleaseNoteChange {
+				change_type: Some("feat".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "add feature".to_string(),
+				..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("fix".to_string()),
+				bump: BumpSeverity::Patch,
+				summary: "fix bug".to_string(),
+				..sample_change("pkg-b", "pkg-b", ".changeset/b.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("breaking".to_string()),
+				bump: BumpSeverity::Major,
+				summary: "remove deprecated API".to_string(),
+				..sample_change("pkg-c", "pkg-c", ".changeset/c.md")
+			},
+		];
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &changes);
+
+		// Sections should be ordered by priority (lower = first)
+		assert_eq!(sections.len(), 3);
+		assert_eq!(sections[0].title, "Breaking Changes");
+		assert_eq!(sections[1].title, "Features");
+		assert_eq!(sections[2].title, "Bug Fixes");
+
+		// Entries should be under the correct section
+		assert_eq!(
+			sections[0].entries,
+			vec!["- remove deprecated API".to_string()]
+		);
+		assert_eq!(sections[1].entries, vec!["- add feature".to_string()]);
+		assert_eq!(sections[2].entries, vec!["- fix bug".to_string()]);
+	}
+
+	#[test]
+	fn render_sections_with_multiple_types_routing_to_same_section() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"minor".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![
+			ReleaseNoteChange {
+				change_type: Some("feat".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "add feature".to_string(),
+				..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("minor".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "minor improvement".to_string(),
+				..sample_change("pkg-b", "pkg-b", ".changeset/b.md")
+			},
+		];
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &changes);
+
+		// Both feat and minor should appear under the same "Features" section
+		assert_eq!(sections.len(), 1);
+		assert_eq!(sections[0].title, "Features");
+		assert_eq!(
+			sections[0].entries,
+			vec![
+				"- add feature".to_string(),
+				"- minor improvement".to_string()
+			]
+		);
+	}
+
+	#[test]
+	fn render_uncategorized_changes_fall_under_changed_heading() {
+		let settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+
+		let changes = vec![ReleaseNoteChange {
+			change_type: None,
+			bump: BumpSeverity::Patch,
+			summary: "uncategorized fix".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &changes);
+
+		// Changes without a matching type should fall under "Changed"
+		assert_eq!(sections.len(), 1);
+		assert_eq!(sections[0].title, "Changed");
+		assert_eq!(sections[0].entries, vec!["- uncategorized fix".to_string()]);
+	}
+
+	#[test]
+	fn render_empty_changes_produces_prepare_release_placeholder() {
+		let settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &[]);
+
+		assert_eq!(sections.len(), 1);
+		assert_eq!(sections[0].title, "Changed");
+		assert_eq!(sections[0].entries, vec!["- prepare release".to_string()]);
+	}
+
+	#[test]
+	fn render_release_notes_document_includes_section_headings_in_markdown() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.sections.insert(
+			"fixes".to_string(),
+			ChangelogSectionDef {
+				heading: "Bug Fixes".to_string(),
+				description: None,
+				priority: 20,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"fix".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "fixes".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![
+			ReleaseNoteChange {
+				change_type: Some("feat".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "add feature".to_string(),
+				..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("fix".to_string()),
+				bump: BumpSeverity::Patch,
+				summary: "fix bug".to_string(),
+				..sample_change("pkg-b", "pkg-b", ".changeset/b.md")
+			},
+		];
+
+		let document = build_release_notes_document(
+			"sdk",
+			"1.1.0",
+			vec!["Grouped release for sdk".to_string()],
+			&settings,
+			&changes,
+		);
+
+		assert_eq!(document.title, "1.1.0");
+		assert_eq!(
+			document.summary,
+			vec!["Grouped release for sdk".to_string()]
+		);
+		assert_eq!(document.sections.len(), 2);
+		assert_eq!(document.sections[0].title, "Features");
+		assert_eq!(document.sections[1].title, "Bug Fixes");
+
+		// Now render to markdown and verify headings appear
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+		assert!(
+			markdown.contains("### Features"),
+			"rendered markdown should include ### Features heading"
+		);
+		assert!(
+			markdown.contains("### Bug Fixes"),
+			"rendered markdown should include ### Bug Fixes heading"
+		);
+		assert!(
+			markdown.contains("- add feature"),
+			"rendered markdown should include feat entry"
+		);
+		assert!(
+			markdown.contains("- fix bug"),
+			"rendered markdown should include fix entry"
+		);
+
+		// Verify heading order in markdown matches priority
+		let features_pos = markdown.find("### Features").expect("Features heading");
+		let fixes_pos = markdown.find("### Bug Fixes").expect("Bug Fixes heading");
+		assert!(
+			features_pos < fixes_pos,
+			"Features should appear before Bug Fixes"
+		);
+	}
+
+	#[test]
+	fn keep_a_changelog_format_always_includes_section_headings() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+
+		// Only one section - keep-a-changelog should still include heading
+		let changes = vec![ReleaseNoteChange {
+			change_type: Some("feat".to_string()),
+			bump: BumpSeverity::Minor,
+			summary: "add feature".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let document =
+			build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
+
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::KeepAChangelog, &document);
+
+		// Keep-a-changelog always includes section headings, even for single section
+		assert!(
+			markdown.contains("### Features"),
+			"keep-a-changelog should include heading even with single section"
+		);
+	}
+
+	#[test]
+	fn monochange_format_omits_heading_for_single_changed_section() {
+		let settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+
+		// Single change with no matching type falls to "Changed"
+		let changes = vec![ReleaseNoteChange {
+			change_type: None,
+			bump: BumpSeverity::Patch,
+			summary: "fix bug".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let document =
+			build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
+
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+
+		// Monochange format omits "### Changed" when it's the only section
+		// (it's a single section with title "Changed" - the default)
+		assert!(
+			!markdown.contains("### Changed"),
+			"monochange format should omit ### Changed heading for single default section"
+		);
+		assert!(
+			markdown.contains("- fix bug"),
+			"entry should appear even without heading"
+		);
+	}
+
+	#[test]
+	fn monochange_format_includes_heading_for_custom_single_section() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![ReleaseNoteChange {
+			change_type: Some("feat".to_string()),
+			bump: BumpSeverity::Minor,
+			summary: "add feature".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let document =
+			build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
+
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+
+		// Single custom section with non-"Changed" title should include heading
+		assert!(
+			markdown.contains("### Features"),
+			"monochange format should include heading for custom single section"
 		);
 	}
 }

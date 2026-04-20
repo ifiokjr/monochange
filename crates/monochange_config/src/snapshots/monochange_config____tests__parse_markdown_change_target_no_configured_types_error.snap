@@ -2,4 +2,4 @@
 source: crates/monochange_config/src/__tests.rs
 expression: no_types_error.to_string()
 ---
-config error: failed to parse change.md: target `core` has invalid type `docs`; no configured types are available for this target
+config error: failed to parse change.md: target `core` has invalid type `custom_unknown_type`; valid types: breaking, change, docs, feat, fix, major, minor, none, patch, refactor, security, test

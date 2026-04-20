@@ -1,8 +1,8 @@
 [defaults]
 package_type = "cargo"
 
-[release_notes]
-change_templates = ["- {{ summary }} ({{ commit_hash }})"]
+[changelog]
+templates = ["- {{ summary }} ({{ commit_hash }})"]
 
 [package.core]
 path = "crates/core"

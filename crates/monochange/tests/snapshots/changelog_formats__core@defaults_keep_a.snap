@@ -4,6 +4,6 @@ expression: core_changelog
 ---
 ## 1.1.0 ([DATE])
 
-### Features
+### Changed
 
-- add keep a changelog support
+#### add keep a changelog support

@@ -514,7 +514,7 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 	assert!(root_changelog.contains("Changed members: core"));
 	assert!(root_changelog.contains("Synchronized members: app"));
 	assert!(core_changelog.contains("## 1.1.0"));
-	assert!(core_changelog.contains("- add feature"));
+	assert!(core_changelog.contains("add feature"));
 	assert!(!tempdir.path().join("crates/app/CHANGELOG.md").exists());
 	assert!(!tempdir.path().join("crates/app/changelog.md").exists());
 	assert!(workspace_manifest.contains("version = \"1.1.0\""));

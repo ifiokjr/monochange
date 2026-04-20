@@ -1,6 +1,15 @@
 [defaults]
 package_type = "cargo"
 
+[changelog.sections.testing]
+heading = "Testing"
+description = "Changes that only modify tests"
+priority = 40
+
+[changelog.types.test]
+section = "testing"
+bump = "none"
+description = "Changes that only modify tests"
+
 [package.core]
 path = "crates/core"
-extra_changelog_sections = [{ name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" }]

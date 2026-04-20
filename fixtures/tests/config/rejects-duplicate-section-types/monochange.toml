@@ -1,0 +1,11 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[changelog.sections.added]
+heading = "Added"
+priority = 30
+
+[changelog.types.feat]
+section = "nonexistent"
+bump = "minor"

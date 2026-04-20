@@ -10,6 +10,9 @@ Changed members: core
 
 Synchronized members: app
 
-### Features
+### Changed
 
-- **core**: add keep a changelog support
+> [!NOTE]
+> *core*
+
+#### add keep a changelog support

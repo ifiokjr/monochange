@@ -67,14 +67,6 @@ format = "keep_a_changelog"
 # a warning listing the conflicting changesets.
 # strict_version_conflicts = false
 #
-# Default extra changelog sections applied to every package/group unless
-# that target adds more sections of its own.
-#
-# Each entry maps one or more changeset `type` values into a named changelog
-# section. Example:
-# extra_changelog_sections = [{ name = "Security", types = ["security"] }]
-#
-# Default: []
 
 # Default empty_update_message applied when a package is bumped but has no
 # direct changeset entries (e.g. transitive dependency bumps or group
@@ -95,10 +87,10 @@ format = "keep_a_changelog"
 # empty_update_message = "No direct changes; {{ package }} updated to {{ version }}."
 
 # =============================================================================
-# [release_notes] — workspace-wide release-note rendering settings
+# [changelog] — workspace-wide release-note rendering settings
 # =============================================================================
 
-[release_notes]
+[changelog]
 # Templates that control how individual change entries render in changelogs.
 # Each template is tried in order; the first one whose required variables are
 # all present wins. If none match, falls back to "- {{ summary }}".
@@ -122,12 +114,62 @@ format = "keep_a_changelog"
 #   {{ closed_issues }}, {{ closed_issue_links }}
 #
 # Default: ["#### {{ summary }}\n\n{{ details }}", "- {{ summary }}"]
-change_templates = [
+templates = [
 	"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
 	"#### {{ summary }}\n\n{{ context }}",
 	"#### {{ summary }}\n\n{{ details }}",
 	"- {{ summary }}",
 ]
+
+[changelog.sections.testing]
+heading = "Testing"
+description = "Changes that only modify tests"
+priority = 40
+
+[changelog.sections.docs]
+heading = "Documentation"
+description = "Changes that only modify documentation"
+priority = 50
+
+[changelog.sections.security]
+heading = "Security"
+description = "Security-related changes"
+priority = 20
+
+[changelog.sections.perf]
+heading = "Performance"
+description = "Performance improvements"
+priority = 60
+
+[changelog.sections.refactor]
+heading = "Refactor"
+description = "Code refactoring without functional changes"
+priority = 70
+
+[changelog.types.test]
+section = "testing"
+bump = "none"
+description = "Changes that only modify tests"
+
+[changelog.types.docs]
+section = "docs"
+bump = "none"
+description = "Changes that only modify documentation"
+
+[changelog.types.security]
+section = "security"
+bump = "none"
+description = "Security-related changes"
+
+[changelog.types.perf]
+section = "perf"
+bump = "none"
+description = "Performance improvements"
+
+[changelog.types.refactor]
+section = "refactor"
+bump = "none"
+description = "Code refactoring without functional changes"
 
 # =============================================================================
 # [package.*] — declare each release-managed package explicitly
@@ -141,8 +183,9 @@ change_templates = [
 #                             (not needed when defaults.package_type is set)
 #   changelog               — true, false, "path/to/changelog.md", or a table
 #                             with { path, format }; overrides [defaults.changelog]
-#   extra_changelog_sections — custom changelog sections with type routing;
-#                              each section supports { name, types, default_bump? }
+#   excluded_changelog_types — list of changelog type keys to exclude from
+#                                this target; the target inherits workspace
+#                                defaults minus the listed types
 #   empty_update_message    — per-package fallback text for transitive bumps
 #   versioned_files         — additional files to update with the new version
 #                             package-scoped string entries infer the package ecosystem,
@@ -312,8 +355,9 @@ type = "npm"
 #                             member-targeted changesets appear in the group
 #                             changelog (direct group-targeted changesets are
 #                             always included; default: "all")
-#   extra_changelog_sections — custom changelog sections with type routing;
-#                              each section supports { name, types, default_bump? }
+#   excluded_changelog_types — list of changelog type keys to exclude from
+#                                this target; the target inherits workspace
+#                                defaults minus the listed types
 #   empty_update_message    — fallback text when the group bumps but a
 #                             specific member has no direct changeset entries
 #   versioned_files         — additional files to version-bump with the group
@@ -363,13 +407,7 @@ packages = [
 	"@monochange/cli-win32-x64-msvc",
 	"@monochange/cli-win32-arm64-msvc",
 ]
-extra_changelog_sections = [
-	{ name = "Testing", types = ["test"], default_bump = "none", description = "Changes that only modify tests" },
-	{ name = "Documentation", types = ["docs"], default_bump = "none", description = "Changes that only modify documentation" },
-	{ name = "Security", types = ["security"], default_bump = "none", description = "Security-related changes" },
-	{ name = "Performance", types = ["perf"], default_bump = "none", description = "Performance improvements" },
-	{ name = "Refactor", types = ["refactor"], default_bump = "none", description = "Code refactoring without functional changes" },
-]
+
 tag = true
 release = true
 version_format = "primary"

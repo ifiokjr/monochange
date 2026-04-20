@@ -418,7 +418,7 @@ mod tests {
 			path: Path::new("crates/core").to_path_buf(),
 			package_type: PackageType::Cargo,
 			changelog: None,
-			extra_changelog_sections: Vec::new(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,

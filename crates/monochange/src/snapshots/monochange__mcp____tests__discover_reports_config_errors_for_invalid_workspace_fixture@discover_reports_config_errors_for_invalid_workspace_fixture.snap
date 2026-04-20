@@ -4,8 +4,8 @@ expression: content_text(&result)
 ---
 {
   "action": "discover",
-  "error": "config error: [release_notes].change_templates uses unsupported variables: commit_hash",
+  "error": "config error: [changelog].templates uses unsupported variables: commit_hash",
   "ok": false,
   "root": "[ROOT]
-  "summary": "config error: [release_notes].change_templates uses unsupported variables: commit_hash"
+  "summary": "config error: [changelog].templates uses unsupported variables: commit_hash"
 }

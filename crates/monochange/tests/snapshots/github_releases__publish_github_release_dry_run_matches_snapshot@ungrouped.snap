@@ -20,7 +20,7 @@ expression: json
               "entries": [
                 "- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
               ],
-              "title": "Fixes"
+              "title": "Changed"
             }
           ],
           "summary": [],
@@ -29,7 +29,7 @@ expression: json
         "ownerId": "app",
         "ownerKind": "package",
         "path": "crates/app/CHANGELOG.md",
-        "rendered": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])\n\n### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
+        "rendered": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
       },
       {
         "format": "monochange",
@@ -37,9 +37,9 @@ expression: json
           "sections": [
             {
               "entries": [
-                "- add feature"
+                "#### add feature"
               ],
-              "title": "Features"
+              "title": "Changed"
             }
           ],
           "summary": [],
@@ -48,7 +48,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Features\n\n- add feature"
+        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n#### add feature"
       }
     ],
     "changesets": [
@@ -189,7 +189,7 @@ expression: json
   "releaseRequest": null,
   "releases": [
     {
-      "body": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])\n\n### Fixes\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.",
+      "body": "## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.",
       "draft": true,
       "generateReleaseNotes": false,
       "name": "app 1.0.1 ([DATE])",
@@ -203,7 +203,7 @@ expression: json
       "targetKind": "package"
     },
     {
-      "body": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Features\n\n- add feature",
+      "body": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n#### add feature",
       "draft": true,
       "generateReleaseNotes": false,
       "name": "core 1.1.0 ([DATE])",

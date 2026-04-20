@@ -51,14 +51,14 @@ expression: manifest
         ],
         "sections": [
           {
-            "title": "Features",
+            "title": "Changed",
             "entries": [
-              "- **core**: add feature"
+              "> [!NOTE]\n> *core*\n\n#### add feature"
             ]
           }
         ]
       },
-      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add feature"
+      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add feature"
     },
     {
       "ownerId": "core",
@@ -70,14 +70,14 @@ expression: manifest
         "summary": [],
         "sections": [
           {
-            "title": "Features",
+            "title": "Changed",
             "entries": [
-              "- add feature"
+              "#### add feature"
             ]
           }
         ]
       },
-      "rendered": "## 1.1.0 ([DATE])\n\n### Features\n\n- add feature"
+      "rendered": "## 1.1.0 ([DATE])\n\n#### add feature"
     }
   ],
   "packagePublications": [

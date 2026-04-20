@@ -816,13 +816,13 @@ mod tests {
 		let configuration = WorkspaceConfiguration {
 			root_path: Path::new(".").to_path_buf(),
 			defaults: monochange_core::WorkspaceDefaults::default(),
-			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			changelog: monochange_core::ChangelogSettings::default(),
 			packages: vec![monochange_core::PackageDefinition {
 				id: "pkg-a".to_string(),
 				path: Path::new("pkg-a").to_path_buf(),
 				package_type: monochange_core::PackageType::Dart,
 				changelog: None,
-				extra_changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -917,7 +917,7 @@ mod tests {
 		let configuration = WorkspaceConfiguration {
 			root_path: Path::new(".").to_path_buf(),
 			defaults: monochange_core::WorkspaceDefaults::default(),
-			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			changelog: monochange_core::ChangelogSettings::default(),
 			packages: (0..13)
 				.map(|index| {
 					monochange_core::PackageDefinition {
@@ -925,7 +925,7 @@ mod tests {
 						path: Path::new("pkg-a").to_path_buf(),
 						package_type: monochange_core::PackageType::Dart,
 						changelog: None,
-						extra_changelog_sections: Vec::new(),
+						excluded_changelog_types: Vec::new(),
 						empty_update_message: None,
 						release_title: None,
 						changelog_version_title: None,

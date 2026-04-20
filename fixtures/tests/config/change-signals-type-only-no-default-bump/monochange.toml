@@ -1,4 +1,10 @@
 [package.core]
 path = "crates/core"
 type = "cargo"
-extra_changelog_sections = [{ name = "Documentation", types = ["docs"] }]
+
+[changelog.sections.documentation]
+heading = "Documentation"
+priority = 40
+
+[changelog.types.docs]
+section = "documentation"

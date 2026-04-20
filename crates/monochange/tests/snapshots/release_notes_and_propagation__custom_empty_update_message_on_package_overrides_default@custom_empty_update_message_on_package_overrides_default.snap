@@ -8,8 +8,6 @@ Grouped release for `sdk`.
 
 Changed members: core, app
 
-### Features
-
 > [!NOTE]
 > *core*
 
@@ -17,8 +15,6 @@ This entry appears in changelog via `group.sdk.changelog.text`
 
 ### Features
 - **core**: add core feature
-
-### Fixes
 
 > [!NOTE]
 > *app*

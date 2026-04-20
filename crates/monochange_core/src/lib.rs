@@ -1039,22 +1039,273 @@ pub struct ReleaseNotesDocument {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ExtraChangelogSection {
-	pub name: String,
+pub struct ChangelogSectionDef {
+	/// Display heading for the section in rendered changelogs.
+	pub heading: String,
+	/// Description of when this section should appear.
 	#[serde(default)]
-	pub types: Vec<String>,
-	#[serde(default)]
-	pub default_bump: Option<BumpSeverity>,
-	/// Description of when this change type should be used.
-	/// Helpful for LLMs and users to understand the purpose of this section.
+	pub description: Option<String>,
+	/// Ordering priority for changelog rendering. Lower values appear first.
+	#[serde(default = "default_changelog_section_priority")]
+	pub priority: i8,
+}
+
+fn default_changelog_section_priority() -> i8 {
+	100
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ChangelogType {
+	/// Semver bump severity implied by this changeset type.
+	#[serde(default = "default_changelog_type_bump")]
+	pub bump: BumpSeverity,
+	/// Section key this type routes to (references a `[changelog.sections]` key).
+	pub section: String,
+	/// Human-readable description of when to use this type.
 	#[serde(default)]
 	pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
-pub struct ReleaseNotesSettings {
+fn default_changelog_type_bump() -> BumpSeverity {
+	BumpSeverity::None
+}
+
+/// Top-level `[changelog]` configuration combining templates, sections, and types.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ChangelogSettings {
 	#[serde(default)]
-	pub change_templates: Vec<String>,
+	pub templates: Vec<String>,
+	#[serde(default)]
+	pub sections: BTreeMap<String, ChangelogSectionDef>,
+	#[serde(default)]
+	pub types: BTreeMap<String, ChangelogType>,
+}
+
+impl Default for ChangelogSettings {
+	fn default() -> Self {
+		Self::defaults()
+	}
+}
+
+impl ChangelogSettings {
+	/// Return the built-in changelog configuration with default sections and types.
+	#[must_use]
+	pub fn defaults() -> Self {
+		let mut sections = BTreeMap::new();
+		sections.insert(
+			"major".to_string(),
+			ChangelogSectionDef {
+				heading: "Major".to_string(),
+				description: Some("Major version bumps".to_string()),
+				priority: 5,
+			},
+		);
+		sections.insert(
+			"breaking".to_string(),
+			ChangelogSectionDef {
+				heading: "Breaking Change".to_string(),
+				description: Some("API changes requiring migration".to_string()),
+				priority: 10,
+			},
+		);
+		sections.insert(
+			"minor".to_string(),
+			ChangelogSectionDef {
+				heading: "Minor".to_string(),
+				description: Some("Minor version bumps".to_string()),
+				priority: 15,
+			},
+		);
+		sections.insert(
+			"feat".to_string(),
+			ChangelogSectionDef {
+				heading: "Added".to_string(),
+				description: Some("New features added".to_string()),
+				priority: 20,
+			},
+		);
+		sections.insert(
+			"change".to_string(),
+			ChangelogSectionDef {
+				heading: "Changed".to_string(),
+				description: Some("Changes to existing functionality".to_string()),
+				priority: 25,
+			},
+		);
+		sections.insert(
+			"fix".to_string(),
+			ChangelogSectionDef {
+				heading: "Fixed".to_string(),
+				description: Some("Bug fixes".to_string()),
+				priority: 30,
+			},
+		);
+		sections.insert(
+			"patch".to_string(),
+			ChangelogSectionDef {
+				heading: "Patch".to_string(),
+				description: Some("Patch version bumps".to_string()),
+				priority: 35,
+			},
+		);
+		sections.insert(
+			"test".to_string(),
+			ChangelogSectionDef {
+				heading: "Testing".to_string(),
+				description: Some("Changes that only modify tests".to_string()),
+				priority: 40,
+			},
+		);
+		sections.insert(
+			"refactor".to_string(),
+			ChangelogSectionDef {
+				heading: "Refactor".to_string(),
+				description: Some("Code refactoring without functional changes".to_string()),
+				priority: 40,
+			},
+		);
+		sections.insert(
+			"docs".to_string(),
+			ChangelogSectionDef {
+				heading: "Documentation".to_string(),
+				description: Some("Changes that only modify documentation".to_string()),
+				priority: 40,
+			},
+		);
+		sections.insert(
+			"security".to_string(),
+			ChangelogSectionDef {
+				heading: "Security".to_string(),
+				description: Some("Security-related changes".to_string()),
+				priority: 40,
+			},
+		);
+		sections.insert(
+			"perf".to_string(),
+			ChangelogSectionDef {
+				heading: "Performance".to_string(),
+				description: Some("Performance improvements".to_string()),
+				priority: 40,
+			},
+		);
+		sections.insert(
+			"none".to_string(),
+			ChangelogSectionDef {
+				heading: "None".to_string(),
+				description: Some("No version bump".to_string()),
+				priority: 50,
+			},
+		);
+
+		let mut types = BTreeMap::new();
+		types.insert(
+			"breaking".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Major,
+				section: "breaking".to_string(),
+				description: Some("Breaking change with major bump".to_string()),
+			},
+		);
+		types.insert(
+			"major".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Major,
+				section: "major".to_string(),
+				description: Some("Major version bump".to_string()),
+			},
+		);
+		types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "feat".to_string(),
+				description: Some(String::new()),
+			},
+		);
+		types.insert(
+			"minor".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "minor".to_string(),
+				description: Some("Minor version bump".to_string()),
+			},
+		);
+		types.insert(
+			"change".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "change".to_string(),
+				description: Some(String::new()),
+			},
+		);
+		types.insert(
+			"fix".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "fix".to_string(),
+				description: Some(String::new()),
+			},
+		);
+		types.insert(
+			"patch".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "patch".to_string(),
+				description: Some("Patch version bump".to_string()),
+			},
+		);
+		types.insert(
+			"refactor".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "refactor".to_string(),
+				description: Some(String::new()),
+			},
+		);
+		types.insert(
+			"test".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "test".to_string(),
+				description: Some(String::new()),
+			},
+		);
+		types.insert(
+			"none".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "none".to_string(),
+				description: Some("No version bump".to_string()),
+			},
+		);
+		types.insert(
+			"docs".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "docs".to_string(),
+				description: Some(String::new()),
+			},
+		);
+		types.insert(
+			"security".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "security".to_string(),
+				description: Some(String::new()),
+			},
+		);
+
+		Self {
+			templates: vec![
+				"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}".to_string(),
+				"#### {{ summary }}\n\n{{ context }}".to_string(),
+				"#### {{ summary }}\n\n{{ details }}".to_string(),
+				"- {{ summary }}".to_string(),
+			],
+			sections,
+			types,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -1192,7 +1443,7 @@ pub struct PackageDefinition {
 	pub path: PathBuf,
 	pub package_type: PackageType,
 	pub changelog: Option<ChangelogTarget>,
-	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub excluded_changelog_types: Vec<String>,
 	pub empty_update_message: Option<String>,
 	#[serde(default)]
 	pub release_title: Option<String>,
@@ -1227,7 +1478,7 @@ pub struct GroupDefinition {
 	pub changelog: Option<ChangelogTarget>,
 	#[serde(default)]
 	pub changelog_include: GroupChangelogInclude,
-	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
+	pub excluded_changelog_types: Vec<String>,
 	pub empty_update_message: Option<String>,
 	#[serde(default)]
 	pub release_title: Option<String>,
@@ -1248,7 +1499,6 @@ pub struct WorkspaceDefaults {
 	pub package_type: Option<PackageType>,
 	pub changelog: Option<ChangelogDefinition>,
 	pub changelog_format: ChangelogFormat,
-	pub extra_changelog_sections: Vec<ExtraChangelogSection>,
 	pub empty_update_message: Option<String>,
 	pub release_title: Option<String>,
 	pub changelog_version_title: Option<String>,
@@ -1264,7 +1514,6 @@ impl Default for WorkspaceDefaults {
 			package_type: None,
 			changelog: None,
 			changelog_format: ChangelogFormat::Monochange,
-			extra_changelog_sections: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -3219,7 +3468,7 @@ pub struct EffectiveReleaseIdentity {
 pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
 	pub defaults: WorkspaceDefaults,
-	pub release_notes: ReleaseNotesSettings,
+	pub changelog: ChangelogSettings,
 	pub packages: Vec<PackageDefinition>,
 	pub groups: Vec<GroupDefinition>,
 	pub cli: Vec<CliCommandDefinition>,
