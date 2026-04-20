@@ -21,6 +21,7 @@
 //!
 //! ```bash
 //! mc init
+//! mc skill -a pi -y
 //! mc discover --format json
 //! mc change --package monochange --bump patch --reason "describe the change"
 //! mc release --dry-run --format json
@@ -75,6 +76,8 @@ pub(crate) use cli::build_command_for_root;
 use cli::build_command_with_cli;
 #[cfg(test)]
 pub(crate) use cli::build_release_record_subcommand;
+#[cfg(test)]
+pub(crate) use cli::build_skill_subcommand;
 #[cfg(test)]
 pub(crate) use cli::build_subagents_subcommand;
 #[cfg(test)]
@@ -221,6 +224,8 @@ pub use release_record::retarget_release;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use skill::SkillOptions;
+use skill::run_skill;
 use subagents::SubagentOptions;
 use subagents::run_subagents;
 pub(crate) use versioned_files::*;
@@ -264,6 +269,7 @@ mod prepared_release_cache;
 mod publish_rate_limits;
 mod release_artifacts;
 mod release_record;
+mod skill;
 mod subagents;
 mod tracing_setup;
 mod versioned_files;
@@ -729,6 +735,16 @@ where
 					result.added_commands.join(", ")
 				))
 			}
+		}
+		Some(("skill", skill_matches)) => {
+			let forwarded_args = skill_matches
+				.get_many::<String>("args")
+				.into_iter()
+				.flatten()
+				.cloned()
+				.collect();
+			let options = SkillOptions { forwarded_args };
+			run_skill(root, &options)
 		}
 		Some(("subagents", subagent_matches)) => {
 			let targets = if subagent_matches.get_flag("all") {

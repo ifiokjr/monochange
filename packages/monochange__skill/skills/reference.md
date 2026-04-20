@@ -34,6 +34,17 @@ mc --help
 ### Skill package
 
 ```bash
+mc help skill
+mc skill
+mc skill --list
+mc skill -a pi -y
+```
+
+`mc skill` forwards the remaining arguments to the upstream `skills add` workflow for the monochange skill source.
+
+If you need the lower-level package helper directly, you can still use:
+
+```bash
 npm install -g @monochange/skill
 monochange-skill --print-install
 monochange-skill --print-skill

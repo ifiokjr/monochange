@@ -102,14 +102,18 @@ mc repair-release --from v1.2.3 --target HEAD --dry-run
 
 ### Assistant workflows
 
-| Goal                                  | Command                 | When to use it                                        |
-| ------------------------------------- | ----------------------- | ----------------------------------------------------- |
-| Generate repo-local agent setup files | `mc subagents <target>` | You want monochange-aware agents, subagents, or rules |
-| Start the MCP server                  | `mc mcp`                | The client launches monochange over stdio             |
+| Goal                                  | Command                       | When to use it                                               |
+| ------------------------------------- | ----------------------------- | ------------------------------------------------------------ |
+| Install the monochange skill locally  | `mc skill [skills-add flags]` | You want the project-local skill bundle through `skills add` |
+| Generate repo-local agent setup files | `mc subagents <target>`       | You want monochange-aware agents, subagents, or rules        |
+| Start the MCP server                  | `mc mcp`                      | The client launches monochange over stdio                    |
 
 Examples:
 
 ```bash
+mc help skill
+mc skill
+mc skill -a pi -y
 mc help subagents
 mc subagents claude
 mc subagents pi codex

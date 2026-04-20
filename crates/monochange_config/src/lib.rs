@@ -137,8 +137,15 @@ use serde::Deserialize;
 use serde_yaml_ng::Mapping;
 
 const CONFIG_FILE: &str = "monochange.toml";
-const RESERVED_CLI_COMMAND_NAMES: &[&str] =
-	&["analyze", "help", "init", "mcp", "subagents", "version"];
+const RESERVED_CLI_COMMAND_NAMES: &[&str] = &[
+	"analyze",
+	"help",
+	"init",
+	"mcp",
+	"skill",
+	"subagents",
+	"version",
+];
 const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"summary",
 	"details",
