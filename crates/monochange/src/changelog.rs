@@ -127,8 +127,7 @@ pub(crate) fn build_changelog_updates(
 			&package_id,
 			&changelog_title,
 			Vec::new(),
-			package_definition.map_or(&[][..], |package| package.changelog_sections.as_slice()),
-			&context.configuration.release_notes.change_templates,
+			&context.configuration.changelog,
 			&changes,
 		);
 		let rendered = render_release_notes(changelog_target.format, &document);
@@ -190,8 +189,7 @@ pub(crate) fn build_changelog_updates(
 			&planned_group.group_id,
 			&changelog_title,
 			group_release_summary(&planned_group.group_id, &member_ids, &changed_members),
-			group_definition.map_or(&[][..], |group| group.changelog_sections.as_slice()),
-			&context.configuration.release_notes.change_templates,
+			&context.configuration.changelog,
 			&changes,
 		);
 		let rendered = render_release_notes(changelog_target.format, &document);
@@ -886,65 +884,62 @@ fn build_release_notes_document(
 	target_id: &str,
 	version: &str,
 	summary: Vec<String>,
-	changelog_sections: &[ChangelogSection],
-	change_templates: &[String],
+	changelog: &ChangelogSettings,
 	changes: &[ReleaseNoteChange],
 ) -> ReleaseNotesDocument {
 	ReleaseNotesDocument {
 		title: version.to_string(),
 		summary,
-		sections: render_release_note_sections(
-			target_id,
-			version,
-			changelog_sections,
-			change_templates,
-			changes,
-		),
+		sections: render_release_note_sections(target_id, version, changelog, changes),
 	}
 }
 
 fn render_release_note_sections(
 	target_id: &str,
 	version: &str,
-	changelog_sections: &[ChangelogSection],
-	change_templates: &[String],
+	changelog: &ChangelogSettings,
 	changes: &[ReleaseNoteChange],
 ) -> Vec<ReleaseNotesSection> {
-	let resolved_sections = changelog_sections
+	// Sort sections by priority (lower = earlier)
+	let mut sorted_sections: Vec<(&str, &str, i8)> = changelog
+		.sections
 		.iter()
-		.map(|section| {
-			ResolvedSectionDefinition {
-				title: section.name.clone(),
-				types: section.types.clone(),
-			}
-		})
+		.map(|(key, def)| (key.as_str(), def.heading.as_str(), def.priority))
 		.collect::<Vec<_>>();
-	let mut section_entries = vec![Vec::<String>::new(); resolved_sections.len()];
+	sorted_sections.sort_by_key(|(_, _, priority)| *priority);
+
+	let mut section_entries: BTreeMap<&str, Vec<String>> = BTreeMap::new();
 	let mut uncategorized = Vec::<String>::new();
 
 	for change in changes {
-		let rendered = render_change_entry(change, target_id, version, change_templates);
-		match classify_release_note_change(change, &resolved_sections) {
-			ResolvedReleaseSectionTarget::Section(index) => {
-				push_unique_release_note_entry(&mut section_entries[index], rendered);
-			}
-			ResolvedReleaseSectionTarget::Uncategorized => {
-				push_unique_release_note_entry(&mut uncategorized, rendered);
-			}
+		let rendered = render_change_entry(change, target_id, version, &changelog.templates);
+		let change_type = change.change_type.as_deref().unwrap_or("");
+		if let Some(typ) = changelog.types.get(change_type) {
+			let section_key = typ.section.as_str();
+			section_entries
+				.entry(section_key)
+				.or_default()
+				.push(rendered);
+		} else if !change_type.is_empty() {
+			uncategorized.push(rendered);
+		} else {
+			uncategorized.push(rendered);
 		}
 	}
 
-	// Build sections in priority order (sections are already sorted by priority
-	// from the configuration; we preserve that ordering here).
+	// Build sections in priority order
 	let mut sections = Vec::new();
-	for (index, section) in resolved_sections.iter().enumerate() {
-		if section_entries[index].is_empty() {
-			continue;
+	let mut used_keys = BTreeSet::new();
+	for (section_key, heading, _priority) in &sorted_sections {
+		if let Some(entries) = section_entries.remove(*section_key) {
+			if !entries.is_empty() {
+				sections.push(ReleaseNotesSection {
+					title: heading.to_string(),
+					entries,
+				});
+				used_keys.insert(*section_key);
+			}
 		}
-		sections.push(ReleaseNotesSection {
-			title: section.title.clone(),
-			entries: section_entries[index].clone(),
-		});
 	}
 	if !uncategorized.is_empty() {
 		sections.push(ReleaseNotesSection {
@@ -961,42 +956,12 @@ fn render_release_note_sections(
 	sections
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum ResolvedReleaseSectionTarget {
-	Section(usize),
-	Uncategorized,
-}
-
-fn classify_release_note_change(
-	change: &ReleaseNoteChange,
-	sections: &[ResolvedSectionDefinition],
-) -> ResolvedReleaseSectionTarget {
-	// First, try to match by explicit change_type (e.g. "feat", "fix", "security")
-	if let Some(change_type) = change.change_type.as_deref()
-		&& let Some(index) = sections
-			.iter()
-			.position(|section| section_matches_resolved_type(section, change_type))
-	{
-		return ResolvedReleaseSectionTarget::Section(index);
-	}
-
-	// Fall back to matching by bump severity selector ("major", "minor", "patch")
-	let bump_selector = change.bump.to_string();
-	if let Some(index) = sections
-		.iter()
-		.position(|section| section_matches_resolved_type(section, &bump_selector))
-	{
-		return ResolvedReleaseSectionTarget::Section(index);
-	}
-
-	ResolvedReleaseSectionTarget::Uncategorized
-}
-
-fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
-	section
-		.types
-		.iter()
-		.any(|candidate| candidate.trim() == change_type)
+fn config_package_id(package: &PackageRecord) -> String {
+	package
+		.metadata
+		.get("config_id")
+		.cloned()
+		.unwrap_or_else(|| package.name.clone())
 }
 
 fn render_change_entry(
@@ -1119,14 +1084,6 @@ fn push_unique_release_note_entry(entries: &mut Vec<String>, entry: String) {
 	}
 }
 
-fn config_package_id(package: &PackageRecord) -> String {
-	package
-		.metadata
-		.get("config_id")
-		.cloned()
-		.unwrap_or_else(|| package.name.clone())
-}
-
 #[cfg(test)]
 mod tests {
 	use std::collections::BTreeMap;
@@ -1135,7 +1092,7 @@ mod tests {
 
 	use monochange_core::ChangeSignal;
 	use monochange_core::ChangelogFormat;
-	use monochange_core::ChangelogSection;
+	use monochange_core::ChangelogSettings;
 	use monochange_core::ChangelogTarget;
 	use monochange_core::ChangesetContext;
 	use monochange_core::ChangesetRevision;
@@ -1159,7 +1116,6 @@ mod tests {
 	use monochange_core::PreparedChangesetTarget;
 	use monochange_core::PublishState;
 	use monochange_core::ReleaseDecision;
-	use monochange_core::ReleaseNotesSettings;
 	use monochange_core::VersionFormat;
 	use monochange_core::WorkspaceConfiguration;
 	use monochange_core::WorkspaceDefaults;

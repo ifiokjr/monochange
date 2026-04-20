@@ -1086,22 +1086,8 @@ pub(crate) fn change_type_default_bump(
 	target_id: &str,
 	change_type: &str,
 ) -> Option<BumpSeverity> {
-	let sections = configuration
-		.package_by_id(target_id)
-		.map(|package| package.changelog_sections.as_slice())
-		.or_else(|| {
-			configuration
-				.group_by_id(target_id)
-				.map(|group| group.changelog_sections.as_slice())
-		})?;
-
-	sections.iter().find_map(|section| {
-		section
-			.types
-			.iter()
-			.any(|candidate| candidate.trim() == change_type)
-			.then_some(section.bump)
-	})
+	let changelog = &configuration.changelog;
+	changelog.types.get(change_type).map(|typ| typ.bump)
 }
 
 fn render_changeset_target_key(target_id: &str) -> String {
@@ -2026,7 +2012,7 @@ mod workspace_ops_tests {
 		WorkspaceConfiguration {
 			root_path: PathBuf::from("."),
 			defaults: monochange_core::WorkspaceDefaults::default(),
-			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			changelog: monochange_core::ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),
@@ -2208,7 +2194,7 @@ mod workspace_ops_tests {
 				path: PathBuf::from("missing"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -2241,13 +2227,13 @@ mod workspace_ops_tests {
 				package_type: Some(PackageType::Cargo),
 				..monochange_core::WorkspaceDefaults::default()
 			},
-			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			changelog: monochange_core::ChangelogSettings::default(),
 			packages: vec![PackageDefinition {
 				id: "empty".to_string(),
 				path: PathBuf::from("empty-package"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -2290,13 +2276,13 @@ mod workspace_ops_tests {
 				package_type: Some(PackageType::Npm),
 				..monochange_core::WorkspaceDefaults::default()
 			},
-			release_notes: monochange_core::ReleaseNotesSettings::default(),
+			changelog: monochange_core::ChangelogSettings::default(),
 			packages: vec![PackageDefinition {
 				id: "pkg".to_string(),
 				path: PathBuf::from("packages/pkg"),
 				package_type: PackageType::Npm,
 				changelog: None,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,

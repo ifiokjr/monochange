@@ -24,21 +24,11 @@ pub fn build_command(bin_name: &'static str) -> Command {
 pub(crate) fn configured_change_type_choices(
 	configuration: &monochange_core::WorkspaceConfiguration,
 ) -> Vec<String> {
-	let all_sections = configuration
-		.packages
-		.iter()
-		.flat_map(|package| package.changelog_sections.iter())
-		.chain(
-			configuration
-				.groups
-				.iter()
-				.flat_map(|group| group.changelog_sections.iter()),
-		);
-
-	all_sections
-		.flat_map(|section| section.types.iter())
-		.map(|value| value.trim().to_string())
-		.filter(|value| !value.is_empty())
+	configuration
+		.changelog
+		.types
+		.keys()
+		.cloned()
 		.collect::<BTreeSet<_>>()
 		.into_iter()
 		.collect()

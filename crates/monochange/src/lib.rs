@@ -138,7 +138,7 @@ use monochange_config::validate_workspace;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
-use monochange_core::ChangelogSection;
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetPolicyEvaluation;

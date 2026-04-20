@@ -133,10 +133,12 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 	// Groups first
 	for group in &configuration.groups {
 		let members = group.packages.join(", ");
-		let configured_types = group
-			.changelog_sections
-			.iter()
-			.flat_map(|section| section.types.iter().cloned())
+		let configured_types = configuration
+			.changelog
+			.types
+			.keys()
+			.cloned()
+			.filter(|key| !group.excluded_changelog_types.contains(key))
 			.collect::<BTreeSet<_>>()
 			.into_iter()
 			.collect();
@@ -152,10 +154,12 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 	// Then standalone packages (not in any group)
 	for package in &configuration.packages {
 		if !grouped_package_ids.contains(&package.id) {
-			let configured_types = package
-				.changelog_sections
-				.iter()
-				.flat_map(|section| section.types.iter().cloned())
+			let configured_types = configuration
+				.changelog
+				.types
+				.keys()
+				.cloned()
+				.filter(|key| !package.excluded_changelog_types.contains(key))
 				.collect::<BTreeSet<_>>()
 				.into_iter()
 				.collect();
@@ -176,10 +180,12 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				.group_for_package(&package.id)
 				.map(|group| format!(" (member of group `{}`)", group.id))
 				.unwrap_or_default();
-			let configured_types = package
-				.changelog_sections
-				.iter()
-				.flat_map(|section| section.types.iter().cloned())
+			let configured_types = configuration
+				.changelog
+				.types
+				.keys()
+				.cloned()
+				.filter(|key| !package.excluded_changelog_types.contains(key))
 				.collect::<BTreeSet<_>>()
 				.into_iter()
 				.collect();
@@ -357,7 +363,7 @@ mod __tests {
 	use inquire::validator::Validation;
 	use monochange_config::load_workspace_configuration;
 	use monochange_core::BumpSeverity;
-	use monochange_core::ChangelogSection;
+	use monochange_core::ChangelogSettings;
 	use monochange_core::ChangesetSettings;
 	use monochange_core::EcosystemSettings;
 	use monochange_core::GroupChangelogInclude;
@@ -366,7 +372,6 @@ mod __tests {
 	use monochange_core::PackageDefinition;
 	use monochange_core::PackageType;
 	use monochange_core::PublishSettings;
-	use monochange_core::ReleaseNotesSettings;
 	use monochange_core::VersionFormat;
 	use monochange_core::WorkspaceConfiguration;
 	use monochange_core::WorkspaceDefaults;
@@ -418,7 +423,7 @@ mod __tests {
 		WorkspaceConfiguration {
 			root_path: std::path::PathBuf::from("."),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),
@@ -621,14 +626,14 @@ mod __tests {
 		let configuration = WorkspaceConfiguration {
 			root_path: std::path::PathBuf::from("."),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: vec![
 				PackageDefinition {
 					id: "app".to_string(),
 					path: std::path::PathBuf::from("crates/app"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					changelog_sections: Vec::new(),
+					excluded_changelog_types: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -646,7 +651,7 @@ mod __tests {
 					path: std::path::PathBuf::from("crates/core"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					changelog_sections: Vec::new(),
+					excluded_changelog_types: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -664,7 +669,7 @@ mod __tests {
 					path: std::path::PathBuf::from("packages/web"),
 					package_type: PackageType::Npm,
 					changelog: None,
-					changelog_sections: Vec::new(),
+					excluded_changelog_types: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -683,7 +688,7 @@ mod __tests {
 				packages: vec!["app".to_string(), "core".to_string()],
 				changelog: None,
 				changelog_include: GroupChangelogInclude::All,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -753,14 +758,14 @@ mod __tests {
 		let configuration = WorkspaceConfiguration {
 			root_path: std::path::PathBuf::from("."),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: vec![GroupDefinition {
 				id: "empty-group".to_string(),
 				packages: Vec::new(),
 				changelog: None,
 				changelog_include: GroupChangelogInclude::All,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -790,14 +795,14 @@ mod __tests {
 		let configuration = WorkspaceConfiguration {
 			root_path: std::path::PathBuf::from("."),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: vec![
 				PackageDefinition {
 					id: "alpha".to_string(),
 					path: std::path::PathBuf::from("crates/alpha"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					changelog_sections: Vec::new(),
+					excluded_changelog_types: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -815,7 +820,7 @@ mod __tests {
 					path: std::path::PathBuf::from("crates/beta"),
 					package_type: PackageType::Cargo,
 					changelog: None,
-					changelog_sections: Vec::new(),
+					excluded_changelog_types: Vec::new(),
 					empty_update_message: None,
 					release_title: None,
 					changelog_version_title: None,
@@ -895,28 +900,13 @@ mod __tests {
 		let configuration = WorkspaceConfiguration {
 			root_path: std::path::PathBuf::from("."),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: vec![PackageDefinition {
 				id: "web".to_string(),
 				path: std::path::PathBuf::from("packages/web"),
 				package_type: PackageType::Npm,
 				changelog: None,
-				changelog_sections: vec![
-					ChangelogSection {
-						name: "Docs".to_string(),
-						types: vec!["test".to_string(), "docs".to_string()],
-						bump: BumpSeverity::None,
-						description: None,
-						priority: 100,
-					},
-					ChangelogSection {
-						name: "More".to_string(),
-						types: vec!["docs".to_string(), "security".to_string()],
-						bump: BumpSeverity::None,
-						description: None,
-						priority: 100,
-					},
-				],
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
