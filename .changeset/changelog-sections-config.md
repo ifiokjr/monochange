@@ -45,5 +45,5 @@ Key changes:
 - `changelog_sections` arrays → `[changelog.sections]` (keyed map) + `[changelog.types]` (keyed map)
 - Per-package/group overrides → `excluded_changelog_types` (filters workspace defaults instead of complete replacement)
 - Type keys must be lowercase, start with a letter, and contain at most one underscore
-- Built-in defaults provide 9 sections and 12 types when `[changelog]` is empty
-- Section priority ordering (lower = first) replaces positional array ordering
+- Built-in defaults provide 13 sections and 13 types when `[changelog]` is empty
+- Bump-severity shorthand types (`minor`, `patch`, `major`, `none`) each get their own title-case section heading (Minor, Patch, Major, None) by default, instead of routing to semantic sections like Added/Fixed
