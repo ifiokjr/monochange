@@ -137,8 +137,8 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 			.changelog
 			.types
 			.keys()
+			.filter(|&key| !group.excluded_changelog_types.contains(key))
 			.cloned()
-			.filter(|key| !group.excluded_changelog_types.contains(key))
 			.collect::<BTreeSet<_>>()
 			.into_iter()
 			.collect();
@@ -158,8 +158,8 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				.changelog
 				.types
 				.keys()
+				.filter(|&key| !package.excluded_changelog_types.contains(key))
 				.cloned()
-				.filter(|key| !package.excluded_changelog_types.contains(key))
 				.collect::<BTreeSet<_>>()
 				.into_iter()
 				.collect();
@@ -184,8 +184,8 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				.changelog
 				.types
 				.keys()
+				.filter(|&key| !package.excluded_changelog_types.contains(key))
 				.cloned()
-				.filter(|key| !package.excluded_changelog_types.contains(key))
 				.collect::<BTreeSet<_>>()
 				.into_iter()
 				.collect();
@@ -936,7 +936,16 @@ mod __tests {
 		assert_eq!(
 			target.configured_types,
 			vec![
+				"breaking".to_string(),
+				"change".to_string(),
 				"docs".to_string(),
+				"feat".to_string(),
+				"fix".to_string(),
+				"major".to_string(),
+				"minor".to_string(),
+				"none".to_string(),
+				"patch".to_string(),
+				"refactor".to_string(),
 				"security".to_string(),
 				"test".to_string()
 			]

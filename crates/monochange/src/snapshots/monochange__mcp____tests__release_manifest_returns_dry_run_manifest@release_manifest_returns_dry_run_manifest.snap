@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/src/mcp.rs
-assertion_line: 1437
 expression: content_text(&result)
 ---
 {
@@ -23,9 +22,9 @@ expression: content_text(&result)
           "sections": [
             {
               "entries": [
-                "- **core**: add release command"
+                "> [!NOTE]\n> *core*\n\n#### add release command"
               ],
-              "title": "Added"
+              "title": "Changed"
             }
           ],
           "summary": [
@@ -38,7 +37,7 @@ expression: content_text(&result)
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Added\n\n- **core**: add release command"
+        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add release command"
       },
       {
         "format": "monochange",
@@ -48,7 +47,7 @@ expression: content_text(&result)
               "entries": [
                 "- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
               ],
-              "title": "Added"
+              "title": "Changed"
             }
           ],
           "summary": [],
@@ -57,7 +56,7 @@ expression: content_text(&result)
         "ownerId": "app",
         "ownerKind": "package",
         "path": "crates/app/changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\n### Added\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
+        "rendered": "## 1.1.0 ([DATE])\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
       },
       {
         "format": "monochange",
@@ -65,9 +64,9 @@ expression: content_text(&result)
           "sections": [
             {
               "entries": [
-                "- add release command"
+                "#### add release command"
               ],
-              "title": "Added"
+              "title": "Changed"
             }
           ],
           "summary": [],
@@ -76,7 +75,7 @@ expression: content_text(&result)
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\n### Added\n\n- add release command"
+        "rendered": "## 1.1.0 ([DATE])\n\n#### add release command"
       }
     ],
     "changesets": [

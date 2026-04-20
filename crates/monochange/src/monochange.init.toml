@@ -78,33 +78,54 @@ warn_on_group_mismatch = true
 {% endraw -%}
 # format = "keep_a_changelog"
 
-# Default changelog sections applied to every package/group unless
-# that target overrides sections of its own.
+# Default changelog configuration. When [changelog] is not specified,
+# built-in defaults provide standard sections (Breaking Change, Added,
+# Changed, Fixed, Testing, Documentation, Security, Performance, Refactor)
+# and corresponding types. See [changelog] section below for customization.
+# [changelog] — workspace-wide changelog configuration
+# 
+# Controls templates, sections, and types for changelog rendering.
+# When omitted, built-in defaults provide standard sections and types.
 #
-# Each entry maps one or more changeset `type` values into a named changelog
-# section, with semver bump and optional priority/description.
-# The `type` field in a changeset must match one of these declared types;
-# unknown types will produce a validation error.
-changelog_sections = [
-    { name = "Breaking Change", types = ["breaking", "major"], bump = "major", description = "API changes requiring migration", priority = 10 },
-    { name = "Added", types = ["feat", "minor"], bump = "minor", description = "New features added", priority = 20 },
-    { name = "Changed", types = ["change"], bump = "minor", description = "Changes to existing functionality", priority = 25 },
-    { name = "Fixed", types = ["fix"], bump = "patch", description = "Bug fixes", priority = 30 },
-    { name = "Testing", types = ["test"], bump = "none", description = "Changes that only modify tests", priority = 40 },
-    { name = "Documentation", types = ["docs"], bump = "none", description = "Changes that only modify documentation", priority = 50 },
-    { name = "Security", types = ["security"], bump = "none", description = "Security-related changes", priority = 60 },
-    { name = "Performance", types = ["perf"], bump = "none", description = "Performance improvements", priority = 70 },
-    { name = "Refactor", types = ["refactor"], bump = "none", description = "Code refactoring without functional changes", priority = 80 },
-]
+# [changelog]
+# templates — Templates that control how individual change entries render.
+# Each template is tried in order; the first one whose required variables are
+# all present wins. If none match, falls back to "- {{ summary }}".
 #
-# Each section can include:
-#   - name: The display name for the changelog section
-#   - types: List of change types that route to this section
-#   - bump: The semver bump for this type (none, patch, minor, major)
-#   - description (optional): When this type should be used; helpful for LLMs and users
-#   - priority (optional): Ordering priority; lower values appear first (default: 100, range: -128 to 127)
+# sections — Named changelog sections with heading and priority (lower = first).
+# The built-in defaults provide standard sections matching the commented example.
 #
-# Default: built-in sections matching the example above
+# types — Change type definitions mapping changeset types to section and bump severity.
+# Each type key references a section key and declares a default bump severity.
+# The built-in defaults provide standard types matching the commented example.
+
+# [changelog.templates]
+# Add custom templates if the defaults don't match your style.
+
+# [changelog.sections]
+# breaking = { heading = "Breaking Change", description = "API changes requiring migration", priority = 10 }
+# added = { heading = "Added", description = "New features added", priority = 20 }
+# changed = { heading = "Changed", description = "Changes to existing functionality", priority = 25 }
+# fixed = { heading = "Fixed", description = "Bug fixes", priority = 30 }
+# testing = { heading = "Testing", description = "Changes that only modify tests", priority = 40 }
+# docs = { heading = "Documentation", description = "Changes that only modify documentation", priority = 50 }
+# security = { heading = "Security", description = "Security-related changes", priority = 60 }
+# perf = { heading = "Performance", description = "Performance improvements", priority = 70 }
+# refactor = { heading = "Refactor", description = "Code refactoring without functional changes", priority = 80 }
+
+# [changelog.types]
+# breaking = { section = "breaking", bump = "major" }
+# major = { section = "breaking", bump = "major" }
+# feat = { section = "added", bump = "minor" }
+# minor = { section = "added", bump = "minor" }
+# change = { section = "changed", bump = "minor" }
+# fix = { section = "fixed", bump = "patch" }
+# test = { section = "testing" }
+# docs = { section = "docs" }
+# security = { section = "security" }
+# perf = { section = "perf" }
+# refactor = { section = "refactor" }
+
 
 # Default empty_update_message applied when a package is bumped but has no
 # direct changeset entries (e.g. transitive dependency bumps or group
@@ -165,10 +186,10 @@ changelog_sections = [
 {% endraw %}
 
 # =============================================================================
-# [release_notes] — workspace-wide release-note rendering settings
+# [changelog] — workspace-wide changelog configuration
 # =============================================================================
 
-# [release_notes]
+# [changelog]
 # Templates that control how individual change entries render in changelogs.
 # Each template is tried in order; the first one whose required variables are
 # all present wins (uses minijinja strict mode — all referenced variables must
@@ -194,7 +215,7 @@ changelog_sections = [
 #   {{ closed_issues }}, {{ closed_issue_links }}
 #
 # Default: ["#### {{ summary }}\n\n{{ details }}", "- {{ summary }}"]
-# change_templates = [
+# templates = [
 #   "#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
 #   "#### {{ summary }}\n\n{{ context }}",
 #   "#### {{ summary }}\n\n{{ details }}",
@@ -214,7 +235,7 @@ changelog_sections = [
 #                             (not needed when defaults.package_type is set)
 #   changelog               — true, false, "path/to/changelog.md", or a table
 #                             with { path, format }; overrides [defaults.changelog]
-#   changelog_sections — override default changelog sections with type routing and bump severity
+#   excluded_changelog_types — list of changelog type keys to exclude from this target
 #   empty_update_message    — per-package fallback text for transitive bumps
 #   versioned_files         — additional files to update with the new version
 #                             package-scoped string entries infer the package ecosystem,
@@ -319,7 +340,7 @@ changelog = "{{ pkg.changelog }}"
 #                             member-targeted changesets appear in the group
 #                             changelog (direct group-targeted changesets are
 #                             always included; default: "all")
-#   changelog_sections — override default changelog sections with type routing and bump severity
+#   excluded_changelog_types — list of changelog type keys to exclude from this target
 #   empty_update_message    — fallback text when the group bumps but a
 #                             specific member has no direct changeset entries
 #   versioned_files         — additional files to version-bump with the group

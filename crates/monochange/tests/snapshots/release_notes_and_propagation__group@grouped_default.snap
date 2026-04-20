@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/release_notes_and_propagation.rs
-assertion_line: 51
 expression: group_changelog
 ---
 # Changelog
@@ -13,6 +12,7 @@ Changed members: core
 
 Synchronized members: app
 
-### Added
+> [!NOTE]
+> *core*
 
-- **core**: add core feature
+#### add core feature

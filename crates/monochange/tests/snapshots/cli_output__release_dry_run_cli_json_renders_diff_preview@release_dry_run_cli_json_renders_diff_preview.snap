@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 340
 info:
   program: mc
   args:
@@ -24,11 +23,11 @@ exit_code: 0
       "path": "Cargo.toml"
     },
     {
-      "diff": "--- a/changelog.md\n+++ b/changelog.md\n@@ -1 +1,13 @@\n # Changelog\n+\n+## 1.1.0 ([DATE])\n+\n+Grouped release for `sdk`.\n+\n+Changed members: core\n+\n+Synchronized members: app\n+\n+### Added\n+\n+- **core**: add feature",
+      "diff": "--- a/changelog.md\n+++ b/changelog.md\n@@ -1 +1,14 @@\n # Changelog\n+\n+## 1.1.0 ([DATE])\n+\n+Grouped release for `sdk`.\n+\n+Changed members: core\n+\n+Synchronized members: app\n+\n+> [!NOTE]\n+> *core*\n+\n+#### add feature",
       "path": "changelog.md"
     },
     {
-      "diff": "--- a/crates/core/CHANGELOG.md\n+++ b/crates/core/CHANGELOG.md\n@@ -1 +1,7 @@\n # Changelog\n+\n+## 1.1.0 ([DATE])\n+\n+### Added\n+\n+- add feature",
+      "diff": "--- a/crates/core/CHANGELOG.md\n+++ b/crates/core/CHANGELOG.md\n@@ -1 +1,5 @@\n # Changelog\n+\n+## 1.1.0 ([DATE])\n+\n+#### add feature",
       "path": "crates/core/CHANGELOG.md"
     },
     {
@@ -53,9 +52,9 @@ exit_code: 0
           "sections": [
             {
               "entries": [
-                "- **core**: add feature"
+                "> [!NOTE]\n> *core*\n\n#### add feature"
               ],
-              "title": "Added"
+              "title": "Changed"
             }
           ],
           "summary": [
@@ -68,7 +67,7 @@ exit_code: 0
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Added\n\n- **core**: add feature"
+        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add feature"
       },
       {
         "format": "monochange",
@@ -76,9 +75,9 @@ exit_code: 0
           "sections": [
             {
               "entries": [
-                "- add feature"
+                "#### add feature"
               ],
-              "title": "Added"
+              "title": "Changed"
             }
           ],
           "summary": [],
@@ -87,7 +86,7 @@ exit_code: 0
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## 1.1.0 ([DATE])\n\n### Added\n\n- add feature"
+        "rendered": "## 1.1.0 ([DATE])\n\n#### add feature"
       }
     ],
     "changesets": [

@@ -1,10 +1,17 @@
 [defaults]
 parent_bump = "patch"
 
+[changelog.sections.security]
+heading = "Security"
+priority = 40
+
+[changelog.types.security]
+section = "security"
+bump = "patch"
+
 [package.sdk-core]
 path = "cargo/sdk-core"
 type = "cargo"
-changelog_sections = [{ name = "Security", types = ["security"], bump = "patch" }]
 
 [package.web-sdk]
 path = "packages/web-sdk"

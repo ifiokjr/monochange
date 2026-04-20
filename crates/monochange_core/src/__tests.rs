@@ -11,7 +11,8 @@ use tempfile::tempdir;
 
 use crate::BumpSeverity;
 use crate::ChangelogFormat;
-use crate::ChangelogSection;
+use crate::ChangelogSectionDef;
+use crate::ChangelogSettings;
 use crate::ChangelogTarget;
 use crate::ChangesetPolicyStatus;
 use crate::ChangesetVerificationSettings;
@@ -47,7 +48,6 @@ use crate::ReleaseManifest;
 use crate::ReleaseManifestPlan;
 use crate::ReleaseNotesDocument;
 use crate::ReleaseNotesSection;
-use crate::ReleaseNotesSettings;
 use crate::ReleaseOwnerKind;
 use crate::ReleaseRecord;
 use crate::ReleaseRecordDiscovery;
@@ -563,22 +563,18 @@ fn versioned_file_definition_uses_regex_returns_false_when_unset() {
 }
 
 #[test]
-fn workspace_defaults_default_has_changelog_sections() {
-	assert!(!WorkspaceDefaults::default().changelog_sections.is_empty());
+fn workspace_defaults_default_has_changelog_settings() {
+	assert!(!ChangelogSettings::defaults().sections.is_empty());
 }
 
 #[test]
 fn changelog_section_supports_description_field() {
-	let section = ChangelogSection {
-		name: "Testing".to_string(),
-		types: vec!["test".to_string()],
-		bump: BumpSeverity::None,
+	let section = ChangelogSectionDef {
+		heading: "Testing".to_string(),
 		description: Some("Changes that only modify tests".to_string()),
 		priority: 40,
 	};
-	assert_eq!(section.name, "Testing");
-	assert_eq!(section.types, vec!["test"]);
-	assert_eq!(section.bump, BumpSeverity::None);
+	assert_eq!(section.heading, "Testing");
 	assert_eq!(
 		section.description,
 		Some("Changes that only modify tests".to_string())
@@ -587,10 +583,8 @@ fn changelog_section_supports_description_field() {
 
 #[test]
 fn changelog_section_description_is_optional() {
-	let section = ChangelogSection {
-		name: "Security".to_string(),
-		types: vec!["security".to_string()],
-		bump: BumpSeverity::Patch,
+	let section = ChangelogSectionDef {
+		heading: "Security".to_string(),
 		description: None,
 		priority: 60,
 	};
@@ -1705,7 +1699,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 	WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
 		defaults: WorkspaceDefaults::default(),
-		release_notes: ReleaseNotesSettings::default(),
+		changelog: ChangelogSettings::default(),
 		packages: vec![
 			PackageDefinition {
 				id: "monochange".to_string(),
@@ -1715,7 +1709,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 					path: PathBuf::from("crates/monochange/changelog.md"),
 					format: ChangelogFormat::Monochange,
 				}),
-				changelog_sections: ChangelogSection::defaults(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1736,7 +1730,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 					path: PathBuf::from("crates/monochange_core/changelog.md"),
 					format: ChangelogFormat::Monochange,
 				}),
-				changelog_sections: ChangelogSection::defaults(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1754,7 +1748,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				path: PathBuf::from("crates/monochange_graph"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				changelog_sections: ChangelogSection::defaults(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1776,7 +1770,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				format: ChangelogFormat::Monochange,
 			}),
 			changelog_include: GroupChangelogInclude::All,
-			changelog_sections: ChangelogSection::defaults(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1802,7 +1796,7 @@ fn group_definition_defaults_changelog_include_when_omitted() {
 		"id": "sdk",
 		"packages": ["core", "app"],
 		"changelog": null,
-		"changelog_sections": [],
+		"excluded_changelog_types": [],
 		"empty_update_message": null,
 		"release_title": null,
 		"changelog_version_title": null,

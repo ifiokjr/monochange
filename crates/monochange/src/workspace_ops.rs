@@ -1083,7 +1083,7 @@ pub(crate) fn add_interactive_change_file(
 
 pub(crate) fn change_type_default_bump(
 	configuration: &monochange_core::WorkspaceConfiguration,
-	target_id: &str,
+	_target_id: &str,
 	change_type: &str,
 ) -> Option<BumpSeverity> {
 	let changelog = &configuration.changelog;
@@ -2012,7 +2012,7 @@ mod workspace_ops_tests {
 		WorkspaceConfiguration {
 			root_path: PathBuf::from("."),
 			defaults: monochange_core::WorkspaceDefaults::default(),
-			changelog: monochange_core::ChangelogSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),
@@ -2227,7 +2227,7 @@ mod workspace_ops_tests {
 				package_type: Some(PackageType::Cargo),
 				..monochange_core::WorkspaceDefaults::default()
 			},
-			changelog: monochange_core::ChangelogSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: vec![PackageDefinition {
 				id: "empty".to_string(),
 				path: PathBuf::from("empty-package"),
@@ -2276,7 +2276,7 @@ mod workspace_ops_tests {
 				package_type: Some(PackageType::Npm),
 				..monochange_core::WorkspaceDefaults::default()
 			},
-			changelog: monochange_core::ChangelogSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: vec![PackageDefinition {
 				id: "pkg".to_string(),
 				path: PathBuf::from("packages/pkg"),

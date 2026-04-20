@@ -1391,7 +1391,6 @@ mod tests {
 	use monochange_core::ReleaseManifestPlanDecision;
 	use monochange_core::ReleaseManifestPlanGroup;
 	use monochange_core::ReleaseManifestTarget;
-	use monochange_core::ReleaseNotesSettings;
 	use monochange_core::SourceChangeRequest;
 	use monochange_core::SourceConfiguration;
 	use monochange_core::SourceProvider;
@@ -1406,7 +1405,7 @@ mod tests {
 		WorkspaceConfiguration {
 			root_path: root.to_path_buf(),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),
@@ -1552,7 +1551,7 @@ mod tests {
 			path: PathBuf::from("pkg-a"),
 			package_type: PackageType::Cargo,
 			changelog: None,
-			changelog_sections: Vec::new(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: Some(
 				"Package {{ id }} {{ previous_version }} -> {{ version }}".to_string(),
@@ -1572,7 +1571,7 @@ mod tests {
 			packages: vec!["pkg-a".to_string()],
 			changelog: None,
 			changelog_include: GroupChangelogInclude::All,
-			changelog_sections: Vec::new(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: Some("Group {{ id }} {{ compare_url }}".to_string()),
 			changelog_version_title: None,
@@ -1729,7 +1728,7 @@ mod tests {
 				path: PathBuf::from("core"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1750,7 +1749,7 @@ mod tests {
 				path: PathBuf::from("web"),
 				package_type: PackageType::Npm,
 				changelog: None,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,
@@ -1772,7 +1771,7 @@ mod tests {
 				path: PathBuf::from("private"),
 				package_type: PackageType::Cargo,
 				changelog: None,
-				changelog_sections: Vec::new(),
+				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
 				release_title: None,
 				changelog_version_title: None,

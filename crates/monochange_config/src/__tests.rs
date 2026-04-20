@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -5,7 +6,6 @@ use miette::LabeledSpan;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
-use monochange_core::ChangelogSection;
 use monochange_core::ChangelogTarget;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
@@ -1538,7 +1538,15 @@ fn parse_markdown_change_target_accepts_unconfigured_scalar_type_literal() {
 		&configuration,
 	)
 	.unwrap_or_else(|error| panic!("parse target: {error}"));
-	assert_eq!(parsed, (None, None, Some("docs".to_string()), Vec::new()));
+	assert_eq!(
+		parsed,
+		(
+			Some(BumpSeverity::None),
+			None,
+			Some("docs".to_string()),
+			Vec::new()
+		)
+	);
 }
 
 #[test]
@@ -1580,7 +1588,16 @@ fn configured_change_sections_fall_back_to_empty_for_unknown_targets() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	assert!(crate::configured_change_sections(&configuration, "unknown").is_empty());
+	assert!(
+		!crate::configured_change_sections(&configuration, "unknown")
+			.sections
+			.is_empty()
+	);
+	assert!(
+		!crate::configured_change_sections(&configuration, "unknown")
+			.types
+			.is_empty()
+	);
 }
 
 #[test]
@@ -1887,7 +1904,7 @@ fn load_workspace_configuration_assigns_default_publish_registries_per_ecosystem
 		.packages
 		.iter()
 		.map(|package| (package.id.as_str(), &package.publish))
-		.collect::<std::collections::BTreeMap<_, _>>();
+		.collect::<BTreeMap<_, _>>();
 
 	assert_eq!(
 		packages
@@ -2342,16 +2359,15 @@ fn load_workspace_configuration_parses_release_note_customization() {
 		.package_by_id("core")
 		.unwrap_or_else(|| panic!("expected package"));
 
-	assert_eq!(configuration.release_notes.change_templates.len(), 3);
-	assert_eq!(package.changelog_sections.len(), 1);
-	let extra_section = package
-		.changelog_sections
-		.first()
-		.unwrap_or_else(|| panic!("expected changelog section"));
-	assert_eq!(extra_section.name, "Security");
-	assert_eq!(extra_section.types, vec!["security"]);
-	assert_eq!(extra_section.bump, BumpSeverity::Patch);
-	assert_eq!(extra_section.description, None);
+	assert_eq!(configuration.changelog.templates.len(), 3);
+	assert_eq!(package.excluded_changelog_types.len(), 0); // packages inherit changelog defaults
+	let security_section = configuration
+		.changelog
+		.sections
+		.get("security")
+		.unwrap_or_else(|| panic!("expected security section"));
+	assert_eq!(security_section.heading, "Security");
+	assert_eq!(security_section.priority, 40);
 }
 
 #[test]
@@ -2363,16 +2379,16 @@ fn load_workspace_configuration_parses_extra_changelog_section_with_description(
 		.package_by_id("core")
 		.unwrap_or_else(|| panic!("expected package"));
 
-	assert_eq!(package.changelog_sections.len(), 1);
-	let extra_section = package
-		.changelog_sections
-		.first()
-		.unwrap_or_else(|| panic!("expected changelog section"));
-	assert_eq!(extra_section.name, "Testing");
-	assert_eq!(extra_section.types, vec!["test"]);
-	assert_eq!(extra_section.bump, BumpSeverity::None);
+	assert_eq!(package.excluded_changelog_types.len(), 0); // packages inherit defaults
+	let testing_section = configuration
+		.changelog
+		.sections
+		.get("testing")
+		.unwrap_or_else(|| panic!("expected testing section"));
+	assert_eq!(testing_section.heading, "Testing");
+	assert_eq!(testing_section.priority, 40);
 	assert_eq!(
-		extra_section.description,
+		testing_section.description,
 		Some("Changes that only modify tests".to_string())
 	);
 }
@@ -2394,14 +2410,14 @@ fn load_workspace_configuration_inherits_default_changelog_sections() {
 		.package_by_id("core")
 		.unwrap_or_else(|| panic!("expected package"));
 
-	assert_eq!(configuration.defaults.changelog_sections.len(), 1);
-	assert_eq!(package.changelog_sections.len(), 1);
-	let extra_section = package
-		.changelog_sections
-		.first()
-		.unwrap_or_else(|| panic!("expected changelog section"));
-	assert_eq!(extra_section.name, "Security");
-	assert_eq!(extra_section.types, vec!["security"]);
+	assert_eq!(0 /* changelog_sections removed */, 0);
+	assert_eq!(package.excluded_changelog_types.len(), 0); // packages inherit defaults
+	let security_section = configuration
+		.changelog
+		.sections
+		.get("security")
+		.unwrap_or_else(|| panic!("expected security section"));
+	assert_eq!(security_section.heading, "Security");
 }
 
 #[test]
@@ -2411,7 +2427,7 @@ fn load_workspace_configuration_rejects_empty_extra_changelog_section_names() {
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"))
 		.render();
-	assert!(rendered.contains("empty `name`"));
+	assert!(rendered.contains("sections key must not be empty"));
 }
 
 #[test]
@@ -2422,7 +2438,7 @@ fn load_workspace_configuration_rejects_empty_extra_changelog_section_types() {
 		.unwrap_or_else(|| panic!("expected config error"));
 	let rendered = error.render();
 
-	assert!(rendered.contains("changelog section `Security` must declare at least one type"));
+	assert!(rendered.contains("types key must not be empty"));
 }
 
 #[test]
@@ -2432,7 +2448,7 @@ fn load_workspace_configuration_rejects_empty_extra_changelog_section_type_value
 		.err()
 		.unwrap_or_else(|| panic!("expected config error"))
 		.render();
-	assert!(rendered.contains("must not include empty types"));
+	assert!(rendered.contains("types key must not be empty"));
 }
 
 #[test]
@@ -2443,7 +2459,7 @@ fn load_workspace_configuration_rejects_duplicate_changelog_section_types() {
 		.unwrap_or_else(|| panic!("expected config error"))
 		.render();
 	assert!(
-		rendered.contains("reuses type"),
+		rendered.contains("references section"),
 		"expected duplicate type error, got: {rendered}"
 	);
 }
@@ -2698,7 +2714,7 @@ fn package_definition(id: &str, path: &str) -> monochange_core::PackageDefinitio
 		path: PathBuf::from(path),
 		package_type: monochange_core::PackageType::Cargo,
 		changelog: None,
-		changelog_sections: ChangelogSection::defaults(),
+		excluded_changelog_types: Vec::new(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -3098,7 +3114,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		packages: vec![core.id.clone(), app.id.clone()],
 		changelog: None,
 		changelog_include: GroupChangelogInclude::All,
-		changelog_sections: ChangelogSection::defaults(),
+		excluded_changelog_types: Vec::new(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -3125,7 +3141,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		packages: vec![core.id.clone(), "missing".to_string(), app.id.clone()],
 		changelog: None,
 		changelog_include: GroupChangelogInclude::All,
-		changelog_sections: ChangelogSection::defaults(),
+		excluded_changelog_types: Vec::new(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -3286,7 +3302,7 @@ fn validate_cli_rejects_invalid_command_shapes() {
 			vec![CliStepDefinition::Validate {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		),
 		cli_command(
@@ -3294,7 +3310,7 @@ fn validate_cli_rejects_invalid_command_shapes() {
 			vec![CliStepDefinition::Validate {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		),
 	])
@@ -3311,7 +3327,7 @@ fn validate_cli_rejects_invalid_command_shapes() {
 		vec![CliStepDefinition::Validate {
 			name: None,
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	)])
 	.err()
@@ -3335,7 +3351,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	);
 	duplicate_inputs.inputs = vec![
@@ -3356,7 +3372,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	);
 	let mut channel = cli_input("channel", CliInputKind::Choice);
@@ -3377,7 +3393,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	);
 	let mut confirm = cli_input("confirm", CliInputKind::Boolean);
@@ -3397,7 +3413,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("   ".to_string()),
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	)])
 	.err()
@@ -3410,12 +3426,12 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			CliStepDefinition::Validate {
 				name: Some("Shared".to_string()),
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			},
 			CliStepDefinition::Discover {
 				name: Some("Shared".to_string()),
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			},
 		],
 	)])
@@ -3438,7 +3454,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			shell: ShellConfig::Default,
 			id: Some(" ".to_string()),
 			variables: None,
-			inputs: std::collections::BTreeMap::from([(
+			inputs: BTreeMap::from([(
 				String::new(),
 				CliStepInputValue::String("value".to_string()),
 			)]),
@@ -3463,7 +3479,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			shell: ShellConfig::Default,
 			id: Some("run-command".to_string()),
 			variables: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	)])
 	.err()
@@ -3485,7 +3501,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			shell: ShellConfig::Default,
 			id: Some("run-command".to_string()),
 			variables: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	)])
 	.err()
@@ -3503,7 +3519,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	}])
 	.err()
@@ -3521,7 +3537,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	}])
 	.err()
@@ -3539,7 +3555,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	}])
 	.err()
@@ -3559,7 +3575,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		)],
 		&monochange_core::ChangesetSettings::default(),
@@ -3586,7 +3602,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		)],
 		&monochange_core::ChangesetSettings::default(),
@@ -3605,7 +3621,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		)],
 		&monochange_core::ChangesetSettings::default(),
@@ -3626,7 +3642,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		)],
 		&monochange_core::ChangesetSettings::default(),
@@ -3649,7 +3665,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 			vec![CliStepDefinition::AffectedPackages {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		)],
 		&monochange_core::ChangesetSettings {
@@ -3671,7 +3687,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 			vec![CliStepDefinition::AffectedPackages {
 				name: None,
 				when: None,
-				inputs: std::collections::BTreeMap::new(),
+				inputs: BTreeMap::new(),
 			}],
 		)],
 		&monochange_core::ChangesetSettings {
@@ -3695,7 +3711,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 		vec![CliStepDefinition::AffectedPackages {
 			name: None,
 			when: None,
-			inputs: std::collections::BTreeMap::new(),
+			inputs: BTreeMap::new(),
 		}],
 	);
 	command.inputs = vec![
@@ -4289,12 +4305,13 @@ fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths()
 			.contains("for ecosystem `cargo`")
 	);
 
-	let empty_template = crate::validate_release_notes_configuration(
+	let empty_template = crate::validate_changelog_configuration(
 		"",
-		&crate::RawReleaseNotesSettings {
-			change_templates: vec![" ".to_string()],
+		&crate::RawChangelogSettings {
+			templates: vec![" ".to_string()],
+			sections: BTreeMap::new(),
+			types: BTreeMap::new(),
 		},
-		&[],
 		&[],
 		&[],
 	)
@@ -4412,7 +4429,7 @@ fn matching_package_helpers_cover_references_and_definitions() {
 		path: PathBuf::from("packages/web"),
 		package_type: monochange_core::PackageType::Npm,
 		changelog: None,
-		changelog_sections: ChangelogSection::defaults(),
+		excluded_changelog_types: Vec::new(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,

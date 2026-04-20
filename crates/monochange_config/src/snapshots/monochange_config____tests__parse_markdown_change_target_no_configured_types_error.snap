@@ -1,6 +1,5 @@
 ---
 source: crates/monochange_config/src/__tests.rs
-assertion_line: 3972
 expression: no_types_error.to_string()
 ---
-config error: failed to parse change.md: target `core` has invalid type `custom_unknown_type`; valid types: breaking, change, docs, feat, fix, major, minor, perf, refactor, security, test
+config error: failed to parse change.md: target `core` has invalid type `custom_unknown_type`; valid types: breaking, change, docs, feat, fix, major, minor, none, patch, refactor, security, test

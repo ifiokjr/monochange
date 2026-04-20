@@ -5,8 +5,8 @@ package_type = "cargo"
 [defaults.changelog]
 path = "{{ path }}/CHANGELOG.md"
 
-[release_notes]
-change_templates = ["This entry appears in changelog via `group.sdk.changelog.text`\n\n### Features\n- **{{ package }}**: {{ summary }}"]
+[changelog]
+templates = ["This entry appears in changelog via `group.sdk.changelog.text`\n\n### Features\n- **{{ package }}**: {{ summary }}"]
 
 [package.core]
 path = "crates/core"

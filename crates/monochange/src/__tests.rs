@@ -1521,7 +1521,7 @@ fn change_type_default_bump_resolves_package_group_and_unknown_targets() {
 	);
 	assert_eq!(
 		crate::change_type_default_bump(&configuration, "unknown", "test"),
-		None
+		Some(BumpSeverity::Minor) // unknown targets inherit workspace defaults
 	);
 }
 
@@ -1859,7 +1859,7 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 	assert!(output.contains("v1.1.0"));
 	assert!(workspace_manifest.contains("version = \"1.1.0\""));
 	assert!(core_changelog.contains("## 1.1.0"));
-	assert!(core_changelog.contains("- add release command"));
+	assert!(core_changelog.contains("add release command"));
 	assert!(app_changelog.contains("## 1.1.0"));
 	assert!(app_changelog.contains("No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."));
 	assert!(group_changelog.contains("Grouped release for `sdk`."));
@@ -8229,7 +8229,7 @@ fn sample_group_definition(include: GroupChangelogInclude) -> monochange_core::G
 		packages: vec!["core".to_string(), "app".to_string()],
 		changelog: None,
 		changelog_include: include,
-		changelog_sections: Vec::new(),
+		excluded_changelog_types: Vec::new(),
 		empty_update_message: None,
 		release_title: None,
 		changelog_version_title: None,
@@ -8250,19 +8250,13 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 	let configuration = monochange_core::WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
 		defaults: monochange_core::WorkspaceDefaults::default(),
-		release_notes: monochange_core::ReleaseNotesSettings::default(),
+		changelog: monochange_core::ChangelogSettings::default(),
 		packages: vec![monochange_core::PackageDefinition {
 			id: "core".to_string(),
 			path: PathBuf::from("crates/core"),
 			package_type: monochange_core::PackageType::Cargo,
 			changelog: None,
-			changelog_sections: vec![monochange_core::ChangelogSection {
-				name: "Docs".to_string(),
-				types: vec![" docs ".to_string(), "test".to_string()],
-				bump: BumpSeverity::None,
-				description: None,
-				priority: 100,
-			}],
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -8280,13 +8274,7 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 			packages: vec!["core".to_string()],
 			changelog: None,
 			changelog_include: GroupChangelogInclude::All,
-			changelog_sections: vec![monochange_core::ChangelogSection {
-				name: "Security".to_string(),
-				types: vec!["security".to_string(), "docs".to_string()],
-				bump: BumpSeverity::None,
-				description: None,
-				priority: 100,
-			}],
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -8307,7 +8295,16 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 	assert_eq!(
 		crate::configured_change_type_choices(&configuration),
 		vec![
+			"breaking".to_string(),
+			"change".to_string(),
 			"docs".to_string(),
+			"feat".to_string(),
+			"fix".to_string(),
+			"major".to_string(),
+			"minor".to_string(),
+			"none".to_string(),
+			"patch".to_string(),
+			"refactor".to_string(),
 			"security".to_string(),
 			"test".to_string()
 		]
@@ -8344,19 +8341,13 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 	let configuration = monochange_core::WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
 		defaults: monochange_core::WorkspaceDefaults::default(),
-		release_notes: monochange_core::ReleaseNotesSettings::default(),
+		changelog: monochange_core::ChangelogSettings::default(),
 		packages: vec![monochange_core::PackageDefinition {
 			id: "core".to_string(),
 			path: PathBuf::from("crates/core"),
 			package_type: monochange_core::PackageType::Cargo,
 			changelog: None,
-			changelog_sections: vec![monochange_core::ChangelogSection {
-				name: "Docs".to_string(),
-				types: vec!["docs".to_string(), "test".to_string()],
-				bump: BumpSeverity::None,
-				description: None,
-				priority: 100,
-			}],
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -8413,7 +8404,13 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
 
 	assert_eq!(cli[0].inputs[0].kind, CliInputKind::Choice);
-	assert_eq!(cli[0].inputs[0].choices, vec!["docs", "test"]);
+	assert_eq!(
+		cli[0].inputs[0].choices,
+		vec![
+			"breaking", "change", "docs", "feat", "fix", "major", "minor", "none", "patch",
+			"refactor", "security", "test"
+		]
+	);
 	assert_eq!(cli[1].inputs[0].choices, vec!["existing"]);
 }
 
@@ -8422,7 +8419,7 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 	let configuration = monochange_core::WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
 		defaults: monochange_core::WorkspaceDefaults::default(),
-		release_notes: monochange_core::ReleaseNotesSettings::default(),
+		changelog: monochange_core::ChangelogSettings::default(),
 		packages: Vec::new(),
 		groups: Vec::new(),
 		cli: Vec::new(),

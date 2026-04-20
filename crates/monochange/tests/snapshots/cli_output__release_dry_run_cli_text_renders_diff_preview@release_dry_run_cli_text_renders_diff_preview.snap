@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 322
 info:
   program: mc
   args:
@@ -50,7 +49,7 @@ file diffs:
 
 --- a/changelog.md
 +++ b/changelog.md
-@@ -1 +1,13 @@
+@@ -1 +1,14 @@
  # Changelog
 +
 +## 1.1.0 ([DATE])
@@ -61,20 +60,19 @@ file diffs:
 +
 +Synchronized members: app
 +
-+### Added
++> [!NOTE]
++> *core*
 +
-+- **core**: add feature
++#### add feature
 
 --- a/crates/core/CHANGELOG.md
 +++ b/crates/core/CHANGELOG.md
-@@ -1 +1,7 @@
+@@ -1 +1,5 @@
  # Changelog
 +
 +## 1.1.0 ([DATE])
 +
-+### Added
-+
-+- add feature
++#### add feature
 
 --- a/group.toml
 +++ b/group.toml

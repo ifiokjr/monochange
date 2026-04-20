@@ -1187,7 +1187,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::Major,
 				section: "breaking".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1195,7 +1195,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::Minor,
 				section: "feat".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1203,7 +1203,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::Minor,
 				section: "feat".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1211,7 +1211,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::Minor,
 				section: "change".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1219,7 +1219,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::Patch,
 				section: "fix".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1227,7 +1227,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::Patch,
 				section: "refactor".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1235,7 +1235,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::None,
 				section: "test".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1243,7 +1243,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::Patch,
 				section: "fix".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1251,7 +1251,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::None,
 				section: "other".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1259,7 +1259,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::None,
 				section: "docs".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 		types.insert(
@@ -1267,7 +1267,7 @@ impl ChangelogSettings {
 			ChangelogType {
 				bump: BumpSeverity::None,
 				section: "security".to_string(),
-				description: Some("".to_string()),
+				description: Some(String::new()),
 			},
 		);
 

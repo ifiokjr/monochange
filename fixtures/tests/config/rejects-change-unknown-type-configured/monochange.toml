@@ -1,7 +1,17 @@
 [package.core]
 path = "crates/core"
 type = "cargo"
-changelog_sections = [
-  { name = "Documentation", types = ["docs"] },
-  { name = "Testing", types = ["test"] },
-]
+
+[changelog.sections.documentation]
+heading = "Documentation"
+priority = 40
+
+[changelog.sections.testing]
+heading = "Testing"
+priority = 40
+
+[changelog.types.docs]
+section = "documentation"
+
+[changelog.types.test]
+section = "testing"

@@ -1,13 +1,20 @@
 [defaults]
 package_type = "cargo"
 
-[release_notes]
-change_templates = [
+[changelog]
+templates = [
     "#### {{ summary }} ({{ package }} {{ bump }})\n\n{{ details }}\n\n{{ context }}",
     "#### {{ summary }}\n\n_Owner:_ {{ change_owner_link }}\n_PR:_ {{ review_request_link }}\n_Closed issues:_ {{ closed_issue_links }}",
     "- {{ summary }}"
 ]
 
+[changelog.sections.security]
+heading = "Security"
+priority = 40
+
+[changelog.types.security]
+section = "security"
+bump = "patch"
+
 [package.core]
 path = "crates/core"
-changelog_sections = [{ name = "Security", types = ["security"], bump = "patch" }]

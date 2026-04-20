@@ -515,12 +515,6 @@ struct GroupReleaseNoteKey {
 	context: Option<String>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct ResolvedSectionDefinition {
-	title: String,
-	types: Vec<String>,
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChangesetDiagnosticsReport {

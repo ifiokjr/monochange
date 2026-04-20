@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_step_input_overrides.rs
-assertion_line: 45
 expression: json
 ---
 {
@@ -19,9 +18,9 @@ expression: json
         "sections": [
           {
             "entries": [
-              "- **core**: add core feature"
+              "> [!NOTE]\n> *core*\n\n#### add core feature"
             ],
-            "title": "Added"
+            "title": "Changed"
           }
         ],
         "summary": [
@@ -34,7 +33,7 @@ expression: json
       "ownerId": "sdk",
       "ownerKind": "group",
       "path": "changelog.md",
-      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Added\n\n- **core**: add core feature"
+      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add core feature"
     },
     {
       "format": "monochange",
@@ -42,9 +41,9 @@ expression: json
         "sections": [
           {
             "entries": [
-              "- add core feature"
+              "#### add core feature"
             ],
-            "title": "Added"
+            "title": "Changed"
           }
         ],
         "summary": [],
@@ -53,7 +52,7 @@ expression: json
       "ownerId": "core",
       "ownerKind": "package",
       "path": "crates/core/CHANGELOG.md",
-      "rendered": "## 1.1.0 ([DATE])\n\n### Added\n\n- add core feature"
+      "rendered": "## 1.1.0 ([DATE])\n\n#### add core feature"
     }
   ],
   "changesets": [

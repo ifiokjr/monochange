@@ -916,14 +916,10 @@ fn render_release_note_sections(
 		let change_type = change.change_type.as_deref().unwrap_or("");
 		if let Some(typ) = changelog.types.get(change_type) {
 			let section_key = typ.section.as_str();
-			section_entries
-				.entry(section_key)
-				.or_default()
-				.push(rendered);
-		} else if !change_type.is_empty() {
-			uncategorized.push(rendered);
+			let entries = section_entries.entry(section_key).or_default();
+			push_unique_release_note_entry(entries, rendered);
 		} else {
-			uncategorized.push(rendered);
+			push_unique_release_note_entry(&mut uncategorized, rendered);
 		}
 	}
 
@@ -931,14 +927,14 @@ fn render_release_note_sections(
 	let mut sections = Vec::new();
 	let mut used_keys = BTreeSet::new();
 	for (section_key, heading, _priority) in &sorted_sections {
-		if let Some(entries) = section_entries.remove(*section_key) {
-			if !entries.is_empty() {
-				sections.push(ReleaseNotesSection {
-					title: heading.to_string(),
-					entries,
-				});
-				used_keys.insert(*section_key);
-			}
+		if let Some(entries) = section_entries.remove(*section_key)
+			&& !entries.is_empty()
+		{
+			sections.push(ReleaseNotesSection {
+				title: heading.to_string(),
+				entries,
+			});
+			used_keys.insert(*section_key);
 		}
 	}
 	if !uncategorized.is_empty() {
@@ -1085,6 +1081,48 @@ fn push_unique_release_note_entry(entries: &mut Vec<String>, entry: String) {
 }
 
 #[cfg(test)]
+struct ResolvedSectionDefinition {
+	types: Vec<String>,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum ResolvedReleaseSectionTarget {
+	Section(usize),
+	Uncategorized,
+}
+
+#[cfg(test)]
+fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
+	section
+		.types
+		.iter()
+		.any(|candidate| candidate.trim() == change_type)
+}
+
+#[cfg(test)]
+fn classify_release_note_change(
+	change: &ReleaseNoteChange,
+	sections: &[ResolvedSectionDefinition],
+) -> ResolvedReleaseSectionTarget {
+	if let Some(change_type) = change.change_type.as_deref()
+		&& let Some(index) = sections
+			.iter()
+			.position(|section| section_matches_resolved_type(section, change_type))
+	{
+		return ResolvedReleaseSectionTarget::Section(index);
+	}
+	let bump_selector = change.bump.to_string();
+	if let Some(index) = sections
+		.iter()
+		.position(|section| section_matches_resolved_type(section, &bump_selector))
+	{
+		return ResolvedReleaseSectionTarget::Section(index);
+	}
+	ResolvedReleaseSectionTarget::Uncategorized
+}
+
+#[cfg(test)]
 mod tests {
 	use std::collections::BTreeMap;
 	use std::collections::BTreeSet;
@@ -1092,8 +1130,10 @@ mod tests {
 
 	use monochange_core::ChangeSignal;
 	use monochange_core::ChangelogFormat;
+	use monochange_core::ChangelogSectionDef;
 	use monochange_core::ChangelogSettings;
 	use monochange_core::ChangelogTarget;
+	use monochange_core::ChangelogType;
 	use monochange_core::ChangesetContext;
 	use monochange_core::ChangesetRevision;
 	use monochange_core::ChangesetTargetKind;
@@ -1128,7 +1168,7 @@ mod tests {
 		WorkspaceConfiguration {
 			root_path: root.to_path_buf(),
 			defaults: WorkspaceDefaults::default(),
-			release_notes: ReleaseNotesSettings::default(),
+			changelog: ChangelogSettings::default(),
 			packages: Vec::new(),
 			groups: Vec::new(),
 			cli: Vec::new(),
@@ -1173,7 +1213,7 @@ mod tests {
 				path: PathBuf::from(format!("packages/{config_id}/CHANGELOG.md")),
 				format: ChangelogFormat::Monochange,
 			}),
-			changelog_sections: Vec::new(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1197,7 +1237,7 @@ mod tests {
 				format: ChangelogFormat::Monochange,
 			}),
 			changelog_include: include,
-			changelog_sections: Vec::new(),
+			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
 			release_title: None,
 			changelog_version_title: None,
@@ -1627,27 +1667,46 @@ mod tests {
 			.is_none()
 		);
 
-		let extra_sections = vec![
-			ChangelogSection {
-				name: "Highlights".to_string(),
-				types: vec!["minor".to_string()],
-				bump: BumpSeverity::Minor,
+		let mut extra_settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		extra_settings.sections.insert(
+			"highlights".to_string(),
+			ChangelogSectionDef {
+				heading: "Highlights".to_string(),
 				description: None,
 				priority: 20,
 			},
-			ChangelogSection {
-				name: "Notes".to_string(),
-				types: vec!["note".to_string()],
-				bump: BumpSeverity::None,
+		);
+		extra_settings.sections.insert(
+			"notes".to_string(),
+			ChangelogSectionDef {
+				heading: "Notes".to_string(),
 				description: None,
 				priority: 100,
 			},
-		];
+		);
+		extra_settings.types.insert(
+			"minor".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "highlights".to_string(),
+				description: None,
+			},
+		);
+		extra_settings.types.insert(
+			"note".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "notes".to_string(),
+				description: None,
+			},
+		);
 		let sections = render_release_note_sections(
 			"sdk",
 			"1.2.3",
-			&extra_sections,
-			&["- {{ summary }}".to_string()],
+			&extra_settings,
 			&[
 				ReleaseNoteChange {
 					change_type: Some("note".to_string()),
@@ -1691,7 +1750,8 @@ mod tests {
 			vec!["- Breaking API".to_string(), "- Bug fix".to_string()]
 		);
 
-		let fallback = render_release_note_sections("sdk", "1.2.3", &[], &[], &[]);
+		let fallback =
+			render_release_note_sections("sdk", "1.2.3", &ChangelogSettings::default(), &[]);
 		assert_eq!(fallback[0].title, "Changed");
 		assert_eq!(fallback[0].entries, vec!["- prepare release".to_string()]);
 
@@ -1699,8 +1759,7 @@ mod tests {
 			"sdk",
 			"1.2.3",
 			vec!["Summary".to_string()],
-			&extra_sections,
-			&["- {{ summary }}".to_string()],
+			&extra_settings,
 			&[sample_change("pkg-a", "pkg-a", ".changeset/a.md")],
 		);
 		assert_eq!(document.title, "1.2.3");
@@ -1968,7 +2027,6 @@ mod tests {
 		configured.metadata.clear();
 		assert_eq!(config_package_id(&configured), "package-a");
 		let selected = ResolvedSectionDefinition {
-			title: "Selected".to_string(),
 			types: vec!["custom".to_string(), " minor ".to_string()],
 		};
 		assert!(section_matches_resolved_type(&selected, "custom"));

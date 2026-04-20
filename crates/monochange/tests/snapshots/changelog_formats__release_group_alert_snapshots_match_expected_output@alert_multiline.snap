@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/changelog_formats.rs
-assertion_line: 66
 expression: group_changelog
 ---
 ## 1.1.0 ([DATE])
@@ -10,8 +9,6 @@ Grouped release for `sdk`.
 Changed members: core
 
 Synchronized members: app
-
-### Added
 
 > [!NOTE]
 > *core*

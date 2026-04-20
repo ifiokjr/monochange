@@ -2855,7 +2855,7 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 }
 
 fn build_changelog_settings(raw: RawChangelogSettings) -> ChangelogSettings {
-	let changelog = if raw.sections.is_empty() && raw.types.is_empty() && raw.templates.is_empty() {
+	if raw.sections.is_empty() && raw.types.is_empty() && raw.templates.is_empty() {
 		ChangelogSettings::defaults()
 	} else {
 		ChangelogSettings {
@@ -2863,8 +2863,7 @@ fn build_changelog_settings(raw: RawChangelogSettings) -> ChangelogSettings {
 			sections: raw.sections,
 			types: raw.types,
 		}
-	};
-	changelog
+	}
 }
 
 fn validate_changelog_configuration(

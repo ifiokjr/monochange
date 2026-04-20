@@ -1,6 +1,14 @@
 [defaults]
 package_type = "cargo"
 
+[changelog.sections.testing]
+heading = "Testing"
+priority = 40
+
+[changelog.types.test]
+section = "testing"
+bump = "minor"
+
 [package.core]
 path = "crates/core"
 
@@ -9,4 +17,3 @@ path = "crates/app"
 
 [group.sdk]
 packages = ["core", "app"]
-changelog_sections = [{ name = "Testing", types = ["test"], bump = "minor" }]
