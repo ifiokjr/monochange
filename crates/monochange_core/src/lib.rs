@@ -1093,11 +1093,27 @@ impl ChangelogSettings {
 	pub fn defaults() -> Self {
 		let mut sections = BTreeMap::new();
 		sections.insert(
+			"major".to_string(),
+			ChangelogSectionDef {
+				heading: "Major".to_string(),
+				description: Some("Major version bumps".to_string()),
+				priority: 5,
+			},
+		);
+		sections.insert(
 			"breaking".to_string(),
 			ChangelogSectionDef {
 				heading: "Breaking Change".to_string(),
 				description: Some("API changes requiring migration".to_string()),
 				priority: 10,
+			},
+		);
+		sections.insert(
+			"minor".to_string(),
+			ChangelogSectionDef {
+				heading: "Minor".to_string(),
+				description: Some("Minor version bumps".to_string()),
+				priority: 15,
 			},
 		);
 		sections.insert(
@@ -1122,6 +1138,14 @@ impl ChangelogSettings {
 				heading: "Fixed".to_string(),
 				description: Some("Bug fixes".to_string()),
 				priority: 30,
+			},
+		);
+		sections.insert(
+			"patch".to_string(),
+			ChangelogSectionDef {
+				heading: "Patch".to_string(),
+				description: Some("Patch version bumps".to_string()),
+				priority: 35,
 			},
 		);
 		sections.insert(
@@ -1165,37 +1189,29 @@ impl ChangelogSettings {
 			},
 		);
 		sections.insert(
-			"other".to_string(),
+			"none".to_string(),
 			ChangelogSectionDef {
-				heading: "Other".to_string(),
-				description: Some("Uncategorized changes".to_string()),
+				heading: "None".to_string(),
+				description: Some("No version bump".to_string()),
 				priority: 50,
 			},
 		);
 
 		let mut types = BTreeMap::new();
 		types.insert(
-			"major".to_string(),
-			ChangelogType {
-				bump: BumpSeverity::Major,
-				section: "breaking".to_string(),
-				description: Some("Major version bump".to_string()),
-			},
-		);
-		types.insert(
 			"breaking".to_string(),
 			ChangelogType {
 				bump: BumpSeverity::Major,
 				section: "breaking".to_string(),
-				description: Some(String::new()),
+				description: Some("Breaking change with major bump".to_string()),
 			},
 		);
 		types.insert(
-			"minor".to_string(),
+			"major".to_string(),
 			ChangelogType {
-				bump: BumpSeverity::Minor,
-				section: "feat".to_string(),
-				description: Some(String::new()),
+				bump: BumpSeverity::Major,
+				section: "major".to_string(),
+				description: Some("Major version bump".to_string()),
 			},
 		);
 		types.insert(
@@ -1207,6 +1223,14 @@ impl ChangelogSettings {
 			},
 		);
 		types.insert(
+			"minor".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "minor".to_string(),
+				description: Some("Minor version bump".to_string()),
+			},
+		);
+		types.insert(
 			"change".to_string(),
 			ChangelogType {
 				bump: BumpSeverity::Minor,
@@ -1215,11 +1239,19 @@ impl ChangelogSettings {
 			},
 		);
 		types.insert(
-			"patch".to_string(),
+			"fix".to_string(),
 			ChangelogType {
 				bump: BumpSeverity::Patch,
 				section: "fix".to_string(),
 				description: Some(String::new()),
+			},
+		);
+		types.insert(
+			"patch".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "patch".to_string(),
+				description: Some("Patch version bump".to_string()),
 			},
 		);
 		types.insert(
@@ -1239,19 +1271,11 @@ impl ChangelogSettings {
 			},
 		);
 		types.insert(
-			"fix".to_string(),
-			ChangelogType {
-				bump: BumpSeverity::Patch,
-				section: "fix".to_string(),
-				description: Some(String::new()),
-			},
-		);
-		types.insert(
 			"none".to_string(),
 			ChangelogType {
 				bump: BumpSeverity::None,
-				section: "other".to_string(),
-				description: Some(String::new()),
+				section: "none".to_string(),
+				description: Some("No version bump".to_string()),
 			},
 		);
 		types.insert(

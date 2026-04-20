@@ -79,9 +79,10 @@ warn_on_group_mismatch = true
 # format = "keep_a_changelog"
 
 # Default changelog configuration. When [changelog] is not specified,
-# built-in defaults provide standard sections (Breaking Change, Added,
-# Changed, Fixed, Testing, Documentation, Security, Performance, Refactor)
-# and corresponding types. See [changelog] section below for customization.
+# built-in defaults provide standard sections (Major, Breaking Change, Added,
+# Minor, Changed, Fixed, Patch, Testing, Refactor, Documentation, Security,
+# Performance, None) and corresponding types. See [changelog] section below
+# for customization.
 # [changelog] — workspace-wide changelog configuration
 # 
 # Controls templates, sections, and types for changelog rendering.
@@ -103,28 +104,34 @@ warn_on_group_mismatch = true
 # Add custom templates if the defaults don't match your style.
 
 # [changelog.sections]
+# major = { heading = "Major", description = "Major version bumps", priority = 5 }
 # breaking = { heading = "Breaking Change", description = "API changes requiring migration", priority = 10 }
-# added = { heading = "Added", description = "New features added", priority = 20 }
-# changed = { heading = "Changed", description = "Changes to existing functionality", priority = 25 }
-# fixed = { heading = "Fixed", description = "Bug fixes", priority = 30 }
-# testing = { heading = "Testing", description = "Changes that only modify tests", priority = 40 }
-# docs = { heading = "Documentation", description = "Changes that only modify documentation", priority = 50 }
-# security = { heading = "Security", description = "Security-related changes", priority = 60 }
-# perf = { heading = "Performance", description = "Performance improvements", priority = 70 }
-# refactor = { heading = "Refactor", description = "Code refactoring without functional changes", priority = 80 }
+# minor = { heading = "Minor", description = "Minor version bumps", priority = 15 }
+# feat = { heading = "Added", description = "New features added", priority = 20 }
+# change = { heading = "Changed", description = "Changes to existing functionality", priority = 25 }
+# fix = { heading = "Fixed", description = "Bug fixes", priority = 30 }
+# patch = { heading = "Patch", description = "Patch version bumps", priority = 35 }
+# test = { heading = "Testing", description = "Changes that only modify tests", priority = 40 }
+# refactor = { heading = "Refactor", description = "Code refactoring without functional changes", priority = 40 }
+# docs = { heading = "Documentation", description = "Changes that only modify documentation", priority = 40 }
+# security = { heading = "Security", description = "Security-related changes", priority = 40 }
+# perf = { heading = "Performance", description = "Performance improvements", priority = 40 }
+# none = { heading = "None", description = "No version bump", priority = 50 }
 
 # [changelog.types]
 # breaking = { section = "breaking", bump = "major" }
-# major = { section = "breaking", bump = "major" }
-# feat = { section = "added", bump = "minor" }
-# minor = { section = "added", bump = "minor" }
-# change = { section = "changed", bump = "minor" }
-# fix = { section = "fixed", bump = "patch" }
-# test = { section = "testing" }
+# major = { section = "major", bump = "major" }
+# feat = { section = "feat", bump = "minor" }
+# minor = { section = "minor", bump = "minor" }
+# change = { section = "change", bump = "minor" }
+# fix = { section = "fix", bump = "patch" }
+# patch = { section = "patch", bump = "patch" }
+# test = { section = "test" }
+# none = { section = "none" }
 # docs = { section = "docs" }
 # security = { section = "security" }
-# perf = { section = "perf" }
-# refactor = { section = "refactor" }
+# refactor = { section = "refactor", bump = "patch" }
+# perf = { heading = "perf" }
 
 
 # Default empty_update_message applied when a package is bumped but has no

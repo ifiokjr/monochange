@@ -2066,4 +2066,413 @@ mod tests {
 			ResolvedReleaseSectionTarget::Section(0)
 		);
 	}
+
+	#[test]
+	fn render_sections_groups_entries_by_type_section_key() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"breaking_change".to_string(),
+			ChangelogSectionDef {
+				heading: "Breaking Changes".to_string(),
+				description: None,
+				priority: 5,
+			},
+		);
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.sections.insert(
+			"bug_fixes".to_string(),
+			ChangelogSectionDef {
+				heading: "Bug Fixes".to_string(),
+				description: None,
+				priority: 20,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"fix".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "bug_fixes".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"breaking".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Major,
+				section: "breaking_change".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![
+			ReleaseNoteChange {
+				change_type: Some("feat".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "add feature".to_string(),
+				..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("fix".to_string()),
+				bump: BumpSeverity::Patch,
+				summary: "fix bug".to_string(),
+				..sample_change("pkg-b", "pkg-b", ".changeset/b.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("breaking".to_string()),
+				bump: BumpSeverity::Major,
+				summary: "remove deprecated API".to_string(),
+				..sample_change("pkg-c", "pkg-c", ".changeset/c.md")
+			},
+		];
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &changes);
+
+		// Sections should be ordered by priority (lower = first)
+		assert_eq!(sections.len(), 3);
+		assert_eq!(sections[0].title, "Breaking Changes");
+		assert_eq!(sections[1].title, "Features");
+		assert_eq!(sections[2].title, "Bug Fixes");
+
+		// Entries should be under the correct section
+		assert_eq!(
+			sections[0].entries,
+			vec!["- remove deprecated API".to_string()]
+		);
+		assert_eq!(sections[1].entries, vec!["- add feature".to_string()]);
+		assert_eq!(sections[2].entries, vec!["- fix bug".to_string()]);
+	}
+
+	#[test]
+	fn render_sections_with_multiple_types_routing_to_same_section() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"minor".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![
+			ReleaseNoteChange {
+				change_type: Some("feat".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "add feature".to_string(),
+				..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("minor".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "minor improvement".to_string(),
+				..sample_change("pkg-b", "pkg-b", ".changeset/b.md")
+			},
+		];
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &changes);
+
+		// Both feat and minor should appear under the same "Features" section
+		assert_eq!(sections.len(), 1);
+		assert_eq!(sections[0].title, "Features");
+		assert_eq!(
+			sections[0].entries,
+			vec![
+				"- add feature".to_string(),
+				"- minor improvement".to_string()
+			]
+		);
+	}
+
+	#[test]
+	fn render_uncategorized_changes_fall_under_changed_heading() {
+		let settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+
+		let changes = vec![ReleaseNoteChange {
+			change_type: None,
+			bump: BumpSeverity::Patch,
+			summary: "uncategorized fix".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &changes);
+
+		// Changes without a matching type should fall under "Changed"
+		assert_eq!(sections.len(), 1);
+		assert_eq!(sections[0].title, "Changed");
+		assert_eq!(sections[0].entries, vec!["- uncategorized fix".to_string()]);
+	}
+
+	#[test]
+	fn render_empty_changes_produces_prepare_release_placeholder() {
+		let settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+
+		let sections = render_release_note_sections("sdk", "1.0.0", &settings, &[]);
+
+		assert_eq!(sections.len(), 1);
+		assert_eq!(sections[0].title, "Changed");
+		assert_eq!(sections[0].entries, vec!["- prepare release".to_string()]);
+	}
+
+	#[test]
+	fn render_release_notes_document_includes_section_headings_in_markdown() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.sections.insert(
+			"fixes".to_string(),
+			ChangelogSectionDef {
+				heading: "Bug Fixes".to_string(),
+				description: None,
+				priority: 20,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"fix".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Patch,
+				section: "fixes".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![
+			ReleaseNoteChange {
+				change_type: Some("feat".to_string()),
+				bump: BumpSeverity::Minor,
+				summary: "add feature".to_string(),
+				..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+			},
+			ReleaseNoteChange {
+				change_type: Some("fix".to_string()),
+				bump: BumpSeverity::Patch,
+				summary: "fix bug".to_string(),
+				..sample_change("pkg-b", "pkg-b", ".changeset/b.md")
+			},
+		];
+
+		let document = build_release_notes_document(
+			"sdk",
+			"1.1.0",
+			vec!["Grouped release for sdk".to_string()],
+			&settings,
+			&changes,
+		);
+
+		assert_eq!(document.title, "1.1.0");
+		assert_eq!(
+			document.summary,
+			vec!["Grouped release for sdk".to_string()]
+		);
+		assert_eq!(document.sections.len(), 2);
+		assert_eq!(document.sections[0].title, "Features");
+		assert_eq!(document.sections[1].title, "Bug Fixes");
+
+		// Now render to markdown and verify headings appear
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+		assert!(
+			markdown.contains("### Features"),
+			"rendered markdown should include ### Features heading"
+		);
+		assert!(
+			markdown.contains("### Bug Fixes"),
+			"rendered markdown should include ### Bug Fixes heading"
+		);
+		assert!(
+			markdown.contains("- add feature"),
+			"rendered markdown should include feat entry"
+		);
+		assert!(
+			markdown.contains("- fix bug"),
+			"rendered markdown should include fix entry"
+		);
+
+		// Verify heading order in markdown matches priority
+		let features_pos = markdown.find("### Features").expect("Features heading");
+		let fixes_pos = markdown.find("### Bug Fixes").expect("Bug Fixes heading");
+		assert!(
+			features_pos < fixes_pos,
+			"Features should appear before Bug Fixes"
+		);
+	}
+
+	#[test]
+	fn keep_a_changelog_format_always_includes_section_headings() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+
+		// Only one section - keep-a-changelog should still include heading
+		let changes = vec![ReleaseNoteChange {
+			change_type: Some("feat".to_string()),
+			bump: BumpSeverity::Minor,
+			summary: "add feature".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let document =
+			build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
+
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::KeepAChangelog, &document);
+
+		// Keep-a-changelog always includes section headings, even for single section
+		assert!(
+			markdown.contains("### Features"),
+			"keep-a-changelog should include heading even with single section"
+		);
+	}
+
+	#[test]
+	fn monochange_format_omits_heading_for_single_changed_section() {
+		let settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+
+		// Single change with no matching type falls to "Changed"
+		let changes = vec![ReleaseNoteChange {
+			change_type: None,
+			bump: BumpSeverity::Patch,
+			summary: "fix bug".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let document =
+			build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
+
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+
+		// Monochange format omits "### Changed" when it's the only section
+		// (it's a single section with title "Changed" - the default)
+		assert!(
+			!markdown.contains("### Changed"),
+			"monochange format should omit ### Changed heading for single default section"
+		);
+		assert!(
+			markdown.contains("- fix bug"),
+			"entry should appear even without heading"
+		);
+	}
+
+	#[test]
+	fn monochange_format_includes_heading_for_custom_single_section() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.sections.insert(
+			"features".to_string(),
+			ChangelogSectionDef {
+				heading: "Features".to_string(),
+				description: None,
+				priority: 10,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "features".to_string(),
+				description: None,
+			},
+		);
+
+		let changes = vec![ReleaseNoteChange {
+			change_type: Some("feat".to_string()),
+			bump: BumpSeverity::Minor,
+			summary: "add feature".to_string(),
+			..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+		}];
+
+		let document =
+			build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
+
+		let markdown =
+			render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+
+		// Single custom section with non-"Changed" title should include heading
+		assert!(
+			markdown.contains("### Features"),
+			"monochange format should include heading for custom single section"
+		);
+	}
 }

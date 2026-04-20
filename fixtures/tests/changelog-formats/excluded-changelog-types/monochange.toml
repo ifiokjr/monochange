@@ -1,0 +1,53 @@
+[defaults]
+parent_bump = "patch"
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+
+[changelog]
+templates = ["- {{ summary }}"]
+
+[changelog.sections.features]
+heading = "Features"
+priority = 10
+
+[changelog.sections.fixes]
+heading = "Bug Fixes"
+priority = 20
+
+[changelog.types.feat]
+section = "features"
+bump = "minor"
+
+[changelog.types.fix]
+section = "fixes"
+bump = "patch"
+
+[changelog.types.test]
+section = "features"
+bump = "none"
+
+[package.core]
+path = "crates/core"
+excluded_changelog_types = ["test"]
+
+[package.app]
+path = "crates/app"
+
+[group.sdk]
+packages = ["core", "app"]
+release = true
+tag = true
+version_format = "primary"
+
+[group.sdk.changelog]
+path = "docs/sdk-CHANGELOG.md"
+
+[ecosystems.cargo]
+enabled = true
+
+[cli.release]
+
+[[cli.release.steps]]
+type = "PrepareRelease"
