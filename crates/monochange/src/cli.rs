@@ -2,11 +2,9 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 
-use anstyle::AnsiColor;
-use anstyle::Color;
-use anstyle::Style;
 use clap::Arg;
 use clap::ArgAction;
+use clap::ColorChoice;
 use clap::Command;
 use monochange_config::load_workspace_configuration;
 use monochange_core::CliCommandDefinition;
@@ -127,25 +125,13 @@ pub(crate) fn build_command_for_root(bin_name: &'static str, root: &Path) -> Com
 /// Color theme for monochange CLI help output.
 fn monochange_styles() -> clap::builder::Styles {
 	clap::builder::Styles::styled()
-		.header(
-			Style::new()
-				.bold()
-				.fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
-		)
-		.usage(
-			Style::new()
-				.bold()
-				.fg_color(Some(Color::Ansi(AnsiColor::White))),
-		)
-		.literal(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))))
-		.placeholder(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Magenta))))
-		.error(
-			Style::new()
-				.bold()
-				.fg_color(Some(Color::Ansi(AnsiColor::Red))),
-		)
-		.valid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))))
-		.invalid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red))))
+		.header(crate::cli_theme::header())
+		.usage(crate::cli_theme::usage())
+		.literal(crate::cli_theme::literal())
+		.placeholder(crate::cli_theme::placeholder())
+		.error(crate::cli_theme::error())
+		.valid(crate::cli_theme::valid())
+		.invalid(crate::cli_theme::error())
 }
 
 pub(crate) fn build_command_with_cli(
@@ -156,6 +142,7 @@ pub(crate) fn build_command_with_cli(
 		Command::new(bin_name)
 			.about("Manage versions and releases for your multiplatform, multilanguage monorepo")
 			.styles(monochange_styles())
+			.color(ColorChoice::Auto)
 			.disable_help_subcommand(true)
 			.subcommand_required(true)
 			.arg_required_else_help(true)

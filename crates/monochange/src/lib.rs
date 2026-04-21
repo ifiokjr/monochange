@@ -46,6 +46,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
 use std::future::Future;
+use std::io::IsTerminal;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
@@ -262,6 +263,7 @@ mod cli;
 mod cli_help;
 mod cli_progress;
 mod cli_runtime;
+mod cli_theme;
 mod git_support;
 mod hosted_sources;
 mod interactive;
@@ -690,6 +692,17 @@ where
 /// Execute the `monochange` CLI against an explicit repository root.
 ///
 /// This is primarily useful for tests and embedding, where the caller wants to
+/// Print a clap `DisplayHelp`/`DisplayVersion` error preserving ANSI colors
+/// when `colored` is true, or return plain text when false.
+fn format_clap_error(error: &clap::Error, colored: bool) -> String {
+	if colored {
+		let _ = error.print();
+		String::new()
+	} else {
+		error.to_string()
+	}
+}
+
 /// control both the argv payload and the workspace root used for config loading
 /// and command execution.
 #[doc(hidden)]
@@ -713,7 +726,10 @@ where
 				ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
 			) =>
 		{
-			return Ok(error.to_string());
+			return Ok(format_clap_error(
+				&error,
+				!cfg!(test) && std::io::stdout().is_terminal(),
+			));
 		}
 		Err(error) => return Err(MonochangeError::Config(error.to_string())),
 	};
