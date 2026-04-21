@@ -48,39 +48,35 @@ fn paint_impl(text: &str, style: anstyle::Style, enabled: bool) -> String {
 }
 
 // Shorthand style constructors using the monochange palette.
+// These delegate to `crate::cli_theme` so clap `--help` and
+// `mc help` share the exact same ANSI styles.
 
 fn accent() -> anstyle::Style {
-	anstyle::Style::new()
-		.fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Cyan)))
-		.bold()
+	crate::cli_theme::header()
 }
 
 fn header() -> anstyle::Style {
-	anstyle::Style::new()
-		.fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::White)))
-		.bold()
+	crate::cli_theme::usage()
 }
 
 fn flag_style() -> anstyle::Style {
-	anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow)))
+	crate::cli_theme::literal()
 }
 
 fn value_style() -> anstyle::Style {
-	anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Magenta)))
+	crate::cli_theme::placeholder()
 }
 
 fn muted() -> anstyle::Style {
-	anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::BrightBlack)))
+	crate::cli_theme::muted()
 }
 
 fn error_style() -> anstyle::Style {
-	anstyle::Style::new()
-		.fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red)))
-		.bold()
+	crate::cli_theme::error()
 }
 
 fn code_style() -> anstyle::Style {
-	anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green)))
+	crate::cli_theme::valid()
 }
 
 // ---------------------------------------------------------------------------

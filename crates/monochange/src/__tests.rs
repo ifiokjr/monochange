@@ -10604,6 +10604,24 @@ fn cli_help_subcommand_overview_without_argument() {
 }
 
 #[test]
+fn format_clap_error_returns_plain_text_without_color() {
+	use clap::Command;
+	let cmd = Command::new("test").about("test cmd");
+	let err = cmd.try_get_matches_from(["test", "--help"]).unwrap_err();
+	let out = crate::format_clap_error(&err, false);
+	assert!(out.contains("Usage: test"));
+}
+
+#[test]
+fn format_clap_error_returns_empty_with_color() {
+	use clap::Command;
+	let cmd = Command::new("test").about("test cmd");
+	let err = cmd.try_get_matches_from(["test", "--help"]).unwrap_err();
+	let out = crate::format_clap_error(&err, true);
+	assert_eq!(out, String::new());
+}
+
+#[test]
 fn parse_remote_url_extracts_owner_repo_from_ssh_url() {
 	let result = crate::workspace_ops::parse_remote_url("git@github.com:ifiokjr/monochange.git");
 	let info = result.unwrap_or_else(|| panic!("expected RemoteInfo"));
