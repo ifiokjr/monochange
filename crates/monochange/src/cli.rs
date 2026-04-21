@@ -108,6 +108,11 @@ pub(crate) fn apply_runtime_prepare_release_markdown_defaults(cli: &mut [CliComm
 			format_input.choices.insert(0, "markdown".to_string());
 		}
 
+		let has_md = format_input.choices.iter().any(|choice| choice == "md");
+		if !has_md {
+			format_input.choices.push("md".to_string());
+		}
+
 		if format_input.default.as_deref() == Some("text") {
 			format_input.default = Some("markdown".to_string());
 		}
@@ -324,8 +329,8 @@ Use `--no-mcp` to skip MCP config files for targets that support repo-local MCP 
 			Arg::new("format")
 				.long("format")
 				.help("Output format for the generated subagent plan")
-				.default_value("text")
-				.value_parser(["text", "json"]),
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
 		)
 		.arg(
 			Arg::new("no-mcp")
@@ -385,8 +390,8 @@ Analysis notes:
 		.arg(
 			Arg::new("format")
 				.long("format")
-				.default_value("text")
-				.value_parser(["text", "json"])
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"])
 				.help("Output format"),
 		)
 }
@@ -415,8 +420,8 @@ Inspection notes:
 			Arg::new("format")
 				.long("format")
 				.help("Output format")
-				.default_value("text")
-				.value_parser(["text", "json"]),
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
 		)
 }
 
@@ -462,8 +467,8 @@ Tagging notes:
 			Arg::new("format")
 				.long("format")
 				.help("Output format")
-				.default_value("text")
-				.value_parser(["text", "json"]),
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
 		)
 }
 
@@ -502,8 +507,8 @@ pub(crate) fn build_check_subcommand() -> Command {
 			Arg::new("format")
 				.long("format")
 				.help("Output format")
-				.default_value("text")
-				.value_parser(["text", "json"]),
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
 		)
 }
 
@@ -519,8 +524,8 @@ pub(crate) fn build_lint_subcommand() -> Command {
 					Arg::new("format")
 						.long("format")
 						.help("Output format")
-						.default_value("text")
-						.value_parser(["text", "json"]),
+						.default_value("markdown")
+						.value_parser(["text", "json", "markdown", "md"]),
 				),
 		)
 		.subcommand(
@@ -535,8 +540,8 @@ pub(crate) fn build_lint_subcommand() -> Command {
 					Arg::new("format")
 						.long("format")
 						.help("Output format")
-						.default_value("text")
-						.value_parser(["text", "json"]),
+						.default_value("markdown")
+						.value_parser(["text", "json", "markdown", "md"]),
 				),
 		)
 		.subcommand(

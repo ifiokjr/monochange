@@ -101,18 +101,20 @@ use cli_runtime::execute_matches;
 pub(crate) use cli_runtime::inferred_retarget_source_configuration;
 #[cfg(test)]
 pub(crate) use cli_runtime::lookup_template_value;
+pub(crate) use cli_runtime::maybe_render_markdown_for_terminal;
 #[cfg(test)]
 pub(crate) use cli_runtime::parse_boolean_step_input;
 #[cfg(test)]
 pub(crate) use cli_runtime::parse_change_bump;
 #[cfg(test)]
 pub(crate) use cli_runtime::parse_direct_template_reference;
-#[cfg(test)]
 pub(crate) use cli_runtime::parse_output_format;
 #[cfg(test)]
 pub(crate) use cli_runtime::render_cli_command_markdown_result;
 #[cfg(test)]
 pub(crate) use cli_runtime::render_cli_command_result;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_markdown_if_terminal;
 #[cfg(test)]
 pub(crate) use cli_runtime::render_retarget_release_report;
 #[cfg(test)]
@@ -348,14 +350,16 @@ impl SubagentTarget {
 /// Output renderer for `mc subagents`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SubagentOutputFormat {
+	Markdown,
 	Text,
 	Json,
 }
 
 fn parse_subagent_output_format_or_default(value: Option<&String>) -> SubagentOutputFormat {
-	match value.map_or("text", String::as_str) {
+	match value.map_or("markdown", String::as_str) {
 		"json" => SubagentOutputFormat::Json,
-		_ => SubagentOutputFormat::Text,
+		"text" => SubagentOutputFormat::Text,
+		_ => SubagentOutputFormat::Markdown,
 	}
 }
 
@@ -611,9 +615,31 @@ pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let args = std::env::args_os();
 	let output = run_with_args(bin_name, args)?;
 	if !quiet && !output.is_empty() {
-		println!("{output}");
+		let format = detect_output_format_from_env_args(std::env::args());
+		if format == OutputFormat::Markdown {
+			println!("{}", maybe_render_markdown_for_terminal(&output));
+		} else {
+			println!("{output}");
+		}
 	}
 	Ok(())
+}
+
+pub(crate) fn detect_output_format_from_env_args(
+	args: impl Iterator<Item = String>,
+) -> OutputFormat {
+	let args: Vec<String> = args.collect();
+	for (i, arg) in args.iter().enumerate() {
+		if arg == "--format"
+			&& let Some(value) = args.get(i + 1)
+		{
+			return parse_output_format(value).unwrap_or(OutputFormat::Markdown);
+		}
+		if let Some(value) = arg.strip_prefix("--format=") {
+			return parse_output_format(value).unwrap_or(OutputFormat::Markdown);
+		}
+	}
+	OutputFormat::Markdown
 }
 
 fn extract_log_level_from_args() -> Option<String> {
@@ -783,14 +809,11 @@ where
 			let detection_level = analyze_matches
 				.get_one::<String>("detection-level")
 				.map_or("signature", String::as_str);
-			let format = if analyze_matches
+			let format = analyze_matches
 				.get_one::<String>("format")
-				.is_some_and(|value| value == "json")
-			{
-				OutputFormat::Json
-			} else {
-				OutputFormat::Text
-			};
+				.map_or(Ok(OutputFormat::Markdown), |value| {
+					parse_output_format(value)
+				})?;
 			render_analyze_report(
 				root,
 				package,
@@ -807,14 +830,11 @@ where
 				.get_one::<String>("from")
 				.map(String::as_str)
 				.ok_or_else(|| MonochangeError::Config("missing release-record ref".to_string()))?;
-			let format = if release_record_matches
+			let format = release_record_matches
 				.get_one::<String>("format")
-				.is_some_and(|value| value == "json")
-			{
-				OutputFormat::Json
-			} else {
-				OutputFormat::Text
-			};
+				.map_or(Ok(OutputFormat::Markdown), |value| {
+					parse_output_format(value)
+				})?;
 			render_release_record_discovery(root, from, format)
 		}
 		Some(("tag-release", tag_release_matches)) => {
@@ -822,14 +842,11 @@ where
 				.get_one::<String>("from")
 				.map(String::as_str)
 				.ok_or_else(|| MonochangeError::Config("missing tag-release ref".to_string()))?;
-			let format = if tag_release_matches
+			let format = tag_release_matches
 				.get_one::<String>("format")
-				.is_some_and(|value| value == "json")
-			{
-				OutputFormat::Json
-			} else {
-				OutputFormat::Text
-			};
+				.map_or(Ok(OutputFormat::Markdown), |value| {
+					parse_output_format(value)
+				})?;
 			let push = tag_release_matches
 				.get_one::<String>("push")
 				.is_none_or(|value| value == "true");
@@ -841,14 +858,11 @@ where
 				return Ok(String::new());
 			}
 			let fix = check_matches.get_flag("fix");
-			let format = if check_matches
+			let format = check_matches
 				.get_one::<String>("format")
-				.is_some_and(|value| value == "json")
-			{
-				OutputFormat::Json
-			} else {
-				OutputFormat::Text
-			};
+				.map_or(Ok(OutputFormat::Markdown), |value| {
+					parse_output_format(value)
+				})?;
 			let ecosystems: Vec<String> = check_matches
 				.get_many::<String>("ecosystem")
 				.map(|values| values.map(String::as_str).map(String::from).collect())

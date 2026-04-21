@@ -557,7 +557,9 @@ pub(crate) fn execute_cli_command_with_options(
 					let format = step_inputs
 						.get("format")
 						.and_then(|values| values.first())
-						.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+						.map_or(Ok(OutputFormat::Markdown), |value| {
+							parse_output_format(value)
+						})?;
 					output = Some(render_discovery_report(&discover_workspace(root)?, format)?);
 					Ok(())
 				}
@@ -2817,14 +2819,16 @@ fn cli_command_output_format(
 	inputs
 		.get("format")
 		.and_then(|values| values.first())
-		.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))
+		.map_or(Ok(OutputFormat::Markdown), |value| {
+			parse_output_format(value)
+		})
 }
 
 #[must_use = "the output format result must be checked"]
 pub(crate) fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat> {
 	match value {
 		"text" => Ok(OutputFormat::Text),
-		"markdown" => Ok(OutputFormat::Markdown),
+		"markdown" | "md" => Ok(OutputFormat::Markdown),
 		"json" => Ok(OutputFormat::Json),
 		other => {
 			Err(MonochangeError::Config(format!(
@@ -2832,6 +2836,23 @@ pub(crate) fn parse_output_format(value: &str) -> MonochangeResult<OutputFormat>
 			)))
 		}
 	}
+}
+
+/// Render raw markdown into terminal-styled text when stdout is a TTY.
+///
+/// When stdout is not an interactive terminal (e.g. piped to a file),
+/// the original markdown string is returned unchanged so that downstream
+/// consumers still receive valid markdown.
+pub(crate) fn render_markdown_if_terminal(markdown: &str, is_terminal: bool) -> String {
+	if is_terminal {
+		termimad::MadSkin::default().term_text(markdown).to_string()
+	} else {
+		markdown.to_string()
+	}
+}
+
+pub(crate) fn maybe_render_markdown_for_terminal(markdown: &str) -> String {
+	render_markdown_if_terminal(markdown, std::io::stdout().is_terminal())
 }
 
 #[must_use = "the change bump result must be checked"]
@@ -3088,7 +3109,9 @@ fn resolve_command_output(
 			.inputs
 			.get("format")
 			.and_then(|values| values.first())
-			.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+			.map_or(Ok(OutputFormat::Markdown), |value| {
+				parse_output_format(value)
+			})?;
 		let rendered = match format {
 			OutputFormat::Json => render_json_output(report, "changeset diagnostics")?,
 			OutputFormat::Markdown | OutputFormat::Text => render_changeset_diagnostics(report),

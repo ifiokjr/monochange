@@ -2143,7 +2143,7 @@ fn command_release_uses_empty_update_message_precedence_for_grouped_changelogs()
 	let group_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(output.contains("command `release` completed"));
+	assert!(output.contains("# `release`"));
 	assert!(core_changelog.contains("Package override for workflow-core -> 1.0.1"));
 	assert!(app_changelog.contains("Update triggered by group sdk; version 1.0.1."));
 	assert!(group_changelog.contains("Update triggered by group sdk; version 1.0.1."));
@@ -4830,7 +4830,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		&configuration,
 		&prepare_release,
 		true,
-		BTreeMap::new(),
+		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
 	.unwrap_or_else(|error| panic!("prepare release: {error}"));
 	assert!(render_output.contains("release manifest: .monochange/release-manifest.json"));
@@ -4860,7 +4860,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		&configuration,
 		&publish_release,
 		true,
-		BTreeMap::new(),
+		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
 	.unwrap_or_else(|error| panic!("publish release: {error}"));
 	assert!(publish_output.contains("releases:"));
@@ -4888,7 +4888,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		&configuration,
 		&release_request,
 		true,
-		BTreeMap::new(),
+		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
 	.unwrap_or_else(|error| panic!("open release request: {error}"));
 	assert!(request_output.contains("release request:"));
@@ -4949,7 +4949,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 				&configuration,
 				&placeholder_command,
 				true,
-				BTreeMap::new(),
+				BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 			)
 			.unwrap_or_else(|error| panic!("placeholder publish: {error}"));
 			assert!(placeholder_output.contains("placeholder publishing:"));
@@ -4978,7 +4978,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 				&configuration,
 				&publish_command,
 				true,
-				BTreeMap::new(),
+				BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 			)
 			.unwrap_or_else(|error| panic!("publish packages: {error}"));
 			assert!(publish_output.contains("package publishing:"));
@@ -5000,9 +5000,6 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 		when.method(GET);
 		then.status(404);
 	});
-	let no_match_inputs =
-		BTreeMap::from([("package".to_string(), vec!["missing-package".to_string()])]);
-
 	temp_env::with_var(
 		"MONOCHANGE_CRATES_IO_API_URL",
 		Some(server.base_url()),
@@ -5022,7 +5019,10 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 				&configuration,
 				&placeholder_command,
 				false,
-				no_match_inputs.clone(),
+				BTreeMap::from([
+					("format".to_string(), vec!["text".to_string()]),
+					("package".to_string(), vec!["missing-package".to_string()]),
+				]),
 			)
 			.unwrap_or_else(|error| panic!("non-dry-run placeholder publish: {error}"));
 			assert!(placeholder_output.contains("placeholder publishing:"));
@@ -5051,7 +5051,10 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 				&configuration,
 				&publish_command,
 				false,
-				no_match_inputs.clone(),
+				BTreeMap::from([
+					("format".to_string(), vec!["text".to_string()]),
+					("package".to_string(), vec!["missing-package".to_string()]),
+				]),
 			)
 			.unwrap_or_else(|error| panic!("non-dry-run publish packages: {error}"));
 			assert!(publish_output.contains("package publishing:"));
@@ -8965,7 +8968,7 @@ fn subagent_parsing_helpers_cover_defaults_deduplication_and_errors() {
 	);
 	assert_eq!(
 		crate::parse_subagent_output_format_or_default(None),
-		crate::SubagentOutputFormat::Text
+		crate::SubagentOutputFormat::Markdown
 	);
 
 	let claude = String::from("claude");
@@ -9650,6 +9653,10 @@ fn parse_output_format_accepts_markdown_text_and_json_and_rejects_invalid_values
 		crate::OutputFormat::Markdown
 	);
 	assert_eq!(
+		crate::parse_output_format("md").unwrap(),
+		crate::OutputFormat::Markdown
+	);
+	assert_eq!(
 		crate::parse_output_format("text").unwrap(),
 		crate::OutputFormat::Text
 	);
@@ -9661,6 +9668,96 @@ fn parse_output_format_accepts_markdown_text_and_json_and_rejects_invalid_values
 		.err()
 		.unwrap_or_else(|| panic!("expected output format error"));
 	assert!(error.to_string().contains("unsupported output format"));
+}
+
+#[test]
+fn maybe_render_markdown_for_terminal_returns_original_when_not_tty() {
+	let markdown = "# Hello\n\n**bold** text";
+	let result = crate::maybe_render_markdown_for_terminal(markdown);
+	assert_eq!(result, markdown);
+}
+
+#[test]
+fn render_markdown_if_terminal_returns_styled_when_terminal() {
+	let markdown = "# Hello\n\n**bold** text";
+	let result = crate::render_markdown_if_terminal(markdown, true);
+	// termimad produces ANSI-styled output when terminal is true
+	assert!(result.contains("Hello"));
+	assert_ne!(result, markdown);
+}
+
+#[test]
+fn render_markdown_if_terminal_returns_original_when_not_terminal() {
+	let markdown = "# Hello\n\n**bold** text";
+	let result = crate::render_markdown_if_terminal(markdown, false);
+	assert_eq!(result, markdown);
+}
+
+#[test]
+fn detect_output_format_from_env_args_defaults_to_markdown() {
+	let args: Vec<String> = vec!["monochange".to_string()];
+	assert_eq!(
+		crate::detect_output_format_from_env_args(args.into_iter()),
+		crate::OutputFormat::Markdown
+	);
+}
+
+#[test]
+fn detect_output_format_from_env_args_parses_format_flag() {
+	let args: Vec<String> = vec![
+		"monochange".to_string(),
+		"--format".to_string(),
+		"json".to_string(),
+	];
+	assert_eq!(
+		crate::detect_output_format_from_env_args(args.into_iter()),
+		crate::OutputFormat::Json
+	);
+}
+
+#[test]
+fn detect_output_format_from_env_args_parses_format_equals() {
+	let args: Vec<String> = vec!["monochange".to_string(), "--format=md".to_string()];
+	assert_eq!(
+		crate::detect_output_format_from_env_args(args.into_iter()),
+		crate::OutputFormat::Markdown
+	);
+}
+
+#[test]
+fn detect_output_format_from_env_args_falls_back_to_markdown_for_invalid() {
+	let args: Vec<String> = vec![
+		"monochange".to_string(),
+		"--format".to_string(),
+		"invalid".to_string(),
+	];
+	assert_eq!(
+		crate::detect_output_format_from_env_args(args.into_iter()),
+		crate::OutputFormat::Markdown
+	);
+}
+
+#[test]
+fn parse_subagent_output_format_or_default_prefers_markdown() {
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(None),
+		crate::SubagentOutputFormat::Markdown
+	);
+	let json = String::from("json");
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(Some(&json)),
+		crate::SubagentOutputFormat::Json
+	);
+	let md = String::from("md");
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(Some(&md)),
+		crate::SubagentOutputFormat::Markdown
+	);
+	let text = String::from("text");
+	assert_eq!(
+		crate::parse_subagent_output_format_or_default(Some(&text)),
+		crate::SubagentOutputFormat::Text
+	);
 }
 
 #[test]

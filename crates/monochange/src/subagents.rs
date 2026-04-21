@@ -63,7 +63,11 @@ pub(crate) fn run_subagents(root: &Path, options: &SubagentOptions) -> Monochang
 			serde_json::to_string_pretty(&plan)
 				.map_err(|error| MonochangeError::Config(error.to_string()))
 		}
-
+		SubagentOutputFormat::Markdown => {
+			Ok(crate::maybe_render_markdown_for_terminal(
+				&render_subagent_plan_text(&plan),
+			))
+		}
 		SubagentOutputFormat::Text => Ok(render_subagent_plan_text(&plan)),
 	}
 }
