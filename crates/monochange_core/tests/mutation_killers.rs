@@ -248,13 +248,30 @@ fn discovery_path_filter_blocks_dot_git() {
 }
 
 #[test]
-fn discovery_path_filter_should_descend_blocks_ignored_dirs() {
+fn discovery_path_filter_should_descend_allows_non_ignored_dirs() {
 	let tmp = tempfile::tempdir().unwrap();
 	let root = tmp.path();
-	std::fs::create_dir(root.join("target")).unwrap();
+	std::fs::create_dir(root.join("crates")).unwrap();
 
 	let filter = DiscoveryPathFilter::new(root);
-	assert!(!filter.should_descend(root.join("target").as_path()));
+	assert!(
+		filter.should_descend(root.join("crates").as_path()),
+		"should_descend should return true for non-ignored directories"
+	);
+}
+
+#[test]
+fn discovery_path_filter_matches_gitignore_blocks_ignored_files() {
+	let tmp = tempfile::tempdir().unwrap();
+	let root = tmp.path();
+	std::fs::write(root.join(".gitignore"), "*.log\n").unwrap();
+	std::fs::write(root.join("test.log"), "").unwrap();
+
+	let filter = DiscoveryPathFilter::new(root);
+	assert!(
+		!filter.allows(root.join("test.log").as_path()),
+		"gitignore pattern should block ignored files"
+	);
 }
 
 // ---------------------------------------------------------------------------
