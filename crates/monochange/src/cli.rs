@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 
-use anstyle::Color;
 use anstyle::AnsiColor;
+use anstyle::Color;
 use anstyle::Style;
 use clap::Arg;
 use clap::ArgAction;
@@ -122,11 +122,23 @@ pub(crate) fn build_command_for_root(bin_name: &'static str, root: &Path) -> Com
 /// Color theme for monochange CLI help output.
 fn monochange_styles() -> clap::builder::Styles {
 	clap::builder::Styles::styled()
-		.header(Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Cyan))))
-		.usage(Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::White))))
+		.header(
+			Style::new()
+				.bold()
+				.fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
+		)
+		.usage(
+			Style::new()
+				.bold()
+				.fg_color(Some(Color::Ansi(AnsiColor::White))),
+		)
 		.literal(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))))
 		.placeholder(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Magenta))))
-		.error(Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Red))))
+		.error(
+			Style::new()
+				.bold()
+				.fg_color(Some(Color::Ansi(AnsiColor::Red))),
+		)
 		.valid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))))
 		.invalid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red))))
 }
@@ -547,12 +559,12 @@ pub(crate) fn build_help_subcommand() -> Command {
 		.long_about(
 			"Show detailed help, examples, and tips for any monochange command. \
 			 Run `mc help` to list all commands, or `mc help <command>` for \
-			 detailed usage information with examples."
+			 detailed usage information with examples.",
 		)
 		.arg(
 			Arg::new("command")
 				.help("Command name to get help for (e.g. change, release, init)")
-				.value_name("COMMAND")
+				.value_name("COMMAND"),
 		)
 }
 

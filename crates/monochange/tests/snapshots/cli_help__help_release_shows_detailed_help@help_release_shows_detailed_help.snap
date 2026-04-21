@@ -1,0 +1,63 @@
+---
+source: crates/monochange/tests/cli_help.rs
+info:
+  program: mc
+  args:
+    - help
+    - release
+  env:
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+╭──────────────────────────────────────────────────────────╮
+│  mc release                                              │
+│  Prepare a release from discovered change files          │
+╰──────────────────────────────────────────────────────────╯
+
+▸ Description
+
+  Reads all changeset files in .changeset/, plans version bumps and changelog updates, and prepares the release artifacts. By default, output is rendered in markdown format.
+
+  In dry-run mode, no files are modified. Use --diff to see unified file diffs for the planned changes. Use --prepared-release to read or write a cached release artifact for multi-step workflows.
+
+▸ Usage
+
+  mc release [OPTIONS]
+
+▸ Options
+
+  --dry-run                 Preview without modifying files
+  --diff                    Show unified file diffs for the release
+  --format <FORMAT>          markdown, text, json (default: markdown)
+  --prepared-release <PATH>  Read/write prepared release artifact path
+
+▸ Examples
+
+  Dry-run preview in text format:
+    mc release --dry-run --format text
+
+  Dry-run with JSON for scripting:
+    mc release --dry-run --format json
+
+  Preview with file diffs:
+    mc release --dry-run --diff
+
+  Execute the release:
+    mc release
+
+▸ Tips
+
+  • Direct package changes propagate to dependents using defaults.parent_bump.
+  • Group synchronization happens before final output is rendered.
+  • Explicit versions on grouped members propagate to the whole group.
+  • Use --prepared-release to cache the release for multi-step workflows.
+
+▸ See Also
+
+  mc help change  mc help versions  mc help commit-release  mc help release-pr
+
+
+----- stderr -----

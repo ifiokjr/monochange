@@ -1,0 +1,75 @@
+---
+source: crates/monochange/tests/cli_help.rs
+info:
+  program: mc
+  args:
+    - help
+    - change
+  env:
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+╭──────────────────────────────────────────────────────────╮
+│  mc change                                               │
+│  Create a change file for one or more packages           │
+╰──────────────────────────────────────────────────────────╯
+
+▸ Description
+
+  Creates a structured changeset markdown file in .changeset/ that describes what changed, which packages are affected, and the requested semver bump. These changeset files are consumed during release planning to produce version bumps, changelogs, and release manifests.
+
+  You can target individual packages or entire version groups. Dependents and group members are propagated automatically during planning. Use --caused-by to mark dependency-only follow-ups.
+
+▸ Usage
+
+  mc change [OPTIONS]
+
+▸ Options
+
+  -i, --interactive       Select packages, bumps, and options interactively
+  --package <PACKAGE>      Package or group to include (repeatable)
+  --bump <BUMP>            none, patch, minor, major (default: patch)
+  --version <VERSION>      Pin an explicit version for this release
+  --reason <REASON>        Short release-note summary
+  --type <TYPE>            Release-note type (feat, fix, security, etc.)
+  --caused-by <CAUSED_BY>  Ids that caused this dependent change (repeatable)
+  --details <DETAILS>      Multi-line release-note details
+  --output <PATH>          Write the change file to a specific path
+
+▸ Examples
+
+  Quick patch for a single package:
+    mc change --package core --bump patch --reason "fix null pointer"
+
+  Minor feature with output path:
+    mc change --package api --bump minor --reason "add pagination" --output .changeset/api-pagination.md
+
+  Group-level change:
+    mc change --package sdk --bump minor --reason "coordinated release"
+
+  Dependency-only follow-up:
+    mc change --package utils --bump patch --caused-by core --reason "bump for core compat"
+
+  Interactive mode:
+    mc change --interactive
+
+  Explicit version pin:
+    mc change --package core --bump major --version 2.0.0 --reason "promote to stable"
+
+▸ Tips
+
+  • Prefer configured package ids over manifest paths.
+  • Use a group id only when the change is intentionally owned by the whole group.
+  • Dependents and grouped members propagate automatically during planning.
+  • --caused-by marks a package as only changing because another moved first.
+  • Legacy manifest paths resolve during migration, but declared ids are the stable interface.
+
+▸ See Also
+
+  mc help release  mc help versions  mc help affected
+
+
+----- stderr -----

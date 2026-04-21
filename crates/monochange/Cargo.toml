@@ -27,9 +27,9 @@ gitlab = ["monochange_gitlab", "monochange_core/http"]
 gitea = ["monochange_gitea", "monochange_core/http"]
 
 [dependencies]
+anstyle = "1.0"
 chrono = { workspace = true, default-features = true }
 clap = { workspace = true, default-features = true, features = ["color"] }
-anstyle = "1.0"
 glob = { workspace = true, default-features = true }
 inquire = { workspace = true, default-features = true }
 minijinja = { workspace = true, default-features = true }
