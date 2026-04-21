@@ -121,55 +121,31 @@ templates = [
 	"- {{ summary }}",
 ]
 
-[changelog.sections.testing]
-heading = "Testing"
-description = "Changes that only modify tests"
-priority = 40
+[changelog.sections]
+breaking = { heading = "Breaking Change", description = "Breaking changes that require consumer updates or migration", priority = 10 }
+feat = { heading = "Added", description = "New features, enhancements, and additions", priority = 20 }
+change = { heading = "Changed", description = "Changes to existing behavior, functionality, or API semantics", priority = 25 }
+fix = { heading = "Fixed", description = "Bug fixes and error corrections", priority = 30 }
+test = { heading = "Testing", description = "Test suite improvements and additions", priority = 40 }
+refactor = { heading = "Refactor", description = "Code refactoring with no functional changes", priority = 40 }
+docs = { heading = "Documentation", description = "Documentation updates and improvements", priority = 40 }
+security = { heading = "Security", description = "Security vulnerabilities, patches, and hardening", priority = 40 }
+perf = { heading = "Performance", description = "Performance optimizations and improvements", priority = 40 }
+other = { heading = "Other", description = "Miscellaneous changes not categorized elsewhere", priority = 50 }
 
-[changelog.sections.docs]
-heading = "Documentation"
-description = "Changes that only modify documentation"
-priority = 50
-
-[changelog.sections.security]
-heading = "Security"
-description = "Security-related changes"
-priority = 20
-
-[changelog.sections.perf]
-heading = "Performance"
-description = "Performance improvements"
-priority = 60
-
-[changelog.sections.refactor]
-heading = "Refactor"
-description = "Code refactoring without functional changes"
-priority = 70
-
-[changelog.types.test]
-section = "testing"
-bump = "none"
-description = "Changes that only modify tests"
-
-[changelog.types.docs]
-section = "docs"
-bump = "none"
-description = "Changes that only modify documentation"
-
-[changelog.types.security]
-section = "security"
-bump = "none"
-description = "Security-related changes"
-
-[changelog.types.perf]
-section = "perf"
-bump = "none"
-description = "Performance improvements"
-
-[changelog.types.refactor]
-section = "refactor"
-bump = "none"
-description = "Code refactoring without functional changes"
+[changelog.types]
+major = { bump = "major", section = "breaking", description = "Major version bump including breaking API changes requiring migration" }
+breaking = { bump = "major", section = "breaking", description = "Breaking changes that require consumers to update their code" }
+minor = { bump = "minor", section = "feat", description = "Minor version bump including new features and enhancements" }
+feat = { bump = "minor", section = "feat", description = "New functionality or capabilities added to the package" }
+change = { bump = "minor", section = "change", description = "Changes to existing behavior or API semantics" }
+patch = { bump = "patch", section = "fix", description = "Patch version bump for bug fixes and small corrections" }
+refactor = { bump = "patch", section = "refactor", description = "Internal code restructuring without changing external behavior" }
+test = { bump = "none", section = "test", description = "Additions or improvements to the test suite only" }
+fix = { bump = "patch", section = "fix", description = "Bug fixes and error corrections" }
+none = { bump = "none", section = "other", description = "Changes with no version impact such as tooling or formatting" }
+docs = { bump = "none", section = "docs", description = "Documentation updates and clarifications only" }
+security = { bump = "none", section = "security", description = "Security improvements, advisories, and vulnerability fixes" }
 
 # =============================================================================
 # [package.*] — declare each release-managed package explicitly
