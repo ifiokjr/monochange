@@ -1,0 +1,94 @@
+name: mutation-testing
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 2:00 AM UTC nightly
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: "Specific crate to test (leave blank for all)"
+        required: false
+        default: ""
+      jobs:
+        description: "Maximum parallel jobs"
+        required: false
+        default: "4"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover-crates:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - id: discover
+        run: |
+          if [ -n "${{ github.event.inputs.crate }}" ]; then
+            MATRIX=$(jq -n -c --arg crate "${{ github.event.inputs.crate }}" '{crate: [$crate]}')
+          else
+            MATRIX=$(cargo metadata --format-version 1 --no-deps 2>/dev/null | jq -c '[.workspace_members[] | split(" ")[0]] | {crate: .}')
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Discovered matrix: $MATRIX"
+
+  mutants:
+    needs: discover-crates
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ github.event.inputs.jobs || 4 }}
+      matrix: ${{ fromJson(needs.discover-crates.outputs.matrix) }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: install cargo-mutants
+        run: cargo install cargo-mutants --locked
+        shell: devenv shell -- bash -e {0}
+
+      - name: run mutation testing for ${{ matrix.crate }}
+        run: |
+          set -euo pipefail
+          cargo mutants -p "${{ matrix.crate }}" --no-shuffle --output "mutants-report/${{ matrix.crate }}"
+        shell: devenv shell -- bash -e {0}
+        timeout-minutes: 90
+
+      - name: upload mutants report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutants-report-${{ matrix.crate }}
+          path: mutants-report/${{ matrix.crate }}*
+          retention-days: 30
+
+      - name: check for missed mutants
+        run: |
+          set -euo pipefail
+          REPORT="mutants-report/${{ matrix.crate }}/mutants.out"
+          if [ -f "$REPORT" ]; then
+            MISSED=$(grep -c "^MISSED" "$REPORT" || true)
+            echo "Missed mutants for ${{ matrix.crate }}: $MISSED"
+            if [ "$MISSED" -gt 0 ]; then
+              echo "::error::${MISSED} mutants survived in ${{ matrix.crate }}"
+              grep "^MISSED" "$REPORT" | head -20
+              exit 1
+            fi
+          else
+            echo "No mutants report found"
+            exit 1
+          fi
+        shell: devenv shell -- bash -e {0}
+        if: always()
