@@ -1,5 +1,5 @@
 ---
-monochange_config: minor
+monochange_config: feat
 ---
 
 #### add publish configuration parsing for registries, trust, and placeholders

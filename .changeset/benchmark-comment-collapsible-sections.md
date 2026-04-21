@@ -1,5 +1,5 @@
 ---
-monochange: patch
+monochange: feat
 ---
 
 #### add visual status summary to benchmark CI comment sections

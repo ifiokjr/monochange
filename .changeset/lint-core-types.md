@@ -1,7 +1,7 @@
 ---
-"monochange_core": minor
-"monochange_analysis": patch
-"monochange_test_helpers": patch
+"monochange_core": feat
+"monochange_analysis": test
+"monochange_test_helpers": test
 ---
 
 #### add core linting types

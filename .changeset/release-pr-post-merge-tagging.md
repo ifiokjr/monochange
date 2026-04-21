@@ -1,6 +1,6 @@
 ---
-monochange: minor
-"@monochange/cli": patch
+monochange: feat
+"@monochange/cli": docs
 ---
 
 #### add `mc tag-release` for post-merge release PR workflows

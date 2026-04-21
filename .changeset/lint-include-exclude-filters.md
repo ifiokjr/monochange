@@ -1,9 +1,9 @@
 ---
-"@monochange/skill": patch
-monochange: minor
-monochange_config: patch
-monochange_core: minor
-monochange_lint: patch
+"@monochange/skill": feat
+monochange: feat
+monochange_config: feat
+monochange_core: feat
+monochange_lint: feat
 ---
 
 #### add lint include/exclude path filters with optional gitignore override

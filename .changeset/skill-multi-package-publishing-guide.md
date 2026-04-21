@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": patch
+"@monochange/skill": docs
 ---
 
 #### add a multi-package publishing guide to the packaged skill

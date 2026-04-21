@@ -1,8 +1,8 @@
 ---
-monochange_gitea: none
-monochange_github: patch
-monochange_gitlab: none
-monochange_hosting: none
+monochange_gitea: change
+monochange_github: change
+monochange_gitlab: change
+monochange_hosting: change
 ---
 
 #### align provider and hosting release examples with package publication metadata

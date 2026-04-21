@@ -1,5 +1,5 @@
 ---
-monochange: patch
+monochange: test
 ---
 
 #### add fixture-first integration coverage for manual trust diagnostics

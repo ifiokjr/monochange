@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": patch
+"@monochange/skill": docs
 ---
 
 #### refresh crates.io and pub.dev trusted publishing guidance

@@ -1,10 +1,10 @@
 ---
-monochange: patch
-monochange_analysis: patch
-monochange_npm: patch
-monochange_deno: patch
-monochange_ecmascript: major
-"@monochange/skill": patch
+monochange: feat
+monochange_analysis: feat
+monochange_npm: fix
+monochange_deno: feat
+monochange_ecmascript: feat
+"@monochange/skill": docs
 ---
 
 #### improve npm and Deno semantic analysis with parser-backed JS/TS export extraction

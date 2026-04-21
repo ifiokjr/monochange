@@ -1,6 +1,6 @@
 ---
-monochange: minor
-monochange_core: minor
+monochange: feat
+monochange_core: feat
 ---
 
 #### add MCP tools for change analysis and validation

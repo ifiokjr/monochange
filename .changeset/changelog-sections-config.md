@@ -1,8 +1,8 @@
 ---
-monochange: minor
-monochange_config: minor
-monochange_core: minor
-monochange_lint: patch
+monochange: breaking
+monochange_config: breaking
+monochange_core: breaking
+monochange_lint: breaking
 ---
 
 # replace changelog_sections with [changelog] section

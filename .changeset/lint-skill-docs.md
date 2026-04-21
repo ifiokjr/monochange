@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": patch
+"@monochange/skill": docs
 ---
 
 #### add lint rule documentation

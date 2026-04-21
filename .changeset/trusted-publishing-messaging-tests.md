@@ -1,5 +1,5 @@
 ---
-monochange: patch
+monochange: test
 ---
 
 #### add trusted-publishing messaging test coverage

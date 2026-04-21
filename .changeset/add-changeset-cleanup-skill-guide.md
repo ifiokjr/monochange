@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": minor
+"@monochange/skill": docs
 ---
 
 #### add changeset cleanup job guide with mc diagnostics workflow

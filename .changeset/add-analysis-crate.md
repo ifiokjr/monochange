@@ -1,5 +1,5 @@
 ---
-monochange_analysis: minor
+monochange_analysis: feat
 ---
 
 #### add semantic change analysis crate

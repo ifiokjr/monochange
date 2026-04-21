@@ -1,6 +1,6 @@
 ---
-"monochange": minor
-"monochange_lint": minor
+"monochange": feat
+"monochange_lint": feat
 ---
 
 #### add mc check command and lint rule integration

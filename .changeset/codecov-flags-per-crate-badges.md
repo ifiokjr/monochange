@@ -1,19 +1,19 @@
 ---
-"@monochange/cli": patch
-monochange: patch
-monochange_analysis: patch
-monochange_cargo: patch
-monochange_config: patch
-monochange_core: patch
-monochange_dart: patch
-monochange_deno: patch
-monochange_gitea: patch
-monochange_github: patch
-monochange_gitlab: patch
-monochange_graph: patch
-monochange_hosting: patch
-monochange_npm: patch
-monochange_semver: patch
+"@monochange/cli": feat
+monochange: feat
+monochange_analysis: feat
+monochange_cargo: feat
+monochange_config: feat
+monochange_core: feat
+monochange_dart: feat
+monochange_deno: feat
+monochange_gitea: feat
+monochange_github: feat
+monochange_gitlab: feat
+monochange_graph: feat
+monochange_hosting: feat
+monochange_npm: feat
+monochange_semver: feat
 ---
 
 #### add per-crate Codecov coverage flags and crate-specific coverage badges

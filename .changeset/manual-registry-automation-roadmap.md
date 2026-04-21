@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": patch
+"@monochange/skill": docs
 ---
 
 #### document future automation boundaries for manual registries

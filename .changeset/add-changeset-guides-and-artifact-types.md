@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": minor
+"@monochange/skill": docs
 ---
 
 #### add artifact-type-aware changeset guides and skill package expansion

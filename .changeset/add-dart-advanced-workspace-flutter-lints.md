@@ -1,7 +1,7 @@
 ---
 "@monochange/skill": none
-"monochange": minor
-"monochange_dart": minor
+"monochange": feat
+"monochange_dart": feat
 ---
 
 Add advanced Dart workspace and Flutter lint rules.

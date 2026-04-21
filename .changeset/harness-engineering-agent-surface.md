@@ -1,6 +1,6 @@
 ---
-monochange: patch
-"@monochange/skill": patch
+monochange: feat
+"@monochange/skill": docs
 ---
 
 #### expand the agent-facing harness around diagnostics, lint metadata, and repo guidance

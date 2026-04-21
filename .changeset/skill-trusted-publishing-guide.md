@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": minor
+"@monochange/skill": docs
 ---
 
 #### add trusted publishing setup guidance for supported registries

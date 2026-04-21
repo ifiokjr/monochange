@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": minor
+"@monochange/skill": docs
 ---
 
 #### add granular changeset generation guidance to the skill package

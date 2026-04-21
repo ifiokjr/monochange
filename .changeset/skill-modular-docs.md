@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": patch
+"@monochange/skill": docs
 ---
 
 #### add modular skill docs and a full linting guide

@@ -1,5 +1,5 @@
 ---
-monochange: patch
+monochange: fix
 ---
 
 #### improve trusted-publishing preflight diagnostics for manual registries

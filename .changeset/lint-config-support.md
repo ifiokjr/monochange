@@ -1,5 +1,5 @@
 ---
-"monochange_config": patch
+"monochange_config": feat
 ---
 
 #### support lints field in ecosystem configuration

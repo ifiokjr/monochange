@@ -1,5 +1,5 @@
 ---
-"@monochange/skill": minor
+"@monochange/skill": docs
 ---
 
 #### reorganize bundled skill docs into lowercased skill paths

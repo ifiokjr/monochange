@@ -1,14 +1,14 @@
 ---
-"@monochange/cli": minor
-"@monochange/cli-darwin-arm64": minor
-"@monochange/cli-darwin-x64": minor
-"@monochange/cli-linux-arm64-gnu": minor
-"@monochange/cli-linux-arm64-musl": minor
-"@monochange/cli-linux-x64-gnu": minor
-"@monochange/cli-linux-x64-musl": minor
-"@monochange/cli-win32-x64-msvc": minor
-"@monochange/cli-win32-arm64-msvc": minor
-"@monochange/skill": minor
+"@monochange/cli": change
+"@monochange/cli-darwin-arm64": change
+"@monochange/cli-darwin-x64": change
+"@monochange/cli-linux-arm64-gnu": change
+"@monochange/cli-linux-arm64-musl": change
+"@monochange/cli-linux-x64-gnu": change
+"@monochange/cli-linux-x64-musl": change
+"@monochange/cli-win32-x64-msvc": change
+"@monochange/cli-win32-arm64-msvc": change
+"@monochange/skill": change
 ---
 
 #### static npm packages in packages/ directory

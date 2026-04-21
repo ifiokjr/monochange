@@ -1,8 +1,8 @@
 ---
-monochange: minor
-monochange_core: minor
-monochange_config: minor
-monochange_npm: patch
+monochange: feat
+monochange_core: feat
+monochange_config: feat
+monochange_npm: fix
 ---
 
 #### add publish rate-limit planning and batched publish metadata

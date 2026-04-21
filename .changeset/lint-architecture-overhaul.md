@@ -1,12 +1,12 @@
 ---
-monochange: minor
-monochange_core: minor
-monochange_config: minor
-monochange_lint: minor
-monochange_cargo: minor
-monochange_npm: minor
-monochange_linting: minor
-monochange_lint_testing: minor
+monochange: change
+monochange_core: change
+monochange_config: change
+monochange_lint: change
+monochange_cargo: feat
+monochange_npm: feat
+monochange_linting: feat
+monochange_lint_testing: feat
 monochange_gitea: none
 monochange_gitlab: none
 "@monochange/cli": none

@@ -1,5 +1,5 @@
 ---
-monochange_core: minor
+monochange_core: feat
 ---
 
 #### add package publication targets and publish step definitions

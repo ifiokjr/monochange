@@ -1,7 +1,7 @@
 ---
-"@monochange/cli": patch
-monochange: minor
-monochange_config: patch
+"@monochange/cli": feat
+monochange: feat
+monochange_config: feat
 ---
 
 Add a package-scoped `mc analyze` CLI command for release-aware semantic analysis.

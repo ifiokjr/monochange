@@ -1,5 +1,5 @@
 ---
-monochange: minor
+monochange: feat
 ---
 
 #### add built-in package publishing and placeholder bootstrap commands

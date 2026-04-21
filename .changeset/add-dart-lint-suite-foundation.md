@@ -1,6 +1,6 @@
 ---
-monochange: minor
-monochange_dart: minor
+monochange: feat
+monochange_dart: feat
 monochange_core: none
 monochange_config: none
 monochange_cargo: none

@@ -1,8 +1,8 @@
 ---
-monochange: minor
-monochange_config: minor
-monochange_core: minor
-monochange_graph: minor
+monochange: feat
+monochange_config: feat
+monochange_core: feat
+monochange_graph: feat
 monochange_cargo: none
 monochange_semver: none
 monochange_lint_testing: none

@@ -1,12 +1,12 @@
 ---
-monochange: minor
-monochange_analysis: minor
-monochange_core: minor
-monochange_cargo: minor
-monochange_npm: minor
-monochange_deno: minor
-monochange_dart: minor
-"@monochange/skill": patch
+monochange: feat
+monochange_analysis: feat
+monochange_core: feat
+monochange_cargo: feat
+monochange_npm: feat
+monochange_deno: feat
+monochange_dart: feat
+"@monochange/skill": docs
 ---
 
 #### add ecosystem-specific semantic analysis for MCP changeset workflows

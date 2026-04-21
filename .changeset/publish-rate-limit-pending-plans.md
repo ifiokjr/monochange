@@ -1,5 +1,5 @@
 ---
-monochange: patch
+monochange: fix
 ---
 
 #### align publish rate-limit plans with pending registry work

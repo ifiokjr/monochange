@@ -1,20 +1,20 @@
 ---
-"@monochange/cli": patch
-monochange: patch
-monochange_analysis: patch
-monochange_cargo: patch
-monochange_config: patch
-monochange_core: patch
-monochange_dart: patch
-monochange_deno: patch
-monochange_gitea: patch
-monochange_github: patch
-monochange_gitlab: patch
-monochange_graph: patch
-monochange_hosting: patch
-monochange_npm: patch
-monochange_semver: patch
-monochange_test_helpers: patch
+"@monochange/cli": refactor
+monochange: refactor
+monochange_analysis: refactor
+monochange_cargo: refactor
+monochange_config: refactor
+monochange_core: refactor
+monochange_dart: refactor
+monochange_deno: refactor
+monochange_gitea: refactor
+monochange_github: refactor
+monochange_gitlab: refactor
+monochange_graph: refactor
+monochange_hosting: refactor
+monochange_npm: refactor
+monochange_semver: refactor
+monochange_test_helpers: refactor
 ---
 
 #### align crate docs and readability with the workspace style guide

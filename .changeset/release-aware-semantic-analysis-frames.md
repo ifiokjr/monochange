@@ -1,5 +1,5 @@
 ---
-monochange_analysis: minor
+monochange_analysis: feat
 ---
 
 `monochange_analysis` can now return release-aware semantic analysis across three explicit frames:

@@ -1,5 +1,5 @@
 ---
-monochange: patch
+monochange: fix
 ---
 
 #### make manual trusted-publishing guidance more actionable

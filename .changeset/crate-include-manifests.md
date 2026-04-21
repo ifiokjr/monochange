@@ -1,16 +1,16 @@
 ---
-monochange_cargo: patch
-monochange_config: patch
-monochange_core: patch
-monochange_dart: patch
-monochange_deno: patch
-monochange_gitea: patch
-monochange_github: patch
-monochange_gitlab: patch
-monochange_graph: patch
-monochange_hosting: patch
-monochange_npm: patch
-monochange_semver: patch
+monochange_cargo: change
+monochange_config: change
+monochange_core: change
+monochange_dart: change
+monochange_deno: change
+monochange_gitea: change
+monochange_github: change
+monochange_gitlab: change
+monochange_graph: change
+monochange_hosting: change
+monochange_npm: change
+monochange_semver: change
 ---
 
 #### move crate include lists into published manifests

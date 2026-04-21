@@ -1,7 +1,7 @@
 ---
-monochange: minor
-monochange_config: patch
-monochange_core: patch
+monochange: feat
+monochange_config: feat
+monochange_core: feat
 ---
 
 #### add a dedicated `mc versions` command
