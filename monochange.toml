@@ -698,8 +698,9 @@ steps = [
 ]
 
 [cli.publish]
-help_text = "Publish all packages after a release"
-steps = [
-	{ type = "Command", command = "cargo workspaces publish --from-git --allow-dirty --yes", name = "publish cargo workspace crates" },
-	{ type = "Command", command = "pnpm -r publish --access public --no-git-checks", name = "publish npm packages" },
+help_text = "Publish packages from this release using built-in publishing workflows"
+inputs = [
+	{ name = "package", type = "string_list" },
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 ]
+steps = [{ name = "publish packages", type = "PublishPackages" }]
