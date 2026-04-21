@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 240
+assertion_line: 447
 info:
   program: mc
   args:
@@ -14,20 +14,33 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-command `release-pr` completed (dry-run)
-version: 1.1.0
-released packages: workflow-app, workflow-core
-release targets:
-- group sdk -> v1.1.0 (tag: true, release: true)
-release manifest: .monochange/release-manifest.json
-release request:
+# `release-pr` (dry-run)
+
+## Summary
+
+- **Version:** `1.1.0`
+- **Released packages:** `workflow-app`, `workflow-core`
+
+## Release targets
+
+- **group `sdk`** → `v1.1.0`
+  - tag: yes · release: yes
+
+## Release manifest
+
+- `.monochange/release-manifest.json`
+
+## Release request
+
 - dry-run ifiokjr/monochange monochange/release/release-pr -> main via github
-changed files:
-- Cargo.toml
-- changelog.md
-- crates/app/Cargo.toml
-- crates/core/CHANGELOG.md
-- crates/core/Cargo.toml
-- group.toml
+
+## Changed files
+
+- `Cargo.toml`
+- `changelog.md`
+- `crates/app/Cargo.toml`
+- `crates/core/CHANGELOG.md`
+- `crates/core/Cargo.toml`
+- `group.toml`
 
 ----- stderr -----

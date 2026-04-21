@@ -206,7 +206,7 @@ fn release_progress_streams_named_steps_on_tty() {
 	assert!(transcript.contains("stream summary [stdout] streamed line 1"));
 	assert!(transcript.contains("stream summary [stdout] streamed line 2"));
 	assert!(transcript.contains("`progress-release` finished"));
-	assert!(transcript.contains("command `progress-release` completed"));
+	assert!(transcript.contains("Summary"));
 }
 
 #[test]
