@@ -1,15 +1,6 @@
----
-"@monochange/cli": change
-"@monochange/cli-darwin-arm64": change
-"@monochange/cli-darwin-x64": change
-"@monochange/cli-linux-arm64-gnu": change
-"@monochange/cli-linux-arm64-musl": change
-"@monochange/cli-linux-x64-gnu": change
-"@monochange/cli-linux-x64-musl": change
-"@monochange/cli-win32-x64-msvc": change
-"@monochange/cli-win32-arm64-msvc": change
-"@monochange/skill": change
----
+## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+
+### Changed
 
 #### static npm packages in packages/ directory
 
@@ -31,3 +22,5 @@ packages/monochange__skill/            # @monochange/skill
 ```
 
 `build-packages.mjs` still runs during release to populate platform binaries into `packages/*/bin/`, but it no longer generates the package structure from scratch. `publish-packages.mjs` now validates that each package has the expected binaries before publishing, preventing accidental empty publishes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #204](https://github.com/ifiokjr/monochange/pull/204) _Introduced in:_ [`a90638b`](https://github.com/ifiokjr/monochange/commit/a90638b911d0aca00afcda8c5686da46ead14831) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)

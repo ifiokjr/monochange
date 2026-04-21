@@ -1,47 +1,66 @@
-# Changelog
-
-All notable changes to `monochange_deno` will be documented in this file.
-
-## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
-
-### Breaking changes
-
-#### 🚀 Initial public release of monochange
-
-**monochange** is a Rust-based release-planning toolkit for monorepos that span multiple package ecosystems. It is designed from the ground up to support the modern, AI-driven development landscape where agents and automation play a central role in software delivery.
-
-##### What is monochange?
-
-In today's agent-driven development environment, managing releases across diverse package ecosystems (Rust, JavaScript/TypeScript, Dart, Python, etc.) becomes increasingly complex. monochange provides a unified, programmatic interface for:
-
-- **Change tracking**: Structured changesets that capture intent across multiple packages
-- **Release planning**: Automated versioning and changelog generation
-- **Multi-ecosystem support**: Native handling of Cargo, NPM, Dart, Deno, and more
-- **CI/CD integration**: Seamless workflows for Gitea, GitHub, and GitLab
-- **Graph-based dependency analysis**: Understanding package relationships across your monorepo
-
-##### Why monochange matters for AI-driven workflows
-
-As development teams increasingly rely on AI agents to generate code, manage dependencies, and orchestrate releases, monochange provides the structured foundation these agents need to operate effectively. It transforms release management from a manual, error-prone process into a deterministic, automatable workflow.
-
-##### What's included in this release
-
-This first release includes:
-
-- Core changeset management engine
-- Multi-ecosystem package detection and versioning
-- Hosting provider integrations (Gitea, GitHub, GitLab)
-- Semantic versioning utilities
-- Configurable release workflows
-- CLI tooling for validation and release orchestration
-
-For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
-
-> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
-
 ## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
+
+#### add semantic change analysis crate
+
+Introduces a new `monochange_analysis` crate that provides intelligent, artifact-aware changeset generation for the monochange ecosystem.
+
+**What it does:**
+
+The crate analyzes git diffs and suggests granular changesets based on the type of code being changed:
+
+- **Libraries**: Detects public API changes (new functions, types, traits)
+- **Applications**: Identifies UI components, routes, and state changes
+- **CLI tools**: Extracts command and flag modifications
+
+**Key features:**
+
+- **Change frame detection**: Automatically detects what to analyze based on git state (working directory, branches, PRs, CI/CD environments)
+- **Artifact type classification**: Determines if a package is a library, application, CLI tool, or mixed artifact
+- **Semantic extraction**: Three levels of analysis - basic (file-level), signature (function/type signatures), and semantic (full AST)
+- **Adaptive grouping**: Configurable thresholds for grouping related changes vs. creating separate changesets
+
+**Example usage:**
+
+```rust
+use monochange_analysis::{
+    analyze_changes,
+    ChangeFrame,
+    AnalysisConfig,
+    DetectionLevel,
+};
+
+// Auto-detect the change frame
+let frame = ChangeFrame::detect(Path::new("."))?;
+
+let config = AnalysisConfig {
+    detection_level: DetectionLevel::Signature,
+    ..Default::default()
+};
+
+let analysis = analyze_changes(Path::new("."), &frame, &config)?;
+
+// Get suggested changesets per package
+for (package_id, pkg) in &analysis.package_changes {
+    for cs in &pkg.suggested_changesets {
+        println!("{}: {}", package_id, cs.summary);
+    }
+}
+```
+
+**Supported CI/CD environments:**
+
+- GitHub Actions
+- GitLab CI
+- CircleCI
+- Travis CI
+- Azure Pipelines
+- Buildkite
+
+This crate is the foundation for the new `mc analyze` command and MCP tools that help agents generate better changesets automatically.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #206](https://github.com/ifiokjr/monochange/pull/206) _Introduced in:_ [`a417022`](https://github.com/ifiokjr/monochange/commit/a417022f80f93d61add00b8087e0f80102a9fd52) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add per-crate Codecov coverage flags and crate-specific coverage badges
 
@@ -164,38 +183,15 @@ The monochange skill documentation now also teaches the new-package rule: the fi
 
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #250](https://github.com/ifiokjr/monochange/pull/250) _Introduced in:_ [`0dd8460`](https://github.com/ifiokjr/monochange/commit/0dd846060614b2de9d3b2dfb5c1337075774b167) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#247](https://github.com/ifiokjr/monochange/issues/247), [#249](https://github.com/ifiokjr/monochange/issues/249)
 
-### Changed
+#### `monochange_analysis` can now return release-aware semantic analysis across three explicit frames:
 
-#### move crate include lists into published manifests
+- `release -> main`
+- `main -> head`
+- `release -> head`
 
-The published library crates in this workspace now declare their `include` file lists in each crate's own `Cargo.toml` instead of inheriting that setting from `[workspace.package]`.
+This adds a first multi-frame API surface for issue #249, including explicit ref-based entry points plus automatic baseline resolution that uses the latest workspace-style release tag and the detected default branch.
 
-**Before (`crates/monochange_core/Cargo.toml`):**
-
-```toml
-[package]
-include = { workspace = true }
-readme = "readme.md"
-```
-
-The package contents depended on the root workspace manifest carrying:
-
-```toml
-[workspace.package]
-include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
-```
-
-**After:**
-
-```toml
-[package]
-include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
-readme = "readme.md"
-```
-
-This keeps each published crate self-contained when packaging, auditing, or updating manifest metadata and avoids relying on a shared workspace-level `include` definition for crates.io package contents.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #227](https://github.com/ifiokjr/monochange/pull/227) _Introduced in:_ [`78af3c2`](https://github.com/ifiokjr/monochange/commit/78af3c244a4090965b455e2879b33a160e28da77) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #252](https://github.com/ifiokjr/monochange/pull/252) _Introduced in:_ [`d1dce9d`](https://github.com/ifiokjr/monochange/commit/d1dce9d880a1739253f5dccc3cd7cc73431b2b41) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#249](https://github.com/ifiokjr/monochange/issues/249)
 
 ### Refactor
 
@@ -244,17 +240,23 @@ The result is more consistent crate documentation, less duplicated prose, and fl
 
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/ifiokjr/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/ifiokjr/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
-### Changed
+### Testing
 
-#### add the first Dart lint suite foundation
+#### add core linting types
 
-monochange now wires Dart manifests into the ecosystem-owned lint registry and supports scaffolding Dart lint files with `mc lint new dart/<rule-name>`.
+Add `monochange_core::lint` module with the foundational types for the linting system:
 
-This foundation change adds:
+- `LintSeverity` (Off, Warning, Error) — rule severity levels
+- `LintCategory` (Style, Correctness, Performance, Suspicious, BestPractice) — rule classification
+- `LintRule` — rule definition with id, name, description, and autofixable flag
+- `LintResult`, `LintLocation` — individual findings with file location and byte spans
+- `LintFix`, `LintEdit` — autofix suggestions with span-based replacements
+- `LintRuleConfig` — flexible configuration supporting simple severity or detailed options
+- `LintReport` — aggregated results with error/warning counts
+- `LintContext` — rule input with workspace root, manifest path, and file contents
+- `LintRuleRunner` trait — executable rule interface with `rule()`, `applies_to()`, and `run()`
+- `LintRuleRegistry` — rule registration and discovery
 
-- a new `monochange_dart::lints` module with target collection for `pubspec.yaml`
-- Dart lint suite registration in the `mc lint` and `mc check` command paths
-- Dart lint scaffolding support in `mc lint new`
-- tests covering managed Dart lint target collection and fixture filtering
+Also adds `lints` field to `EcosystemSettings` for per-ecosystem lint configuration and `Lint` variant to `CliStepDefinition` with `format`, `fix`, and `ecosystem` inputs.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/ifiokjr/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/ifiokjr/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/ifiokjr/monochange/issues/230)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/ifiokjr/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/ifiokjr/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)

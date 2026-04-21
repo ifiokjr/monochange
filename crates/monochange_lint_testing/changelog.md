@@ -1,17 +1,6 @@
----
-monochange: change
-monochange_core: change
-monochange_config: change
-monochange_lint: change
-monochange_cargo: feat
-monochange_npm: feat
-monochange_linting: feat
-monochange_lint_testing: feat
-monochange_gitea: none
-monochange_gitlab: none
-"@monochange/cli": none
-"@monochange/skill": none
----
+## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+
+### Added
 
 #### centralize manifest lint configuration and split lint suites by ecosystem
 
@@ -88,3 +77,13 @@ This release also adds two new support crates:
 - `monochange_lint_testing` — snapshot-friendly helpers for lint reports and autofix output
 
 The Cargo and npm suites now live in `monochange_cargo::lints` and `monochange_npm::lints`, so ecosystem-specific parsing and rule behavior stay with their ecosystem adapters.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/ifiokjr/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/ifiokjr/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+
+### Changed
+
+#### add `caused_by` changeset context for dependency propagation
+
+You can now annotate dependency-only follow-up changesets with `caused_by`, use `mc change --caused-by ...` to author them, inspect the linkage in diagnostics output, and suppress matching automatic dependency propagation during release planning.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/ifiokjr/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/ifiokjr/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/ifiokjr/monochange/issues/208)

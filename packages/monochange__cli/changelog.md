@@ -1,43 +1,36 @@
-## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
-
-### Breaking changes
-
-#### 🚀 Initial public release of monochange
-
-**monochange** is a Rust-based release-planning toolkit for monorepos that span multiple package ecosystems. It is designed from the ground up to support the modern, AI-driven development landscape where agents and automation play a central role in software delivery.
-
-##### What is monochange?
-
-In today's agent-driven development environment, managing releases across diverse package ecosystems (Rust, JavaScript/TypeScript, Dart, Python, etc.) becomes increasingly complex. monochange provides a unified, programmatic interface for:
-
-- **Change tracking**: Structured changesets that capture intent across multiple packages
-- **Release planning**: Automated versioning and changelog generation
-- **Multi-ecosystem support**: Native handling of Cargo, NPM, Dart, Deno, and more
-- **CI/CD integration**: Seamless workflows for Gitea, GitHub, and GitLab
-- **Graph-based dependency analysis**: Understanding package relationships across your monorepo
-
-##### Why monochange matters for AI-driven workflows
-
-As development teams increasingly rely on AI agents to generate code, manage dependencies, and orchestrate releases, monochange provides the structured foundation these agents need to operate effectively. It transforms release management from a manual, error-prone process into a deterministic, automatable workflow.
-
-##### What's included in this release
-
-This first release includes:
-
-- Core changeset management engine
-- Multi-ecosystem package detection and versioning
-- Hosting provider integrations (Gitea, GitHub, GitLab)
-- Semantic versioning utilities
-- Configurable release workflows
-- CLI tooling for validation and release orchestration
-
-For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
-
-> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
-
 ## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
+
+#### Add `mc skill` for project-local monochange skill installation through the upstream `skills add` workflow.
+
+Before:
+
+```bash
+npm install -g @monochange/skill
+monochange-skill --copy ~/.pi/agent/skills/monochange
+```
+
+After:
+
+```bash
+mc help skill
+mc skill
+mc skill -a pi -y
+mc skill --list
+```
+
+`mc skill` auto-detects `npx`, `pnpm dlx`, or `bunx`, forwards the remaining native `skills add` flags, and installs the monochange skill source into the current project by default.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #257](https://github.com/ifiokjr/monochange/pull/257) _Introduced in:_ [`0a6937a`](https://github.com/ifiokjr/monochange/commit/0a6937ac81dadbc6252e5eac60fd692335cee3a5) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+
+#### Add a package-scoped `mc analyze` CLI command for release-aware semantic analysis.
+
+The command defaults `--release-ref` to the most recent tag for the selected package or its owning version group, compares `main -> head` for first releases when no prior tag exists, and supports text or JSON output for package-focused review workflows.
+
+`monochange_config` now reserves the built-in `analyze` command name so workspace CLI definitions cannot collide with the new built-in subcommand.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #256](https://github.com/ifiokjr/monochange/pull/256) _Introduced in:_ [`75e3329`](https://github.com/ifiokjr/monochange/commit/75e33295d17248f4daca6e7bc83988855a033a08) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add per-crate Codecov coverage flags and crate-specific coverage badges
 
@@ -59,67 +52,90 @@ monochange now uploads one Codecov coverage flag per public crate while keeping 
 
 ### Changed
 
-#### move crate include lists into published manifests
+#### static npm packages in packages/ directory
 
-The published library crates in this workspace now declare their `include` file lists in each crate's own `Cargo.toml` instead of inheriting that setting from `[workspace.package]`.
-
-**Before (`crates/monochange_core/Cargo.toml`):**
-
-```toml
-[package]
-include = { workspace = true }
-readme = "readme.md"
-```
-
-The package contents depended on the root workspace manifest carrying:
-
-```toml
-[workspace.package]
-include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
-```
-
-**After:**
-
-```toml
-[package]
-include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
-readme = "readme.md"
-```
-
-This keeps each published crate self-contained when packaging, auditing, or updating manifest metadata and avoids relying on a shared workspace-level `include` definition for crates.io package contents.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #227](https://github.com/ifiokjr/monochange/pull/227) _Introduced in:_ [`78af3c2`](https://github.com/ifiokjr/monochange/commit/78af3c244a4090965b455e2879b33a160e28da77) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
-
-#### align provider and hosting release examples with package publication metadata
-
-The hosting/provider crates in this PR all moved together around the same outward shape change: `ReleaseManifest` now carries `package_publications`, and the provider-facing examples and compatibility fixtures now show that field consistently.
+All npm packages now live as static directories under `packages/` instead of being dynamically generated during the release workflow.
 
 **Before:**
 
-```rust
-let manifest = ReleaseManifest {
-    release_targets: vec![target],
-    released_packages: vec!["workflow-core".to_string()],
-    changed_files: Vec::new(),
-    ..todo!()
-};
+The `@monochange/cli` and platform packages were generated on-the-fly by `build-packages.mjs` into a temporary directory, then published from there. `@monochange/skill` lived in `npm/skill`.
+
+**After:**
+
+Package directories are permanently present under `packages/` using the `@scope__name` convention:
+
+```
+packages/monochange__cli/              # @monochange/cli
+packages/monochange__cli-darwin-arm64/  # @monochange/cli-darwin-arm64
+packages/monochange__skill/            # @monochange/skill
+...
+```
+
+`build-packages.mjs` still runs during release to populate platform binaries into `packages/*/bin/`, but it no longer generates the package structure from scratch. `publish-packages.mjs` now validates that each package has the expected binaries before publishing, preventing accidental empty publishes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #204](https://github.com/ifiokjr/monochange/pull/204) _Introduced in:_ [`a90638b`](https://github.com/ifiokjr/monochange/commit/a90638b911d0aca00afcda8c5686da46ead14831) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+
+### Documentation
+
+#### Document the new 100% patch-coverage requirement in the generated repository command lists.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #246](https://github.com/ifiokjr/monochange/pull/246) _Introduced in:_ [`62a4f85`](https://github.com/ifiokjr/monochange/commit/62a4f856af4528d9cbacdd7719c5cfb538fbb1c3) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+
+#### add `mc tag-release` for post-merge release PR workflows
+
+monochange now ships a first-class `mc tag-release` command for the long-running release PR flow.
+
+**Before:**
+
+```bash
+mc release-record --from HEAD --format json
+mc publish
+```
+
+That let CI detect a merged monochange release commit and publish package registries from the durable `ReleaseRecord`, but monochange did not have a built-in command to create and push the release tag set after merge.
+
+**After:**
+
+```bash
+mc release-record --from HEAD --format json
+mc tag-release --from HEAD
+mc publish
+```
+
+`mc tag-release` reads the durable `ReleaseRecord` on the merged release commit, creates the declared tag set on that commit, and pushes those tags to `origin`.
+
+**Before (generated GitHub Actions `release.yml`):**
+
+```yaml
+- name: prepare and open release PR
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: mc commit-release
 ```
 
 **After:**
 
-```rust
-let manifest = ReleaseManifest {
-    release_targets: vec![target],
-    released_packages: vec!["workflow-core".to_string()],
-    package_publications: Vec::new(),
-    changed_files: Vec::new(),
-    ..todo!()
-};
+```yaml
+- name: refresh release PR
+  if: steps.release_record.outputs.is_release_commit != 'true'
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: mc release-pr
+
+- name: create release tags
+  if: steps.release_record.outputs.is_release_commit == 'true'
+  run: mc tag-release --from HEAD
+
+- name: publish packages
+  if: steps.release_record.outputs.is_release_commit == 'true'
+  run: mc publish
 ```
 
-`monochange_github` updates its public example to match the new manifest shape, while `monochange_hosting`, `monochange_gitlab`, and `monochange_gitea` now exercise the same field in their compatibility coverage instead of lagging behind `monochange_core`.
+The generated GitHub workflow now refreshes the release PR on normal `main` pushes, then switches into post-merge tagging and package publication when `HEAD` is already the merged monochange release commit.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #205](https://github.com/ifiokjr/monochange/pull/205) _Introduced in:_ [`62801a7`](https://github.com/ifiokjr/monochange/commit/62801a789eca1186717abc5619407d59aa4584b6) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+The bundled `@monochange/cli` documentation now describes this post-merge tagging flow as part of the recommended release PR workflow.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #220](https://github.com/ifiokjr/monochange/pull/220) _Introduced in:_ [`cf5e581`](https://github.com/ifiokjr/monochange/commit/cf5e58113adcda077dfff7c3dd8f5e7598e411d8) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#209](https://github.com/ifiokjr/monochange/issues/209)
 
 ### Refactor
 
@@ -169,6 +185,12 @@ The result is more consistent crate documentation, less duplicated prose, and fl
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/ifiokjr/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/ifiokjr/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Changed
+
+#### add `caused_by` changeset context for dependency propagation
+
+You can now annotate dependency-only follow-up changesets with `caused_by`, use `mc change --caused-by ...` to author them, inspect the linkage in diagnostics output, and suppress matching automatic dependency propagation during release planning.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/ifiokjr/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/ifiokjr/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/ifiokjr/monochange/issues/208)
 
 #### add the first Dart lint suite foundation
 
