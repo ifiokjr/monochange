@@ -56,6 +56,7 @@ serde_yaml_ng = { workspace = true, default-features = true }
 shlex = { workspace = true, default-features = true }
 similar = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
+termimad = "0.34"
 thiserror = { workspace = true, default-features = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"], default-features = true }
 toml = { workspace = true, default-features = true }

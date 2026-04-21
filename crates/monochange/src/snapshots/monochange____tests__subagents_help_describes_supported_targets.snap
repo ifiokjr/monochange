@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/src/__tests.rs
+assertion_line: 351
 expression: output
 ---
 Generate repo-local monochange subagents and agent guidance files
@@ -15,7 +16,7 @@ Options:
   -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
       --dry-run                   Preview the generated files without writing them
       --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
-      --format <format>           Output format for the generated subagent plan [default: text] [possible values: text, json]
+      --format <format>           Output format for the generated subagent plan [default: markdown] [possible values: text, json, markdown, md]
       --no-mcp                    Skip repo-local MCP config files for supported targets
   -h, --help                      Print help
 

@@ -257,26 +257,20 @@ pub(crate) fn handle_lint_subcommand(
 		.expect("clap requires a lint subcommand");
 
 	if subcommand == "list" {
-		let format = if subcommand_matches
+		let format = subcommand_matches
 			.get_one::<String>("format")
-			.is_some_and(|value| value == "json")
-		{
-			OutputFormat::Json
-		} else {
-			OutputFormat::Text
-		};
+			.map_or(Ok(OutputFormat::Markdown), |value| {
+				crate::parse_output_format(value)
+			})?;
 		return render_lint_catalog(format);
 	}
 
 	if subcommand == "explain" {
-		let format = if subcommand_matches
+		let format = subcommand_matches
 			.get_one::<String>("format")
-			.is_some_and(|value| value == "json")
-		{
-			OutputFormat::Json
-		} else {
-			OutputFormat::Text
-		};
+			.map_or(Ok(OutputFormat::Markdown), |value| {
+				crate::parse_output_format(value)
+			})?;
 		let id = subcommand_matches
 			.get_one::<String>("id")
 			.expect("clap requires a lint id")
