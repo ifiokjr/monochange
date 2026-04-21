@@ -9965,8 +9965,18 @@ fn configure_origin_remote(root: &Path) {
 	);
 }
 
+/// The original `PATH` captured at process start, before any `temp_env` test
+/// can temporarily replace it with a fixture-only path. This prevents race
+/// conditions where a parallel test's PATH mutation causes `git` to be
+/// unavailable to other tests that spawn git commands.
+fn original_path() -> &'static str {
+	static PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+	PATH.get_or_init(|| std::env::var("PATH").unwrap_or_default())
+}
+
 fn sanitized_git_command() -> std::process::Command {
 	let mut command = std::process::Command::new("git");
+	command.env("PATH", original_path());
 	for variable in [
 		"GIT_DIR",
 		"GIT_WORK_TREE",
@@ -9977,6 +9987,7 @@ fn sanitized_git_command() -> std::process::Command {
 	] {
 		command.env_remove(variable);
 	}
+
 	command
 }
 
