@@ -106,21 +106,15 @@ fn strongest_assessment_for_package_filters_by_package_id() {
 		make_assessment("core", BumpSeverity::Minor),
 	];
 
-	let core_strongest = strongest_assessment_for_package(
-		&assessments, "core"
-	)
-	.unwrap_or_else(|| panic!("expected assessment for core"));
+	let core_strongest = strongest_assessment_for_package(&assessments, "core")
+		.unwrap_or_else(|| panic!("expected assessment for core"));
 	assert_eq!(core_strongest.severity, BumpSeverity::Major);
 
-	let app_strongest = strongest_assessment_for_package(
-		&assessments, "app"
-	)
-	.unwrap_or_else(|| panic!("expected assessment for app"));
+	let app_strongest = strongest_assessment_for_package(&assessments, "app")
+		.unwrap_or_else(|| panic!("expected assessment for app"));
 	assert_eq!(app_strongest.severity, BumpSeverity::Patch);
 
-	assert!(strongest_assessment_for_package(
-		&assessments, "missing"
-	).is_none());
+	assert!(strongest_assessment_for_package(&assessments, "missing").is_none());
 }
 
 // -- direct_release_severity --
@@ -187,8 +181,8 @@ fn propagated_release_severity_keeps_parent_bump_when_higher_than_assessment() {
 // -- property tests --
 
 use proptest::prelude::*;
-use proptest::proptest;
 use proptest::prop_compose;
+use proptest::proptest;
 
 prop_compose! {
 	fn arbitrary_bump_severity()(n in 0..4u8) -> BumpSeverity {
@@ -376,19 +370,11 @@ fn collect_assessments_gathers_from_matching_packages() {
 	let provider = TestProvider {
 		severity: BumpSeverity::Major,
 	};
-	let assessments = collect_assessments(
-		&[&provider], &packages, &signals
-	);
+	let assessments = collect_assessments(&[&provider], &packages, &signals);
 
 	assert_eq!(assessments.len(), 1);
-	assert_eq!(
-		assessments.first().unwrap().severity,
-		BumpSeverity::Major
-	);
-	assert_eq!(
-		assessments.first().unwrap().package_id,
-		package_id
-	);
+	assert_eq!(assessments.first().unwrap().severity, BumpSeverity::Major);
+	assert_eq!(assessments.first().unwrap().package_id, package_id);
 }
 
 #[test]
@@ -417,9 +403,7 @@ fn collect_assessments_returns_empty_for_unmatched_signals() {
 	let provider = TestProvider {
 		severity: BumpSeverity::Patch,
 	};
-	let assessments = collect_assessments(
-		&[&provider], &packages, &signals
-	);
+	let assessments = collect_assessments(&[&provider], &packages, &signals);
 	assert!(assessments.is_empty());
 }
 
@@ -447,8 +431,6 @@ fn collect_assessments_returns_empty_without_providers() {
 		source_path: PathBuf::from(".changeset/fix.md"),
 	}];
 	let providers: Vec<&dyn CompatibilityProvider> = vec![];
-	let assessments = collect_assessments(
-		&providers, &packages, &signals
-	);
+	let assessments = collect_assessments(&providers, &packages, &signals);
 	assert!(assessments.is_empty());
 }
