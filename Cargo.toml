@@ -36,6 +36,7 @@ oxc_ast = { version = "0.110.0", default-features = false }
 oxc_parser = { version = "0.110.0", default-features = false }
 oxc_span = { version = "0.110.0", default-features = false }
 portable-pty = { version = "^0.9", default-features = false }
+proptest = { version = "^1.6", default-features = false }
 quote = { version = "^1", default-features = false }
 rayon = { version = "^1.10", default-features = false }
 regex = { version = "^1", default-features = false, features = ["std", "unicode-perl"] }
