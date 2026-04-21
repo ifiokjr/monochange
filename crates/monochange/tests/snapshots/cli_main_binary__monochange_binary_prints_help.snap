@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
-assertion_line: 14
 info:
   program: monochange
   args:
@@ -26,6 +25,7 @@ Commands:
   lint                 Inspect and scaffold manifest lint rules
   mcp                  Start the monochange MCP (Model Context Protocol) server over stdin/stdout
   check                Validate configuration, changesets, and run manifest lint rules
+  help                 Show detailed help for a command
   validate             Validate monochange configuration and changesets
   discover             Discover packages across supported ecosystems
   change               Create a change file for one or more packages
@@ -37,7 +37,6 @@ Commands:
   affected             Show packages affected by file changes and their changeset coverage
   diagnostics          Show per-changeset diagnostics including context and commit/PR context
   repair-release       Repair a recent release by moving its release tags to a later commit
-  help                 Print this message or the help of the given subcommand(s)
 
 Options:
   -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported

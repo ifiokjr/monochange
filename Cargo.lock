@@ -1930,6 +1930,7 @@ dependencies = [
 name = "monochange"
 version = "0.2.0"
 dependencies = [
+ "anstyle",
  "chrono",
  "clap",
  "criterion",
