@@ -653,4 +653,7 @@ fn planned_group(
 }
 
 #[cfg(test)]
+mod mutant_killers;
+
+#[cfg(test)]
 mod __tests;

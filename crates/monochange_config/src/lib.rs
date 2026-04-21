@@ -4455,4 +4455,8 @@ fn validate_changeset_targets(
 }
 
 #[cfg(test)]
+#[cfg(test)]
+mod mutant_killers;
+
+#[cfg(test)]
 mod __tests;
