@@ -1,0 +1,63 @@
+---
+source: crates/monochange/tests/cli_help.rs
+info:
+  program: mc
+  args:
+    - help
+    - analyze
+  env:
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+╭──────────────────────────────────────────────────────────╮
+│  mc analyze                                              │
+│  Analyze semantic changes for a package                  │
+╰──────────────────────────────────────────────────────────╯
+
+▸ Description
+
+  Runs package-scoped semantic analysis comparing a package's public API across main, head, and optional release baselines. Produces a structured assessment of what changed and the implied semver bump.
+
+  Defaults --release-ref to the newest tag for the package or its version group. If no prior release tag exists, falls back to first-release analysis using only main → head.
+
+▸ Usage
+
+  mc analyze --package <PACKAGE> [OPTIONS]
+
+▸ Options
+
+  --package <PACKAGE>        Package id, name, manifest path, or directory (required)
+  --release-ref <REF>        Explicit release baseline ref
+  --main-ref <REF>           Base branch ref (default: detected default branch)
+  --head-ref <REF>           Head ref to analyze (default: HEAD)
+  --detection-level <LEVEL>  basic, signature, semantic (default: signature)
+  --format <FORMAT>          text, json (default: text)
+
+▸ Examples
+
+  Analyze a package:
+    mc analyze --package core
+
+  JSON output:
+    mc analyze --package core --format json
+
+  Against a specific release tag:
+    mc analyze --package core --release-ref core/v1.2.3
+
+  Custom main and head refs:
+    mc analyze --package core --main-ref main --head-ref HEAD
+
+▸ Tips
+
+  • Use the package id from monochange.toml for the most reliable resolution.
+  • Add --format json for scripting and LLM consumption.
+
+▸ See Also
+
+  mc help release  mc help versions  mc help change
+
+
+----- stderr -----

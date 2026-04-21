@@ -257,6 +257,7 @@ mod changelog;
 mod changeset_policy;
 mod changesets;
 mod cli;
+mod cli_help;
 mod cli_progress;
 mod cli_runtime;
 mod git_support;
@@ -692,6 +693,17 @@ where
 	};
 
 	match matches.subcommand() {
+		Some(("help", help_matches)) => {
+			let command_name = help_matches
+				.get_one::<String>("command")
+				.map_or("", String::as_str);
+			let output = if command_name.is_empty() {
+				cli_help::render_overview_help(bin_name)
+			} else {
+				cli_help::render_command_help(bin_name, command_name)
+			};
+			Ok(output)
+		}
 		Some(("init", init_matches)) => {
 			let provider = init_matches
 				.get_one::<String>("provider")

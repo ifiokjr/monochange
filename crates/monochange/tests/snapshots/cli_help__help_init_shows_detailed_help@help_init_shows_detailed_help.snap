@@ -1,0 +1,63 @@
+---
+source: crates/monochange/tests/cli_help.rs
+info:
+  program: mc
+  args:
+    - help
+    - init
+  env:
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+╭──────────────────────────────────────────────────────────╮
+│  mc init                                                 │
+│  Generate monochange.toml with detected packages         │
+╰──────────────────────────────────────────────────────────╯
+
+▸ Description
+
+  Scans the workspace for supported package manifests (Cargo.toml, package.json, deno.json, pubspec.yaml) and generates a monochange.toml configuration file with discovered packages, version groups, and default CLI commands.
+
+  Use --provider to scaffold source-control integration (GitHub, GitLab, Gitea) with release automation CLI commands.
+
+▸ Usage
+
+  mc init [OPTIONS]
+
+▸ Options
+
+  --force               Overwrite an existing monochange.toml file
+  --provider <PROVIDER>  Source-control provider (github, gitlab, gitea)
+
+▸ Examples
+
+  Initialize a fresh workspace:
+    mc init
+
+  Overwrite existing config:
+    mc init --force
+
+  Initialize with GitHub integration:
+    mc init --provider github
+
+  Initialize with GitLab integration:
+    mc init --provider gitlab
+
+  Initialize with Gitea integration:
+    mc init --provider gitea
+
+▸ Tips
+
+  • Run mc init at the root of your monorepo.
+  • The generated config is a starting point — customize packages, groups, and CLI commands in monochange.toml.
+  • Use --provider=github to get GitHub Actions workflow templates included.
+
+▸ See Also
+
+  mc help populate  mc help validate  mc help discover
+
+
+----- stderr -----

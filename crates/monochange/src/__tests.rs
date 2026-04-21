@@ -10481,6 +10481,32 @@ fn cli_help_does_not_show_log_level_flag() {
 }
 
 #[test]
+fn cli_help_subcommand_renders_detailed_command_help() {
+	let output = run_with_args(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("help"),
+			OsString::from("change"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("help change output: {error}"));
+
+	assert!(output.contains("change"));
+	assert!(output.contains("Description"));
+	assert!(output.contains("Usage"));
+}
+
+#[test]
+fn cli_help_subcommand_overview_without_argument() {
+	let output = run_with_args("mc", [OsString::from("mc"), OsString::from("help")])
+		.unwrap_or_else(|error| panic!("help overview output: {error}"));
+
+	assert!(output.contains("mc help"));
+	assert!(output.contains("Commands"));
+}
+
+#[test]
 fn parse_remote_url_extracts_owner_repo_from_ssh_url() {
 	let result = crate::workspace_ops::parse_remote_url("git@github.com:ifiokjr/monochange.git");
 	let info = result.unwrap_or_else(|| panic!("expected RemoteInfo"));

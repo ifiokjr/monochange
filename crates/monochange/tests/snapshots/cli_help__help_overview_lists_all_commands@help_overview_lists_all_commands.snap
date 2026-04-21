@@ -1,0 +1,57 @@
+---
+source: crates/monochange/tests/cli_help.rs
+info:
+  program: mc
+  args:
+    - help
+  env:
+    NO_COLOR: "1"
+    RUST_LOG: ""
+---
+success: true
+exit_code: 0
+----- stdout -----
+╭──────────────────────────────────────────────────────────╮
+│  mc                                                      │
+│  monochange — versioning & releases for your monorepo  │
+╰──────────────────────────────────────────────────────────╯
+
+▸ Description
+
+monochange discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter, then coordinates version bumps, changelogs, and release automation from a single monochange.toml config.
+
+Run `mc help <command>` for detailed examples and usage tips for any command.
+
+▸ Commands
+
+  init                 Generate monochange.toml with detected packages
+  populate             Add missing built-in CLI commands to monochange.toml
+  skill                Install the monochange skill bundle for AI agents
+  subagents            Generate repo-local monochange subagents and agent guidance
+  analyze              Analyze semantic changes for a package
+  change               Create a change file for one or more packages
+  release              Prepare a release from discovered change files
+  versions             Display planned versions without modifying files
+  commit-release       Create a local release commit with an embedded release record
+  release-pr           Open or update a hosted release pull request
+  affected             Evaluate affected packages and changeset coverage
+  diagnostics          Inspect parsed changeset data, provenance, and metadata
+  repair-release       Repair a recent release by retargeting its tag set
+  tag-release          Create and push release tags from an embedded release record
+  release-record       Inspect the monochange release record for a tag or commit
+  check                Validate configuration, changesets, and run manifest lint rules
+  lint                 Inspect and scaffold manifest lint rules
+  mcp                  Start the monochange MCP server over stdin/stdout
+  validate             Validate monochange configuration and changesets
+  discover             Discover packages across supported ecosystems
+  placeholder-publish  Publish placeholder versions for missing registry packages
+  publish-packages     Publish package versions from release state
+
+▸ Global Flags
+
+  --quiet     Suppress output, run in dry-run mode
+  --progress-format <FORMAT>  auto, unicode, ascii, json
+  Use `mc help <command>` for detailed command help.
+
+
+----- stderr -----

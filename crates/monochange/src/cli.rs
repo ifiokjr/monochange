@@ -2,6 +2,9 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 
+use anstyle::AnsiColor;
+use anstyle::Color;
+use anstyle::Style;
 use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
@@ -116,6 +119,30 @@ pub(crate) fn build_command_for_root(bin_name: &'static str, root: &Path) -> Com
 	build_command_with_cli(bin_name, &cli)
 }
 
+/// Color theme for monochange CLI help output.
+fn monochange_styles() -> clap::builder::Styles {
+	clap::builder::Styles::styled()
+		.header(
+			Style::new()
+				.bold()
+				.fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
+		)
+		.usage(
+			Style::new()
+				.bold()
+				.fg_color(Some(Color::Ansi(AnsiColor::White))),
+		)
+		.literal(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))))
+		.placeholder(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Magenta))))
+		.error(
+			Style::new()
+				.bold()
+				.fg_color(Some(Color::Ansi(AnsiColor::Red))),
+		)
+		.valid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))))
+		.invalid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red))))
+}
+
 pub(crate) fn build_command_with_cli(
 	bin_name: &'static str,
 	cli: &[CliCommandDefinition],
@@ -123,6 +150,8 @@ pub(crate) fn build_command_with_cli(
 	let mut command =
 		Command::new(bin_name)
 			.about("Manage versions and releases for your multiplatform, multilanguage monorepo")
+			.styles(monochange_styles())
+			.disable_help_subcommand(true)
 			.subcommand_required(true)
 			.arg_required_else_help(true)
 			.arg(
@@ -189,7 +218,8 @@ When provided, the generated config includes:\n\
 			.subcommand(Command::new("mcp").about(
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
 			))
-			.subcommand(build_check_subcommand());
+			.subcommand(build_check_subcommand())
+			.subcommand(build_help_subcommand());
 
 	for cli_command in cli {
 		command = command.subcommand(build_cli_command_subcommand(cli_command));
@@ -520,6 +550,21 @@ pub(crate) fn build_lint_subcommand() -> Command {
 						.required(true)
 						.help("New lint id in the form <ecosystem>/<rule-name>"),
 				),
+		)
+}
+
+pub(crate) fn build_help_subcommand() -> Command {
+	Command::new("help")
+		.about("Show detailed help for a command")
+		.long_about(
+			"Show detailed help, examples, and tips for any monochange command. \
+			 Run `mc help` to list all commands, or `mc help <command>` for \
+			 detailed usage information with examples.",
+		)
+		.arg(
+			Arg::new("command")
+				.help("Command name to get help for (e.g. change, release, init)")
+				.value_name("COMMAND"),
 		)
 }
 

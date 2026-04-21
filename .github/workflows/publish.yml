@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish:
+  plan:
     environment: publisher
     permissions:
       actions: read
@@ -26,6 +26,10 @@ jobs:
       github.repository_owner == 'ifiokjr'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.release_tag.outputs.tag }}
+      has-batches: ${{ steps.publish_plan.outputs.has_batches }}
+      matrix: ${{ steps.publish_plan.outputs.matrix }}
     steps:
       - name: resolve release tag
         id: release_tag
@@ -51,6 +55,10 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: get crates oidc auth token
+        uses: rust-lang/crates-io-auth-action@v1
+        id: crates-oidc
+
       - name: download release assets
         if: startsWith( steps.release_tag.outputs.tag , 'v')
         env:
@@ -64,18 +72,7 @@ jobs:
             --pattern "monochange-*-${RELEASE_TAG}.zip" \
             --dir "$RUNNER_TEMP/release-assets"
 
-      - name: get crates oidc auth token
-        uses: rust-lang/crates-io-auth-action@v1
-        id: crates-oidc
-
-      - name: publish unreleased packages
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
-        run: mc publish
-        shell: devenv shell -- bash -e {0}
-
       - name: populate cli npm packages with release binaries
-        if: startsWith( steps.release_tag.outputs.tag , 'v')
         env:
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
         run: |
@@ -85,10 +82,79 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: publish cli npm packages
-        if: startsWith( steps.release_tag.outputs.tag , 'v')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/npm/publish-packages.mjs \
             --packages-dir packages
+        shell: devenv shell -- bash -e {0}
+
+      - name: plan publish batches
+        id: publish_plan
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+        run: |
+          report="$(mc publish-plan --format json)"
+          echo "report<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$report" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          batch_count="$(echo "$report" | jq '.publishRateLimits.batches | length')"
+          if [ "$batch_count" -eq 0 ]; then
+            echo "has_batches=false" >> "$GITHUB_OUTPUT"
+            # Emit a valid placeholder matrix so GitHub Actions can parse the output.
+            # The publish job is skipped via the has-batches gate so this is never used.
+            echo "matrix={\"include\":[{\"registry\":\"none\",\"batch\":0,\"total_batches\":0,\"packages\":\"\",\"wait_seconds\":0}]}" >> "$GITHUB_OUTPUT"
+            echo "No packages to publish — all versions already exist on their registries."
+            exit 0
+          fi
+
+          echo "has_batches=true" >> "$GITHUB_OUTPUT"
+          matrix="$(echo "$report" | jq -c '{include: [.publishRateLimits.batches[] | {registry: (.registry | tostring), batch: .batchIndex, total_batches: .totalBatches, packages: (.packages | map("--package " + .) | join(" ")), wait_seconds: (.recommendedWaitSeconds // 0)}]}')"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+          echo "Publish plan:"
+          echo "$report" | jq '.publishRateLimits'
+
+  publish:
+    needs: plan
+    environment: publisher
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    if: >-
+      needs.plan.outputs.has-batches == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    name: publish ${{ matrix.registry }} (${{ matrix.batch }}/${{ matrix.total_batches }})
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: get crates oidc auth token
+        if: matrix.registry == 'crates_io'
+        uses: rust-lang/crates-io-auth-action@v1
+        id: crates-oidc
+
+      - name: wait for rate-limit window
+        if: matrix.wait_seconds > 0
+        run: |
+          echo "Waiting ${{ matrix.wait_seconds }} seconds before publishing batch ${{ matrix.batch }}..."
+          sleep "${{ matrix.wait_seconds }}"
+
+      - name: publish batch ${{ matrix.batch }} of ${{ matrix.total_batches }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+        run: mc publish ${{ matrix.packages }} --format json
         shell: devenv shell -- bash -e {0}
