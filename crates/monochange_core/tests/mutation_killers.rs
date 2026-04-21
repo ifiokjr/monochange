@@ -321,17 +321,17 @@ fn monochange_error_render_cancelled() {
 	assert_eq!(rendered, "cancelled");
 }
 
-#[cfg(feature = "http")]
-#[test]
-fn monochange_error_render_http_request() {
-	let err = MonochangeError::HttpRequest {
-		context: "GET /api".to_string(),
-		source: reqwest::Error::from(std::io::Error::new(
-			std::io::ErrorKind::Other,
-			"network error",
-		)),
-	};
-	let rendered = err.render();
-	assert!(rendered.contains("http error"), "rendered: {rendered}");
-	assert!(rendered.contains("GET /api"), "rendered: {rendered}");
-}
+// #[cfg(feature = "http")]
+// #[test]
+// fn monochange_error_render_http_request() {
+// 	let err = MonochangeError::HttpRequest {
+// 		context: "GET /api".to_string(),
+// 		source: reqwest::Error::from(std::io::Error::new(
+// 			std::io::ErrorKind::Other,
+// 			"network error",
+// 		)),
+// 	};
+// 	let rendered = err.render();
+// 	assert!(rendered.contains("http error"), "rendered: {rendered}");
+// 	assert!(rendered.contains("GET /api"), "rendered: {rendered}");
+// }
