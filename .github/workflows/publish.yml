@@ -1,13 +1,10 @@
 name: "publish"
 
 on:
-  push:
-    tags:
-      - "@monochange/skill/**"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish to npm (for example `v0.1.0`)."
+        description: "Release tag to publish (for example `v0.1.0`)."
         required: true
         type: string
 
@@ -36,12 +33,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG='${{ inputs.tag }}'
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            TAG='${{ github.ref_name }}'
-          fi
-
+          TAG='${{ inputs.tag }}'
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Resolved release tag: $TAG"
 
