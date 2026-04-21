@@ -271,14 +271,10 @@ path = "crates/monochange_lint_testing"
 [package."@monochange/skill"]
 path = "packages/monochange__skill"
 type = "npm"
-tag = true
-release = true
 
 [package."@monochange/cli"]
 path = "packages/monochange__cli"
 type = "npm"
-tag = true
-release = true
 
 [package."@monochange/cli-darwin-arm64"]
 path = "packages/monochange__cli-darwin-arm64"
@@ -382,13 +378,13 @@ packages = [
 	"@monochange/cli-linux-x64-musl",
 	"@monochange/cli-win32-x64-msvc",
 	"@monochange/cli-win32-arm64-msvc",
+	"@monochange/skill",
 ]
-
 tag = true
 release = true
 version_format = "primary"
 versioned_files = [
-	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version", "workspace.metadata.bin.monochange.version"] },
+	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] },
 ]
 # Optional: filter member-targeted notes in the group changelog.
 # Omit `include` (or set it to "all") to keep current behavior.
