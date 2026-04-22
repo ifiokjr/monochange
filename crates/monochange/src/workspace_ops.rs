@@ -177,6 +177,9 @@ pub(crate) fn parse_remote_url(url: &str) -> Option<RemoteInfo> {
 
 const CHANGESET_POLICY_WORKFLOW: &str = include_str!("templates/changeset-policy.yml");
 const RELEASE_WORKFLOW: &str = include_str!("templates/release.yml");
+const SLASH_COMMAND_RELEASE_WORKFLOW: &str = include_str!("templates/slash-command-release.yml");
+const WORKFLOW_DISPATCH_RELEASE_WORKFLOW: &str =
+	include_str!("templates/workflow-dispatch-release.yml");
 
 fn write_github_workflows(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 	let workflows_dir = root.join(".github/workflows");
@@ -191,6 +194,11 @@ fn write_github_workflows(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 	for (name, content) in [
 		("changeset-policy.yml", CHANGESET_POLICY_WORKFLOW),
 		("release.yml", RELEASE_WORKFLOW),
+		("slash-command-release.yml", SLASH_COMMAND_RELEASE_WORKFLOW),
+		(
+			"workflow-dispatch-release.yml",
+			WORKFLOW_DISPATCH_RELEASE_WORKFLOW,
+		),
 	] {
 		let path = workflows_dir.join(name);
 		fs::write(&path, content).map_err(|error| {

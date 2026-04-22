@@ -10770,6 +10770,14 @@ fn init_with_github_provider_creates_workflow_files() {
 		output.contains("release.yml"),
 		"expected release.yml in output"
 	);
+	assert!(
+		output.contains("slash-command-release.yml"),
+		"expected slash-command-release.yml in output"
+	);
+	assert!(
+		output.contains("workflow-dispatch-release.yml"),
+		"expected workflow-dispatch-release.yml in output"
+	);
 
 	let policy = fs::read_to_string(
 		tempdir
@@ -10803,6 +10811,40 @@ fn init_with_github_provider_creates_workflow_files() {
 	assert!(
 		release.contains("github-actions[bot]"),
 		"expected bot git config"
+	);
+
+	let slash = fs::read_to_string(
+		tempdir
+			.path()
+			.join(".github/workflows/slash-command-release.yml"),
+	)
+	.unwrap_or_else(|error| panic!("slash-command-release.yml: {error}"));
+	assert!(
+		slash.contains("issue_comment"),
+		"expected issue_comment trigger"
+	);
+	assert!(
+		slash.contains("mc merge-release-pr"),
+		"expected mc merge-release-pr command"
+	);
+
+	let dispatch = fs::read_to_string(
+		tempdir
+			.path()
+			.join(".github/workflows/workflow-dispatch-release.yml"),
+	)
+	.unwrap_or_else(|error| panic!("workflow-dispatch-release.yml: {error}"));
+	assert!(
+		dispatch.contains("workflow_dispatch"),
+		"expected workflow_dispatch trigger"
+	);
+	assert!(
+		dispatch.contains("gh pr list"),
+		"expected gh pr list command"
+	);
+	assert!(
+		dispatch.contains("mc merge-release-pr"),
+		"expected mc merge-release-pr command"
 	);
 }
 
