@@ -19,6 +19,12 @@ name = "paths"
 type = "string_list"
 required = true
 
+[[cli.pr-check.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.pr-check.steps]]
 type = "AffectedPackages"
-inputs = { changed_paths = "{{ inputs.paths }}", verify = false, format = "json" }
+inputs = { changed_paths = "{{ inputs.paths }}", verify = false }

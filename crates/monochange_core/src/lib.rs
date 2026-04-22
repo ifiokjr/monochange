@@ -2003,16 +2003,13 @@ impl CliStepDefinition {
 		match self {
 			Self::Validate { .. } => Some(&["fix"]),
 			Self::CommitRelease { .. } => Some(&[]),
-			Self::Discover { .. }
-			| Self::DisplayVersions { .. }
-			| Self::PrepareRelease { .. }
+			Self::Discover { .. } | Self::DisplayVersions { .. } => Some(&["format"]),
+			Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
 			| Self::OpenReleaseRequest { .. }
-			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
-			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
-				Some(&["format", "package"])
-			}
-			Self::PlanPublishRateLimits { .. } => Some(&["format", "mode", "package", "ci"]),
+			| Self::CommentReleasedIssues { .. } => Some(&[]),
+			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => Some(&["package"]),
+			Self::PlanPublishRateLimits { .. } => Some(&["mode", "package"]),
 			Self::CreateChangeFile { .. } => {
 				Some(&[
 					"interactive",
@@ -2021,14 +2018,13 @@ impl CliStepDefinition {
 					"version",
 					"reason",
 					"type",
+					"caused_by",
 					"details",
 					"output",
 				])
 			}
-			Self::AffectedPackages { .. } => {
-				Some(&["format", "changed_paths", "since", "verify", "label"])
-			}
-			Self::DiagnoseChangesets { .. } => Some(&["format", "changeset"]),
+			Self::AffectedPackages { .. } => Some(&["changed_paths", "since", "verify", "label"]),
+			Self::DiagnoseChangesets { .. } => Some(&["changeset"]),
 			Self::RetargetRelease { .. } => Some(&["from", "target", "force", "sync_provider"]),
 			Self::Command { .. } => None,
 		}
@@ -2047,20 +2043,18 @@ impl CliStepDefinition {
 				}
 			}
 			Self::CommitRelease { .. } | Self::Command { .. } => None,
-			Self::Discover { .. }
-			| Self::DisplayVersions { .. }
-			| Self::PrepareRelease { .. }
-			| Self::PublishRelease { .. }
-			| Self::OpenReleaseRequest { .. }
-			| Self::CommentReleasedIssues { .. } => {
+			Self::Discover { .. } | Self::DisplayVersions { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					_ => None,
 				}
 			}
+			Self::PrepareRelease { .. }
+			| Self::PublishRelease { .. }
+			| Self::OpenReleaseRequest { .. }
+			| Self::CommentReleasedIssues { .. } => None,
 			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
 				match name {
-					"format" => Some(CliInputKind::Choice),
 					"package" => Some(CliInputKind::StringList),
 					_ => None,
 				}
@@ -2068,14 +2062,14 @@ impl CliStepDefinition {
 			Self::PlanPublishRateLimits { .. } => {
 				match name {
 					"package" => Some(CliInputKind::StringList),
-					"format" | "mode" | "ci" => Some(CliInputKind::Choice),
+					"mode" => Some(CliInputKind::Choice),
 					_ => None,
 				}
 			}
 			Self::CreateChangeFile { .. } => {
 				match name {
 					"interactive" => Some(CliInputKind::Boolean),
-					"package" => Some(CliInputKind::StringList),
+					"package" | "caused_by" => Some(CliInputKind::StringList),
 					"bump" => Some(CliInputKind::Choice),
 					"version" | "reason" | "type" | "details" => Some(CliInputKind::String),
 					"output" => Some(CliInputKind::Path),
@@ -2084,7 +2078,6 @@ impl CliStepDefinition {
 			}
 			Self::AffectedPackages { .. } => {
 				match name {
-					"format" => Some(CliInputKind::Choice),
 					"changed_paths" | "label" => Some(CliInputKind::StringList),
 					"since" => Some(CliInputKind::String),
 					"verify" => Some(CliInputKind::Boolean),
@@ -2093,7 +2086,6 @@ impl CliStepDefinition {
 			}
 			Self::DiagnoseChangesets { .. } => {
 				match name {
-					"format" => Some(CliInputKind::Choice),
 					"changeset" => Some(CliInputKind::StringList),
 					_ => None,
 				}
@@ -3561,7 +3553,10 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::Discover {
 				name: Some("discover packages".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					CliStepInputValue::String("{{ inputs.format }}".to_string()),
+				)]),
 			}],
 		},
 		CliCommandDefinition {
@@ -3667,7 +3662,44 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 				show_progress: None,
 				name: Some("create change file".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([
+					(
+						"interactive".to_string(),
+						CliStepInputValue::String("{{ inputs.interactive }}".to_string()),
+					),
+					(
+						"package".to_string(),
+						CliStepInputValue::String("{{ inputs.package }}".to_string()),
+					),
+					(
+						"bump".to_string(),
+						CliStepInputValue::String("{{ inputs.bump }}".to_string()),
+					),
+					(
+						"version".to_string(),
+						CliStepInputValue::String("{{ inputs.version }}".to_string()),
+					),
+					(
+						"reason".to_string(),
+						CliStepInputValue::String("{{ inputs.reason }}".to_string()),
+					),
+					(
+						"type".to_string(),
+						CliStepInputValue::String("{{ inputs.type }}".to_string()),
+					),
+					(
+						"caused_by".to_string(),
+						CliStepInputValue::String("{{ inputs.caused_by }}".to_string()),
+					),
+					(
+						"details".to_string(),
+						CliStepInputValue::String("{{ inputs.details }}".to_string()),
+					),
+					(
+						"output".to_string(),
+						CliStepInputValue::String("{{ inputs.output }}".to_string()),
+					),
+				]),
 			}],
 		},
 		CliCommandDefinition {
@@ -3714,7 +3746,10 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::DisplayVersions {
 				name: Some("display versions".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([(
+					"format".to_string(),
+					CliStepInputValue::String("{{ inputs.format }}".to_string()),
+				)]),
 			}],
 		},
 		CliCommandDefinition {
@@ -3752,7 +3787,10 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::PlaceholderPublish {
 				name: Some("publish placeholder packages".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([(
+					"package".to_string(),
+					CliStepInputValue::String("{{ inputs.package }}".to_string()),
+				)]),
 			}],
 		},
 		CliCommandDefinition {
@@ -3788,7 +3826,10 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::PublishPackages {
 				name: Some("publish packages".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([(
+					"package".to_string(),
+					CliStepInputValue::String("{{ inputs.package }}".to_string()),
+				)]),
 			}],
 		},
 		CliCommandDefinition {
@@ -3842,7 +3883,16 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::PlanPublishRateLimits {
 				name: Some("plan publish rate limits".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([
+					(
+						"mode".to_string(),
+						CliStepInputValue::String("{{ inputs.mode }}".to_string()),
+					),
+					(
+						"package".to_string(),
+						CliStepInputValue::String("{{ inputs.package }}".to_string()),
+					),
+				]),
 			}],
 		},
 		CliCommandDefinition {
@@ -3908,7 +3958,24 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::AffectedPackages {
 				name: Some("evaluate affected packages".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([
+					(
+						"changed_paths".to_string(),
+						CliStepInputValue::String("{{ inputs.changed_paths }}".to_string()),
+					),
+					(
+						"since".to_string(),
+						CliStepInputValue::String("{{ inputs.since }}".to_string()),
+					),
+					(
+						"verify".to_string(),
+						CliStepInputValue::String("{{ inputs.verify }}".to_string()),
+					),
+					(
+						"label".to_string(),
+						CliStepInputValue::String("{{ inputs.label }}".to_string()),
+					),
+				]),
 			}],
 		},
 		CliCommandDefinition {
@@ -3942,7 +4009,10 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::DiagnoseChangesets {
 				name: Some("diagnose changesets".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([(
+					"changeset".to_string(),
+					CliStepInputValue::String("{{ inputs.changeset }}".to_string()),
+				)]),
 			}],
 		},
 		CliCommandDefinition {
@@ -4002,7 +4072,24 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 			steps: vec![CliStepDefinition::RetargetRelease {
 				name: Some("retarget release".to_string()),
 				when: None,
-				inputs: BTreeMap::new(),
+				inputs: BTreeMap::from([
+					(
+						"from".to_string(),
+						CliStepInputValue::String("{{ inputs.from }}".to_string()),
+					),
+					(
+						"target".to_string(),
+						CliStepInputValue::String("{{ inputs.target }}".to_string()),
+					),
+					(
+						"force".to_string(),
+						CliStepInputValue::String("{{ inputs.force }}".to_string()),
+					),
+					(
+						"sync_provider".to_string(),
+						CliStepInputValue::String("{{ inputs.sync_provider }}".to_string()),
+					),
+				]),
 			}],
 		},
 	]

@@ -17,6 +17,7 @@ use crate::ChangelogTarget;
 use crate::ChangesetPolicyStatus;
 use crate::ChangesetVerificationSettings;
 use crate::CliStepDefinition;
+use crate::CliStepInputValue;
 use crate::DependencyKind;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
@@ -879,7 +880,10 @@ fn default_cli_commands_expose_versions_and_publish_flows_alongside_release_plan
 		vec![CliStepDefinition::PlaceholderPublish {
 			name: Some("publish placeholder packages".to_string()),
 			when: None,
-			inputs: BTreeMap::new(),
+			inputs: BTreeMap::from([(
+				"package".to_string(),
+				CliStepInputValue::String("{{ inputs.package }}".to_string()),
+			)]),
 		}]
 	);
 
@@ -892,7 +896,10 @@ fn default_cli_commands_expose_versions_and_publish_flows_alongside_release_plan
 		vec![CliStepDefinition::PublishPackages {
 			name: Some("publish packages".to_string()),
 			when: None,
-			inputs: BTreeMap::new(),
+			inputs: BTreeMap::from([(
+				"package".to_string(),
+				CliStepInputValue::String("{{ inputs.package }}".to_string()),
+			)]),
 		}]
 	);
 
@@ -905,7 +912,16 @@ fn default_cli_commands_expose_versions_and_publish_flows_alongside_release_plan
 		vec![CliStepDefinition::PlanPublishRateLimits {
 			name: Some("plan publish rate limits".to_string()),
 			when: None,
-			inputs: BTreeMap::new(),
+			inputs: BTreeMap::from([
+				(
+					"mode".to_string(),
+					CliStepInputValue::String("{{ inputs.mode }}".to_string()),
+				),
+				(
+					"package".to_string(),
+					CliStepInputValue::String("{{ inputs.package }}".to_string()),
+				),
+			]),
 		}]
 	);
 }
@@ -1240,7 +1256,6 @@ fn valid_input_names_returns_expected_names_for_affected_packages() {
 		inputs: BTreeMap::new(),
 	};
 	let names = step.valid_input_names().unwrap();
-	assert!(names.contains(&"format"));
 	assert!(names.contains(&"changed_paths"));
 	assert!(names.contains(&"since"));
 	assert!(names.contains(&"verify"));
@@ -1277,10 +1292,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 		when: None,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(
-		publish.valid_input_names(),
-		Some(["format", "package"].as_slice())
-	);
+	assert_eq!(publish.valid_input_names(), Some(["package"].as_slice()));
 
 	let plan = CliStepDefinition::PlanPublishRateLimits {
 		name: None,
@@ -1288,7 +1300,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 		inputs: BTreeMap::new(),
 	};
 	let names = plan.valid_input_names().unwrap();
-	for expected in ["format", "mode", "package", "ci"] {
+	for expected in ["mode", "package"] {
 		assert!(names.contains(&expected), "missing: {expected}");
 	}
 }
@@ -1309,6 +1321,7 @@ fn valid_input_names_returns_expected_names_for_create_change_file() {
 		"version",
 		"reason",
 		"type",
+		"caused_by",
 		"details",
 		"output",
 	] {
@@ -1347,10 +1360,7 @@ fn expected_input_kind_returns_correct_types_for_affected_packages() {
 		when: None,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(
-		step.expected_input_kind("format"),
-		Some(CliInputKind::Choice)
-	);
+	assert_eq!(step.expected_input_kind("format"), None);
 	assert_eq!(
 		step.expected_input_kind("changed_paths"),
 		Some(CliInputKind::StringList)
@@ -1415,10 +1425,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		when: None,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(
-		prepare.expected_input_kind("format"),
-		Some(CliInputKind::Choice)
-	);
+	assert_eq!(prepare.expected_input_kind("format"), None);
 	assert_eq!(prepare.expected_input_kind("versions"), None);
 	assert_eq!(prepare.expected_input_kind("unknown"), None);
 
@@ -1427,10 +1434,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		when: None,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(
-		publish.expected_input_kind("format"),
-		Some(CliInputKind::Choice)
-	);
+	assert_eq!(publish.expected_input_kind("format"), None);
 	assert_eq!(
 		publish.expected_input_kind("package"),
 		Some(CliInputKind::StringList)
@@ -1442,16 +1446,13 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		when: None,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(
-		plan.expected_input_kind("format"),
-		Some(CliInputKind::Choice)
-	);
+	assert_eq!(plan.expected_input_kind("format"), None);
 	assert_eq!(plan.expected_input_kind("mode"), Some(CliInputKind::Choice));
 	assert_eq!(
 		plan.expected_input_kind("package"),
 		Some(CliInputKind::StringList)
 	);
-	assert_eq!(plan.expected_input_kind("ci"), Some(CliInputKind::Choice));
+	assert_eq!(plan.expected_input_kind("ci"), None);
 	assert_eq!(plan.expected_input_kind("unknown"), None);
 }
 
@@ -1482,6 +1483,10 @@ fn expected_input_kind_returns_correct_types_for_create_change_file() {
 		step.expected_input_kind("package"),
 		Some(CliInputKind::StringList)
 	);
+	assert_eq!(
+		step.expected_input_kind("caused_by"),
+		Some(CliInputKind::StringList)
+	);
 	assert_eq!(step.expected_input_kind("bump"), Some(CliInputKind::Choice));
 	assert_eq!(
 		step.expected_input_kind("reason"),
@@ -1498,10 +1503,7 @@ fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
 		when: None,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(
-		step.expected_input_kind("format"),
-		Some(CliInputKind::Choice)
-	);
+	assert_eq!(step.expected_input_kind("format"), None);
 	assert_eq!(
 		step.expected_input_kind("changeset"),
 		Some(CliInputKind::StringList)

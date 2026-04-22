@@ -169,10 +169,7 @@ fn resolve_step_inputs(
 	context: &CliContext,
 	step: &CliStepDefinition,
 ) -> MonochangeResult<BTreeMap<String, Vec<String>>> {
-	let mut resolved = context.inputs.clone();
-	if step.inputs().is_empty() {
-		return Ok(resolved);
-	}
+	let mut resolved = BTreeMap::new();
 
 	let template_context = build_cli_template_context(context, &context.inputs, None);
 	for (input_name, input_value) in step.inputs() {
@@ -945,7 +942,11 @@ fn evaluate_cli_step_condition(
 	if trimmed.is_empty() {
 		return Ok(false);
 	}
-	let template_context = build_cli_template_context(context, step_inputs, None);
+	let mut merged_inputs = context.inputs.clone();
+	for (name, values) in step_inputs {
+		merged_inputs.insert(name.clone(), values.clone());
+	}
+	let template_context = build_cli_template_context(context, &merged_inputs, None);
 	let template_context_json = serde_json::Value::Object(template_context.clone());
 	if let Some(path) = parse_direct_template_reference(trimmed) {
 		let Some(value) = lookup_template_value(&template_context_json, path) else {
@@ -1404,7 +1405,7 @@ fn cli_input_template_value(input_values: &[String]) -> serde_json::Value {
 		return serde_json::Value::String(value.to_string());
 	}
 	if input_values.is_empty() {
-		return serde_json::Value::Bool(false);
+		return serde_json::Value::Null;
 	}
 	serde_json::Value::Array(
 		input_values
@@ -3067,7 +3068,7 @@ fn resolve_command_output(
 	output: Option<String>,
 ) -> MonochangeResult<String> {
 	if let Some(prepared_release) = &context.prepared_release {
-		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let format = cli_command_output_format(&context.inputs)?;
 		return match format {
 			OutputFormat::Json => {
 				let manifest =
@@ -3094,7 +3095,7 @@ fn resolve_command_output(
 		};
 	}
 	if let Some(evaluation) = &context.changeset_policy_evaluation {
-		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let format = cli_command_output_format(&context.inputs)?;
 		let rendered = match format {
 			OutputFormat::Json => render_json_output(evaluation, "changeset policy evaluation")?,
 			OutputFormat::Markdown | OutputFormat::Text => {
@@ -3119,7 +3120,7 @@ fn resolve_command_output(
 		return Ok(rendered);
 	}
 	if let Some(report) = &context.retarget_report {
-		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let format = cli_command_output_format(&context.inputs)?;
 		let rendered = match format {
 			OutputFormat::Json => {
 				serde_json::to_string_pretty(report)
@@ -3130,7 +3131,7 @@ fn resolve_command_output(
 		return Ok(rendered);
 	}
 	if let Some(report) = &context.package_publish_report {
-		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let format = cli_command_output_format(&context.inputs)?;
 		let rendered = match format {
 			OutputFormat::Json => {
 				render_publish_command_json(Some(report), context.rate_limit_report.as_ref())?
@@ -3141,10 +3142,10 @@ fn resolve_command_output(
 		return Ok(rendered);
 	}
 	if let Some(report) = &context.rate_limit_report {
-		if let Some(ci_renderer) = requested_ci_renderer(&context.last_step_inputs)? {
+		if let Some(ci_renderer) = requested_ci_renderer(&context.inputs)? {
 			return render_publish_rate_limit_ci_snippet(report, ci_renderer);
 		}
-		let format = cli_command_output_format(&context.last_step_inputs)?;
+		let format = cli_command_output_format(&context.inputs)?;
 		let rendered = match format {
 			OutputFormat::Json => render_publish_command_json(None, Some(report))?,
 			OutputFormat::Markdown | OutputFormat::Text => {
@@ -3966,8 +3967,7 @@ path = "crates/core"
 			}],
 		};
 		let mut context = cli_context();
-		context.last_step_inputs =
-			BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
+		context.inputs = BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
 		context.package_publish_report = Some(package_publish::PackagePublishReport {
 			mode: package_publish::PackagePublishRunMode::Placeholder,
 			dry_run: true,
@@ -4036,8 +4036,7 @@ path = "crates/core"
 		};
 
 		let mut text_context = cli_context();
-		text_context.last_step_inputs =
-			BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
+		text_context.inputs = BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
 		text_context.package_publish_report = Some(package_publish::PackagePublishReport {
 			mode: package_publish::PackagePublishRunMode::Placeholder,
 			dry_run: true,
@@ -4049,7 +4048,7 @@ path = "crates/core"
 		assert!(text.contains("no packages matched the publishing criteria"));
 
 		let mut markdown_context = cli_context();
-		markdown_context.last_step_inputs =
+		markdown_context.inputs =
 			BTreeMap::from([("format".to_string(), vec!["markdown".to_string()])]);
 		markdown_context.package_publish_report = Some(package_publish::PackagePublishReport {
 			mode: package_publish::PackagePublishRunMode::Placeholder,
@@ -4084,8 +4083,7 @@ path = "crates/core"
 		};
 
 		let mut context = cli_context();
-		context.last_step_inputs =
-			BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
+		context.inputs = BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
 		context.rate_limit_report = Some(sample_rate_limit_report());
 
 		let text = resolve_command_output(&cli_command, &context, true, None)
@@ -4095,30 +4093,26 @@ path = "crates/core"
 		assert!(text.contains("planned batches:"));
 		assert!(text.contains("wait: 86400s before this batch"));
 
-		context.last_step_inputs =
-			BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
+		context.inputs = BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
 		let json = resolve_command_output(&cli_command, &context, true, None)
 			.unwrap_or_else(|error| panic!("rate limit json output: {error}"));
 		assert!(json.contains("batchesRequired"));
 		assert!(json.contains("publishRateLimits"));
 
-		context.last_step_inputs =
-			BTreeMap::from([("ci".to_string(), vec!["github-actions".to_string()])]);
+		context.inputs = BTreeMap::from([("ci".to_string(), vec!["github-actions".to_string()])]);
 		let github = resolve_command_output(&cli_command, &context, true, None)
 			.unwrap_or_else(|error| panic!("rate limit github snippet: {error}"));
 		assert!(github.contains("jobs:"));
 		assert!(github.contains("wait_seconds: 86400"));
 		assert!(github.contains("mc publish"));
 
-		context.last_step_inputs =
-			BTreeMap::from([("ci".to_string(), vec!["gitlab-ci".to_string()])]);
+		context.inputs = BTreeMap::from([("ci".to_string(), vec!["gitlab-ci".to_string()])]);
 		let gitlab = resolve_command_output(&cli_command, &context, true, None)
 			.unwrap_or_else(|error| panic!("rate limit gitlab snippet: {error}"));
 		assert!(gitlab.contains("publish_batches:"));
 		assert!(gitlab.contains("WAIT_SECONDS: \"86400\""));
 
-		context.last_step_inputs =
-			BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
+		context.inputs = BTreeMap::from([("format".to_string(), vec!["text".to_string()])]);
 		context.rate_limit_report = Some(monochange_core::PublishRateLimitReport {
 			dry_run: true,
 			windows: Vec::new(),

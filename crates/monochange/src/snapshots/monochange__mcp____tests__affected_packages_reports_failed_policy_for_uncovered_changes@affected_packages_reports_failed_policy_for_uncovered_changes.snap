@@ -4,33 +4,8 @@ expression: content_text(&result)
 ---
 {
   "action": "affected_packages",
-  "evaluation": {
-    "affectedPackageIds": [
-      "core"
-    ],
-    "changedPaths": [
-      "crates/core/src/lib.rs"
-    ],
-    "changesetPaths": [],
-    "comment": "### monochange changeset verification failed\n\nchangeset verification failed: attached changesets do not cover 1 changed package\n\nChanged package paths:\n- `crates/core/src/lib.rs`\n\nAffected packages:\n- `core`\n\nErrors:\n- changed packages are not covered by attached changesets: core\n\nAllowed skip labels:\n- `no-changeset-required`\n\nHow to fix:\n- add or update a `.changeset/*.md` file so it references every changed package or owning group\n- for example: `mc change --package <id> --bump patch --reason \"describe the change\"`\n- or apply one of the configured skip labels when no release note is required",
-    "coveredPackageIds": [],
-    "enforce": false,
-    "errors": [
-      "changed packages are not covered by attached changesets: core"
-    ],
-    "ignoredPaths": [],
-    "labels": [],
-    "matchedPaths": [
-      "crates/core/src/lib.rs"
-    ],
-    "matchedSkipLabels": [],
-    "required": true,
-    "status": "failed",
-    "summary": "changeset verification failed: attached changesets do not cover 1 changed package",
-    "uncoveredPackageIds": [
-      "core"
-    ]
-  },
+  "error": "config error: failed to parse [ROOT]/monochange.toml: TOML parse error at line 36, column 30\n   |\n36 | inputs = { changed_paths = \\\"{{ inputs.changed_paths }}\\\", since = \\\"{{ inputs.since }}\\\", verify = \\\"{{ inputs.verify }}\\\", label = \\\"{{ inputs.label }}\\\" }\n   |                              ^\nmissing key for inline table element, expected `,`\n",
   "ok": false,
-  "summary": "changeset verification failed: attached changesets do not cover 1 changed package"
+  "root": "[ROOT]
+  "summary": "config error: failed to parse [ROOT]/monochange.toml: TOML parse error at line 36, column 30\n   |\n36 | inputs = { changed_paths = \\\"{{ inputs.changed_paths }}\\\", since = \\\"{{ inputs.since }}\\\", verify = \\\"{{ inputs.verify }}\\\", label = \\\"{{ inputs.label }}\\\" }\n   |                              ^\nmissing key for inline table element, expected `,`\n"
 }

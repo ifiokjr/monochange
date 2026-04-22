@@ -3,9 +3,9 @@ package_type = "cargo"
 
 [changesets.verify]
 enabled = true
-required = false
+required = true
 skip_labels = ["no-changeset-required"]
-comment_on_failure = false
+comment_on_failure = true
 
 [package.core]
 path = "crates/core"
@@ -14,6 +14,12 @@ additional_paths = ["Cargo.lock"]
 
 [cli.pr-check]
 
+[[cli.pr-check.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.pr-check.steps]]
 type = "AffectedPackages"
-inputs = { changed_paths = "{{ inputs.nonexistent }}", verify = false, format = "json" }
+inputs = { changed_paths = "{{ inputs.nonexistent }}", verify = false }

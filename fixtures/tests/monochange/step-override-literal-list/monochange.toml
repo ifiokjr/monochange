@@ -14,6 +14,12 @@ additional_paths = ["Cargo.lock"]
 
 [cli.pr-check]
 
+[[cli.pr-check.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.pr-check.steps]]
 type = "AffectedPackages"
-inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = false, format = "json" }
+inputs = { changed_paths = ["crates/core/src/lib.rs"], verify = false }

@@ -16,6 +16,7 @@ use monochange_core::BumpSeverity;
 use monochange_core::ChangesetTargetKind;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
+use monochange_core::CliStepInputValue;
 use monochange_core::Ecosystem;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PreparedChangesetTarget;
@@ -4775,7 +4776,10 @@ fn execute_cli_command_change_step_requires_reason_input() {
 			show_progress: None,
 			name: None,
 			when: None,
-			inputs: BTreeMap::new(),
+			inputs: BTreeMap::from([(
+				"package".to_string(),
+				CliStepInputValue::String("{{ inputs.package }}".to_string()),
+			)]),
 		}],
 	};
 	let error = crate::execute_cli_command(
@@ -5011,7 +5015,10 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 				steps: vec![monochange_core::CliStepDefinition::PlaceholderPublish {
 					name: None,
 					when: None,
-					inputs: BTreeMap::new(),
+					inputs: BTreeMap::from([(
+						"package".to_string(),
+						CliStepInputValue::String("{{ inputs.package }}".to_string()),
+					)]),
 				}],
 			};
 			let placeholder_output = crate::execute_cli_command(
@@ -5042,7 +5049,10 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 					monochange_core::CliStepDefinition::PublishPackages {
 						name: None,
 						when: None,
-						inputs: BTreeMap::new(),
+						inputs: BTreeMap::from([(
+							"package".to_string(),
+							CliStepInputValue::String("{{ inputs.package }}".to_string()),
+						)]),
 					},
 				],
 			};
@@ -5068,7 +5078,16 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 				steps: vec![monochange_core::CliStepDefinition::PlanPublishRateLimits {
 					name: None,
 					when: None,
-					inputs: BTreeMap::new(),
+					inputs: BTreeMap::from([
+						(
+							"mode".to_string(),
+							CliStepInputValue::String("{{ inputs.mode }}".to_string()),
+						),
+						(
+							"package".to_string(),
+							CliStepInputValue::String("{{ inputs.package }}".to_string()),
+						),
+					]),
 				}],
 			};
 			let plan_output = crate::execute_cli_command(
