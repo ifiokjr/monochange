@@ -979,13 +979,6 @@ fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, d
 		return;
 	}
 
-	if !matches!(
-		registry,
-		RegistryKind::Npm | RegistryKind::CratesIo | RegistryKind::Jsr
-	) {
-		return;
-	}
-
 	args.push("--dry-run".to_string());
 }
 
@@ -1294,31 +1287,32 @@ fn resolve_cargo_placeholder_license_metadata(
 	Ok((workspace_license, workspace_license_file))
 }
 
-fn read_workspace_package_table(
-	root: &Path,
-) -> MonochangeResult<Option<toml::map::Map<String, TomlValue>>> {
+type WorkspacePackageTable = toml::map::Map<String, TomlValue>;
+
+fn read_workspace_package_table(root: &Path) -> MonochangeResult<Option<WorkspacePackageTable>> {
 	let workspace_manifest_path = root.join("Cargo.toml");
+	let Some(contents) = maybe_read_workspace_manifest_contents(&workspace_manifest_path)? else {
+		return Ok(None);
+	};
+	let parsed = parse_workspace_manifest_value(&workspace_manifest_path, &contents)?;
+	Ok(extract_workspace_package_table(&parsed))
+}
+
+fn maybe_read_workspace_manifest_contents(
+	workspace_manifest_path: &Path,
+) -> MonochangeResult<Option<String>> {
 	if !workspace_manifest_path.is_file() {
 		return Ok(None);
 	}
 
-	let contents = read_workspace_manifest_contents(&workspace_manifest_path)?;
-	let parsed = parse_workspace_manifest_value(&workspace_manifest_path, &contents)?;
-	let workspace = parsed.get("workspace").and_then(TomlValue::as_table);
-	let workspace_package = workspace
-		.and_then(|workspace| workspace.get("package"))
-		.and_then(TomlValue::as_table)
-		.cloned();
-	Ok(workspace_package)
-}
-
-fn read_workspace_manifest_contents(workspace_manifest_path: &Path) -> MonochangeResult<String> {
-	fs::read_to_string(workspace_manifest_path).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to read Cargo manifest {}: {error}",
-			workspace_manifest_path.display()
-		))
-	})
+	fs::read_to_string(workspace_manifest_path)
+		.map(Some)
+		.map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read Cargo manifest {}: {error}",
+				workspace_manifest_path.display()
+			))
+		})
 }
 
 fn parse_workspace_manifest_value(
@@ -1331,6 +1325,15 @@ fn parse_workspace_manifest_value(
 			workspace_manifest_path.display()
 		))
 	})
+}
+
+fn extract_workspace_package_table(parsed: &TomlValue) -> Option<WorkspacePackageTable> {
+	parsed
+		.get("workspace")
+		.and_then(TomlValue::as_table)
+		.and_then(|workspace| workspace.get("package"))
+		.and_then(TomlValue::as_table)
+		.cloned()
 }
 
 fn write_dart_placeholder_manifest(
@@ -4489,6 +4492,15 @@ jobs:
 	}
 
 	#[test]
+	fn append_publish_dry_run_args_appends_standard_flag_for_non_pubdev_registries() {
+		for registry in [RegistryKind::Npm, RegistryKind::CratesIo, RegistryKind::Jsr] {
+			let mut args = vec!["publish".to_string()];
+			append_publish_dry_run_args(&mut args, registry, true);
+			assert_eq!(args.last(), Some(&"--dry-run".to_string()));
+		}
+	}
+
+	#[test]
 	fn build_npm_placeholder_publish_command_uses_package_root_as_cwd() {
 		let command = build_npm_placeholder_publish_command(
 			&sample_request(RegistryKind::Npm),
@@ -4535,6 +4547,22 @@ jobs:
 			fs::read_to_string(placeholder_dir.path().join("LICENSE"))
 				.expect("read placeholder license"),
 			"MIT"
+		);
+	}
+
+	#[test]
+	fn extract_workspace_package_table_returns_workspace_package_table() {
+		let parsed = toml::from_str::<TomlValue>(concat!(
+			"[workspace]\n",
+			"members = [\"pkg\"]\n",
+			"[workspace.package]\n",
+			"license = \"MIT\"\n",
+		))
+		.expect("parse manifest");
+		let workspace_package = extract_workspace_package_table(&parsed).expect("package table");
+		assert_eq!(
+			workspace_package.get("license").and_then(TomlValue::as_str),
+			Some("MIT")
 		);
 	}
 
