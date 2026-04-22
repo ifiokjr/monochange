@@ -1,0 +1,17 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[package.private]
+path = "crates/private"
+type = "cargo"
+
+[package.docs]
+path = "packages/docs"
+type = "npm"
+
+[ecosystems.cargo]
+enabled = true
+
+[ecosystems.npm.publish]
+enabled = false

@@ -162,7 +162,12 @@ pub(crate) fn build_package_publication_targets(
 				.cloned()
 				.unwrap_or_else(|| package.name.clone());
 			let package_definition = configuration.package_by_id(&config_id)?;
-			if !package_definition.publish.enabled {
+			if !package_definition.publish.enabled
+				|| matches!(
+					package.publish_state,
+					monochange_core::PublishState::Private
+						| monochange_core::PublishState::Excluded
+				) {
 				return None;
 			}
 			Some(PackagePublicationTarget {
@@ -1767,8 +1772,8 @@ mod tests {
 				version_format: VersionFormat::Primary,
 			},
 			PackageDefinition {
-				id: "private".to_string(),
-				path: PathBuf::from("private"),
+				id: "disabled".to_string(),
+				path: PathBuf::from("disabled"),
 				package_type: PackageType::Cargo,
 				changelog: None,
 				excluded_changelog_types: Vec::new(),
@@ -1788,12 +1793,36 @@ mod tests {
 				},
 				version_format: VersionFormat::Primary,
 			},
+			PackageDefinition {
+				id: "private".to_string(),
+				path: PathBuf::from("private"),
+				package_type: PackageType::Cargo,
+				changelog: None,
+				excluded_changelog_types: Vec::new(),
+				empty_update_message: None,
+				release_title: None,
+				changelog_version_title: None,
+				versioned_files: Vec::new(),
+				ignore_ecosystem_versioned_files: false,
+				ignored_paths: Vec::new(),
+				additional_paths: Vec::new(),
+				tag: true,
+				release: true,
+				publish: PublishSettings {
+					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+					..PublishSettings::default()
+				},
+				version_format: VersionFormat::Primary,
+			},
 		];
 
+		let mut private_package = sample_package(root, "private", PackageType::Cargo);
+		private_package.publish_state = PublishState::Private;
 		let packages = vec![
 			sample_package(root, "core", PackageType::Cargo),
 			sample_package(root, "web", PackageType::Npm),
-			sample_package(root, "private", PackageType::Cargo),
+			sample_package(root, "disabled", PackageType::Cargo),
+			private_package,
 		];
 		let plan = ReleasePlan {
 			workspace_root: root.to_path_buf(),
@@ -1813,6 +1842,16 @@ mod tests {
 					trigger_type: "changeset".to_string(),
 					recommended_bump: BumpSeverity::Patch,
 					planned_version: Some(Version::new(2, 0, 1)),
+					group_id: None,
+					reasons: vec!["fix".to_string()],
+					upstream_sources: Vec::new(),
+					warnings: Vec::new(),
+				},
+				ReleaseDecision {
+					package_id: "cargo:disabled/manifest".to_string(),
+					trigger_type: "changeset".to_string(),
+					recommended_bump: BumpSeverity::Patch,
+					planned_version: Some(Version::new(1, 0, 1)),
 					group_id: None,
 					reasons: vec!["fix".to_string()],
 					upstream_sources: Vec::new(),

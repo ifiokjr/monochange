@@ -71,6 +71,12 @@ fn mock_missing_publish_versions(server: &MockServer) {
 			"versions": {}
 		}));
 	});
+	server.mock(|when, then| {
+		when.method(GET).path("/npm-pkg");
+		then.status(200).json_body_obj(&serde_json::json!({
+			"versions": {}
+		}));
+	});
 }
 
 #[test]
@@ -105,6 +111,7 @@ fn placeholder_publish_dry_run_reports_manual_registry_trust_contexts() {
 			)
 			.env("GITHUB_JOB", "release")
 			.env("MONOCHANGE_CRATES_IO_API_URL", server.base_url())
+			.env("MONOCHANGE_NPM_REGISTRY_URL", server.base_url())
 			.env("MONOCHANGE_PUB_DEV_API_URL", server.base_url())
 			.env("MONOCHANGE_JSR_BASE_URL", server.base_url())
 			.arg("placeholder-publish")
@@ -129,6 +136,7 @@ fn placeholder_publish_dry_run_reports_missing_manual_registry_workflow_configur
 			.env_remove("GITHUB_WORKFLOW_REF")
 			.env_remove("GITHUB_JOB")
 			.env("MONOCHANGE_CRATES_IO_API_URL", server.base_url())
+			.env("MONOCHANGE_NPM_REGISTRY_URL", server.base_url())
 			.env("MONOCHANGE_PUB_DEV_API_URL", server.base_url())
 			.env("MONOCHANGE_JSR_BASE_URL", server.base_url())
 			.arg("placeholder-publish")

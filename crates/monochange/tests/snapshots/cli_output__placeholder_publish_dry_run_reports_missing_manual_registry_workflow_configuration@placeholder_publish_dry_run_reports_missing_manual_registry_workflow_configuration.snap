@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 89
 info:
   program: mc
   args:
@@ -11,9 +10,10 @@ info:
   env:
     GITHUB_JOB: ""
     GITHUB_WORKFLOW_REF: ""
-    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:55456"
-    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:55456"
-    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:55456"
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:49289"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:49289"
+    MONOCHANGE_NPM_REGISTRY_URL: "http://127.0.0.1:49289"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:49289"
     NO_COLOR: "1"
     RUST_LOG: ""
 ---
@@ -75,6 +75,23 @@ exit_code: 0
           "workflow": null
         },
         "version": "0.0.0"
+      },
+      {
+        "ecosystem": "npm",
+        "message": "would publish placeholder npm-pkg 0.0.0 to npm",
+        "package": "npm_pkg",
+        "placeholder": true,
+        "registry": "npm",
+        "status": "planned",
+        "trustedPublishing": {
+          "environment": null,
+          "message": "configure trusted publishing manually for `npm-pkg` before the next built-in release publish; open https://www.npmjs.com/package/npm-pkg/access and finish the GitHub context setup first: config error: trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`",
+          "repository": null,
+          "setupUrl": "https://www.npmjs.com/package/npm-pkg/access",
+          "status": "manual_action_required",
+          "workflow": null
+        },
+        "version": "0.0.0"
       }
     ]
   },
@@ -88,6 +105,16 @@ exit_code: 0
         ],
         "recommendedWaitSeconds": null,
         "registry": "crates_io",
+        "totalBatches": 1
+      },
+      {
+        "batchIndex": 1,
+        "operation": "placeholder_publish",
+        "packages": [
+          "npm_pkg"
+        ],
+        "recommendedWaitSeconds": null,
+        "registry": "npm",
         "totalBatches": 1
       },
       {
@@ -132,6 +159,25 @@ exit_code: 0
         "pending": 1,
         "registry": "crates_io",
         "windowSeconds": 60
+      },
+      {
+        "batchesRequired": 1,
+        "confidence": "low",
+        "evidence": [
+          {
+            "kind": "official",
+            "notes": "official workflow guidance but no exact package publish quota",
+            "title": "npm trusted publishing documentation",
+            "url": "https://docs.npmjs.com/trusted-publishers"
+          }
+        ],
+        "fitsSingleWindow": true,
+        "limit": null,
+        "notes": "npm does not publish a precise package publish quota; use sequential CI publishing with retries",
+        "operation": "placeholder_publish",
+        "pending": 1,
+        "registry": "npm",
+        "windowSeconds": null
       },
       {
         "batchesRequired": 1,
