@@ -619,45 +619,21 @@ mod tests {
 			deleted_changesets: Vec::new(),
 			dry_run: true,
 		};
-		let server = MockServer::start();
-		server.mock(|when, then| {
-			when.method(GET).path("/crates/core");
-			then.status(404);
-		});
-		server.mock(|when, then| {
-			when.method(GET).path("/crates/private");
-			then.status(404);
-		});
-		server.mock(|when, then| {
-			when.method(GET).path("/docs");
-			then.status(404);
-		});
-
-		let client = Client::builder()
-			.build()
-			.unwrap_or_else(|error| panic!("http client: {error}"));
-		let endpoints = package_publish::RegistryEndpoints {
-			npm_registry: server.base_url(),
-			crates_io_api: server.base_url(),
-			crates_io_index: server.base_url(),
-			pub_dev_api: server.base_url(),
-			jsr_base: server.base_url(),
-		};
-		let requests = build_release_plan_requests_with_transport(
-			tempdir.path(),
+		let packages = discover_workspace(tempdir.path())
+			.unwrap_or_else(|error| panic!("discover workspace: {error}"))
+			.packages;
+		let requests = package_publish::build_release_requests(
 			&configuration,
-			Some(&prepared_release),
-			&discover_workspace(tempdir.path())
-				.unwrap_or_else(|error| panic!("discover workspace: {error}"))
-				.packages,
+			&packages,
+			&prepared_release.package_publications,
 			&BTreeSet::new(),
-			&client,
-			&endpoints,
 		)
-		.unwrap_or_else(|error| panic!("build release plan requests: {error}"));
+		.unwrap_or_else(|error| panic!("build release requests: {error}"));
 		let report =
 			plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
 
+		assert_eq!(requests.len(), 1);
+		assert_eq!(requests[0].package_id, "core");
 		assert_eq!(report.windows.len(), 1);
 		assert_eq!(report.windows[0].registry, RegistryKind::CratesIo);
 		assert_eq!(report.windows[0].pending, 1);
