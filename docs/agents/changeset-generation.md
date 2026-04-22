@@ -318,7 +318,9 @@ Every user-facing changeset must include:
 
 1. **What changed** — High-level description
 2. **Why it matters** — Impact on users
-3. **Before/after examples** — Concrete migration path
+3. **Before/after examples** — Concrete migration path when the example itself changed
+
+When the command, config snippet, or code example is identical before and after, do **not** print it twice. Show the unchanged example once, then highlight only the changed output, behavior, or migration note.
 
 See examples section below for detailed templates.
 
@@ -758,6 +760,36 @@ Agent detects code changes (via PR, commit, or manual trigger)
 ```
 
 ## Examples
+
+### Example pattern: unchanged command, changed output
+
+````markdown
+---
+"@monochange/cli": patch
+---
+
+#### update release planning output
+
+Command:
+
+```bash
+mc publish-plan --format json
+```
+
+**Before (output):**
+
+```json
+{ "publishRateLimits": { "batches": ["private", "public"] } }
+```
+
+**After (output):**
+
+```json
+{ "publishRateLimits": { "batches": ["public"] } }
+```
+````
+
+Do not repeat the same `mc publish-plan --format json` invocation in both sections.
 
 ### Example 1: Library with new API
 
