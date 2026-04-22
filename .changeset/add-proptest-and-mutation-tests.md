@@ -1,8 +1,8 @@
 ---
-monochange_config: none
-monochange_core: none
-monochange_graph: none
-monochange_semver: none
+monochange_config: test
+monochange_core: test
+monochange_graph: test
+monochange_semver: test
 ---
 
 #### test
