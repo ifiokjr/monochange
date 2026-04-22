@@ -10394,6 +10394,9 @@ fn batch_changeset_contexts_returns_empty_without_git_repo() {
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
+	let _env_lock = crate::TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 

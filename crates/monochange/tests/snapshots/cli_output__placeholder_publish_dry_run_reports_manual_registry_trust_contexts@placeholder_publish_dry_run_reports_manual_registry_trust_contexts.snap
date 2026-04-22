@@ -10,10 +10,10 @@ info:
   env:
     GITHUB_JOB: release
     GITHUB_WORKFLOW_REF: ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main
-    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:49288"
-    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:49288"
-    MONOCHANGE_NPM_REGISTRY_URL: "http://127.0.0.1:49288"
-    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:49288"
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:54999"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:54999"
+    MONOCHANGE_NPM_REGISTRY_URL: "http://127.0.0.1:54999"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:54999"
     NO_COLOR: "1"
     RUST_LOG: ""
 ---
@@ -60,7 +60,7 @@ placeholder publishing:
   placeholder: yes
   publish: would publish placeholder npm-pkg 0.0.0 to npm
   trusted publishing: planned
-  trust message: would configure npm trusted publishing
+  trust message: would configure npm trusted publishing with `npm trust github npm-pkg --file publish.yml --repo ifiokjr/monochange --yes --env publisher`
   repository: ifiokjr/monochange
   workflow: publish.yml
   environment: publisher
