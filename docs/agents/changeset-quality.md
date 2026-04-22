@@ -16,10 +16,14 @@ A one-liner that only restates the PR title is not acceptable. The body must be 
 
 For any change that adds, removes, or modifies a CLI command or flag:
 
-- Show the **exact command invocations** before and after.
+- Show the **exact command invocations** before and after when the invocation itself changed.
+- If the command stayed the same and only the result changed, show the command **once** and only show the changed output before/after.
+- Do **not** print the same command, config snippet, or other example twice when the example itself did not change.
 - Show **config snippets** (`monochange.toml`) when behaviour is driven by configuration.
 - Show representative **output** (text or JSON) when the output shape changes.
 - Use `# before` / `# after` comments when renaming flags or restructuring commands.
+
+The goal is to highlight the differences, not duplicate unchanged context.
 
 Example headline for a renamed flag:
 
@@ -40,6 +44,30 @@ Example body:
 > ```
 >
 > `--changed-path` is kept as a hidden alias for one release cycle.
+
+When the invocation is unchanged but the output changes, prefer a structure like this:
+
+> #### update `mc publish-plan --format json` batch filtering
+>
+> Command:
+>
+> ```bash
+> mc publish-plan --format json
+> ```
+>
+> **Before (output):**
+>
+> ```json
+> { "publishRateLimits": { "batches": ["private", "public"] } }
+> ```
+>
+> **After (output):**
+>
+> ```json
+> { "publishRateLimits": { "batches": ["public"] } }
+> ```
+>
+> Do not repeat the same `mc publish-plan --format json` command in both sections.
 
 When a command is **removed**, explain what users should do instead:
 
@@ -87,7 +115,9 @@ For new APIs, show a minimal but realistic usage example:
 
 ## Configuration changes
 
-For new or changed `monochange.toml` keys, always show the TOML before and after:
+For new or changed `monochange.toml` keys, always show the TOML before and after when the TOML itself changed.
+
+If the config snippet is identical before and after, do not duplicate it. Show the unchanged config once, then show the changed output or behaviour instead.
 
 > **Before (no per-package format override):**
 >
