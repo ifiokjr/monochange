@@ -591,6 +591,11 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
+[source.pull_requests.slash_commands.authorization]
+allow_admins = true
+allowed_users = []
+allowed_teams = []
+
 # [source.bot.changesets] — changeset policy for the AffectedPackages / `mc affected` step
 #
 # By default, every configured package path is automatically included: any file

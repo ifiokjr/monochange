@@ -1,0 +1,49 @@
+name: slash-command-release
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/release')
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+
+      - name: install mc
+        run: cargo binstall monochange --no-confirm
+
+      - name: configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: merge release pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mc merge-release-pr \
+            --pr-number ${{ github.event.issue.number }} \
+            --author ${{ github.event.comment.user.login }}

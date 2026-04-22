@@ -1,0 +1,73 @@
+name: workflow-dispatch-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to merge and release"
+        required: true
+        type: number
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.pr_number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: find release PR
+        id: find_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.pr_number }}" ]; then
+            echo "pr_number=${{ inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+          else
+            pr=$(gh pr list --repo ${{ github.repository }} \
+              --head "monochange/release" \
+              --state open \
+              --json number \
+              --jq '.[0].number')
+            echo "pr_number=$pr" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: refs/pull/${{ steps.find_pr.outputs.pr_number }}/head
+          fetch-depth: 0
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-binstall
+
+      - name: install mc
+        run: cargo binstall monochange --no-confirm
+
+      - name: configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: merge release pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mc merge-release-pr \
+            --pr-number ${{ steps.find_pr.outputs.pr_number }} \
+            --author "${{ github.actor }}"
