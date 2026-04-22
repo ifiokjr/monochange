@@ -19,6 +19,9 @@ use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedSourceAdapter;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
+use monochange_core::MergeReleasePullRequestOperation;
+use monochange_core::MergeReleasePullRequestOutcome;
+use monochange_core::MergeReleasePullRequestRequest;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
@@ -33,6 +36,7 @@ use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
+use monochange_core::SlashCommandAuthorizationResult;
 use monochange_core::RetargetOperation;
 use monochange_core::RetargetProviderOperation;
 use monochange_core::RetargetTagResult;
@@ -2017,3 +2021,98 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 		.unwrap_or_else(|error| panic!("update release file: {error}"));
 	(tempdir, repo)
 }
+
+
+#[test]
+fn authorize_slash_command_release_explicit_allow_list_authorized() {
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings {
+			slash_commands: monochange_core::ProviderSlashCommandSettings {
+				enabled: true,
+				authorization: monochange_core::SlashCommandAuthorizationSettings {
+					allow_admins: false,
+					allowed_users: vec!["trusted_user".to_string()],
+					allowed_teams: Vec::new(),
+				},
+			},
+			..ProviderMergeRequestSettings::default()
+		},
+		bot: ProviderBotSettings::default(),
+	};
+
+	let result = authorize_slash_command_release(&source, "trusted_user"
+	);
+	assert_eq!(result.unwrap(), SlashCommandAuthorizationResult::Authorized);
+}
+
+#[test]
+fn authorize_slash_command_release_explicit_allow_list_denied() {
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings {
+			slash_commands: monochange_core::ProviderSlashCommandSettings {
+				enabled: true,
+				authorization: monochange_core::SlashCommandAuthorizationSettings {
+					allow_admins: false,
+					allowed_users: vec!["trusted_user".to_string()],
+					allowed_teams: Vec::new(),
+				},
+			},
+			..ProviderMergeRequestSettings::default()
+		},
+		bot: ProviderBotSettings::default(),
+	};
+
+	let result = authorize_slash_command_release(&source, "untrusted_user"
+	);
+	assert_eq!(result.unwrap(), SlashCommandAuthorizationResult::Denied);
+}
+
+#[test]
+fn authorize_slash_command_release_disabled_returns_denied() {
+	let source = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings {
+			slash_commands: monochange_core::ProviderSlashCommandSettings {
+				enabled: false,
+				authorization: monochange_core::SlashCommandAuthorizationSettings {
+					allow_admins: true,
+					allowed_users: Vec::new(),
+					allowed_teams: Vec::new(),
+				},
+			},
+			..ProviderMergeRequestSettings::default()
+		},
+		bot: ProviderBotSettings::default(),
+	};
+
+	let result = authorize_slash_command_release(&source, "anyone"
+	);
+	assert_eq!(result.unwrap(), SlashCommandAuthorizationResult::Denied);
+}
+
+// NOTE: API-level tests for authorize_slash_command_release and
+// merge_release_pull_request require a running GitHub mock server that
+// octocrab can talk to. These are better suited as integration tests.
+
+// #[test]
+// fn authorize_slash_command_release_admin_check_uses_api() { ... }
+
+// #[test]
+// fn merge_release_pull_request_calls_correct_endpoint() { ... }

@@ -34,6 +34,10 @@ use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostedSourceAdapter;
+use monochange_core::MergeReleasePullRequestOperation;
+use monochange_core::MergeReleasePullRequestOutcome;
+use monochange_core::MergeReleasePullRequestRequest;
+use monochange_core::SlashCommandAuthorizationResult;
 use monochange_core::HostedSourceFeatures;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
@@ -695,3 +699,81 @@ fn auth_headers(token: &str) -> MonochangeResult<HeaderMap> {
 
 #[cfg(test)]
 mod __tests;
+
+fn authorize_slash_command_release(
+	source: &SourceConfiguration,
+	author: &str,
+) -> MonochangeResult<SlashCommandAuthorizationResult> {
+	let settings = &source.pull_requests.slash_commands;
+	if !settings.enabled {
+		return Ok(SlashCommandAuthorizationResult::Denied);
+	}
+
+	let config = &settings.authorization;
+	if config.allowed_users.iter().any(|u| u == author) {
+		return Ok(SlashCommandAuthorizationResult::Authorized);
+	}
+	if !config.allowed_users.is_empty() {
+		return Ok(SlashCommandAuthorizationResult::Denied);
+	}
+
+	let client = build_http_client("Gitea")?;
+	let api_base = gitea_api_base(source)?;
+	let token = gitea_token()?;
+	let headers = auth_headers(&token)?;
+	let url = format!(
+		"{api_base}/repos/{}/{}/collaborators/{}/permission",
+		encode(&source.owner),
+		encode(&source.repo),
+		encode(author),
+	);
+
+	if config.allow_admins {
+		let result: serde_json::Value = get_json(&client, &headers, &url, "Gitea")?;
+		if result.get("permission").and_then(|p| p.as_str()) == Some("admin") {
+			return Ok(SlashCommandAuthorizationResult::Authorized);
+		}
+	}
+
+	Ok(SlashCommandAuthorizationResult::Denied)
+}
+
+fn merge_release_pull_request(
+	source: &SourceConfiguration,
+	request: &MergeReleasePullRequestRequest,
+) -> MonochangeResult<MergeReleasePullRequestOutcome> {
+	let client = build_http_client("Gitea")?;
+	let api_base = gitea_api_base(source)?;
+	let token = gitea_token()?;
+	let headers = auth_headers(&token)?;
+	let url = format!(
+		"{api_base}/repos/{}/{}/pulls/{}/merge",
+		encode(&request.owner),
+		encode(&request.repo),
+		request.pr_number,
+	);
+
+	let body = serde_json::json!({
+		"Do": "squash",
+		"title": request.commit_message.subject,
+		"message": request.commit_message.body.clone().unwrap_or_default(),
+	});
+
+	let response: serde_json::Value = post_json(
+		&client, &headers, &url, &body, "Gitea")?;
+
+	Ok(MergeReleasePullRequestOutcome {
+		provider: SourceProvider::Gitea,
+		repository: request.repository.clone(),
+		pr_number: request.pr_number,
+		merge_commit_sha: response
+			.get("sha")
+			.and_then(|s| s.as_str())
+			.map(String::from),
+		url: response
+			.get("html_url")
+			.and_then(|s| s.as_str())
+			.map(String::from),
+		operation: MergeReleasePullRequestOperation::Merged,
+	})
+}

@@ -195,6 +195,30 @@ pub(crate) fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> Monocha
 	)
 }
 
+pub(crate) fn run_git_fetch_origin(root: &Path, branch: &str) -> MonochangeResult<()> {
+	let args: Vec<String> = vec![
+		"fetch".to_string(),
+		"origin".to_string(),
+		branch.to_string(),
+	];
+	let output = git_command_output(root, &args.iter().map(String::as_str).collect::<Vec<_>>())
+		.map_err(|error| {
+			MonochangeError::Discovery(format!(
+				"failed to fetch origin/{branch} to resolve merge commit: {error}"
+			))
+		})?;
+
+	if !output.status.success() {
+		let stderr = git_stderr_trimmed(&output);
+		tracing::warn!(%branch, %stderr, "git fetch origin failed");
+		return Err(MonochangeError::Discovery(format!(
+			"git fetch origin/{branch} failed: {stderr}"
+		)));
+	}
+
+	Ok(())
+}
+
 fn resolve_stageable_release_paths(
 	root: &Path,
 	tracked_paths: &[PathBuf],

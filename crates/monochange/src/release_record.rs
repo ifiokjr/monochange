@@ -32,6 +32,7 @@ use crate::git_support::push_git_tags_without_force;
 use crate::git_support::read_git_commit_message;
 use crate::git_support::resolve_git_commit_ref;
 use crate::git_support::resolve_git_tag_commit;
+use crate::git_support::run_git_fetch_origin;
 use crate::hosted_sources;
 
 pub(crate) fn render_release_record_discovery(
@@ -600,13 +601,24 @@ pub(crate) fn render_merge_release_pr_report(
 		Some(adapter.merge_release_pull_request(source, &request)?)
 	};
 
+	let mut tag_count = None;
+	if let Some(ref merge) = merge_outcome {
+		if let Some(ref sha) = merge.merge_commit_sha {
+			// Fetch the base branch so the merge commit is available locally
+			let _ = run_git_fetch_origin(root, &source.pull_requests.base);
+			let discovery = discover_release_record(root, sha)?;
+			let tag_report = create_release_tags(root, &discovery, true, dry_run)?;
+			tag_count = Some(tag_report.tag_results.len());
+		}
+	}
+
 	let report = MergeReleasePrReport {
 		pr_number,
 		repository: request.repository,
 		dry_run,
 		authorization,
 		merge_outcome,
-		tag_count: None,
+		tag_count,
 		release_outcomes: None,
 		status: if dry_run {
 			"dry_run".to_string()

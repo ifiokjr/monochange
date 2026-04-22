@@ -28,12 +28,17 @@
 //! <!-- {/monochangeGitlabCrateDocs} -->
 
 use std::env;
+
 use std::path::Path;
 use std::path::PathBuf;
 use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostedSourceAdapter;
+use monochange_core::MergeReleasePullRequestOperation;
+use monochange_core::MergeReleasePullRequestOutcome;
+use monochange_core::MergeReleasePullRequestRequest;
+use monochange_core::SlashCommandAuthorizationResult;
 use monochange_core::HostedSourceFeatures;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
@@ -119,6 +124,22 @@ impl HostedSourceAdapter for GitLabHostedSourceAdapter {
 		changesets: &mut [PreparedChangeset],
 	) {
 		enrich_changeset_context(source, changesets);
+	}
+
+	fn authorize_slash_command_release(
+		&self,
+		source: &SourceConfiguration,
+		author: &str,
+	) -> MonochangeResult<SlashCommandAuthorizationResult> {
+		authorize_slash_command_release(source, author)
+	}
+
+	fn merge_release_pull_request(
+		&self,
+		source: &SourceConfiguration,
+		request: &MergeReleasePullRequestRequest,
+	) -> MonochangeResult<MergeReleasePullRequestOutcome> {
+		merge_release_pull_request(source, request)
 	}
 }
 
@@ -669,3 +690,80 @@ fn auth_headers(token: &str) -> MonochangeResult<HeaderMap> {
 
 #[cfg(test)]
 mod __tests;
+
+fn authorize_slash_command_release(
+	source: &SourceConfiguration,
+	author: &str,
+) -> MonochangeResult<SlashCommandAuthorizationResult> {
+	let settings = &source.pull_requests.slash_commands;
+	if !settings.enabled {
+		return Ok(SlashCommandAuthorizationResult::Denied);
+	}
+
+	let config = &settings.authorization;
+	if config.allowed_users.iter().any(|u| u == author) {
+		return Ok(SlashCommandAuthorizationResult::Authorized);
+	}
+	if !config.allowed_users.is_empty() {
+		return Ok(SlashCommandAuthorizationResult::Denied);
+	}
+
+	let client = build_http_client("GitLab")?;
+	let api_base = gitlab_api_base(source)?;
+	let token = gitlab_token()?;
+	let headers = auth_headers(&token)?;
+	let project_id = encode(&format!("{}/{}", source.owner, source.repo)).into_owned();
+
+	if config.allow_admins {
+		let url = format!(
+			"{api_base}/projects/{project_id}/members?query={}",
+			encode(author),
+		);
+		let members: Vec<serde_json::Value> = get_json(&client, &headers, &url, "GitLab")?;
+		if members.iter().any(|m| {
+			m.get("username").and_then(|u| u.as_str()) == Some(author)
+				&& m.get("access_level").and_then(|l| l.as_u64()).unwrap_or(0) >= 40
+		}) {
+			return Ok(SlashCommandAuthorizationResult::Authorized);
+		}
+	}
+
+	Ok(SlashCommandAuthorizationResult::Denied)
+}
+
+fn merge_release_pull_request(
+	source: &SourceConfiguration,
+	request: &MergeReleasePullRequestRequest,
+) -> MonochangeResult<MergeReleasePullRequestOutcome> {
+	let client = build_http_client("GitLab")?;
+	let api_base = gitlab_api_base(source)?;
+	let token = gitlab_token()?;
+	let headers = auth_headers(&token)?;
+	let project_id = encode(&format!("{}/{}", request.owner, request.repo)).into_owned();
+	let url = format!(
+		"{api_base}/projects/{project_id}/merge_requests/{}/merge",
+		request.pr_number,
+	);
+
+	let body = serde_json::json!({
+		"squash": true,
+		"squash_commit_message": request.commit_message.subject,
+	});
+
+	let response: serde_json::Value = put_json(&client, &headers, &url, &body, "GitLab")?;
+
+	Ok(MergeReleasePullRequestOutcome {
+		provider: SourceProvider::GitLab,
+		repository: request.repository.clone(),
+		pr_number: request.pr_number,
+		merge_commit_sha: response
+			.get("merge_commit_sha")
+			.and_then(|s| s.as_str())
+			.map(String::from),
+		url: response
+			.get("web_url")
+			.and_then(|s| s.as_str())
+			.map(String::from),
+		operation: MergeReleasePullRequestOperation::Merged,
+	})
+}
