@@ -1,3 +1,4 @@
 [package]
 name = "core"
 version = "1.2.3"
+license = "Unlicense"
