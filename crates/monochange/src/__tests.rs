@@ -775,7 +775,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				when: Some("{{ inputs.enabled }}".to_string()),
 				inputs: BTreeMap::from([(
 					"format".to_string(),
-					monochange_core::CliStepInputValue::String("json".to_string()),
+					CliStepInputValue::String("json".to_string()),
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
@@ -787,10 +787,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				shell: monochange_core::ShellConfig::None,
 				id: Some("none-shell".to_string()),
 				variables: None,
-				inputs: BTreeMap::from([(
-					"enabled".to_string(),
-					monochange_core::CliStepInputValue::Boolean(true),
-				)]),
+				inputs: BTreeMap::from([("enabled".to_string(), CliStepInputValue::Boolean(true))]),
 			},
 			monochange_core::CliStepDefinition::Command {
 				show_progress: None,
@@ -824,7 +821,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				])),
 				inputs: BTreeMap::from([(
 					"changed_paths".to_string(),
-					monochange_core::CliStepInputValue::List(vec!["src/lib.rs".to_string()]),
+					CliStepInputValue::List(vec!["src/lib.rs".to_string()]),
 				)]),
 			},
 			monochange_core::CliStepDefinition::Command {
@@ -843,7 +840,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
-					monochange_core::CliStepInputValue::String("json".to_string()),
+					CliStepInputValue::String("json".to_string()),
 				)]),
 			},
 			monochange_core::CliStepDefinition::PublishRelease {
@@ -851,7 +848,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
-					monochange_core::CliStepInputValue::String("text".to_string()),
+					CliStepInputValue::String("text".to_string()),
 				)]),
 			},
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
@@ -859,7 +856,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
-					monochange_core::CliStepInputValue::String("json".to_string()),
+					CliStepInputValue::String("json".to_string()),
 				)]),
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
@@ -867,7 +864,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				when: None,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
-					monochange_core::CliStepInputValue::String("text".to_string()),
+					CliStepInputValue::String("text".to_string()),
 				)]),
 			},
 		],

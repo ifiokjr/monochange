@@ -2002,12 +2002,12 @@ impl CliStepDefinition {
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
 			Self::Validate { .. } => Some(&["fix"]),
-			Self::CommitRelease { .. } => Some(&[]),
-			Self::Discover { .. } | Self::DisplayVersions { .. } => Some(&["format"]),
-			Self::PrepareRelease { .. }
+			Self::CommitRelease { .. }
+			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
 			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => Some(&[]),
+			Self::Discover { .. } | Self::DisplayVersions { .. } => Some(&["format"]),
 			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => Some(&["package"]),
 			Self::PlanPublishRateLimits { .. } => Some(&["mode", "package"]),
 			Self::CreateChangeFile { .. } => {
@@ -2042,17 +2042,18 @@ impl CliStepDefinition {
 					_ => None,
 				}
 			}
-			Self::CommitRelease { .. } | Self::Command { .. } => None,
+			Self::CommitRelease { .. }
+			| Self::Command { .. }
+			| Self::PrepareRelease { .. }
+			| Self::PublishRelease { .. }
+			| Self::OpenReleaseRequest { .. }
+			| Self::CommentReleasedIssues { .. } => None,
 			Self::Discover { .. } | Self::DisplayVersions { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					_ => None,
 				}
 			}
-			Self::PrepareRelease { .. }
-			| Self::PublishRelease { .. }
-			| Self::OpenReleaseRequest { .. }
-			| Self::CommentReleasedIssues { .. } => None,
 			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
 				match name {
 					"package" => Some(CliInputKind::StringList),

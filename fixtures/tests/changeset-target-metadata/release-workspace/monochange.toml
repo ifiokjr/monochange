@@ -40,6 +40,7 @@ enabled = true
 
 [[cli.validate.steps]]
 type = "Validate"
+inputs = { fix = "{{ inputs.fix }}" }
 
 [cli.release]
 

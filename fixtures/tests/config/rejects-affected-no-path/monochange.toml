@@ -11,4 +11,3 @@ enabled = true
 
 [[cli.affected.steps]]
 type = "AffectedPackages"
-inputs = { changed_paths = \"{{ inputs.changed_paths }}\", since = \"{{ inputs.since }}\", verify = \"{{ inputs.verify }}\", label = \"{{ inputs.label }}\" }

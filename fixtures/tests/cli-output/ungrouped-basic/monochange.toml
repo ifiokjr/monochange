@@ -50,6 +50,7 @@ type = "path"
 
 [[cli.change.steps]]
 type = "CreateChangeFile"
+inputs = { interactive = "{{ inputs.interactive }}", package = "{{ inputs.package }}", bump = "{{ inputs.bump }}", version = "{{ inputs.version }}", reason = "{{ inputs.reason }}", type = "{{ inputs.type }}", caused_by = "{{ inputs.caused_by }}", details = "{{ inputs.details }}", output = "{{ inputs.output }}" }
 
 [cli.release]
 

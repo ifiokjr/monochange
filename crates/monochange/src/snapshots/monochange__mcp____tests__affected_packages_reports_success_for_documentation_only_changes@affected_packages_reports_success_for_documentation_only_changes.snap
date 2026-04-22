@@ -4,8 +4,29 @@ expression: content_text(&result)
 ---
 {
   "action": "affected_packages",
-  "error": "config error: CLI command `release` step `PrepareRelease` has unknown input override `format`; this step accepts no inputs",
-  "ok": false,
-  "root": "[ROOT]
-  "summary": "config error: CLI command `release` step `PrepareRelease` has unknown input override `format`; this step accepts no inputs"
+  "evaluation": {
+    "affectedPackageIds": [],
+    "changedPaths": [
+      "docs/readme.md"
+    ],
+    "changesetPaths": [],
+    "comment": null,
+    "coveredPackageIds": [],
+    "enforce": false,
+    "errors": [],
+    "ignoredPaths": [],
+    "labels": [
+      "no-changeset-required"
+    ],
+    "matchedPaths": [],
+    "matchedSkipLabels": [
+      "no-changeset-required"
+    ],
+    "required": false,
+    "status": "skipped",
+    "summary": "changeset verification skipped because the change has an allowed label: no-changeset-required",
+    "uncoveredPackageIds": []
+  },
+  "ok": true,
+  "summary": "changeset verification skipped because the change has an allowed label: no-changeset-required"
 }

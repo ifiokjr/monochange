@@ -8,4 +8,4 @@ path = "crates/core"
 
 [[cli.diag.steps]]
 type = "DiagnoseChangesets"
-inputs = { format = "json", changeset = ["my-change.md"] }
+inputs = { changeset = ["my-change.md"] }

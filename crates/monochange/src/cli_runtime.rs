@@ -1018,7 +1018,7 @@ fn parse_string_as_boolean(value: &str, condition: &str) -> MonochangeResult<boo
 	}
 	match value.as_str() {
 		"true" => Ok(true),
-		"false" | "0" | "" => Ok(false),
+		"false" | "0" | "" | "none" => Ok(false),
 		other => {
 			Err(MonochangeError::Config(format!(
 				"`when` condition `{condition}` must be a boolean, got `{other}`"

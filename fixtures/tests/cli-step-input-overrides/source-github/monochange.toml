@@ -28,29 +28,44 @@ enabled = true
 [cli.publish-release]
 help_text = "Publish releases"
 
+[[cli.publish-release.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.publish-release.steps]]
 type = "PrepareRelease"
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
-inputs = { format = "json" }
 
 [cli.release-pr]
 help_text = "Open a release pull request"
+
+[[cli.release-pr.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
-inputs = { format = "json" }
 
 [cli.release-comments]
 help_text = "Comment on released issues"
+
+[[cli.release-comments.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
 
 [[cli.release-comments.steps]]
 type = "PrepareRelease"
 
 [[cli.release-comments.steps]]
 type = "CommentReleasedIssues"
-inputs = { format = "json" }

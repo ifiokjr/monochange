@@ -37,9 +37,15 @@ type = "Validate"
 [cli.discover]
 help_text = "Discover packages"
 
+[[cli.discover.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.discover.steps]]
 type = "Discover"
-inputs = { format = "json" }
+inputs = { format = "{{ inputs.format }}" }
 
 [cli.change]
 help_text = "Create a hardcoded change"
@@ -51,17 +57,27 @@ inputs = { package = ["core"], bump = "minor", reason = "hardcoded change", outp
 [cli.release]
 help_text = "Prepare a release"
 
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.release.steps]]
 type = "PrepareRelease"
-inputs = { format = "json" }
-
 
 [cli.affected]
 help_text = "Evaluate affected packages"
 
+[[cli.affected.inputs]]
+name = "format"
+type = "choice"
+default = "json"
+choices = ["text", "json"]
+
 [[cli.affected.steps]]
 type = "AffectedPackages"
-inputs = { format = "json", changed_paths = ["crates/core/CHANGELOG.md"], label = ["no-changeset-required"], verify = true }
+inputs = { changed_paths = ["crates/core/CHANGELOG.md"], label = ["no-changeset-required"], verify = true }
 
 [cli.announce]
 help_text = "Write a hardcoded message"

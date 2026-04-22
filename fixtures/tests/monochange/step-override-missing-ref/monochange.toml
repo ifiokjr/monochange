@@ -3,9 +3,9 @@ package_type = "cargo"
 
 [changesets.verify]
 enabled = true
-required = true
+required = false
 skip_labels = ["no-changeset-required"]
-comment_on_failure = true
+comment_on_failure = false
 
 [package.core]
 path = "crates/core"

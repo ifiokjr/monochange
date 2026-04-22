@@ -2343,9 +2343,7 @@ fn load_workspace_configuration_rejects_unknown_input_on_diagnose_changesets() {
 		"error was: {error}"
 	);
 	assert!(
-		error
-			.to_string()
-			.contains("valid inputs: format, changeset"),
+		error.to_string().contains("valid inputs: changeset"),
 		"error was: {error}"
 	);
 }
