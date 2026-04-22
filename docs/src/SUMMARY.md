@@ -41,3 +41,5 @@
   - [CommentReleasedIssues](reference/cli-steps/12-comment-released-issues.md)
   - [Command](reference/cli-steps/13-command.md)
   - [DisplayVersions](reference/cli-steps/14-display-versions.md)
+  - [PlaceholderPublish](reference/cli-steps/15-placeholder-publish.md)
+  - [PublishPackages](reference/cli-steps/16-publish-packages.md)
