@@ -12,24 +12,6 @@ enabled = true
 mode = "builtin"
 trusted_publishing = true
 
-[package.jsr_pkg]
-path = "packages/jsr-pkg"
-type = "deno"
-
-[package.jsr_pkg.publish]
-enabled = true
-mode = "builtin"
-trusted_publishing = true
-
-[package.dart_pkg]
-path = "packages/dart-pkg"
-type = "dart"
-
-[package.dart_pkg.publish]
-enabled = true
-mode = "builtin"
-trusted_publishing = true
-
 [package.npm_pkg]
 path = "packages/npm-pkg"
 type = "npm"
