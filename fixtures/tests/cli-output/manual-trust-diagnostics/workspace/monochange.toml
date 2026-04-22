@@ -29,3 +29,12 @@ type = "dart"
 enabled = true
 mode = "builtin"
 trusted_publishing = true
+
+[package.npm_pkg]
+path = "packages/npm-pkg"
+type = "npm"
+
+[package.npm_pkg.publish]
+enabled = true
+mode = "builtin"
+trusted_publishing = true

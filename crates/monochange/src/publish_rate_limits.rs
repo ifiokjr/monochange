@@ -59,7 +59,7 @@ pub(crate) fn plan_publish_rate_limits(
 	let discovery = discover_workspace(root)?;
 	let packages = &discovery.packages;
 	#[rustfmt::skip]
-	let requests = if mode == PublishRateLimitMode::Placeholder { build_placeholder_plan_requests(root, configuration, packages, selected_packages)? } else { build_release_plan_requests(root, prepared_release, packages, selected_packages)? };
+	let requests = if mode == PublishRateLimitMode::Placeholder { build_placeholder_plan_requests(root, configuration, packages, selected_packages)? } else { build_release_plan_requests(root, configuration, prepared_release, packages, selected_packages)? };
 	Ok(plan_publish_rate_limits_for_requests(
 		&requests,
 		mode.operation(),
@@ -80,14 +80,19 @@ fn build_placeholder_plan_requests(
 
 fn build_release_plan_requests(
 	root: &Path,
+	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
 	packages: &[monochange_core::PackageRecord],
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
 	#[rustfmt::skip]
 	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	let requests =
-		package_publish::build_release_requests(packages, &publications, selected_packages)?;
+	let requests = package_publish::build_release_requests(
+		configuration,
+		packages,
+		&publications,
+		selected_packages,
+	)?;
 	package_publish::filter_pending_publish_requests(&requests)
 }
 
@@ -401,6 +406,7 @@ mod tests {
 			package_manager: Some("pnpm".to_string()),
 			mode,
 			version: Version::new(1, 0, 0).to_string(),
+			placeholder: false,
 			trusted_publishing: TrustedPublishingSettings::default(),
 			placeholder_readme: String::new(),
 		}
@@ -519,6 +525,110 @@ mod tests {
 	}
 
 	#[test]
+	fn plan_publish_rate_limits_skips_private_and_disabled_packages_from_release_batches() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests/publish-rate-limits/disabled-and-private/workspace");
+		copy_fixture_dir(&fixture, tempdir.path());
+		let configuration = crate::load_workspace_configuration(tempdir.path())
+			.unwrap_or_else(|error| panic!("load config: {error}"));
+		let prepared_release = PreparedRelease {
+			plan: monochange_core::ReleasePlan {
+				workspace_root: tempdir.path().to_path_buf(),
+				decisions: Vec::new(),
+				groups: Vec::new(),
+				warnings: Vec::new(),
+				unresolved_items: Vec::new(),
+				compatibility_evidence: Vec::new(),
+			},
+			changeset_paths: Vec::new(),
+			changesets: Vec::new(),
+			released_packages: vec![
+				"core".to_string(),
+				"private".to_string(),
+				"docs".to_string(),
+			],
+			package_publications: vec![
+				PackagePublicationTarget {
+					package: "core".to_string(),
+					ecosystem: monochange_core::Ecosystem::Cargo,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+					version: Version::new(1, 0, 1).to_string(),
+					mode: PublishMode::Builtin,
+					trusted_publishing: TrustedPublishingSettings::default(),
+				},
+				PackagePublicationTarget {
+					package: "private".to_string(),
+					ecosystem: monochange_core::Ecosystem::Cargo,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+					version: Version::new(1, 0, 1).to_string(),
+					mode: PublishMode::Builtin,
+					trusted_publishing: TrustedPublishingSettings::default(),
+				},
+				PackagePublicationTarget {
+					package: "docs".to_string(),
+					ecosystem: monochange_core::Ecosystem::Npm,
+					registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+					version: Version::new(1, 0, 1).to_string(),
+					mode: PublishMode::Builtin,
+					trusted_publishing: TrustedPublishingSettings::default(),
+				},
+			],
+			version: None,
+			group_version: None,
+			release_targets: Vec::new(),
+			changed_files: Vec::new(),
+			changelogs: Vec::new(),
+			updated_changelogs: Vec::new(),
+			deleted_changesets: Vec::new(),
+			dry_run: true,
+		};
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/core");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/private");
+			then.status(404);
+		});
+		server.mock(|when, then| {
+			when.method(GET).path("/docs");
+			then.status(404);
+		});
+
+		let report = with_vars(
+			[
+				(
+					"MONOCHANGE_CRATES_IO_API_URL",
+					Some(server.base_url().as_str()),
+				),
+				(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				),
+			],
+			|| {
+				plan_publish_rate_limits(
+					tempdir.path(),
+					&configuration,
+					Some(&prepared_release),
+					&BTreeSet::new(),
+					PublishRateLimitMode::Publish,
+					true,
+				)
+			},
+		)
+		.unwrap_or_else(|error| panic!("plan rate limits: {error}"));
+
+		assert_eq!(report.windows.len(), 1);
+		assert_eq!(report.windows[0].registry, RegistryKind::CratesIo);
+		assert_eq!(report.windows[0].pending, 1);
+		assert_eq!(report.batches.len(), 1);
+		assert_eq!(report.batches[0].packages, vec!["core".to_string()]);
+	}
+
+	#[test]
 	fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -632,7 +742,7 @@ mod tests {
 	}
 
 	#[test]
-	fn build_placeholder_plan_requests_skips_placeholder_versions_that_already_exist() {
+	fn build_placeholder_plan_requests_skips_packages_when_any_registry_version_exists() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
 			.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
@@ -645,7 +755,7 @@ mod tests {
 		server.mock(|when, then| {
 			when.method(GET).path("/crates/core");
 			then.status(200).json_body_obj(&serde_json::json!({
-				"versions": [{ "num": "0.0.0" }]
+				"versions": [{ "num": "1.2.3" }]
 			}));
 		});
 		server.mock(|when, then| {
@@ -906,6 +1016,7 @@ mod tests {
 					package_manager: None,
 					mode: PublishMode::Builtin,
 					version: Version::new(1, 0, 0).to_string(),
+					placeholder: false,
 					trusted_publishing: TrustedPublishingSettings::default(),
 					placeholder_readme: String::new(),
 				}

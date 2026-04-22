@@ -1,0 +1,91 @@
+---
+source: crates/monochange/tests/cli_main_binary.rs
+info:
+  program: monochange
+  args:
+    - discover
+    - "--format=json"
+  env:
+    NO_COLOR: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+{
+  "dependencies": [
+    {
+      "direct": true,
+      "from": "dart:dart/mobile_sdk/pubspec.yaml",
+      "kind": "runtime",
+      "to": "npm:packages/web-sdk/package.json"
+    },
+    {
+      "direct": true,
+      "from": "deno:deno/tool/deno.json",
+      "kind": "runtime",
+      "to": "npm:packages/web-sdk/package.json"
+    },
+    {
+      "direct": true,
+      "from": "npm:packages/web-sdk/package.json",
+      "kind": "runtime",
+      "to": "cargo:cargo/sdk-core/Cargo.toml"
+    }
+  ],
+  "packages": [
+    {
+      "ecosystem": "cargo",
+      "id": "cargo:cargo/sdk-core/Cargo.toml",
+      "manifestPath": "cargo/sdk-core/Cargo.toml",
+      "name": "sdk-core",
+      "publishState": "public",
+      "version": "1.0.0",
+      "versionGroup": "sdk",
+      "workspaceRoot": "."
+    },
+    {
+      "ecosystem": "dart",
+      "id": "dart:dart/mobile_sdk/pubspec.yaml",
+      "manifestPath": "dart/mobile_sdk/pubspec.yaml",
+      "name": "mobile_sdk",
+      "publishState": "public",
+      "version": "1.0.0",
+      "versionGroup": null,
+      "workspaceRoot": "."
+    },
+    {
+      "ecosystem": "deno",
+      "id": "deno:deno/tool/deno.json",
+      "manifestPath": "deno/tool/deno.json",
+      "name": "deno-tool",
+      "publishState": "public",
+      "version": "1.0.0",
+      "versionGroup": null,
+      "workspaceRoot": "."
+    },
+    {
+      "ecosystem": "npm",
+      "id": "npm:packages/web-sdk/package.json",
+      "manifestPath": "packages/web-sdk/package.json",
+      "name": "web-sdk",
+      "publishState": "public",
+      "version": "1.0.0",
+      "versionGroup": "sdk",
+      "workspaceRoot": "."
+    }
+  ],
+  "versionGroups": [
+    {
+      "id": "sdk",
+      "members": [
+        "cargo:cargo/sdk-core/Cargo.toml",
+        "npm:packages/web-sdk/package.json"
+      ],
+      "mismatchDetected": false
+    }
+  ],
+  "warnings": [],
+  "workspaceRoot": "."
+}
+
+----- stderr -----

@@ -1,7 +1,12 @@
+use std::path::PathBuf;
 use std::process::Command;
 
 use insta_cmd::assert_cmd_snapshot;
 use insta_cmd::get_cargo_bin;
+
+fn fixture_path(relative: &str) -> PathBuf {
+	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
 
 fn monochange_cli() -> Command {
 	let mut command = Command::new(get_cargo_bin("monochange"));
@@ -34,5 +39,16 @@ fn monochange_binary_quiet_suppresses_cli_errors() {
 	assert!(
 		output.stderr.is_empty(),
 		"quiet mode should suppress stderr"
+	);
+}
+
+#[test]
+fn monochange_binary_accepts_equals_format_flags() {
+	let root = fixture_path("cli-output/discover-mixed");
+	assert_cmd_snapshot!(
+		monochange_cli()
+			.current_dir(root)
+			.arg("discover")
+			.arg("--format=json")
 	);
 }
