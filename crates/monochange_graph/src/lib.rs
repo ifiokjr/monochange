@@ -657,3 +657,6 @@ mod mutant_killers;
 
 #[cfg(test)]
 mod __tests;
+
+#[cfg(test)]
+mod prop_tests;
