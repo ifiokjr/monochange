@@ -16,7 +16,6 @@ description = "Configuration parsing and validation for monochange"
 doc-comment = { workspace = true, default-features = true }
 glob = { workspace = true, default-features = true }
 miette = { workspace = true, default-features = true }
-minijinja = { workspace = true, default-features = true }
 monochange_cargo = { workspace = true }
 monochange_core = { workspace = true }
 monochange_dart = { workspace = true }
@@ -37,6 +36,7 @@ tracing = { workspace = true, default-features = true }
 [dev-dependencies]
 insta = { workspace = true, default-features = true }
 monochange_test_helpers = { workspace = true }
+proptest = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
