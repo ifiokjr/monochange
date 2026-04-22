@@ -101,12 +101,8 @@ fn build_release_plan_requests(
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
 	#[rustfmt::skip]
 	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	let requests = package_publish::build_release_requests(
-		configuration,
-		packages,
-		&publications,
-		selected_packages,
-	)?;
+	#[rustfmt::skip]
+	let requests = package_publish::build_release_requests(configuration, packages, &publications, selected_packages)?;
 	package_publish::filter_pending_publish_requests(&requests)
 }
 
@@ -122,12 +118,8 @@ fn build_release_plan_requests_with_transport(
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
 	#[rustfmt::skip]
 	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	let requests = package_publish::build_release_requests(
-		configuration,
-		packages,
-		&publications,
-		selected_packages,
-	)?;
+	#[rustfmt::skip]
+	let requests = package_publish::build_release_requests(configuration, packages, &publications, selected_packages)?;
 	package_publish::filter_pending_publish_requests_with_transport(&requests, client, endpoints)
 }
 
@@ -386,7 +378,6 @@ mod tests {
 	use monochange_core::PublishMode;
 	use monochange_core::PublishRegistry;
 	use monochange_core::TrustedPublishingSettings;
-	use reqwest::blocking::Client;
 	use semver::Version;
 	use tempfile::tempdir;
 
@@ -527,7 +518,7 @@ mod tests {
 			then.status(404);
 		});
 
-		let client = Client::builder()
+		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
 		let endpoints = package_publish::RegistryEndpoints {
@@ -789,7 +780,7 @@ mod tests {
 			then.status(404);
 		});
 
-		let client = Client::builder()
+		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
 		let endpoints = package_publish::RegistryEndpoints {
@@ -858,7 +849,7 @@ mod tests {
 			then.status(404);
 		});
 
-		let client = Client::builder()
+		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
 		let endpoints = package_publish::RegistryEndpoints {
@@ -938,7 +929,7 @@ mod tests {
 			then.status(404);
 		});
 
-		let client = Client::builder()
+		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
 		let endpoints = package_publish::RegistryEndpoints {

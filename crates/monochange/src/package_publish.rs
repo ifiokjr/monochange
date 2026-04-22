@@ -225,12 +225,8 @@ pub(crate) fn run_publish_packages(
 	let discovery = discover_workspace(root)?;
 	let publication_targets =
 		release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	let requests = build_release_requests(
-		configuration,
-		&discovery.packages,
-		&publication_targets,
-		selected_packages,
-	)?;
+	#[rustfmt::skip]
+	let requests = build_release_requests(configuration, &discovery.packages, &publication_targets, selected_packages)?;
 	let env_map = current_env_map();
 	let endpoints = RegistryEndpoints::from_env();
 	let client = registry_client()?;
@@ -268,9 +264,7 @@ fn registry_client() -> MonochangeResult<Client> {
 	Client::builder()
 		.user_agent(format!("monochange/{}", env!("CARGO_PKG_VERSION")))
 		.build()
-		.map_err(|error| {
-			MonochangeError::Discovery(format!("registry client build failed: {error}"))
-		})
+		.map_err(http_error("registry client build"))
 }
 
 fn package_can_be_published(
@@ -661,13 +655,16 @@ fn trust_outcome_for_skip(
 	} else if request.registry == RegistryKind::Npm {
 		match resolve_github_trust_context(root, source, &request.trusted_publishing, env_map) {
 			Ok(context) => {
+				let command = render_npm_trust_command(request, &context);
 				TrustedPublishingOutcome {
 					status: TrustedPublishingStatus::Configured,
 					repository: Some(context.repository),
 					workflow: Some(context.workflow),
 					environment: context.environment,
 					setup_url: Some(manual_setup_url(request)),
-					message: "npm trusted publishing is expected for this package".to_string(),
+					message: format!(
+						"npm trusted publishing is expected for this package; rerun `{command}` if you need to repair it manually"
+					),
 				}
 			}
 			Err(_) => planned_trust_outcome(request, source, root, env_map),
@@ -688,13 +685,14 @@ fn planned_trust_outcome(
 	} else if request.registry == RegistryKind::Npm {
 		match resolve_github_trust_context(root, source, &request.trusted_publishing, env_map) {
 			Ok(context) => {
+				let command = render_npm_trust_command(request, &context);
 				TrustedPublishingOutcome {
 					status: TrustedPublishingStatus::Planned,
 					repository: Some(context.repository),
 					workflow: Some(context.workflow),
 					environment: context.environment,
 					setup_url: Some(manual_setup_url(request)),
-					message: "would configure npm trusted publishing".to_string(),
+					message: format!("would configure npm trusted publishing with `{command}`"),
 				}
 			}
 			Err(_) => manual_trust_outcome(request, source, root, env_map),
@@ -780,6 +778,10 @@ fn build_npm_trust_command(request: &PublishRequest, context: &GitHubTrustContex
 	];
 	append_npm_trust_environment_arg(&mut args, context.environment.as_ref());
 	build_npm_cli_command(request, args)
+}
+
+fn render_npm_trust_command(request: &PublishRequest, context: &GitHubTrustContext) -> String {
+	render_command(&build_npm_trust_command(request, context))
 }
 
 fn append_npm_trust_environment_arg(args: &mut Vec<String>, environment: Option<&String>) {
@@ -1304,101 +1306,96 @@ fn registry_version_exists(
 	endpoints: &RegistryEndpoints,
 	request: &PublishRequest,
 ) -> MonochangeResult<bool> {
-	match request.registry {
-		RegistryKind::Npm => {
-			let url = format!(
-				"{}/{}",
-				endpoints.npm_registry.trim_end_matches('/'),
-				encode(&request.package_name)
-			);
-			let response = client
-				.get(url)
-				.send()
-				.map_err(http_error("npm registry lookup"))?;
-			if response.status() == StatusCode::NOT_FOUND {
-				return Ok(false);
-			}
+	if request.registry == RegistryKind::Npm {
+		let url = format!(
+			"{}/{}",
+			endpoints.npm_registry.trim_end_matches('/'),
+			encode(&request.package_name)
+		);
+		let response = client
+			.get(url)
+			.send()
+			.map_err(http_error("npm registry lookup"))?;
+		if response.status() == StatusCode::NOT_FOUND {
+			return Ok(false);
+		}
 
-			let response = response
-				.error_for_status()
-				.map_err(http_error("npm registry lookup"))?;
-			let json = response
-				.json::<JsonValue>()
-				.map_err(http_error("npm registry decode"))?;
-			let exists = json
-				.get("versions")
-				.and_then(JsonValue::as_object)
-				.is_some_and(|versions| {
-					request.placeholder && !versions.is_empty()
-						|| versions.contains_key(&request.version)
-				});
-			Ok(exists)
-		}
-		RegistryKind::CratesIo => crates_io_version_exists(client, endpoints, request),
-		RegistryKind::PubDev => {
-			let url = format!(
-				"{}/packages/{}",
-				endpoints.pub_dev_api.trim_end_matches('/'),
-				encode(&request.package_name)
-			);
-			let response = client
-				.get(url)
-				.send()
-				.map_err(http_error("pub.dev lookup"))?;
-			if response.status() == StatusCode::NOT_FOUND {
-				return Ok(false);
-			}
-
-			let response = response
-				.error_for_status()
-				.map_err(http_error("pub.dev lookup"))?;
-			let json = response
-				.json::<JsonValue>()
-				.map_err(http_error("pub.dev decode"))?;
-			let exists = json
-				.get("versions")
-				.and_then(JsonValue::as_array)
-				.is_some_and(|versions| {
-					request.placeholder && !versions.is_empty()
-						|| versions.iter().any(|version| {
-							version.get("version").and_then(JsonValue::as_str)
-								== Some(request.version.as_str())
-						})
-				});
-			Ok(exists)
-		}
-		RegistryKind::Jsr => {
-			let url = format!(
-				"{}/{}/meta.json",
-				endpoints.jsr_base.trim_end_matches('/'),
-				request.package_name
-			);
-			let response = client.get(url).send().map_err(http_error("jsr lookup"))?;
-			if response.status() == StatusCode::NOT_FOUND {
-				return Ok(false);
-			}
-
-			let response = response
-				.error_for_status()
-				.map_err(http_error("jsr lookup"))?;
-			let json = response
-				.json::<JsonValue>()
-				.map_err(http_error("jsr decode"))?;
-			let exists = json
-				.get("versions")
-				.and_then(JsonValue::as_object)
-				.is_some_and(|versions| {
-					request.placeholder && !versions.is_empty()
-						|| versions.contains_key(&request.version)
-				});
-			Ok(exists)
-		}
-		_ => {
-			Err(MonochangeError::Config(
-				"unsupported built-in publish registry".to_string(),
-			))
-		}
+		let response = response
+			.error_for_status()
+			.map_err(http_error("npm registry lookup"))?;
+		let json = response
+			.json::<JsonValue>()
+			.map_err(http_error("npm registry decode"))?;
+		let exists = json
+			.get("versions")
+			.and_then(JsonValue::as_object)
+			.is_some_and(|versions| {
+				request.placeholder && !versions.is_empty()
+					|| versions.contains_key(&request.version)
+			});
+		return Ok(exists);
 	}
+
+	if request.registry == RegistryKind::CratesIo {
+		return crates_io_version_exists(client, endpoints, request);
+	}
+
+	if request.registry == RegistryKind::PubDev {
+		let url = format!(
+			"{}/packages/{}",
+			endpoints.pub_dev_api.trim_end_matches('/'),
+			encode(&request.package_name)
+		);
+		let response = client
+			.get(url)
+			.send()
+			.map_err(http_error("pub.dev lookup"))?;
+		if response.status() == StatusCode::NOT_FOUND {
+			return Ok(false);
+		}
+
+		let response = response
+			.error_for_status()
+			.map_err(http_error("pub.dev lookup"))?;
+		let json = response
+			.json::<JsonValue>()
+			.map_err(http_error("pub.dev decode"))?;
+		let exists = json
+			.get("versions")
+			.and_then(JsonValue::as_array)
+			.is_some_and(|versions| {
+				request.placeholder && !versions.is_empty()
+					|| versions.iter().any(|version| {
+						version.get("version").and_then(JsonValue::as_str)
+							== Some(request.version.as_str())
+					})
+			});
+		return Ok(exists);
+	}
+
+	let url = format!(
+		"{}/{}/meta.json",
+		endpoints.jsr_base.trim_end_matches('/'),
+		request.package_name
+	);
+	let response = client.get(url).send().map_err(http_error("jsr lookup"))?;
+	if response.status() == StatusCode::NOT_FOUND {
+		return Ok(false);
+	}
+
+	let response = response
+		.error_for_status()
+		.map_err(http_error("jsr lookup"))?;
+	let json = response
+		.json::<JsonValue>()
+		.map_err(http_error("jsr decode"))?;
+	let exists = json
+		.get("versions")
+		.and_then(JsonValue::as_object)
+		.is_some_and(|versions| {
+			request.placeholder && !versions.is_empty() || versions.contains_key(&request.version)
+		});
+	Ok(exists)
 }
 
 fn crates_io_version_exists(
@@ -1522,12 +1519,22 @@ fn manual_trust_outcome(
 	let setup_url = manual_setup_url(request);
 	match resolve_github_trust_context(root, source, &request.trusted_publishing, env_map) {
 		Ok(context) => {
-			let message = format!(
-				"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and register {} there",
-				request.package_name,
-				setup_url,
-				format_manual_trust_context(&context),
-			);
+			let message = if request.registry == RegistryKind::Npm {
+				let command = render_npm_trust_command(request, &context);
+				format!(
+					"configure trusted publishing for `{}` before the next built-in release publish by running `{command}`; you can also open {} and register {} there",
+					request.package_name,
+					setup_url,
+					format_manual_trust_context(&context),
+				)
+			} else {
+				format!(
+					"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and register {} there",
+					request.package_name,
+					setup_url,
+					format_manual_trust_context(&context),
+				)
+			};
 			TrustedPublishingOutcome {
 				status: TrustedPublishingStatus::ManualActionRequired,
 				repository: Some(context.repository),
@@ -2496,10 +2503,11 @@ jobs:
 
 	#[test]
 	fn crates_io_index_entry_path_covers_sparse_layout_rules() {
+		assert_eq!(crates_io_index_entry_path(""), "");
 		assert_eq!(crates_io_index_entry_path("a"), "1/a");
 		assert_eq!(crates_io_index_entry_path("ab"), "2/ab");
 		assert_eq!(crates_io_index_entry_path("pkg"), "3/p/pkg");
-		assert_eq!(crates_io_index_entry_path("crate"), "cr/at/crate");
+		assert_eq!(crates_io_index_entry_path("Crate"), "cr/at/crate");
 	}
 
 	#[test]
@@ -2549,6 +2557,91 @@ jobs:
 			error
 				.to_string()
 				.contains("crates.io index fallback failed")
+		);
+	}
+
+	#[test]
+	fn crates_io_index_version_exists_handles_missing_invalid_and_nonmatching_entries() {
+		let client = Client::builder().build().expect("http client:");
+
+		let missing_server = MockServer::start();
+		missing_server.mock(|when, then| {
+			when.method(GET).path("/3/p/pkg");
+			then.status(404);
+		});
+		assert!(
+			!crates_io_index_version_exists(
+				&client,
+				&sample_endpoints(&missing_server.base_url()),
+				&sample_request(RegistryKind::CratesIo),
+			)
+			.expect("missing index entry:")
+		);
+
+		let invalid_server = MockServer::start();
+		invalid_server.mock(|when, then| {
+			when.method(GET).path("/3/p/pkg");
+			then.status(200).body("not-json\n");
+		});
+		let invalid_error = crates_io_index_version_exists(
+			&client,
+			&sample_endpoints(&invalid_server.base_url()),
+			&sample_request(RegistryKind::CratesIo),
+		)
+		.expect_err("expected index decode error");
+		assert!(
+			invalid_error
+				.to_string()
+				.contains("crates.io index decode failed")
+		);
+
+		let nonmatching_server = MockServer::start();
+		nonmatching_server.mock(|when, then| {
+			when.method(GET).path("/3/p/pkg");
+			then.status(200)
+				.body("{\"name\":\"pkg\"}\n{\"name\":\"pkg\",\"vers\":\"9.9.9\"}\n");
+		});
+		assert!(
+			!crates_io_index_version_exists(
+				&client,
+				&sample_endpoints(&nonmatching_server.base_url()),
+				&sample_request(RegistryKind::CratesIo),
+			)
+			.expect("nonmatching index entry:")
+		);
+	}
+
+	#[test]
+	fn crates_io_index_version_exists_matches_placeholder_or_requested_version() {
+		let client = Client::builder().build().expect("http client:");
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/3/p/pkg");
+			then.status(200).body(
+				"{\"name\":\"pkg\",\"vers\":\"1.0.0\"}\n{\"name\":\"pkg\",\"vers\":\"1.2.3\"}\n",
+			);
+		});
+		let endpoints = sample_endpoints(&server.base_url());
+
+		assert!(
+			crates_io_index_version_exists(
+				&client,
+				&endpoints,
+				&PublishRequest {
+					placeholder: true,
+					version: PLACEHOLDER_VERSION.to_string(),
+					..sample_request(RegistryKind::CratesIo)
+				},
+			)
+			.expect("placeholder index entry:")
+		);
+		assert!(
+			crates_io_index_version_exists(
+				&client,
+				&endpoints,
+				&sample_request(RegistryKind::CratesIo),
+			)
+			.expect("matching index entry:")
 		);
 	}
 
@@ -3006,6 +3099,25 @@ jobs:
 	}
 
 	#[test]
+	fn build_release_requests_skips_publication_targets_missing_from_discovery() {
+		let configuration =
+			sample_configuration(&[("pkg", monochange_core::PackageType::Npm, true)]);
+		let publications = vec![PackagePublicationTarget {
+			package: "pkg".to_string(),
+			ecosystem: Ecosystem::Npm,
+			registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+			version: "1.2.3".to_string(),
+			mode: PublishMode::Builtin,
+			trusted_publishing: TrustedPublishingSettings::default(),
+		}];
+
+		let requests = build_release_requests(&configuration, &[], &publications, &BTreeSet::new())
+			.expect("requests");
+
+		assert!(requests.is_empty());
+	}
+
+	#[test]
 	fn build_release_requests_skips_disabled_and_private_packages() {
 		let configuration = sample_configuration(&[
 			("public", monochange_core::PackageType::Npm, true),
@@ -3278,6 +3390,47 @@ jobs:
 		);
 		assert!(outcome.message.contains(
 			"register repository `ifiokjr/monochange`, workflow `publish.yml`, environment `pub.dev`"
+		));
+	}
+
+	#[test]
+	fn manual_trust_outcome_includes_copyable_npm_trust_command_when_context_is_known() {
+		let mut request = trusted_request(RegistryKind::Npm);
+		request.trusted_publishing.repository = Some("ifiokjr/monochange".to_string());
+		request.trusted_publishing.workflow = Some("publish.yml".to_string());
+		request.trusted_publishing.environment = Some("publisher".to_string());
+
+		let outcome = manual_trust_outcome(&request, None, Path::new("."), &BTreeMap::new());
+
+		assert_eq!(
+			outcome.status,
+			TrustedPublishingStatus::ManualActionRequired
+		);
+		assert!(outcome.message.contains(
+			"npm trust github pkg --file publish.yml --repo ifiokjr/monochange --yes --env publisher"
+		));
+	}
+
+	#[test]
+	fn planned_trust_outcome_includes_copyable_npm_trust_command_when_context_is_known() {
+		let root = workflow_root();
+		let env_map = BTreeMap::from([
+			(
+				"GITHUB_WORKFLOW_REF".to_string(),
+				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+			),
+			("GITHUB_JOB".to_string(), "release".to_string()),
+		]);
+		let outcome = planned_trust_outcome(
+			&trusted_request(RegistryKind::Npm),
+			Some(&sample_source()),
+			root.path(),
+			&env_map,
+		);
+
+		assert_eq!(outcome.status, TrustedPublishingStatus::Planned);
+		assert!(outcome.message.contains(
+			"would configure npm trusted publishing with `npm trust github pkg --file publish.yml --repo ifiokjr/monochange --yes --env publisher`"
 		));
 	}
 
