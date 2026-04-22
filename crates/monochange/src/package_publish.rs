@@ -531,7 +531,24 @@ fn execute_publish_requests(
 			continue;
 		}
 
+		let placeholder_dir = if mode == PackagePublishRunMode::Placeholder {
+			Some(build_placeholder_directory(root, request, source)?)
+		} else {
+			None
+		};
+		let publish_command =
+			build_publish_command(request, mode, placeholder_dir.as_ref(), dry_run);
+
 		if dry_run {
+			let output = executor.run(&publish_command)?;
+			if !output.success {
+				return Err(MonochangeError::Discovery(format!(
+					"`{}` failed: {}",
+					render_command(&publish_command),
+					render_command_error(&output)
+				)));
+			}
+
 			outcomes.push(PackagePublishOutcome {
 				package: request.package_id.clone(),
 				ecosystem: request.ecosystem,
@@ -549,12 +566,6 @@ fn execute_publish_requests(
 			enforce_release_trust_prerequisites(request, source, root, env_map)?;
 		}
 
-		let placeholder_dir = if mode == PackagePublishRunMode::Placeholder {
-			Some(build_placeholder_directory(root, request, source)?)
-		} else {
-			None
-		};
-		let publish_command = build_publish_command(request, mode, placeholder_dir.as_ref());
 		let output = executor.run(&publish_command)?;
 		if !output.success {
 			return Err(MonochangeError::Discovery(format!(
@@ -922,6 +933,7 @@ fn build_publish_command(
 	request: &PublishRequest,
 	mode: PackagePublishRunMode,
 	placeholder_dir: Option<&TempDir>,
+	dry_run: bool,
 ) -> CommandSpec {
 	let mut command = None;
 	let is_jsr_release =
@@ -959,7 +971,27 @@ fn build_publish_command(
 	if is_jsr_release {
 		command = Some(build_jsr_publish_command(&request.package_root));
 	}
-	command.expect("unsupported built-in publish registry")
+
+	let mut command = command.expect("unsupported built-in publish registry");
+	append_publish_dry_run_args(&mut command.args, request.registry, dry_run);
+	command
+}
+
+fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, dry_run: bool) {
+	if !dry_run {
+		return;
+	}
+
+	match registry {
+		RegistryKind::Npm | RegistryKind::CratesIo | RegistryKind::Jsr => {
+			args.push("--dry-run".to_string());
+		}
+		RegistryKind::PubDev => {
+			args.retain(|arg| arg != "--force");
+			args.push("--dry-run".to_string());
+		}
+		_ => {}
+	}
 }
 
 fn build_npm_placeholder_publish_command(
@@ -1162,11 +1194,8 @@ fn write_cargo_placeholder_manifest(
 				request.manifest_path.display()
 			))
 		})?;
-	let license = package
-		.get("license")
-		.and_then(TomlValue::as_str)
-		.map(ToString::to_string);
-	let license_file = package
+	let (license, license_file) = resolve_cargo_placeholder_license_metadata(package, root)?;
+	let package_license_file = package
 		.get("license-file")
 		.and_then(TomlValue::as_str)
 		.map(ToString::to_string);
@@ -1202,7 +1231,12 @@ fn write_cargo_placeholder_manifest(
 	}
 	if let Some(license_file) = license_file {
 		manifest.push_str("license-file = \"LICENSE\"\n");
-		let source_path = request.package_root.join(&license_file);
+		let source_root = if package_license_file.as_deref() == Some(license_file.as_str()) {
+			request.package_root.as_path()
+		} else {
+			root
+		};
+		let source_path = source_root.join(&license_file);
 		let resolved_source = if source_path.is_absolute() {
 			source_path
 		} else {
@@ -1233,6 +1267,65 @@ fn write_cargo_placeholder_manifest(
 	fs::write(dir.join("Cargo.toml"), manifest).map_err(|error| {
 		MonochangeError::Io(format!("failed to write placeholder Cargo.toml: {error}"))
 	})
+}
+
+fn resolve_cargo_placeholder_license_metadata(
+	package: &toml::map::Map<String, TomlValue>,
+	root: &Path,
+) -> MonochangeResult<(Option<String>, Option<String>)> {
+	let license = package
+		.get("license")
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	let license_file = package
+		.get("license-file")
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	if license.is_some() || license_file.is_some() {
+		return Ok((license, license_file));
+	}
+
+	let workspace_package = read_workspace_package_table(root)?;
+	let workspace_license = workspace_package
+		.as_ref()
+		.and_then(|package| package.get("license"))
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	let workspace_license_file = workspace_package
+		.as_ref()
+		.and_then(|package| package.get("license-file"))
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	Ok((workspace_license, workspace_license_file))
+}
+
+fn read_workspace_package_table(
+	root: &Path,
+) -> MonochangeResult<Option<toml::map::Map<String, TomlValue>>> {
+	let workspace_manifest_path = root.join("Cargo.toml");
+	if !workspace_manifest_path.is_file() {
+		return Ok(None);
+	}
+
+	let contents = fs::read_to_string(&workspace_manifest_path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to read Cargo manifest {}: {error}",
+			workspace_manifest_path.display()
+		))
+	})?;
+	let parsed = toml::from_str::<TomlValue>(&contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {}: {error}",
+			workspace_manifest_path.display()
+		))
+	})?;
+	let workspace_package = parsed
+		.get("workspace")
+		.and_then(TomlValue::as_table)
+		.and_then(|workspace| workspace.get("package"))
+		.and_then(TomlValue::as_table)
+		.cloned();
+	Ok(workspace_package)
 }
 
 fn write_dart_placeholder_manifest(
@@ -2198,6 +2291,7 @@ jobs:
 			&sample_request(RegistryKind::Npm),
 			PackagePublishRunMode::Placeholder,
 			Some(&tempdir),
+			false,
 		);
 		assert_eq!(
 			npm_placeholder.args,
@@ -2212,6 +2306,7 @@ jobs:
 			&sample_request(RegistryKind::Npm),
 			PackagePublishRunMode::Release,
 			None,
+			false,
 		);
 		assert_eq!(npm.program, "npm");
 		let pnpm_request = PublishRequest {
@@ -2222,14 +2317,17 @@ jobs:
 			&pnpm_request,
 			PackagePublishRunMode::Placeholder,
 			Some(&tempdir),
+			false,
 		);
 		assert_eq!(pnpm_placeholder.program, "pnpm");
-		let pnpm = build_publish_command(&pnpm_request, PackagePublishRunMode::Release, None);
+		let pnpm =
+			build_publish_command(&pnpm_request, PackagePublishRunMode::Release, None, false);
 		assert_eq!(pnpm.program, "pnpm");
 		let cargo_placeholder = build_publish_command(
 			&sample_request(RegistryKind::CratesIo),
 			PackagePublishRunMode::Placeholder,
 			Some(&tempdir),
+			false,
 		);
 		assert_eq!(cargo_placeholder.program, "cargo");
 		assert!(
@@ -2241,18 +2339,21 @@ jobs:
 			&sample_request(RegistryKind::CratesIo),
 			PackagePublishRunMode::Release,
 			None,
+			false,
 		);
 		assert_eq!(cargo.program, "cargo");
 		let dart = build_publish_command(
 			&sample_request(RegistryKind::PubDev),
 			PackagePublishRunMode::Release,
 			None,
+			false,
 		);
 		assert_eq!(dart.program, "dart");
 		let dart_placeholder = build_publish_command(
 			&sample_request(RegistryKind::PubDev),
 			PackagePublishRunMode::Placeholder,
 			Some(&tempdir),
+			false,
 		);
 		assert_eq!(dart_placeholder.cwd, tempdir.path());
 		let flutter = build_publish_command(
@@ -2262,12 +2363,14 @@ jobs:
 			},
 			PackagePublishRunMode::Release,
 			None,
+			false,
 		);
 		assert_eq!(flutter.program, "flutter");
 		let jsr = build_publish_command(
 			&sample_request(RegistryKind::Jsr),
 			PackagePublishRunMode::Placeholder,
 			Some(&tempdir),
+			false,
 		);
 		assert_eq!(jsr.program, "deno");
 		assert_eq!(jsr.cwd, tempdir.path());
@@ -2275,8 +2378,47 @@ jobs:
 			&sample_request(RegistryKind::Jsr),
 			PackagePublishRunMode::Release,
 			None,
+			false,
 		);
 		assert_eq!(jsr_release.cwd, PathBuf::from("/workspace/pkg"));
+	}
+
+	#[test]
+	fn build_publish_command_appends_dry_run_flags_for_supported_registries() {
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+
+		let npm = build_publish_command(
+			&sample_request(RegistryKind::Npm),
+			PackagePublishRunMode::Placeholder,
+			Some(&tempdir),
+			true,
+		);
+		assert_eq!(npm.args.last(), Some(&"--dry-run".to_string()));
+
+		let cargo = build_publish_command(
+			&sample_request(RegistryKind::CratesIo),
+			PackagePublishRunMode::Placeholder,
+			Some(&tempdir),
+			true,
+		);
+		assert_eq!(cargo.args.last(), Some(&"--dry-run".to_string()));
+
+		let dart = build_publish_command(
+			&sample_request(RegistryKind::PubDev),
+			PackagePublishRunMode::Placeholder,
+			Some(&tempdir),
+			true,
+		);
+		assert!(dart.args.contains(&"--dry-run".to_string()));
+		assert!(!dart.args.contains(&"--force".to_string()));
+
+		let jsr = build_publish_command(
+			&sample_request(RegistryKind::Jsr),
+			PackagePublishRunMode::Placeholder,
+			Some(&tempdir),
+			true,
+		);
+		assert_eq!(jsr.args.last(), Some(&"--dry-run".to_string()));
 	}
 
 	#[test]
@@ -2791,6 +2933,52 @@ jobs:
 		.expect_err("expected cargo placeholder error");
 		let text = error.to_string();
 		assert!(text.contains("license"), "{text}");
+	}
+
+	#[test]
+	fn write_cargo_placeholder_manifest_reads_workspace_license_metadata() {
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+		fs::write(
+			tempdir.path().join("Cargo.toml"),
+			concat!(
+				"[workspace]\n",
+				"members = [\"pkg\"]\n\n",
+				"[workspace.package]\n",
+				"license = \"Unlicense\"\n",
+			),
+		)
+		.expect("write workspace manifest:");
+		let package_root = tempdir.path().join("pkg");
+		fs::create_dir_all(&package_root).expect("mkdir:");
+		let manifest_path = package_root.join("Cargo.toml");
+		fs::write(
+			&manifest_path,
+			concat!(
+				"[package]\n",
+				"name = \"pkg\"\n",
+				"version = \"1.0.0\"\n",
+				"license = { workspace = true }\n",
+			),
+		)
+		.expect("write manifest:");
+		let placeholder_dir = tempfile::tempdir().expect("tempdir:");
+		let request = PublishRequest {
+			manifest_path,
+			package_root,
+			..sample_request(RegistryKind::CratesIo)
+		};
+
+		write_cargo_placeholder_manifest(
+			placeholder_dir.path(),
+			&request,
+			tempdir.path(),
+			Some(&sample_source()),
+		)
+		.expect("cargo placeholder:");
+
+		let placeholder_manifest = fs::read_to_string(placeholder_dir.path().join("Cargo.toml"))
+			.expect("read placeholder manifest:");
+		assert!(placeholder_manifest.contains("license = \"Unlicense\""));
 	}
 
 	#[test]
@@ -3858,6 +4046,84 @@ jobs:
 			TrustedPublishingStatus::Configured
 		);
 		assert_eq!(executor.commands.len(), 4);
+	}
+
+	#[test]
+	fn execute_publish_requests_placeholder_dry_run_validates_publish_command() {
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/pkg");
+			then.status(404);
+		});
+		let client = Client::builder().build().expect("http client:");
+		let endpoints = sample_endpoints(&server.base_url());
+		let mut executor = FakeExecutor::new(vec![CommandOutput {
+			success: true,
+			stdout: String::new(),
+			stderr: String::new(),
+		}]);
+
+		let report = execute_publish_requests(
+			Path::new("."),
+			None,
+			PackagePublishRunMode::Release,
+			true,
+			&[sample_request(RegistryKind::Npm)],
+			&client,
+			&endpoints,
+			&BTreeMap::new(),
+			&mut executor,
+		)
+		.expect("report:");
+
+		assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
+		assert_eq!(executor.commands.len(), 1);
+		assert_eq!(
+			executor.commands[0].args.last(),
+			Some(&"--dry-run".to_string())
+		);
+	}
+
+	#[test]
+	fn execute_publish_requests_placeholder_dry_run_surfaces_manifest_prerequisites() {
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/pkg");
+			then.status(404);
+		});
+		let root = tempfile::tempdir().expect("tempdir:");
+		let package_root = root.path().join("pkg");
+		fs::create_dir_all(&package_root).expect("mkdir:");
+		fs::write(
+			package_root.join("Cargo.toml"),
+			concat!("[package]\n", "name = \"pkg\"\n", "version = \"1.0.0\"\n",),
+		)
+		.expect("write manifest:");
+
+		let client = Client::builder().build().expect("http client:");
+		let endpoints = sample_endpoints(&server.base_url());
+		let mut request = sample_request(RegistryKind::CratesIo);
+		request.manifest_path = package_root.join("Cargo.toml");
+		request.package_root = package_root;
+		request.placeholder = true;
+		let mut executor = FakeExecutor::new(Vec::new());
+
+		let error = execute_publish_requests(
+			root.path(),
+			Some(&sample_source()),
+			PackagePublishRunMode::Placeholder,
+			true,
+			&[request],
+			&client,
+			&endpoints,
+			&BTreeMap::new(),
+			&mut executor,
+		)
+		.expect_err("expected placeholder manifest error");
+		assert!(error.to_string().contains(
+			"placeholder publishing requires `package.license` or `package.license-file`"
+		));
+		assert!(executor.commands.is_empty());
 	}
 
 	#[test]
