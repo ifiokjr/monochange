@@ -24,20 +24,24 @@ The reference pages in this section document each built-in step with:
 
 <!-- {@cliStepReferenceChoosingGuide} -->
 
-| Step                    | Use it when you want to…                                                 | Requires previous step?          | Typical follow-up                                                                           |
-| ----------------------- | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------- |
-| `Validate`              | fail fast on invalid config, groups, or changesets                       | no                               | CI gate or local preflight                                                                  |
-| `Discover`              | inspect normalized package discovery across ecosystems                   | no                               | local inspection, debug commands                                                            |
-| `CreateChangeFile`      | author a `.changeset/*.md` file from CLI inputs                          | no                               | run independently, or before planning                                                       |
-| `PrepareRelease`        | build the release result, update files, and refresh the cached manifest  | no                               | `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command` |
-| `CommitRelease`         | create a local release commit with an embedded `ReleaseRecord`           | `PrepareRelease`                 | `OpenReleaseRequest`, manual review, custom `Command`                                       |
-| `PublishRelease`        | create or update hosted provider releases                                | `PrepareRelease` + `[source]`    | `CommentReleasedIssues`, custom notification commands                                       |
-| `OpenReleaseRequest`    | create or update a hosted release PR/MR                                  | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                  |
-| `CommentReleasedIssues` | post release follow-up comments to closed issues                         | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                             |
-| `AffectedPackages`      | evaluate changeset coverage for changed files                            | no                               | CI enforcement, custom failure messaging                                                    |
-| `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata | no                               | local debugging, CI inspection                                                              |
-| `RetargetRelease`       | repair a recent release by moving its tag set                            | no                               | custom `Command` steps using `retarget.*`                                                   |
-| `Command`               | run arbitrary shell/program commands with monochange context             | depends on your workflow         | any external tool                                                                           |
+| Step                    | Use it when you want to…                                                  | Requires previous step?          | Typical follow-up                                                                           |
+| ----------------------- | ------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `Validate`              | fail fast on invalid config, groups, or changesets                        | no                               | CI gate or local preflight                                                                  |
+| `Discover`              | inspect normalized package discovery across ecosystems                    | no                               | local inspection, debug commands                                                            |
+| `CreateChangeFile`      | author a `.changeset/*.md` file from CLI inputs                           | no                               | run independently, or before planning                                                       |
+| `PrepareRelease`        | build the release result, update files, and refresh the cached manifest   | no                               | `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command` |
+| `DisplayVersions`       | display planned package and group versions without mutating release files | no                               | `PrepareRelease`                                                                            |
+| `CommitRelease`         | create a local release commit with an embedded `ReleaseRecord`            | `PrepareRelease`                 | `OpenReleaseRequest`, manual review, custom `Command`                                       |
+| `PublishRelease`        | create or update hosted provider releases                                 | `PrepareRelease` + `[source]`    | `CommentReleasedIssues`, custom notification commands                                       |
+| `OpenReleaseRequest`    | create or update a hosted release PR/MR                                   | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                  |
+| `PlanPublishRateLimits` | plan package-registry publish work against known rate limits              | no                               | `PublishPackages`, `PlaceholderPublish`                                                     |
+| `PlaceholderPublish`    | publish `0.0.0` placeholder versions for missing registry packages        | no                               | normally before `PublishPackages`                                                           |
+| `PublishPackages`       | publish package versions to registries using built-in ecosystem workflows | `PrepareRelease`                 | custom `Command` steps using `publish.*`                                                    |
+| `CommentReleasedIssues` | post release follow-up comments to closed issues                          | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                             |
+| `AffectedPackages`      | evaluate changeset coverage for changed files                             | no                               | CI enforcement, custom failure messaging                                                    |
+| `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata  | no                               | local debugging, CI inspection                                                              |
+| `RetargetRelease`       | repair a recent release by moving its tag set                             | no                               | custom `Command` steps using `retarget.*`                                                   |
+| `Command`               | run arbitrary shell/program commands with monochange context              | depends on your workflow         | any external tool                                                                           |
 
 <!-- {/cliStepReferenceChoosingGuide} -->
 
@@ -378,6 +382,52 @@ shell = true
 ```
 
 <!-- {/cliStepCommandStepOutputExample} -->
+
+<!-- {@cliStepPlaceholderPublishExample} -->
+
+```toml
+[cli.placeholder-publish]
+help_text = "Publish placeholder package versions for missing registry packages"
+
+[[cli.placeholder-publish.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "markdown", "json"]
+default = "text"
+
+[[cli.placeholder-publish.inputs]]
+name = "package"
+type = "string_list"
+
+[[cli.placeholder-publish.steps]]
+name = "publish placeholder packages"
+type = "PlaceholderPublish"
+```
+
+<!-- {/cliStepPlaceholderPublishExample} -->
+
+<!-- {@cliStepPublishPackagesExample} -->
+
+```toml
+[cli.publish]
+help_text = "Publish package versions from monochange release state using built-in workflows"
+
+[[cli.publish.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "markdown", "json"]
+default = "text"
+
+[[cli.publish.inputs]]
+name = "package"
+type = "string_list"
+
+[[cli.publish.steps]]
+name = "publish packages"
+type = "PublishPackages"
+```
+
+<!-- {/cliStepPublishPackagesExample} -->
 
 <!-- {@cliStepRetargetCommandCompositionExample} -->
 
