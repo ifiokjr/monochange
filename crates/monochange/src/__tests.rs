@@ -4922,6 +4922,29 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
 	let root = tempdir.path();
+	fs::write(
+		root.join("Cargo.toml"),
+		concat!(
+			"[workspace]\n",
+			"members = [\"crates/*\"]\n",
+			"resolver = \"2\"\n\n",
+			"[workspace.package]\n",
+			"version = \"1.0.0\"\n",
+			"license = \"Unlicense\"\n\n",
+			"[workspace.dependencies]\n",
+			"workflow-core = { path = \"./crates/core\", version = \"1.0.0\" }\n",
+			"workflow-app = { path = \"./crates/app\", version = \"1.0.0\" }\n",
+		),
+	)
+	.unwrap_or_else(|error| panic!("workspace manifest: {error}"));
+	fs::create_dir_all(root.join("crates/core/src"))
+		.unwrap_or_else(|error| panic!("core src dir: {error}"));
+	fs::create_dir_all(root.join("crates/app/src"))
+		.unwrap_or_else(|error| panic!("app src dir: {error}"));
+	fs::write(root.join("crates/core/src/lib.rs"), "pub fn core() {}\n")
+		.unwrap_or_else(|error| panic!("core src file: {error}"));
+	fs::write(root.join("crates/app/src/lib.rs"), "pub fn app() {}\n")
+		.unwrap_or_else(|error| panic!("app src file: {error}"));
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 	let server = MockServer::start();
@@ -4978,7 +5001,10 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 				&configuration,
 				&publish_command,
 				true,
-				BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
+				BTreeMap::from([
+					("format".to_string(), vec!["text".to_string()]),
+					("package".to_string(), vec!["core".to_string()]),
+				]),
 			)
 			.unwrap_or_else(|error| panic!("publish packages: {error}"));
 			assert!(publish_output.contains("package publishing:"));
