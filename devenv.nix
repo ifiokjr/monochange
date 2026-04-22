@@ -338,6 +338,7 @@ in
         lint:clippy
         lint:format
         lint:architecture
+        lint:root-git-config
         deny:check
         docs:check
         lint:monochange
@@ -379,6 +380,27 @@ in
         node scripts/check-architecture-boundaries.mjs
       '';
       description = "Check that provider and ecosystem dispatch stays inside the documented allowlist.";
+      binary = "bash";
+    };
+    "lint:root-git-config" = {
+      exec = ''
+        set -euo pipefail
+        common_git_dir="$(git rev-parse --git-common-dir)"
+        config_path="$common_git_dir/config"
+
+        if git config --file "$config_path" --get core.worktree >/dev/null 2>&1; then
+          echo "error: root git config must not set core.worktree in $config_path" >&2
+          git config --file "$config_path" --get core.worktree >&2
+          exit 1
+        fi
+
+        if git config --file "$config_path" --get-regexp '^user\.' >/dev/null 2>&1; then
+          echo "error: root git config must not contain a [user] block in $config_path" >&2
+          git config --file "$config_path" --get-regexp '^user\.' >&2
+          exit 1
+        fi
+      '';
+      description = "Check that the shared root .git/config does not contain worktree or user overrides.";
       binary = "bash";
     };
     "docs:check" = {
