@@ -3190,6 +3190,7 @@ mod tests {
 	use tempfile::tempdir;
 
 	use super::*;
+	use crate::TEST_ENV_LOCK;
 
 	fn cli_context() -> CliContext {
 		CliContext {
@@ -4890,6 +4891,9 @@ path = "crates/core"
 		);
 		assert!(paint_markdown_inline("muted", MarkdownStyle::Muted, true).contains("[2m"));
 
+		let _env_lock = TEST_ENV_LOCK
+			.lock()
+			.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
 		temp_env::with_vars(
 			[("NO_COLOR", Some("1")), ("TERM", Some("xterm-256color"))],
 			|| {

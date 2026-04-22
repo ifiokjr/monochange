@@ -50,6 +50,10 @@ use std::io::IsTerminal;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+#[cfg(test)]
+use std::sync::LazyLock;
+#[cfg(test)]
+use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -160,6 +164,9 @@ use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 use monochange_core::GroupChangelogInclude;
+
+#[cfg(test)]
+pub(crate) static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;

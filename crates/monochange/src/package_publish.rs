@@ -164,16 +164,16 @@ impl CommandExecutor for ProcessCommandExecutor {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct RegistryEndpoints {
-	npm_registry: String,
-	crates_io_api: String,
-	crates_io_index: String,
-	pub_dev_api: String,
-	jsr_base: String,
+pub(crate) struct RegistryEndpoints {
+	pub(crate) npm_registry: String,
+	pub(crate) crates_io_api: String,
+	pub(crate) crates_io_index: String,
+	pub(crate) pub_dev_api: String,
+	pub(crate) jsr_base: String,
 }
 
 impl RegistryEndpoints {
-	fn from_env() -> Self {
+	pub(crate) fn from_env() -> Self {
 		Self {
 			npm_registry: env::var("MONOCHANGE_NPM_REGISTRY_URL")
 				.unwrap_or_else(|_| "https://registry.npmjs.org".to_string()),
@@ -401,7 +401,7 @@ pub(crate) fn filter_pending_publish_requests(
 	filter_pending_publish_requests_with_transport(requests, &client, &endpoints)
 }
 
-fn filter_pending_publish_requests_with_transport(
+pub(crate) fn filter_pending_publish_requests_with_transport(
 	requests: &[PublishRequest],
 	client: &Client,
 	endpoints: &RegistryEndpoints,
@@ -1625,6 +1625,7 @@ mod tests {
 	use temp_env::with_vars;
 
 	use super::*;
+	use crate::TEST_ENV_LOCK;
 
 	struct FakeExecutor {
 		outputs: VecDeque<CommandOutput>,
@@ -1738,6 +1739,13 @@ mod tests {
 			pub_dev_api: base_url.to_string(),
 			jsr_base: base_url.to_string(),
 		}
+	}
+
+	fn with_locked_env_vars<T>(action: impl FnOnce() -> T) -> T {
+		let _env_lock = TEST_ENV_LOCK
+			.lock()
+			.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+		action()
 	}
 
 	fn workflow_root() -> TempDir {
@@ -3840,20 +3848,26 @@ jobs:
 		let configuration =
 			crate::load_workspace_configuration(root.path()).expect("configuration:");
 
-		with_vars(
-			vec![(
-				"MONOCHANGE_NPM_REGISTRY_URL",
-				Some(server.base_url().as_str()),
-			)],
-			|| {
-				let report =
-					run_placeholder_publish(root.path(), &configuration, &BTreeSet::new(), true)
-						.expect("placeholder report:");
-				assert_eq!(report.mode, PackagePublishRunMode::Placeholder);
-				assert_eq!(report.packages.len(), 1);
-				assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
-			},
-		);
+		with_locked_env_vars(|| {
+			with_vars(
+				vec![(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				)],
+				|| {
+					let report = run_placeholder_publish(
+						root.path(),
+						&configuration,
+						&BTreeSet::new(),
+						true,
+					)
+					.expect("placeholder report:");
+					assert_eq!(report.mode, PackagePublishRunMode::Placeholder);
+					assert_eq!(report.packages.len(), 1);
+					assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
+				},
+			);
+		});
 	}
 
 	#[test]
@@ -3889,26 +3903,28 @@ jobs:
 			}],
 		);
 
-		with_vars(
-			vec![(
-				"MONOCHANGE_NPM_REGISTRY_URL",
-				Some(server.base_url().as_str()),
-			)],
-			|| {
-				let report = run_publish_packages(
-					root.path(),
-					&configuration,
-					Some(&prepared_release),
-					&BTreeSet::new(),
-					true,
-				)
-				.expect("publish report:");
-				assert_eq!(report.mode, PackagePublishRunMode::Release);
-				assert_eq!(report.packages.len(), 1);
-				assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
-				assert_eq!(report.packages[0].version, "1.2.3");
-			},
-		);
+		with_locked_env_vars(|| {
+			with_vars(
+				vec![(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				)],
+				|| {
+					let report = run_publish_packages(
+						root.path(),
+						&configuration,
+						Some(&prepared_release),
+						&BTreeSet::new(),
+						true,
+					)
+					.expect("publish report:");
+					assert_eq!(report.mode, PackagePublishRunMode::Release);
+					assert_eq!(report.packages.len(), 1);
+					assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
+					assert_eq!(report.packages[0].version, "1.2.3");
+				},
+			);
+		});
 	}
 
 	#[test]
@@ -3957,21 +3973,28 @@ jobs:
 				.expect("release record publications");
 		assert_eq!(discovered.len(), 1);
 
-		with_vars(
-			vec![(
-				"MONOCHANGE_NPM_REGISTRY_URL",
-				Some(server.base_url().as_str()),
-			)],
-			|| {
-				let report =
-					run_publish_packages(root.path(), &configuration, None, &BTreeSet::new(), true)
-						.expect("publish report:");
-				assert_eq!(report.mode, PackagePublishRunMode::Release);
-				assert_eq!(report.packages.len(), 1);
-				assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
-				assert_eq!(report.packages[0].version, "1.2.3");
-			},
-		);
+		with_locked_env_vars(|| {
+			with_vars(
+				vec![(
+					"MONOCHANGE_NPM_REGISTRY_URL",
+					Some(server.base_url().as_str()),
+				)],
+				|| {
+					let report = run_publish_packages(
+						root.path(),
+						&configuration,
+						None,
+						&BTreeSet::new(),
+						true,
+					)
+					.expect("publish report:");
+					assert_eq!(report.mode, PackagePublishRunMode::Release);
+					assert_eq!(report.packages.len(), 1);
+					assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
+					assert_eq!(report.packages[0].version, "1.2.3");
+				},
+			);
+		});
 	}
 
 	#[test]

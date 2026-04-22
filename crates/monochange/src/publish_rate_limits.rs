@@ -78,6 +78,20 @@ fn build_placeholder_plan_requests(
 	package_publish::filter_pending_publish_requests(&requests)
 }
 
+#[cfg(test)]
+fn build_placeholder_plan_requests_with_transport(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	packages: &[monochange_core::PackageRecord],
+	selected_packages: &BTreeSet<String>,
+	client: &reqwest::blocking::Client,
+	endpoints: &package_publish::RegistryEndpoints,
+) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
+	#[rustfmt::skip]
+	let requests = package_publish::build_placeholder_requests(root, configuration, packages, selected_packages)?;
+	package_publish::filter_pending_publish_requests_with_transport(&requests, client, endpoints)
+}
+
 fn build_release_plan_requests(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
@@ -94,6 +108,27 @@ fn build_release_plan_requests(
 		selected_packages,
 	)?;
 	package_publish::filter_pending_publish_requests(&requests)
+}
+
+#[cfg(test)]
+fn build_release_plan_requests_with_transport(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	packages: &[monochange_core::PackageRecord],
+	selected_packages: &BTreeSet<String>,
+	client: &reqwest::blocking::Client,
+	endpoints: &package_publish::RegistryEndpoints,
+) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
+	#[rustfmt::skip]
+	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
+	let requests = package_publish::build_release_requests(
+		configuration,
+		packages,
+		&publications,
+		selected_packages,
+	)?;
+	package_publish::filter_pending_publish_requests_with_transport(&requests, client, endpoints)
 }
 
 pub(crate) fn plan_publish_rate_limits_for_requests(
@@ -351,8 +386,8 @@ mod tests {
 	use monochange_core::PublishMode;
 	use monochange_core::PublishRegistry;
 	use monochange_core::TrustedPublishingSettings;
+	use reqwest::blocking::Client;
 	use semver::Version;
-	use temp_env::with_vars;
 	use tempfile::tempdir;
 
 	use super::*;
@@ -492,29 +527,30 @@ mod tests {
 			then.status(404);
 		});
 
-		let report = with_vars(
-			[
-				(
-					"MONOCHANGE_CRATES_IO_API_URL",
-					Some(server.base_url().as_str()),
-				),
-				(
-					"MONOCHANGE_NPM_REGISTRY_URL",
-					Some(server.base_url().as_str()),
-				),
-			],
-			|| {
-				plan_publish_rate_limits(
-					tempdir.path(),
-					&configuration,
-					Some(&prepared_release),
-					&BTreeSet::new(),
-					PublishRateLimitMode::Publish,
-					true,
-				)
-			},
+		let client = Client::builder()
+			.build()
+			.unwrap_or_else(|error| panic!("http client: {error}"));
+		let endpoints = package_publish::RegistryEndpoints {
+			npm_registry: server.base_url(),
+			crates_io_api: server.base_url(),
+			crates_io_index: server.base_url(),
+			pub_dev_api: server.base_url(),
+			jsr_base: server.base_url(),
+		};
+		let requests = build_release_plan_requests_with_transport(
+			tempdir.path(),
+			&configuration,
+			Some(&prepared_release),
+			&discover_workspace(tempdir.path())
+				.unwrap_or_else(|error| panic!("discover workspace: {error}"))
+				.packages,
+			&BTreeSet::new(),
+			&client,
+			&endpoints,
 		)
-		.unwrap_or_else(|error| panic!("plan rate limits: {error}"));
+		.unwrap_or_else(|error| panic!("build release plan requests: {error}"));
+		let report =
+			plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
 
 		assert_eq!(report.windows.len(), 2);
 		assert!(report.warnings.is_empty());
@@ -597,29 +633,30 @@ mod tests {
 			then.status(404);
 		});
 
-		let report = with_vars(
-			[
-				(
-					"MONOCHANGE_CRATES_IO_API_URL",
-					Some(server.base_url().as_str()),
-				),
-				(
-					"MONOCHANGE_NPM_REGISTRY_URL",
-					Some(server.base_url().as_str()),
-				),
-			],
-			|| {
-				plan_publish_rate_limits(
-					tempdir.path(),
-					&configuration,
-					Some(&prepared_release),
-					&BTreeSet::new(),
-					PublishRateLimitMode::Publish,
-					true,
-				)
-			},
+		let client = Client::builder()
+			.build()
+			.unwrap_or_else(|error| panic!("http client: {error}"));
+		let endpoints = package_publish::RegistryEndpoints {
+			npm_registry: server.base_url(),
+			crates_io_api: server.base_url(),
+			crates_io_index: server.base_url(),
+			pub_dev_api: server.base_url(),
+			jsr_base: server.base_url(),
+		};
+		let requests = build_release_plan_requests_with_transport(
+			tempdir.path(),
+			&configuration,
+			Some(&prepared_release),
+			&discover_workspace(tempdir.path())
+				.unwrap_or_else(|error| panic!("discover workspace: {error}"))
+				.packages,
+			&BTreeSet::new(),
+			&client,
+			&endpoints,
 		)
-		.unwrap_or_else(|error| panic!("plan rate limits: {error}"));
+		.unwrap_or_else(|error| panic!("build release plan requests: {error}"));
+		let report =
+			plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
 
 		assert_eq!(report.windows.len(), 1);
 		assert_eq!(report.windows[0].registry, RegistryKind::CratesIo);
@@ -699,29 +736,30 @@ mod tests {
 			then.status(404);
 		});
 
-		let report = with_vars(
-			[
-				(
-					"MONOCHANGE_CRATES_IO_API_URL",
-					Some(server.base_url().as_str()),
-				),
-				(
-					"MONOCHANGE_NPM_REGISTRY_URL",
-					Some(server.base_url().as_str()),
-				),
-			],
-			|| {
-				plan_publish_rate_limits(
-					tempdir.path(),
-					&configuration,
-					Some(&prepared_release),
-					&BTreeSet::new(),
-					PublishRateLimitMode::Publish,
-					true,
-				)
-			},
+		let client = Client::builder()
+			.build()
+			.unwrap_or_else(|error| panic!("http client: {error}"));
+		let endpoints = package_publish::RegistryEndpoints {
+			npm_registry: server.base_url(),
+			crates_io_api: server.base_url(),
+			crates_io_index: server.base_url(),
+			pub_dev_api: server.base_url(),
+			jsr_base: server.base_url(),
+		};
+		let requests = build_release_plan_requests_with_transport(
+			tempdir.path(),
+			&configuration,
+			Some(&prepared_release),
+			&discover_workspace(tempdir.path())
+				.unwrap_or_else(|error| panic!("discover workspace: {error}"))
+				.packages,
+			&BTreeSet::new(),
+			&client,
+			&endpoints,
 		)
-		.unwrap_or_else(|error| panic!("plan rate limits: {error}"));
+		.unwrap_or_else(|error| panic!("build release plan requests: {error}"));
+		let report =
+			plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
 
 		assert_eq!(report.windows.len(), 1);
 		assert_eq!(report.windows[0].registry, RegistryKind::Npm);
@@ -767,25 +805,23 @@ mod tests {
 			then.status(404);
 		});
 
-		let requests = with_vars(
-			[
-				(
-					"MONOCHANGE_CRATES_IO_API_URL",
-					Some(server.base_url().as_str()),
-				),
-				(
-					"MONOCHANGE_NPM_REGISTRY_URL",
-					Some(server.base_url().as_str()),
-				),
-			],
-			|| {
-				build_placeholder_plan_requests(
-					tempdir.path(),
-					&configuration,
-					&discovery.packages,
-					&BTreeSet::new(),
-				)
-			},
+		let client = Client::builder()
+			.build()
+			.unwrap_or_else(|error| panic!("http client: {error}"));
+		let endpoints = package_publish::RegistryEndpoints {
+			npm_registry: server.base_url(),
+			crates_io_api: server.base_url(),
+			crates_io_index: server.base_url(),
+			pub_dev_api: server.base_url(),
+			jsr_base: server.base_url(),
+		};
+		let requests = build_placeholder_plan_requests_with_transport(
+			tempdir.path(),
+			&configuration,
+			&discovery.packages,
+			&BTreeSet::new(),
+			&client,
+			&endpoints,
 		)
 		.unwrap_or_else(|error| panic!("build placeholder plan requests: {error}"));
 
@@ -849,29 +885,32 @@ mod tests {
 			then.status(404);
 		});
 
-		let report = with_vars(
-			[
-				(
-					"MONOCHANGE_CRATES_IO_API_URL",
-					Some(server.base_url().as_str()),
-				),
-				(
-					"MONOCHANGE_NPM_REGISTRY_URL",
-					Some(server.base_url().as_str()),
-				),
-			],
-			|| {
-				plan_publish_rate_limits(
-					tempdir.path(),
-					&configuration,
-					None,
-					&BTreeSet::new(),
-					PublishRateLimitMode::Placeholder,
-					true,
-				)
-			},
+		let client = Client::builder()
+			.build()
+			.unwrap_or_else(|error| panic!("http client: {error}"));
+		let endpoints = package_publish::RegistryEndpoints {
+			npm_registry: server.base_url(),
+			crates_io_api: server.base_url(),
+			crates_io_index: server.base_url(),
+			pub_dev_api: server.base_url(),
+			jsr_base: server.base_url(),
+		};
+		let requests = build_placeholder_plan_requests_with_transport(
+			tempdir.path(),
+			&configuration,
+			&discover_workspace(tempdir.path())
+				.unwrap_or_else(|error| panic!("discover workspace: {error}"))
+				.packages,
+			&BTreeSet::new(),
+			&client,
+			&endpoints,
 		)
-		.unwrap_or_else(|error| panic!("plan placeholder rate limits: {error}"));
+		.unwrap_or_else(|error| panic!("build placeholder plan requests: {error}"));
+		let report = plan_publish_rate_limits_for_requests(
+			&requests,
+			RateLimitOperation::PlaceholderPublish,
+			true,
+		);
 
 		assert!(
 			report
