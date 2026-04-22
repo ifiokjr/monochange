@@ -33,7 +33,9 @@ jobs:
           if [ -n "${{ github.event.inputs.crate }}" ]; then
             MATRIX=$(jq -n -c --arg crate "${{ github.event.inputs.crate }}" '{crate: [$crate]}')
           else
-            MATRIX=$(cargo metadata --format-version 1 --no-deps 2>/dev/null | jq -c '[.workspace_members[] | split(" ")[0]] | {crate: .}')
+            # Extract package name from package ID path+file:///.../crate-name#version
+            MATRIX=$(cargo metadata --format-version=1 --no-deps 2>/dev/null | \
+              jq -c '[.workspace_members[] | split("#")[0] | split("/")[-1] | select(. != "docs")] | {crate: .}')
           fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "Discovered matrix: $MATRIX"
