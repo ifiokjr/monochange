@@ -235,6 +235,30 @@ proptest! {
 	}
 
 	#[test]
+	fn merge_severities_idempotence_proptest(
+		x in arbitrary_bump_severity()
+	) {
+		prop_assert_eq!(
+			merge_severities(x, x),
+			x
+		);
+	}
+
+	#[test]
+	fn merge_severities_with_major_is_absorbing_proptest(
+		x in arbitrary_bump_severity()
+	) {
+		prop_assert_eq!(
+			merge_severities(BumpSeverity::Major, x),
+			BumpSeverity::Major
+		);
+		prop_assert_eq!(
+			merge_severities(x, BumpSeverity::Major),
+			BumpSeverity::Major
+		);
+	}
+
+	#[test]
 	fn merge_severities_result_is_gte_each_input_proptest(
 		left in arbitrary_bump_severity(),
 		right in arbitrary_bump_severity()
@@ -279,6 +303,31 @@ proptest! {
 				"non-empty input produced None for strongest"
 			);
 		}
+	}
+
+	#[test]
+	fn strongest_assessment_max_severity_equals_max_of_inputs_proptest(
+		assessments in proptest::collection::vec(
+			(arbitrary_bump_severity(), "[a-z]{1,16}"),
+			1..20
+		)
+	) {
+		let inputs: Vec<CompatibilityAssessment> = assessments
+			.iter()
+			.map(|(severity, package_id)| {
+				make_assessment(package_id, *severity)
+			})
+			.collect();
+
+		let max_severity = inputs.iter().map(|a| a.severity).max().unwrap();
+		let strongest = strongest_assessment(&inputs).unwrap();
+		prop_assert_eq!(
+			strongest.severity,
+			max_severity,
+			"strongest severity {:?} does not equal max {:?}",
+			strongest.severity,
+			max_severity
+		);
 	}
 
 	#[test]
