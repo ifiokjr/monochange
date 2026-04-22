@@ -540,15 +540,6 @@ fn execute_publish_requests(
 			build_publish_command(request, mode, placeholder_dir.as_ref(), dry_run);
 
 		if dry_run {
-			let output = executor.run(&publish_command)?;
-			if !output.success {
-				return Err(MonochangeError::Discovery(format!(
-					"`{}` failed: {}",
-					render_command(&publish_command),
-					render_command_error(&output)
-				)));
-			}
-
 			outcomes.push(PackagePublishOutcome {
 				package: request.package_id.clone(),
 				ecosystem: request.ecosystem,
@@ -4077,11 +4068,7 @@ jobs:
 		.expect("report:");
 
 		assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
-		assert_eq!(executor.commands.len(), 1);
-		assert_eq!(
-			executor.commands[0].args.last(),
-			Some(&"--dry-run".to_string())
-		);
+		assert!(executor.commands.is_empty());
 	}
 
 	#[test]
