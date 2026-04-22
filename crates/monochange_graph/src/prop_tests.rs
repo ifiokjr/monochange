@@ -76,8 +76,8 @@ proptest! {
 			edge_indices
 				.into_iter()
 				.map(|(from_idx, to_idx)| {
-					let from = package_ids_vec[from_idx % package_ids_vec.len()].clone();
-					let to = package_ids_vec[to_idx % package_ids_vec.len()].clone();
+					let from = package_ids_vec.get(from_idx % package_ids_vec.len()).cloned().unwrap_or_default();
+					let to = package_ids_vec.get(to_idx % package_ids_vec.len()).cloned().unwrap_or_default();
 					DependencyEdge {
 						from_package_id: from,
 						to_package_id: to,
