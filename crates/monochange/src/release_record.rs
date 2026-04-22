@@ -1,5 +1,10 @@
 use std::path::Path;
 
+use monochange_core::CommitMessage;
+use monochange_core::MergeReleasePrReport;
+use monochange_core::MergeReleasePullRequestOperation;
+use monochange_core::MergeReleasePullRequestOutcome;
+use monochange_core::MergeReleasePullRequestRequest;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::ReleaseRecordDiscovery;
@@ -9,6 +14,7 @@ use monochange_core::RetargetProviderOperation;
 use monochange_core::RetargetProviderResult;
 use monochange_core::RetargetResult;
 use monochange_core::RetargetTagResult;
+use monochange_core::SlashCommandAuthorizationResult;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::parse_release_record_block;
@@ -544,5 +550,118 @@ pub(crate) fn text_release_record_discovery(discovery: &ReleaseRecordDiscovery) 
 			provider.kind, provider.owner, provider.repo
 		));
 	}
+	lines.join("\n")
+}
+
+pub(crate) fn render_merge_release_pr_report(
+	root: &Path,
+	pr_number: u64,
+	format: OutputFormat,
+	dry_run: bool,
+	author: Option<&str>,
+) -> MonochangeResult<String> {
+	use monochange_config::load_workspace_configuration;
+
+	let configuration = load_workspace_configuration(root)?;
+	let Some(source) = configuration.source.as_ref() else {
+		return Err(MonochangeError::Config(
+			"merge-release-pr requires a [source] section in monochange.toml".to_string(),
+		));
+	};
+
+	let adapter = hosted_sources::configured_hosted_source_adapter(source);
+
+	let authorization = author
+		.map(|value| adapter.authorize_slash_command_release(source, value))
+		.transpose()?;
+
+	let request = MergeReleasePullRequestRequest {
+		provider: source.provider,
+		repository: format!("{}/{}", source.owner, source.repo),
+		owner: source.owner.clone(),
+		repo: source.repo.clone(),
+		pr_number,
+		commit_message: CommitMessage {
+			subject: source.pull_requests.title.clone(),
+			body: None,
+		},
+	};
+
+	let merge_outcome = if dry_run {
+		Some(MergeReleasePullRequestOutcome {
+			provider: source.provider,
+			repository: request.repository.clone(),
+			pr_number,
+			merge_commit_sha: None,
+			url: None,
+			operation: MergeReleasePullRequestOperation::Skipped,
+		})
+	} else {
+		Some(adapter.merge_release_pull_request(source, &request)?)
+	};
+
+	let report = MergeReleasePrReport {
+		pr_number,
+		repository: request.repository,
+		dry_run,
+		authorization,
+		merge_outcome,
+		tag_count: None,
+		release_outcomes: None,
+		status: if dry_run {
+			"dry_run".to_string()
+		} else {
+			"completed".to_string()
+		},
+	};
+
+	match format {
+		OutputFormat::Json => {
+			serde_json::to_string_pretty(&report)
+				.map_err(|error| MonochangeError::Discovery(error.to_string()))
+		}
+		OutputFormat::Markdown | OutputFormat::Text => Ok(text_merge_release_pr_report(&report)),
+	}
+}
+
+fn text_merge_release_pr_report(report: &MergeReleasePrReport) -> String {
+	let mut lines = vec!["merge release pr:".to_string()];
+	lines.push(format!("  pr number: {}", report.pr_number));
+	lines.push(format!("  repository: {}", report.repository));
+	lines.push(format!(
+		"  dry-run: {}",
+		if report.dry_run { "yes" } else { "no" }
+	));
+	if let Some(ref authorization) = report.authorization {
+		lines.push(format!(
+			"  authorization: {}",
+			match authorization {
+				SlashCommandAuthorizationResult::Authorized => "authorized",
+				SlashCommandAuthorizationResult::Denied => "denied",
+			}
+		));
+	}
+	if let Some(ref merge) = report.merge_outcome {
+		lines.push(format!(
+			"  merge: {}{}",
+			match merge.operation {
+				MergeReleasePullRequestOperation::Merged => "merged",
+				MergeReleasePullRequestOperation::Skipped => "skipped",
+			},
+			merge
+				.merge_commit_sha
+				.as_deref()
+				.map_or_else(String::new, |sha| {
+					format!(" ({})", crate::short_commit_sha(sha))
+				})
+		));
+		if let Some(ref url) = merge.url {
+			lines.push(format!("  url: {url}"));
+		}
+	}
+	if let Some(count) = report.tag_count {
+		lines.push(format!("  tags planned: {count}"));
+	}
+	lines.push(format!("  status: {}", report.status.replace('_', "-")));
 	lines.join("\n")
 }

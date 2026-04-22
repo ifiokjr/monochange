@@ -206,6 +206,7 @@ When provided, the generated config includes:\n\
 			.subcommand(build_analyze_subcommand())
 			.subcommand(build_release_record_subcommand())
 			.subcommand(build_tag_release_subcommand())
+			.subcommand(build_merge_release_pr_subcommand())
 			.subcommand(build_lint_subcommand())
 			.subcommand(Command::new("mcp").about(
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
@@ -449,6 +450,49 @@ Tagging notes:
 				.default_missing_value("true")
 				.require_equals(true)
 				.value_parser(["true", "false"]),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format")
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
+		)
+}
+
+pub(crate) fn build_merge_release_pr_subcommand() -> Command {
+	Command::new("merge-release-pr")
+		.about("Merge a release pull request and publish releases")
+		.after_help(
+			r"Examples:
+  mc merge-release-pr --pr-number 42 --author githubuser
+  mc merge-release-pr --pr-number 42 --dry-run --format json
+
+Process:
+  1. Authorize the triggering user against the configured slash-command policy.
+  2. Squash-merge the PR using the provider API with a computed release commit message.
+  3. Fetch origin so tags point to the API-created merge commit.
+  4. Create and push release tags, then publish provider releases.",
+		)
+		.arg(
+			Arg::new("pr-number")
+				.long("pr-number")
+				.required(true)
+				.value_name("NUMBER")
+				.help("The pull request number to merge")
+				.value_parser(clap::value_parser!(u64)),
+		)
+		.arg(
+			Arg::new("author")
+				.long("author")
+				.value_name("USER")
+				.help("The user triggering the merge (for authorization)"),
+		)
+		.arg(
+			Arg::new("dry-run")
+				.long("dry-run")
+				.help("Preview merge without executing")
+				.action(ArgAction::SetTrue),
 		)
 		.arg(
 			Arg::new("format")

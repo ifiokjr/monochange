@@ -876,6 +876,22 @@ where
 			let dry_run = quiet || tag_release_matches.get_flag("dry-run");
 			render_release_tag_report(root, from, format, push, dry_run)
 		}
+		Some(("merge-release-pr", merge_matches)) => {
+			let pr_number = merge_matches
+				.get_one::<u64>("pr-number")
+				.copied()
+				.ok_or_else(|| MonochangeError::Config("missing --pr-number".to_string()))?;
+			let author = merge_matches
+				.get_one::<String>("author")
+				.map(String::as_str);
+			let format = merge_matches
+				.get_one::<String>("format")
+				.map_or(Ok(OutputFormat::Markdown), |value| {
+					parse_output_format(value)
+				})?;
+			let dry_run = quiet || merge_matches.get_flag("dry-run");
+			release_record::render_merge_release_pr_report(root, pr_number, format, dry_run, author)
+		}
 		Some(("check", check_matches)) => {
 			if quiet {
 				return Ok(String::new());
