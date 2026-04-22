@@ -295,3 +295,54 @@ jobs:
             exit 1
           fi
         shell: devenv shell -- bash -e {0}
+
+  release-pr:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'ifiokjr'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        shell: devenv shell -- bash -e {0}
+
+      - name: refresh tags from origin
+        run: git fetch --force --tags origin
+        shell: devenv shell -- bash -e {0}
+
+      - name: detect merged release commit
+        id: release_record
+        run: |
+          set -euo pipefail
+
+          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+            echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: devenv shell -- bash -e {0}
+
+      - name: refresh release pull request
+        if: steps.release_record.outputs.is_release_commit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mc release-pr
+        shell: devenv shell -- bash -e {0}
+
+      - name: skip refresh on merged release commit
+        if: steps.release_record.outputs.is_release_commit == 'true'
+        run: echo "HEAD is already a merged release commit; skipping release PR refresh."

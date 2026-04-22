@@ -697,6 +697,19 @@ steps = [
 	{ type = "CommentReleasedIssues", name = "comment on released issues", when = "{{ inputs.commit }}" },
 ]
 
+[cli.release-pr]
+help_text = "Prepare a pull request release from discovered change files. It should only be run in a github action."
+inputs = [{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" }]
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "Command", name = "generate cargo lockfile", command = "cargo generate-lockfile" },
+	{ type = "Command", name = "generate pnpm lockfile", command = "pnpm install --lockfile-only" },
+	{ type = "Command", name = "format changed files", command = "dprint fmt {{ changed_files }}" },
+	{ type = "Command", name = "refresh shared markdown", command = "mdt update", when = "{{ inputs.commit }}" },
+	{ type = "CommitRelease", name = "create release commit" },
+	{ type = "OpenReleaseRequest", name = "create the pr" },
+]
+
 [cli.publish]
 help_text = "Publish packages from this release using built-in publishing workflows"
 inputs = [
