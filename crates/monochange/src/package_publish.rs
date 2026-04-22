@@ -973,16 +973,20 @@ fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, d
 		return;
 	}
 
-	match registry {
-		RegistryKind::Npm | RegistryKind::CratesIo | RegistryKind::Jsr => {
-			args.push("--dry-run".to_string());
-		}
-		RegistryKind::PubDev => {
-			args.retain(|arg| arg != "--force");
-			args.push("--dry-run".to_string());
-		}
-		_ => {}
+	if registry == RegistryKind::PubDev {
+		args.retain(|arg| arg != "--force");
+		args.push("--dry-run".to_string());
+		return;
 	}
+
+	if !matches!(
+		registry,
+		RegistryKind::Npm | RegistryKind::CratesIo | RegistryKind::Jsr
+	) {
+		return;
+	}
+
+	args.push("--dry-run".to_string());
 }
 
 fn build_npm_placeholder_publish_command(
@@ -1298,25 +1302,35 @@ fn read_workspace_package_table(
 		return Ok(None);
 	}
 
-	let contents = fs::read_to_string(&workspace_manifest_path).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to read Cargo manifest {}: {error}",
-			workspace_manifest_path.display()
-		))
-	})?;
-	let parsed = toml::from_str::<TomlValue>(&contents).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to parse {}: {error}",
-			workspace_manifest_path.display()
-		))
-	})?;
-	let workspace_package = parsed
-		.get("workspace")
-		.and_then(TomlValue::as_table)
+	let contents = read_workspace_manifest_contents(&workspace_manifest_path)?;
+	let parsed = parse_workspace_manifest_value(&workspace_manifest_path, &contents)?;
+	let workspace = parsed.get("workspace").and_then(TomlValue::as_table);
+	let workspace_package = workspace
 		.and_then(|workspace| workspace.get("package"))
 		.and_then(TomlValue::as_table)
 		.cloned();
 	Ok(workspace_package)
+}
+
+fn read_workspace_manifest_contents(workspace_manifest_path: &Path) -> MonochangeResult<String> {
+	fs::read_to_string(workspace_manifest_path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to read Cargo manifest {}: {error}",
+			workspace_manifest_path.display()
+		))
+	})
+}
+
+fn parse_workspace_manifest_value(
+	workspace_manifest_path: &Path,
+	contents: &str,
+) -> MonochangeResult<TomlValue> {
+	toml::from_str::<TomlValue>(contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {}: {error}",
+			workspace_manifest_path.display()
+		))
+	})
 }
 
 fn write_dart_placeholder_manifest(
@@ -4460,6 +4474,127 @@ jobs:
 			}),
 			"command failed"
 		);
+	}
+
+	#[test]
+	fn append_publish_dry_run_args_replaces_force_with_dry_run_for_pubdev() {
+		let mut args = vec![
+			"pub".to_string(),
+			"publish".to_string(),
+			"--force".to_string(),
+		];
+		append_publish_dry_run_args(&mut args, RegistryKind::PubDev, true);
+		assert!(!args.contains(&"--force".to_string()));
+		assert!(args.contains(&"--dry-run".to_string()));
+	}
+
+	#[test]
+	fn build_npm_placeholder_publish_command_uses_package_root_as_cwd() {
+		let command = build_npm_placeholder_publish_command(
+			&sample_request(RegistryKind::Npm),
+			Path::new("/tmp/placeholder"),
+		);
+		assert_eq!(command.program, "npm");
+		assert_eq!(command.cwd, PathBuf::from("/workspace/pkg"));
+		assert_eq!(command.args[0], "publish");
+	}
+
+	#[test]
+	fn write_cargo_placeholder_manifest_reads_workspace_license_file_from_root() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let package_root = root.path().join("pkg");
+		fs::create_dir_all(&package_root).expect("mkdir");
+		fs::write(
+			root.path().join("Cargo.toml"),
+			concat!(
+				"[workspace]\n",
+				"members = [\"pkg\"]\n",
+				"[workspace.package]\n",
+				"license-file = \"LICENSE\"\n",
+			),
+		)
+		.expect("write workspace manifest");
+		fs::write(
+			package_root.join("Cargo.toml"),
+			concat!("[package]\n", "name = \"pkg\"\n", "version = \"1.0.0\"\n"),
+		)
+		.expect("write package manifest");
+		fs::write(root.path().join("LICENSE"), "MIT").expect("write license");
+		let request = PublishRequest {
+			manifest_path: package_root.join("Cargo.toml"),
+			package_root,
+			..sample_request(RegistryKind::CratesIo)
+		};
+		let placeholder_dir = tempfile::tempdir().expect("tempdir");
+		write_cargo_placeholder_manifest(placeholder_dir.path(), &request, root.path(), None)
+			.expect("cargo placeholder");
+		let placeholder_manifest = fs::read_to_string(placeholder_dir.path().join("Cargo.toml"))
+			.expect("read placeholder manifest");
+		assert!(placeholder_manifest.contains("license-file = \"LICENSE\""));
+		assert_eq!(
+			fs::read_to_string(placeholder_dir.path().join("LICENSE"))
+				.expect("read placeholder license"),
+			"MIT"
+		);
+	}
+
+	#[test]
+	fn read_workspace_package_table_returns_workspace_package_table() {
+		let root = tempfile::tempdir().expect("tempdir");
+		fs::write(
+			root.path().join("Cargo.toml"),
+			concat!(
+				"[workspace]\n",
+				"members = [\"pkg\"]\n",
+				"[workspace.package]\n",
+				"license = \"MIT\"\n",
+			),
+		)
+		.expect("write manifest");
+		let workspace_package = read_workspace_package_table(root.path())
+			.expect("workspace package")
+			.expect("package table");
+		assert_eq!(
+			workspace_package.get("license").and_then(TomlValue::as_str),
+			Some("MIT")
+		);
+	}
+
+	#[test]
+	fn read_workspace_package_table_reports_io_and_parse_errors() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let read_result = read_workspace_package_table(root.path());
+		assert!(read_result.is_ok());
+		assert!(read_result.expect("read").is_none());
+
+		let manifest_path = root.path().join("Cargo.toml");
+		fs::write(&manifest_path, "[workspace]\nmembers = []\n").expect("write manifest");
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			let mut permissions = fs::metadata(&manifest_path)
+				.expect("metadata")
+				.permissions();
+			permissions.set_mode(0o000);
+			fs::set_permissions(&manifest_path, permissions).expect("chmod");
+			let read_error =
+				read_workspace_package_table(root.path()).expect_err("expected read error");
+			assert!(
+				read_error
+					.to_string()
+					.contains("failed to read Cargo manifest")
+			);
+			let mut restore = fs::metadata(&manifest_path)
+				.expect("metadata")
+				.permissions();
+			restore.set_mode(0o644);
+			fs::set_permissions(&manifest_path, restore).expect("restore chmod");
+		}
+
+		fs::write(&manifest_path, "not valid toml").expect("write invalid");
+		let parse_result = read_workspace_package_table(root.path());
+		let error = parse_result.expect_err("expected parse error");
+		assert!(error.to_string().contains("failed to parse"));
 	}
 
 	#[test]
