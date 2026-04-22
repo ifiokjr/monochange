@@ -4672,7 +4672,6 @@ fn load_workspace_configuration_parses_top_level_lints_and_scopes() {
 
 // -- proptest_config module (merged from proptest_config.rs) --
 
-use monochange_core::PackageType;
 use proptest::prelude::*;
 
 use crate::package_type_to_ecosystem_type;
@@ -4681,7 +4680,7 @@ use crate::render_changelog_path_template;
 #[test]
 fn package_type_cargo_maps_to_ecosystem_type_cargo() {
 	assert_eq!(
-		package_type_to_ecosystem_type(PackageType::Cargo),
+		package_type_to_ecosystem_type(monochange_core::PackageType::Cargo),
 		EcosystemType::Cargo
 	);
 }
@@ -4689,7 +4688,7 @@ fn package_type_cargo_maps_to_ecosystem_type_cargo() {
 #[test]
 fn package_type_npm_maps_to_ecosystem_type_npm() {
 	assert_eq!(
-		package_type_to_ecosystem_type(PackageType::Npm),
+		package_type_to_ecosystem_type(monochange_core::PackageType::Npm),
 		EcosystemType::Npm
 	);
 }
@@ -4697,7 +4696,7 @@ fn package_type_npm_maps_to_ecosystem_type_npm() {
 #[test]
 fn package_type_deno_maps_to_ecosystem_type_deno() {
 	assert_eq!(
-		package_type_to_ecosystem_type(PackageType::Deno),
+		package_type_to_ecosystem_type(monochange_core::PackageType::Deno),
 		EcosystemType::Deno
 	);
 }
@@ -4705,7 +4704,7 @@ fn package_type_deno_maps_to_ecosystem_type_deno() {
 #[test]
 fn package_type_dart_maps_to_ecosystem_type_dart() {
 	assert_eq!(
-		package_type_to_ecosystem_type(PackageType::Dart),
+		package_type_to_ecosystem_type(monochange_core::PackageType::Dart),
 		EcosystemType::Dart
 	);
 }
@@ -4713,7 +4712,7 @@ fn package_type_dart_maps_to_ecosystem_type_dart() {
 #[test]
 fn package_type_flutter_maps_to_ecosystem_type_dart() {
 	assert_eq!(
-		package_type_to_ecosystem_type(PackageType::Flutter),
+		package_type_to_ecosystem_type(monochange_core::PackageType::Flutter),
 		EcosystemType::Dart
 	);
 }
