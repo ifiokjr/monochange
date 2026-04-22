@@ -86,8 +86,6 @@ use std::path::PathBuf;
 use glob::Pattern;
 use miette::LabeledSpan;
 use miette::SourceSpan;
-use minijinja::Environment;
-use minijinja::UndefinedBehavior;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogDefinition;
@@ -520,14 +518,20 @@ fn merge_cli_commands(cli: BTreeMap<String, RawCliCommandDefinition>) -> Vec<Cli
 }
 
 fn render_changelog_path_template(template: &str, package_path: &Path) -> String {
-	let package_path_str = package_path.to_string_lossy();
-	let mut env = Environment::new();
+	let path = package_path.to_string_lossy();
+	let package_dir = package_path
+		.file_name()
+		.map(|s| s.to_string_lossy().into_owned())
+		.unwrap_or_default();
+	let package_name = package_path
+		.file_stem()
+		.map(|s| s.to_string_lossy().into_owned())
+		.unwrap_or_default();
 
-	env.set_undefined_behavior(UndefinedBehavior::Lenient);
-
-	let context = minijinja::context! { path => package_path_str.as_ref() };
-	env.render_str(template, context)
-		.unwrap_or_else(|_| template.replace("{{ path }}", &package_path_str))
+	template
+		.replace("{{package_dir}}", &package_dir)
+		.replace("{{package_name}}", &package_name)
+		.replace("{{ path }}", &path)
 }
 
 impl RawChangelogConfig {

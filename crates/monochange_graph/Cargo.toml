@@ -20,6 +20,7 @@ tracing = { workspace = true, default-features = true }
 
 [dev-dependencies]
 insta = { workspace = true, default-features = true }
+proptest = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
 
