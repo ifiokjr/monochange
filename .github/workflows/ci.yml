@@ -85,8 +85,33 @@ jobs:
         run: build:all
         shell: devenv shell -- bash -e {0}
 
+      - name: detect current release commit
+        id: release_record
+        run: |
+          set -euo pipefail
+
+          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+            resolved_commit="$(jq -r '.resolvedCommit' /tmp/release-record.json)"
+            record_commit="$(jq -r '.recordCommit' /tmp/release-record.json)"
+
+            if [ "$resolved_commit" = "$record_commit" ]; then
+              echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: devenv shell -- bash -e {0}
+
       - name: check publish builds
+        if: steps.release_record.outputs.is_release_commit != 'true'
         run: publish:check
+        shell: devenv shell -- bash -e {0}
+
+      - name: skip publish build check on release commit
+        if: steps.release_record.outputs.is_release_commit == 'true'
+        run: echo "HEAD is a release commit; skipping publish:check."
         shell: devenv shell -- bash -e {0}
 
       - name: build book
@@ -324,13 +349,20 @@ jobs:
         run: git fetch --force --tags origin
         shell: devenv shell -- bash -e {0}
 
-      - name: detect merged release commit
+      - name: detect current release commit
         id: release_record
         run: |
           set -euo pipefail
 
           if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-            echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+            resolved_commit="$(jq -r '.resolvedCommit' /tmp/release-record.json)"
+            record_commit="$(jq -r '.recordCommit' /tmp/release-record.json)"
+
+            if [ "$resolved_commit" = "$record_commit" ]; then
+              echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi
