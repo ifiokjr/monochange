@@ -32,7 +32,7 @@ in
     ];
 
   enterShell = ''
-    set -e
+    set -euo pipefail
 
     # Keep shell entry fast for local iteration. Only bootstrap missing toolchains
     # here; explicit updates happen via install/update tasks instead of every shell.
@@ -85,7 +85,11 @@ in
         pass_filenames = false;
         name = "lint and test";
         description = "Run the local CI lint rules and test suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all";
+        entry = ''
+          set -euo pipefail
+          ${config.env.DEVENV_PROFILE}/bin/lint:all;
+          ${config.env.DEVENV_PROFILE}/bin/test:all
+        '';
         stages = [ "pre-push" ];
       };
     };
@@ -94,7 +98,7 @@ in
   scripts = {
     "monochange" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo run --quiet --package monochange --bin monochange -- "$@"
       '';
       description = "The dev build of the `monochange` executable";
@@ -102,7 +106,7 @@ in
     };
     "mc" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo run --quiet --release --package monochange --bin mc -- "$@"
       '';
       description = "The release build of the `monochange` executable";
@@ -110,7 +114,7 @@ in
     };
     "install:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         install:cargo:bin
       '';
       description = "Install all packages.";
@@ -118,7 +122,7 @@ in
     };
     "install:toolchains" = {
       exec = ''
-        set -e
+        set -euo pipefail
         rustup toolchain install nightly --component rustfmt --no-self-update
         rustup toolchain install stable --no-self-update
       '';
@@ -127,7 +131,7 @@ in
     };
     "install:cargo:bin" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin --install
       '';
       description = "Install cargo binaries locally.";
@@ -135,7 +139,7 @@ in
     };
     "update:deps" = {
       exec = ''
-        set -e
+        set -euo pipefail
         update:toolchains
         cargo update
         devenv update
@@ -145,7 +149,7 @@ in
     };
     "update:toolchains" = {
       exec = ''
-        set -e
+        set -euo pipefail
         rustup toolchain install nightly --component rustfmt --no-self-update
         rustup update stable --no-self-update
       '';
@@ -154,7 +158,7 @@ in
     };
     "build:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         if [ -z "$CI" ]; then
           echo "Building project locally"
           cargo build --workspace --all-features
@@ -168,7 +172,7 @@ in
     };
     "build:book" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mdbook build docs
       '';
       description = "Build the mdbook documentation.";
@@ -203,7 +207,7 @@ in
     };
     "test:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         test:cargo
         test:docs
         test:node
@@ -213,7 +217,7 @@ in
     };
     "test:cargo" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin cargo-nextest run --workspace --all-features --no-tests pass
       '';
       description = "Run cargo tests with nextest.";
@@ -221,7 +225,7 @@ in
     };
     "test:cargo:expensive" = {
       exec = ''
-        set -e
+        set -euo pipefail
         MONOCHANGE_EXPENSIVE_TESTS=1 cargo bin cargo-nextest run --workspace --all-features --no-tests pass
       '';
       description = "Run cargo tests with the CI-only large-fixture cases enabled.";
@@ -229,7 +233,7 @@ in
     };
     "test:docs" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo test --doc --workspace --all-features
       '';
       description = "Run documentation tests.";
@@ -237,7 +241,7 @@ in
     };
     "test:node" = {
       exec = ''
-        set -e
+        set -euo pipefail
         node --test npm/tests/*.test.mjs scripts/npm/tests/*.test.mjs
       '';
       description = "Run npm helper, launcher, and repository utility tests with the built-in Node test runner.";
@@ -245,7 +249,7 @@ in
     };
     "test:agent-evals" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo test --package monochange --all-features agent_eval_
       '';
       description = "Run the focused agent-style eval coverage for machine-readable workflows.";
@@ -285,7 +289,7 @@ in
     };
     "fix:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         fix:clippy
         docs:update
         fix:monochange
@@ -297,7 +301,7 @@ in
     };
     "fix:format" = {
       exec = ''
-        set -e
+        set -euo pipefail
         dprint fmt --config "$DEVENV_ROOT/dprint.json"
       '';
       description = "Format files with dprint.";
@@ -305,7 +309,7 @@ in
     };
     "fix:clippy" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo clippy --workspace --fix --allow-dirty --allow-staged --all-features --all-targets
       '';
       description = "Fix clippy lints for rust.";
@@ -313,7 +317,7 @@ in
     };
     "fix:monochange" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mc validate
         mc check --fix
       '';
@@ -322,7 +326,7 @@ in
     };
     "deny:check" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo deny check
       '';
       description = "Run cargo-deny checks for security advisories and license compliance.";
@@ -330,7 +334,7 @@ in
     };
     "lint:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         lint:clippy
         lint:format
         lint:architecture
@@ -344,7 +348,7 @@ in
     };
     "lint:format" = {
       exec = ''
-        set -e
+        set -euo pipefail
         dprint check
       '';
       description = "Check that all files are formatted.";
@@ -352,7 +356,7 @@ in
     };
     "lint:monochange" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mc validate
         mc check
       '';
@@ -361,7 +365,7 @@ in
     };
     "lint:clippy" = {
       exec = ''
-        set -e
+        set -euo pipefail
         # Treat all compiler and clippy warnings as errors so warning-only
         # regressions never make it into CI or a pushed branch.
         cargo clippy --workspace --all-features --all-targets -- -D warnings
@@ -371,7 +375,7 @@ in
     };
     "lint:architecture" = {
       exec = ''
-        set -e
+        set -euo pipefail
         node scripts/check-architecture-boundaries.mjs
       '';
       description = "Check that provider and ecosystem dispatch stays inside the documented allowlist.";
@@ -379,7 +383,7 @@ in
     };
     "docs:check" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mdt check
         node scripts/check-agent-surface.mjs
       '';
@@ -388,7 +392,7 @@ in
     };
     "docs:update" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mdt update
       '';
       description = "Update shared documentation blocks across markdown and source files.";
@@ -396,7 +400,7 @@ in
     };
     "snapshot:review" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo insta review
       '';
       description = "Review insta snapshots.";
@@ -404,7 +408,7 @@ in
     };
     "snapshot:update" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin cargo-nextest run --workspace --all-features --no-tests pass
         cargo insta accept
       '';
@@ -413,7 +417,7 @@ in
     };
     "setup:helix" = {
       exec = ''
-        set -e
+        set -euo pipefail
         rm -rf .helix
         cp -r setup/editors/helix .helix
       '';
@@ -422,7 +426,7 @@ in
     };
     "setup:vscode" = {
       exec = ''
-        set -e
+        set -euo pipefail
         rm -rf .vscode
         cp -r ./setup/editors/vscode .vscode
       '';
