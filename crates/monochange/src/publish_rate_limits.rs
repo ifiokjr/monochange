@@ -562,70 +562,147 @@ mod tests {
 
 	#[test]
 	fn plan_publish_rate_limits_skips_private_and_disabled_packages_from_release_batches() {
-		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-			.join("../../fixtures/tests/publish-rate-limits/disabled-and-private/workspace");
-		copy_fixture_dir(&fixture, tempdir.path());
-		let configuration = crate::load_workspace_configuration(tempdir.path())
-			.unwrap_or_else(|error| panic!("load config: {error}"));
-		let prepared_release = PreparedRelease {
-			plan: monochange_core::ReleasePlan {
-				workspace_root: tempdir.path().to_path_buf(),
-				decisions: Vec::new(),
-				groups: Vec::new(),
-				warnings: Vec::new(),
-				unresolved_items: Vec::new(),
-				compatibility_evidence: Vec::new(),
-			},
-			changeset_paths: Vec::new(),
-			changesets: Vec::new(),
-			released_packages: vec![
-				"core".to_string(),
-				"private".to_string(),
-				"docs".to_string(),
+		let configuration = WorkspaceConfiguration {
+			root_path: std::path::PathBuf::from("/workspace"),
+			defaults: monochange_core::WorkspaceDefaults::default(),
+			changelog: monochange_core::ChangelogSettings::default(),
+			packages: vec![
+				monochange_core::PackageDefinition {
+					id: "core".to_string(),
+					path: std::path::PathBuf::from("crates/core"),
+					package_type: monochange_core::PackageType::Cargo,
+					changelog: None,
+					excluded_changelog_types: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: monochange_core::VersionFormat::Primary,
+					publish: monochange_core::PublishSettings::default(),
+				},
+				monochange_core::PackageDefinition {
+					id: "private".to_string(),
+					path: std::path::PathBuf::from("crates/private"),
+					package_type: monochange_core::PackageType::Cargo,
+					changelog: None,
+					excluded_changelog_types: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: monochange_core::VersionFormat::Primary,
+					publish: monochange_core::PublishSettings::default(),
+				},
+				monochange_core::PackageDefinition {
+					id: "docs".to_string(),
+					path: std::path::PathBuf::from("packages/docs"),
+					package_type: monochange_core::PackageType::Npm,
+					changelog: None,
+					excluded_changelog_types: Vec::new(),
+					empty_update_message: None,
+					release_title: None,
+					changelog_version_title: None,
+					versioned_files: Vec::new(),
+					ignore_ecosystem_versioned_files: false,
+					ignored_paths: Vec::new(),
+					additional_paths: Vec::new(),
+					tag: true,
+					release: true,
+					version_format: monochange_core::VersionFormat::Primary,
+					publish: monochange_core::PublishSettings {
+						enabled: false,
+						..monochange_core::PublishSettings::default()
+					},
+				},
 			],
-			package_publications: vec![
-				PackagePublicationTarget {
-					package: "core".to_string(),
-					ecosystem: monochange_core::Ecosystem::Cargo,
-					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
-					version: Version::new(1, 0, 1).to_string(),
-					mode: PublishMode::Builtin,
-					trusted_publishing: TrustedPublishingSettings::default(),
-				},
-				PackagePublicationTarget {
-					package: "private".to_string(),
-					ecosystem: monochange_core::Ecosystem::Cargo,
-					registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
-					version: Version::new(1, 0, 1).to_string(),
-					mode: PublishMode::Builtin,
-					trusted_publishing: TrustedPublishingSettings::default(),
-				},
-				PackagePublicationTarget {
-					package: "docs".to_string(),
-					ecosystem: monochange_core::Ecosystem::Npm,
-					registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
-					version: Version::new(1, 0, 1).to_string(),
-					mode: PublishMode::Builtin,
-					trusted_publishing: TrustedPublishingSettings::default(),
-				},
-			],
-			version: None,
-			group_version: None,
-			release_targets: Vec::new(),
-			changed_files: Vec::new(),
-			changelogs: Vec::new(),
-			updated_changelogs: Vec::new(),
-			deleted_changesets: Vec::new(),
-			dry_run: true,
+			groups: Vec::new(),
+			cli: Vec::new(),
+			changesets: monochange_core::ChangesetSettings::default(),
+			source: None,
+			lints: monochange_core::lint::WorkspaceLintSettings::default(),
+			cargo: monochange_core::EcosystemSettings::default(),
+			npm: monochange_core::EcosystemSettings::default(),
+			deno: monochange_core::EcosystemSettings::default(),
+			dart: monochange_core::EcosystemSettings::default(),
 		};
-		let packages = discover_workspace(tempdir.path())
-			.unwrap_or_else(|error| panic!("discover workspace: {error}"))
-			.packages;
+		let packages = vec![
+			monochange_core::PackageRecord {
+				id: "cargo:crates/core/Cargo.toml".to_string(),
+				name: "core".to_string(),
+				ecosystem: monochange_core::Ecosystem::Cargo,
+				manifest_path: std::path::PathBuf::from("/workspace/crates/core/Cargo.toml"),
+				workspace_root: std::path::PathBuf::from("/workspace"),
+				current_version: Some(Version::new(1, 0, 0)),
+				publish_state: monochange_core::PublishState::Public,
+				version_group_id: None,
+				metadata: BTreeMap::from([("config_id".to_string(), "core".to_string())]),
+				declared_dependencies: Vec::new(),
+			},
+			monochange_core::PackageRecord {
+				id: "cargo:crates/private/Cargo.toml".to_string(),
+				name: "private".to_string(),
+				ecosystem: monochange_core::Ecosystem::Cargo,
+				manifest_path: std::path::PathBuf::from("/workspace/crates/private/Cargo.toml"),
+				workspace_root: std::path::PathBuf::from("/workspace"),
+				current_version: Some(Version::new(1, 0, 0)),
+				publish_state: monochange_core::PublishState::Private,
+				version_group_id: None,
+				metadata: BTreeMap::from([("config_id".to_string(), "private".to_string())]),
+				declared_dependencies: Vec::new(),
+			},
+			monochange_core::PackageRecord {
+				id: "npm:packages/docs/package.json".to_string(),
+				name: "docs".to_string(),
+				ecosystem: monochange_core::Ecosystem::Npm,
+				manifest_path: std::path::PathBuf::from("/workspace/packages/docs/package.json"),
+				workspace_root: std::path::PathBuf::from("/workspace"),
+				current_version: Some(Version::new(1, 0, 0)),
+				publish_state: monochange_core::PublishState::Public,
+				version_group_id: None,
+				metadata: BTreeMap::from([("config_id".to_string(), "docs".to_string())]),
+				declared_dependencies: Vec::new(),
+			},
+		];
+		let publications = vec![
+			PackagePublicationTarget {
+				package: "core".to_string(),
+				ecosystem: monochange_core::Ecosystem::Cargo,
+				registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+				version: Version::new(1, 0, 1).to_string(),
+				mode: PublishMode::Builtin,
+				trusted_publishing: TrustedPublishingSettings::default(),
+			},
+			PackagePublicationTarget {
+				package: "private".to_string(),
+				ecosystem: monochange_core::Ecosystem::Cargo,
+				registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+				version: Version::new(1, 0, 1).to_string(),
+				mode: PublishMode::Builtin,
+				trusted_publishing: TrustedPublishingSettings::default(),
+			},
+			PackagePublicationTarget {
+				package: "docs".to_string(),
+				ecosystem: monochange_core::Ecosystem::Npm,
+				registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+				version: Version::new(1, 0, 1).to_string(),
+				mode: PublishMode::Builtin,
+				trusted_publishing: TrustedPublishingSettings::default(),
+			},
+		];
 		let requests = package_publish::build_release_requests(
 			&configuration,
 			&packages,
-			&prepared_release.package_publications,
+			&publications,
 			&BTreeSet::new(),
 		)
 		.unwrap_or_else(|error| panic!("build release requests: {error}"));
