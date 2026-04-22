@@ -113,6 +113,9 @@ use monochange_core::HostedSourceAdapter;
 use monochange_core::HostedSourceFeatures;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
+use monochange_core::MergeReleasePullRequestOperation;
+use monochange_core::MergeReleasePullRequestOutcome;
+use monochange_core::MergeReleasePullRequestRequest;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
@@ -124,6 +127,7 @@ use monochange_core::RetargetOperation;
 use monochange_core::RetargetProviderOperation;
 use monochange_core::RetargetProviderResult;
 use monochange_core::RetargetTagResult;
+use monochange_core::SlashCommandAuthorizationResult;
 use monochange_core::SourceCapabilities;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceChangeRequestOperation;
@@ -254,6 +258,22 @@ impl HostedSourceAdapter for GitHubHostedSourceAdapter {
 		dry_run: bool,
 	) -> MonochangeResult<Vec<RetargetProviderResult>> {
 		sync_retargeted_releases(source, tag_results, dry_run)
+	}
+
+	fn authorize_slash_command_release(
+		&self,
+		source: &SourceConfiguration,
+		author: &str,
+	) -> MonochangeResult<SlashCommandAuthorizationResult> {
+		authorize_slash_command_release(source, author)
+	}
+
+	fn merge_release_pull_request(
+		&self,
+		source: &SourceConfiguration,
+		request: &MergeReleasePullRequestRequest,
+	) -> MonochangeResult<MergeReleasePullRequestOutcome> {
+		merge_release_pull_request(source, request)
 	}
 }
 
@@ -1495,6 +1515,20 @@ where
 	})
 }
 
+async fn put_json<Body, Response>(
+	client: &Octocrab,
+	path: &str,
+	body: &Body,
+) -> MonochangeResult<Response>
+where
+	Body: Serialize + ?Sized,
+	Response: DeserializeOwned,
+{
+	client.put(path, Some(body)).await.map_err(|error| {
+		MonochangeError::Config(format!("GitHub API PUT `{path}` failed: {error}"))
+	})
+}
+
 fn join_existing_pull_request_lookup(
 	handle: thread::JoinHandle<MonochangeResult<Option<GitHubExistingPullRequest>>>,
 ) -> MonochangeResult<Option<GitHubExistingPullRequest>> {
@@ -1745,6 +1779,106 @@ fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifestTarg
 		}
 	}
 	lines.join("\n")
+}
+
+fn authorize_slash_command_release(
+	source: &SourceConfiguration,
+	author: &str,
+) -> MonochangeResult<SlashCommandAuthorizationResult> {
+	let settings = &source.pull_requests.slash_commands;
+	if !settings.enabled {
+		return Ok(SlashCommandAuthorizationResult::Denied);
+	}
+
+	let config = &settings.authorization;
+	if config.allowed_users.iter().any(|u| u == author) {
+		return Ok(SlashCommandAuthorizationResult::Authorized);
+	}
+	if !config.allowed_users.is_empty() {
+		return Ok(SlashCommandAuthorizationResult::Denied);
+	}
+
+	let runtime = RuntimeBuilder::new_current_thread()
+		.enable_all()
+		.build()
+		.map_err(|e| MonochangeError::Config(format!("runtime: {e}")))?;
+
+	runtime.block_on(async {
+		let client = github_client_from_env(source)?;
+		if config.allow_admins {
+			let path = format!(
+				"repos/{}/{}/collaborators/{}/permission",
+				encode(&source.owner),
+				encode(&source.repo),
+				encode(author)
+			);
+			let result: serde_json::Value = get_json(&client, &path).await?;
+			if result.get("permission").and_then(|p| p.as_str()) == Some("admin") {
+				return Ok(SlashCommandAuthorizationResult::Authorized);
+			}
+		}
+		for team in &config.allowed_teams {
+			let path = format!(
+				"orgs/{}/teams/{}/memberships/{}",
+				encode(&source.owner),
+				encode(team),
+				encode(author)
+			);
+			let result: Option<serde_json::Value> = get_optional_json(&client, &path).await?;
+			if result
+				.as_ref()
+				.and_then(|r| r.get("state"))
+				.and_then(|s| s.as_str())
+				== Some("active")
+			{
+				return Ok(SlashCommandAuthorizationResult::Authorized);
+			}
+		}
+		Ok(SlashCommandAuthorizationResult::Denied)
+	})
+}
+
+fn merge_release_pull_request(
+	source: &SourceConfiguration,
+	request: &MergeReleasePullRequestRequest,
+) -> MonochangeResult<MergeReleasePullRequestOutcome> {
+	let runtime = RuntimeBuilder::new_current_thread()
+		.enable_all()
+		.build()
+		.map_err(|e| MonochangeError::Config(format!("runtime: {e}")))?;
+
+	runtime.block_on(async {
+		let client = github_client_from_env(source)?;
+		let path = format!(
+			"repos/{}/{}/pulls/{}/merge",
+			encode(&request.owner),
+			encode(&request.repo),
+			request.pr_number
+		);
+
+		let payload = serde_json::json!({
+			"merge_method": "squash",
+			"commit_title": request.commit_message.subject,
+			"commit_message": request.commit_message.body.clone().unwrap_or_default(),
+		});
+
+		let response: serde_json::Value = put_json(&client, &path, &payload).await?;
+
+		Ok(MergeReleasePullRequestOutcome {
+			provider: SourceProvider::GitHub,
+			repository: request.repository.clone(),
+			pr_number: request.pr_number,
+			merge_commit_sha: response
+				.get("sha")
+				.and_then(|s| s.as_str())
+				.map(String::from),
+			url: response
+				.get("html_url")
+				.and_then(|s| s.as_str())
+				.map(String::from),
+			operation: MergeReleasePullRequestOperation::Merged,
+		})
+	})
 }
 
 #[cfg(test)]

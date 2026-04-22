@@ -3056,6 +3056,8 @@ pub struct ProviderMergeRequestSettings {
 	pub labels: Vec<String>,
 	#[serde(default)]
 	pub auto_merge: bool,
+	#[serde(default)]
+	pub slash_commands: ProviderSlashCommandSettings,
 }
 
 impl Default for ProviderMergeRequestSettings {
@@ -3067,6 +3069,40 @@ impl Default for ProviderMergeRequestSettings {
 			title: default_pull_request_title(),
 			labels: default_pull_request_labels(),
 			auto_merge: false,
+			slash_commands: ProviderSlashCommandSettings::default(),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlashCommandAuthorizationSettings {
+	#[serde(default = "default_true")]
+	pub allow_admins: bool,
+	#[serde(default)]
+	pub allowed_users: Vec<String>,
+	#[serde(default)]
+	pub allowed_teams: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderSlashCommandSettings {
+	#[serde(default = "default_true")]
+	pub enabled: bool,
+	#[serde(default)]
+	pub authorization: SlashCommandAuthorizationSettings,
+}
+
+impl Default for ProviderSlashCommandSettings {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			authorization: SlashCommandAuthorizationSettings {
+				allow_admins: true,
+				allowed_users: Vec::new(),
+				allowed_teams: Vec::new(),
+			},
 		}
 	}
 }
@@ -3374,6 +3410,28 @@ pub trait HostedSourceAdapter: Sync {
 			source.provider
 		)))
 	}
+
+	fn authorize_slash_command_release(
+		&self,
+		_source: &SourceConfiguration,
+		_author: &str,
+	) -> MonochangeResult<SlashCommandAuthorizationResult> {
+		Err(MonochangeError::Config(format!(
+			"slash command authorization is not yet supported for {}",
+			self.provider()
+		)))
+	}
+
+	fn merge_release_pull_request(
+		&self,
+		_source: &SourceConfiguration,
+		_request: &MergeReleasePullRequestRequest,
+	) -> MonochangeResult<MergeReleasePullRequestOutcome> {
+		Err(MonochangeError::Config(format!(
+			"merge release pull request is not yet supported for {}",
+			self.provider()
+		)))
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -3451,6 +3509,55 @@ pub struct SourceChangeRequestOutcome {
 	pub head_branch: String,
 	pub operation: SourceChangeRequestOperation,
 	pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MergeReleasePullRequestOperation {
+	Merged,
+	Skipped,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeReleasePullRequestRequest {
+	pub provider: SourceProvider,
+	pub repository: String,
+	pub owner: String,
+	pub repo: String,
+	pub pr_number: u64,
+	pub commit_message: CommitMessage,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeReleasePullRequestOutcome {
+	pub provider: SourceProvider,
+	pub repository: String,
+	pub pr_number: u64,
+	pub merge_commit_sha: Option<String>,
+	pub url: Option<String>,
+	pub operation: MergeReleasePullRequestOperation,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlashCommandAuthorizationResult {
+	Authorized,
+	Denied,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeReleasePrReport {
+	pub pr_number: u64,
+	pub repository: String,
+	pub dry_run: bool,
+	pub authorization: Option<SlashCommandAuthorizationResult>,
+	pub merge_outcome: Option<MergeReleasePullRequestOutcome>,
+	pub tag_count: Option<usize>,
+	pub release_outcomes: Option<Vec<SourceReleaseOutcome>>,
+	pub status: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
