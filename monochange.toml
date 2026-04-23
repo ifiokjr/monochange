@@ -640,6 +640,9 @@ ignored_paths = [
 	"**/__tests.rs",
 	"**/snapshots/**",
 	"fixtures/tests/**",
+	"crates/*/changelog.md",
+	"changelog.md",
+	"packages/*/changelog.md",
 ]
 
 # =============================================================================
