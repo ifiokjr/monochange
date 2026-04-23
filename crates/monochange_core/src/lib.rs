@@ -41,6 +41,7 @@
 //!     sections: vec![ReleaseNotesSection {
 //!         title: "Features".to_string(),
 //!         entries: vec!["- add keep-a-changelog output".to_string()],
+//!         collapsed: false,
 //!     }],
 //! };
 //!
