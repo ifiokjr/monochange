@@ -14,10 +14,10 @@ description = "Shared ECMAScript semantic analysis helpers for monochange adapte
 
 [dependencies]
 monochange_core = { workspace = true }
-oxc_allocator = { workspace = true }
-oxc_ast = { workspace = true }
-oxc_parser = { workspace = true }
-oxc_span = { workspace = true }
+oxc_allocator = { workspace = true, default-features = true }
+oxc_ast = { workspace = true, default-features = true }
+oxc_parser = { workspace = true, default-features = true }
+oxc_span = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

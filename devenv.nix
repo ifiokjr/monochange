@@ -33,17 +33,6 @@ in
 
   enterShell = ''
     set -euo pipefail
-
-    # Keep shell entry fast for local iteration. Only bootstrap missing toolchains
-    # here; explicit updates happen via install/update tasks instead of every shell.
-    if ! rustup toolchain list | grep -Eq '^nightly'; then
-      rustup toolchain install nightly --component rustfmt --no-self-update 2>/dev/null || true
-    fi
-    if ! rustup toolchain list | grep -Eq '^stable'; then
-      rustup toolchain install stable --no-self-update 2>/dev/null || true
-    fi
-
-    export PATH="$DEVENV_ROOT/scripts:$PATH"
     eval "$(pnpm-activate-env)"
   '';
 
@@ -120,15 +109,6 @@ in
       description = "Install all packages.";
       binary = "bash";
     };
-    "install:toolchains" = {
-      exec = ''
-        set -euo pipefail
-        rustup toolchain install nightly --component rustfmt --no-self-update
-        rustup toolchain install stable --no-self-update
-      '';
-      description = "Install the Rust toolchains used by monochange.";
-      binary = "bash";
-    };
     "install:cargo:bin" = {
       exec = ''
         set -euo pipefail
@@ -140,20 +120,10 @@ in
     "update:deps" = {
       exec = ''
         set -euo pipefail
-        update:toolchains
         cargo update
         devenv update
       '';
       description = "Update dependencies.";
-      binary = "bash";
-    };
-    "update:toolchains" = {
-      exec = ''
-        set -euo pipefail
-        rustup toolchain install nightly --component rustfmt --no-self-update
-        rustup update stable --no-self-update
-      '';
-      description = "Refresh the Rust toolchains used by monochange.";
       binary = "bash";
     };
     "build:all" = {
