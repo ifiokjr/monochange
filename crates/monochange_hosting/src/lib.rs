@@ -756,6 +756,7 @@ mod tests {
 				summary: vec![],
 				sections: vec![ReleaseNotesSection {
 					title: "Bug Fixes".to_string(),
+					collapsed: false,
 					entries: vec!["fix crash".to_string()],
 				}],
 			},

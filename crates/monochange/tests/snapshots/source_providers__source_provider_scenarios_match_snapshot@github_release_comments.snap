@@ -14,6 +14,7 @@ expression: json
       "notes": {
         "sections": [
           {
+            "collapsed": false,
             "entries": [
               "#### add github fixture coverage"
             ],

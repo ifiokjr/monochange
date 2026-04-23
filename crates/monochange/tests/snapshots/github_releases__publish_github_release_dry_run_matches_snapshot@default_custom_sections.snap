@@ -16,6 +16,7 @@ expression: json
         "notes": {
           "sections": [
             {
+              "collapsed": false,
               "entries": [
                 "#### rotate signing keys (core patch)\n\nRoll the signing key before the release window closes."
               ],

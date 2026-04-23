@@ -17,6 +17,7 @@ expression: json
       "notes": {
         "sections": [
           {
+            "collapsed": false,
             "entries": [
               "> [!NOTE]\n> *core*\n\n#### add core feature"
             ],
@@ -40,6 +41,7 @@ expression: json
       "notes": {
         "sections": [
           {
+            "collapsed": false,
             "entries": [
               "#### add core feature"
             ],

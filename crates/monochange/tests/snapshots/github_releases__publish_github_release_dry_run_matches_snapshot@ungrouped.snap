@@ -17,6 +17,7 @@ expression: json
         "notes": {
           "sections": [
             {
+              "collapsed": false,
               "entries": [
                 "- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1."
               ],
@@ -36,6 +37,7 @@ expression: json
         "notes": {
           "sections": [
             {
+              "collapsed": false,
               "entries": [
                 "#### add feature"
               ],

@@ -21,6 +21,7 @@ expression: content_text(&result)
         "notes": {
           "sections": [
             {
+              "collapsed": false,
               "entries": [
                 "> [!NOTE]\n> *core*\n\n#### add release command"
               ],
@@ -44,6 +45,7 @@ expression: content_text(&result)
         "notes": {
           "sections": [
             {
+              "collapsed": false,
               "entries": [
                 "- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
               ],
@@ -63,6 +65,7 @@ expression: content_text(&result)
         "notes": {
           "sections": [
             {
+              "collapsed": false,
               "entries": [
                 "#### add release command"
               ],

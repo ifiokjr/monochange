@@ -52,6 +52,7 @@ expression: manifest
         "sections": [
           {
             "title": "Changed",
+            "collapsed": false,
             "entries": [
               "> [!NOTE]\n> *core*\n\n#### add feature"
             ]
@@ -71,6 +72,7 @@ expression: manifest
         "sections": [
           {
             "title": "Changed",
+            "collapsed": false,
             "entries": [
               "#### add feature"
             ]

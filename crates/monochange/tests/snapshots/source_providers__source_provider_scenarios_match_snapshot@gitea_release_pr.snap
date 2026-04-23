@@ -16,6 +16,7 @@ expression: json
         "notes": {
           "sections": [
             {
+              "collapsed": false,
               "entries": [
                 "#### add gitea fixture coverage"
               ],

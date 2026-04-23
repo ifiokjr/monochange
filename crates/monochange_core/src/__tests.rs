@@ -592,6 +592,13 @@ fn changelog_section_description_is_optional() {
 }
 
 #[test]
+fn changelog_section_thresholds_default_disable_collapsed_and_ignored_sections() {
+	let thresholds = crate::ChangelogSectionThresholds::default();
+	assert_eq!(thresholds.collapse, i8::MAX);
+	assert_eq!(thresholds.ignored, i8::MAX);
+}
+
+#[test]
 fn bump_severity_orders_from_none_to_major() {
 	assert!(BumpSeverity::Patch > BumpSeverity::None);
 	assert!(BumpSeverity::Minor > BumpSeverity::Patch);
@@ -1234,7 +1241,7 @@ fn valid_input_names_returns_empty_for_commit_release() {
 		no_verify: false,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(step.valid_input_names(), Some([].as_slice()));
+	assert_eq!(step.valid_input_names(), Some(["no_verify"].as_slice()));
 }
 
 #[test]
@@ -1641,6 +1648,7 @@ fn render_release_notes_supports_monochange_and_keep_a_changelog_formats() {
 		summary: vec!["Grouped release for `sdk`.".to_string()],
 		sections: vec![ReleaseNotesSection {
 			title: "Changed".to_string(),
+			collapsed: false,
 			entries: vec!["add release automation".to_string()],
 		}],
 	};
@@ -1656,6 +1664,29 @@ fn render_release_notes_supports_monochange_and_keep_a_changelog_formats() {
 		"render_release_notes_supports_monochange_and_keep_a_changelog_formats__keep_a_changelog",
 		keep_a_changelog
 	);
+}
+
+#[test]
+fn render_release_notes_renders_collapsed_sections_as_details_blocks() {
+	let document = ReleaseNotesDocument {
+		title: "1.2.3".to_string(),
+		summary: vec!["Grouped release for `sdk`.".to_string()],
+		sections: vec![ReleaseNotesSection {
+			title: "Documentation".to_string(),
+			collapsed: true,
+			entries: vec!["- update migration guide".to_string()],
+		}],
+	};
+
+	let monochange = render_release_notes(ChangelogFormat::Monochange, &document);
+	let keep_a_changelog = render_release_notes(ChangelogFormat::KeepAChangelog, &document);
+
+	for rendered in [monochange, keep_a_changelog] {
+		assert!(rendered.contains("<details>"));
+		assert!(rendered.contains("<summary><strong>Documentation</strong></summary>"));
+		assert!(rendered.contains("- update migration guide"));
+		assert!(rendered.contains("</details>"));
+	}
 }
 
 #[test]

@@ -1494,6 +1494,7 @@ mod tests {
 					summary: vec!["Grouped release".to_string()],
 					sections: vec![ReleaseNotesSection {
 						title: "Features".to_string(),
+						collapsed: false,
 						entries: vec!["- Added batching".to_string()],
 					}],
 				},

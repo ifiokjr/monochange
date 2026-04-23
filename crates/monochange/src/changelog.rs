@@ -908,6 +908,9 @@ fn render_release_note_sections(
 		.collect::<Vec<_>>();
 	sorted_sections.sort_by_key(|(_, _, priority)| *priority);
 
+	let collapse_threshold = changelog.section_thresholds.collapse;
+	let ignored_threshold = changelog.section_thresholds.ignored;
+
 	let mut section_entries: BTreeMap<&str, Vec<String>> = BTreeMap::new();
 	let mut uncategorized = Vec::<String>::new();
 
@@ -925,29 +928,35 @@ fn render_release_note_sections(
 
 	// Build sections in priority order
 	let mut sections = Vec::new();
-	let mut used_keys = BTreeSet::new();
-	for (section_key, heading, _priority) in &sorted_sections {
+	for (section_key, heading, priority) in &sorted_sections {
+		if *priority > ignored_threshold {
+			section_entries.remove(*section_key);
+			continue;
+		}
 		if let Some(entries) = section_entries.remove(*section_key)
 			&& !entries.is_empty()
 		{
 			sections.push(ReleaseNotesSection {
 				title: heading.to_string(),
+				collapsed: *priority >= collapse_threshold,
 				entries,
 			});
-			used_keys.insert(*section_key);
 		}
 	}
 	if !uncategorized.is_empty() {
 		sections.push(ReleaseNotesSection {
 			title: "Changed".to_string(),
+			collapsed: false,
 			entries: uncategorized,
 		});
 	}
 	if sections.is_empty() {
 		sections.push(ReleaseNotesSection {
 			title: "Changed".to_string(),
+			collapsed: false,
 			entries: vec!["- prepare release".to_string()],
 		});
+		return sections;
 	}
 	sections
 }
@@ -2253,7 +2262,96 @@ mod tests {
 
 		assert_eq!(sections.len(), 1);
 		assert_eq!(sections[0].title, "Changed");
+		assert!(!sections[0].collapsed);
 		assert_eq!(sections[0].entries, vec!["- prepare release".to_string()]);
+	}
+
+	#[test]
+	fn render_sections_collapse_and_ignore_by_priority_thresholds() {
+		let mut settings = ChangelogSettings {
+			templates: vec!["- {{ summary }}".to_string()],
+			..ChangelogSettings::default()
+		};
+		settings.section_thresholds.collapse = 50;
+		settings.section_thresholds.ignored = 100;
+		settings.sections.insert(
+			"highlights".to_string(),
+			ChangelogSectionDef {
+				heading: "Highlights".to_string(),
+				description: None,
+				priority: 20,
+			},
+		);
+		settings.sections.insert(
+			"notes".to_string(),
+			ChangelogSectionDef {
+				heading: "Notes".to_string(),
+				description: None,
+				priority: 50,
+			},
+		);
+		settings.sections.insert(
+			"internal".to_string(),
+			ChangelogSectionDef {
+				heading: "Internal".to_string(),
+				description: None,
+				priority: 101,
+			},
+		);
+		settings.types.insert(
+			"feat".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::Minor,
+				section: "highlights".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"note".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "notes".to_string(),
+				description: None,
+			},
+		);
+		settings.types.insert(
+			"internal".to_string(),
+			ChangelogType {
+				bump: BumpSeverity::None,
+				section: "internal".to_string(),
+				description: None,
+			},
+		);
+
+		let sections = render_release_note_sections(
+			"sdk",
+			"1.0.0",
+			&settings,
+			&[
+				ReleaseNoteChange {
+					change_type: Some("feat".to_string()),
+					summary: "ship highlights".to_string(),
+					..sample_change("pkg-a", "pkg-a", ".changeset/a.md")
+				},
+				ReleaseNoteChange {
+					change_type: Some("note".to_string()),
+					summary: "background note".to_string(),
+					..sample_change("pkg-b", "pkg-b", ".changeset/b.md")
+				},
+				ReleaseNoteChange {
+					change_type: Some("internal".to_string()),
+					summary: "internal cleanup".to_string(),
+					..sample_change("pkg-c", "pkg-c", ".changeset/c.md")
+				},
+			],
+		);
+
+		assert_eq!(sections.len(), 2);
+		assert_eq!(sections[0].title, "Highlights");
+		assert!(!sections[0].collapsed);
+		assert_eq!(sections[1].title, "Notes");
+		assert!(sections[1].collapsed);
+		assert!(!sections.iter().any(|section| section.title == "Internal"));
 	}
 
 	#[test]

@@ -114,6 +114,13 @@ format = "keep_a_changelog"
 #   {{ closed_issues }}, {{ closed_issue_links }}
 #
 # Default: ["#### {{ summary }}\n\n{{ details }}", "- {{ summary }}"]
+#
+# Section visibility can also be controlled by priority thresholds:
+#   collapse — sections with priority >= this value render inside markdown
+#              <details> blocks
+#   ignored  — sections with priority > this value are omitted entirely
+#              and must be >= collapse
+# Defaults: collapse = 127, ignored = 127 (disabled)
 templates = [
 	"#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
 	"#### {{ summary }}\n\n{{ context }}",
@@ -132,6 +139,10 @@ docs = { heading = "Documentation", description = "Documentation updates and imp
 security = { heading = "Security", description = "Security vulnerabilities, patches, and hardening", priority = 40 }
 perf = { heading = "Performance", description = "Performance optimizations and improvements", priority = 40 }
 other = { heading = "Other", description = "Miscellaneous changes not categorized elsewhere", priority = 50 }
+
+[changelog.section_thresholds]
+collapse = 127
+ignored = 127
 
 [changelog.types]
 major = { bump = "major", section = "breaking", description = "Major version bump including breaking API changes requiring migration" }

@@ -4311,6 +4311,7 @@ fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths()
 		&crate::RawChangelogSettings {
 			templates: vec![" ".to_string()],
 			sections: BTreeMap::new(),
+			section_thresholds: monochange_core::ChangelogSectionThresholds::default(),
 			types: BTreeMap::new(),
 		},
 		&[],
@@ -4327,6 +4328,28 @@ fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths()
 	assert_eq!(
 		crate::change_template_variables("{{ summary }} {{ details | default('') }} {{"),
 		vec!["details".to_string(), "summary".to_string()]
+	);
+
+	let invalid_thresholds = crate::validate_changelog_configuration(
+		"",
+		&crate::RawChangelogSettings {
+			templates: Vec::new(),
+			sections: BTreeMap::new(),
+			section_thresholds: monochange_core::ChangelogSectionThresholds {
+				collapse: 80,
+				ignored: 50,
+			},
+			types: BTreeMap::new(),
+		},
+		&[],
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid threshold error"));
+	assert!(
+		invalid_thresholds
+			.to_string()
+			.contains("section_thresholds.ignored")
 	);
 }
 

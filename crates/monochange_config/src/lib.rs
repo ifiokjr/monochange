@@ -420,6 +420,8 @@ struct RawChangelogSettings {
 	#[serde(default)]
 	pub sections: BTreeMap<String, monochange_core::ChangelogSectionDef>,
 	#[serde(default)]
+	pub section_thresholds: monochange_core::ChangelogSectionThresholds,
+	#[serde(default)]
 	pub types: BTreeMap<String, monochange_core::ChangelogType>,
 }
 
@@ -2868,11 +2870,14 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 
 fn build_changelog_settings(raw: RawChangelogSettings) -> ChangelogSettings {
 	if raw.sections.is_empty() && raw.types.is_empty() && raw.templates.is_empty() {
-		ChangelogSettings::defaults()
+		let mut defaults = ChangelogSettings::defaults();
+		defaults.section_thresholds = raw.section_thresholds;
+		defaults
 	} else {
 		ChangelogSettings {
 			templates: raw.templates,
 			sections: raw.sections,
+			section_thresholds: raw.section_thresholds,
 			types: raw.types,
 		}
 	}
@@ -2906,6 +2911,11 @@ fn validate_changelog_configuration(
 	}
 	validate_changelog_keys(contents, "section", &changelog.sections)?;
 	validate_changelog_keys(contents, "type", &changelog.types)?;
+	if changelog.section_thresholds.ignored < changelog.section_thresholds.collapse {
+		return Err(MonochangeError::Config(
+			"[changelog].section_thresholds.ignored must be greater than or equal to [changelog].section_thresholds.collapse".to_string(),
+		));
+	}
 	// Validate that each type references an existing section
 	for (type_key, typ) in &changelog.types {
 		if !changelog.sections.contains_key(&typ.section) {

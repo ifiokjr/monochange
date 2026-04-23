@@ -65,6 +65,7 @@ exit_code: 0
         "sections": [
           {
             "title": "Changed",
+            "collapsed": false,
             "entries": [
               "> [!NOTE]\n> *core*\n\n#### add feature"
             ]
@@ -84,6 +85,7 @@ exit_code: 0
         "sections": [
           {
             "title": "Changed",
+            "collapsed": false,
             "entries": [
               "#### add feature"
             ]

@@ -1028,6 +1028,8 @@ pub struct ChangelogTarget {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseNotesSection {
 	pub title: String,
+	#[serde(default)]
+	pub collapsed: bool,
 	pub entries: Vec<String>,
 }
 
@@ -1055,6 +1057,33 @@ fn default_changelog_section_priority() -> i8 {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ChangelogSectionThresholds {
+	/// Collapse sections whose priority is greater than or equal to this value.
+	#[serde(default = "default_changelog_collapse_threshold")]
+	pub collapse: i8,
+	/// Omit sections whose priority is strictly greater than this value.
+	#[serde(default = "default_changelog_ignored_threshold")]
+	pub ignored: i8,
+}
+
+fn default_changelog_collapse_threshold() -> i8 {
+	i8::MAX
+}
+
+fn default_changelog_ignored_threshold() -> i8 {
+	i8::MAX
+}
+
+impl Default for ChangelogSectionThresholds {
+	fn default() -> Self {
+		Self {
+			collapse: default_changelog_collapse_threshold(),
+			ignored: default_changelog_ignored_threshold(),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangelogType {
 	/// Semver bump severity implied by this changeset type.
 	#[serde(default = "default_changelog_type_bump")]
@@ -1077,6 +1106,8 @@ pub struct ChangelogSettings {
 	pub templates: Vec<String>,
 	#[serde(default)]
 	pub sections: BTreeMap<String, ChangelogSectionDef>,
+	#[serde(default)]
+	pub section_thresholds: ChangelogSectionThresholds,
 	#[serde(default)]
 	pub types: BTreeMap<String, ChangelogType>,
 }
@@ -1303,6 +1334,7 @@ impl ChangelogSettings {
 				"- {{ summary }}".to_string(),
 			],
 			sections,
+			section_thresholds: ChangelogSectionThresholds::default(),
 			types,
 		}
 	}
@@ -2157,13 +2189,17 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 		|| document
 			.sections
 			.iter()
-			.any(|section| section.title != "Changed");
+			.any(|section| section.title != "Changed" || section.collapsed);
 	for section in &document.sections {
 		if section.entries.is_empty() {
 			continue;
 		}
 		if !lines.last().is_some_and(String::is_empty) {
 			lines.push(String::new());
+		}
+		if section.collapsed {
+			push_collapsed_release_note_section(&mut lines, section);
+			continue;
 		}
 		if include_section_headings {
 			lines.push(format!("### {}", section.title));
@@ -2189,11 +2225,26 @@ fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> Str
 		if !lines.last().is_some_and(String::is_empty) {
 			lines.push(String::new());
 		}
+		if section.collapsed {
+			push_collapsed_release_note_section(&mut lines, section);
+			continue;
+		}
 		lines.push(format!("### {}", section.title));
 		lines.push(String::new());
 		push_release_note_entries(&mut lines, &section.entries);
 	}
 	lines.join("\n")
+}
+
+fn push_collapsed_release_note_section(lines: &mut Vec<String>, section: &ReleaseNotesSection) {
+	lines.push("<details>".to_string());
+	lines.push(format!(
+		"<summary><strong>{}</strong></summary>",
+		section.title
+	));
+	lines.push(String::new());
+	push_release_note_entries(lines, &section.entries);
+	lines.push("</details>".to_string());
 }
 
 fn push_release_note_entries(lines: &mut Vec<String>, entries: &[String]) {

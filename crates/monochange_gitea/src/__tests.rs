@@ -987,6 +987,7 @@ fn sample_manifest() -> ReleaseManifest {
 				summary: vec!["Grouped release for `sdk`.".to_string()],
 				sections: vec![ReleaseNotesSection {
 					title: "Features".to_string(),
+					collapsed: false,
 					entries: vec!["add gitea publishing".to_string()],
 				}],
 			},

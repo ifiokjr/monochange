@@ -96,6 +96,10 @@ warn_on_group_mismatch = true
 # sections — Named changelog sections with heading and priority (lower = first).
 # The built-in defaults provide standard sections matching the commented example.
 #
+# section_thresholds — Optional rendering cutoffs based on section priority.
+# Use these to collapse lower-priority sections into markdown <details> blocks
+# or omit them entirely.
+#
 # types — Change type definitions mapping changeset types to section and bump severity.
 # Each type key references a section key and declares a default bump severity.
 # The built-in defaults provide standard types matching the commented example.
@@ -117,6 +121,10 @@ warn_on_group_mismatch = true
 # security = { heading = "Security", description = "Security-related changes", priority = 40 }
 # perf = { heading = "Performance", description = "Performance improvements", priority = 40 }
 # none = { heading = "None", description = "No version bump", priority = 50 }
+
+# [changelog.section_thresholds]
+# collapse = 127
+# ignored = 127
 
 # [changelog.types]
 # breaking = { section = "breaking", bump = "major" }
