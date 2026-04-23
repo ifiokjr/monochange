@@ -1447,11 +1447,11 @@ fn format_github_api_error(method: &str, path: &str, error: &octocrab::Error) ->
 			if let Some(documentation_url) = &source.documentation_url {
 				parts.push(format!("documentation: {documentation_url}"));
 			}
-			if let Some(errors) = &source.errors {
-				if !errors.is_empty() {
-					for error in errors {
-						parts.push(format!("details: {error}"));
-					}
+			if let Some(errors) = &source.errors
+				&& !errors.is_empty()
+			{
+				for error in errors {
+					parts.push(format!("details: {error}"));
 				}
 			}
 			format!("GitHub API {method} `{path}` failed: {}", parts.join("; "))

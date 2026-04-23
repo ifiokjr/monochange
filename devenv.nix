@@ -7,7 +7,7 @@
 }:
 
 let
-  extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
+  custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
 in
 {
   packages =
@@ -16,10 +16,10 @@ in
       cargo-binstall
       cargo-run-bin
       cacert
+      custom.mdt
+      custom.pnpm
       deno
       dprint
-      extra.mdt
-      extra.pnpm-standalone
       gitleaks
       hyperfine
       mdbook
@@ -294,7 +294,6 @@ in
         docs:update
         fix:monochange
         fix:format
-        publish:check
       '';
       description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
       binary = "bash";
