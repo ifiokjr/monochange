@@ -1762,6 +1762,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		no_verify: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Publish hosted releases from a prepared `monochange` release.
@@ -1812,6 +1814,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		no_verify: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
@@ -2002,13 +2006,13 @@ impl CliStepDefinition {
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
 			Self::Validate { .. } => Some(&["fix"]),
-			Self::CommitRelease { .. } => Some(&[]),
+			Self::CommitRelease { .. } => Some(&["no_verify"]),
 			Self::Discover { .. }
 			| Self::DisplayVersions { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
-			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
+			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
 			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
 				Some(&["format", "package"])
 			}
@@ -2046,15 +2050,27 @@ impl CliStepDefinition {
 					_ => None,
 				}
 			}
-			Self::CommitRelease { .. } | Self::Command { .. } => None,
+			Self::CommitRelease { .. } => {
+				match name {
+					"no_verify" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
+			Self::Command { .. } => None,
 			Self::Discover { .. }
 			| Self::DisplayVersions { .. }
 			| Self::PrepareRelease { .. }
 			| Self::PublishRelease { .. }
-			| Self::OpenReleaseRequest { .. }
 			| Self::CommentReleasedIssues { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
+					_ => None,
+				}
+			}
+			Self::OpenReleaseRequest { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"no_verify" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}

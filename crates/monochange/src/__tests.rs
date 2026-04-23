@@ -840,6 +840,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 			monochange_core::CliStepDefinition::CommitRelease {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
@@ -856,6 +857,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
@@ -4594,6 +4596,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
 			"`OpenReleaseRequest` requires a previous `PrepareRelease` step",
@@ -4734,6 +4737,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
 			"`OpenReleaseRequest` requires `[source]` configuration",
@@ -4879,6 +4883,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -6184,6 +6189,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 		steps: vec![monochange_core::CliStepDefinition::CommitRelease {
 			name: None,
 			when: None,
+			no_verify: false,
 			inputs: BTreeMap::new(),
 		}],
 	};

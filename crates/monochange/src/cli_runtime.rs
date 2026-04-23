@@ -388,9 +388,10 @@ fn build_release_request_result_for_source(
 	root: &Path,
 	request: &SourceChangeRequest,
 	tracked_paths: &[PathBuf],
+	no_verify: bool,
 ) -> MonochangeResult<String> {
 	#[rustfmt::skip]
-	let result = build_release_request_result(dry_run, request, || publish_source_change_request(source, root, request, tracked_paths));
+	let result = build_release_request_result(dry_run, request, || publish_source_change_request(source, root, request, tracked_paths, no_verify));
 	result
 }
 
@@ -684,7 +685,7 @@ pub(crate) fn execute_cli_command_with_options(
 					output = None;
 					Ok(())
 				}
-				CliStepDefinition::CommitRelease { .. } => {
+				CliStepDefinition::CommitRelease { no_verify, .. } => {
 					ensure_prepared_release_for_consumer_step(
 						root,
 						configuration,
@@ -703,13 +704,16 @@ pub(crate) fn execute_cli_command_with_options(
 						prepared_release,
 						&context.command_logs,
 					);
+					let no_verify =
+						parse_boolean_step_input(&step_inputs, "no_verify")?.unwrap_or(*no_verify);
 					#[rustfmt::skip]
-				let release_commit_report = commit_release(root, &context, configuration.source.as_ref(), &manifest)?;
+				let release_commit_report =
+					commit_release(root, &context, configuration.source.as_ref(), &manifest, no_verify)?;
 					context.release_commit_report = Some(release_commit_report);
 					output = None;
 					Ok(())
 				}
-				CliStepDefinition::OpenReleaseRequest { .. } => {
+				CliStepDefinition::OpenReleaseRequest { no_verify, .. } => {
 					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
 						MonochangeError::Config(
 							"`OpenReleaseRequest` requires a previous `PrepareRelease` step"
@@ -729,8 +733,17 @@ pub(crate) fn execute_cli_command_with_options(
 					let request = build_source_change_request(&source, &manifest);
 					let tracked_paths = tracked_release_pull_request_paths(&context, &manifest);
 					let dry_run = context.dry_run;
+					let no_verify =
+						parse_boolean_step_input(&step_inputs, "no_verify")?.unwrap_or(*no_verify);
 					#[rustfmt::skip]
-						let result = build_release_request_result_for_source(dry_run, &source, root, &request, &tracked_paths)?;
+						let result = build_release_request_result_for_source(
+						dry_run,
+						&source,
+						root,
+						&request,
+						&tracked_paths,
+						no_verify,
+					)?;
 					context.release_request_result = Some(result);
 					context.release_request = Some(request);
 					output = None;

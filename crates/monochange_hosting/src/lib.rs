@@ -395,13 +395,22 @@ pub fn git_commit_paths(
 	root: &Path,
 	message: &CommitMessage,
 	context: &str,
+	no_verify: bool,
 ) -> MonochangeResult<()> {
-	run_commit_command_allow_nothing_to_commit(git_commit_paths_command(root, message), context)
+	run_commit_command_allow_nothing_to_commit(
+		git_commit_paths_command(root, message, no_verify),
+		context,
+	)
 }
 
 /// Push the release branch to `origin` with `--force-with-lease`.
-pub fn git_push_branch(root: &Path, branch: &str, context: &str) -> MonochangeResult<()> {
-	run_command(git_push_branch_command(root, branch), context)
+pub fn git_push_branch(
+	root: &Path,
+	branch: &str,
+	context: &str,
+	no_verify: bool,
+) -> MonochangeResult<()> {
+	run_command(git_push_branch_command(root, branch, no_verify), context)
 }
 
 #[cfg(test)]

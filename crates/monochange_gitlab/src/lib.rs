@@ -407,6 +407,7 @@ pub fn publish_release_pull_request(
 	root: &Path,
 	request: &SourceChangeRequest,
 	tracked_paths: &[PathBuf],
+	no_verify: bool,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
@@ -427,6 +428,7 @@ pub fn publish_release_pull_request(
 		root,
 		&request.commit_message,
 		"commit release merge request changes",
+		no_verify,
 	)?;
 	let head_commit = git_head_commit(root)?;
 	let existing = join_existing_merge_request_lookup(existing_merge_request)?;
@@ -437,6 +439,7 @@ pub fn publish_release_pull_request(
 			root,
 			&request.head_branch,
 			"push release merge request branch",
+			no_verify,
 		)?;
 	}
 

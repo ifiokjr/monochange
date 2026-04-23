@@ -3621,6 +3621,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::new(),
 			}],
 		)],

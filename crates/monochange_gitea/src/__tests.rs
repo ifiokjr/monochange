@@ -619,8 +619,14 @@ fn publish_release_pull_request_create_branch_is_covered_without_etest() {
 	let request = build_release_pull_request_request(&source, &sample_manifest());
 
 	let outcome = with_gitea_env(Some("token"), || {
-		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
-			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		publish_release_pull_request(
+			&source,
+			&repo,
+			&request,
+			&[PathBuf::from("release.txt")],
+			false,
+		)
+		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list.assert();
@@ -665,8 +671,14 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 	request.commit_message.body = Some("release body".to_string());
 
 	let outcome = with_gitea_env(Some("token"), || {
-		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
-			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		publish_release_pull_request(
+			&source,
+			&repo,
+			&request,
+			&[PathBuf::from("release.txt")],
+			false,
+		)
+		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list.assert();
@@ -696,6 +708,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 			body: None,
 		},
 		"commit release pull request changes",
+		false,
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
@@ -727,6 +740,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 			body: None,
 		},
 		"commit release pull request changes",
+		false,
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
@@ -756,6 +770,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 			body: None,
 		},
 		"commit release pull request changes",
+		false,
 	)
 	.unwrap_or_else(|error| panic!("commit paths: {error}"));
 
@@ -912,8 +927,14 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 	);
 
 	let outcome = with_gitea_env(Some("token"), || {
-		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
-			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		publish_release_pull_request(
+			&source,
+			&repo,
+			&request,
+			&[PathBuf::from("release.txt")],
+			false,
+		)
+		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list.assert();

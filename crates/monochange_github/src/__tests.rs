@@ -1119,8 +1119,14 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 	);
 
 	let outcome = with_github_env(Some("token"), || {
-		publish_release_pull_request(&source, &repo, &request, &[PathBuf::from("release.txt")])
-			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		publish_release_pull_request(
+			&source,
+			&repo,
+			&request,
+			&[PathBuf::from("release.txt")],
+			false,
+		)
+		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list_pull_requests.assert();
@@ -1175,9 +1181,10 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 				"Prepare release.\n\n## monochange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{}\n```\n<!-- monochange:release-record:end -->".to_string(),
 			),
 		},
+		false,
 	)
 		.unwrap_or_else(|error| panic!("commit paths: {error}"));
-	git_push_branch(&repo, "monochange/release/release")
+	git_push_branch(&repo, "monochange/release/release", false)
 		.unwrap_or_else(|error| panic!("push branch: {error}"));
 
 	let branch = git_output(
@@ -1329,6 +1336,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
+		false,
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
@@ -1359,6 +1367,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
+		false,
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
@@ -1387,6 +1396,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
+		false,
 	)
 	.unwrap_or_else(|error| panic!("commit paths: {error}"));
 

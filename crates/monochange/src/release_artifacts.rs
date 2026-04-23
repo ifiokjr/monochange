@@ -1183,19 +1183,38 @@ pub(crate) fn publish_source_change_request(
 	root: &Path,
 	request: &SourceChangeRequest,
 	tracked_paths: &[PathBuf],
+	no_verify: bool,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	match source.provider {
 		#[cfg(feature = "github")]
 		SourceProvider::GitHub => {
-			github_provider::publish_release_pull_request(source, root, request, tracked_paths)
+			github_provider::publish_release_pull_request(
+				source,
+				root,
+				request,
+				tracked_paths,
+				no_verify,
+			)
 		}
 		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => {
-			gitlab_provider::publish_release_pull_request(source, root, request, tracked_paths)
+			gitlab_provider::publish_release_pull_request(
+				source,
+				root,
+				request,
+				tracked_paths,
+				no_verify,
+			)
 		}
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => {
-			gitea_provider::publish_release_pull_request(source, root, request, tracked_paths)
+			gitea_provider::publish_release_pull_request(
+				source,
+				root,
+				request,
+				tracked_paths,
+				no_verify,
+			)
 		}
 		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
 		_ => {
@@ -1269,12 +1288,13 @@ pub(crate) fn commit_release(
 	context: &CliContext,
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
+	no_verify: bool,
 ) -> MonochangeResult<CommitReleaseReport> {
 	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
 	let message = build_release_commit_message(source, manifest);
 	if !context.dry_run {
 		git_stage_paths(root, &tracked_paths)?;
-		git_commit_paths(root, &message)?;
+		git_commit_paths(root, &message, no_verify)?;
 	}
 	Ok(CommitReleaseReport {
 		subject: message.subject,
@@ -2064,6 +2084,7 @@ mod tests {
 				commit_message: build_release_commit_message(Some(&gitea), &manifest),
 			},
 			&manifest.changed_files,
+			false,
 		)
 		.err()
 		.unwrap_or_else(|| {

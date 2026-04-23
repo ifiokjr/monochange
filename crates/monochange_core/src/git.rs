@@ -48,9 +48,13 @@ pub fn git_stage_paths_command(root: &Path, tracked_paths: &[PathBuf]) -> Comman
 
 /// Build a `git commit` command for the supplied monochange commit message.
 #[must_use]
-pub fn git_commit_paths_command(root: &Path, message: &CommitMessage) -> Command {
+pub fn git_commit_paths_command(root: &Path, message: &CommitMessage, no_verify: bool) -> Command {
 	let mut command = git_command(root);
-	command.arg("commit").arg("--message").arg(&message.subject);
+	command.arg("commit");
+	if no_verify {
+		command.arg("--no-verify");
+	}
+	command.arg("--message").arg(&message.subject);
 	if let Some(body) = &message.body {
 		command.arg("--message").arg(body);
 	}
@@ -59,10 +63,13 @@ pub fn git_commit_paths_command(root: &Path, message: &CommitMessage) -> Command
 
 /// Build a force-with-lease push command for `branch`.
 #[must_use]
-pub fn git_push_branch_command(root: &Path, branch: &str) -> Command {
+pub fn git_push_branch_command(root: &Path, branch: &str, no_verify: bool) -> Command {
 	let mut command = git_command(root);
+	command.arg("push");
+	if no_verify {
+		command.arg("--no-verify");
+	}
 	command
-		.arg("push")
 		.arg("--force-with-lease")
 		.arg("origin")
 		.arg(format!("HEAD:{branch}"));

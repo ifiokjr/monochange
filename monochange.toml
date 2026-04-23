@@ -699,15 +699,18 @@ steps = [
 
 [cli.release-pr]
 help_text = "Prepare a pull request release from discovered change files. It should only be run in a github action."
-inputs = [{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" }]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+	{ name = "no_verify", type = "boolean", default = true },
+]
 steps = [
 	{ type = "PrepareRelease", name = "plan release" },
 	{ type = "Command", name = "generate cargo lockfile", command = "cargo generate-lockfile" },
 	{ type = "Command", name = "generate pnpm lockfile", command = "pnpm install --lockfile-only" },
 	{ type = "Command", name = "format changed files", command = "dprint fmt {{ changed_files }}" },
 	{ type = "Command", name = "refresh shared markdown", command = "mdt update" },
-	{ type = "CommitRelease", name = "create release commit" },
-	{ type = "OpenReleaseRequest", name = "create the pr" },
+	{ type = "CommitRelease", name = "create release commit", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}" } },
 ]
 
 [cli.publish]

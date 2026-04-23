@@ -1044,6 +1044,7 @@ pub fn publish_release_pull_request(
 	root: &Path,
 	request: &GitHubPullRequestRequest,
 	tracked_paths: &[PathBuf],
+	no_verify: bool,
 ) -> MonochangeResult<GitHubPullRequestOutcome> {
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
@@ -1051,7 +1052,7 @@ pub fn publish_release_pull_request(
 		thread::spawn(move || lookup_existing_pull_request(&lookup_source, &lookup_request));
 	git_checkout_branch(root, &request.head_branch)?;
 	git_stage_paths(root, tracked_paths)?;
-	git_commit_paths(root, &request.commit_message)?;
+	git_commit_paths(root, &request.commit_message, no_verify)?;
 	let head_commit = git_head_commit(root)?;
 	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
 	let head_matches_existing = existing
@@ -1059,7 +1060,7 @@ pub fn publish_release_pull_request(
 		.and_then(|pull_request| pull_request.head.sha.as_deref())
 		== Some(head_commit.as_str());
 	if !head_matches_existing {
-		git_push_branch(root, &request.head_branch)?;
+		git_push_branch(root, &request.head_branch, no_verify)?;
 	}
 
 	let runtime = github_runtime()?;
@@ -1592,16 +1593,16 @@ fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	}
 }
 
-fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
+fn git_commit_paths(root: &Path, message: &CommitMessage, no_verify: bool) -> MonochangeResult<()> {
 	run_commit_command_allow_nothing_to_commit(
-		git_commit_paths_command(root, message),
+		git_commit_paths_command(root, message, no_verify),
 		"commit release pull request changes",
 	)
 }
 
-fn git_push_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
+fn git_push_branch(root: &Path, branch: &str, no_verify: bool) -> MonochangeResult<()> {
 	run_command(
-		git_push_branch_command(root, branch),
+		git_push_branch_command(root, branch, no_verify),
 		"push release pull request branch",
 	)
 }

@@ -391,7 +391,7 @@ fn git_checkout_branch_command_builds_expected_arguments() {
 #[test]
 fn git_push_branch_command_builds_expected_arguments() {
 	let root = PathBuf::from("/tmp/test-repo");
-	let command = git_push_branch_command(&root, "release/v1.0.0");
+	let command = git_push_branch_command(&root, "release/v1.0.0", false);
 	let args: Vec<_> = command.get_args().collect();
 	assert_eq!(
 		args,
@@ -1002,6 +1002,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::CommitRelease {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
 			"CommitRelease",
@@ -1018,6 +1019,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
 			"OpenReleaseRequest",
@@ -1147,6 +1149,7 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 		CliStepDefinition::CommitRelease {
 			name: Some(expected.to_string()),
 			when: None,
+			no_verify: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishRelease {
@@ -1157,6 +1160,7 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 		CliStepDefinition::OpenReleaseRequest {
 			name: Some(expected.to_string()),
 			when: None,
+			no_verify: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CommentReleasedIssues {
@@ -1227,6 +1231,7 @@ fn valid_input_names_returns_empty_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
 		name: None,
 		when: None,
+		no_verify: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.valid_input_names(), Some([].as_slice()));
@@ -1391,6 +1396,7 @@ fn expected_input_kind_returns_none_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
 		name: None,
 		when: None,
+		no_verify: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.expected_input_kind("format"), None);

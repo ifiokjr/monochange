@@ -275,9 +275,13 @@ fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 }
 
 #[must_use = "the commit result must be checked"]
-pub(crate) fn git_commit_paths(root: &Path, message: &CommitMessage) -> MonochangeResult<()> {
+pub(crate) fn git_commit_paths(
+	root: &Path,
+	message: &CommitMessage,
+	no_verify: bool,
+) -> MonochangeResult<()> {
 	run_git_process(
-		git_commit_paths_command(root, message),
+		git_commit_paths_command(root, message, no_verify),
 		"failed to create release commit",
 	)
 }
