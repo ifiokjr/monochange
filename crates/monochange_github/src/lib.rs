@@ -1437,6 +1437,29 @@ fn build_github_client(token: &str, base_uri: Option<&str>) -> MonochangeResult<
 	})
 }
 
+fn format_github_api_error(method: &str, path: &str, error: &octocrab::Error) -> String {
+	match error {
+		octocrab::Error::GitHub { source, .. } => {
+			let mut parts = vec![
+				format!("status {}", source.status_code.as_u16()),
+				source.message.clone(),
+			];
+			if let Some(documentation_url) = &source.documentation_url {
+				parts.push(format!("documentation: {documentation_url}"));
+			}
+			if let Some(errors) = &source.errors {
+				if !errors.is_empty() {
+					for error in errors {
+						parts.push(format!("details: {error}"));
+					}
+				}
+			}
+			format!("GitHub API {method} `{path}` failed: {}", parts.join("; "))
+		}
+		_ => format!("GitHub API {method} `{path}` failed: {error}"),
+	}
+}
+
 async fn get_optional_json<T>(client: &Octocrab, path: &str) -> MonochangeResult<Option<T>>
 where
 	T: DeserializeOwned,
@@ -1447,8 +1470,8 @@ where
 			Ok(None)
 		}
 		Err(error) => {
-			Err(MonochangeError::Config(format!(
-				"GitHub API GET `{path}` failed: {error}"
+			Err(MonochangeError::Config(format_github_api_error(
+				"GET", path, &error,
 			)))
 		}
 	}
@@ -1461,8 +1484,8 @@ where
 	match client.get::<T, _, _>(path, None::<&()>).await {
 		Ok(value) => Ok(value),
 		Err(error) => {
-			Err(MonochangeError::Config(format!(
-				"GitHub API GET `{path}` failed: {error}"
+			Err(MonochangeError::Config(format_github_api_error(
+				"GET", path, &error,
 			)))
 		}
 	}
@@ -1477,9 +1500,10 @@ where
 	Body: Serialize + ?Sized,
 	Response: DeserializeOwned,
 {
-	client.post(path, Some(body)).await.map_err(|error| {
-		MonochangeError::Config(format!("GitHub API POST `{path}` failed: {error}"))
-	})
+	client
+		.post(path, Some(body))
+		.await
+		.map_err(|error| MonochangeError::Config(format_github_api_error("POST", path, &error)))
 }
 
 async fn patch_json<Body, Response>(
@@ -1491,9 +1515,10 @@ where
 	Body: Serialize + ?Sized,
 	Response: DeserializeOwned,
 {
-	client.patch(path, Some(body)).await.map_err(|error| {
-		MonochangeError::Config(format!("GitHub API PATCH `{path}` failed: {error}"))
-	})
+	client
+		.patch(path, Some(body))
+		.await
+		.map_err(|error| MonochangeError::Config(format_github_api_error("PATCH", path, &error)))
 }
 
 fn join_existing_pull_request_lookup(
