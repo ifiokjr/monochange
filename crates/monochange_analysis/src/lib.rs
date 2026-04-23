@@ -1332,6 +1332,9 @@ mod tests {
 		let exact_limit_file = root.join("crates/core/src/exact.rs");
 		fs::write(&exact_limit_file, "e".repeat(256 * 1024))
 			.unwrap_or_else(|error| panic!("write exact limit file: {error}"));
+		let file_named_target = root.join("crates/core/src/target");
+		fs::write(&file_named_target, "not a directory")
+			.unwrap_or_else(|error| panic!("write target file: {error}"));
 		git(&root, &["add", "."]);
 		git(&root, &["commit", "-m", "add fixture files"]);
 
@@ -1346,6 +1349,12 @@ mod tests {
 			working_files
 				.iter()
 				.any(|file| file.path == Path::new("src/medium.rs"))
+		);
+		assert!(
+			working_files
+				.iter()
+				.any(|file| file.path == Path::new("src/target")),
+			"a file named 'target' should be included in the snapshot"
 		);
 		assert_eq!(
 			read_working_tree_text(&medium_file),
