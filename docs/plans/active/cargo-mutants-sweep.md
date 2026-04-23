@@ -84,3 +84,13 @@ Run cargo-mutants across the monochange Rust workspace from the latest `main`, f
   - `get_optional_json` handling of both 404 and successful responses
   - packaging/build compatibility for `src/__tests.rs` via `include = ["src/*.rs", ...]` and `#[cfg(test)] mod __tests;`
 - `monochange_hosting` rerun result: 34 caught, 43 unviable, 0 missed.
+- Completed focused pass on `monochange_analysis`.
+- Added mutation-killing coverage for:
+  - `latest_workspace_release_tag` filtering of namespaced tags
+  - `snapshot_files_from_working_tree` including exact-size (256KB) and medium files
+  - `snapshot_files_from_working_tree` preserving files named like skip-list directories (e.g. `target`)
+  - `detect_raw_pr_environment` rejecting non-PR GitHub events and Travis `false` PRs
+  - `default_branch_name` following origin HEAD symbolic reference
+  - `get_merge_base` returning actual merge base commits
+  - `ChangeFrame::changed_files` distinguishing WorkingDirectory from StagedOnly
+- `monochange_analysis` rerun result: 0 missed (was 17).
