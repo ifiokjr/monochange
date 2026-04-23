@@ -275,6 +275,7 @@ mod git_support;
 mod hosted_sources;
 mod interactive;
 mod lint;
+mod lint_check_reporter;
 mod mcp;
 mod package_publish;
 mod prepared_release_cache;

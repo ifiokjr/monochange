@@ -19,6 +19,7 @@ use monochange_core::WorkspaceConfiguration;
 use monochange_core::lint::LintContext;
 use monochange_core::lint::LintFix;
 use monochange_core::lint::LintPreset;
+use monochange_core::lint::LintProgressReporter;
 use monochange_core::lint::LintReport;
 use monochange_core::lint::LintRule;
 use monochange_core::lint::LintRuleConfig;
@@ -27,6 +28,7 @@ use monochange_core::lint::LintSelector;
 use monochange_core::lint::LintSeverity;
 use monochange_core::lint::LintSuite;
 use monochange_core::lint::LintTarget;
+use monochange_core::lint::NoopLintProgressReporter;
 use monochange_core::lint::WorkspaceLintSettings;
 
 /// Optional filters applied when running the linter.
@@ -176,11 +178,25 @@ impl Linter {
 		&self,
 		workspace_root: &Path,
 		configuration: &WorkspaceConfiguration,
+		reporter: &dyn LintProgressReporter,
 	) -> LintReport {
 		let mut report = LintReport::new();
 		self.warn_for_missing_presets(&mut report);
 		let gitignore_filter =
 			(!self.settings.disable_gitignore).then(|| build_gitignore_filter(workspace_root));
+
+		let active_suites: Vec<&str> = self
+			.registry
+			.suites
+			.keys()
+			.filter(|suite_id| self.selection.allows_suite(suite_id))
+			.map(String::as_str)
+			.collect();
+		reporter.planning_started(&active_suites);
+
+		let mut total_files = 0usize;
+		let mut total_rules = 0usize;
+		let mut suite_targets: Vec<(String, Vec<LintTarget>)> = Vec::new();
 
 		for (suite_id, suite) in &self.registry.suites {
 			if !self.selection.allows_suite(suite_id) {
@@ -197,14 +213,46 @@ impl Linter {
 				}
 			};
 
-			for target in &targets {
+			let applicable_rules = suite
+				.rules()
+				.iter()
+				.filter(|rule| self.selection.allows_rule(&rule.rule().id))
+				.count();
+
+			total_files += targets.len();
+			total_rules += applicable_rules * targets.len();
+			suite_targets.push((suite_id.clone(), targets));
+		}
+
+		reporter.planning_finished(total_files, total_rules);
+
+		for (suite_id, targets) in &suite_targets {
+			let fallback = LintTarget {
+				workspace_root: workspace_root.to_path_buf(),
+				manifest_path: workspace_root.join("Cargo.toml"),
+				contents: String::new(),
+				metadata: monochange_core::lint::LintTargetMetadata::default(),
+				parsed: Box::new(()),
+			};
+			let any_target = targets.first().unwrap_or(&fallback);
+			let applicable_rules = self.registry.rules.applicable_rules(any_target);
+			reporter.suite_started(suite_id, targets.len(), applicable_rules.len());
+
+			let mut suite_result_count = 0usize;
+			let mut suite_fixable = 0usize;
+
+			for target in targets {
 				if !self.target_is_included(target, gitignore_filter.as_ref()) {
 					continue;
 				}
 
-				let target_report = self.lint_target(target);
+				let target_report = self.lint_target_with_reporter(target, reporter);
+				suite_result_count += target_report.results.len();
+				suite_fixable += target_report.autofixable().len();
 				report.merge(target_report);
 			}
+
+			reporter.suite_finished(suite_id, suite_result_count, suite_fixable);
 		}
 
 		report
@@ -234,12 +282,18 @@ impl Linter {
 		fixed_files
 	}
 
-	fn lint_target(&self, target: &LintTarget) -> LintReport {
+	fn lint_target_with_reporter(
+		&self,
+		target: &LintTarget,
+		reporter: &dyn LintProgressReporter,
+	) -> LintReport {
 		let mut report = LintReport::new();
 		let applicable_rules = self.registry.rules.applicable_rules(target);
 		if applicable_rules.is_empty() {
 			return report;
 		}
+
+		reporter.file_started(&target.manifest_path, applicable_rules.len());
 
 		for rule in applicable_rules {
 			let rule_id = rule.rule().id.as_str();
@@ -262,13 +316,26 @@ impl Linter {
 				parsed: target.parsed.as_ref(),
 			};
 
+			reporter.file_rule_started(&target.manifest_path, rule_id);
+			let mut rule_results = Vec::new();
 			for mut result in rule.run(&ctx, &config) {
 				result.severity = config.severity();
+				rule_results.push(result);
+			}
+			reporter.file_rule_finished(&target.manifest_path, rule_id, rule_results.len());
+			for result in rule_results {
 				report.add(result);
 			}
 		}
 
+		reporter.file_finished(&target.manifest_path, report.results.len());
 		report
+	}
+
+	/// Lint a single target without progress reporting (convenience).
+	#[allow(dead_code)]
+	fn lint_target(&self, target: &LintTarget) -> LintReport {
+		self.lint_target_with_reporter(target, &NoopLintProgressReporter)
 	}
 
 	fn resolve_rule_config(&self, target: &LintTarget, rule_id: &str) -> Option<LintRuleConfig> {
@@ -672,7 +739,7 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
-		let report = linter.lint_workspace(root.path(), &configuration);
+		let report = linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert_eq!(report.error_count, 1);
 		assert_eq!(report.results.len(), 1);
 	}
@@ -704,7 +771,7 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
-		let report = linter.lint_workspace(root.path(), &configuration);
+		let report = linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(report.results.is_empty());
 	}
 
@@ -717,7 +784,7 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
-		let report = linter.lint_workspace(root.path(), &configuration);
+		let report = linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(
 			report
 				.warnings
@@ -737,7 +804,7 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
-		let report = linter.lint_workspace(root.path(), &configuration);
+		let report = linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(report.results.is_empty());
 	}
 
@@ -753,7 +820,7 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
-		let report = linter.lint_workspace(root.path(), &configuration);
+		let report = linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert_eq!(report.error_count, 1);
 	}
 
@@ -767,7 +834,7 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let include_report = Linter::new(vec![Box::new(ExampleSuite)], include_filtered)
-			.lint_workspace(root.path(), &configuration);
+			.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(include_report.results.is_empty());
 
 		let exclude_filtered = WorkspaceLintSettings {
@@ -776,7 +843,7 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let exclude_report = Linter::new(vec![Box::new(ExampleSuite)], exclude_filtered)
-			.lint_workspace(root.path(), &configuration);
+			.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(exclude_report.results.is_empty());
 	}
 
@@ -790,12 +857,14 @@ mod tests {
 		};
 		let suite_filtered = Linter::new(vec![Box::new(ExampleSuite)], settings.clone())
 			.with_selection(LintSelection::all().with_suites(["other"]));
-		let suite_report = suite_filtered.lint_workspace(root.path(), &configuration);
+		let suite_report =
+			suite_filtered.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(suite_report.results.is_empty());
 
 		let rule_filtered = Linter::new(vec![Box::new(ExampleSuite)], settings)
 			.with_selection(LintSelection::all().with_rules(["other/rule"]));
-		let rule_report = rule_filtered.lint_workspace(root.path(), &configuration);
+		let rule_report =
+			rule_filtered.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(rule_report.results.is_empty());
 	}
 
@@ -846,7 +915,7 @@ mod tests {
 			vec![Box::new(FailingSuite)],
 			WorkspaceLintSettings::default(),
 		);
-		let report = linter.lint_workspace(root.path(), &configuration);
+		let report = linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(
 			report
 				.warnings
@@ -985,14 +1054,15 @@ mod tests {
 			..WorkspaceLintSettings::default()
 		};
 		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
-		let report = linter.lint_workspace(root.path(), &configuration);
+		let report = linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert_eq!(report.error_count, 1);
 
 		let empty_linter = Linter::new(
 			vec![Box::new(EmptyTargetSuite)],
 			WorkspaceLintSettings::default(),
 		);
-		let empty_report = empty_linter.lint_workspace(root.path(), &configuration);
+		let empty_report =
+			empty_linter.lint_workspace(root.path(), &configuration, &NoopLintProgressReporter);
 		assert!(empty_report.results.is_empty());
 	}
 

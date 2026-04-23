@@ -5,12 +5,14 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::Path;
+use std::path::PathBuf;
 
 use clap::ArgMatches;
 use monochange_config::load_workspace_configuration;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::lint::LintPreset;
+use monochange_core::lint::LintProgressReporter;
 use monochange_core::lint::LintReport;
 use monochange_core::lint::LintRule;
 use monochange_core::lint::LintSeverity;
@@ -98,10 +100,30 @@ pub(crate) fn run_check_command(
 		.with_suites(ecosystems.iter().cloned())
 		.with_rules(only_rules.iter().cloned());
 	let linter = build_linter(&configuration, selection);
-	let report = linter.lint_workspace(root, &configuration);
 
+	let show_progress = matches!(format, OutputFormat::Text | OutputFormat::Markdown);
+	let reporter = if show_progress {
+		Some(crate::lint_check_reporter::HumanLintProgressReporter::new())
+	} else {
+		None
+	};
+
+	let report = if let Some(ref r) = reporter {
+		linter.lint_workspace(root, &configuration, r)
+	} else {
+		linter.lint_workspace(
+			root,
+			&configuration,
+			&monochange_core::lint::NoopLintProgressReporter,
+		)
+	};
+
+	let mut fixed_files: Vec<(PathBuf, String)> = Vec::new();
 	if fix {
 		let fixes = linter.apply_fixes(&report);
+		if let Some(ref r) = reporter {
+			r.fix_started(fixes.len());
+		}
 		for (file_path, fixed_content) in fixes {
 			std::fs::write(&file_path, fixed_content).map_err(|error| {
 				MonochangeError::Io(format!(
@@ -110,10 +132,33 @@ pub(crate) fn run_check_command(
 					error
 				))
 			})?;
+			if let Some(ref r) = reporter {
+				let description = report
+					.autofixable()
+					.iter()
+					.find(|res| res.location.file_path == file_path)
+					.and_then(|res| res.fix.as_ref())
+					.map_or("fixed", |f| f.description.as_str());
+				fixed_files.push((file_path.clone(), description.to_string()));
+				r.fix_applied(&file_path, description);
+			}
+		}
+		if let Some(ref r) = reporter {
+			r.fix_finished(fixed_files.len());
 		}
 	}
 
 	let lint_has_errors = report.has_errors();
+	if let Some(r) = reporter {
+		r.summary(
+			report.error_count,
+			report.warning_count,
+			report.autofixable().len(),
+			fix,
+		);
+		r.finish();
+	}
+
 	match format {
 		OutputFormat::Json => {
 			Ok(serde_json::to_string_pretty(&report)
@@ -136,7 +181,11 @@ pub(crate) fn run_check_command(
 pub(crate) fn run_lint_step(root: &Path, fix: bool) -> MonochangeResult<(String, bool)> {
 	let configuration = load_workspace_configuration(root)?;
 	let linter = build_linter(&configuration, LintSelection::all());
-	let report = linter.lint_workspace(root, &configuration);
+	let report = linter.lint_workspace(
+		root,
+		&configuration,
+		&monochange_core::lint::NoopLintProgressReporter,
+	);
 	let has_errors = report.has_errors();
 
 	if fix {
