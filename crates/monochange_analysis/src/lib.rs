@@ -1237,6 +1237,30 @@ mod tests {
 	}
 
 	#[test]
+	fn latest_workspace_release_tag_ignores_higher_namespaced_tags() {
+		let repo = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = repo.path();
+		copy_directory(&fixture_path("analysis/release-trajectory/release"), root);
+		git(root, &["init"]);
+		git(root, &["config", "user.name", "monochange-tests"]);
+		git(
+			root,
+			&["config", "user.email", "monochange-tests@example.com"],
+		);
+		git(root, &["add", "."]);
+		git(root, &["commit", "-m", "release"]);
+		git(root, &["branch", "-M", "main"]);
+		git(root, &["tag", "v9.9.9/namespace"]);
+		git(root, &["tag", "v1.2.3"]);
+
+		assert_eq!(
+			latest_workspace_release_tag(root)
+				.unwrap_or_else(|error| panic!("latest workspace tag: {error}")),
+			"v1.2.3"
+		);
+	}
+
+	#[test]
 	fn auto_release_trajectory_resolution_uses_latest_workspace_tag_and_branch_refs() {
 		let release = fixture_path("analysis/release-trajectory/release");
 		let main = fixture_path("analysis/release-trajectory/main");
@@ -1302,12 +1326,40 @@ mod tests {
 		fs::write(&large_file, "a".repeat(300_000))
 			.unwrap_or_else(|error| panic!("write large file: {error}"));
 
+		let medium_file = root.join("crates/core/src/medium.rs");
+		fs::write(&medium_file, "m".repeat(2_000))
+			.unwrap_or_else(|error| panic!("write medium file: {error}"));
+		let exact_limit_file = root.join("crates/core/src/exact.rs");
+		fs::write(&exact_limit_file, "e".repeat(256 * 1024))
+			.unwrap_or_else(|error| panic!("write exact limit file: {error}"));
+		git(&root, &["add", "."]);
+		git(&root, &["commit", "-m", "add fixture files"]);
+
 		let working_files = snapshot_files_from_working_tree(&root, package_root)
 			.unwrap_or_else(|error| panic!("working tree snapshot: {error}"));
 		assert!(
 			!working_files
 				.iter()
 				.any(|file| file.path == Path::new("src/large.rs"))
+		);
+		assert!(
+			working_files
+				.iter()
+				.any(|file| file.path == Path::new("src/medium.rs"))
+		);
+		assert_eq!(
+			read_working_tree_text(&medium_file),
+			Some("m".repeat(2_000))
+		);
+		assert_eq!(
+			read_text_file_from_git_object(&root, "HEAD:crates/core/src/medium.rs")
+				.unwrap_or_else(|error| panic!("read medium git object: {error}")),
+			Some("m".repeat(2_000))
+		);
+		assert_eq!(
+			read_text_file_from_git_object(&root, "HEAD:crates/core/src/exact.rs")
+				.unwrap_or_else(|error| panic!("read exact-size git object: {error}")),
+			Some("e".repeat(256 * 1024))
 		);
 
 		let merge_base_error = git_merge_base(&root, "main", "missing-branch")
