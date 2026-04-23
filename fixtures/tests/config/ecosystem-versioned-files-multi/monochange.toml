@@ -1,0 +1,20 @@
+[ecosystems.cargo]
+versioned_files = ["Cargo.toml"]
+
+[ecosystems.deno]
+versioned_files = ["deno.json"]
+
+[ecosystems.dart]
+versioned_files = ["pubspec.yaml"]
+
+[package.rust]
+path = "crates/rust"
+type = "cargo"
+
+[package.edge]
+path = "packages/edge"
+type = "deno"
+
+[package.app]
+path = "packages/app"
+type = "dart"

@@ -2329,6 +2329,7 @@ dependencies = [
 name = "monochange_hosting"
 version = "0.2.0"
 dependencies = [
+ "httpmock",
  "monochange_core",
  "reqwest",
  "serde",

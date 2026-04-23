@@ -4,7 +4,7 @@ version = { workspace = true }
 categories = { workspace = true }
 documentation = "https://docs.rs/monochange_hosting"
 edition = { workspace = true }
-include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+include = ["src/*.rs", "src/**/*.rs", "Cargo.toml", "readme.md"]
 keywords = ["hosting", "releases", "versioning", "monorepo"]
 license = { workspace = true }
 readme = "readme.md"
@@ -16,6 +16,9 @@ description = "Shared hosting utilities for monochange source providers"
 monochange_core = { workspace = true }
 reqwest = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
+
+[dev-dependencies]
+httpmock = { workspace = true }
 
 [lints]
 workspace = true

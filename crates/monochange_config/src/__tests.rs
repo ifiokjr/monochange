@@ -990,6 +990,47 @@ fn load_workspace_configuration_inherits_ecosystem_versioned_files_unless_packag
 }
 
 #[test]
+fn load_workspace_configuration_inherits_ecosystem_versioned_files_for_cargo_deno_and_dart() {
+	let root = fixture_path("config/ecosystem-versioned-files-multi");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let rust = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "rust")
+		.unwrap_or_else(|| panic!("expected rust package"));
+	let edge = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "edge")
+		.unwrap_or_else(|| panic!("expected edge package"));
+	let app = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "app")
+		.unwrap_or_else(|| panic!("expected app package"));
+
+	assert_eq!(
+		rust.versioned_files
+			.first()
+			.map(|definition| definition.path.as_str()),
+		Some("Cargo.toml")
+	);
+	assert_eq!(
+		edge.versioned_files
+			.first()
+			.map(|definition| definition.path.as_str()),
+		Some("deno.json")
+	);
+	assert_eq!(
+		app.versioned_files
+			.first()
+			.map(|definition| definition.path.as_str()),
+		Some("pubspec.yaml")
+	);
+}
+
+#[test]
 fn load_workspace_configuration_parses_ecosystem_lockfile_commands() {
 	let root = fixture_path("config/lockfile-commands");
 	let configuration = load_workspace_configuration(&root)
@@ -1505,6 +1546,23 @@ fn validate_configured_change_type_accepts_known_type() {
 		"security",
 	)
 	.unwrap_or_else(|error| panic!("validate type: {error}"));
+}
+
+#[test]
+fn validate_configured_change_type_rejects_package_excluded_type() {
+	let root = fixture_path("changelog-formats/excluded-changelog-types");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let error = crate::validate_configured_change_type(
+		&configuration,
+		Path::new("change.md"),
+		"core",
+		"test",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid type error"));
+	assert!(error.to_string().contains("invalid type `test`"));
+	assert!(error.to_string().contains("valid types: feat, fix"));
 }
 
 #[test]
@@ -2685,11 +2743,89 @@ fn load_change_signals_infers_group_bump_from_member_explicit_version() {
 }
 
 #[test]
+fn load_change_signals_uses_highest_group_member_version_for_explicit_group_bump() {
+	let root = fixture_path("config/change-signals-group-explicit-max");
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			root.join("crates/core/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"app",
+			root.join("crates/app/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(2, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let changeset = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| panic!("changeset file: {error}"));
+
+	let target = changeset
+		.targets
+		.first()
+		.unwrap_or_else(|| panic!("expected target"));
+	assert_eq!(target.bump, Some(BumpSeverity::Minor));
+	assert_eq!(target.explicit_version, Some(Version::new(2, 1, 0)));
+}
+
+#[test]
+fn load_change_signals_keeps_highest_group_member_version_when_members_descend() {
+	let root = fixture_path("config/change-signals-group-explicit-desc");
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			root.join("crates/core/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"app",
+			root.join("crates/app/Cargo.toml"),
+			root.clone(),
+			Some(Version::new(2, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let changeset = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| panic!("changeset file: {error}"));
+
+	let target = changeset
+		.targets
+		.first()
+		.unwrap_or_else(|| panic!("expected target"));
+	assert_eq!(target.bump, Some(BumpSeverity::Minor));
+	assert_eq!(target.explicit_version, Some(Version::new(2, 1, 0)));
+}
+
+#[test]
 fn load_workspace_configuration_accepts_detailed_and_enabled_true_changelog_in_defaults() {
 	let root = fixture_path("config/defaults-changelog-enabled-true");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert!(!configuration.packages.is_empty());
+	assert_eq!(
+		configuration.defaults.changelog,
+		Some(ChangelogDefinition::PackageDefault)
+	);
 }
 
 #[test]
@@ -2698,6 +2834,10 @@ fn load_workspace_configuration_accepts_detailed_changelog_disabled_in_defaults(
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert!(!configuration.packages.is_empty());
+	assert_eq!(
+		configuration.defaults.changelog,
+		Some(ChangelogDefinition::Disabled)
+	);
 }
 
 #[test]
@@ -2706,6 +2846,10 @@ fn load_workspace_configuration_accepts_detailed_changelog_enabled_with_no_path_
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert!(!configuration.packages.is_empty());
+	assert_eq!(
+		configuration.defaults.changelog,
+		Some(ChangelogDefinition::PackageDefault)
+	);
 }
 
 fn package_definition(id: &str, path: &str) -> monochange_core::PackageDefinition {
@@ -4816,5 +4960,56 @@ proptest! {
 		let twice = render_changelog_path_template(&once, path);
 
 		prop_assert_eq!(once, twice);
+	}
+
+	#[test]
+	fn infer_bump_from_versions_returns_major_when_major_increases(
+		current_major in 0u64..20,
+		current_minor in 0u64..20,
+		current_patch in 0u64..20,
+		next_major_delta in 1u64..5,
+	) {
+		let current = Version::new(current_major, current_minor, current_patch);
+		let explicit = Version::new(
+			current_major + next_major_delta,
+			current_minor,
+			current_patch,
+		);
+
+		prop_assert_eq!(crate::infer_bump_from_versions(&current, &explicit), BumpSeverity::Major);
+	}
+
+	#[test]
+	fn infer_bump_from_versions_returns_minor_when_minor_increases(
+		current_major in 0u64..20,
+		current_minor in 0u64..20,
+		current_patch in 0u64..20,
+		next_minor_delta in 1u64..5,
+	) {
+		let current = Version::new(current_major, current_minor, current_patch);
+		let explicit = Version::new(
+			current_major,
+			current_minor + next_minor_delta,
+			current_patch,
+		);
+
+		prop_assert_eq!(crate::infer_bump_from_versions(&current, &explicit), BumpSeverity::Minor);
+	}
+
+	#[test]
+	fn infer_bump_from_versions_returns_patch_when_only_patch_increases(
+		current_major in 0u64..20,
+		current_minor in 0u64..20,
+		current_patch in 0u64..20,
+		next_patch_delta in 1u64..5,
+	) {
+		let current = Version::new(current_major, current_minor, current_patch);
+		let explicit = Version::new(
+			current_major,
+			current_minor,
+			current_patch + next_patch_delta,
+		);
+
+		prop_assert_eq!(crate::infer_bump_from_versions(&current, &explicit), BumpSeverity::Patch);
 	}
 }
