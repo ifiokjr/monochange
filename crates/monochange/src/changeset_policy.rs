@@ -85,6 +85,15 @@ pub fn affected_packages(
 		.iter()
 		.filter(|path| !is_changeset_markdown_path(path))
 	{
+		if path_matches_any_configured_changelog(
+			path,
+			&configuration.packages,
+			&configuration.groups,
+		) {
+			ignored_paths.push(path.clone());
+			continue;
+		}
+
 		let mut matched_any_package = false;
 		let mut ignored_by_package = false;
 		for package in &configuration.packages {
@@ -300,6 +309,28 @@ fn path_touches_package(path: &str, package: &monochange_core::PackageDefinition
 fn path_is_ignored_for_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
 	path_is_within_package(path, package)
 		&& matches_any_package_pattern(path, package, &package.ignored_paths)
+}
+
+fn path_matches_any_configured_changelog(
+	path: &str,
+	packages: &[monochange_core::PackageDefinition],
+	groups: &[monochange_core::GroupDefinition],
+) -> bool {
+	packages.iter().any(|package| {
+		package
+			.changelog
+			.as_ref()
+			.is_some_and(|target| path_matches_changelog_target(path, &target.path))
+	}) || groups.iter().any(|group| {
+		group
+			.changelog
+			.as_ref()
+			.is_some_and(|target| path_matches_changelog_target(path, &target.path))
+	})
+}
+
+fn path_matches_changelog_target(path: &str, changelog_path: &Path) -> bool {
+	normalize_changed_path(&changelog_path.to_string_lossy()) == path
 }
 
 fn path_is_within_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
