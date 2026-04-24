@@ -18,6 +18,14 @@ function createSandbox() {
 
 function createRoot(root) {
 	mkdirSync(join(root, "bin"), { recursive: true });
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify({
+			name: "monochange-bin-test",
+			private: true,
+			type: "commonjs",
+		}),
+	);
 	cpSync(launcherPath, join(root, "bin", "monochange.js"));
 }
 

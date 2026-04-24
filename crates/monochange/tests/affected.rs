@@ -27,6 +27,10 @@ use test_support::snapshot_settings;
 	"affected/ignored-paths",
 	&["--changed-paths", "crates/core/tests/smoke.rs"]
 )]
+#[case::ignores_configured_package_changelog_paths(
+	"affected/changelog-paths",
+	&["--changed-paths", "crates/core/changelog.md"]
+)]
 #[case::respects_package_additional_paths(
 	"affected/additional-paths",
 	&["--changed-paths", "Cargo.lock"]

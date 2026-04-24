@@ -218,16 +218,55 @@ fn append_changelog_section(path: &Path, section: &str) -> MonochangeResult<Stri
 		String::new()
 	};
 
-	let mut content = current.trim_end().to_string();
+	let current = current.trim_end();
+	if current.is_empty() {
+		return Ok(format!("{section}\n"));
+	}
 
-	if !content.is_empty() {
+	let Some(offset) = current
+		.lines()
+		.scan(0usize, |start, line| {
+			let offset = *start;
+			*start += line.len() + 1;
+			Some((offset, line))
+		})
+		.find_map(|(offset, line)| is_release_heading(line).then_some(offset))
+	else {
+		return Ok(format!("{current}\n\n{section}\n"));
+	};
+
+	let prefix = current[..offset].trim_end();
+	let suffix = current[offset..].trim_start();
+	let mut content = String::new();
+
+	if !prefix.is_empty() {
+		content.push_str(prefix);
 		content.push_str("\n\n");
 	}
 
 	content.push_str(section);
 	content.push('\n');
 
+	if !suffix.is_empty() {
+		content.push('\n');
+		content.push_str(suffix);
+		content.push('\n');
+	}
+
 	Ok(content)
+}
+
+fn is_release_heading(line: &str) -> bool {
+	let Some(heading) = line.strip_prefix("## ") else {
+		return false;
+	};
+
+	let heading = heading.trim_start();
+	heading.starts_with('[')
+		|| heading
+			.chars()
+			.next()
+			.is_some_and(|character| character.is_ascii_digit())
 }
 
 fn dedup_changelog_updates(updates: Vec<ChangelogUpdate>) -> Vec<ChangelogUpdate> {
@@ -1327,7 +1366,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("append second changelog section: {error}"));
 		assert_eq!(
 			appended,
-			"# Changelog\n\n## 0.9.0\n- older\n\n## 1.0.0\n- latest\n"
+			"# Changelog\n\n## 1.0.0\n- latest\n\n## 0.9.0\n- older\n"
 		);
 
 		let earlier = ChangelogUpdate {

@@ -1,0 +1,26 @@
+---
+source: crates/monochange/tests/affected.rs
+assertion_line: 111
+expression: output
+---
+{
+  "affectedPackageIds": [],
+  "changedPaths": [
+    "crates/core/changelog.md"
+  ],
+  "changesetPaths": [],
+  "comment": null,
+  "coveredPackageIds": [],
+  "enforce": false,
+  "errors": [],
+  "ignoredPaths": [
+    "crates/core/changelog.md"
+  ],
+  "labels": [],
+  "matchedPaths": [],
+  "matchedSkipLabels": [],
+  "required": false,
+  "status": "not_required",
+  "summary": "changeset verification passed: no configured packages were affected by the changed files",
+  "uncoveredPackageIds": []
+}

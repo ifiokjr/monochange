@@ -1,0 +1,35 @@
+[defaults]
+package_type = "cargo"
+
+[defaults.changelog]
+path = "{{ path }}/changelog.md"
+format = "keep_a_changelog"
+
+[changesets.verify]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+
+[package.core]
+path = "crates/core"
+
+[cli.affected]
+[[cli.affected.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+[[cli.affected.inputs]]
+name = "changed_paths"
+type = "string_list"
+[[cli.affected.inputs]]
+name = "since"
+type = "string"
+[[cli.affected.inputs]]
+name = "verify"
+type = "boolean"
+[[cli.affected.inputs]]
+name = "label"
+type = "string_list"
+[[cli.affected.steps]]
+type = "AffectedPackages"

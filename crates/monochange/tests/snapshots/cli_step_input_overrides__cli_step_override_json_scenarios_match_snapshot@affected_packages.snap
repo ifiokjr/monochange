@@ -1,11 +1,10 @@
 ---
 source: crates/monochange/tests/cli_step_input_overrides.rs
+assertion_line: 45
 expression: json
 ---
 {
-  "affectedPackageIds": [
-    "core"
-  ],
+  "affectedPackageIds": [],
   "changedPaths": [
     "crates/core/CHANGELOG.md"
   ],
@@ -14,20 +13,18 @@ expression: json
   "coveredPackageIds": [],
   "enforce": true,
   "errors": [],
-  "ignoredPaths": [],
+  "ignoredPaths": [
+    "crates/core/CHANGELOG.md"
+  ],
   "labels": [
     "no-changeset-required"
   ],
-  "matchedPaths": [
-    "crates/core/CHANGELOG.md"
-  ],
+  "matchedPaths": [],
   "matchedSkipLabels": [
     "no-changeset-required"
   ],
   "required": false,
   "status": "skipped",
   "summary": "changeset verification skipped because the change has an allowed label: no-changeset-required",
-  "uncoveredPackageIds": [
-    "core"
-  ]
+  "uncoveredPackageIds": []
 }
