@@ -649,10 +649,10 @@ mod tests {
 	#[test]
 	fn run_check_command_applies_fixes_without_progress_reporter() {
 		let tempdir = readonly_fix_workspace();
-		run_check_command(tempdir.path(), true, &[], &[], OutputFormat::Json).unwrap_or_else(
-			|error| {
-				panic!("expected fixable lint workspace to succeed without a reporter: {error}")
-			},
+		let result = run_check_command(tempdir.path(), true, &[], &[], OutputFormat::Json);
+		assert!(
+			result.is_ok(),
+			"expected fixable lint workspace to succeed without a reporter: {result:?}"
 		);
 
 		let manifest = fs::read_to_string(tempdir.path().join("crates/example/Cargo.toml"))

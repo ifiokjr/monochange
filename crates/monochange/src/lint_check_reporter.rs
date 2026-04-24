@@ -342,12 +342,11 @@ mod tests {
 		reporter.fix_finished(2);
 
 		let files = reporter.fixed_files.lock().unwrap();
-		let first = files
-			.first()
-			.unwrap_or_else(|| panic!("expected the first fixed file"));
-		let second = files
-			.get(1)
-			.unwrap_or_else(|| panic!("expected the second fixed file"));
+		assert_eq!(files.len(), 2);
+		let mut files = files.iter();
+		let first = files.next().unwrap();
+		let second = files.next().unwrap();
+		assert!(files.next().is_none());
 		assert_eq!(first.0, PathBuf::from("a.toml"));
 		assert_eq!(first.1, "Sorted");
 		assert_eq!(second.0, PathBuf::from("b.toml"));
@@ -355,17 +354,19 @@ mod tests {
 	}
 
 	#[test]
-	#[should_panic(expected = "expected exactly two fixed files")]
-	fn reporter_fix_applied_panics_when_file_count_mismatches() {
+	fn reporter_fix_applied_tracks_single_file() {
 		let reporter = reporter();
 		reporter.fix_started(1);
 		reporter.fix_applied(Path::new("a.toml"), "Sorted");
+		reporter.fix_finished(1);
 
 		let files = reporter.fixed_files.lock().unwrap();
-		let [(first_path, first_reason), (second_path, second_reason)] = files.as_slice() else {
-			panic!("expected exactly two fixed files");
-		};
-		let _ = (first_path, first_reason, second_path, second_reason);
+		assert_eq!(files.len(), 1);
+		let first = files
+			.first()
+			.unwrap_or_else(|| panic!("expected the first fixed file"));
+		assert_eq!(first.0, PathBuf::from("a.toml"));
+		assert_eq!(first.1, "Sorted");
 	}
 
 	#[test]
