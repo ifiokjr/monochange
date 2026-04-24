@@ -417,13 +417,38 @@ pub fn git_push_branch(
 mod tests {
 	use std::path::PathBuf;
 
+	use httpmock::Method::GET;
+	use httpmock::Method::PATCH;
+	use httpmock::Method::POST;
+	use httpmock::Method::PUT;
+	use httpmock::MockServer;
 	use monochange_core::ReleaseManifest;
+	use monochange_core::ReleaseManifestChangelog;
 	use monochange_core::ReleaseManifestPlan;
 	use monochange_core::ReleaseManifestTarget;
+	use monochange_core::ReleaseNotesDocument;
+	use monochange_core::ReleaseNotesSection;
 	use monochange_core::ReleaseOwnerKind;
 	use monochange_core::VersionFormat;
+	use reqwest::header::HeaderMap;
+	use serde::Deserialize;
+	use serde::Serialize;
 
 	use super::*;
+
+	#[derive(Debug, Serialize)]
+	struct SampleBody {
+		name: String,
+	}
+
+	#[derive(Debug, Deserialize, Eq, PartialEq)]
+	struct SampleResponse {
+		ok: bool,
+	}
+
+	fn empty_headers() -> HeaderMap {
+		HeaderMap::new()
+	}
 
 	fn sample_manifest() -> ReleaseManifest {
 		ReleaseManifest {
@@ -654,6 +679,51 @@ mod tests {
 	}
 
 	#[test]
+	fn release_pull_request_body_ignores_changelogs_without_exact_owner_match() {
+		let mut manifest = sample_manifest();
+		manifest.release_targets = vec![minimal_target("core")];
+		manifest.changelogs = vec![
+			ReleaseManifestChangelog {
+				owner_id: "other".to_string(),
+				owner_kind: ReleaseOwnerKind::Package,
+				path: PathBuf::from("other.md"),
+				format: monochange_core::ChangelogFormat::Monochange,
+				notes: ReleaseNotesDocument {
+					title: "0.1.0".to_string(),
+					summary: vec![],
+					sections: vec![ReleaseNotesSection {
+						title: "Wrong".to_string(),
+						collapsed: false,
+						entries: vec!["wrong package".to_string()],
+					}],
+				},
+				rendered: "wrong package changelog".to_string(),
+			},
+			ReleaseManifestChangelog {
+				owner_id: "core".to_string(),
+				owner_kind: ReleaseOwnerKind::Group,
+				path: PathBuf::from("group.md"),
+				format: monochange_core::ChangelogFormat::Monochange,
+				notes: ReleaseNotesDocument {
+					title: "0.1.0".to_string(),
+					summary: vec![],
+					sections: vec![ReleaseNotesSection {
+						title: "Wrong kind".to_string(),
+						collapsed: false,
+						entries: vec!["wrong owner kind".to_string()],
+					}],
+				},
+				rendered: "wrong kind changelog".to_string(),
+			},
+		];
+
+		let body = release_pull_request_body(&manifest);
+		assert!(!body.contains("wrong package changelog"));
+		assert!(!body.contains("wrong kind changelog"));
+		assert!(body.contains(&minimal_release_body(&manifest, &minimal_target("core"))));
+	}
+
+	#[test]
 	fn minimal_release_body_with_decision_reasons() {
 		let manifest = ReleaseManifest {
 			command: "release".to_string(),
@@ -798,4 +868,178 @@ mod tests {
 		assert!(body.is_some());
 		assert!(body.unwrap().contains("core"));
 	}
+
+	#[test]
+	fn release_body_falls_back_to_minimal_when_only_non_matching_changelog_exists() {
+		use monochange_core::ProviderBotSettings;
+		use monochange_core::ProviderMergeRequestSettings;
+		use monochange_core::ProviderReleaseNotesSource;
+		use monochange_core::ProviderReleaseSettings;
+
+		let source = SourceConfiguration {
+			provider: monochange_core::SourceProvider::GitLab,
+			owner: "org".to_string(),
+			repo: "repo".to_string(),
+			host: None,
+			api_url: None,
+			releases: ProviderReleaseSettings {
+				enabled: true,
+				draft: false,
+				prerelease: false,
+				generate_notes: false,
+				source: ProviderReleaseNotesSource::Monochange,
+			},
+			pull_requests: ProviderMergeRequestSettings::default(),
+			bot: ProviderBotSettings::default(),
+		};
+		let mut manifest = sample_manifest();
+		let target = minimal_target("core");
+		manifest.changelogs = vec![
+			ReleaseManifestChangelog {
+				owner_id: "other".to_string(),
+				owner_kind: ReleaseOwnerKind::Package,
+				path: PathBuf::from("other.md"),
+				format: monochange_core::ChangelogFormat::Monochange,
+				notes: ReleaseNotesDocument {
+					title: "0.1.0".to_string(),
+					summary: vec![],
+					sections: vec![ReleaseNotesSection {
+						title: "Wrong package".to_string(),
+						collapsed: false,
+						entries: vec!["wrong package".to_string()],
+					}],
+				},
+				rendered: "wrong package changelog".to_string(),
+			},
+			ReleaseManifestChangelog {
+				owner_id: "core".to_string(),
+				owner_kind: ReleaseOwnerKind::Group,
+				path: PathBuf::from("group.md"),
+				format: monochange_core::ChangelogFormat::Monochange,
+				notes: ReleaseNotesDocument {
+					title: "0.1.0".to_string(),
+					summary: vec![],
+					sections: vec![ReleaseNotesSection {
+						title: "Wrong kind".to_string(),
+						collapsed: false,
+						entries: vec!["wrong kind".to_string()],
+					}],
+				},
+				rendered: "wrong kind changelog".to_string(),
+			},
+		];
+
+		assert_eq!(
+			release_body(&source, &manifest, &target),
+			Some(minimal_release_body(&manifest, &target))
+		);
+	}
+
+	#[test]
+	fn get_optional_json_returns_none_for_404_and_some_for_success() {
+		let server = MockServer::start();
+		let not_found = server.mock(|when, then| {
+			when.method(GET).path("/missing");
+			then.status(404);
+		});
+		let found = server.mock(|when, then| {
+			when.method(GET).path("/present");
+			then.status(200)
+				.header("content-type", "application/json")
+				.body(r#"{"ok":true}"#);
+		});
+		let client = build_http_client("test").unwrap_or_else(|error| panic!("client: {error}"));
+		let headers = empty_headers();
+
+		assert_eq!(
+			get_optional_json::<SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/missing"),
+				"test",
+			)
+			.unwrap_or_else(|error| panic!("404 response: {error}")),
+			None
+		);
+		assert_eq!(
+			get_optional_json::<SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/present"),
+				"test",
+			)
+			.unwrap_or_else(|error| panic!("200 response: {error}")),
+			Some(SampleResponse { ok: true })
+		);
+		not_found.assert();
+		found.assert();
+	}
+
+	#[test]
+	fn get_json_and_write_helpers_require_success_status() {
+		let server = MockServer::start();
+		let get_ok = server.mock(|when, then| {
+			when.method(GET).path("/get");
+			then.status(200)
+				.header("content-type", "application/json")
+				.body(r#"{"ok":true}"#);
+		});
+		let post_ok = server.mock(|when, then| {
+			when.method(POST).path("/post");
+			then.status(200)
+				.header("content-type", "application/json")
+				.body(r#"{"ok":true}"#);
+		});
+		let put_ok = server.mock(|when, then| {
+			when.method(PUT).path("/put");
+			then.status(200)
+				.header("content-type", "application/json")
+				.body(r#"{"ok":true}"#);
+		});
+		let patch_ok = server.mock(|when, then| {
+			when.method(PATCH).path("/patch");
+			then.status(200)
+				.header("content-type", "application/json")
+				.body(r#"{"ok":true}"#);
+		});
+		let client = build_http_client("test").unwrap_or_else(|error| panic!("client: {error}"));
+		let headers = empty_headers();
+		let body = SampleBody {
+			name: "demo".to_string(),
+		};
+
+		assert_eq!(
+			get_json::<SampleResponse>(&client, &headers, &server.url("/get"), "test")
+				.unwrap_or_else(|error| panic!("get response: {error}")),
+			SampleResponse { ok: true }
+		);
+		assert_eq!(
+			post_json::<_, SampleResponse>(&client, &headers, &server.url("/post"), &body, "test")
+				.unwrap_or_else(|error| panic!("post response: {error}")),
+			SampleResponse { ok: true }
+		);
+		assert_eq!(
+			put_json::<_, SampleResponse>(&client, &headers, &server.url("/put"), &body, "test")
+				.unwrap_or_else(|error| panic!("put response: {error}")),
+			SampleResponse { ok: true }
+		);
+		assert_eq!(
+			patch_json::<_, SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/patch"),
+				&body,
+				"test",
+			)
+			.unwrap_or_else(|error| panic!("patch response: {error}")),
+			SampleResponse { ok: true }
+		);
+		get_ok.assert();
+		post_ok.assert();
+		put_ok.assert();
+		patch_ok.assert();
+	}
 }
+
+#[cfg(test)]
+mod __tests;

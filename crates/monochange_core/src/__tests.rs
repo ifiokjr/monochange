@@ -703,6 +703,20 @@ fn discovery_path_filter_rejects_paths_under_nested_git_worktrees() {
 	assert!(filter.allows(&root.join("crates/root/Cargo.toml")));
 }
 
+#[test]
+fn discovery_path_filter_does_not_treat_parent_git_dir_outside_root_as_nested_worktree() {
+	let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/cargo/ignore-parent-git-outside-root");
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_directory(&source, tempdir.path());
+
+	let root = tempdir.path().join("workspace");
+	let filter = crate::DiscoveryPathFilter::new(&root);
+
+	assert!(filter.allows(&root.join("crates/root/Cargo.toml")));
+	assert!(filter.allows(&tempdir.path().join("outside/Cargo.toml")));
+}
+
 fn setup_discovery_fixture(name: &str) -> TempDir {
 	let source = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/cargo")
@@ -2525,6 +2539,20 @@ fn strip_json_comments_removes_comments_but_preserves_string_literals() {
 	assert!(!stripped.contains("/* block */"));
 	assert!(stripped.contains("https://example.com//still-string"));
 	assert!(stripped.contains("quote: \\\" // still string"));
+}
+
+#[test]
+fn strip_json_comments_removes_block_comments_with_embedded_stars_until_closing_marker() {
+	let stripped = crate::strip_json_comments(
+		r#"{
+  /* comment with * characters that should stay inside the comment */
+  "value": 1
+}
+"#,
+	);
+	assert!(!stripped.contains("comment with * characters"));
+	assert!(!stripped.contains("inside the comment"));
+	assert!(stripped.contains("\"value\": 1"));
 }
 
 #[test]

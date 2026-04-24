@@ -41,6 +41,7 @@
 		"**/dist",
 		"docs/book",
 		".devenv/**",
+		".tmp-node/**",
 		"**/fixtures",
 		"**/snapshots",
 		"**/target",

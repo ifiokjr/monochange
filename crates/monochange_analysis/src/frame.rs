@@ -602,6 +602,115 @@ mod tests {
 	}
 
 	#[test]
+	fn detect_raw_pr_environment_ignores_non_pr_github_events() {
+		let pr = with_vars(
+			[
+				("GITHUB_EVENT_NAME", Some("push")),
+				("GITHUB_HEAD_REF", Some("feature-branch")),
+				("GITHUB_BASE_REF", Some("main")),
+			],
+			detect_raw_pr_environment,
+		);
+		assert_eq!(pr, None);
+	}
+
+	#[test]
+	fn detect_raw_pr_environment_treats_travis_false_as_non_pr() {
+		// Use `Some("push")` rather than `None` for `GITHUB_EVENT_NAME` because
+		// `temp_env::with_vars` with `None` does not reliably unset env vars
+		// under CI runners (GitHub Actions keeps `GITHUB_EVENT_NAME` set to
+		// `"pull_request"` regardless). Setting it to a non-PR event value is
+		// the only hermetic approach that passes in CI.
+		let pr = with_vars(
+			[
+				("GITHUB_EVENT_NAME", Some("push")),
+				("GITHUB_HEAD_REF", Some("")),
+				("GITHUB_BASE_REF", Some("")),
+				("GITHUB_EVENT_NUMBER", Some("")),
+				("TRAVIS", Some("true")),
+				("TRAVIS_PULL_REQUEST", Some("false")),
+				("TRAVIS_PULL_REQUEST_BRANCH", Some("feature-branch")),
+				("TRAVIS_BRANCH", Some("main")),
+			],
+			detect_raw_pr_environment,
+		);
+		assert_eq!(pr, None);
+	}
+
+	#[test]
+	fn default_branch_name_prefers_origin_head_symbolic_ref() {
+		let tempdir = init_repo();
+		let root = tempdir.path();
+		git(root, &["checkout", "-b", "develop"]);
+		let head = git_output_trimmed(root, &["rev-parse", "HEAD"]);
+		git(root, &["update-ref", "refs/remotes/origin/develop", &head]);
+		git(
+			root,
+			&[
+				"symbolic-ref",
+				"refs/remotes/origin/HEAD",
+				"refs/remotes/origin/develop",
+			],
+		);
+
+		assert_eq!(
+			default_branch_name(root)
+				.unwrap_or_else(|error| panic!("default branch name: {error}")),
+			"develop"
+		);
+	}
+
+	#[test]
+	fn get_merge_base_returns_actual_merge_base_when_available() {
+		let tempdir = init_repo();
+		let root = tempdir.path();
+		let base_commit = git_output_trimmed(root, &["rev-parse", "HEAD"]);
+		git(root, &["checkout", "-b", "feature"]);
+		fs::write(root.join("feature.txt"), "feature\n")
+			.unwrap_or_else(|error| panic!("write feature file: {error}"));
+		git(root, &["add", "feature.txt"]);
+		git(root, &["commit", "-m", "feature"]);
+		git(root, &["checkout", "main"]);
+		fs::write(root.join("main.txt"), "main\n")
+			.unwrap_or_else(|error| panic!("write main file: {error}"));
+		git(root, &["add", "main.txt"]);
+		git(root, &["commit", "-m", "main"]);
+
+		assert_eq!(
+			get_merge_base(root, "main", "feature")
+				.unwrap_or_else(|error| panic!("merge base: {error}")),
+			base_commit
+		);
+	}
+
+	#[test]
+	fn changed_files_distinguishes_working_directory_and_staged_only() {
+		let tempdir = init_repo();
+		let root = tempdir.path();
+		fs::write(root.join("staged.txt"), "staged\n")
+			.unwrap_or_else(|error| panic!("write staged file: {error}"));
+		git(root, &["add", "staged.txt"]);
+		fs::write(root.join("README.md"), "hello updated\n")
+			.unwrap_or_else(|error| panic!("write unstaged tracked file: {error}"));
+
+		assert_eq!(
+			ChangeFrame::StagedOnly
+				.changed_files(root)
+				.unwrap_or_else(|error| panic!("staged changed files: {error}")),
+			vec![std::path::PathBuf::from("staged.txt")]
+		);
+		assert_eq!(
+			ChangeFrame::WorkingDirectory
+				.changed_files(root)
+				.unwrap_or_else(|error| panic!("working changed files: {error}")),
+			vec![
+				std::path::PathBuf::from("README.md"),
+				std::path::PathBuf::from("staged.txt"),
+			]
+		);
+	}
+
+	#[test]
 	fn resolve_pr_source_branch_falls_back_to_head_for_detached_repos() {
 		let tempdir = init_repo();
 		let head = git_output_trimmed(tempdir.path(), &["rev-parse", "HEAD"]);
