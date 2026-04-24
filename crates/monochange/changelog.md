@@ -884,6 +884,7 @@ The new tests cover:
 - preservation of explicit trusted-publishing context in manual-action outcomes
 
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #215](https://github.com/ifiokjr/monochange/pull/215) _Introduced in:_ [`36c1d4e`](https://github.com/ifiokjr/monochange/commit/36c1d4ec3c2daa675c233e388e161f339a77b6c2) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+
 ## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
 
 ### Breaking changes
@@ -920,4 +921,3 @@ This first release includes:
 For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
 
 > _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
-
