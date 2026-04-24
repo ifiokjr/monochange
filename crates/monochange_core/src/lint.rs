@@ -827,6 +827,8 @@ impl std::fmt::Display for LintResult {
 
 #[cfg(test)]
 mod tests {
+	use std::path::Path;
+
 	use super::*;
 
 	#[test]
@@ -940,6 +942,24 @@ mod tests {
 		let option = LintOptionDefinition::new("fix", "desc", LintOptionKind::Boolean)
 			.with_default(serde_json::Value::Bool(true));
 		assert_eq!(option.default_value, Some(serde_json::Value::Bool(true)));
+	}
+
+	#[test]
+	fn noop_lint_progress_reporter_methods_are_noops() {
+		let reporter = NoopLintProgressReporter;
+		let path = Path::new("Cargo.toml");
+		reporter.planning_started(&["cargo"]);
+		reporter.planning_finished(1, 1);
+		reporter.suite_started("cargo", 1, 1);
+		reporter.suite_finished("cargo", 1, 1);
+		reporter.file_started(path, 1);
+		reporter.file_rule_started(path, "cargo/example");
+		reporter.file_rule_finished(path, "cargo/example", 1);
+		reporter.file_finished(path, 1);
+		reporter.fix_started(1);
+		reporter.fix_applied(path, "fixed");
+		reporter.fix_finished(1);
+		reporter.summary(1, 1, 1, true);
 	}
 
 	#[test]

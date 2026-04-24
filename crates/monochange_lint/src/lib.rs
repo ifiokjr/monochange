@@ -745,6 +745,26 @@ mod tests {
 	}
 
 	#[test]
+	fn linter_lint_target_uses_noop_reporter_convenience() {
+		let root = tempfile::tempdir().unwrap();
+		let configuration = sample_workspace_configuration(root.path());
+		let settings = WorkspaceLintSettings {
+			presets: vec!["example/recommended".to_string()],
+			..WorkspaceLintSettings::default()
+		};
+		let linter = Linter::new(vec![Box::new(ExampleSuite)], settings);
+		let target = ExampleSuite
+			.collect_targets(root.path(), &configuration)
+			.unwrap_or_else(|error| panic!("expected example suite targets: {error}"))
+			.into_iter()
+			.next()
+			.unwrap_or_else(|| panic!("expected a target"));
+		let report = linter.lint_target(&target);
+		assert_eq!(report.error_count, 1);
+		assert_eq!(report.results.len(), 1);
+	}
+
+	#[test]
 	fn scoped_rule_override_can_disable_a_rule() {
 		let root = tempfile::tempdir().unwrap();
 		let configuration = sample_workspace_configuration(root.path());
