@@ -618,6 +618,10 @@ mod tests {
 	fn detect_raw_pr_environment_treats_travis_false_as_non_pr() {
 		let pr = with_vars(
 			[
+				("GITHUB_EVENT_NAME", None),
+				("GITHUB_HEAD_REF", None),
+				("GITHUB_BASE_REF", None),
+				("GITHUB_EVENT_NUMBER", None),
 				("TRAVIS", Some("true")),
 				("TRAVIS_PULL_REQUEST", Some("false")),
 				("TRAVIS_PULL_REQUEST_BRANCH", Some("feature-branch")),
