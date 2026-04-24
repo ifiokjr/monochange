@@ -2,43 +2,6 @@
 
 All notable changes to `monochange_semver` will be documented in this file.
 
-## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
-
-### Breaking changes
-
-#### 🚀 Initial public release of monochange
-
-**monochange** is a Rust-based release-planning toolkit for monorepos that span multiple package ecosystems. It is designed from the ground up to support the modern, AI-driven development landscape where agents and automation play a central role in software delivery.
-
-##### What is monochange?
-
-In today's agent-driven development environment, managing releases across diverse package ecosystems (Rust, JavaScript/TypeScript, Dart, Python, etc.) becomes increasingly complex. monochange provides a unified, programmatic interface for:
-
-- **Change tracking**: Structured changesets that capture intent across multiple packages
-- **Release planning**: Automated versioning and changelog generation
-- **Multi-ecosystem support**: Native handling of Cargo, NPM, Dart, Deno, and more
-- **CI/CD integration**: Seamless workflows for Gitea, GitHub, and GitLab
-- **Graph-based dependency analysis**: Understanding package relationships across your monorepo
-
-##### Why monochange matters for AI-driven workflows
-
-As development teams increasingly rely on AI agents to generate code, manage dependencies, and orchestrate releases, monochange provides the structured foundation these agents need to operate effectively. It transforms release management from a manual, error-prone process into a deterministic, automatable workflow.
-
-##### What's included in this release
-
-This first release includes:
-
-- Core changeset management engine
-- Multi-ecosystem package detection and versioning
-- Hosting provider integrations (Gitea, GitHub, GitLab)
-- Semantic versioning utilities
-- Configurable release workflows
-- CLI tooling for validation and release orchestration
-
-For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
-
-> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
-
 ## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
@@ -148,3 +111,40 @@ The result is more consistent crate documentation, less duplicated prose, and fl
 You can now annotate dependency-only follow-up changesets with `caused_by`, use `mc change --caused-by ...` to author them, inspect the linkage in diagnostics output, and suppress matching automatic dependency propagation during release planning.
 
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/ifiokjr/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/ifiokjr/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/ifiokjr/monochange/issues/208)
+
+## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
+
+### Breaking changes
+
+#### 🚀 Initial public release of monochange
+
+**monochange** is a Rust-based release-planning toolkit for monorepos that span multiple package ecosystems. It is designed from the ground up to support the modern, AI-driven development landscape where agents and automation play a central role in software delivery.
+
+##### What is monochange?
+
+In today's agent-driven development environment, managing releases across diverse package ecosystems (Rust, JavaScript/TypeScript, Dart, Python, etc.) becomes increasingly complex. monochange provides a unified, programmatic interface for:
+
+- **Change tracking**: Structured changesets that capture intent across multiple packages
+- **Release planning**: Automated versioning and changelog generation
+- **Multi-ecosystem support**: Native handling of Cargo, NPM, Dart, Deno, and more
+- **CI/CD integration**: Seamless workflows for Gitea, GitHub, and GitLab
+- **Graph-based dependency analysis**: Understanding package relationships across your monorepo
+
+##### Why monochange matters for AI-driven workflows
+
+As development teams increasingly rely on AI agents to generate code, manage dependencies, and orchestrate releases, monochange provides the structured foundation these agents need to operate effectively. It transforms release management from a manual, error-prone process into a deterministic, automatable workflow.
+
+##### What's included in this release
+
+This first release includes:
+
+- Core changeset management engine
+- Multi-ecosystem package detection and versioning
+- Hosting provider integrations (Gitea, GitHub, GitLab)
+- Semantic versioning utilities
+- Configurable release workflows
+- CLI tooling for validation and release orchestration
+
+For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
+
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
