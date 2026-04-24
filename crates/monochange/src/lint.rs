@@ -520,11 +520,12 @@ fn format_check_report(report: &LintReport, fixed: bool) -> String {
 #[cfg(test)]
 mod tests {
 	use std::fs;
+	use std::path::PathBuf;
 
 	use super::*;
 	use crate::cli::build_lint_subcommand;
 
-	fn lint_settings_root() -> std::path::PathBuf {
+	fn lint_settings_root() -> PathBuf {
 		monochange_test_helpers::fixture_path!("config/lint-settings")
 	}
 
@@ -631,6 +632,32 @@ mod tests {
 		let error = run_check_command(tempdir.path(), true, &[], &[], OutputFormat::Text)
 			.expect_err("expected fix write to fail for readonly manifest");
 		assert!(error.to_string().contains("Failed to write fixed content"));
+	}
+
+	#[test]
+	fn run_check_command_applies_fixes_and_reports_them() {
+		let tempdir = readonly_fix_workspace();
+		let output = run_check_command(tempdir.path(), true, &[], &[], OutputFormat::Text)
+			.unwrap_or_else(|error| panic!("expected fixable lint workspace to succeed: {error}"));
+		assert!(output.contains("Fixed all auto-fixable issues."));
+
+		let manifest = fs::read_to_string(tempdir.path().join("crates/example/Cargo.toml"))
+			.unwrap_or_else(|error| panic!("expected fixed manifest to be readable: {error}"));
+		assert!(manifest.contains("publish = false"));
+	}
+
+	#[test]
+	fn run_check_command_applies_fixes_without_progress_reporter() {
+		let tempdir = readonly_fix_workspace();
+		run_check_command(tempdir.path(), true, &[], &[], OutputFormat::Json).unwrap_or_else(
+			|error| {
+				panic!("expected fixable lint workspace to succeed without a reporter: {error}")
+			},
+		);
+
+		let manifest = fs::read_to_string(tempdir.path().join("crates/example/Cargo.toml"))
+			.unwrap_or_else(|error| panic!("expected fixed manifest to be readable: {error}"));
+		assert!(manifest.contains("publish = false"));
 	}
 
 	#[test]
