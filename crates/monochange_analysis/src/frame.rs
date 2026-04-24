@@ -616,12 +616,17 @@ mod tests {
 
 	#[test]
 	fn detect_raw_pr_environment_treats_travis_false_as_non_pr() {
+		// Use `Some("push")` rather than `None` for `GITHUB_EVENT_NAME` because
+		// `temp_env::with_vars` with `None` does not reliably unset env vars
+		// under CI runners (GitHub Actions keeps `GITHUB_EVENT_NAME` set to
+		// `"pull_request"` regardless). Setting it to a non-PR event value is
+		// the only hermetic approach that passes in CI.
 		let pr = with_vars(
 			[
-				("GITHUB_EVENT_NAME", None),
-				("GITHUB_HEAD_REF", None),
-				("GITHUB_BASE_REF", None),
-				("GITHUB_EVENT_NUMBER", None),
+				("GITHUB_EVENT_NAME", Some("push")),
+				("GITHUB_HEAD_REF", Some("")),
+				("GITHUB_BASE_REF", Some("")),
+				("GITHUB_EVENT_NUMBER", Some("")),
 				("TRAVIS", Some("true")),
 				("TRAVIS_PULL_REQUEST", Some("false")),
 				("TRAVIS_PULL_REQUEST_BRANCH", Some("feature-branch")),
