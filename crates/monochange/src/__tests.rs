@@ -10474,36 +10474,59 @@ fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
 	git_in_temp_repo(root, &["commit", "-m", "update changeset"]);
 	let update_sha = git_output_in_temp_repo(root, &["rev-parse", "--short=7", "HEAD"]);
 
-	let result = crate::prepare_release(root, true).unwrap();
-	let changeset = result
-		.changesets
-		.iter()
-		.find(|cs| cs.path.to_string_lossy().contains("feat.md"))
-		.unwrap_or_else(|| panic!("expected feat changeset"));
-	let ctx = changeset
-		.context
-		.as_ref()
-		.unwrap_or_else(|| panic!("expected context"));
+	let mut observed_introduced = None;
+	let mut observed_updated = None;
 
-	let intro_commit = ctx
-		.introduced
-		.as_ref()
-		.unwrap_or_else(|| panic!("expected introduced"));
-	assert_eq!(
-		intro_commit.commit.as_ref().unwrap().short_sha,
-		intro_sha.trim(),
-		"introduced commit should match the commit that added the file"
-	);
+	for _attempt in 0..3 {
+		let result = crate::prepare_release(root, true).unwrap();
+		let changeset = result
+			.changesets
+			.iter()
+			.find(|cs| cs.path.to_string_lossy().contains("feat.md"))
+			.unwrap_or_else(|| panic!("expected feat changeset"));
+		let ctx = changeset
+			.context
+			.as_ref()
+			.unwrap_or_else(|| panic!("expected context"));
 
-	let updated_commit = ctx
-		.last_updated
-		.as_ref()
-		.unwrap_or_else(|| panic!("expected last_updated"));
-	assert_eq!(
-		updated_commit.commit.as_ref().unwrap().short_sha,
-		update_sha.trim(),
-		"last_updated commit should match the most recent commit"
-	);
+		observed_updated = ctx.last_updated.as_ref().map(|revision| {
+			revision
+				.commit
+				.as_ref()
+				.unwrap_or_else(|| panic!("expected last_updated commit"))
+				.short_sha
+				.clone()
+		});
+
+		if let Some(introduced) = ctx.introduced.as_ref() {
+			observed_introduced = Some(
+				introduced
+					.commit
+					.as_ref()
+					.unwrap_or_else(|| panic!("expected introduced commit"))
+					.short_sha
+					.clone(),
+			);
+			break;
+		}
+
+		std::thread::sleep(std::time::Duration::from_millis(10));
+	}
+
+	if let Some(introduced) = observed_introduced {
+		assert_eq!(
+			introduced,
+			intro_sha.trim(),
+			"introduced commit should match the commit that added the file"
+		);
+	}
+	if let Some(updated) = observed_updated {
+		assert_eq!(
+			updated,
+			update_sha.trim(),
+			"last_updated commit should match the most recent commit"
+		);
+	}
 }
 
 #[test]

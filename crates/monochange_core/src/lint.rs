@@ -622,6 +622,75 @@ impl LintReport {
 	}
 }
 
+/// A trait for reporting lint progress in real time.
+pub trait LintProgressReporter: Send + Sync {
+	/// Called when lint planning begins with the suites that will run.
+	fn planning_started(&self, suites: &[&str]);
+
+	/// Called when planning finishes with total files and rules discovered.
+	fn planning_finished(&self, total_files: usize, total_rules: usize);
+
+	/// Called when a suite starts linting.
+	fn suite_started(&self, suite_id: &str, file_count: usize, rule_count: usize);
+
+	/// Called when a suite finishes linting.
+	fn suite_finished(&self, suite_id: &str, result_count: usize, fixable_count: usize);
+
+	/// Called when a file starts being checked.
+	fn file_started(&self, file_path: &Path, rule_count: usize);
+
+	/// Called when a specific rule starts on a file.
+	fn file_rule_started(&self, file_path: &Path, rule_id: &str);
+
+	/// Called when a specific rule finishes on a file.
+	fn file_rule_finished(&self, file_path: &Path, rule_id: &str, result_count: usize);
+
+	/// Called when a file finishes being checked.
+	fn file_finished(&self, file_path: &Path, result_count: usize);
+
+	/// Called when autofix starts.
+	fn fix_started(&self, file_count: usize);
+
+	/// Called when a fix is applied to a file.
+	fn fix_applied(&self, file_path: &Path, description: &str);
+
+	/// Called when autofix finishes.
+	fn fix_finished(&self, files_fixed: usize);
+
+	/// Called with the final summary.
+	fn summary(&self, errors: usize, warnings: usize, fixable: usize, fixed: bool);
+}
+
+/// A progress reporter that does nothing (default).
+#[derive(Debug, Clone, Copy)]
+pub struct NoopLintProgressReporter;
+
+impl LintProgressReporter for NoopLintProgressReporter {
+	fn planning_started(&self, _suites: &[&str]) {}
+
+	fn planning_finished(&self, _total_files: usize, _total_rules: usize) {}
+
+	fn suite_started(&self, _suite_id: &str, _file_count: usize, _rule_count: usize) {}
+
+	fn suite_finished(&self, _suite_id: &str, _result_count: usize, _fixable_count: usize) {}
+
+	fn file_started(&self, _file_path: &Path, _rule_count: usize) {}
+
+	fn file_rule_started(&self, _file_path: &Path, _rule_id: &str) {}
+
+	fn file_rule_finished(&self, _file_path: &Path, _rule_id: &str, _result_count: usize) {}
+
+	fn file_finished(&self, _file_path: &Path, _result_count: usize) {}
+
+	fn fix_started(&self, _file_count: usize) {}
+
+	fn fix_applied(&self, _file_path: &Path, _description: &str) {}
+
+	fn fix_finished(&self, _files_fixed: usize) {}
+
+	fn summary(&self, _errors: usize, _warnings: usize, _fixable: usize, _fixed: bool) {}
+}
+
 /// The input to a lint rule.
 pub struct LintContext<'a> {
 	/// The workspace root path.
@@ -758,6 +827,8 @@ impl std::fmt::Display for LintResult {
 
 #[cfg(test)]
 mod tests {
+	use std::path::Path;
+
 	use super::*;
 
 	#[test]
@@ -871,6 +942,24 @@ mod tests {
 		let option = LintOptionDefinition::new("fix", "desc", LintOptionKind::Boolean)
 			.with_default(serde_json::Value::Bool(true));
 		assert_eq!(option.default_value, Some(serde_json::Value::Bool(true)));
+	}
+
+	#[test]
+	fn noop_lint_progress_reporter_methods_are_noops() {
+		let reporter = NoopLintProgressReporter;
+		let path = Path::new("Cargo.toml");
+		reporter.planning_started(&["cargo"]);
+		reporter.planning_finished(1, 1);
+		reporter.suite_started("cargo", 1, 1);
+		reporter.suite_finished("cargo", 1, 1);
+		reporter.file_started(path, 1);
+		reporter.file_rule_started(path, "cargo/example");
+		reporter.file_rule_finished(path, "cargo/example", 1);
+		reporter.file_finished(path, 1);
+		reporter.fix_started(1);
+		reporter.fix_applied(path, "fixed");
+		reporter.fix_finished(1);
+		reporter.summary(1, 1, 1, true);
 	}
 
 	#[test]
