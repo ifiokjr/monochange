@@ -8,6 +8,7 @@ This is a repo-shaped example for a long-running release PR branch flow where re
 - a small Cargo workspace with one publishable package
 - a sample `.changeset/*.md` file
 - `.github/workflows/release.yml` showing the release-PR refresh and post-merge tagging pattern
+- `.github/workflows/release-pr-merge.yml` showing a maintainer-triggered merge-commit workflow for release PRs that are intentionally blocked in the normal merge UI
 
 ## Recommended validation flow
 
@@ -21,4 +22,5 @@ mc release --dry-run --diff
 
 - it is optimized for human review before release files land on `main`
 - it keeps tag creation after merge, not on the release branch
+- it can pair a failing `release-pr-manual-merge-blocker` required check with a dedicated merge workflow so release PRs are merged only through an explicit merge-commit path
 - it separates release planning from downstream publish jobs

@@ -633,6 +633,25 @@ For the long-running release PR model, the recommended shape is now:
 
 That keeps tag creation on the default branch side of the merge, which is much safer than tagging the PR branch early.
 
+### Blocking manual release-PR merges while keeping merge commits
+
+If you want to stop humans from accidentally using **Squash and merge** or **Rebase and merge** on release PRs, add a required job that fails whenever the PR head branch starts with your release-branch prefix, then provide a separate maintainer-triggered workflow that merges the PR with `gh pr merge --merge`.
+
+That pattern works around GitHub's repository-level merge-method settings:
+
+1. the release PR stays blocked in the normal merge UI because the required blocker job fails
+2. the dedicated merge workflow verifies every other check is green
+3. the workflow merges with `--merge` so the durable monochange release commit lands on `main` unchanged
+4. the workflow uses a dedicated token or GitHub App installation token that is allowed to bypass branch protection for that one intentional merge path
+
+A practical repository setup looks like this:
+
+- required PR job: `release-pr-manual-merge-blocker`
+- manual merge workflow: `.github/workflows/release-pr-merge.yml`
+- bypass token secret: `RELEASE_PR_MERGE_TOKEN`
+
+That gives you a selective policy for release PRs even though GitHub cannot disable squash/rebase only for one class of pull request.
+
 ### GitHub Actions reference sketch
 
 ```yaml

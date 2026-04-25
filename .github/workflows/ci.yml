@@ -321,6 +321,27 @@ jobs:
           fi
         shell: devenv shell -- bash -e {0}
 
+  release-pr-manual-merge-blocker:
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: enforce automated merge for release pull requests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_branch_prefix='monochange/release/'
+          branch='${{ github.head_ref }}'
+
+          if [[ "$branch" == "$release_branch_prefix"* ]]; then
+            echo "::error::Release pull requests must be merged by the release-pr-merge workflow so the release commit lands on main unchanged."
+            echo "::error::Run the release-pr-merge workflow with a bypass-capable token instead of using GitHub's merge button."
+            exit 1
+          fi
+
+          echo "Branch '$branch' is not a release PR branch; manual release-PR merge blocking is not needed."
+
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'ifiokjr'
     timeout-minutes: 20

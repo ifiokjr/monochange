@@ -1,0 +1,128 @@
+name: release-pr-merge
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Optional release PR number. Leave empty to auto-detect the single open release PR.
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.pull_request || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      RELEASE_PR_BRANCH_PREFIX: monochange/release/
+      RELEASE_PR_MANUAL_MERGE_BLOCKER: release-pr-manual-merge-blocker
+    steps:
+      - name: verify bypass token
+        env:
+          RELEASE_PR_MERGE_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${RELEASE_PR_MERGE_TOKEN:-}" ]; then
+            echo "::error::Set RELEASE_PR_MERGE_TOKEN to a token or GitHub App installation token that can bypass branch protection for release PR merges."
+            exit 1
+          fi
+
+      - name: resolve release PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          requested='${{ inputs.pull_request }}'
+
+          if [ -n "$requested" ]; then
+            pr_json="$(gh pr view "$requested" --repo "$GITHUB_REPOSITORY" --json number,url)"
+          else
+            candidates="$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --base main \
+              --json number,headRefName,url \
+              | jq '[.[] | select(.headRefName | startswith(env.RELEASE_PR_BRANCH_PREFIX))]')"
+            candidate_count="$(jq 'length' <<<"$candidates")"
+
+            if [ "$candidate_count" -ne 1 ]; then
+              echo "::error::Expected exactly one open release PR on main, found $candidate_count. Re-run the workflow with the pull_request input set explicitly."
+              jq -r '.[] | "- #\(.number) \(.headRefName) (\(.url))"' <<<"$candidates"
+              exit 1
+            fi
+
+            pr_json="$(jq '.[0]' <<<"$candidates")"
+          fi
+
+          echo "number=$(jq -r '.number' <<<"$pr_json")" >> "$GITHUB_OUTPUT"
+          echo "url=$(jq -r '.url' <<<"$pr_json")" >> "$GITHUB_OUTPUT"
+
+      - name: inspect release PR state
+        id: inspect
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          pr='${{ steps.pr.outputs.number }}'
+          pr_json="$(gh pr view "$pr" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json state,baseRefName,headRefName,headRefOid,isCrossRepository,mergeable)"
+
+          jq -e '.state == "OPEN"' <<<"$pr_json" >/dev/null
+          jq -e '.baseRefName == "main"' <<<"$pr_json" >/dev/null
+          jq -e '.headRefName | startswith(env.RELEASE_PR_BRANCH_PREFIX)' <<<"$pr_json" >/dev/null
+          jq -e '.isCrossRepository == false' <<<"$pr_json" >/dev/null
+
+          mergeable="$(jq -r '.mergeable' <<<"$pr_json")"
+          if [ "$mergeable" != "MERGEABLE" ]; then
+            echo "::error::GitHub reports PR #$pr as $mergeable. Resolve conflicts or wait for mergeability to finish computing, then re-run this workflow."
+            exit 1
+          fi
+
+          echo "head_sha=$(jq -r '.headRefOid' <<<"$pr_json")" >> "$GITHUB_OUTPUT"
+
+      - name: require green checks except the manual merge blocker
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          pr='${{ steps.pr.outputs.number }}'
+          checks="$(gh pr checks "$pr" --repo "$GITHUB_REPOSITORY" --required --json name,bucket)"
+
+          blocker_failures="$(jq --arg blocker "$RELEASE_PR_MANUAL_MERGE_BLOCKER" '[.[] | select(.name == $blocker and .bucket == "fail")] | length' <<<"$checks")"
+          pending_checks="$(jq '[.[] | select(.bucket == "pending")] | length' <<<"$checks")"
+          cancelled_checks="$(jq '[.[] | select(.bucket == "cancel")] | length' <<<"$checks")"
+          failing_checks="$(jq --arg blocker "$RELEASE_PR_MANUAL_MERGE_BLOCKER" '[.[] | select(.bucket == "fail" and .name != $blocker)] | length' <<<"$checks")"
+
+          if [ "$blocker_failures" -ne 1 ] || [ "$pending_checks" -ne 0 ] || [ "$cancelled_checks" -ne 0 ] || [ "$failing_checks" -ne 0 ]; then
+            echo "$checks" | jq
+            echo "::error::Only the intentional manual-merge blocker may be failing before this workflow bypass merges the release PR."
+            exit 1
+          fi
+
+      - name: merge release PR with a merge commit
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          gh pr merge '${{ steps.pr.outputs.number }}' \
+            --repo "$GITHUB_REPOSITORY" \
+            --merge \
+            --admin \
+            --match-head-commit '${{ steps.inspect.outputs.head_sha }}'
+
+      - name: report merged release PR
+        run: |
+          echo "Merged release PR #${{ steps.pr.outputs.number }} via merge commit."
+          echo "PR URL: ${{ steps.pr.outputs.url }}"
