@@ -260,6 +260,7 @@ in
         docs:update
         fix:monochange
         fix:format
+        fix:js
       '';
       description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
       binary = "bash";
@@ -313,6 +314,8 @@ in
         lint:format
         lint:architecture
         lint:root-git-config
+        lint:js
+        lint:js:types
         deny:check
         docs:check
         lint:monochange
@@ -375,6 +378,46 @@ in
         fi
       '';
       description = "Check that the shared root .git/config does not contain worktree or user overrides.";
+      binary = "bash";
+    };
+    "lint:js" = {
+      exec = ''
+        set -euo pipefail
+        pnpm exec oxlint --type-aware .
+      '';
+      description = "Lint all JS/TS files with oxlint (type-aware).";
+      binary = "bash";
+    };
+    "lint:js:syntax" = {
+      exec = ''
+        set -euo pipefail
+        pnpm exec oxlint .
+      '';
+      description = "Lint all JS/TS files with oxlint (syntax-only, faster).";
+      binary = "bash";
+    };
+    "lint:js:types" = {
+      exec = ''
+        set -euo pipefail
+        pnpm exec tsgo -config tsconfig.json
+      '';
+      description = "Type-check all JS/TS files with tsgo.";
+      binary = "bash";
+    };
+    "fix:js" = {
+      exec = ''
+        set -euo pipefail
+        pnpm exec oxfmt --write .
+      '';
+      description = "Format all JS/TS files with oxfmt.";
+      binary = "bash";
+    };
+    "build:js" = {
+      exec = ''
+        set -euo pipefail
+        pnpm exec tsdown
+      '';
+      description = "Bundle JS/TS entry points with tsdown.";
       binary = "bash";
     };
     "docs:check" = {

@@ -1,0 +1,37 @@
+{
+	"$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+	"plugins": ["unicorn"],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "error",
+		"perf": "warn"
+	},
+	"ignorePatterns": [
+		"**/node_modules",
+		"**/dist",
+		"**/target",
+		"**/fixtures",
+		"**/snapshots",
+		"**/*.test.mjs",
+		"**/*.test.js",
+		"**/Cargo.toml"
+	],
+	"rules": {
+		"eslint/no-console": "off",
+		"unicorn/no-null": "off",
+		"unicorn/prefer-module": "off",
+		"unicorn/switch-case-braces": "off",
+		"eslint/no-magic-numbers": "off",
+		"eslint/max-lines": "off",
+		"eslint/max-statements": "off",
+		"eslint/id-length": "off",
+		"eslint/func-style": "off",
+		"eslint/sort-keys": "off",
+		"eslint/sort-imports": "off",
+		"eslint/init-declarations": "off",
+		"eslint/no-continue": "off",
+		"unicorn/no-array-reduce": "off",
+		"unicorn/prefer-top-level-await": "off",
+		"unicorn/prefer-spread": "off"
+	}
+}

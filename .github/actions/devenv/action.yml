@@ -100,3 +100,19 @@ runs:
           echo "::warning::install:cargo:bin failed (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
           sleep "$sleep_seconds"
         done
+
+        max_attempts=3
+        for attempt in $(seq 1 "$max_attempts"); do
+          if devenv shell pnpm install --frozen-lockfile; then
+            break
+          fi
+
+          if [ "$attempt" -eq "$max_attempts" ]; then
+            echo "::error::pnpm install failed after $attempt attempts"
+            exit 1
+          fi
+
+          sleep_seconds=$((attempt * 10))
+          echo "::warning::pnpm install failed (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+          sleep "$sleep_seconds"
+        done

@@ -7,10 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const launcherPath = join(
-	process.cwd(),
-	"packages/monochange__cli/bin/monochange.js",
-);
+const launcherPath = join(process.cwd(), "packages/monochange__cli/bin/monochange.js");
 
 function createSandbox() {
 	return mkdtempSync(join(tmpdir(), "monochange-bin-"));
@@ -54,16 +51,16 @@ function runLauncher(root, args = []) {
 test("launcher executes the installed platform binary", () => {
 	const root = createSandbox();
 	createRoot(root);
-	const pkgName = process.platform === "darwin"
-		? `@monochange/cli-darwin-${process.arch}`
-		: process.platform === "linux"
-		? `@monochange/cli-linux-${process.arch === "arm64" ? "arm64" : "x64"}-gnu`
-		: `@monochange/cli-win32-${
-			process.arch === "arm64" ? "arm64" : "x64"
-		}-msvc`;
-	const binary = process.platform === "win32"
-		? "@echo off\r\necho launcher-ok %*\r\n"
-		: '#!/bin/sh\necho launcher-ok "$@"\n';
+	const pkgName =
+		process.platform === "darwin"
+			? `@monochange/cli-darwin-${process.arch}`
+			: process.platform === "linux"
+				? `@monochange/cli-linux-${process.arch === "arm64" ? "arm64" : "x64"}-gnu`
+				: `@monochange/cli-win32-${process.arch === "arm64" ? "arm64" : "x64"}-msvc`;
+	const binary =
+		process.platform === "win32"
+			? "@echo off\r\necho launcher-ok %*\r\n"
+			: '#!/bin/sh\necho launcher-ok "$@"\n';
 	createPackage(root, pkgName, binary);
 
 	const result = runLauncher(root, ["--help"]);

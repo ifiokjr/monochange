@@ -11,10 +11,7 @@ const PLATFORM_PACKAGES = {
 		x64: ["@monochange/cli-darwin-x64"],
 	},
 	linux: {
-		arm64: [
-			"@monochange/cli-linux-arm64-gnu",
-			"@monochange/cli-linux-arm64-musl",
-		],
+		arm64: ["@monochange/cli-linux-arm64-gnu", "@monochange/cli-linux-arm64-musl"],
 		x64: ["@monochange/cli-linux-x64-gnu", "@monochange/cli-linux-x64-musl"],
 	},
 	win32: {
@@ -31,9 +28,7 @@ function resolveBinary(pkgName) {
 	try {
 		const packageJsonPath = require.resolve(`${pkgName}/package.json`);
 		const packageDir = path.dirname(packageJsonPath);
-		const binaryName = process.platform === "win32"
-			? "monochange.exe"
-			: "monochange";
+		const binaryName = process.platform === "win32" ? "monochange.exe" : "monochange";
 		const binaryPath = path.join(packageDir, "bin", binaryName);
 		if (fs.existsSync(binaryPath)) {
 			return binaryPath;
@@ -91,8 +86,7 @@ function main() {
 		});
 
 		if (shouldTryNextPackage(result)) {
-			const detail = result.error?.message ?? result.stderr?.trim() ??
-				"failed to launch";
+			const detail = result.error?.message ?? result.stderr?.trim() ?? "failed to launch";
 			failures.push(`${pkgName}: ${detail}`);
 			continue;
 		}
@@ -101,9 +95,7 @@ function main() {
 		process.exit(result.status ?? 0);
 	}
 
-	console.error(
-		"Unable to find a compatible monochange binary in the installed npm packages.",
-	);
+	console.error("Unable to find a compatible monochange binary in the installed npm packages.");
 	console.error(`Tried: ${candidates.join(", ")}`);
 	if (failures.length > 0) {
 		console.error(failures.join("\n"));

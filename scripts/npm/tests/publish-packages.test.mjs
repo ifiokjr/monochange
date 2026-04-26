@@ -18,10 +18,7 @@ import {
 
 function makeSandbox() {
 	const base = join(process.cwd(), ".tmp-test-publish-packages");
-	const sandbox = join(
-		base,
-		`test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-	);
+	const sandbox = join(base, `test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 	mkdirSync(sandbox, { recursive: true });
 	return sandbox;
 }
@@ -65,34 +62,22 @@ describe("run", () => {
 	});
 
 	test("throws on non-zero exit with stderr", () => {
-		assert.throws(
-			() => run("sh", ["-c", "echo err >&2; exit 1"]),
-			{ message: /failed/ },
-		);
+		assert.throws(() => run("sh", ["-c", "echo err >&2; exit 1"]), { message: /failed/ });
 	});
 
 	test("throws on non-zero exit with stdout when stderr is empty", () => {
-		assert.throws(
-			() => run("sh", ["-c", "echo out; exit 1"]),
-			{ message: /failed/ },
-		);
+		assert.throws(() => run("sh", ["-c", "echo out; exit 1"]), { message: /failed/ });
 	});
 
 	test("handles null status", () => {
 		_setSpawnSync(() => ({ status: null, stderr: "", stdout: "" }));
-		assert.throws(
-			() => run("noop", []),
-			{ message: /exit code unknown/ },
-		);
+		assert.throws(() => run("noop", []), { message: /exit code unknown/ });
 	});
 
 	test("respects cwd option", () => {
 		const sandbox = makeSandbox();
 		const result = run("sh", ["-c", "pwd"], { cwd: sandbox });
-		assert.match(
-			result.stdout.trim(),
-			new RegExp(sandbox.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-		);
+		assert.match(result.stdout.trim(), new RegExp(sandbox.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 	});
 
 	test("respects stdio option", () => {
@@ -182,10 +167,7 @@ describe("publishPackage", () => {
 				version: "1.0.0",
 			}),
 		);
-		assert.throws(
-			() => publishPackage(sandbox),
-			{ message: /no binary found/ },
-		);
+		assert.throws(() => publishPackage(sandbox), { message: /no binary found/ });
 	});
 
 	test("error message includes package name and version", () => {
@@ -250,10 +232,7 @@ describe("publishPackage", () => {
 
 describe("main", () => {
 	test("throws when --packages-dir is missing", () => {
-		assert.throws(
-			() => publishMain([]),
-			{ message: /usage:/ },
-		);
+		assert.throws(() => publishMain([]), { message: /usage:/ });
 	});
 
 	test("publishes all platform packages then the cli package", () => {
@@ -263,16 +242,12 @@ describe("main", () => {
 		for (const dirName of [...PLATFORM_PACKAGE_DIRS, CLI_PACKAGE_DIR]) {
 			const pkgDir = join(sandbox, dirName);
 			mkdirSync(join(pkgDir, "bin"), { recursive: true });
-			const binaryName = dirName === CLI_PACKAGE_DIR
-				? "monochange.js"
-				: "monochange";
+			const binaryName = dirName === CLI_PACKAGE_DIR ? "monochange.js" : "monochange";
 			writeFileSync(join(pkgDir, "bin", binaryName), "");
 			writeFileSync(
 				join(pkgDir, "package.json"),
 				JSON.stringify({
-					name: `@monochange/${
-						dirName.replace("monochange__", "").replace("__", "/")
-					}`,
+					name: `@monochange/${dirName.replace("monochange__", "").replace("__", "/")}`,
 					version: "1.0.0",
 				}),
 			);
@@ -309,15 +284,11 @@ describe("PLATFORM_PACKAGE_DIRS", () => {
 	});
 
 	test("includes linux arm64 gnu", () => {
-		assert.ok(
-			PLATFORM_PACKAGE_DIRS.includes("monochange__cli-linux-arm64-gnu"),
-		);
+		assert.ok(PLATFORM_PACKAGE_DIRS.includes("monochange__cli-linux-arm64-gnu"));
 	});
 
 	test("includes linux arm64 musl", () => {
-		assert.ok(
-			PLATFORM_PACKAGE_DIRS.includes("monochange__cli-linux-arm64-musl"),
-		);
+		assert.ok(PLATFORM_PACKAGE_DIRS.includes("monochange__cli-linux-arm64-musl"));
 	});
 
 	test("includes linux x64 gnu", () => {
@@ -333,9 +304,7 @@ describe("PLATFORM_PACKAGE_DIRS", () => {
 	});
 
 	test("includes win32 arm64 msvc", () => {
-		assert.ok(
-			PLATFORM_PACKAGE_DIRS.includes("monochange__cli-win32-arm64-msvc"),
-		);
+		assert.ok(PLATFORM_PACKAGE_DIRS.includes("monochange__cli-win32-arm64-msvc"));
 	});
 });
 

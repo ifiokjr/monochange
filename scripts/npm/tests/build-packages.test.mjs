@@ -20,10 +20,7 @@ import {
 
 function makeSandbox() {
 	const base = join(process.cwd(), ".tmp-test-build-packages");
-	const sandbox = join(
-		base,
-		`test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-	);
+	const sandbox = join(base, `test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 	mkdirSync(sandbox, { recursive: true });
 	return sandbox;
 }
@@ -34,12 +31,7 @@ afterEach(() => {
 
 describe("parseArgs", () => {
 	test("parses --release-tag and --assets-dir", () => {
-		const result = parseArgs([
-			"--release-tag",
-			"v1.0.0",
-			"--assets-dir",
-			"/tmp",
-		]);
+		const result = parseArgs(["--release-tag", "v1.0.0", "--assets-dir", "/tmp"]);
 		assert.deepEqual(result, { "release-tag": "v1.0.0", "assets-dir": "/tmp" });
 	});
 
@@ -86,34 +78,22 @@ describe("run", () => {
 	});
 
 	test("throws on non-zero exit with stderr", () => {
-		assert.throws(
-			() => run("sh", ["-c", "echo err >&2; exit 1"]),
-			{ message: /failed/ },
-		);
+		assert.throws(() => run("sh", ["-c", "echo err >&2; exit 1"]), { message: /failed/ });
 	});
 
 	test("throws on non-zero exit with stdout when stderr is empty", () => {
-		assert.throws(
-			() => run("sh", ["-c", "echo out; exit 1"]),
-			{ message: /failed/ },
-		);
+		assert.throws(() => run("sh", ["-c", "echo out; exit 1"]), { message: /failed/ });
 	});
 
 	test("handles null status", () => {
 		_setSpawnSync(() => ({ status: null, stderr: "", stdout: "" }));
-		assert.throws(
-			() => run("noop", []),
-			{ message: /exit code unknown/ },
-		);
+		assert.throws(() => run("noop", []), { message: /exit code unknown/ });
 	});
 
 	test("respects cwd option", () => {
 		const sandbox = makeSandbox();
 		const result = run("sh", ["-c", "pwd"], { cwd: sandbox });
-		assert.match(
-			result.stdout.trim(),
-			new RegExp(sandbox.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-		);
+		assert.match(result.stdout.trim(), new RegExp(sandbox.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 	});
 
 	test("respects stdio option", () => {
@@ -125,26 +105,17 @@ describe("run", () => {
 describe("findArchive", () => {
 	test("returns archive path when file exists", () => {
 		const sandbox = makeSandbox();
-		const archivePath = join(
-			sandbox,
-			"monochange-x86_64-apple-darwin-v1.0.0.tar.gz",
-		);
+		const archivePath = join(sandbox, "monochange-x86_64-apple-darwin-v1.0.0.tar.gz");
 		writeFileSync(archivePath, "");
-		const result = findArchive(
-			sandbox,
-			"x86_64-apple-darwin",
-			"v1.0.0",
-			"tar.gz",
-		);
+		const result = findArchive(sandbox, "x86_64-apple-darwin", "v1.0.0", "tar.gz");
 		assert.equal(result, archivePath);
 	});
 
 	test("throws when archive is missing", () => {
 		const sandbox = makeSandbox();
-		assert.throws(
-			() => findArchive(sandbox, "x86_64-apple-darwin", "v1.0.0", "tar.gz"),
-			{ message: /missing release asset/ },
-		);
+		assert.throws(() => findArchive(sandbox, "x86_64-apple-darwin", "v1.0.0", "tar.gz"), {
+			message: /missing release asset/,
+		});
 	});
 });
 
@@ -172,10 +143,9 @@ describe("extractArchive", () => {
 	test("throws for unsupported archive type", () => {
 		const sandbox = makeSandbox();
 		const outDir = join(sandbox, "out");
-		assert.throws(
-			() => extractArchive(join(sandbox, "file.rar"), outDir),
-			{ message: /unsupported archive/ },
-		);
+		assert.throws(() => extractArchive(join(sandbox, "file.rar"), outDir), {
+			message: /unsupported archive/,
+		});
 	});
 
 	test("extracts .tar.gz archives", () => {
@@ -222,10 +192,7 @@ describe("findBinary", () => {
 
 	test("throws when binary not found", () => {
 		const sandbox = makeSandbox();
-		assert.throws(
-			() => findBinary(sandbox, "monochange"),
-			{ message: /could not find/ },
-		);
+		assert.throws(() => findBinary(sandbox, "monochange"), { message: /could not find/ });
 	});
 });
 
@@ -266,9 +233,10 @@ describe("populatePlatformPackage", () => {
 		writeFileSync(join(srcBinDir, "monochange"), "#!/bin/sh\necho hi\n");
 		chmodSync(join(srcBinDir, "monochange"), 0o755);
 		execSync(
-			`tar -czf ${
-				join(assetsDir, "monochange-aarch64-apple-darwin-v1.2.3.tar.gz")
-			} -C ${assetsDir} src`,
+			`tar -czf ${join(
+				assetsDir,
+				"monochange-aarch64-apple-darwin-v1.2.3.tar.gz",
+			)} -C ${assetsDir} src`,
 		);
 
 		populatePlatformPackage({
@@ -327,23 +295,14 @@ describe("populatePlatformPackage", () => {
 
 describe("main", () => {
 	test("throws when required arguments are missing", () => {
-		assert.throws(
-			() => buildMain([]),
-			{ message: /usage:/ },
-		);
+		assert.throws(() => buildMain([]), { message: /usage:/ });
 	});
 
 	test("throws when --assets-dir is missing", () => {
-		assert.throws(
-			() => buildMain(["--release-tag", "v1.0.0"]),
-			{ message: /usage:/ },
-		);
+		assert.throws(() => buildMain(["--release-tag", "v1.0.0"]), { message: /usage:/ });
 	});
 
 	test("throws when --release-tag is missing", () => {
-		assert.throws(
-			() => buildMain(["--assets-dir", "/tmp"]),
-			{ message: /usage:/ },
-		);
+		assert.throws(() => buildMain(["--assets-dir", "/tmp"]), { message: /usage:/ });
 	});
 });

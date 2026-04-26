@@ -30,8 +30,7 @@ function normalizeSourcePath(filePath, repoRoot) {
 
 function isSubpath(candidatePath, parentPath) {
 	const relativePath = relative(parentPath, candidatePath);
-	return relativePath === "" ||
-		(!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+	return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
 function parsePublicCrates(repoRoot) {
@@ -44,9 +43,7 @@ function parsePublicCrates(repoRoot) {
 			const cargoToml = readFileSync(resolve(directory, "Cargo.toml"), "utf8");
 			const nameMatch = /^name\s*=\s*"([^"]+)"/mu.exec(cargoToml);
 			if (!nameMatch) {
-				throw new Error(
-					`unable to read package name from crates/${entry.name}/Cargo.toml`,
-				);
+				throw new Error(`unable to read package name from crates/${entry.name}/Cargo.toml`);
 			}
 
 			return {
@@ -56,7 +53,7 @@ function parsePublicCrates(repoRoot) {
 			};
 		})
 		.filter((crateInfo) => crateInfo.publish)
-		.sort((left, right) => left.name.localeCompare(right.name));
+		.toSorted((left, right) => left.name.localeCompare(right.name));
 }
 
 function parseLcovRecords(text, repoRoot) {
@@ -65,9 +62,7 @@ function parseLcovRecords(text, repoRoot) {
 		.map((chunk) => chunk.trim())
 		.filter(Boolean)
 		.map((chunk) => {
-			const sourceLine = chunk
-				.split(/\r?\n/u)
-				.find((line) => line.startsWith("SF:"));
+			const sourceLine = chunk.split(/\r?\n/u).find((line) => line.startsWith("SF:"));
 			if (!sourceLine) {
 				throw new Error("encountered LCOV record without an SF line");
 			}
@@ -82,13 +77,11 @@ function parseLcovRecords(text, repoRoot) {
 function splitCoverageByCrate({ lcovText, repoRoot }) {
 	const publicCrates = parsePublicCrates(repoRoot);
 	const records = parseLcovRecords(lcovText, repoRoot);
-	const coverageByCrate = new Map(
-		publicCrates.map((crateInfo) => [crateInfo.name, []]),
-	);
+	const coverageByCrate = new Map(publicCrates.map((crateInfo) => [crateInfo.name, []]));
 
 	for (const record of records) {
 		const crateInfo = publicCrates.find((candidate) =>
-			isSubpath(record.sourcePath, candidate.directory)
+			isSubpath(record.sourcePath, candidate.directory),
 		);
 		if (!crateInfo) {
 			continue;
@@ -102,9 +95,7 @@ function splitCoverageByCrate({ lcovText, repoRoot }) {
 			continue;
 		}
 
-		throw new Error(
-			`no LCOV coverage records matched public crate ${crateInfo.name}`,
-		);
+		throw new Error(`no LCOV coverage records matched public crate ${crateInfo.name}`);
 	}
 
 	return publicCrates.map((crateInfo) => ({
@@ -117,10 +108,7 @@ function writeFlagReports(crateReports, outDir) {
 	mkdirSync(outDir, { recursive: true });
 
 	for (const crateReport of crateReports) {
-		writeFileSync(
-			resolve(outDir, `${crateReport.name}.lcov`),
-			crateReport.records.join(""),
-		);
+		writeFileSync(resolve(outDir, `${crateReport.name}.lcov`), crateReport.records.join(""));
 	}
 }
 
@@ -131,18 +119,14 @@ function writeGitHubOutput(crateReports, githubOutputPath) {
 
 	writeFileSync(
 		githubOutputPath,
-		`flags=${
-			JSON.stringify(crateReports.map((crateReport) => crateReport.name))
-		}\n`,
+		`flags=${JSON.stringify(crateReports.map((crateReport) => crateReport.name))}\n`,
 		{ flag: "a" },
 	);
 }
 
 function main(argv = process.argv.slice(2)) {
 	const options = parseArgs(argv);
-	const repoRoot = options["repo-root"]
-		? resolve(options["repo-root"])
-		: process.cwd();
+	const repoRoot = options["repo-root"] ? resolve(options["repo-root"]) : process.cwd();
 	const lcovPath = options.lcov
 		? resolve(repoRoot, options.lcov)
 		: resolve(repoRoot, "target/coverage/lcov.info");
@@ -155,9 +139,7 @@ function main(argv = process.argv.slice(2)) {
 	writeFlagReports(crateReports, outDir);
 	writeGitHubOutput(crateReports, options["github-output"]);
 
-	console.log(
-		`prepared ${crateReports.length} Codecov flag report(s) in ${outDir}`,
-	);
+	console.log(`prepared ${crateReports.length} Codecov flag report(s) in ${outDir}`);
 	for (const crateReport of crateReports) {
 		console.log(`- ${crateReport.name}`);
 	}

@@ -41,6 +41,10 @@ jobs:
         run: docs:check
         shell: devenv shell -- bash -e {0}
 
+      - name: lint js
+        run: lint:js:syntax
+        shell: devenv shell -- bash -e {0}
+
       - name: cargo deny
         run: deny:check
         shell: devenv shell -- bash -e {0}
