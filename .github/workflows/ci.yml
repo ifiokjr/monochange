@@ -385,13 +385,14 @@ jobs:
       - name: refresh release pull request
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
         run: mc release-pr
         shell: devenv shell -- bash -e {0}
 
       - name: skip refresh on merged release commit
         if: steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is already a merged release commit; skipping release PR refresh."
+
   release-post-merge:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
     needs: release-pr
@@ -435,15 +436,14 @@ jobs:
 
       - name: publish release
         if: steps.tag_release.outputs.is_release_commit == 'true'
-        uses: ./.github/actions/publish-release
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          from-ref: HEAD
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mc publish-release --from-ref="${{ inputs.from-ref }}"
+        shell: devenv shell -- bash -e {0}
 
       - name: comment on released issues
         if: steps.tag_release.outputs.is_release_commit == 'true'
-        uses: ./.github/actions/comment-released-issues
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          from-ref: HEAD
-          auto-close-issues: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mc comment-released-issues --from-ref="HEAD" --auto-close-issues
+        shell: devenv shell -- bash -e {0}
