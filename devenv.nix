@@ -74,11 +74,7 @@ in
         pass_filenames = false;
         name = "lint and test";
         description = "Run the local CI lint rules and test suite before push.";
-        entry = ''
-          set -euo pipefail
-          ${config.env.DEVENV_PROFILE}/bin/lint:all;
-          ${config.env.DEVENV_PROFILE}/bin/test:all
-        '';
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:test";
         stages = [ "pre-push" ];
       };
     };
@@ -299,6 +295,15 @@ in
         cargo deny check
       '';
       description = "Run cargo-deny checks for security advisories and license compliance.";
+      binary = "bash";
+    };
+    "lint:test" = {
+      exec = ''
+        set -euo pipefail
+        lint:all;
+        test:all;
+      '';
+      description = "Used for the pre push checks";
       binary = "bash";
     };
     "lint:all" = {
