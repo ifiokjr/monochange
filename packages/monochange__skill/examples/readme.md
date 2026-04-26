@@ -17,6 +17,6 @@ Use these condensed examples when the main skill needs quick setup guidance with
 
 Full repository examples live in the monochange repository at:
 
-- <https://github.com/ifiokjr/monochange/tree/main/examples>
+- <https://github.com/monochange/monochange/tree/main/examples>
 
 That folder also includes `examples/validate-examples.sh` for running `mc validate`, `mc check`, and `mc release --dry-run --diff` across the repo-shaped examples.

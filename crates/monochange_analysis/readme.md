@@ -4,7 +4,7 @@
 
 <!-- {=crateReadmeBadgeRow:"monochange_analysis"} -->
 
-[![Crates.io](https://img.shields.io/badge/crates.io-monochange__analysis-orange?logo=rust)](https://crates.io/crates/monochange_analysis) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__analysis-1f425f?logo=docs.rs)](https://docs.rs/monochange_analysis/) [![CI](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag=monochange_analysis)](https://codecov.io/gh/ifiokjr/monochange?flag=monochange_analysis) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
+[![Crates.io](https://img.shields.io/badge/crates.io-monochange__analysis-orange?logo=rust)](https://crates.io/crates/monochange_analysis) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__analysis-1f425f?logo=docs.rs)](https://docs.rs/monochange_analysis/) [![CI](https://github.com/monochange/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/monochange/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/monochange/monochange/branch/main/graph/badge.svg?flag=monochange_analysis)](https://codecov.io/gh/monochange/monochange?flag=monochange_analysis) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
 
 <!-- {/crateReadmeBadgeRow} -->
 

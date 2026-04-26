@@ -5,11 +5,11 @@
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ifiokjr/monochange.git"
+		"url": "git+https://github.com/monochange/monochange.git"
 	},
-	"homepage": "https://github.com/ifiokjr/monochange",
+	"homepage": "https://github.com/monochange/monochange",
 	"bugs": {
-		"url": "https://github.com/ifiokjr/monochange/issues"
+		"url": "https://github.com/monochange/monochange/issues"
 	},
 	"files": [
 		"SKILL.md",

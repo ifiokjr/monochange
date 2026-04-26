@@ -322,7 +322,7 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   release-pr:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'ifiokjr'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
     timeout-minutes: 20
     runs-on: ubuntu-latest
     permissions:

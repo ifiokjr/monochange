@@ -7,7 +7,7 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 
 const DEFAULT_SKILL_SOURCE: &str =
-	"https://github.com/ifiokjr/monochange/tree/main/packages/monochange__skill";
+	"https://github.com/monochange/monochange/tree/main/packages/monochange__skill";
 const SKILL_SOURCE_ENV_VAR: &str = "MONOCHANGE_SKILL_SOURCE";
 const SKILL_RUNNER_ENV_VAR: &str = "MONOCHANGE_SKILL_RUNNER";
 

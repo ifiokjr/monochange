@@ -122,4 +122,4 @@ End the planning flow with a compact decision record:
 ## Related examples
 
 - [../examples/readme.md](../examples/readme.md)
-- full repository examples: <https://github.com/ifiokjr/monochange/tree/main/examples>
+- full repository examples: <https://github.com/monochange/monochange/tree/main/examples>

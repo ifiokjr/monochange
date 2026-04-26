@@ -60,4 +60,4 @@ The bundled skill explains how to:
 
 Open [SKILL.md](./SKILL.md) first, then use [skills/readme.md](./skills/readme.md), [examples/readme.md](./examples/readme.md), [skills/reference.md](./skills/reference.md), [skills/trusted-publishing.md](./skills/trusted-publishing.md), and [skills/multi-package-publishing.md](./skills/multi-package-publishing.md) for the deeper sections.
 
-For fuller repo-shaped examples in the monochange repository, see <https://github.com/ifiokjr/monochange/tree/main/examples>.
+For fuller repo-shaped examples in the monochange repository, see <https://github.com/monochange/monochange/tree/main/examples>.
