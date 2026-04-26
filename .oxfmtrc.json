@@ -1,5 +1,10 @@
 {
-  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxfmt/configuration_schema.json",
-  "singleQuote": true,
-  "ignorePatterns": ["dist/**", "coverage/**", "node_modules/**", "pnpm-lock.yaml"]
+	"$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxfmt/configuration_schema.json",
+	"singleQuote": true,
+	"ignorePatterns": [
+		"dist/**",
+		"coverage/**",
+		"node_modules/**",
+		"pnpm-lock.yaml"
+	]
 }

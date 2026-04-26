@@ -1,13 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
-import {
-	chmodSync,
-	copyFileSync,
-	existsSync,
-	mkdirSync,
-	readdirSync,
-} from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -128,8 +122,7 @@ export function run(command, args, options = {}) {
 		cwd: options.cwd,
 	});
 	if (result.status !== 0) {
-		const detail = result.stderr || result.stdout ||
-			`exit code ${result.status ?? "unknown"}`;
+		const detail = result.stderr || result.stdout || `exit code ${result.status ?? "unknown"}`;
 		throw new Error(`${command} ${args.join(" ")} failed: ${detail}`);
 	}
 	return result;
@@ -182,15 +175,8 @@ export function packageNameToDirName(packageName) {
 	return packageName.replace("@", "").replace("/", "__");
 }
 
-export function populatePlatformPackage(
-	{ packagesDir, spec, releaseTag, assetsDir, tmpDir },
-) {
-	const archivePath = findArchive(
-		assetsDir,
-		spec.target,
-		releaseTag,
-		spec.archiveExt,
-	);
+export function populatePlatformPackage({ packagesDir, spec, releaseTag, assetsDir, tmpDir }) {
+	const archivePath = findArchive(assetsDir, spec.target, releaseTag, spec.archiveExt);
 	const extractedDir = join(tmpDir, spec.target);
 	const packageDir = join(packagesDir, packageNameToDirName(spec.packageName));
 	const binDir = join(packageDir, "bin");
@@ -211,9 +197,7 @@ export function main(argv = process.argv.slice(2)) {
 	const assetsDir = resolve(args["assets-dir"] ?? "");
 
 	if (!releaseTag || !args["assets-dir"]) {
-		throw new Error(
-			"usage: build-packages.mjs --release-tag <vX.Y.Z> --assets-dir <dir>",
-		);
+		throw new Error("usage: build-packages.mjs --release-tag <vX.Y.Z> --assets-dir <dir>");
 	}
 
 	const packagesDir = join(repoRoot, "packages");
@@ -229,14 +213,9 @@ export function main(argv = process.argv.slice(2)) {
 		});
 	}
 
-	console.log(
-		`Populated platform binaries in ${packagesDir} for ${releaseTag}`,
-	);
+	console.log(`Populated platform binaries in ${packagesDir} for ${releaseTag}`);
 }
 
-if (
-	process.argv[1] &&
-	resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
-) {
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
 	main();
 }

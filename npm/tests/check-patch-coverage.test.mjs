@@ -13,14 +13,7 @@ const repoRoot = "/repo";
 describe("parseArgs", () => {
 	test("parses supported flags", () => {
 		assert.deepEqual(
-			parseArgs([
-				"--base",
-				"origin/main",
-				"--head",
-				"HEAD",
-				"--lcov",
-				"target/coverage/lcov.info",
-			]),
+			parseArgs(["--base", "origin/main", "--head", "HEAD", "--lcov", "target/coverage/lcov.info"]),
 			{
 				base: "origin/main",
 				head: "HEAD",
@@ -39,24 +32,12 @@ describe("parseArgs", () => {
 describe("parseLcov", () => {
 	test("collects per-line hit counts by source file", () => {
 		const coverageByFile = parseLcov(
-			[
-				"TN:",
-				"SF:crates/monochange/src/lib.rs",
-				"DA:10,3",
-				"DA:11,0",
-				"end_of_record",
-			].join("\n"),
+			["TN:", "SF:crates/monochange/src/lib.rs", "DA:10,3", "DA:11,0", "end_of_record"].join("\n"),
 			repoRoot,
 		);
 
-		assert.equal(
-			coverageByFile.get("/repo/crates/monochange/src/lib.rs").get(10),
-			3,
-		);
-		assert.equal(
-			coverageByFile.get("/repo/crates/monochange/src/lib.rs").get(11),
-			0,
-		);
+		assert.equal(coverageByFile.get("/repo/crates/monochange/src/lib.rs").get(10), 3);
+		assert.equal(coverageByFile.get("/repo/crates/monochange/src/lib.rs").get(11), 0);
 	});
 });
 
@@ -102,20 +83,13 @@ describe("parseChangedLines", () => {
 describe("computePatchCoverage", () => {
 	test("counts only executable changed lines from the coverage report", () => {
 		const coverageByFile = parseLcov(
-			[
-				"SF:crates/monochange/src/lib.rs",
-				"DA:10,1",
-				"DA:11,0",
-				"DA:12,4",
-				"end_of_record",
-			].join("\n"),
+			["SF:crates/monochange/src/lib.rs", "DA:10,1", "DA:11,0", "DA:12,4", "end_of_record"].join(
+				"\n",
+			),
 			repoRoot,
 		);
 		const changedLinesByFile = new Map([
-			[
-				"/repo/crates/monochange/src/lib.rs",
-				new Set([9, 10, 11, 12, 13]),
-			],
+			["/repo/crates/monochange/src/lib.rs", new Set([9, 10, 11, 12, 13])],
 		]);
 
 		const result = computePatchCoverage(coverageByFile, changedLinesByFile);
@@ -132,12 +106,9 @@ describe("computePatchCoverage", () => {
 describe("verifyPatchCoverage", () => {
 	test("passes when every executable changed line is covered", () => {
 		const result = verifyPatchCoverage({
-			lcovText: [
-				"SF:crates/monochange/src/lib.rs",
-				"DA:10,1",
-				"DA:11,7",
-				"end_of_record",
-			].join("\n"),
+			lcovText: ["SF:crates/monochange/src/lib.rs", "DA:10,1", "DA:11,7", "end_of_record"].join(
+				"\n",
+			),
 			diffText: [
 				"diff --git a/crates/monochange/src/lib.rs b/crates/monochange/src/lib.rs",
 				"--- a/crates/monochange/src/lib.rs",
@@ -158,12 +129,9 @@ describe("verifyPatchCoverage", () => {
 
 	test("fails when patch coverage drops below 100%", () => {
 		const result = verifyPatchCoverage({
-			lcovText: [
-				"SF:crates/monochange/src/lib.rs",
-				"DA:10,1",
-				"DA:11,0",
-				"end_of_record",
-			].join("\n"),
+			lcovText: ["SF:crates/monochange/src/lib.rs", "DA:10,1", "DA:11,0", "end_of_record"].join(
+				"\n",
+			),
 			diffText: [
 				"diff --git a/crates/monochange/src/lib.rs b/crates/monochange/src/lib.rs",
 				"--- a/crates/monochange/src/lib.rs",
@@ -183,11 +151,7 @@ describe("verifyPatchCoverage", () => {
 
 	test("treats diffs without executable changed lines as passing", () => {
 		const result = verifyPatchCoverage({
-			lcovText: [
-				"SF:crates/monochange/src/lib.rs",
-				"DA:10,1",
-				"end_of_record",
-			].join("\n"),
+			lcovText: ["SF:crates/monochange/src/lib.rs", "DA:10,1", "end_of_record"].join("\n"),
 			diffText: [
 				"diff --git a/docs/readme.md b/docs/readme.md",
 				"--- a/docs/readme.md",

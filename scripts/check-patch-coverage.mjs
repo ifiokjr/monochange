@@ -121,9 +121,7 @@ export function computePatchCoverage(coverageByFile, changedLinesByFile) {
 			continue;
 		}
 
-		const sortedChangedLines = [...changedLines].sort((left, right) =>
-			left - right
-		);
+		const sortedChangedLines = [...changedLines].sort((left, right) => left - right);
 		for (const lineNumber of sortedChangedLines) {
 			if (!lineCoverage.has(lineNumber)) {
 				continue;
@@ -139,9 +137,8 @@ export function computePatchCoverage(coverageByFile, changedLinesByFile) {
 		}
 	}
 
-	const percentage = executableChangedLines === 0
-		? 100
-		: (coveredLines / executableChangedLines) * 100;
+	const percentage =
+		executableChangedLines === 0 ? 100 : (coveredLines / executableChangedLines) * 100;
 
 	return {
 		coveredLines,
@@ -153,8 +150,7 @@ export function computePatchCoverage(coverageByFile, changedLinesByFile) {
 
 export function formatCoverageSummary(result, target) {
 	const percentage = result.percentage.toFixed(2);
-	const summary =
-		`PATCH_COVERAGE ${result.coveredLines}/${result.executableChangedLines} (${percentage}%)`;
+	const summary = `PATCH_COVERAGE ${result.coveredLines}/${result.executableChangedLines} (${percentage}%)`;
 	if (result.executableChangedLines === 0) {
 		return `${summary}\nNo executable changed lines were found in the coverage report.`;
 	}
@@ -164,28 +160,25 @@ export function formatCoverageSummary(result, target) {
 	}
 
 	if (result.percentage >= target) {
-		return `${summary}\nPatch coverage meets the required ${
-			target.toFixed(2)
-		}% target.`;
+		return `${summary}\nPatch coverage meets the required ${target.toFixed(2)}% target.`;
 	}
 
 	const missingLines = result.uncoveredLines
 		.map(({ filePath, lineNumber }) => `- ${filePath}:${lineNumber}`)
 		.join("\n");
-	return `${summary}\nRequired patch coverage: ${
-		target.toFixed(2)
-	}%\nUncovered executable changed lines:\n${missingLines}`;
+	return `${summary}\nRequired patch coverage: ${target.toFixed(
+		2,
+	)}%\nUncovered executable changed lines:\n${missingLines}`;
 }
 
-export function verifyPatchCoverage(
-	{ lcovText, diffText, repoRoot, target = 100 },
-) {
+export function verifyPatchCoverage({ lcovText, diffText, repoRoot, target = 100 }) {
 	const coverageByFile = parseLcov(lcovText, repoRoot);
 	const changedLinesByFile = parseChangedLines(diffText, repoRoot);
 	const result = computePatchCoverage(coverageByFile, changedLinesByFile);
-	const passed = target === 100
-		? result.coveredLines === result.executableChangedLines
-		: result.percentage >= target;
+	const passed =
+		target === 100
+			? result.coveredLines === result.executableChangedLines
+			: result.percentage >= target;
 
 	return {
 		...result,
@@ -210,17 +203,13 @@ function run(command, args, options = {}) {
 
 export function main(argv = process.argv.slice(2)) {
 	const options = parseArgs(argv);
-	const repoRoot = options["repo-root"]
-		? resolve(options["repo-root"])
-		: process.cwd();
+	const repoRoot = options["repo-root"] ? resolve(options["repo-root"]) : process.cwd();
 	const base = options.base;
 	const head = options.head ?? "HEAD";
 	const lcovPath = options.lcov
 		? resolve(repoRoot, options.lcov)
 		: resolve(repoRoot, "target/coverage/lcov.info");
-	const target = options.target === undefined
-		? 100
-		: Number.parseFloat(options.target);
+	const target = options.target === undefined ? 100 : Number.parseFloat(options.target);
 
 	if (!base) {
 		throw new Error("missing required --base <git-ref> option");
@@ -232,13 +221,7 @@ export function main(argv = process.argv.slice(2)) {
 	const lcovText = readFileSync(lcovPath, "utf8");
 	const diffText = run(
 		"git",
-		[
-			"diff",
-			"--unified=0",
-			"--no-color",
-			"--no-ext-diff",
-			`${base}...${head}`,
-		],
+		["diff", "--unified=0", "--no-color", "--no-ext-diff", `${base}...${head}`],
 		{ cwd: repoRoot },
 	);
 

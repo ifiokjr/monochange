@@ -21,23 +21,13 @@ function extractBlock(contents, startMarker, endMarker) {
 }
 
 function extractToolNamesFromTemplate(contents) {
-	const block = extractBlock(
-		contents,
-		"<!-- {@mcpToolsList} -->",
-		"<!-- {/mcpToolsList} -->",
-	);
+	const block = extractBlock(contents, "<!-- {@mcpToolsList} -->", "<!-- {/mcpToolsList} -->");
 
-	return new Set(
-		[...block.matchAll(/`(monochange_[^`]+)`/g)].map((match) => match[1]),
-	);
+	return new Set([...block.matchAll(/`(monochange_[^`]+)`/g)].map((match) => match[1]));
 }
 
 function extractToolNamesFromServer(contents) {
-	return new Set(
-		[...contents.matchAll(/name = "(monochange_[^"]+)"/g)].map((match) =>
-			match[1]
-		),
-	);
+	return new Set([...contents.matchAll(/name = "(monochange_[^"]+)"/g)].map((match) => match[1]));
 }
 
 function assertSetEquals(label, actual, expected) {
@@ -77,12 +67,8 @@ function assertExists(relativePath) {
 	}
 }
 
-const templateTools = extractToolNamesFromTemplate(
-	read(".templates/guides.t.md"),
-);
-const serverTools = extractToolNamesFromServer(
-	read("crates/monochange/src/mcp.rs"),
-);
+const templateTools = extractToolNamesFromTemplate(read(".templates/guides.t.md"));
+const serverTools = extractToolNamesFromServer(read("crates/monochange/src/mcp.rs"));
 assertSetEquals("MCP tool list", templateTools, serverTools);
 
 assertExists("ARCHITECTURE.md");
@@ -93,15 +79,9 @@ const harnessPlanPaths = [
 	"docs/plans/completed/harness-engineering.md",
 ];
 
-if (
-	!harnessPlanPaths.some((relativePath) =>
-		fs.existsSync(path.join(repoRoot, relativePath))
-	)
-) {
+if (!harnessPlanPaths.some((relativePath) => fs.existsSync(path.join(repoRoot, relativePath)))) {
 	throw new Error(
-		`missing required harness engineering plan file: ${
-			harnessPlanPaths.join(" or ")
-		}`,
+		`missing required harness engineering plan file: ${harnessPlanPaths.join(" or ")}`,
 	);
 }
 

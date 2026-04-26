@@ -54,8 +54,7 @@ export function run(command, args, options = {}) {
 	});
 
 	if (result.status !== 0) {
-		const detail = result.stderr || result.stdout ||
-			`exit code ${result.status ?? "unknown"}`;
+		const detail = result.stderr || result.stdout || `exit code ${result.status ?? "unknown"}`;
 		throw new Error(`${command} ${args.join(" ")} failed: ${detail}`);
 	}
 
@@ -67,12 +66,7 @@ export function packageMetadata(dir) {
 }
 
 export function packageExists(name, version) {
-	const result = _spawnSync("npm", [
-		"view",
-		`${name}@${version}`,
-		"version",
-		"--json",
-	], {
+	const result = _spawnSync("npm", ["view", `${name}@${version}`, "version", "--json"], {
 		encoding: "utf8",
 		stdio: "pipe",
 	});
@@ -93,9 +87,7 @@ export function publishPackage(dir) {
 	const pkg = packageMetadata(dir);
 	if (hasBinary(dir) === false) {
 		throw new Error(
-			`Cannot publish ${pkg.name}@${pkg.version}: no binary found in ${
-				join(dir, "bin")
-			}. ` +
+			`Cannot publish ${pkg.name}@${pkg.version}: no binary found in ${join(dir, "bin")}. ` +
 				"Run build-packages.mjs first to populate platform binaries.",
 		);
 	}
@@ -127,9 +119,6 @@ export function main(argv = process.argv.slice(2)) {
 	publishPackage(join(packagesDir, CLI_PACKAGE_DIR));
 }
 
-if (
-	process.argv[1] &&
-	resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
-) {
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
 	main();
 }
