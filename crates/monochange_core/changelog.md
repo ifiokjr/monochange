@@ -2,6 +2,247 @@
 
 All notable changes to `monochange_core` will be documented in this file.
 
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-26)
+
+### Added
+
+#### feat
+
+Add beautiful interactive progress reporting for `mc check` and `mc lint`.
+
+- Introduced `LintProgressReporter` trait in `monochange_core::lint` with 14 lifecycle hooks from planning through summary.
+- Added `NoopLintProgressReporter` for silent / backward-compatible operation.
+- Updated `Linter::lint_workspace` to emit planning, suite, file, rule, and summary events to the reporter.
+- Created `HumanLintProgressReporter` in `monochange` that writes animated spinners, suite-level progress, fix tracking, and a styled summary to stderr.
+- Enhanced `format_check_report` to list which files were fixed when `--fix` is active.
+- Respects `NO_COLOR` and `MONOCHANGE_NO_PROGRESS` environment variables.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #281](https://github.com/monochange/monochange/pull/281) _Introduced in:_ [`a9eec58`](https://github.com/monochange/monochange/commit/a9eec586e72d0a8704d08b7552523e0bd85ed20d)
+
+### Testing
+
+#### test
+
+Add property-based testing with proptest to `monochange_core` and `monochange_semver`. Add mutation-testing-killing tests to `monochange_graph` and `monochange_config` to close coverage gaps identified by `cargo-mutants`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #266](https://github.com/monochange/monochange/pull/266) _Introduced in:_ [`9ef1044`](https://github.com/monochange/monochange/commit/9ef1044ccdde303143453d6880cc68df374c0c13) _Last updated in:_ [`3a638bd`](https://github.com/monochange/monochange/commit/3a638bdb089b3a0d2c5968116e035ec052498542)
+
+#### test
+
+Add cargo-mutants regression coverage for `monochange_analysis`, `monochange_config`, `monochange_core`, and `monochange_hosting`.
+
+- `monochange_analysis`: add tests for `latest_workspace_release_tag` to ignore namespaced tags, `snapshot_files_from_working_tree` and `read_text_file_from_git_object` for medium/exact-size files, `detect_raw_pr_environment` to reject non-PR events across CI providers, `default_branch_name` with origin HEAD symbolic ref, `get_merge_base` returning actual merge base, and `ChangeFrame::changed_files` distinguishing working directory from staged-only.
+- `monochange_config`: add fixture-backed tests and proptests for ecosystem versioned-file inheritance, explicit group bump inference, and changelog validation defaults to close mutation gaps in release-planning configuration loading.
+- `monochange_core`: add fixture-backed tests for discovery filtering around parent `.git` directories outside the workspace root and block-comment stripping edge cases in JSON helper logic.
+- `monochange_hosting`: add HTTP-mock tests for error paths in `get_json`, `get_optional_json`, `post_json`, `put_json`, and `patch_json` to kill mutants on status-code checks. Update `Cargo.toml` to include `src/*.rs` in the distribution manifest so `__tests.rs` builds correctly with `httpmock` as a dev-dependency.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #277](https://github.com/monochange/monochange/pull/277) _Introduced in:_ [`4c411d9`](https://github.com/monochange/monochange/commit/4c411d9efe84aaefbe2231ac16e4065249fc2a06)
+
+### Changed
+
+#### test
+
+Add additional property-based tests across crates.
+
+- `monochange_config`: proptests for `render_changelog_path_template` with `{{package_dir}}`, `{{package_name}}`, unknown placeholder passthrough, and idempotence. Remove unused `minijinja` dependency.
+- `monochange_core`: proptests for `strip_json_comments` on string literal preservation, line/block comment removal, idempotence, and comment-free input preservation.
+- `monochange_graph`: proptests for `trigger_priority` ordering, `propagation_is_suppressed` correctness, and `NormalizedGraph` reverse edge correctness.
+- `monochange_semver`: proptests for `merge_severities` idempotence and Major severity absorbing all values.
+- Fix clippy `needless_borrow` lint in `monochange_github` and `indexing_slicing` lint in `monochange_graph` proptests.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #268](https://github.com/monochange/monochange/pull/268) _Introduced in:_ [`015c48d`](https://github.com/monochange/monochange/commit/015c48d77818b6e195d740986d7fa571867ad9b5)
+
+#### add changelog section thresholds for collapsed and ignored sections
+
+`monochange` changelog rendering can now hide or collapse sections based on each section's configured priority. This lets you keep high-signal sections expanded while moving low-priority notes into collapsible markdown blocks or omitting them entirely.
+
+Add the new workspace setting under `[changelog.section_thresholds]`:
+
+```toml
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+With that configuration:
+
+- sections with `priority < 50` stay fully expanded
+- sections with `priority >= 50` render inside markdown `<details>` blocks
+- sections with `priority > 100` are omitted from the rendered changelog
+
+**Before:** every configured `changelog.sections` entry rendered normally once it had entries.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+### Other
+
+- internal cleanup note
+```
+
+**After:** lower-priority sections can collapse automatically.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+<details>
+<summary><strong>Other</strong></summary>
+
+- internal cleanup note
+
+</details>
+```
+
+This release also updates the generated init config and workspace config annotations so the new thresholds are documented where `monochange.toml` is authored.
+
+> **Breaking change for Rust library consumers** — `monochange_core::ReleaseNotesSection` and `monochange_core::ChangelogSettings` now carry the new changelog-threshold metadata, so manual struct literals must include the added fields.
+
+**Before (`monochange_core`):**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    types,
+}
+```
+
+**After:**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    collapsed: true,
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    section_thresholds,
+    types,
+}
+```
+
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`4426b99`](https://github.com/monochange/monochange/commit/4426b9916791ceff82957f61837be1e681988c9a)
+
+#### add post-merge release automation and release PR merge guards
+
+- Add `release-pr-manual-merge-blocker` job to CI that fails on PRs from `monochange/release/*` branches, forcing the `/merge` slash-command workflow
+- Protect the `release-pr` job with `environment: publisher` so branch-protection rules apply
+- Introduce a `release-post-merge` job that runs `PublishRelease` and `CommentReleasedIssues` steps after a release PR merges
+- Add `from-ref` support to `PublishRelease` and `CommentReleasedIssues` for discovering the release record from the merge commit when `prepared_release` context is unavailable
+- Add `auto-close-issues` flag to `CommentReleasedIssues` that closes released issues not already closed by a PR reference
+- Store `changesets` in `ReleaseRecord` so post-merge steps can resolve related issues without access to the deleted changeset files
+- Update `plan_released_issue_comments` to include all issue relationships and set `close` state appropriately
+- Update `comment_released_issues_with_client` to PATCH issue state to `"closed"` when `plan.close` is `true`
+- Add dedicated composite actions: `publish-release` and `comment-released-issues`
+- Add `publish-release` and `comment-released-issues` CLI step definitions to `monochange.init.toml`
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #282](https://github.com/monochange/monochange/pull/282) _Introduced in:_ [`014491d`](https://github.com/monochange/monochange/commit/014491ddb0de1a562bd0ca6552bba9646baf7f42)
+
+#### Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740)
+
+#### add `no_verify` support to automated release commit and release request steps
+
+> **Breaking change** — library consumers that construct `monochange_core::CliStepDefinition::CommitRelease` or `OpenReleaseRequest`, or that call the exported git/provider release helpers directly, must now handle the new `no_verify` field/argument.
+
+Release automation can now bypass local git hooks when creating the generated release commit and when pushing the release request branch. This is useful for CI-driven `mc release-pr` flows where repository hooks depend on tools that are not available in the runner environment.
+
+**Before (`monochange.toml`):**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit" },
+	{ type = "OpenReleaseRequest", name = "create the pr" },
+]
+```
+
+**After:**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+	{ name = "no_verify", type = "boolean", default = true },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+]
+```
+
+That keeps the `mc release-pr` invocation the same while making hook bypass explicit in config:
+
+```bash
+mc release-pr
+```
+
+For crate consumers, the step and git helper APIs now carry the same flag through the full release-request pipeline.
+
+**Before (`monochange_core` / hosting adapters):**
+
+```rust
+// before
+CliStepDefinition::CommitRelease { name, when, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, inputs }
+
+git_commit_paths_command(root, &message)
+git_push_branch_command(root, branch)
+```
+
+**After:**
+
+```rust
+// after
+CliStepDefinition::CommitRelease { name, when, no_verify, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, no_verify, inputs }
+
+git_commit_paths_command(root, &message, no_verify)
+git_push_branch_command(root, branch, no_verify)
+```
+
+Provider-facing release helpers in `monochange_hosting`, `monochange_github`, `monochange_gitlab`, and `monochange_gitea` now forward that flag so a single `no_verify` choice applies consistently to commit creation and branch push operations.
+
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Breaking Change

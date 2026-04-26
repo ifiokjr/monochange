@@ -1,3 +1,185 @@
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-26)
+
+### Testing
+
+#### add changelog section thresholds for collapsed and ignored sections
+
+`monochange` changelog rendering can now hide or collapse sections based on each section's configured priority. This lets you keep high-signal sections expanded while moving low-priority notes into collapsible markdown blocks or omitting them entirely.
+
+Add the new workspace setting under `[changelog.section_thresholds]`:
+
+```toml
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+With that configuration:
+
+- sections with `priority < 50` stay fully expanded
+- sections with `priority >= 50` render inside markdown `<details>` blocks
+- sections with `priority > 100` are omitted from the rendered changelog
+
+**Before:** every configured `changelog.sections` entry rendered normally once it had entries.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+### Other
+
+- internal cleanup note
+```
+
+**After:** lower-priority sections can collapse automatically.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+<details>
+<summary><strong>Other</strong></summary>
+
+- internal cleanup note
+
+</details>
+```
+
+This release also updates the generated init config and workspace config annotations so the new thresholds are documented where `monochange.toml` is authored.
+
+> **Breaking change for Rust library consumers** — `monochange_core::ReleaseNotesSection` and `monochange_core::ChangelogSettings` now carry the new changelog-threshold metadata, so manual struct literals must include the added fields.
+
+**Before (`monochange_core`):**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    types,
+}
+```
+
+**After:**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    collapsed: true,
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    section_thresholds,
+    types,
+}
+```
+
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`4426b99`](https://github.com/monochange/monochange/commit/4426b9916791ceff82957f61837be1e681988c9a)
+
+### Changed
+
+#### Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740)
+
+#### add `no_verify` support to automated release commit and release request steps
+
+> **Breaking change** — library consumers that construct `monochange_core::CliStepDefinition::CommitRelease` or `OpenReleaseRequest`, or that call the exported git/provider release helpers directly, must now handle the new `no_verify` field/argument.
+
+Release automation can now bypass local git hooks when creating the generated release commit and when pushing the release request branch. This is useful for CI-driven `mc release-pr` flows where repository hooks depend on tools that are not available in the runner environment.
+
+**Before (`monochange.toml`):**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit" },
+	{ type = "OpenReleaseRequest", name = "create the pr" },
+]
+```
+
+**After:**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+	{ name = "no_verify", type = "boolean", default = true },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+]
+```
+
+That keeps the `mc release-pr` invocation the same while making hook bypass explicit in config:
+
+```bash
+mc release-pr
+```
+
+For crate consumers, the step and git helper APIs now carry the same flag through the full release-request pipeline.
+
+**Before (`monochange_core` / hosting adapters):**
+
+```rust
+// before
+CliStepDefinition::CommitRelease { name, when, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, inputs }
+
+git_commit_paths_command(root, &message)
+git_push_branch_command(root, branch)
+```
+
+**After:**
+
+```rust
+// after
+CliStepDefinition::CommitRelease { name, when, no_verify, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, no_verify, inputs }
+
+git_commit_paths_command(root, &message, no_verify)
+git_push_branch_command(root, branch, no_verify)
+```
+
+Provider-facing release helpers in `monochange_hosting`, `monochange_github`, `monochange_gitlab`, and `monochange_gitea` now forward that flag so a single `no_verify` choice applies consistently to commit creation and branch push operations.
+
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
