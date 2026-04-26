@@ -1005,9 +1005,7 @@ pub(crate) fn build_release_manifest(
 	}
 }
 
-pub(crate) fn build_release_manifest_from_record(
-	record: &ReleaseRecord,
-) -> ReleaseManifest {
+pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> ReleaseManifest {
 	ReleaseManifest {
 		command: record.command.clone(),
 		dry_run: false,
@@ -1042,7 +1040,11 @@ pub(crate) fn build_release_manifest_from_record(
 					owner_kind: ReleaseOwnerKind::Group,
 					path: path.clone(),
 					format: ChangelogFormat::default(),
-					notes: ReleaseNotesDocument { title: String::new(), summary: Vec::new(), sections: Vec::new() },
+					notes: ReleaseNotesDocument {
+						title: String::new(),
+						summary: Vec::new(),
+						sections: Vec::new(),
+					},
 					rendered: String::new(),
 				}
 			})

@@ -626,12 +626,9 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::PublishRelease { .. } => {
-					let manifest = if let Some(prepared_release) = context.prepared_release.as_ref() {
-						build_release_manifest(
-							cli_command,
-							prepared_release,
-							&context.command_logs,
-						)
+					let manifest = if let Some(prepared_release) = context.prepared_release.as_ref()
+					{
+						build_release_manifest(cli_command, prepared_release, &context.command_logs)
 					} else {
 						let from_ref = step_inputs
 							.get("from-ref")
@@ -754,12 +751,9 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::CommentReleasedIssues { .. } => {
-					let manifest = if let Some(prepared_release) = context.prepared_release.as_ref() {
-						build_release_manifest(
-							cli_command,
-							prepared_release,
-							&context.command_logs,
-						)
+					let manifest = if let Some(prepared_release) = context.prepared_release.as_ref()
+					{
+						build_release_manifest(cli_command, prepared_release, &context.command_logs)
 					} else {
 						let from_ref = step_inputs
 							.get("from-ref")
@@ -769,7 +763,8 @@ pub(crate) fn execute_cli_command_with_options(
 						build_release_manifest_from_record(&discovery.record)
 					};
 					let auto_close_issues =
-						parse_boolean_step_input(&step_inputs, "auto-close-issues")?.unwrap_or(false);
+						parse_boolean_step_input(&step_inputs, "auto-close-issues")?
+							.unwrap_or(false);
 					let source = configuration.source.clone().ok_or_else(|| {
 						MonochangeError::Config(
 							"`CommentReleasedIssues` requires `[source]` configuration".to_string(),
@@ -782,7 +777,8 @@ pub(crate) fn execute_cli_command_with_options(
 							source.provider
 						)));
 					}
-					let mut issue_comment_plans = adapter.plan_released_issue_comments(&source, &manifest);
+					let mut issue_comment_plans =
+						adapter.plan_released_issue_comments(&source, &manifest);
 					if !auto_close_issues {
 						for plan in &mut issue_comment_plans {
 							plan.close = false;
@@ -790,7 +786,10 @@ pub(crate) fn execute_cli_command_with_options(
 					}
 					let dry_run = context.dry_run;
 					let results = build_issue_comment_results_for_source(
-						dry_run, &source, &manifest, &issue_comment_plans,
+						dry_run,
+						&source,
+						&manifest,
+						&issue_comment_plans,
 					)?;
 					context.issue_comment_plans = issue_comment_plans;
 					context.issue_comment_results = results;

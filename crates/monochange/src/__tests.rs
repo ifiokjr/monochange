@@ -2346,7 +2346,7 @@ fn resolve_changeset_path_rejects_invalid_inputs() {
 fn render_changeset_diagnostics_reports_empty_set() {
 	let report = crate::ChangesetDiagnosticsReport {
 		requested_changesets: Vec::new(),
-			changesets: Vec::new(),
+		changesets: Vec::new(),
 	};
 	let rendered = crate::render_changeset_diagnostics(&report);
 
@@ -4581,6 +4581,33 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["init", "-b", "main"])
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.email", "test@example.com"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config email: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.name", "Test User"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config name: {error}"));
+	fs::write(tempdir.path().join("tracked.txt"), "test\n")
+		.unwrap_or_else(|error| panic!("write tracked: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["add", "tracked.txt"])
+		.output()
+		.unwrap_or_else(|error| panic!("git add: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["commit", "-m", "initial commit"])
+		.output()
+		.unwrap_or_else(|error| panic!("git commit: {error}"));
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let cases = [
@@ -4591,7 +4618,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 				when: None,
 				inputs: BTreeMap::new(),
 			},
-			"`PublishRelease` requires a previous `PrepareRelease` step",
+			"no monochange release record found in first-parent ancestry",
 		),
 		(
 			"release-pr",
@@ -4610,7 +4637,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 				when: None,
 				inputs: BTreeMap::new(),
 			},
-			"`CommentReleasedIssues` requires a previous `PrepareRelease` step",
+			"no monochange release record found in first-parent ancestry",
 		),
 	];
 	for (name, step, expected) in cases {

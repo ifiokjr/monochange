@@ -992,8 +992,12 @@ async fn comment_released_issues_with_client(
 				url: plan.issue_url.clone(),
 			});
 			if plan.close {
-				let issue_path = format!("/repos/{}/{}/issues/{}", source.owner, source.repo, issue_number);
-				let _: serde_json::Value = patch_json(client, &issue_path, &json!({ "state": "closed" })).await?;
+				let issue_path = format!(
+					"/repos/{}/{}/issues/{}",
+					source.owner, source.repo, issue_number
+				);
+				let _: serde_json::Value =
+					patch_json(client, &issue_path, &json!({ "state": "closed" })).await?;
 			}
 			continue;
 		}
@@ -1006,7 +1010,11 @@ async fn comment_released_issues_with_client(
 		outcomes.push(GitHubIssueCommentOutcome {
 			repository: plan.repository.clone(),
 			issue_id: plan.issue_id.clone(),
-			operation: if plan.close { GitHubIssueCommentOperation::Closed } else { GitHubIssueCommentOperation::Created },
+			operation: if plan.close {
+				GitHubIssueCommentOperation::Closed
+			} else {
+				GitHubIssueCommentOperation::Created
+			},
 			url: response.html_url.or_else(|| plan.issue_url.clone()),
 		});
 	}
