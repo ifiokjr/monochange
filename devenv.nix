@@ -383,7 +383,7 @@ in
     "lint:js" = {
       exec = ''
         set -euo pipefail
-        oxlint --type-aware .
+        pnpm exec oxlint --type-aware .
       '';
       description = "Lint all JS/TS files with oxlint (type-aware).";
       binary = "bash";
@@ -391,7 +391,7 @@ in
     "lint:js:syntax" = {
       exec = ''
         set -euo pipefail
-        oxlint .
+        pnpm exec oxlint .
       '';
       description = "Lint all JS/TS files with oxlint (syntax-only, faster).";
       binary = "bash";
@@ -399,7 +399,7 @@ in
     "lint:js:types" = {
       exec = ''
         set -euo pipefail
-        tsgo -config tsconfig.json
+        pnpm exec tsgo -config tsconfig.json
       '';
       description = "Type-check all JS/TS files with tsgo.";
       binary = "bash";
@@ -407,7 +407,7 @@ in
     "fix:js" = {
       exec = ''
         set -euo pipefail
-        oxfmt --write .
+        pnpm exec oxfmt --write .
       '';
       description = "Format all JS/TS files with oxfmt.";
       binary = "bash";
@@ -415,7 +415,7 @@ in
     "build:js" = {
       exec = ''
         set -euo pipefail
-        tsdown
+        pnpm exec tsdown
       '';
       description = "Bundle JS/TS entry points with tsdown.";
       binary = "bash";
