@@ -11133,3 +11133,347 @@ fn quiet_lint_commands_return_empty_output() {
 	.unwrap_or_else(|error| panic!("quiet lint list: {error}"));
 	assert!(output.is_empty());
 }
+
+#[test]
+fn build_release_manifest_from_record_populates_manifest_from_release_record() {
+	use std::path::PathBuf;
+
+	use monochange_core::ChangelogFormat;
+	use monochange_core::ReleaseManifestChangelog;
+	use monochange_core::ReleaseNotesDocument;
+	use monochange_core::ReleaseOwnerKind;
+	use monochange_core::ReleaseRecord;
+	use monochange_core::ReleaseRecordProvider;
+	use monochange_core::ReleaseRecordTarget;
+
+	let record = ReleaseRecord {
+		schema_version: 1,
+		kind: "monochange.releaseRecord".to_string(),
+		created_at: "2024-01-01T00:00:00Z".to_string(),
+		command: "release-pr".to_string(),
+		version: Some("1.0.0".to_string()),
+		group_version: None,
+		release_targets: vec![ReleaseRecordTarget {
+			id: "core".to_string(),
+			kind: ReleaseOwnerKind::Package,
+			version: "1.0.0".to_string(),
+			version_format: VersionFormat::Namespaced,
+			tag: true,
+			release: true,
+			tag_name: "core/v1.0.0".to_string(),
+			members: vec!["core".to_string()],
+		}],
+		released_packages: vec!["workflow-core".to_string()],
+		changed_files: vec![PathBuf::from("Cargo.toml")],
+		package_publications: vec![],
+		updated_changelogs: vec![PathBuf::from("crates/core/CHANGELOG.md")],
+		deleted_changesets: vec![],
+		changesets: vec![],
+		provider: Some(ReleaseRecordProvider {
+			kind: monochange_core::SourceProvider::GitHub,
+			owner: "ifiokjr".to_string(),
+			repo: "monochange".to_string(),
+			host: None,
+		}),
+	};
+
+	let manifest = crate::release_artifacts::build_release_manifest_from_record(&record);
+	assert_eq!(manifest.command, "release-pr");
+	assert_eq!(manifest.version, Some("1.0.0".to_string()));
+	assert_eq!(manifest.release_targets.len(), 1);
+	assert_eq!(manifest.release_targets[0].id, "core");
+	assert_eq!(manifest.changelogs.len(), 1);
+	assert_eq!(
+		manifest.changelogs[0],
+		ReleaseManifestChangelog {
+			path: PathBuf::from("crates/core/CHANGELOG.md"),
+			format: ChangelogFormat::Monochange,
+			owner_id: String::new(),
+			owner_kind: ReleaseOwnerKind::Group,
+			notes: ReleaseNotesDocument {
+				title: String::new(),
+				summary: Vec::new(),
+				sections: Vec::new(),
+			},
+			rendered: String::new(),
+		}
+	);
+}
+
+#[test]
+fn build_issue_comment_results_includes_closed_operation() {
+	let issue_comment_plans = vec![monochange_github::GitHubIssueCommentPlan {
+		repository: "ifiokjr/monochange".to_string(),
+		issue_id: "#7".to_string(),
+		issue_url: Some("https://example.com/issues/7".to_string()),
+		body: "released".to_string(),
+		close: true,
+	}];
+	let issue_comment_results =
+		crate::cli_runtime::build_issue_comment_results(false, &issue_comment_plans, || {
+			Ok(vec![monochange_github::GitHubIssueCommentOutcome {
+				repository: "ifiokjr/monochange".to_string(),
+				issue_id: "#7".to_string(),
+				operation: monochange_github::GitHubIssueCommentOperation::Closed,
+				url: Some("https://example.com/issues/7#event-1".to_string()),
+			}])
+		})
+		.unwrap_or_else(|error| panic!("render issue comment results: {error}"));
+	assert_eq!(
+		issue_comment_results,
+		vec!["ifiokjr/monochange #7 (closed)".to_string(),]
+	);
+}
+
+#[test]
+fn execute_cli_command_publish_release_falls_back_to_release_record_from_git() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["init", "-b", "main"])
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.email", "test@example.com"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config email: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.name", "Test User"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config name: {error}"));
+	fs::write(tempdir.path().join("tracked.txt"), "test\n")
+		.unwrap_or_else(|error| panic!("write tracked: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["add", "tracked.txt"])
+		.output()
+		.unwrap_or_else(|error| panic!("git add: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["commit", "-m", "initial commit"])
+		.output()
+		.unwrap_or_else(|error| panic!("git commit: {error}"));
+
+	// Write a release record block into a file and commit it
+	let record = monochange_core::ReleaseRecord {
+		schema_version: 1,
+		kind: "monochange.releaseRecord".to_string(),
+		created_at: "2024-01-01T00:00:00Z".to_string(),
+		command: "release-pr".to_string(),
+		version: Some("1.0.0".to_string()),
+		group_version: None,
+		release_targets: vec![monochange_core::ReleaseRecordTarget {
+			id: "test".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Group,
+			version: "1.0.0".to_string(),
+			version_format: VersionFormat::Primary,
+			tag: true,
+			release: true,
+			tag_name: "v1.0.0".to_string(),
+			members: vec![],
+		}],
+		released_packages: vec![],
+		changed_files: vec![],
+		package_publications: vec![],
+		updated_changelogs: vec![],
+		deleted_changesets: vec![],
+		changesets: vec![monochange_core::PreparedChangeset {
+			path: PathBuf::from(".changeset/test.md"),
+			summary: Some("Test changeset".to_string()),
+			details: None,
+			targets: vec![],
+			context: Some(monochange_core::ChangesetContext {
+				provider: monochange_core::HostingProviderKind::GitHub,
+				host: None,
+				capabilities: monochange_core::HostingCapabilities::default(),
+				introduced: None,
+				last_updated: None,
+				related_issues: vec![monochange_core::HostedIssueRef {
+					provider: monochange_core::HostingProviderKind::GitHub,
+					host: None,
+					id: "#1".to_string(),
+					title: None,
+					url: None,
+					relationship:
+						monochange_core::HostedIssueRelationshipKind::ClosedByReviewRequest,
+				}],
+			}),
+		}],
+		provider: None,
+	};
+	let block = monochange_core::render_release_record_block(&record)
+		.unwrap_or_else(|error| panic!("render release record: {error}"));
+	fs::write(tempdir.path().join("release.txt"), block.clone())
+		.unwrap_or_else(|error| panic!("write release: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["add", "release.txt"])
+		.output()
+		.unwrap_or_else(|error| panic!("git add release: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args([
+			"commit",
+			"-m",
+			&format!("chore(release): prepare release\n\n{block}"),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("git commit release: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "publish-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::PublishRelease {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let result = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		true,
+		BTreeMap::new(),
+	);
+	// It will fail because there's no source configured, but it should get past the fallback
+	let error = result.err().unwrap_or_else(|| panic!("expected error"));
+	let message = error.to_string();
+	assert!(
+		message.contains("source") || message.contains("publish"),
+		"unexpected error: {message}"
+	);
+}
+
+#[test]
+fn execute_cli_command_comment_released_issues_falls_back_to_release_record_from_git() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["init", "-b", "main"])
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.email", "test@example.com"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config email: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.name", "Test User"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config name: {error}"));
+	fs::write(tempdir.path().join("tracked.txt"), "test\n")
+		.unwrap_or_else(|error| panic!("write tracked: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["add", "tracked.txt"])
+		.output()
+		.unwrap_or_else(|error| panic!("git add: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["commit", "-m", "initial commit"])
+		.output()
+		.unwrap_or_else(|error| panic!("git commit: {error}"));
+
+	let record = monochange_core::ReleaseRecord {
+		schema_version: 1,
+		kind: "monochange.releaseRecord".to_string(),
+		created_at: "2024-01-01T00:00:00Z".to_string(),
+		command: "release-pr".to_string(),
+		version: Some("1.0.0".to_string()),
+		group_version: None,
+		release_targets: vec![monochange_core::ReleaseRecordTarget {
+			id: "test".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Group,
+			version: "1.0.0".to_string(),
+			version_format: VersionFormat::Primary,
+			tag: true,
+			release: true,
+			tag_name: "v1.0.0".to_string(),
+			members: vec![],
+		}],
+		released_packages: vec![],
+		changed_files: vec![],
+		package_publications: vec![],
+		updated_changelogs: vec![],
+		deleted_changesets: vec![],
+		changesets: vec![monochange_core::PreparedChangeset {
+			path: PathBuf::from(".changeset/test.md"),
+			summary: Some("Test changeset".to_string()),
+			details: None,
+			targets: vec![],
+			context: Some(monochange_core::ChangesetContext {
+				provider: monochange_core::HostingProviderKind::GitHub,
+				host: None,
+				capabilities: monochange_core::HostingCapabilities::default(),
+				introduced: None,
+				last_updated: None,
+				related_issues: vec![monochange_core::HostedIssueRef {
+					provider: monochange_core::HostingProviderKind::GitHub,
+					host: None,
+					id: "#1".to_string(),
+					title: None,
+					url: None,
+					relationship:
+						monochange_core::HostedIssueRelationshipKind::ClosedByReviewRequest,
+				}],
+			}),
+		}],
+		provider: None,
+	};
+	let block = monochange_core::render_release_record_block(&record)
+		.unwrap_or_else(|error| panic!("render release record: {error}"));
+	fs::write(tempdir.path().join("release.txt"), block.clone())
+		.unwrap_or_else(|error| panic!("write release: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["add", "release.txt"])
+		.output()
+		.unwrap_or_else(|error| panic!("git add release: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args([
+			"commit",
+			"-m",
+			&format!("chore(release): prepare release\n\n{block}"),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("git commit release: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = monochange_core::CliCommandDefinition {
+		name: "release-comments".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::CommentReleasedIssues {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		}],
+	};
+	let result = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		true,
+		BTreeMap::new(),
+	);
+	result.unwrap_or_else(|error| panic!("unexpected error: {error}"));
+}

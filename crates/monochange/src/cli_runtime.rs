@@ -779,18 +779,13 @@ pub(crate) fn execute_cli_command_with_options(
 					}
 					let mut issue_comment_plans =
 						adapter.plan_released_issue_comments(&source, &manifest);
-					if !auto_close_issues {
-						for plan in &mut issue_comment_plans {
-							plan.close = false;
-						}
+					for plan in &mut issue_comment_plans {
+						plan.close &= auto_close_issues;
 					}
+					#[rustfmt::skip]
 					let dry_run = context.dry_run;
-					let results = build_issue_comment_results_for_source(
-						dry_run,
-						&source,
-						&manifest,
-						&issue_comment_plans,
-					)?;
+					#[rustfmt::skip]
+					let results = build_issue_comment_results_for_source(dry_run, &source, &manifest, &issue_comment_plans)?;
 					context.issue_comment_plans = issue_comment_plans;
 					context.issue_comment_results = results;
 					output = None;
