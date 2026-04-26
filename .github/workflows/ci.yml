@@ -322,7 +322,7 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   release-pr-manual-merge-blocker:
-    if: github.event_name == pull_request && startsWith(github.head_ref, monochange/release/)
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'monochange/release/')
     runs-on: ubuntu-latest
     steps:
       - name: block direct merge of release branches
@@ -430,17 +430,16 @@ jobs:
           fi
 
       - name: publish release
-        if: steps.tag_release.outputs.is_release_commit == true
+        if: steps.tag_release.outputs.is_release_commit == 'true'
         uses: ./.github/actions/publish-release
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           from-ref: HEAD
 
       - name: comment on released issues
-        if: steps.tag_release.outputs.is_release_commit == true
+        if: steps.tag_release.outputs.is_release_commit == 'true'
         uses: ./.github/actions/comment-released-issues
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           from-ref: HEAD
           auto-close-issues: true
-
