@@ -1,4 +1,4 @@
-## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
 
@@ -78,10 +78,10 @@ This release also adds two new support crates:
 
 The Cargo and npm suites now live in `monochange_cargo::lints` and `monochange_npm::lints`, so ecosystem-specific parsing and rule behavior stay with their ecosystem adapters.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/ifiokjr/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/ifiokjr/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/monochange/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/monochange/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Refactor
 
 #### Adopt `declare_lint_rule` for Cargo lint metadata and clarify when lint authors should use it.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #239](https://github.com/ifiokjr/monochange/pull/239) _Introduced in:_ [`f30f62f`](https://github.com/ifiokjr/monochange/commit/f30f62f26c5e846448a94b2aa08b5b84d147a27a) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#234](https://github.com/ifiokjr/monochange/issues/234)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #239](https://github.com/monochange/monochange/pull/239) _Introduced in:_ [`f30f62f`](https://github.com/monochange/monochange/commit/f30f62f26c5e846448a94b2aa08b5b84d147a27a) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#234](https://github.com/monochange/monochange/issues/234)

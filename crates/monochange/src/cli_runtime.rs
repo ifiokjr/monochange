@@ -3371,7 +3371,7 @@ mod tests {
 			placeholder: false,
 			trusted_publishing: package_publish::TrustedPublishingOutcome {
 				status: trust_status,
-				repository: Some("ifiokjr/monochange".to_string()),
+				repository: Some("monochange/monochange".to_string()),
 				workflow: Some("publish.yml".to_string()),
 				environment: Some("release".to_string()),
 				setup_url: Some("https://docs.npmjs.com/cli/v11/commands/npm-trust".to_string()),
@@ -3807,7 +3807,7 @@ path = "crates/core"
 				placeholder: false,
 				trusted_publishing: package_publish::TrustedPublishingOutcome {
 					status: package_publish::TrustedPublishingStatus::Configured,
-					repository: Some("ifiokjr/monochange".to_string()),
+					repository: Some("monochange/monochange".to_string()),
 					workflow: Some("publish.yml".to_string()),
 					environment: Some("release".to_string()),
 					setup_url: None,
@@ -3821,7 +3821,7 @@ path = "crates/core"
 		assert!(text.contains("package publishing:"));
 		assert!(text.contains("@scope/pkg"));
 		assert!(text.contains("trusted publishing: configured"));
-		assert!(text.contains("repository: ifiokjr/monochange"));
+		assert!(text.contains("repository: monochange/monochange"));
 		assert!(text.contains("commands:"));
 
 		let markdown = render_cli_command_markdown_result(&cli_command, &context);
@@ -3858,13 +3858,13 @@ path = "crates/core"
 			)],
 		};
 		let text = render_package_publish_report(&detailed_report).join("\n");
-		assert!(text.contains("repository: ifiokjr/monochange"));
+		assert!(text.contains("repository: monochange/monochange"));
 		assert!(text.contains("workflow: publish.yml"));
 		assert!(text.contains("environment: release"));
 		assert!(text.contains("setup: https://docs.npmjs.com/cli/v11/commands/npm-trust"));
 
 		let markdown = render_package_publish_report_markdown(&detailed_report, false).join("\n");
-		assert!(markdown.contains("**Repository:** `ifiokjr/monochange`"));
+		assert!(markdown.contains("**Repository:** `monochange/monochange`"));
 		assert!(markdown.contains("**Workflow:** `publish.yml`"));
 		assert!(markdown.contains("**Environment:** `release`"));
 		assert!(
@@ -3887,7 +3887,7 @@ path = "crates/core"
 				placeholder: false,
 				trusted_publishing: package_publish::TrustedPublishingOutcome {
 					status: package_publish::TrustedPublishingStatus::ManualActionRequired,
-					repository: Some("ifiokjr/monochange".to_string()),
+					repository: Some("monochange/monochange".to_string()),
 					workflow: Some("publish.yml".to_string()),
 					environment: Some("release".to_string()),
 					setup_url: Some("https://crates.io/crates/pkg".to_string()),

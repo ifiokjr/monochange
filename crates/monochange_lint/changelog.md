@@ -1,4 +1,4 @@
-## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Breaking Change
 
@@ -45,7 +45,7 @@ Key changes:
 - Built-in defaults provide 13 sections and 13 types when `[changelog]` is empty
 - Bump-severity shorthand types (`minor`, `patch`, `major`, `none`) each get their own title-case section heading (Minor, Patch, Major, None) by default, instead of routing to semantic sections like Added/Fixed
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #259](https://github.com/ifiokjr/monochange/pull/259) _Introduced in:_ [`c698d29`](https://github.com/ifiokjr/monochange/commit/c698d29ffabefab418a0a750a06de3b1d6074561) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #259](https://github.com/monochange/monochange/pull/259) _Introduced in:_ [`c698d29`](https://github.com/monochange/monochange/commit/c698d29ffabefab418a0a750a06de3b1d6074561) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Added
 
@@ -53,7 +53,7 @@ Key changes:
 
 Add `mc check` CLI command that combines workspace validation with lint rule enforcement. Supports `--fix` for autofix, `--ecosystem` for filtering, and `--format` for output selection. The Validate step also runs lint rules and accepts a `fix` input. Includes the full `monochange_lint` crate with 5 Cargo and 6 NPM lint rules.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/ifiokjr/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/ifiokjr/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/monochange/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/monochange/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add lint include/exclude path filters with optional gitignore override
 
@@ -69,7 +69,7 @@ By default, monochange now skips gitignored manifests during linting while still
 
 The repository config and bundled linting docs now show how to exclude `examples/**` when example manifests would otherwise trigger false positives.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/ifiokjr/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/ifiokjr/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/monochange/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/monochange/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Changed
 
@@ -149,7 +149,7 @@ This release also adds two new support crates:
 
 The Cargo and npm suites now live in `monochange_cargo::lints` and `monochange_npm::lints`, so ecosystem-specific parsing and rule behavior stay with their ecosystem adapters.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/ifiokjr/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/ifiokjr/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/monochange/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/monochange/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Changed
 
@@ -164,4 +164,4 @@ This foundation change adds:
 - Dart lint scaffolding support in `mc lint new`
 - tests covering managed Dart lint target collection and fixture filtering
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/ifiokjr/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/ifiokjr/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/ifiokjr/monochange/issues/230)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/monochange/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/monochange/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/monochange/monochange/issues/230)

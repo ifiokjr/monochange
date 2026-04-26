@@ -10,10 +10,10 @@ version = "0.2.0"
 authors = ["Ifiok Jr. <ifiokotung@gmail.com>"]
 categories = ["development-tools"]
 edition = "2024"
-homepage = "https://github.com/ifiokjr/monochange"
+homepage = "https://github.com/monochange/monochange"
 license = "Unlicense"
 readme = "readme.md"
-repository = "https://github.com/ifiokjr/monochange"
+repository = "https://github.com/monochange/monochange"
 rust-version = "1.90.0"
 
 [workspace.dependencies]

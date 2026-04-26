@@ -75,7 +75,7 @@
 //! };
 //! let github = SourceConfiguration {
 //!     provider: SourceProvider::GitHub,
-//!     owner: "ifiokjr".to_string(),
+//!     owner: "monochange".to_string(),
 //!     repo: "monochange".to_string(),
 //!     host: None,
 //!     api_url: None,
@@ -88,7 +88,7 @@
 //!
 //! assert_eq!(requests.len(), 1);
 //! assert_eq!(requests[0].tag_name, "v1.2.0");
-//! assert_eq!(requests[0].repository, "ifiokjr/monochange");
+//! assert_eq!(requests[0].repository, "monochange/monochange");
 //! ```
 //! <!-- {/monochangeGithubCrateDocs} -->
 

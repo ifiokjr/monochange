@@ -1795,7 +1795,7 @@ mod tests {
 	fn sample_source() -> SourceConfiguration {
 		SourceConfiguration {
 			provider: SourceProvider::GitHub,
-			owner: "ifiokjr".to_string(),
+			owner: "monochange".to_string(),
 			repo: "monochange".to_string(),
 			host: None,
 			api_url: None,
@@ -1949,7 +1949,7 @@ mod tests {
 	fn parse_github_workflow_ref_extracts_filename() {
 		assert_eq!(
 			parse_github_workflow_ref(
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main"
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main"
 			),
 			Some("publish.yml".to_string())
 		);
@@ -2063,13 +2063,14 @@ jobs:
 			&BTreeMap::from([
 				(
 					"GITHUB_WORKFLOW_REF".to_string(),
-					"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+					"monochange/monochange/.github/workflows/publish.yml@refs/heads/main"
+						.to_string(),
 				),
 				("GITHUB_JOB".to_string(), "release".to_string()),
 			]),
 		)
 		.expect("context:");
-		assert_eq!(context.repository, "ifiokjr/monochange");
+		assert_eq!(context.repository, "monochange/monochange");
 		assert_eq!(context.workflow, "publish.yml");
 		assert_eq!(context.environment, Some("publisher".to_string()));
 	}
@@ -2116,16 +2117,16 @@ jobs:
 	#[test]
 	fn trust_list_contains_context_supports_json_and_text() {
 		let context = GitHubTrustContext {
-			repository: "ifiokjr/monochange".to_string(),
+			repository: "monochange/monochange".to_string(),
 			workflow: "publish.yml".to_string(),
 			environment: Some("publisher".to_string()),
 		};
 		assert!(trust_list_contains_context(
-			r#"{"publisher":{"repository":"ifiokjr/monochange","workflow":"publish.yml","environment":"publisher"}}"#,
+			r#"{"publisher":{"repository":"monochange/monochange","workflow":"publish.yml","environment":"publisher"}}"#,
 			&context,
 		));
 		assert!(trust_list_contains_context(
-			"repository ifiokjr/monochange workflow publish.yml environment publisher",
+			"repository monochange/monochange workflow publish.yml environment publisher",
 			&context,
 		));
 	}
@@ -2149,17 +2150,17 @@ jobs:
 	#[test]
 	fn trust_list_contains_context_checks_arrays_and_missing_values() {
 		let context = GitHubTrustContext {
-			repository: "ifiokjr/monochange".to_string(),
+			repository: "monochange/monochange".to_string(),
 			workflow: "publish.yml".to_string(),
 			environment: None,
 		};
 		assert!(trust_list_contains_context(
-			r#"[{"repository":"ifiokjr/monochange"},{"workflow":"publish.yml"}]"#,
+			r#"[{"repository":"monochange/monochange"},{"workflow":"publish.yml"}]"#,
 			&context,
 		));
 		assert!(!json_value_contains(&serde_json::json!(false), "publish"));
 		assert!(!trust_list_contains_context(
-			r#"{"repository":"ifiokjr/monochange"}"#,
+			r#"{"repository":"monochange/monochange"}"#,
 			&context
 		));
 	}
@@ -2452,7 +2453,7 @@ jobs:
 		let trust_command = build_npm_trust_command(
 			&request,
 			&GitHubTrustContext {
-				repository: "ifiokjr/monochange".to_string(),
+				repository: "monochange/monochange".to_string(),
 				workflow: "publish.yml".to_string(),
 				environment: Some("publisher".to_string()),
 			},
@@ -2469,7 +2470,7 @@ jobs:
 				"--file".to_string(),
 				"publish.yml".to_string(),
 				"--repo".to_string(),
-				"ifiokjr/monochange".to_string(),
+				"monochange/monochange".to_string(),
 				"--yes".to_string(),
 				"--env".to_string(),
 				"publisher".to_string(),
@@ -3028,7 +3029,8 @@ jobs:
 		assert!(placeholder_manifest.contains("edition = \"2024\""));
 		assert!(placeholder_manifest.contains("license-file = \"LICENSE\""));
 		assert!(
-			placeholder_manifest.contains("repository = \"https://github.com/ifiokjr/monochange\"")
+			placeholder_manifest
+				.contains("repository = \"https://github.com/monochange/monochange\"")
 		);
 		assert_eq!(
 			fs::read_to_string(placeholder_dir.path().join("LICENSE"))
@@ -3449,7 +3451,7 @@ jobs:
 			.and_then(JsonValue::as_str);
 		assert_eq!(
 			npm_repository,
-			Some("https://github.com/ifiokjr/monochange")
+			Some("https://github.com/monochange/monochange")
 		);
 
 		let dart = build_placeholder_directory(
@@ -3460,7 +3462,7 @@ jobs:
 		.expect("dart placeholder:");
 		let pubspec =
 			fs::read_to_string(dart.path().join("pubspec.yaml")).expect("read pubspec.yaml:");
-		assert!(pubspec.contains("repository: https://github.com/ifiokjr/monochange"));
+		assert!(pubspec.contains("repository: https://github.com/monochange/monochange"));
 
 		let jsr = build_placeholder_directory(
 			tempdir.path(),
@@ -3477,7 +3479,7 @@ jobs:
 			.and_then(JsonValue::as_str);
 		assert_eq!(
 			deno_repository,
-			Some("https://github.com/ifiokjr/monochange")
+			Some("https://github.com/monochange/monochange")
 		);
 	}
 
@@ -3487,7 +3489,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -3523,7 +3525,7 @@ jobs:
 			&env_map,
 		);
 		assert_eq!(manual.status, TrustedPublishingStatus::ManualActionRequired);
-		assert_eq!(manual.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(manual.repository.as_deref(), Some("monochange/monochange"));
 		assert_eq!(manual.workflow.as_deref(), Some("publish.yml"));
 		assert_eq!(manual.environment.as_deref(), Some("publisher"));
 		assert!(
@@ -3540,7 +3542,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -3554,7 +3556,7 @@ jobs:
 			outcome.status,
 			TrustedPublishingStatus::ManualActionRequired
 		);
-		assert_eq!(outcome.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(outcome.repository.as_deref(), Some("monochange/monochange"));
 		assert_eq!(outcome.workflow.as_deref(), Some("publish.yml"));
 		assert_eq!(outcome.environment.as_deref(), Some("publisher"));
 	}
@@ -3562,7 +3564,7 @@ jobs:
 	#[test]
 	fn manual_trust_outcome_preserves_explicit_context_and_registry_setup_url() {
 		let mut request = trusted_request(RegistryKind::PubDev);
-		request.trusted_publishing.repository = Some("ifiokjr/monochange".to_string());
+		request.trusted_publishing.repository = Some("monochange/monochange".to_string());
 		request.trusted_publishing.workflow = Some("publish.yml".to_string());
 		request.trusted_publishing.environment = Some("pub.dev".to_string());
 
@@ -3572,7 +3574,7 @@ jobs:
 			outcome.status,
 			TrustedPublishingStatus::ManualActionRequired
 		);
-		assert_eq!(outcome.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(outcome.repository.as_deref(), Some("monochange/monochange"));
 		assert_eq!(outcome.workflow.as_deref(), Some("publish.yml"));
 		assert_eq!(outcome.environment.as_deref(), Some("pub.dev"));
 		assert_eq!(
@@ -3585,14 +3587,14 @@ jobs:
 				.contains("configure trusted publishing manually for `pkg`")
 		);
 		assert!(outcome.message.contains(
-			"register repository `ifiokjr/monochange`, workflow `publish.yml`, environment `pub.dev`"
+			"register repository `monochange/monochange`, workflow `publish.yml`, environment `pub.dev`"
 		));
 	}
 
 	#[test]
 	fn manual_trust_outcome_includes_copyable_npm_trust_command_when_context_is_known() {
 		let mut request = trusted_request(RegistryKind::Npm);
-		request.trusted_publishing.repository = Some("ifiokjr/monochange".to_string());
+		request.trusted_publishing.repository = Some("monochange/monochange".to_string());
 		request.trusted_publishing.workflow = Some("publish.yml".to_string());
 		request.trusted_publishing.environment = Some("publisher".to_string());
 
@@ -3603,7 +3605,7 @@ jobs:
 			TrustedPublishingStatus::ManualActionRequired
 		);
 		assert!(outcome.message.contains(
-			"npm trust github pkg --file publish.yml --repo ifiokjr/monochange --yes --env publisher"
+			"npm trust github pkg --file publish.yml --repo monochange/monochange --yes --env publisher"
 		));
 	}
 
@@ -3613,7 +3615,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -3626,14 +3628,14 @@ jobs:
 
 		assert_eq!(outcome.status, TrustedPublishingStatus::Planned);
 		assert!(outcome.message.contains(
-			"would configure npm trusted publishing with `npm trust github pkg --file publish.yml --repo ifiokjr/monochange --yes --env publisher`"
+			"would configure npm trusted publishing with `npm trust github pkg --file publish.yml --repo monochange/monochange --yes --env publisher`"
 		));
 	}
 
 	#[test]
 	fn manual_trust_outcome_reports_missing_github_context_configuration() {
 		let mut request = trusted_request(RegistryKind::Jsr);
-		request.trusted_publishing.repository = Some("ifiokjr/monochange".to_string());
+		request.trusted_publishing.repository = Some("monochange/monochange".to_string());
 
 		let outcome = manual_trust_outcome(&request, None, Path::new("."), &BTreeMap::new());
 
@@ -3641,7 +3643,7 @@ jobs:
 			outcome.status,
 			TrustedPublishingStatus::ManualActionRequired
 		);
-		assert_eq!(outcome.repository.as_deref(), Some("ifiokjr/monochange"));
+		assert_eq!(outcome.repository.as_deref(), Some("monochange/monochange"));
 		assert_eq!(outcome.workflow, None);
 		assert!(
 			outcome
@@ -3696,7 +3698,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -3713,7 +3715,7 @@ jobs:
 			},
 			CommandOutput {
 				success: true,
-				stdout: r#"{"repository":"ifiokjr/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
+				stdout: r#"{"repository":"monochange/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
 				stderr: String::new(),
 			},
 		]);
@@ -3744,13 +3746,13 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
 		let mut executor = FakeExecutor::new(vec![CommandOutput {
 			success: true,
-			stdout: r#"{"repository":"ifiokjr/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
+			stdout: r#"{"repository":"monochange/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
 			stderr: String::new(),
 		}]);
 
@@ -3778,7 +3780,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -3813,7 +3815,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -3852,7 +3854,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -3878,7 +3880,7 @@ jobs:
 				.contains("manual trusted publishing setup")
 		);
 		assert!(manual_error.to_string().contains(
-			"repository `ifiokjr/monochange`, workflow `publish.yml`, environment `publisher`"
+			"repository `monochange/monochange`, workflow `publish.yml`, environment `publisher`"
 		));
 
 		enforce_release_trust_prerequisites(
@@ -3891,7 +3893,7 @@ jobs:
 
 		let mut missing_workflow_request = trusted_request(RegistryKind::PubDev);
 		missing_workflow_request.trusted_publishing.repository =
-			Some("ifiokjr/monochange".to_string());
+			Some("monochange/monochange".to_string());
 		let missing_context_error = enforce_release_trust_prerequisites(
 			&missing_workflow_request,
 			None,
@@ -4007,7 +4009,7 @@ jobs:
 		let env_map = BTreeMap::from([
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
-				"ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
 		]);
@@ -4029,7 +4031,7 @@ jobs:
 			},
 			CommandOutput {
 				success: true,
-				stdout: r#"{"repository":"ifiokjr/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
+				stdout: r#"{"repository":"monochange/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
 				stderr: String::new(),
 			},
 		]);

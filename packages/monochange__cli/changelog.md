@@ -1,4 +1,4 @@
-## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
 
@@ -22,7 +22,7 @@ mc skill --list
 
 `mc skill` auto-detects `npx`, `pnpm dlx`, or `bunx`, forwards the remaining native `skills add` flags, and installs the monochange skill source into the current project by default.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #257](https://github.com/ifiokjr/monochange/pull/257) _Introduced in:_ [`0a6937a`](https://github.com/ifiokjr/monochange/commit/0a6937ac81dadbc6252e5eac60fd692335cee3a5) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #257](https://github.com/monochange/monochange/pull/257) _Introduced in:_ [`0a6937a`](https://github.com/monochange/monochange/commit/0a6937ac81dadbc6252e5eac60fd692335cee3a5) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### Add a package-scoped `mc analyze` CLI command for release-aware semantic analysis.
 
@@ -30,7 +30,7 @@ The command defaults `--release-ref` to the most recent tag for the selected pac
 
 `monochange_config` now reserves the built-in `analyze` command name so workspace CLI definitions cannot collide with the new built-in subcommand.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #256](https://github.com/ifiokjr/monochange/pull/256) _Introduced in:_ [`75e3329`](https://github.com/ifiokjr/monochange/commit/75e33295d17248f4daca6e7bc83988855a033a08) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #256](https://github.com/monochange/monochange/pull/256) _Introduced in:_ [`75e3329`](https://github.com/monochange/monochange/commit/75e33295d17248f4daca6e7bc83988855a033a08) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add per-crate Codecov coverage flags and crate-specific coverage badges
 
@@ -48,7 +48,7 @@ monochange now uploads one Codecov coverage flag per public crate while keeping 
 - each published crate README now points its coverage badge at that crate’s own Codecov flag page, for example `?flag=monochange_core`
 - the repository keeps the overall workspace coverage upload and lowers the Codecov patch coverage status target to 95%
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #255](https://github.com/ifiokjr/monochange/pull/255) _Introduced in:_ [`26e13ff`](https://github.com/ifiokjr/monochange/commit/26e13fff071e93dc32fe071a5771232c980ebd46) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #255](https://github.com/monochange/monochange/pull/255) _Introduced in:_ [`26e13ff`](https://github.com/monochange/monochange/commit/26e13fff071e93dc32fe071a5771232c980ebd46) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Changed
 
@@ -73,13 +73,13 @@ packages/monochange__skill/            # @monochange/skill
 
 `build-packages.mjs` still runs during release to populate platform binaries into `packages/*/bin/`, but it no longer generates the package structure from scratch. `publish-packages.mjs` now validates that each package has the expected binaries before publishing, preventing accidental empty publishes.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #204](https://github.com/ifiokjr/monochange/pull/204) _Introduced in:_ [`a90638b`](https://github.com/ifiokjr/monochange/commit/a90638b911d0aca00afcda8c5686da46ead14831) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #204](https://github.com/monochange/monochange/pull/204) _Introduced in:_ [`a90638b`](https://github.com/monochange/monochange/commit/a90638b911d0aca00afcda8c5686da46ead14831) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Documentation
 
 #### Document the new 100% patch-coverage requirement in the generated repository command lists.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #246](https://github.com/ifiokjr/monochange/pull/246) _Introduced in:_ [`62a4f85`](https://github.com/ifiokjr/monochange/commit/62a4f856af4528d9cbacdd7719c5cfb538fbb1c3) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #246](https://github.com/monochange/monochange/pull/246) _Introduced in:_ [`62a4f85`](https://github.com/monochange/monochange/commit/62a4f856af4528d9cbacdd7719c5cfb538fbb1c3) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add `mc tag-release` for post-merge release PR workflows
 
@@ -135,7 +135,7 @@ The generated GitHub workflow now refreshes the release PR on normal `main` push
 
 The bundled `@monochange/cli` documentation now describes this post-merge tagging flow as part of the recommended release PR workflow.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #220](https://github.com/ifiokjr/monochange/pull/220) _Introduced in:_ [`cf5e581`](https://github.com/ifiokjr/monochange/commit/cf5e58113adcda077dfff7c3dd8f5e7598e411d8) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#209](https://github.com/ifiokjr/monochange/issues/209)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #220](https://github.com/monochange/monochange/pull/220) _Introduced in:_ [`cf5e581`](https://github.com/monochange/monochange/commit/cf5e58113adcda077dfff7c3dd8f5e7598e411d8) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#209](https://github.com/monochange/monochange/issues/209)
 
 ### Refactor
 
@@ -182,7 +182,7 @@ match existing {
 
 The result is more consistent crate documentation, less duplicated prose, and flatter control flow in a few high-traffic code paths.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/ifiokjr/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/ifiokjr/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/monochange/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/monochange/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Changed
 
@@ -190,7 +190,7 @@ The result is more consistent crate documentation, less duplicated prose, and fl
 
 You can now annotate dependency-only follow-up changesets with `caused_by`, use `mc change --caused-by ...` to author them, inspect the linkage in diagnostics output, and suppress matching automatic dependency propagation during release planning.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/ifiokjr/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/ifiokjr/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/ifiokjr/monochange/issues/208)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/monochange/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/monochange/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/monochange/monochange/issues/208)
 
 #### add the first Dart lint suite foundation
 
@@ -203,7 +203,7 @@ This foundation change adds:
 - Dart lint scaffolding support in `mc lint new`
 - tests covering managed Dart lint target collection and fixture filtering
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/ifiokjr/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/ifiokjr/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/ifiokjr/monochange/issues/230)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/monochange/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/monochange/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/monochange/monochange/issues/230)
 
 #### centralize manifest lint configuration and split lint suites by ecosystem
 
@@ -281,4 +281,4 @@ This release also adds two new support crates:
 
 The Cargo and npm suites now live in `monochange_cargo::lints` and `monochange_npm::lints`, so ecosystem-specific parsing and rule behavior stay with their ecosystem adapters.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/ifiokjr/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/ifiokjr/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/monochange/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/monochange/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)

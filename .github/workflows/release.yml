@@ -28,7 +28,7 @@ jobs:
     permissions:
       contents: write
     if: >-
-      github.repository_owner == 'ifiokjr' &&
+      github.repository_owner == 'monochange' &&
       startsWith(inputs.tag || github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
@@ -99,7 +99,7 @@ jobs:
     permissions:
       actions: write
     if: >-
-      github.repository_owner == 'ifiokjr' &&
+      github.repository_owner == 'monochange' &&
       startsWith(inputs.tag || github.event.release.tag_name, 'v')
     runs-on: ubuntu-latest
     timeout-minutes: 10

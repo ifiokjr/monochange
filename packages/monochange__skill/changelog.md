@@ -1,4 +1,4 @@
-## @monochange/skill [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/@monochange/skill/v0.1.0) (2026-04-13)
+## @monochange/skill [0.1.0](https://github.com/monochange/monochange/releases/tag/@monochange/skill/v0.1.0) (2026-04-13)
 
 ### Breaking changes
 
@@ -33,9 +33,9 @@ This first release includes:
 
 For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
 
-> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/monochange/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
 
-## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
 
@@ -53,7 +53,7 @@ By default, monochange now skips gitignored manifests during linting while still
 
 The repository config and bundled linting docs now show how to exclude `examples/**` when example manifests would otherwise trigger false positives.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/ifiokjr/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/ifiokjr/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/monochange/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/monochange/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Changed
 
@@ -78,7 +78,7 @@ packages/monochange__skill/            # @monochange/skill
 
 `build-packages.mjs` still runs during release to populate platform binaries into `packages/*/bin/`, but it no longer generates the package structure from scratch. `publish-packages.mjs` now validates that each package has the expected binaries before publishing, preventing accidental empty publishes.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #204](https://github.com/ifiokjr/monochange/pull/204) _Introduced in:_ [`a90638b`](https://github.com/ifiokjr/monochange/commit/a90638b911d0aca00afcda8c5686da46ead14831) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #204](https://github.com/monochange/monochange/pull/204) _Introduced in:_ [`a90638b`](https://github.com/monochange/monochange/commit/a90638b911d0aca00afcda8c5686da46ead14831) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Documentation
 
@@ -106,7 +106,7 @@ Generated agent instructions are now CLI-first and prefer `mc`, then `monochange
 
 `@monochange/skill` now teaches host agents to use `mc help subagents` / `mc subagents` instead of the removed `mc assist` flow.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #254](https://github.com/ifiokjr/monochange/pull/254) _Introduced in:_ [`1b2b412`](https://github.com/ifiokjr/monochange/commit/1b2b41237b194c608c3e521daefd3f15c2729f91) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #254](https://github.com/monochange/monochange/pull/254) _Introduced in:_ [`1b2b412`](https://github.com/monochange/monochange/commit/1b2b41237b194c608c3e521daefd3f15c2729f91) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### Add `mc skill` for project-local monochange skill installation through the upstream `skills add` workflow.
 
@@ -128,7 +128,7 @@ mc skill --list
 
 `mc skill` auto-detects `npx`, `pnpm dlx`, or `bunx`, forwards the remaining native `skills add` flags, and installs the monochange skill source into the current project by default.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #257](https://github.com/ifiokjr/monochange/pull/257) _Introduced in:_ [`0a6937a`](https://github.com/ifiokjr/monochange/commit/0a6937ac81dadbc6252e5eac60fd692335cee3a5) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #257](https://github.com/monochange/monochange/pull/257) _Introduced in:_ [`0a6937a`](https://github.com/monochange/monochange/commit/0a6937ac81dadbc6252e5eac60fd692335cee3a5) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add changeset cleanup job guide with mc diagnostics workflow
 
@@ -144,7 +144,7 @@ Adds a comprehensive "Changeset cleanup job" section to `skills/changesets.md` t
 
 Updates the root `SKILL.md` reference to highlight "auditing, cleaning up" alongside creation.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #242](https://github.com/ifiokjr/monochange/pull/242) _Introduced in:_ [`7342723`](https://github.com/ifiokjr/monochange/commit/7342723dc924b9fd4dd0cdf9ca34da9812e83b70) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #242](https://github.com/monochange/monochange/pull/242) _Introduced in:_ [`7342723`](https://github.com/monochange/monochange/commit/7342723dc924b9fd4dd0cdf9ca34da9812e83b70) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add artifact-type-aware changeset guides and skill package expansion
 
@@ -166,7 +166,7 @@ Key additions:
 
 **After:** Agents can follow per-type rules, manage changeset lifecycles, configure UX sections with screenshots, and provide dependency propagation context.
 
-> _Owner:_ Ifiok Jr. _Introduced in:_ [`36bb233`](https://github.com/ifiokjr/monochange/commit/36bb2338f182c271679bca1ad14bd3a48bbf5f71) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`36bb233`](https://github.com/monochange/monochange/commit/36bb2338f182c271679bca1ad14bd3a48bbf5f71) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add ecosystem-specific semantic analysis for MCP changeset workflows
 
@@ -250,7 +250,7 @@ Current analyzer coverage includes:
 
 `@monochange/skill` now documents the semantic-analysis-backed MCP workflows and the expanded cross-ecosystem validation guidance for assistant consumers.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #247](https://github.com/ifiokjr/monochange/pull/247) _Introduced in:_ [`8c96c8f`](https://github.com/ifiokjr/monochange/commit/8c96c8f0a3b9d44bf30148b5a83067d7ce3ab62b) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#243](https://github.com/ifiokjr/monochange/issues/243) _Related issues:_ [#244](https://github.com/ifiokjr/monochange/issues/244)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #247](https://github.com/monochange/monochange/pull/247) _Introduced in:_ [`8c96c8f`](https://github.com/monochange/monochange/commit/8c96c8f0a3b9d44bf30148b5a83067d7ce3ab62b) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#243](https://github.com/monochange/monochange/issues/243) _Related issues:_ [#244](https://github.com/monochange/monochange/issues/244)
 
 #### expand the agent-facing harness around diagnostics, lint metadata, and repo guidance
 
@@ -269,13 +269,13 @@ Current analyzer coverage includes:
 - the repository now keeps an explicit `ARCHITECTURE.md` map plus `docs/plans/` for active plans, completed plans, and tech-debt tracking
 - `docs:check` now verifies that the agent-facing docs stay aligned with the live MCP tool surface, and `lint:architecture` checks that provider/ecosystem dispatch stays inside the documented allowlist
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #251](https://github.com/ifiokjr/monochange/pull/251) _Introduced in:_ [`47847db`](https://github.com/ifiokjr/monochange/commit/47847db5d8e98e9b8284e72e5f94c184473b4ffd) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #251](https://github.com/monochange/monochange/pull/251) _Introduced in:_ [`47847db`](https://github.com/monochange/monochange/commit/47847db5d8e98e9b8284e72e5f94c184473b4ffd) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add lint rule documentation
 
 Document the mc check command and all available lint rules for Cargo and NPM ecosystems in SKILL.md and REFERENCE.md.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/ifiokjr/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/ifiokjr/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/monochange/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/monochange/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### reorganize bundled skill docs into lowercased skill paths
 
@@ -288,7 +288,7 @@ Moves the bundled deep-dive markdown files under `skills/` and lowercases the pu
 - package and example readme files now use lowercase `readme.md`
 - internal links and published package file paths were updated to match the new structure
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/ifiokjr/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/ifiokjr/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/monochange/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/monochange/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### document future automation boundaries for manual registries
 
@@ -300,7 +300,7 @@ It also makes the current boundary explicit:
 - manual registries remain guidance- and diagnostics-first today
 - registry-side admin or browser-confirmed steps are still treated as manual unless the registry exposes a safer automation path later
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #223](https://github.com/ifiokjr/monochange/pull/223) _Introduced in:_ [`ed2ae40`](https://github.com/ifiokjr/monochange/commit/ed2ae4009e05a761d7abf24b22b65af7415912bc) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #223](https://github.com/monochange/monochange/pull/223) _Introduced in:_ [`ed2ae40`](https://github.com/monochange/monochange/commit/ed2ae4009e05a761d7abf24b22b65af7415912bc) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### improve npm and Deno semantic analysis with parser-backed JS/TS export extraction
 
@@ -319,7 +319,7 @@ This work also extracts the shared JavaScript and TypeScript export-analysis log
 
 The monochange skill documentation now also teaches the new-package rule: the first changeset for a newly introduced published package or crate should use a `major` bump for that new package entry.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #250](https://github.com/ifiokjr/monochange/pull/250) _Introduced in:_ [`0dd8460`](https://github.com/ifiokjr/monochange/commit/0dd846060614b2de9d3b2dfb5c1337075774b167) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#247](https://github.com/ifiokjr/monochange/issues/247), [#249](https://github.com/ifiokjr/monochange/issues/249)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #250](https://github.com/monochange/monochange/pull/250) _Introduced in:_ [`0dd8460`](https://github.com/monochange/monochange/commit/0dd846060614b2de9d3b2dfb5c1337075774b167) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#247](https://github.com/monochange/monochange/issues/247), [#249](https://github.com/monochange/monochange/issues/249)
 
 #### prefer official trusted-publishing workflows in the packaged skill
 
@@ -333,7 +333,7 @@ The packaged skill now explicitly recommends the registry-maintained GitHub publ
 
 These recommendations were added to the main skill entrypoint, the configuration deep dive, and the packaged trusted-publishing guide.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #214](https://github.com/ifiokjr/monochange/pull/214) _Introduced in:_ [`8a8a13a`](https://github.com/ifiokjr/monochange/commit/8a8a13a09520f7549ae15204f69bf1e9357d1662) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #214](https://github.com/monochange/monochange/pull/214) _Introduced in:_ [`8a8a13a`](https://github.com/monochange/monochange/commit/8a8a13a09520f7549ae15204f69bf1e9357d1662) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add an adoption playbook and example indexes to the packaged skill
 
@@ -345,7 +345,7 @@ The packaged `@monochange/skill` now includes an interactive adoption guide plus
 
 This makes the skill better at plan-mode interrogation, migration guidance, and recommendation-driven setup conversations.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #241](https://github.com/ifiokjr/monochange/pull/241) _Introduced in:_ [`05c393c`](https://github.com/ifiokjr/monochange/commit/05c393c72ce88b4c4e1eee99858e33ae72554559) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #241](https://github.com/monochange/monochange/pull/241) _Introduced in:_ [`05c393c`](https://github.com/monochange/monochange/commit/05c393c72ce88b4c4e1eee99858e33ae72554559) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add granular changeset generation guidance to the skill package
 
@@ -390,7 +390,7 @@ core: minor
 
 This makes the packaged skill better aligned with monochange's current agent rules for granular, user-facing release notes.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #205](https://github.com/ifiokjr/monochange/pull/205) _Introduced in:_ [`467fdff`](https://github.com/ifiokjr/monochange/commit/467fdff63ea036ffc0f38f18a62d23723f007740) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #205](https://github.com/monochange/monochange/pull/205) _Introduced in:_ [`467fdff`](https://github.com/monochange/monochange/commit/467fdff63ea036ffc0f38f18a62d23723f007740) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add modular skill docs and a full linting guide
 
@@ -425,7 +425,7 @@ skills/
 
 This makes the published skill package easier to load incrementally while giving agents a much denser reference surface for current monochange features.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #210](https://github.com/ifiokjr/monochange/pull/210) _Introduced in:_ [`63de80c`](https://github.com/ifiokjr/monochange/commit/63de80c29e46e88271b5dfe91bbf074a6e4c6135) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#209](https://github.com/ifiokjr/monochange/issues/209)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #210](https://github.com/monochange/monochange/pull/210) _Introduced in:_ [`63de80c`](https://github.com/monochange/monochange/commit/63de80c29e46e88271b5dfe91bbf074a6e4c6135) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#209](https://github.com/monochange/monochange/issues/209)
 
 #### add a multi-package publishing guide to the packaged skill
 
@@ -440,7 +440,7 @@ It explains:
 
 The skill `README.md`, `SKILL.md`, `REFERENCE.md`, and `skills/configuration.md` now point agents to the new guide when publishing strategy depends on monorepo shape rather than only on per-registry trusted-publishing setup.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #219](https://github.com/ifiokjr/monochange/pull/219) _Introduced in:_ [`df07da7`](https://github.com/ifiokjr/monochange/commit/df07da727967a2ef83f1995197c2159024fb46ad) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #219](https://github.com/monochange/monochange/pull/219) _Introduced in:_ [`df07da7`](https://github.com/monochange/monochange/commit/df07da727967a2ef83f1995197c2159024fb46ad) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add trusted publishing setup guidance for supported registries
 
@@ -459,7 +459,7 @@ The skill README, `SKILL.md`, and `REFERENCE.md` also point agents to the new gu
 
 The mdBook user guide now mirrors that content in a dedicated trusted-publishing chapter so the same setup guidance is available in both the packaged skill and the docs site.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #211](https://github.com/ifiokjr/monochange/pull/211) _Introduced in:_ [`38fe09f`](https://github.com/ifiokjr/monochange/commit/38fe09f69f31ab268d7adc37889dacb80bfba2b7) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #211](https://github.com/monochange/monochange/pull/211) _Introduced in:_ [`38fe09f`](https://github.com/monochange/monochange/commit/38fe09f69f31ab268d7adc37889dacb80bfba2b7) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### refresh crates.io and pub.dev trusted publishing guidance
 
@@ -473,7 +473,7 @@ The packaged trusted-publishing guide now includes more complete GitHub/OIDC set
 
 The mdBook trusted-publishing chapter was updated to mirror the same information.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #212](https://github.com/ifiokjr/monochange/pull/212) _Introduced in:_ [`c371be8`](https://github.com/ifiokjr/monochange/commit/c371be8864bc87c7454da4471b2a31d53089bb3d) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #212](https://github.com/monochange/monochange/pull/212) _Introduced in:_ [`c371be8`](https://github.com/monochange/monochange/commit/c371be8864bc87c7454da4471b2a31d53089bb3d) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Changed
 
@@ -481,11 +481,11 @@ The mdBook trusted-publishing chapter was updated to mirror the same information
 
 You can now annotate dependency-only follow-up changesets with `caused_by`, use `mc change --caused-by ...` to author them, inspect the linkage in diagnostics output, and suppress matching automatic dependency propagation during release planning.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/ifiokjr/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/ifiokjr/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/ifiokjr/monochange/issues/208)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/monochange/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/monochange/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/monochange/monochange/issues/208)
 
 #### Add advanced Dart workspace and Flutter lint rules.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #238](https://github.com/ifiokjr/monochange/pull/238) _Introduced in:_ [`acb4faa`](https://github.com/ifiokjr/monochange/commit/acb4faae2361ac75d01f20824ed85259ed5139a0) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#233](https://github.com/ifiokjr/monochange/issues/233)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #238](https://github.com/monochange/monochange/pull/238) _Introduced in:_ [`acb4faa`](https://github.com/monochange/monochange/commit/acb4faae2361ac75d01f20824ed85259ed5139a0) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#233](https://github.com/monochange/monochange/issues/233)
 
 #### add the first Dart lint suite foundation
 
@@ -498,11 +498,11 @@ This foundation change adds:
 - Dart lint scaffolding support in `mc lint new`
 - tests covering managed Dart lint target collection and fixture filtering
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/ifiokjr/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/ifiokjr/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/ifiokjr/monochange/issues/230)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/monochange/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/monochange/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/monochange/monochange/issues/230)
 
 #### Add Dart SDK constraint and dependency hygiene lint rules.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #237](https://github.com/ifiokjr/monochange/pull/237) _Introduced in:_ [`1192d15`](https://github.com/ifiokjr/monochange/commit/1192d1576156c89804373f1ea6b69f94d887f255) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#232](https://github.com/ifiokjr/monochange/issues/232)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #237](https://github.com/monochange/monochange/pull/237) _Introduced in:_ [`1192d15`](https://github.com/monochange/monochange/commit/1192d1576156c89804373f1ea6b69f94d887f255) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#232](https://github.com/monochange/monochange/issues/232)
 
 #### centralize manifest lint configuration and split lint suites by ecosystem
 
@@ -580,4 +580,4 @@ This release also adds two new support crates:
 
 The Cargo and npm suites now live in `monochange_cargo::lints` and `monochange_npm::lints`, so ecosystem-specific parsing and rule behavior stay with their ecosystem adapters.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/ifiokjr/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/ifiokjr/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/monochange/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/monochange/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)

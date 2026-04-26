@@ -2,7 +2,7 @@
 
 All notable changes to the `main` release group will be documented in this file.
 
-## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 Grouped release for `main`.
 
@@ -31,7 +31,7 @@ Changed members: monochange, monochange_core, monochange_cargo, monochange_npm, 
 - 🚨 over budget shown when any phase exceeds its configured budget
 - reviewers can expand only the fixture tables they need while keeping the rest of the comment compact
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #258](https://github.com/ifiokjr/monochange/pull/258) _Introduced in:_ [`d1fa746`](https://github.com/ifiokjr/monochange/commit/d1fa7467bb8bc207939cbf10a907c5dc8fe725d4) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #258](https://github.com/monochange/monochange/pull/258) _Introduced in:_ [`d1fa746`](https://github.com/monochange/monochange/commit/d1fa7467bb8bc207939cbf10a907c5dc8fe725d4) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 > [!NOTE]
 > _monochange_
@@ -92,7 +92,7 @@ mc publish-release --format json
 
 Built-in publishing also reports trusted-publishing status in text, markdown, and JSON output, including manual setup URLs when a registry still needs trust configured.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #205](https://github.com/ifiokjr/monochange/pull/205) _Introduced in:_ [`3ed719e`](https://github.com/ifiokjr/monochange/commit/3ed719e42d89d66b7db47528a69d1ecf1cdeada2) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #205](https://github.com/monochange/monochange/pull/205) _Introduced in:_ [`3ed719e`](https://github.com/monochange/monochange/commit/3ed719e42d89d66b7db47528a69d1ecf1cdeada2) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Fixed
 
@@ -123,7 +123,7 @@ mc publish-plan --format json
 
 The `publishRateLimits` report now shrinks automatically on reruns, partial publishes, and placeholder bootstrap flows where some packages already exist. That keeps advisory warnings, optional enforcement, and CI batch plans aligned with the actual work left to publish.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #240](https://github.com/ifiokjr/monochange/pull/240) _Introduced in:_ [`63fbe0d`](https://github.com/ifiokjr/monochange/commit/63fbe0de9825f3139386b7a25cf4821156813301) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #240](https://github.com/monochange/monochange/pull/240) _Introduced in:_ [`63fbe0d`](https://github.com/monochange/monochange/commit/63fbe0de9825f3139386b7a25cf4821156813301) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 > [!NOTE]
 > _monochange_
@@ -138,7 +138,7 @@ Improves CLI guidance for registries that still require manual trusted-publishin
 - package-publish text and markdown output now include a concrete next step telling users to finish registry setup and rerun `mc publish`
 - built-in publish prerequisite failures now tell users to complete registry setup and rerun the publish command
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #216](https://github.com/ifiokjr/monochange/pull/216) _Introduced in:_ [`3ffb516`](https://github.com/ifiokjr/monochange/commit/3ffb5165d643371be3315edf715a80b04f277144) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #216](https://github.com/monochange/monochange/pull/216) _Introduced in:_ [`3ffb516`](https://github.com/monochange/monochange/commit/3ffb5165d643371be3315edf715a80b04f277144) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 > [!NOTE]
 > _monochange_
@@ -153,7 +153,7 @@ Improves trusted-publishing diagnostics for registries that still require manual
 - manual-registry guidance now surfaces the resolved repository, workflow, and environment when monochange can infer them
 - manual-registry errors now explain when the GitHub context is incomplete and point to the exact `publish.trusted_publishing.*` field that still needs configuration
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #218](https://github.com/ifiokjr/monochange/pull/218) _Introduced in:_ [`85bc41f`](https://github.com/ifiokjr/monochange/commit/85bc41f72766a34981e25cf1ad73442e9e80c267) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #218](https://github.com/monochange/monochange/pull/218) _Introduced in:_ [`85bc41f`](https://github.com/monochange/monochange/commit/85bc41f72766a34981e25cf1ad73442e9e80c267) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Testing
 
@@ -162,7 +162,7 @@ Improves trusted-publishing diagnostics for registries that still require manual
 
 #### Fix CI race condition where tests that spawn `git` could fail under parallel `cargo llvm-cov` execution because skill command tests temporarily replace `PATH`. Capture the original `PATH` at process start and pass it explicitly to every git subprocess spawned by test helpers. Also reorder coverage job so Codecov uploads always complete before the patch threshold gate fails.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #262](https://github.com/ifiokjr/monochange/pull/262) _Introduced in:_ [`184ab4f`](https://github.com/ifiokjr/monochange/commit/184ab4fab3cf96f58b14f905a66511c6d0a469aa) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #262](https://github.com/monochange/monochange/pull/262) _Introduced in:_ [`184ab4f`](https://github.com/monochange/monochange/commit/184ab4fab3cf96f58b14f905a66511c6d0a469aa) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 > [!NOTE]
 > _monochange_
@@ -177,7 +177,7 @@ The new integration tests cover:
 - missing workflow configuration guidance when monochange cannot resolve the GitHub workflow yet
 - placeholder-publish dry-run output in both text and JSON formats
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #221](https://github.com/ifiokjr/monochange/pull/221) _Introduced in:_ [`c7a0209`](https://github.com/ifiokjr/monochange/commit/c7a0209392b81f70b5d51b0b777db40487b8ac29) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #221](https://github.com/monochange/monochange/pull/221) _Introduced in:_ [`c7a0209`](https://github.com/monochange/monochange/commit/c7a0209392b81f70b5d51b0b777db40487b8ac29) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 > [!NOTE]
 > _monochange_
@@ -191,9 +191,9 @@ The new tests cover:
 - manual registry setup guidance rendering in text and markdown output
 - preservation of explicit trusted-publishing context in manual-action outcomes
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #215](https://github.com/ifiokjr/monochange/pull/215) _Introduced in:_ [`36c1d4e`](https://github.com/ifiokjr/monochange/commit/36c1d4ec3c2daa675c233e388e161f339a77b6c2) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #215](https://github.com/monochange/monochange/pull/215) _Introduced in:_ [`36c1d4e`](https://github.com/monochange/monochange/commit/36c1d4ec3c2daa675c233e388e161f339a77b6c2) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
-## [0.1.0](https://github.com/ifiokjr/monochange/releases/tag/v0.1.0) (2026-04-13)
+## [0.1.0](https://github.com/monochange/monochange/releases/tag/v0.1.0) (2026-04-13)
 
 Grouped release for `main`.
 
@@ -235,4 +235,4 @@ This first release includes:
 
 For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
 
-> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/ifiokjr/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
+> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/monochange/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)

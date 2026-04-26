@@ -5,7 +5,7 @@
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ifiokjr/monochange.git"
+		"url": "git+https://github.com/monochange/monochange.git"
 	},
 	"engines": {
 		"node": ">=18",

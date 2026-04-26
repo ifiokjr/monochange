@@ -1,6 +1,6 @@
 <!-- {@crateReadmeBadgeRow:"crate_name"} -->
 
-[![Crates.io](https://img.shields.io/badge/crates.io-{{ crate_name|replace("_", "__") }}-orange?logo=rust)](https://crates.io/crates/{{ crate_name }}) [![Docs.rs](https://img.shields.io/badge/docs.rs-{{ crate_name|replace("_", "__") }}-1f425f?logo=docs.rs)](https://docs.rs/{{ crate_name }}/) [![CI](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/ifiokjr/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ifiokjr/monochange/branch/main/graph/badge.svg?flag={{ crate_name }})](https://codecov.io/gh/ifiokjr/monochange?flag={{ crate_name }}) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
+[![Crates.io](https://img.shields.io/badge/crates.io-{{ crate_name|replace("_", "__") }}-orange?logo=rust)](https://crates.io/crates/{{ crate_name }}) [![Docs.rs](https://img.shields.io/badge/docs.rs-{{ crate_name|replace("_", "__") }}-1f425f?logo=docs.rs)](https://docs.rs/{{ crate_name }}/) [![CI](https://github.com/monochange/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/monochange/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/monochange/monochange/branch/main/graph/badge.svg?flag={{ crate_name }})](https://codecov.io/gh/monochange/monochange?flag={{ crate_name }}) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
 
 <!-- {/crateReadmeBadgeRow} -->
 
@@ -346,7 +346,7 @@ let manifest = ReleaseManifest {
 };
 let github = SourceConfiguration {
     provider: SourceProvider::GitHub,
-    owner: "ifiokjr".to_string(),
+    owner: "monochange".to_string(),
     repo: "monochange".to_string(),
     host: None,
     api_url: None,
@@ -359,7 +359,7 @@ let requests = build_release_requests(&github, &manifest);
 
 assert_eq!(requests.len(), 1);
 assert_eq!(requests[0].tag_name, "v1.2.0");
-assert_eq!(requests[0].repository, "ifiokjr/monochange");
+assert_eq!(requests[0].repository, "monochange/monochange");
 ```
 
 <!-- {/monochangeGithubCrateDocs} -->

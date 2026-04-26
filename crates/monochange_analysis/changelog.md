@@ -1,4 +1,4 @@
-## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
+## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
 
@@ -60,7 +60,7 @@ for (package_id, pkg) in &analysis.package_changes {
 
 This crate is the foundation for the new `mc analyze` command and MCP tools that help agents generate better changesets automatically.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #206](https://github.com/ifiokjr/monochange/pull/206) _Introduced in:_ [`a417022`](https://github.com/ifiokjr/monochange/commit/a417022f80f93d61add00b8087e0f80102a9fd52) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #206](https://github.com/monochange/monochange/pull/206) _Introduced in:_ [`a417022`](https://github.com/monochange/monochange/commit/a417022f80f93d61add00b8087e0f80102a9fd52) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add per-crate Codecov coverage flags and crate-specific coverage badges
 
@@ -78,7 +78,7 @@ monochange now uploads one Codecov coverage flag per public crate while keeping 
 - each published crate README now points its coverage badge at that crate’s own Codecov flag page, for example `?flag=monochange_core`
 - the repository keeps the overall workspace coverage upload and lowers the Codecov patch coverage status target to 95%
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #255](https://github.com/ifiokjr/monochange/pull/255) _Introduced in:_ [`26e13ff`](https://github.com/ifiokjr/monochange/commit/26e13fff071e93dc32fe071a5771232c980ebd46) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #255](https://github.com/monochange/monochange/pull/255) _Introduced in:_ [`26e13ff`](https://github.com/monochange/monochange/commit/26e13fff071e93dc32fe071a5771232c980ebd46) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add ecosystem-specific semantic analysis for MCP changeset workflows
 
@@ -162,7 +162,7 @@ Current analyzer coverage includes:
 
 `@monochange/skill` now documents the semantic-analysis-backed MCP workflows and the expanded cross-ecosystem validation guidance for assistant consumers.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #247](https://github.com/ifiokjr/monochange/pull/247) _Introduced in:_ [`8c96c8f`](https://github.com/ifiokjr/monochange/commit/8c96c8f0a3b9d44bf30148b5a83067d7ce3ab62b) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#243](https://github.com/ifiokjr/monochange/issues/243) _Related issues:_ [#244](https://github.com/ifiokjr/monochange/issues/244)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #247](https://github.com/monochange/monochange/pull/247) _Introduced in:_ [`8c96c8f`](https://github.com/monochange/monochange/commit/8c96c8f0a3b9d44bf30148b5a83067d7ce3ab62b) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#243](https://github.com/monochange/monochange/issues/243) _Related issues:_ [#244](https://github.com/monochange/monochange/issues/244)
 
 #### improve npm and Deno semantic analysis with parser-backed JS/TS export extraction
 
@@ -181,7 +181,7 @@ This work also extracts the shared JavaScript and TypeScript export-analysis log
 
 The monochange skill documentation now also teaches the new-package rule: the first changeset for a newly introduced published package or crate should use a `major` bump for that new package entry.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #250](https://github.com/ifiokjr/monochange/pull/250) _Introduced in:_ [`0dd8460`](https://github.com/ifiokjr/monochange/commit/0dd846060614b2de9d3b2dfb5c1337075774b167) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#247](https://github.com/ifiokjr/monochange/issues/247), [#249](https://github.com/ifiokjr/monochange/issues/249)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #250](https://github.com/monochange/monochange/pull/250) _Introduced in:_ [`0dd8460`](https://github.com/monochange/monochange/commit/0dd846060614b2de9d3b2dfb5c1337075774b167) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#247](https://github.com/monochange/monochange/issues/247), [#249](https://github.com/monochange/monochange/issues/249)
 
 #### `monochange_analysis` can now return release-aware semantic analysis across three explicit frames:
 
@@ -191,7 +191,7 @@ The monochange skill documentation now also teaches the new-package rule: the fi
 
 This adds a first multi-frame API surface for issue #249, including explicit ref-based entry points plus automatic baseline resolution that uses the latest workspace-style release tag and the detected default branch.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #252](https://github.com/ifiokjr/monochange/pull/252) _Introduced in:_ [`d1dce9d`](https://github.com/ifiokjr/monochange/commit/d1dce9d880a1739253f5dccc3cd7cc73431b2b41) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#249](https://github.com/ifiokjr/monochange/issues/249)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #252](https://github.com/monochange/monochange/pull/252) _Introduced in:_ [`d1dce9d`](https://github.com/monochange/monochange/commit/d1dce9d880a1739253f5dccc3cd7cc73431b2b41) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#249](https://github.com/monochange/monochange/issues/249)
 
 ### Refactor
 
@@ -238,7 +238,7 @@ match existing {
 
 The result is more consistent crate documentation, less duplicated prose, and flatter control flow in a few high-traffic code paths.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/ifiokjr/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/ifiokjr/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/monochange/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/monochange/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ### Testing
 
@@ -259,4 +259,4 @@ Add `monochange_core::lint` module with the foundational types for the linting s
 
 Also adds `lints` field to `EcosystemSettings` for per-ecosystem lint configuration and `Lint` variant to `CliStepDefinition` with `format`, `fix`, and `ecosystem` inputs.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/ifiokjr/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/ifiokjr/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/monochange/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/monochange/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
