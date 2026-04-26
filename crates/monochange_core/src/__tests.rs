@@ -306,6 +306,7 @@ fn hosted_source_adapter_default_comment_publishing_errors_when_provider_lacks_s
 			issue_id: "#7".to_string(),
 			issue_url: Some("https://gitlab.example.com/org/repo/-/issues/7".to_string()),
 			body: "Released in v1.2.3.".to_string(),
+			close: false,
 		}],
 	};
 	let source = test_source_configuration(SourceProvider::GitLab);
@@ -2128,6 +2129,7 @@ fn sample_release_record() -> ReleaseRecord {
 		package_publications: Vec::new(),
 		updated_changelogs: vec![PathBuf::from("crates/monochange/CHANGELOG.md")],
 		deleted_changesets: vec![PathBuf::from(".changeset/032-step-outputs.md")],
+		changesets: Vec::new(),
 		provider: Some(ReleaseRecordProvider {
 			kind: SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),

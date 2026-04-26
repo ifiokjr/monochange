@@ -1005,6 +1005,64 @@ pub(crate) fn build_release_manifest(
 	}
 }
 
+pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> ReleaseManifest {
+	ReleaseManifest {
+		command: record.command.clone(),
+		dry_run: false,
+		version: record.version.clone(),
+		group_version: record.group_version.clone(),
+		release_targets: record
+			.release_targets
+			.iter()
+			.map(|target| {
+				ReleaseManifestTarget {
+					id: target.id.clone(),
+					kind: target.kind,
+					version: target.version.clone(),
+					tag: target.tag,
+					release: target.release,
+					version_format: target.version_format,
+					tag_name: target.tag_name.clone(),
+					members: target.members.clone(),
+					rendered_title: String::new(),
+					rendered_changelog_title: String::new(),
+				}
+			})
+			.collect(),
+		released_packages: record.released_packages.clone(),
+		changed_files: record.changed_files.clone(),
+		changelogs: record
+			.updated_changelogs
+			.iter()
+			.map(|path| {
+				ReleaseManifestChangelog {
+					owner_id: String::new(),
+					owner_kind: ReleaseOwnerKind::Group,
+					path: path.clone(),
+					format: ChangelogFormat::default(),
+					notes: ReleaseNotesDocument {
+						title: String::new(),
+						summary: Vec::new(),
+						sections: Vec::new(),
+					},
+					rendered: String::new(),
+				}
+			})
+			.collect(),
+		package_publications: record.package_publications.clone(),
+		changesets: record.changesets.clone(),
+		deleted_changesets: record.deleted_changesets.clone(),
+		plan: ReleaseManifestPlan {
+			workspace_root: PathBuf::from("."),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		},
+	}
+}
+
 pub(crate) fn build_release_record(
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
@@ -1043,6 +1101,7 @@ pub(crate) fn build_release_record(
 			.map(|changelog| changelog.path.clone())
 			.collect(),
 		deleted_changesets: manifest.deleted_changesets.clone(),
+		changesets: manifest.changesets.clone(),
 		provider: source.map(|source| {
 			ReleaseRecordProvider {
 				kind: source.provider,

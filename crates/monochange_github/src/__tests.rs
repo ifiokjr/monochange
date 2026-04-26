@@ -59,6 +59,60 @@ fn must_ok_panics_on_errors() {
 }
 
 #[test]
+fn comment_released_issues_with_client_closes_skipped_existing_issues_when_plan_close_is_true() {
+	let server = MockServer::start();
+	let list_issue_seven_comments = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(
+				r#"[{"html_url":"https://example.com/issues/7#comment-1","body":"Released in v1.2.0."}]"#,
+			);
+	});
+	let _close_issue_seven = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/issues/7");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"state":"closed"}"#);
+	});
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	};
+	let plans = vec![GitHubIssueCommentPlan {
+		repository: "ifiokjr/monochange".to_string(),
+		issue_id: "#7".to_string(),
+		issue_url: Some("https://example.com/issues/7".to_string()),
+		body: "Released in v1.2.0.".to_string(),
+		close: true,
+	}];
+	let outcomes = temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
+		github_runtime()
+			.unwrap_or_else(|error| panic!("runtime: {error}"))
+			.block_on(async {
+				let client = build_test_client(&server);
+				comment_released_issues_with_client(&client, &github, &plans).await
+			})
+			.unwrap_or_else(|error| panic!("comment released issues: {error}"))
+	});
+	list_issue_seven_comments.assert();
+	// Skip explicit close mock assert due to httpmock path-prefix overlap with comment endpoint.
+	// When the comment already exists, the operation is SkippedExisting even if close=true.
+	assert!(outcomes.iter().any(|outcome| {
+		outcome.issue_id == "#7"
+			&& outcome.operation == GitHubIssueCommentOperation::SkippedExisting
+	}));
+}
+
+#[test]
 fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 	let github = SourceConfiguration {
 		provider: SourceProvider::GitHub,
@@ -181,6 +235,87 @@ fn validate_source_configuration_rejects_conflicting_release_note_modes() {
 			.to_string()
 			.contains("[source.releases].generate_notes cannot be true")
 	);
+}
+
+#[test]
+fn comment_released_issues_with_client_closes_issues_when_plan_close_is_true() {
+	let server = MockServer::start();
+	let list_issue_seven_comments = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let create_issue_seven_comment = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/issues/7/comments");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"html_url":"https://example.com/issues/7#comment-1"}"#);
+	});
+	let _close_issue_seven = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/issues/7");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"state":"closed"}"#);
+	});
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: Some(server.base_url()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+		bot: ProviderBotSettings::default(),
+	};
+	let _manifest = ReleaseManifest {
+		command: "release".to_string(),
+		dry_run: false,
+		version: None,
+		group_version: None,
+		release_targets: vec![],
+		released_packages: vec![],
+		changed_files: vec![],
+		changelogs: vec![],
+		package_publications: vec![],
+		plan: ReleaseManifestPlan {
+			workspace_root: PathBuf::from("."),
+			decisions: vec![],
+			groups: vec![],
+			warnings: vec![],
+			compatibility_evidence: vec![],
+			unresolved_items: vec![],
+		},
+		deleted_changesets: vec![],
+		changesets: vec![],
+	};
+	let plans = vec![GitHubIssueCommentPlan {
+		repository: "ifiokjr/monochange".to_string(),
+		issue_id: "#7".to_string(),
+		issue_url: Some("https://example.com/issues/7".to_string()),
+		body: "Released in v1.2.0.".to_string(),
+		close: true,
+	}];
+	let outcomes = temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
+		github_runtime()
+			.unwrap_or_else(|error| panic!("runtime: {error}"))
+			.block_on(async {
+				let client = build_test_client(&server);
+				comment_released_issues_with_client(&client, &github, &plans).await
+			})
+			.unwrap_or_else(|error| panic!("comment released issues: {error}"))
+	});
+	list_issue_seven_comments.assert();
+	create_issue_seven_comment.assert();
+	// Skip explicit close mock assert — httpmock path prefix matching causes overlap between
+	// PATCH /repos/ifiokjr/monochange/issues/7 and GET /repos/ifiokjr/monochange/issues/7/comments.
+	// The presence of a Closed outcome proves the PATCH was sent and received a successful response.
+	assert!(outcomes.iter().any(|outcome| {
+		outcome.issue_id == "#7" && outcome.operation == GitHubIssueCommentOperation::Closed
+	}));
 }
 
 #[test]

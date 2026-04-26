@@ -1927,6 +1927,7 @@ mod tests {
 			package_publications: publications,
 			updated_changelogs: Vec::new(),
 			deleted_changesets: Vec::new(),
+			changesets: Vec::new(),
 			provider: None,
 		};
 		let block = render_release_record_block(&record).expect("render release record");
