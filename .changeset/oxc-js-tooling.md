@@ -1,5 +1,5 @@
 ---
-"@monochange/root": patch
+"@monochange/cli": patch
 ---
 
 Add OXC tooling for all JavaScript and TypeScript in the project
