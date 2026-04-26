@@ -1,0 +1,26 @@
+name: publish-release
+description: "Create provider releases from a durable release record via monochange"
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+  from-ref:
+    description: "Git ref to discover the release record from"
+    required: false
+    default: "HEAD"
+
+runs:
+  using: composite
+  steps:
+    - name: setup
+      uses: ./.github/actions/devenv
+      with:
+        github-token: ${{ inputs.github-token }}
+
+    - name: publish release
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      shell: devenv shell -- bash -e {0}
+      run: |
+        set -euo pipefail
+        mc publish-release --from-ref="${{ inputs.from-ref }}"

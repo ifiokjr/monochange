@@ -2346,7 +2346,7 @@ fn resolve_changeset_path_rejects_invalid_inputs() {
 fn render_changeset_diagnostics_reports_empty_set() {
 	let report = crate::ChangesetDiagnosticsReport {
 		requested_changesets: Vec::new(),
-		changesets: Vec::new(),
+			changesets: Vec::new(),
 	};
 	let rendered = crate::render_changeset_diagnostics(&report);
 
@@ -3811,6 +3811,7 @@ fn sample_release_record_for_discovery_text() -> monochange_core::ReleaseRecord 
 		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
 		updated_changelogs: vec![Path::new("crates/monochange/CHANGELOG.md").to_path_buf()],
 		deleted_changesets: vec![Path::new(".changeset/feature.md").to_path_buf()],
+		changesets: Vec::new(),
 		package_publications: Vec::new(),
 		provider: Some(monochange_core::ReleaseRecordProvider {
 			kind: monochange_core::SourceProvider::GitHub,
@@ -3840,6 +3841,7 @@ fn text_release_record_discovery_omits_empty_sections() {
 			changed_files: Vec::new(),
 			updated_changelogs: Vec::new(),
 			deleted_changesets: Vec::new(),
+			changesets: Vec::new(),
 			package_publications: Vec::new(),
 			provider: None,
 		},
@@ -5204,6 +5206,7 @@ fn release_follow_up_helpers_render_real_operation_outputs() {
 		issue_id: "#7".to_string(),
 		issue_url: Some("https://example.com/issues/7".to_string()),
 		body: "released".to_string(),
+		close: false,
 	}];
 	let issue_comment_results =
 		crate::cli_runtime::build_issue_comment_results(false, &issue_comment_plans, || {
@@ -8198,6 +8201,7 @@ fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
 		changed_files: vec![Path::new("Cargo.lock").to_path_buf()],
 		updated_changelogs: Vec::new(),
 		deleted_changesets: Vec::new(),
+		changesets: Vec::new(),
 		package_publications: Vec::new(),
 		provider: Some(monochange_core::ReleaseRecordProvider {
 			kind: monochange_core::SourceProvider::GitHub,

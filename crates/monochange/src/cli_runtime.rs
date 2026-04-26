@@ -418,6 +418,7 @@ pub(crate) fn build_issue_comment_results(
 						monochange_core::HostedIssueCommentOperation::SkippedExisting => {
 							"skipped_existing"
 						}
+						monochange_core::HostedIssueCommentOperation::Closed => "closed",
 					}
 				)
 			})
@@ -625,22 +626,25 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::PublishRelease { .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`PublishRelease` requires a previous `PrepareRelease` step"
-								.to_string(),
+					let manifest = if let Some(prepared_release) = context.prepared_release.as_ref() {
+						build_release_manifest(
+							cli_command,
+							prepared_release,
+							&context.command_logs,
 						)
-					})?;
+					} else {
+						let from_ref = step_inputs
+							.get("from-ref")
+							.and_then(|v| v.first().cloned())
+							.unwrap_or_else(|| "HEAD".to_string());
+						let discovery = discover_release_record(root, &from_ref)?;
+						build_release_manifest_from_record(&discovery.record)
+					};
 					let source = configuration.source.clone().ok_or_else(|| {
 						MonochangeError::Config(
 							"`PublishRelease` requires `[source]` configuration".to_string(),
 						)
 					})?;
-					let manifest = build_release_manifest(
-						cli_command,
-						prepared_release,
-						&context.command_logs,
-					);
 					context.release_requests = build_source_release_requests(&source, &manifest);
 					#[rustfmt::skip]
 						let results = build_release_results_for_source(context.dry_run, &source, &context.release_requests)?;
@@ -750,12 +754,22 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::CommentReleasedIssues { .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`CommentReleasedIssues` requires a previous `PrepareRelease` step"
-								.to_string(),
+					let manifest = if let Some(prepared_release) = context.prepared_release.as_ref() {
+						build_release_manifest(
+							cli_command,
+							prepared_release,
+							&context.command_logs,
 						)
-					})?;
+					} else {
+						let from_ref = step_inputs
+							.get("from-ref")
+							.and_then(|v| v.first().cloned())
+							.unwrap_or_else(|| "HEAD".to_string());
+						let discovery = discover_release_record(root, &from_ref)?;
+						build_release_manifest_from_record(&discovery.record)
+					};
+					let auto_close_issues =
+						parse_boolean_step_input(&step_inputs, "auto-close-issues")?.unwrap_or(false);
 					let source = configuration.source.clone().ok_or_else(|| {
 						MonochangeError::Config(
 							"`CommentReleasedIssues` requires `[source]` configuration".to_string(),
@@ -768,17 +782,17 @@ pub(crate) fn execute_cli_command_with_options(
 							source.provider
 						)));
 					}
-					let manifest = build_release_manifest(
-						cli_command,
-						prepared_release,
-						&context.command_logs,
-					);
-					context.issue_comment_plans =
-						adapter.plan_released_issue_comments(&source, &manifest);
+					let mut issue_comment_plans = adapter.plan_released_issue_comments(&source, &manifest);
+					if !auto_close_issues {
+						for plan in &mut issue_comment_plans {
+							plan.close = false;
+						}
+					}
 					let dry_run = context.dry_run;
-					let plans = &context.issue_comment_plans;
-					let results =
-						build_issue_comment_results_for_source(dry_run, &source, &manifest, plans)?;
+					let results = build_issue_comment_results_for_source(
+						dry_run, &source, &manifest, &issue_comment_plans,
+					)?;
+					context.issue_comment_plans = issue_comment_plans;
 					context.issue_comment_results = results;
 					output = None;
 					Ok(())

@@ -2837,6 +2837,8 @@ pub struct ReleaseRecord {
 	#[serde(default)]
 	pub deleted_changesets: Vec<PathBuf>,
 	#[serde(default)]
+	pub changesets: Vec<PreparedChangeset>,
+	#[serde(default)]
 	pub provider: Option<ReleaseRecordProvider>,
 }
 
@@ -3339,6 +3341,8 @@ pub struct HostedIssueCommentPlan {
 	pub issue_id: String,
 	pub issue_url: Option<String>,
 	pub body: String,
+	#[serde(default)]
+	pub close: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -3346,6 +3350,7 @@ pub struct HostedIssueCommentPlan {
 pub enum HostedIssueCommentOperation {
 	Created,
 	SkippedExisting,
+	Closed,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

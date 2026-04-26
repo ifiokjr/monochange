@@ -1,0 +1,64 @@
+name: release-pr-merge
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Optional release PR number. Leave empty to auto-detect the single open release PR.
+        required: false
+        type: string
+      comment:
+        description: Whether the action should post a pull request comment.
+        required: false
+        default: on-error
+        type: choice
+        options:
+          - always
+          - on-error
+          - never
+  issue_comment:
+    types:
+      - created
+
+concurrency:
+  group: release-pr-merge-${{ github.event.issue.number || inputs.pull_request || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  merge-release-pr:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '/merge')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      statuses: read
+    steps:
+      - name: fast-forward release PR from workflow dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: monochange/actions/merge@v0.1.0
+        with:
+          github-token: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+          pull-request: ${{ inputs.pull_request }}
+          base-branch: main
+          head-branch-prefix: monochange/release/
+          required-failing-check: release-pr-manual-merge-blocker
+          require-actor-push-permission: 'true'
+          comment: ${{ inputs.comment }}
+
+      - name: fast-forward release PR from /merge comment
+        if: github.event_name == 'issue_comment'
+        uses: monochange/actions/merge@v0.1.0
+        with:
+          github-token: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+          base-branch: main
+          head-branch-prefix: monochange/release/
+          required-failing-check: release-pr-manual-merge-blocker
+          require-actor-push-permission: 'true'
+          comment: always

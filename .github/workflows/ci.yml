@@ -321,10 +321,20 @@ jobs:
           fi
         shell: devenv shell -- bash -e {0}
 
+  release-pr-manual-merge-blocker:
+    if: github.event_name == pull_request && startsWith(github.head_ref, monochange/release/)
+    runs-on: ubuntu-latest
+    steps:
+      - name: block direct merge of release branches
+        run: |
+          echo "::error::Release branches must be merged via the /merge comment workflow."
+          exit 1
+
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'ifiokjr'
     timeout-minutes: 20
     runs-on: ubuntu-latest
+    environment: publisher
     permissions:
       contents: write
       pull-requests: write
@@ -378,3 +388,59 @@ jobs:
       - name: skip refresh on merged release commit
         if: steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is already a merged release commit; skipping release PR refresh."
+  release-post-merge:
+    if: github.event_name == push && github.ref == refs/heads/main && github.repository_owner == ifiokjr
+    needs: release-pr
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: detect release commit and create tags
+        id: tag_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: devenv shell -- bash -e {0}
+        run: |
+          set -euo pipefail
+
+          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+            resolved_commit="$(jq -r .resolvedCommit /tmp/release-record.json)"
+            record_commit="$(jq -r .recordCommit /tmp/release-record.json)"
+
+            if [ "$resolved_commit" = "$record_commit" ]; then
+              echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+              mc tag-release --from HEAD --push=true --format json | tee /tmp/tag-report.json
+            else
+              echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: publish release
+        if: steps.tag_release.outputs.is_release_commit == true
+        uses: ./.github/actions/publish-release
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          from-ref: HEAD
+
+      - name: comment on released issues
+        if: steps.tag_release.outputs.is_release_commit == true
+        uses: ./.github/actions/comment-released-issues
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          from-ref: HEAD
+          auto-close-issues: true
+

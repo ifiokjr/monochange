@@ -924,7 +924,6 @@ pub fn plan_released_issue_comments(
 		.iter()
 		.filter_map(|changeset| changeset.context.as_ref())
 		.flat_map(|context| context.related_issues.iter())
-		.filter(|issue| issue.relationship == HostedIssueRelationshipKind::ClosedByReviewRequest)
 	{
 		plans_by_issue.entry(issue.id.clone()).or_insert_with(|| {
 			GitHubIssueCommentPlan {
@@ -932,6 +931,7 @@ pub fn plan_released_issue_comments(
 				issue_id: issue.id.clone(),
 				issue_url: issue.url.clone(),
 				body: body.clone(),
+				close: issue.relationship != HostedIssueRelationshipKind::ClosedByReviewRequest,
 			}
 		});
 	}
@@ -991,6 +991,10 @@ async fn comment_released_issues_with_client(
 				operation: GitHubIssueCommentOperation::SkippedExisting,
 				url: plan.issue_url.clone(),
 			});
+			if plan.close {
+				let issue_path = format!("/repos/{}/{}/issues/{}", source.owner, source.repo, issue_number);
+				let _: serde_json::Value = patch_json(client, &issue_path, &json!({ "state": "closed" })).await?;
+			}
 			continue;
 		}
 		let response = post_json::<_, GitHubIssueCommentResponse>(
@@ -1002,7 +1006,7 @@ async fn comment_released_issues_with_client(
 		outcomes.push(GitHubIssueCommentOutcome {
 			repository: plan.repository.clone(),
 			issue_id: plan.issue_id.clone(),
-			operation: GitHubIssueCommentOperation::Created,
+			operation: if plan.close { GitHubIssueCommentOperation::Closed } else { GitHubIssueCommentOperation::Created },
 			url: response.html_url.or_else(|| plan.issue_url.clone()),
 		});
 	}
