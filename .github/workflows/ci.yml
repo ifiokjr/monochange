@@ -389,7 +389,7 @@ jobs:
         if: steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is already a merged release commit; skipping release PR refresh."
   release-post-merge:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'ifiokjr'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
     needs: release-pr
     timeout-minutes: 10
     runs-on: ubuntu-latest
