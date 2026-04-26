@@ -31,8 +31,8 @@ function extractToolNamesFromServer(contents) {
 }
 
 function assertSetEquals(label, actual, expected) {
-	const actualValues = [...actual].sort();
-	const expectedValues = [...expected].sort();
+	const actualValues = [...actual].toSorted();
+	const expectedValues = [...expected].toSorted();
 
 	if (JSON.stringify(actualValues) === JSON.stringify(expectedValues)) {
 		return;

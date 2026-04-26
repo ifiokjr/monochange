@@ -121,7 +121,7 @@ export function computePatchCoverage(coverageByFile, changedLinesByFile) {
 			continue;
 		}
 
-		const sortedChangedLines = [...changedLines].sort((left, right) => left - right);
+		const sortedChangedLines = [...changedLines].toSorted((left, right) => left - right);
 		for (const lineNumber of sortedChangedLines) {
 			if (!lineCoverage.has(lineNumber)) {
 				continue;

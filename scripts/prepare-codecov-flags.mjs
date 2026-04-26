@@ -53,7 +53,7 @@ function parsePublicCrates(repoRoot) {
 			};
 		})
 		.filter((crateInfo) => crateInfo.publish)
-		.sort((left, right) => left.name.localeCompare(right.name));
+		.toSorted((left, right) => left.name.localeCompare(right.name));
 }
 
 function parseLcovRecords(text, repoRoot) {
