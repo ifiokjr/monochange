@@ -125,7 +125,6 @@ jobs:
       codecov-flags: ${{ steps.prepare-codecov-flags.outputs.flags }}
     permissions:
       contents: read
-      id-token: write
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -174,7 +173,6 @@ jobs:
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v5
         with:
-          use_oidc: true
           files: ./target/coverage/lcov.info
           disable_search: true
           fail_ci_if_error: true
@@ -193,7 +191,6 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
-      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -211,7 +208,6 @@ jobs:
       - name: upload crate coverage flag to codecov
         uses: codecov/codecov-action@v5
         with:
-          use_oidc: true
           files: ./target/coverage/flags/${{ matrix.flag }}.lcov
           disable_search: true
           fail_ci_if_error: true
