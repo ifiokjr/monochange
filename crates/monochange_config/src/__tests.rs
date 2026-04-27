@@ -3431,6 +3431,22 @@ fn validate_cli_rejects_invalid_command_shapes() {
 	.unwrap_or_else(|| panic!("expected reserved name error"));
 	assert!(reserved.to_string().contains("reserved built-in command"));
 
+	let reserved_step_prefix = crate::validate_cli(&[cli_command(
+		"step:discover",
+		vec![CliStepDefinition::Validate {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		}],
+	)])
+	.err()
+	.unwrap_or_else(|| panic!("expected reserved step prefix error"));
+	assert!(
+		reserved_step_prefix
+			.to_string()
+			.contains("uses reserved `step:` prefix")
+	);
+
 	let no_steps = crate::validate_cli(&[cli_command("release", Vec::new())])
 		.err()
 		.unwrap_or_else(|| panic!("expected missing steps error"));

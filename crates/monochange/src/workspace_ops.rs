@@ -396,19 +396,6 @@ fn render_cli_step_toml(rendered: &mut String, step: &CliStepDefinition) {
 			}
 			render_step_inputs_toml(rendered, inputs);
 		}
-		CliStepDefinition::Validate { inputs, .. }
-		| CliStepDefinition::Discover { inputs, .. }
-		| CliStepDefinition::CreateChangeFile { inputs, .. }
-		| CliStepDefinition::PrepareRelease { inputs, .. }
-		| CliStepDefinition::CommitRelease { inputs, .. }
-		| CliStepDefinition::PublishRelease { inputs, .. }
-		| CliStepDefinition::OpenReleaseRequest { inputs, .. }
-		| CliStepDefinition::CommentReleasedIssues { inputs, .. }
-		| CliStepDefinition::AffectedPackages { inputs, .. }
-		| CliStepDefinition::DiagnoseChangesets { inputs, .. }
-		| CliStepDefinition::RetargetRelease { inputs, .. } => {
-			render_step_inputs_toml(rendered, inputs);
-		}
 		_ => {
 			render_step_inputs_toml(rendered, step.inputs());
 		}

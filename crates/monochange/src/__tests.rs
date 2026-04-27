@@ -107,6 +107,18 @@ fn shared_fs_test_support_setup_scenario_workspace_prefers_workspace_and_skips_e
 }
 
 #[test]
+fn synthetic_step_command_definition_rejects_unknown_steps() {
+	let error = crate::synthetic_step_command_definition("step:not-a-step")
+		.err()
+		.unwrap_or_else(|| panic!("expected unknown step error"));
+
+	assert_eq!(
+		error.to_string(),
+		"config error: unknown step command: step:not-a-step"
+	);
+}
+
+#[test]
 fn cli_parses_discover_command() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let matches = build_command_for_root("mc", &fixture_root)

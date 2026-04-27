@@ -261,6 +261,27 @@ pub(crate) use workspace_ops::render_interactive_changeset_markdown;
 #[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
+pub(crate) fn synthetic_step_command_definition(
+	cli_command_name: &str,
+) -> MonochangeResult<CliCommandDefinition> {
+	let kebab = cli_command_name
+		.strip_prefix("step:")
+		.unwrap_or(cli_command_name);
+	let step = monochange_core::all_step_variants()
+		.into_iter()
+		.find(|step| step.step_kebab_name() == kebab)
+		.ok_or_else(|| {
+			MonochangeError::Config(format!("unknown step command: {cli_command_name}"))
+		})?;
+
+	Ok(CliCommandDefinition {
+		name: cli_command_name.to_string(),
+		help_text: step.name().map(ToString::to_string),
+		inputs: step.step_inputs_schema(),
+		steps: vec![step],
+	})
+}
+
 mod analyze;
 mod changelog;
 mod changeset_policy;
@@ -920,21 +941,7 @@ where
 		}
 		Some((cli_command_name, cli_command_matches)) if cli_command_name.starts_with("step:") => {
 			let configuration = configuration?;
-			let kebab = cli_command_name
-				.strip_prefix("step:")
-				.unwrap_or(cli_command_name);
-			let step = monochange_core::all_step_variants()
-				.into_iter()
-				.find(|s| s.step_kebab_name() == kebab)
-				.ok_or_else(|| {
-					MonochangeError::Config(format!("unknown step command: {cli_command_name}"))
-				})?;
-			let synthetic = CliCommandDefinition {
-				name: cli_command_name.to_string(),
-				help_text: step.name().map(ToString::to_string),
-				inputs: step.step_inputs_schema(),
-				steps: vec![step],
-			};
+			let synthetic = synthetic_step_command_definition(cli_command_name)?;
 			let inputs = collect_cli_command_inputs(&synthetic, cli_command_matches);
 			let dry_run = quiet || cli_command_matches.get_flag("dry-run");
 			execute_cli_command(root, &configuration, &synthetic, dry_run, inputs)

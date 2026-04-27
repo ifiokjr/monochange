@@ -863,6 +863,23 @@ fn default_cli_commands_are_empty() {
 }
 
 #[test]
+fn command_steps_have_no_generated_input_schema() {
+	let step = CliStepDefinition::Command {
+		name: None,
+		when: None,
+		show_progress: None,
+		command: "echo ok".to_string(),
+		dry_run_command: None,
+		shell: ShellConfig::None,
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+
+	assert!(step.step_inputs_schema().is_empty());
+}
+
+#[test]
 fn cli_step_definition_kind_name_covers_all_variants() {
 	use std::collections::BTreeMap;
 	let cases: Vec<(CliStepDefinition, &str)> = vec![

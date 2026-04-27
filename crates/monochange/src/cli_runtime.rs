@@ -49,21 +49,7 @@ pub(crate) fn execute_matches(
 	quiet: bool,
 ) -> MonochangeResult<String> {
 	let cli_command = if cli_command_name.starts_with("step:") {
-		let kebab = cli_command_name
-			.strip_prefix("step:")
-			.unwrap_or(cli_command_name);
-		let step = monochange_core::all_step_variants()
-			.into_iter()
-			.find(|s| s.step_kebab_name() == kebab)
-			.ok_or_else(|| {
-				MonochangeError::Config(format!("unknown step command: {cli_command_name}"))
-			})?;
-		Some(monochange_core::CliCommandDefinition {
-			name: cli_command_name.to_string(),
-			help_text: step.name().map(ToString::to_string),
-			inputs: step.step_inputs_schema(),
-			steps: vec![step],
-		})
+		Some(synthetic_step_command_definition(cli_command_name)?)
 	} else {
 		configuration
 			.cli
@@ -3377,25 +3363,15 @@ mod tests {
 		(configuration, matches)
 	}
 
-	#[allow(clippy::redundant_closure_for_method_calls)]
 	fn default_cli_command(name: &str) -> CliCommandDefinition {
-		// Look up a built-in step by name (accepting both old names and step:* prefixes).
-		// Creates a synthetic CliCommandDefinition on the fly since default_cli_commands
-		// is now intentionally empty.
-		let step = monochange_core::all_step_variants()
-			.into_iter()
-			.find(|s| s.step_kebab_name() == name.strip_prefix("step:").unwrap_or(name));
+		let command_name = if name.starts_with("step:") {
+			name.to_string()
+		} else {
+			format!("step:{name}")
+		};
 
-		if let Some(step) = step {
-			return CliCommandDefinition {
-				name: format!("step:{}", step.step_kebab_name()),
-				help_text: step.name().map(ToString::to_string),
-				inputs: step.step_inputs_schema(),
-				steps: vec![step],
-			};
-		}
-
-		panic!("expected default cli command `{name}`")
+		synthetic_step_command_definition(&command_name)
+			.unwrap_or_else(|error| panic!("expected default cli command `{name}`: {error}"))
 	}
 
 	fn sample_package_publish_outcome(
