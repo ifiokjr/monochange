@@ -67,26 +67,26 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 
 ## CLI commands
 
-| Command                  | Purpose                                                                |
-| ------------------------ | ---------------------------------------------------------------------- |
-| `mc init`                | Generate a starter `monochange.toml` from detected packages            |
-| `mc validate`            | Validate config and changeset targets                                  |
-| `mc check`               | Validate config and run lint rules against package manifests           |
-| `mc lint`                | Inspect registered lint rules and presets                              |
-| `mc discover`            | Discover packages across ecosystems                                    |
-| `mc change`              | Create a `.changeset/*.md` file                                        |
-| `mc release`             | Prepare a release plan from changesets and refresh the cached manifest |
-| `mc placeholder-publish` | Publish placeholder versions for packages missing from registries      |
-| `mc publish`             | Publish package artifacts using built-in registry workflows            |
-| `mc commit-release`      | Prepare a release and create a local commit                            |
-| `mc publish-release`     | Create provider releases                                               |
-| `mc release-pr`          | Open or update a release pull request                                  |
+| Command                     | Purpose                                                                |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `mc init`                   | Generate a starter `monochange.toml` from detected packages            |
+| `mc validate`               | Validate config and changeset targets                                  |
+| `mc check`                  | Validate config and run lint rules against package manifests           |
+| `mc lint`                   | Inspect registered lint rules and presets                              |
+| `mc discover`               | Discover packages across ecosystems                                    |
+| `mc change`                 | Create a `.changeset/*.md` file                                        |
+| `mc release`                | Prepare a release plan from changesets and refresh the cached manifest |
+| `mc placeholder-publish`    | Publish placeholder versions for packages missing from registries      |
+| `mc publish`                | Publish package artifacts using built-in registry workflows            |
+| `mc commit-release`         | Prepare a release and create a local commit                            |
+| `mc publish-release`        | Create provider releases                                               |
+| `mc release-pr`             | Open or update a release pull request                                  |
 | `mc step:affected-packages` | Evaluate changeset policy from changed paths without a config wrapper  |
-| `mc diagnostics`         | Show changeset context with git and review metadata                    |
-| `mc release-record`      | Inspect a durable release declaration from git history                 |
-| `mc repair-release`      | Repair a recent release by retargeting tags                            |
-| `mc subagents`           | Generate repo-local monochange agent, subagent, and rule files         |
-| `mc mcp`                 | Start the stdio MCP server                                             |
+| `mc diagnostics`            | Show changeset context with git and review metadata                    |
+| `mc release-record`         | Inspect a durable release declaration from git history                 |
+| `mc repair-release`         | Repair a recent release by retargeting tags                            |
+| `mc subagents`              | Generate repo-local monochange agent, subagent, and rule files         |
+| `mc mcp`                    | Start the stdio MCP server                                             |
 
 ## CLI step types
 

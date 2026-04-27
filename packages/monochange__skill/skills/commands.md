@@ -6,10 +6,10 @@ Use this guide when the task is to choose, explain, or sequence monochange CLI c
 
 ### Create or repair config
 
-| Goal                                     | Command       | When to use it                                                                          |
-| ---------------------------------------- | ------------- | --------------------------------------------------------------------------------------- |
-| Bootstrap a repo                         | `mc init`     | You need a starter `monochange.toml` based on detected packages                         |
-| Check config and changesets              | `mc validate` | Before and after release-affecting edits                                                |
+| Goal                        | Command       | When to use it                                                  |
+| --------------------------- | ------------- | --------------------------------------------------------------- |
+| Bootstrap a repo            | `mc init`     | You need a starter `monochange.toml` based on detected packages |
+| Check config and changesets | `mc validate` | Before and after release-affecting edits                        |
 
 Examples:
 
@@ -57,9 +57,9 @@ mc check --fix
 
 ### Create release intent
 
-| Goal                                     | Command       | When to use it                                                      |
-| ---------------------------------------- | ------------- | ------------------------------------------------------------------- |
-| Create a changeset                       | `mc change`   | You know the target package or group id                             |
+| Goal                                     | Command                     | When to use it                                                                               |
+| ---------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------- |
+| Create a changeset                       | `mc change`                 | You know the target package or group id                                                      |
 | Check policy coverage from changed files | `mc step:affected-packages` | CI or review needs to confirm that changed packages have changesets without a config wrapper |
 
 Examples:
