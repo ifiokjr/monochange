@@ -104,28 +104,7 @@ fn load_workspace_configuration_uses_defaults_when_file_is_missing() {
 	assert_eq!(configuration.defaults.empty_update_message, None);
 	assert!(configuration.packages.is_empty());
 	assert!(configuration.groups.is_empty());
-	assert_eq!(configuration.cli.len(), 11);
-	let cli_command_names = configuration
-		.cli
-		.iter()
-		.map(|cli_command| cli_command.name.as_str())
-		.collect::<Vec<_>>();
-	assert_eq!(
-		cli_command_names,
-		vec![
-			"validate",
-			"discover",
-			"change",
-			"release",
-			"versions",
-			"placeholder-publish",
-			"publish",
-			"publish-plan",
-			"affected",
-			"diagnostics",
-			"repair-release"
-		]
-	);
+	assert!(configuration.cli.is_empty());
 	assert_eq!(configuration.cargo.enabled, None);
 	assert_eq!(configuration.npm.enabled, None);
 	assert_eq!(configuration.deno.enabled, None);
@@ -151,7 +130,7 @@ fn load_workspace_configuration_supports_diagnostics_cli_command_definition() {
 }
 
 #[test]
-fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_custom_commands() {
+fn load_workspace_configuration_keeps_configured_cli_commands_without_implicit_defaults() {
 	let root = fixture_path("config/merge-default-cli-overrides");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -160,33 +139,7 @@ fn load_workspace_configuration_merges_default_cli_commands_with_overrides_and_c
 		.iter()
 		.map(|cli_command| cli_command.name.as_str())
 		.collect::<Vec<_>>();
-	assert_eq!(
-		cli_command_names,
-		vec![
-			"validate",
-			"discover",
-			"change",
-			"release",
-			"versions",
-			"placeholder-publish",
-			"publish",
-			"publish-plan",
-			"affected",
-			"diagnostics",
-			"repair-release"
-		]
-	);
-
-	let discover = configuration
-		.cli
-		.iter()
-		.find(|command| command.name == "discover")
-		.unwrap_or_else(|| panic!("expected discover command"));
-	assert_eq!(
-		discover.help_text.as_deref(),
-		Some("Discover packages across supported ecosystems")
-	);
-	assert_eq!(discover.inputs.len(), 1);
+	assert_eq!(cli_command_names, vec!["release"]);
 
 	let release = configuration
 		.cli
