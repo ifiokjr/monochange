@@ -344,7 +344,7 @@ fn render_cli_input_toml(rendered: &mut String, input: &monochange_core::CliInpu
 	}
 }
 
-fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDefinition) {
+fn render_cli_step_toml(rendered: &mut String, step: &CliStepDefinition) {
 	let step_type = step.kind_name();
 	writeln!(rendered, "type = {}", render_toml_string(step_type))
 		.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
@@ -353,7 +353,7 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 			.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 	}
 	match step {
-		monochange_core::CliStepDefinition::Command {
+		CliStepDefinition::Command {
 			command,
 			dry_run_command,
 			shell,
@@ -396,17 +396,17 @@ fn render_cli_step_toml(rendered: &mut String, step: &monochange_core::CliStepDe
 			}
 			render_step_inputs_toml(rendered, inputs);
 		}
-		monochange_core::CliStepDefinition::Validate { inputs, .. }
-		| monochange_core::CliStepDefinition::Discover { inputs, .. }
-		| monochange_core::CliStepDefinition::CreateChangeFile { inputs, .. }
-		| monochange_core::CliStepDefinition::PrepareRelease { inputs, .. }
-		| monochange_core::CliStepDefinition::CommitRelease { inputs, .. }
-		| monochange_core::CliStepDefinition::PublishRelease { inputs, .. }
-		| monochange_core::CliStepDefinition::OpenReleaseRequest { inputs, .. }
-		| monochange_core::CliStepDefinition::CommentReleasedIssues { inputs, .. }
-		| monochange_core::CliStepDefinition::AffectedPackages { inputs, .. }
-		| monochange_core::CliStepDefinition::DiagnoseChangesets { inputs, .. }
-		| monochange_core::CliStepDefinition::RetargetRelease { inputs, .. } => {
+		CliStepDefinition::Validate { inputs, .. }
+		| CliStepDefinition::Discover { inputs, .. }
+		| CliStepDefinition::CreateChangeFile { inputs, .. }
+		| CliStepDefinition::PrepareRelease { inputs, .. }
+		| CliStepDefinition::CommitRelease { inputs, .. }
+		| CliStepDefinition::PublishRelease { inputs, .. }
+		| CliStepDefinition::OpenReleaseRequest { inputs, .. }
+		| CliStepDefinition::CommentReleasedIssues { inputs, .. }
+		| CliStepDefinition::AffectedPackages { inputs, .. }
+		| CliStepDefinition::DiagnoseChangesets { inputs, .. }
+		| CliStepDefinition::RetargetRelease { inputs, .. } => {
 			render_step_inputs_toml(rendered, inputs);
 		}
 		_ => {

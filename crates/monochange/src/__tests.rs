@@ -8,12 +8,14 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 
+use clap::Command;
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
 use httpmock::MockServer;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangesetTargetKind;
+use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
 use monochange_core::Ecosystem;
@@ -108,10 +110,10 @@ fn shared_fs_test_support_setup_scenario_workspace_prefers_workspace_and_skips_e
 fn cli_parses_discover_command() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let matches = build_command_for_root("mc", &fixture_root)
-		.try_get_matches_from([OsString::from("mc"), OsString::from("discover")])
+		.try_get_matches_from([OsString::from("mc"), OsString::from("step:discover")])
 		.unwrap_or_else(|error| panic!("matches: {error}"));
 
-	assert_eq!(matches.subcommand_name(), Some("discover"));
+	assert_eq!(matches.subcommand_name(), Some("step:discover"));
 }
 
 #[test]
@@ -124,12 +126,12 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("analyze"));
 	assert!(!output.contains("assist"));
 	assert!(output.contains("mcp"));
-	assert!(output.contains("change"));
-	assert!(output.contains("diagnostics"));
-	assert!(output.contains("placeholder-publish"));
-	assert!(output.contains("publish"));
-	assert!(output.contains("publish-plan"));
-	assert!(output.contains("repair-release"));
+	assert!(output.contains("step:create-change-file"));
+	assert!(output.contains("step:diagnose-changesets"));
+	assert!(output.contains("step:placeholder-publish"));
+	assert!(output.contains("step:publish-release"));
+	assert!(output.contains("step:plan-publish-rate-limits"));
+	assert!(output.contains("step:retarget-release"));
 	assert!(output.contains("release-record"));
 	assert!(output.contains("tag-release"));
 }
@@ -140,7 +142,7 @@ fn repair_release_help_describes_retargeting_workflow() {
 		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("repair-release"),
+			OsString::from("step:retarget-release"),
 			OsString::from("--help"),
 		],
 	)
@@ -149,28 +151,39 @@ fn repair_release_help_describes_retargeting_workflow() {
 	assert!(
 		output.contains("Repair a recent release by moving its release tags to a later commit")
 	);
-	assert!(output.contains("mc repair-release --from v1.2.3 --dry-run"));
+	assert!(output.contains("mc step:retarget-release --from v1.2.3 --dry-run"));
 	assert!(output.contains("--sync-provider=false"));
 }
 
 #[test]
 fn boolean_cli_inputs_support_explicit_false_values() {
-	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
-	let matches = build_command_for_root("mc", &fixture_root)
-		.try_get_matches_from([
-			OsString::from("mc"),
-			OsString::from("repair-release"),
-			OsString::from("--from"),
-			OsString::from("v1.2.3"),
-			OsString::from("--sync-provider=false"),
-		])
+	// Test boolean input parsing with a synthetic command that has
+	// default = true, which enables --flag=false syntax.
+	let cli_command = CliCommandDefinition {
+		name: "test-bool".to_string(),
+		help_text: None,
+		inputs: vec![CliInputDefinition {
+			name: "flag".to_string(),
+			kind: CliInputKind::Boolean,
+			help_text: None,
+			required: false,
+			default: Some("true".to_string()),
+			choices: vec![],
+			short: None,
+		}],
+		steps: vec![],
+	};
+	let subcommand = crate::build_cli_command_subcommand(&cli_command);
+	let matches = Command::new("mc")
+		.subcommand(subcommand)
+		.try_get_matches_from(["mc", "test-bool", "--flag=false"])
 		.unwrap_or_else(|error| panic!("matches: {error}"));
 	let (_, subcommand_matches) = matches
 		.subcommand()
-		.unwrap_or_else(|| panic!("expected repair-release subcommand"));
+		.unwrap_or_else(|| panic!("expected test-bool subcommand"));
 	assert_eq!(
 		subcommand_matches
-			.get_one::<String>("sync_provider")
+			.get_one::<String>("flag")
 			.map(String::as_str),
 		Some("false")
 	);
@@ -255,7 +268,7 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("release"),
+			OsString::from("step:prepare-release"),
 			OsString::from("--help"),
 		],
 	)
@@ -266,7 +279,7 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("versions"),
+			OsString::from("step:display-versions"),
 			OsString::from("--help"),
 		],
 	)
@@ -277,7 +290,7 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 	let matches = build_command_for_root("mc", &fixture_root)
 		.try_get_matches_from([
 			OsString::from("mc"),
-			OsString::from("versions"),
+			OsString::from("step:display-versions"),
 			OsString::from("--format"),
 			OsString::from("json"),
 		])
@@ -601,7 +614,7 @@ fn populate_adds_all_missing_default_cli_commands_to_an_existing_configuration()
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 11 default CLI commands"));
+	assert!(output.contains("already defines all default CLI commands"));
 	for table in [
 		"[cli.validate]",
 		"[cli.discover]",
@@ -632,7 +645,7 @@ fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 10 default CLI commands"));
+	assert!(output.contains("already defines all default CLI commands"));
 	assert!(config.contains("help_text = \"Custom release pipeline\""));
 	assert_eq!(config.matches("[cli.release]").count(), 1);
 	for table in [
@@ -749,14 +762,14 @@ fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
 	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
-	assert!(output.contains("added 11 default CLI commands"));
-	assert!(config.starts_with("[cli.validate]"));
-	assert!(config.contains("[cli.versions]"));
+	assert!(output.contains("already defines all default CLI commands"));
+	// With empty defaults, populate adds nothing
+	assert!(!config.contains("[cli.validate]"));
 }
 
 #[test]
 fn render_cli_commands_toml_handles_release_and_command_step_variants() {
-	let rendered = crate::render_cli_commands_toml(&[monochange_core::CliCommandDefinition {
+	let rendered = crate::render_cli_commands_toml(&[CliCommandDefinition {
 		name: "custom".to_string(),
 		help_text: None,
 		inputs: vec![CliInputDefinition {
@@ -980,7 +993,7 @@ fn workspace_discover_json_output_contains_contract_fields() {
 		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("discover"),
+			OsString::from("step:discover"),
 			OsString::from("--format"),
 			OsString::from("json"),
 		],
@@ -1070,11 +1083,11 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let output_path = tempdir.path().join("feature.md");
 
-	let output = run_cli(
+	let _output = run_cli(
 		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--package"),
 			OsString::from("sdk-core"),
 			OsString::from("--package"),
@@ -1091,7 +1104,7 @@ fn changes_add_writes_a_change_file_via_the_cli() {
 	let content = fs::read_to_string(&output_path)
 		.unwrap_or_else(|error| panic!("read change file: {error}"));
 
-	assert!(output.contains("wrote change file"));
+	// Step commands return empty output by default; verify via file content
 	assert!(content.contains("sdk-core: minor"));
 	assert!(content.contains("web-sdk: minor"));
 	assert!(content.contains("# feature foundation"));
@@ -1107,7 +1120,7 @@ fn changes_add_supports_release_note_type_and_details() {
 		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--package"),
 			OsString::from("sdk-core"),
 			OsString::from("--bump"),
@@ -1141,7 +1154,7 @@ fn changes_add_canonicalizes_package_references_to_package_names() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--package"),
 			OsString::from("crates/monochange"),
 			OsString::from("--bump"),
@@ -1183,7 +1196,73 @@ fn add_change_file_creates_default_path_under_changeset_directory() {
 #[test]
 fn change_command_sources_type_choices_from_workspace_configuration() {
 	let root = fixture_path("changeset-target-metadata/cli-type-only-change");
-	let error = build_command_for_root("mc", &root)
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("fixture should load: {error}"));
+	let mut cli = vec![CliCommandDefinition {
+		name: "change".to_string(),
+		help_text: None,
+		inputs: vec![
+			CliInputDefinition {
+				name: "package".to_string(),
+				kind: CliInputKind::StringList,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: vec![],
+				short: None,
+			},
+			CliInputDefinition {
+				name: "type".to_string(),
+				kind: CliInputKind::Choice,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: vec![],
+				short: None,
+			},
+			CliInputDefinition {
+				name: "reason".to_string(),
+				kind: CliInputKind::String,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: vec![],
+				short: None,
+			},
+			CliInputDefinition {
+				name: "interactive".to_string(),
+				kind: CliInputKind::Boolean,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: vec![],
+				short: None,
+			},
+		],
+		steps: vec![monochange_core::CliStepDefinition::CreateChangeFile {
+			name: None,
+			when: None,
+			show_progress: None,
+			inputs: BTreeMap::new(),
+		}],
+	}];
+	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
+	let change = cli
+		.iter()
+		.find(|c| c.name == "change")
+		.unwrap_or_else(|| panic!("expected change command"));
+	let type_input = change
+		.inputs
+		.iter()
+		.find(|i| i.name == "type")
+		.unwrap_or_else(|| panic!("expected type input"));
+	assert_eq!(
+		type_input.choices,
+		vec!["docs".to_string(), "test".to_string()]
+	);
+
+	let error = Command::new("mc")
+		.subcommand(crate::build_cli_command_subcommand(&cli[0]))
 		.try_get_matches_from([
 			OsString::from("mc"),
 			OsString::from("change"),
@@ -1206,12 +1285,12 @@ fn build_command_for_root_falls_back_to_default_cli_when_config_load_fails() {
 	let matches = build_command_for_root("mc", &root)
 		.try_get_matches_from([
 			OsString::from("mc"),
-			OsString::from("repair-release"),
+			OsString::from("step:retarget-release"),
 			OsString::from("--from"),
 			OsString::from("v1.2.3"),
 		])
 		.unwrap_or_else(|error| panic!("matches: {error}"));
-	assert_eq!(matches.subcommand_name(), Some("repair-release"));
+	assert_eq!(matches.subcommand_name(), Some("step:retarget-release"));
 }
 
 #[test]
@@ -1221,7 +1300,7 @@ fn collect_cli_command_inputs_omits_default_bump_for_type_only_changes() {
 	let matches = command
 		.try_get_matches_from([
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--package"),
 			OsString::from("core"),
 			OsString::from("--type"),
@@ -1233,9 +1312,17 @@ fn collect_cli_command_inputs_omits_default_bump_for_type_only_changes() {
 	let (_, subcommand_matches) = matches
 		.subcommand()
 		.unwrap_or_else(|| panic!("expected subcommand"));
-	let cli_command = monochange_core::default_cli_commands()
+	let cli_command = monochange_core::all_step_variants()
 		.into_iter()
-		.find(|command| command.name == "change")
+		.find(|s| s.step_kebab_name() == "create-change-file")
+		.map(|step| {
+			CliCommandDefinition {
+				name: format!("step:{}", step.step_kebab_name()),
+				help_text: step.name().map(|n| n.to_string()),
+				inputs: step.step_inputs_schema(),
+				steps: vec![step],
+			}
+		})
 		.unwrap_or_else(|| panic!("expected change command"));
 	let inputs = crate::collect_cli_command_inputs(&cli_command, subcommand_matches);
 	assert!(inputs.get("bump").is_some_and(Vec::is_empty));
@@ -1277,7 +1364,7 @@ fn changes_add_requires_package_or_interactive_mode() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--reason"),
 			OsString::from("missing package"),
 		],
@@ -1303,7 +1390,7 @@ fn changes_add_defaults_bump_to_none_when_type_is_present() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--package"),
 			OsString::from("core"),
 			OsString::from("--type"),
@@ -1671,7 +1758,7 @@ fn changes_add_rejects_legacy_evidence_input() {
 		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--package"),
 			OsString::from("sdk-core"),
 			OsString::from("--bump"),
@@ -1700,7 +1787,7 @@ fn changes_add_rejects_unknown_package_references() {
 		&fixture_root,
 		[
 			OsString::from("mc"),
-			OsString::from("change"),
+			OsString::from("step:create-change-file"),
 			OsString::from("--package"),
 			OsString::from("missing-package"),
 			OsString::from("--reason"),
@@ -1726,7 +1813,7 @@ fn release_dry_run_rejects_legacy_origin_and_evidence_metadata() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("release"),
+			OsString::from("step:prepare-release"),
 			OsString::from("--dry-run"),
 			OsString::from("--format"),
 			OsString::from("json"),
@@ -1771,7 +1858,7 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("release"),
+			OsString::from("step:prepare-release"),
 			OsString::from("--dry-run"),
 		],
 	)
@@ -1888,7 +1975,7 @@ fn command_release_normalizes_authored_changeset_heading_levels() {
 
 	run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/changelog.md"))
@@ -1912,7 +1999,7 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 
 	let output = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let workspace_manifest = fs::read_to_string(tempdir.path().join("Cargo.toml"))
@@ -1955,7 +2042,7 @@ fn command_release_updates_inferred_cargo_lockfiles_without_commands() {
 	with_path_prefixed(tempdir.path(), || {
 		run_cli(
 			tempdir.path(),
-			[OsString::from("mc"), OsString::from("release")],
+			[OsString::from("mc"), OsString::from("step:prepare-release")],
 		)
 		.unwrap_or_else(|error| panic!("command output: {error}"));
 	});
@@ -1973,7 +2060,7 @@ fn command_release_updates_inferred_npm_lockfiles_without_commands() {
 	with_path_prefixed(tempdir.path(), || {
 		run_cli(
 			tempdir.path(),
-			[OsString::from("mc"), OsString::from("release")],
+			[OsString::from("mc"), OsString::from("step:prepare-release")],
 		)
 		.unwrap_or_else(|error| panic!("command output: {error}"));
 	});
@@ -1991,7 +2078,7 @@ fn command_release_updates_inferred_bun_lockfiles_without_commands() {
 	with_path_prefixed(tempdir.path(), || {
 		run_cli(
 			tempdir.path(),
-			[OsString::from("mc"), OsString::from("release")],
+			[OsString::from("mc"), OsString::from("step:prepare-release")],
 		)
 		.unwrap_or_else(|error| panic!("command output: {error}"));
 	});
@@ -2008,7 +2095,7 @@ fn command_release_updates_inferred_deno_lockfiles_without_commands() {
 
 	run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let deno_lock = fs::read_to_string(tempdir.path().join("packages/app/deno.lock"))
@@ -2051,7 +2138,7 @@ fn command_release_prefers_custom_lockfile_commands_over_defaults() {
 	with_path_prefixed(tempdir.path(), || {
 		run_cli(
 			tempdir.path(),
-			[OsString::from("mc"), OsString::from("release")],
+			[OsString::from("mc"), OsString::from("step:prepare-release")],
 		)
 		.unwrap_or_else(|error| panic!("command output: {error}"));
 	});
@@ -2102,7 +2189,7 @@ fn command_release_honors_explicit_lockfile_paths_in_versioned_files() {
 
 	run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let shared_lock = fs::read_to_string(tempdir.path().join("lockfiles/shared/package-lock.json"))
@@ -2118,7 +2205,7 @@ fn command_release_updates_regex_versioned_files() {
 
 	run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let readme = fs::read_to_string(tempdir.path().join("README.md"))
@@ -2135,7 +2222,7 @@ fn command_release_uses_empty_update_message_precedence_for_grouped_changelogs()
 
 	let output = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/changelog.md"))
@@ -2158,7 +2245,7 @@ fn command_release_failures_do_not_delete_changesets() {
 
 	let error = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected command failure"));
@@ -2176,7 +2263,7 @@ fn command_diagnostics_reports_requested_changeset_text() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("diagnostics"),
+			OsString::from("step:diagnose-changesets"),
 			OsString::from("--changeset"),
 			OsString::from(".changeset/feature.md"),
 		],
@@ -2198,7 +2285,7 @@ fn command_diagnostics_reports_multiple_changesets_in_json() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("diagnostics"),
+			OsString::from("step:diagnose-changesets"),
 			OsString::from("--format"),
 			OsString::from("json"),
 		],
@@ -2229,7 +2316,7 @@ fn command_diagnostics_deduplicates_duplicate_requested_paths() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("diagnostics"),
+			OsString::from("step:diagnose-changesets"),
 			OsString::from("--changeset"),
 			OsString::from(".changeset/feature.md"),
 			OsString::from("--changeset"),
@@ -2258,7 +2345,7 @@ fn command_diagnostics_reports_unknown_changeset_path() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("diagnostics"),
+			OsString::from("step:diagnose-changesets"),
 			OsString::from("--changeset"),
 			OsString::from(".changeset/does-not-exist.md"),
 		],
@@ -2278,7 +2365,7 @@ fn command_diagnostics_resolves_changeset_fallback_for_short_paths() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("diagnostics"),
+			OsString::from("step:diagnose-changesets"),
 			OsString::from("--changeset"),
 			OsString::from("feature.md"),
 		],
@@ -2298,7 +2385,7 @@ fn command_diagnostics_supports_absolute_changeset_path() {
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("diagnostics"),
+			OsString::from("step:diagnose-changesets"),
 			OsString::from("--format"),
 			OsString::from("text"),
 			OsString::from("--changeset"),
@@ -2432,7 +2519,7 @@ fn command_step_without_dry_run_override_reports_skipped_command() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "announce".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -2465,7 +2552,7 @@ fn command_step_rejects_unparseable_commands() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "announce".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -2503,7 +2590,7 @@ fn command_step_rejects_empty_commands() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "announce".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -2537,7 +2624,7 @@ fn command_step_reports_process_spawn_failures() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "announce".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -2575,7 +2662,7 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "announce".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -2612,7 +2699,7 @@ fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "announce".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -2646,7 +2733,7 @@ fn execute_cli_command_without_steps_reports_completion_status() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "noop".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -2947,7 +3034,7 @@ fn assert_cli_release_pattern(
 		tempdir.path(),
 		[
 			OsString::from("mc"),
-			OsString::from("release"),
+			OsString::from("step:prepare-release"),
 			OsString::from("--dry-run"),
 			OsString::from("--format"),
 			OsString::from("json"),
@@ -3141,7 +3228,7 @@ fn release_step_exposes_updated_changelogs_to_command_steps() {
 
 	let output = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 
@@ -3865,7 +3952,7 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 
 	let output = run_cli(
 		root,
-		[OsString::from("mc"), OsString::from("commit-release")],
+		[OsString::from("mc"), OsString::from("step:commit-release")],
 	)
 	.unwrap_or_else(|error| panic!("commit-release output: {error}"));
 	let commit_subject = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%s"]);
@@ -3893,7 +3980,7 @@ fn commit_release_command_reports_json_output() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("commit-release"),
+			OsString::from("step:commit-release"),
 			OsString::from("--format"),
 			OsString::from("json"),
 			OsString::from("--dry-run"),
@@ -3930,7 +4017,7 @@ fn repair_release_command_dry_run_reports_text_output() {
 			root,
 			[
 				OsString::from("mc"),
-				OsString::from("repair-release"),
+				OsString::from("step:retarget-release"),
 				OsString::from("--from"),
 				OsString::from("v1.2.3"),
 				OsString::from("--target"),
@@ -3962,7 +4049,7 @@ fn repair_release_command_reports_json_output() {
 			root,
 			[
 				OsString::from("mc"),
-				OsString::from("repair-release"),
+				OsString::from("step:retarget-release"),
 				OsString::from("--from"),
 				OsString::from("v1.2.3"),
 				OsString::from("--sync-provider=false"),
@@ -4040,7 +4127,7 @@ fn repair_release_command_rejects_non_descendant_targets_without_force() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("repair-release"),
+			OsString::from("step:retarget-release"),
 			OsString::from("--from"),
 			OsString::from("v1.2.3"),
 			OsString::from("--target"),
@@ -4360,7 +4447,7 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 
 #[test]
 fn render_cli_command_result_prefers_retarget_report() {
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "repair-release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4398,7 +4485,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 
 #[test]
 fn render_cli_command_result_renders_release_follow_up_sections() {
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4441,7 +4528,7 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 
 #[test]
 fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release() {
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4488,7 +4575,7 @@ fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release
 
 #[test]
 fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4551,7 +4638,7 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "repair-release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4641,7 +4728,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		),
 	];
 	for (name, step, expected) in cases {
-		let cli_command = monochange_core::CliCommandDefinition {
+		let cli_command = CliCommandDefinition {
 			name: name.to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -4675,7 +4762,7 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
 		bot: monochange_core::ProviderBotSettings::default(),
 	});
-	let prepare_and_publish = monochange_core::CliCommandDefinition {
+	let prepare_and_publish = CliCommandDefinition {
 		name: "publish-release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4714,7 +4801,7 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 	let mut configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.source = None;
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "release-comments".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4774,7 +4861,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 	];
 
 	for (name, step, expected) in cases {
-		let cli_command = monochange_core::CliCommandDefinition {
+		let cli_command = CliCommandDefinition {
 			name: name.to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -4800,7 +4887,7 @@ fn execute_cli_command_change_step_requires_reason_input() {
 	let root = fixture_path("monochange/release-base");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "change".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4848,7 +4935,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 
 	let manifest_path = root.join(".monochange/release-manifest.json");
-	let prepare_release = monochange_core::CliCommandDefinition {
+	let prepare_release = CliCommandDefinition {
 		name: "release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4871,7 +4958,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		fs::read_to_string(&manifest_path).unwrap_or_else(|error| panic!("read manifest: {error}"));
 	assert!(manifest_contents.contains("\"releaseTargets\""));
 
-	let publish_release = monochange_core::CliCommandDefinition {
+	let publish_release = CliCommandDefinition {
 		name: "publish-release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4899,7 +4986,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 	assert!(publish_output.contains("releases:"));
 	assert!(publish_output.contains("dry-run"));
 
-	let release_request = monochange_core::CliCommandDefinition {
+	let release_request = CliCommandDefinition {
 		name: "release-pr".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4928,7 +5015,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 	assert!(request_output.contains("release request:"));
 	assert!(request_output.contains("dry-run"));
 
-	let issue_comments = monochange_core::CliCommandDefinition {
+	let issue_comments = CliCommandDefinition {
 		name: "release-comments".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -4991,7 +5078,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 		"MONOCHANGE_CRATES_IO_API_URL",
 		Some(server.base_url()),
 		|| {
-			let placeholder_command = monochange_core::CliCommandDefinition {
+			let placeholder_command = CliCommandDefinition {
 				name: "placeholder-publish".to_string(),
 				help_text: None,
 				inputs: Vec::new(),
@@ -5013,7 +5100,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 			assert!(placeholder_output.contains("would publish placeholder"));
 			assert!(placeholder_output.contains("publish rate limits:"));
 
-			let publish_command = monochange_core::CliCommandDefinition {
+			let publish_command = CliCommandDefinition {
 				name: "publish".to_string(),
 				help_text: None,
 				inputs: Vec::new(),
@@ -5064,7 +5151,7 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 		"MONOCHANGE_CRATES_IO_API_URL",
 		Some(server.base_url()),
 		|| {
-			let placeholder_command = monochange_core::CliCommandDefinition {
+			let placeholder_command = CliCommandDefinition {
 				name: "placeholder-publish".to_string(),
 				help_text: None,
 				inputs: Vec::new(),
@@ -5089,7 +5176,7 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 			assert!(placeholder_output.contains("no packages matched the publishing criteria"));
 			assert!(placeholder_output.contains("no publish operations matched the current plan"));
 
-			let publish_command = monochange_core::CliCommandDefinition {
+			let publish_command = CliCommandDefinition {
 				name: "publish".to_string(),
 				help_text: None,
 				inputs: Vec::new(),
@@ -5121,7 +5208,7 @@ fn execute_cli_command_supports_rate_limit_publish_steps_without_matching_packag
 			assert!(publish_output.contains("no packages matched the publishing criteria"));
 			assert!(publish_output.contains("no publish operations matched the current plan"));
 
-			let plan_command = monochange_core::CliCommandDefinition {
+			let plan_command = CliCommandDefinition {
 				name: "publish-plan".to_string(),
 				help_text: None,
 				inputs: Vec::new(),
@@ -5268,7 +5355,7 @@ fn execute_matches_rejects_unknown_cli_command_names() {
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let matches = clap::Command::new("dummy")
+	let matches = Command::new("dummy")
 		.try_get_matches_from(["dummy"])
 		.unwrap_or_else(|error| panic!("matches: {error}"));
 	let error = crate::execute_matches(tempdir.path(), &configuration, "missing", &matches, false)
@@ -6212,7 +6299,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "commit-release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -8519,10 +8606,28 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 
 #[test]
 fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defaults() {
-	let mut cli = monochange_core::default_cli_commands();
+	let mut cli = vec![CliCommandDefinition {
+		name: "step:prepare-release".to_string(),
+		help_text: None,
+		inputs: vec![CliInputDefinition {
+			name: "format".to_string(),
+			kind: CliInputKind::Choice,
+			help_text: None,
+			required: false,
+			default: Some("text".to_string()),
+			choices: vec!["text".to_string(), "json".to_string()],
+			short: None,
+		}],
+		steps: vec![monochange_core::CliStepDefinition::PrepareRelease {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		}],
+	}];
+
 	let release = cli
 		.iter_mut()
-		.find(|command| command.name == "release")
+		.find(|command| command.name == "step:prepare-release")
 		.unwrap_or_else(|| panic!("expected release command"));
 	release.inputs[0].default = Some("text".to_string());
 	release.inputs[0].choices = vec!["text".to_string(), "json".to_string()];
@@ -8531,7 +8636,7 @@ fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defau
 
 	let release = cli
 		.iter()
-		.find(|command| command.name == "release")
+		.find(|command| command.name == "step:prepare-release")
 		.unwrap_or_else(|| panic!("expected release command after runtime defaults"));
 	let format = release
 		.inputs
@@ -8577,7 +8682,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 		dart: monochange_core::EcosystemSettings::default(),
 	};
 	let mut cli = vec![
-		monochange_core::CliCommandDefinition {
+		CliCommandDefinition {
 			name: "change".to_string(),
 			help_text: Some("Create a change".to_string()),
 			inputs: vec![CliInputDefinition {
@@ -8591,7 +8696,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 			}],
 			steps: Vec::new(),
 		},
-		monochange_core::CliCommandDefinition {
+		CliCommandDefinition {
 			name: "change-with-existing-choices".to_string(),
 			help_text: None,
 			inputs: vec![CliInputDefinition {
@@ -8637,7 +8742,7 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 		deno: monochange_core::EcosystemSettings::default(),
 		dart: monochange_core::EcosystemSettings::default(),
 	};
-	let mut cli = vec![monochange_core::CliCommandDefinition {
+	let mut cli = vec![CliCommandDefinition {
 		name: "change".to_string(),
 		help_text: None,
 		inputs: vec![CliInputDefinition {
@@ -8663,8 +8768,6 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 		.iter()
 		.map(|command| command.name.as_str())
 		.collect::<Vec<_>>();
-	assert!(command_names.contains(&"validate"));
-	assert!(command_names.contains(&"discover"));
 	assert!(command_names.contains(&"release"));
 	assert_eq!(
 		cli.iter()
@@ -8678,7 +8781,7 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 
 #[test]
 fn build_skill_subcommand_forwards_native_add_flags() {
-	let command = clap::Command::new("mc").subcommand(crate::build_skill_subcommand());
+	let command = Command::new("mc").subcommand(crate::build_skill_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -8919,7 +9022,7 @@ fn skill_command_reports_nonzero_exit_status_from_runner() {
 
 #[test]
 fn build_subagents_subcommand_parses_valid_inputs_and_rejects_invalid_targets() {
-	let command = clap::Command::new("mc").subcommand(crate::build_subagents_subcommand());
+	let command = Command::new("mc").subcommand(crate::build_subagents_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -9084,7 +9187,7 @@ fn subagents_command_supports_all_targets_in_default_text_output() {
 
 #[test]
 fn build_release_record_subcommand_requires_from_and_supports_json_output() {
-	let command = clap::Command::new("mc").subcommand(crate::build_release_record_subcommand());
+	let command = Command::new("mc").subcommand(crate::build_release_record_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -9123,7 +9226,7 @@ fn build_release_record_subcommand_requires_from_and_supports_json_output() {
 
 #[test]
 fn build_command_with_cli_registers_custom_subcommands_and_default_help_text() {
-	let cli = vec![monochange_core::CliCommandDefinition {
+	let cli = vec![CliCommandDefinition {
 		name: "custom".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -9158,7 +9261,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		),
 	];
 	for (name, expected) in cases {
-		let after_help = crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
+		let after_help = crate::cli_command_after_help(&CliCommandDefinition {
 			name: name.to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -9168,7 +9271,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		assert!(after_help.contains(expected));
 	}
 	assert!(
-		crate::cli_command_after_help(&monochange_core::CliCommandDefinition {
+		crate::cli_command_after_help(&CliCommandDefinition {
 			name: "custom".to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -9180,7 +9283,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 
 #[test]
 fn build_cli_command_subcommand_parses_supported_input_kinds() {
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "custom".to_string(),
 		help_text: Some("Run a custom command".to_string()),
 		inputs: vec![
@@ -9242,8 +9345,7 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 		steps: Vec::new(),
 	};
 
-	let command =
-		clap::Command::new("mc").subcommand(crate::build_cli_command_subcommand(&cli_command));
+	let command = Command::new("mc").subcommand(crate::build_cli_command_subcommand(&cli_command));
 	let matches = command
 		.try_get_matches_from([
 			OsString::from("mc"),
@@ -9609,7 +9711,7 @@ fn command_release_without_diff_skips_file_diff_previews() {
 	set_force_build_file_diff_previews_error(true);
 	let output = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.unwrap_or_else(|error| panic!("release without diff: {error}"));
 	set_force_build_file_diff_previews_error(false);
@@ -9623,7 +9725,7 @@ fn command_release_command_steps_can_still_request_file_diffs() {
 	set_force_build_file_diff_previews_error(true);
 	let error = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("release")],
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected release command to require file diffs"));
@@ -10318,8 +10420,11 @@ fn release_command_updates_versioned_files_and_changelogs() {
 	git_in_temp_repo(root, &["add", "."]);
 	git_in_temp_repo(root, &["commit", "-m", "initial"]);
 
-	let output = run_cli(root, [OsString::from("mc"), OsString::from("release")])
-		.unwrap_or_else(|error| panic!("release output: {error}"));
+	let output = run_cli(
+		root,
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
+	)
+	.unwrap_or_else(|error| panic!("release output: {error}"));
 
 	// Release should report the planned version.
 	assert!(
@@ -10565,16 +10670,16 @@ fn extract_quiet_from_args_detects_short_and_long_flags() {
 	assert!(crate::extract_quiet_from_args([
 		OsString::from("mc"),
 		OsString::from("--quiet"),
-		OsString::from("release"),
+		OsString::from("step:prepare-release"),
 	]));
 	assert!(crate::extract_quiet_from_args([
 		OsString::from("mc"),
 		OsString::from("-q"),
-		OsString::from("discover"),
+		OsString::from("step:discover"),
 	]));
 	assert!(!crate::extract_quiet_from_args([
 		OsString::from("mc"),
-		OsString::from("release"),
+		OsString::from("step:prepare-release"),
 	]));
 }
 
@@ -10673,12 +10778,12 @@ fn cli_help_subcommand_renders_detailed_command_help() {
 		[
 			OsString::from("mc"),
 			OsString::from("help"),
-			OsString::from("change"),
+			OsString::from("validate"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("help change output: {error}"));
+	.unwrap_or_else(|error| panic!("help validate output: {error}"));
 
-	assert!(output.contains("change"));
+	assert!(output.contains("validate"));
 	assert!(output.contains("Description"));
 	assert!(output.contains("Usage"));
 }
@@ -11325,7 +11430,7 @@ fn execute_cli_command_publish_release_falls_back_to_release_record_from_git() {
 
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "publish-release".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
@@ -11458,7 +11563,7 @@ repo = "monochange"
 
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let cli_command = monochange_core::CliCommandDefinition {
+	let cli_command = CliCommandDefinition {
 		name: "release-comments".to_string(),
 		help_text: None,
 		inputs: Vec::new(),

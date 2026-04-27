@@ -134,6 +134,7 @@ fn monochange_styles() -> clap::builder::Styles {
 		.invalid(crate::cli_theme::error())
 }
 
+#[allow(clippy::redundant_closure_for_method_calls)]
 pub(crate) fn build_command_with_cli(
 	bin_name: &'static str,
 	cli: &[CliCommandDefinition],
@@ -211,10 +212,21 @@ When provided, the generated config includes:\n\
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
 			))
 			.subcommand(build_check_subcommand())
+			.subcommand(build_validate_subcommand())
 			.subcommand(build_help_subcommand());
 
 	for cli_command in cli {
 		command = command.subcommand(build_cli_command_subcommand(cli_command));
+	}
+	for step in monochange_core::all_step_variants() {
+		let kebab = step.step_kebab_name();
+		let synthetic = CliCommandDefinition {
+			name: format!("step:{kebab}"),
+			help_text: step.name().map(|n| n.to_string()),
+			inputs: step.step_inputs_schema(),
+			steps: vec![step],
+		};
+		command = command.subcommand(build_cli_command_subcommand(&synthetic));
 	}
 
 	command
@@ -489,6 +501,31 @@ pub(crate) fn build_check_subcommand() -> Command {
 				.help("Run only the specified lint rule ids")
 				.value_name("RULES")
 				.value_delimiter(','),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format")
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
+		)
+}
+
+pub(crate) fn build_validate_subcommand() -> Command {
+	Command::new("validate")
+		.about("Validate monochange configuration and changesets")
+		.hide(true)
+		.after_help(
+			r"Examples:
+  mc validate
+
+Runs the Validate step directly without requiring a configuration entry.",
+		)
+		.arg(
+			Arg::new("dry-run")
+				.long("dry-run")
+				.help("Run without making any changes")
+				.action(ArgAction::SetTrue),
 		)
 		.arg(
 			Arg::new("format")

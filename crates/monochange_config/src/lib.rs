@@ -135,12 +135,20 @@ use serde_yaml_ng::Mapping;
 
 const CONFIG_FILE: &str = "monochange.toml";
 const RESERVED_CLI_COMMAND_NAMES: &[&str] = &[
+	"agent",
+	"agents",
 	"analyze",
+	"check",
+	"fix",
 	"help",
 	"init",
+	"lint",
+	"lsp",
 	"mcp",
 	"skill",
+	"skills",
 	"subagents",
+	"validate",
 	"version",
 ];
 const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
@@ -3273,6 +3281,12 @@ fn validate_cli(cli: &[CliCommandDefinition]) -> MonochangeResult<()> {
 		if RESERVED_CLI_COMMAND_NAMES.contains(&cli_command.name.as_str()) {
 			return Err(MonochangeError::Config(format!(
 				"CLI command `{}` collides with a reserved built-in command",
+				cli_command.name
+			)));
+		}
+		if cli_command.name.starts_with("step:") {
+			return Err(MonochangeError::Config(format!(
+				"CLI command `{}` uses reserved `step:` prefix",
 				cli_command.name
 			)));
 		}

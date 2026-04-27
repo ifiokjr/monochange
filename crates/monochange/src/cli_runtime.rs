@@ -3358,11 +3358,25 @@ mod tests {
 		(configuration, matches)
 	}
 
+	#[allow(clippy::redundant_closure_for_method_calls)]
 	fn default_cli_command(name: &str) -> CliCommandDefinition {
-		monochange_core::default_cli_commands()
+		// Look up a built-in step by name (accepting both old names and step:* prefixes).
+		// Creates a synthetic CliCommandDefinition on the fly since default_cli_commands
+		// is now intentionally empty.
+		let step = monochange_core::all_step_variants()
 			.into_iter()
-			.find(|command| command.name == name)
-			.unwrap_or_else(|| panic!("expected default cli command `{name}`"))
+			.find(|s| s.step_kebab_name() == name.strip_prefix("step:").unwrap_or(name));
+
+		if let Some(step) = step {
+			return CliCommandDefinition {
+				name: format!("step:{}", step.step_kebab_name()),
+				help_text: step.name().map(|n| n.to_string()),
+				inputs: step.step_inputs_schema(),
+				steps: vec![step],
+			};
+		}
+
+		panic!("expected default cli command `{name}`")
 	}
 
 	fn sample_package_publish_outcome(
@@ -3609,7 +3623,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_results_include_release_details_policy_and_logs() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		context.show_diff = true;
 		context.release_manifest_path = Some(PathBuf::from(".monochange/release.json"));
@@ -4613,7 +4627,7 @@ path = "crates/core"
 		let output = execute_cli_command_with_options(
 			&root,
 			&configuration,
-			&default_cli_command("versions"),
+			&default_cli_command("display-versions"),
 			ExecuteCliCommandOptions {
 				dry_run: false,
 				quiet: false,
@@ -4645,7 +4659,7 @@ path = "crates/core"
 		let error = execute_cli_command_with_options(
 			&root,
 			&configuration,
-			&default_cli_command("versions"),
+			&default_cli_command("display-versions"),
 			ExecuteCliCommandOptions {
 				dry_run: false,
 				quiet: false,
@@ -4683,7 +4697,7 @@ path = "crates/core"
 		let error = execute_cli_command_with_options(
 			&root,
 			&configuration,
-			&default_cli_command("versions"),
+			&default_cli_command("display-versions"),
 			ExecuteCliCommandOptions {
 				dry_run: false,
 				quiet: false,
@@ -4728,7 +4742,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_result_includes_release_results_and_changed_files() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		let mut prepared_release = sample_prepared_release();
 		prepared_release.changed_files = vec![PathBuf::from("Cargo.toml")];
@@ -4823,7 +4837,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_result_and_markdown_cover_empty_and_fallback_paths() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		context.command_logs = vec!["ran command".to_string()];
 		let text = render_cli_command_result(&cli_command, &context);
@@ -4836,7 +4850,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_result_and_markdown_include_release_target_details_without_diffs() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		context.prepared_release = Some(PreparedRelease {
 			plan: ReleasePlan {
