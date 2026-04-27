@@ -185,12 +185,12 @@ fn update_project_version(document: &mut DocumentMut, owner_version: Option<&str
 	else {
 		return;
 	};
-	if let Some(existing) = project.get_mut("version") {
-		if let Some(existing_value) = existing.as_value() {
-			let mut new_value = toml_edit::Value::from(version);
-			*new_value.decor_mut() = existing_value.decor().clone();
-			*existing = Item::Value(new_value);
-		}
+	if let Some(existing) = project.get_mut("version")
+		&& let Some(existing_value) = existing.as_value()
+	{
+		let mut new_value = toml_edit::Value::from(version);
+		*new_value.decor_mut() = existing_value.decor().clone();
+		*existing = Item::Value(new_value);
 	}
 }
 
@@ -472,15 +472,15 @@ fn parse_pep621_dependencies(project: &Value) -> Vec<PackageDependency> {
 
 	if let Some(dep_array) = project.get("dependencies").and_then(Value::as_array) {
 		for dep in dep_array {
-			if let Some(spec) = dep.as_str() {
-				if let Some(name) = parse_dependency_name(spec) {
-					deps.push(PackageDependency {
-						name: normalize_python_package_name(&name),
-						kind: DependencyKind::Runtime,
-						version_constraint: extract_version_constraint(spec, &name),
-						optional: false,
-					});
-				}
+			if let Some(spec) = dep.as_str()
+				&& let Some(name) = parse_dependency_name(spec)
+			{
+				deps.push(PackageDependency {
+					name: normalize_python_package_name(&name),
+					kind: DependencyKind::Runtime,
+					version_constraint: extract_version_constraint(spec, &name),
+					optional: false,
+				});
 			}
 		}
 	}
@@ -492,15 +492,15 @@ fn parse_pep621_dependencies(project: &Value) -> Vec<PackageDependency> {
 		for (_group, group_deps) in optional_deps {
 			if let Some(dep_array) = group_deps.as_array() {
 				for dep in dep_array {
-					if let Some(spec) = dep.as_str() {
-						if let Some(name) = parse_dependency_name(spec) {
-							deps.push(PackageDependency {
-								name: normalize_python_package_name(&name),
-								kind: DependencyKind::Development,
-								version_constraint: extract_version_constraint(spec, &name),
-								optional: true,
-							});
-						}
+					if let Some(spec) = dep.as_str()
+						&& let Some(name) = parse_dependency_name(spec)
+					{
+						deps.push(PackageDependency {
+							name: normalize_python_package_name(&name),
+							kind: DependencyKind::Development,
+							version_constraint: extract_version_constraint(spec, &name),
+							optional: true,
+						});
 					}
 				}
 			}

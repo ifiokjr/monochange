@@ -38,7 +38,7 @@ warn_on_group_mismatch = true
 # Default package type for all packages that don't declare their own `type`.
 # Setting this avoids repeating `type = "cargo"` on every [package.*] entry.
 #
-# Options: "cargo", "npm", "deno", "dart", "flutter"
+# Options: "cargo", "npm", "deno", "dart", "flutter", "python"
 # Default: none (each package must declare its own type)
 package_type = "cargo"
 
@@ -243,6 +243,9 @@ path = "crates/monochange_ecmascript"
 [package.monochange_dart]
 path = "crates/monochange_dart"
 
+[package.monochange_python]
+path = "crates/monochange_python"
+
 [package.monochange_graph]
 path = "crates/monochange_graph"
 
@@ -370,6 +373,7 @@ packages = [
 	"monochange_deno",
 	"monochange_ecmascript",
 	"monochange_dart",
+	"monochange_python",
 	"monochange_graph",
 	"monochange_semver",
 	"monochange_github",

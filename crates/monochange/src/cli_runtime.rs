@@ -3283,6 +3283,7 @@ mod tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		}
 	}
 
@@ -4551,6 +4552,7 @@ path = "crates/core"
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let error = execute_cli_command(
 			tempdir.path(),

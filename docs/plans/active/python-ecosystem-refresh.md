@@ -40,6 +40,7 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] run formatter (`cargo fmt --all`)
 - [x] run targeted Python adapter tests
 - [ ] run repository lint/quality validation (`devenv shell lint:all`)
+- [x] run workspace config validation (`mc validate`)
 - [ ] update PR branch or open replacement PR after validation
 
 ## Validation
@@ -47,7 +48,8 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] `cargo check -p monochange --features python`
 - [x] `cargo test -p monochange_python`
 - [x] `cargo fmt --all`
-- [ ] `devenv shell lint:all`
+- [ ] `devenv shell lint:all` (Rust, architecture, docs, JS lint, deny, and validation phases passed; timed out during publish dry-run packaging)
+- [x] `mc validate`
 
 ## Notes
 

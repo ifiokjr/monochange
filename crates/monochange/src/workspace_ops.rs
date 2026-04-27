@@ -2057,6 +2057,7 @@ mod workspace_ops_tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		}
 	}
 
@@ -2282,6 +2283,7 @@ mod workspace_ops_tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let undetected_error = discover_release_workspace(undetected_root.path(), &undetected)
 			.err()
@@ -2331,6 +2333,7 @@ mod workspace_ops_tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let missing_manifest_error =
 			discover_release_workspace(missing_manifest_root.path(), &missing_manifest)

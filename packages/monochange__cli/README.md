@@ -18,7 +18,7 @@
 
 It discovers packages, normalizes dependency data, applies group rules, turns explicit change files into release plans, and can run config-defined release preparation from those same inputs.
 
-Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter.
+Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, Dart/Flutter, and Python.
 
 <!-- {/projectReadmeOverview} -->
 
@@ -167,7 +167,7 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
 
 <!-- {=projectMilestoneCapabilities} -->
 
-- discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
+- discover Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, and Python packages
 - normalize dependency edges across ecosystems
 - coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input
@@ -211,6 +211,8 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__deno-orange?logo=rust)](https://crates.io/crates/monochange_deno) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__deno-1f425f?logo=docs.rs)](https://docs.rs/monochange_deno/)
 - `monochange_dart` — Dart and Flutter workspace discovery.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust)](https://crates.io/crates/monochange_dart) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs)](https://docs.rs/monochange_dart/)
+- `monochange_python` — Python uv workspace, Poetry, and pyproject.toml discovery.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__python-orange?logo=rust)](https://crates.io/crates/monochange_python) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__python-1f425f?logo=docs.rs)](https://docs.rs/monochange_python/)
 
 <!-- {/projectCrateCatalog} -->
 

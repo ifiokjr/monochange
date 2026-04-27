@@ -814,7 +814,6 @@ fn default_publish_registry_for_ecosystem(
 		EcosystemType::Npm => Some(PublishRegistry::Builtin(RegistryKind::Npm)),
 		EcosystemType::Deno => Some(PublishRegistry::Builtin(RegistryKind::Jsr)),
 		EcosystemType::Dart => Some(PublishRegistry::Builtin(RegistryKind::PubDev)),
-		EcosystemType::Python => None,
 		_ => None,
 	};
 	registry
