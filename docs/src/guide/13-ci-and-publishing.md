@@ -10,6 +10,8 @@ These commands solve different automation problems:
 
 <!-- {=projectCommandAutomationMatrix} -->
 
+These are the commands most repositories use after running `mc init`. With the new CLI model, workflow names such as `discover`, `change`, `release`, `publish`, and `affected` come from `[cli.*]` tables in `monochange.toml`; hardcoded binary commands such as `validate`, `check`, `init`, and `mcp` stay built in. The underlying built-in steps are always available directly as immutable `mc step:*` commands.
+
 | Goal                             | Command                                                     | Use it when                                                                                              |
 | -------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Validate config and changesets   | `mc validate`                                               | You changed `monochange.toml` or `.changeset/*.md` files                                                 |

@@ -93,7 +93,6 @@ For release-oriented commands, markdown is the default human-readable output for
 ```bash
 mc init
 mc init --provider github
-mc populate
 mc validate
 ```
 
@@ -101,7 +100,7 @@ Use these when you are creating or refining `monochange.toml`.
 
 - `mc init` generates a starter config from detected packages
 - `mc init --provider github` also seeds source/provider automation config
-- `mc populate` appends any missing built-in `[cli.<command>]` definitions to an existing config
+- `mc init` seeds editable `[cli.*]` workflow commands; built-in steps are also available directly as `mc step:*`
 - `mc validate` checks config shape and changeset targets before you do anything riskier
 
 ### Inspect the workspace model
@@ -123,7 +122,7 @@ Use these when you need facts before making changes.
 ```bash
 mc change --package monochange --bump minor --reason "add diagnostics command"
 mc change --package monochange_config --bump none --caused-by monochange_core --reason "dependency-only follow-up"
-mc affected --changed-paths crates/monochange/src/lib.rs --format json
+mc step:affected-packages --verify --changed-paths crates/monochange/src/lib.rs --format json
 ```
 
 Use these when you are deciding what should be released.
@@ -202,7 +201,7 @@ monochange_config:
 Bumps `monochange_core` dependency to v2.1.0 after the public API change to `ChangelogFormat`.
 ```
 
-For packages flagged by `mc affected` that have no meaningful change, use `bump: none` with `caused_by`:
+For packages flagged by `mc step:affected-packages` that have no meaningful change, use `bump: none` with `caused_by`:
 
 ```markdown
 ---

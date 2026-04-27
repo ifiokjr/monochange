@@ -218,9 +218,13 @@ mc release
 
 <!-- {=releaseWorkflowBehavior} -->
 
-`mc release` is part of monochange's built-in default command set. The defaults include: `validate`, `discover`, `change`, `release`, `affected`, `diagnostics`, and `repair-release`. You only need to add `[cli.release]` when you want to replace that default definition with your own steps, inputs, or help text.
+`mc release` is a config-driven workflow command. `mc init` writes a starter `[cli.release]` table that runs `PrepareRelease`, so initialized repositories can use `mc release` immediately while keeping the workflow editable in `monochange.toml`.
 
-Commands like `commit-release` (which combines `PrepareRelease` + `CommitRelease` steps) are not included in the defaults — define them explicitly in your `monochange.toml` when you need them.
+The binary no longer ships a hidden default workflow set for commands such as `discover`, `change`, `release`, `affected`, `diagnostics`, `repair-release`, `publish`, or `publish-plan`. Those names exist when your config defines them, usually because `mc init` generated the starter tables. If a repository has not opted into a named workflow, use the immutable step command instead, for example `mc step:discover`, `mc step:create-change-file`, `mc step:prepare-release`, `mc step:affected-packages`, or `mc step:retarget-release`.
+
+`mc validate` remains a hardcoded binary command for normal preflight checks. The matching immutable step form is also available as `mc step:validate`. Do not define `[cli.validate]` or any `[cli.step:*]` command in `monochange.toml`; those names are reserved for built-in commands.
+
+Commands like `commit-release` combine `PrepareRelease` with later stateful steps such as `CommitRelease` and `OpenReleaseRequest`. Keep them as explicit `[cli.*]` workflow commands when you want a durable, named release process.
 
 Current `PrepareRelease` behavior:
 
@@ -290,7 +294,7 @@ jobs:
           set -euo pipefail
 
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(verify --format json)
+          args=(step:affected-packages --format json --verify)
 
           for path in $CHANGED_FILES; do
             args+=(--changed-paths "$path")

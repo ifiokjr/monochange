@@ -9,7 +9,6 @@ Use this guide when the task is to choose, explain, or sequence monochange CLI c
 | Goal                                     | Command       | When to use it                                                                          |
 | ---------------------------------------- | ------------- | --------------------------------------------------------------------------------------- |
 | Bootstrap a repo                         | `mc init`     | You need a starter `monochange.toml` based on detected packages                         |
-| Add missing built-in command definitions | `mc populate` | The repo already has `monochange.toml`, but you want editable `[cli.<command>]` entries |
 | Check config and changesets              | `mc validate` | Before and after release-affecting edits                                                |
 
 Examples:
@@ -17,7 +16,6 @@ Examples:
 ```bash
 mc init
 mc init --provider github
-mc populate
 mc validate
 ```
 
@@ -62,14 +60,14 @@ mc check --fix
 | Goal                                     | Command       | When to use it                                                      |
 | ---------------------------------------- | ------------- | ------------------------------------------------------------------- |
 | Create a changeset                       | `mc change`   | You know the target package or group id                             |
-| Check policy coverage from changed files | `mc affected` | CI or review needs to confirm that changed packages have changesets |
+| Check policy coverage from changed files | `mc step:affected-packages` | CI or review needs to confirm that changed packages have changesets without a config wrapper |
 
 Examples:
 
 ```bash
 mc change --package monochange --bump minor --reason "add diagnostics command"
 mc change --package monochange_config --bump none --caused-by monochange_core --reason "dependency-only follow-up"
-mc affected --changed-paths crates/monochange/src/lib.rs --format json
+mc step:affected-packages --verify --changed-paths crates/monochange/src/lib.rs --format json
 ```
 
 ### Plan or execute a release

@@ -506,7 +506,7 @@ Bumps `monochange_core` dependency to v2.1.0 after the public API change to `Cha
 
 **`none` bump with `caused_by` — the "nothing meaningful changed" case:**
 
-When `mc affected` flags a package but the change is not meaningful (just a lockfile update or a re-export), use `bump: none` with `caused_by`:
+When `mc step:affected-packages` (or a config-defined wrapper such as `mc affected`) flags a package but the change is not meaningful (just a lockfile update or a re-export), use `bump: none` with `caused_by`:
 
 ```markdown
 ---

@@ -9,7 +9,7 @@ description: Guides agents through monochange adoption planning, discovery, chan
 
 If the user is still deciding how deeply to adopt monochange, start with [skills/adoption.md](skills/adoption.md) and [examples/readme.md](examples/readme.md) before generating files.
 
-1. If `monochange.toml` does not exist yet, run `mc init`. If it exists but you want editable built-in command definitions, run `mc populate`.
+1. If `monochange.toml` does not exist yet, run `mc init`. `mc init` writes editable `[cli.*]` workflow commands; built-in steps are always available directly as immutable `mc step:*` commands.
 2. Read `monochange.toml` first — it is the single source of truth.
 3. Run `mc validate` before making release-affecting edits.
 4. Use `mc discover --format json` to inspect the workspace model.
@@ -25,7 +25,7 @@ If the user is still deciding how deeply to adopt monochange, start with [skills
 - Use `.changeset/*.md` files for explicit release intent — each targets one or more package/group ids with a bump severity, optional `type`, optional explicit `version`, and a human-readable summary.
 - Use `caused_by` in changeset frontmatter when a dependent package is updating because of a dependency change — this provides context and replaces the matching automatic "dependency changed → patch" propagation.
 - `caused_by` uses object syntax in markdown changesets and can reference package ids or group ids; in CLI form, pass one or more `--caused-by <id>` flags.
-- When `mc affected` flags a package that has no meaningful change, create a changeset with `bump: none` and `caused_by` listing the root cause package(s).
+- When `mc step:affected-packages` flags a package that has no meaningful change, create a changeset with `bump: none` and `caused_by` listing the root cause package(s).
 - Review existing `.changeset/*.md` files before creating a new one so you can decide whether the right lifecycle action is create, update, replace, or remove.
 - Keep changesets package-centric and granular. Distinct features should get distinct changesets even when they land in the same package; only expand an existing changeset when the new work is clearly the same feature growing in scope.
 - Combine near-duplicate changesets when the outward change is the same across multiple related packages. Do not emit cloned compatibility notes that differ only by package name.
@@ -70,7 +70,6 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 | Command                  | Purpose                                                                |
 | ------------------------ | ---------------------------------------------------------------------- |
 | `mc init`                | Generate a starter `monochange.toml` from detected packages            |
-| `mc populate`            | Append missing built-in CLI command definitions to config              |
 | `mc validate`            | Validate config and changeset targets                                  |
 | `mc check`               | Validate config and run lint rules against package manifests           |
 | `mc lint`                | Inspect registered lint rules and presets                              |
@@ -82,7 +81,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 | `mc commit-release`      | Prepare a release and create a local commit                            |
 | `mc publish-release`     | Create provider releases                                               |
 | `mc release-pr`          | Open or update a release pull request                                  |
-| `mc affected`            | Evaluate changeset policy from changed paths                           |
+| `mc step:affected-packages` | Evaluate changeset policy from changed paths without a config wrapper  |
 | `mc diagnostics`         | Show changeset context with git and review metadata                    |
 | `mc release-record`      | Inspect a durable release declaration from git history                 |
 | `mc repair-release`      | Repair a recent release by retargeting tags                            |
