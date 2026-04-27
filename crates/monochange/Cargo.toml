@@ -16,6 +16,11 @@ description = "Manage versions and releases for your multiplatform, multilanguag
 name = "mc"
 path = "src/bin/mc.rs"
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }-v{ version }{ archive-suffix }"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
+
 [features]
 default = ["cargo", "npm", "deno", "dart", "github", "gitlab", "gitea"]
 cargo = ["monochange_cargo"]
