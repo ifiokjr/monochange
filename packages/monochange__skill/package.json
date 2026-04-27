@@ -1,6 +1,6 @@
 {
 	"name": "@monochange/skill",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Skill for monochange adoption, release planning, and publishing guidance",
 	"license": "Unlicense",
 	"repository": {

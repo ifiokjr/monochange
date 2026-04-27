@@ -1,3 +1,20 @@
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-27)
+
+### Added
+
+#### feat
+
+Add beautiful interactive progress reporting for `mc check` and `mc lint`.
+
+- Introduced `LintProgressReporter` trait in `monochange_core::lint` with 14 lifecycle hooks from planning through summary.
+- Added `NoopLintProgressReporter` for silent / backward-compatible operation.
+- Updated `Linter::lint_workspace` to emit planning, suite, file, rule, and summary events to the reporter.
+- Created `HumanLintProgressReporter` in `monochange` that writes animated spinners, suite-level progress, fix tracking, and a styled summary to stderr.
+- Enhanced `format_check_report` to list which files were fixed when `--fix` is active.
+- Respects `NO_COLOR` and `MONOCHANGE_NO_PROGRESS` environment variables.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #281](https://github.com/monochange/monochange/pull/281) _Introduced in:_ [`a9eec58`](https://github.com/monochange/monochange/commit/a9eec586e72d0a8704d08b7552523e0bd85ed20d)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Breaking Change

@@ -1,6 +1,6 @@
 {
 	"name": "@monochange/cli-linux-arm64-musl",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Prebuilt monochange binary for Linux arm64 (musl)",
 	"license": "Unlicense",
 	"repository": {

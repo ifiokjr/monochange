@@ -1,3 +1,27 @@
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-27)
+
+### Changed
+
+#### Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740)
+
+#### Add OXC tooling for all JavaScript and TypeScript in the project
+
+- Integrate `dprint-plugin-oxc` as the formatter for JS/TS files, replacing the dprint typescript plugin.
+- Add `oxfmt` and `oxlint` configuration (`.oxfmtrc.json` and `.oxlintrc.json`) with rules adapted from the sibling `actions` repo.
+- Add `tsgo` for type-checking and `tsdown` for bundling, with a root `tsdown.config.json`.
+- Wire everything into `devenv.nix` with new scripts: `lint:js`, `lint:js:syntax`, `lint:js:types`, `fix:js`, and `build:js`. Update `lint:all` and `fix:all` to include the JS checks.
+- Add JS devDependencies (`oxfmt`, `oxlint`, `@rslint/tsgo`, `tsdown`) to `package.json`.
+- Add JS dependency installation (`pnpm install --frozen-lockfile`) to the shared `devenv` GitHub Action so CI has the tools available.
+- Add `lint:js:syntax` check to the CI `lint` job.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #286](https://github.com/monochange/monochange/pull/286) _Introduced in:_ [`09298d3`](https://github.com/monochange/monochange/commit/09298d326fa75e4229080159051fa1c3e6363794)
+
+#### Document the new CLI process where `mc init` generates editable workflow commands in `monochange.toml` and every built-in step is available directly through immutable `mc step:*` commands. The docs now clarify reserved command names such as `validate` and recommend `mc step:affected-packages --verify` for direct changeset-policy checks.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #291](https://github.com/monochange/monochange/pull/291) _Introduced in:_ [`74ac16a`](https://github.com/monochange/monochange/commit/74ac16af949ab07644c9b583774a00da2d95a7be)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added

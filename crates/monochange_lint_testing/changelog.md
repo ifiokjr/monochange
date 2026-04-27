@@ -1,3 +1,9 @@
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-27)
+
+### Changed
+
+- No package-specific changes were recorded; `monochange_lint_testing` was updated to 0.3.0 as part of group `main`.
+
 ## [0.2.0](https://github.com/ifiokjr/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added

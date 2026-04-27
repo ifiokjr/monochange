@@ -6,7 +6,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Ifiok Jr. <ifiokotung@gmail.com>"]
 categories = ["development-tools"]
 edition = "2024"
@@ -68,25 +68,25 @@ urlencoding = { version = "2", default-features = false }
 walkdir = { version = "2", default-features = false }
 
 # Internal crates
-monochange = { version = "0.2.0", path = "./crates/monochange" }
-monochange_analysis = { version = "0.2.0", path = "./crates/monochange_analysis" }
-monochange_cargo = { version = "0.2.0", path = "./crates/monochange_cargo" }
-monochange_config = { version = "0.2.0", path = "./crates/monochange_config" }
-monochange_core = { version = "0.2.0", path = "./crates/monochange_core" }
-monochange_dart = { version = "0.2.0", path = "./crates/monochange_dart" }
-monochange_deno = { version = "0.2.0", path = "./crates/monochange_deno" }
-monochange_ecmascript = { version = "0.2.0", path = "./crates/monochange_ecmascript" }
-monochange_gitea = { version = "0.2.0", path = "./crates/monochange_gitea" }
-monochange_github = { version = "0.2.0", path = "./crates/monochange_github" }
-monochange_gitlab = { version = "0.2.0", path = "./crates/monochange_gitlab" }
-monochange_graph = { version = "0.2.0", path = "./crates/monochange_graph" }
-monochange_hosting = { version = "0.2.0", path = "./crates/monochange_hosting" }
-monochange_lint = { version = "0.2.0", path = "./crates/monochange_lint" }
-monochange_lint_testing = { version = "0.2.0", path = "./crates/monochange_lint_testing" }
-monochange_linting = { version = "0.2.0", path = "./crates/monochange_linting" }
-monochange_npm = { version = "0.2.0", path = "./crates/monochange_npm" }
-monochange_semver = { version = "0.2.0", path = "./crates/monochange_semver" }
-monochange_test_helpers = { version = "0.0.2", path = "./crates/monochange_test_helpers" }
+monochange = { version = "0.3.0", path = "./crates/monochange" }
+monochange_analysis = { version = "0.3.0", path = "./crates/monochange_analysis" }
+monochange_cargo = { version = "0.3.0", path = "./crates/monochange_cargo" }
+monochange_config = { version = "0.3.0", path = "./crates/monochange_config" }
+monochange_core = { version = "0.3.0", path = "./crates/monochange_core" }
+monochange_dart = { version = "0.3.0", path = "./crates/monochange_dart" }
+monochange_deno = { version = "0.3.0", path = "./crates/monochange_deno" }
+monochange_ecmascript = { version = "0.3.0", path = "./crates/monochange_ecmascript" }
+monochange_gitea = { version = "0.3.0", path = "./crates/monochange_gitea" }
+monochange_github = { version = "0.3.0", path = "./crates/monochange_github" }
+monochange_gitlab = { version = "0.3.0", path = "./crates/monochange_gitlab" }
+monochange_graph = { version = "0.3.0", path = "./crates/monochange_graph" }
+monochange_hosting = { version = "0.3.0", path = "./crates/monochange_hosting" }
+monochange_lint = { version = "0.3.0", path = "./crates/monochange_lint" }
+monochange_lint_testing = { version = "0.3.0", path = "./crates/monochange_lint_testing" }
+monochange_linting = { version = "0.3.0", path = "./crates/monochange_linting" }
+monochange_npm = { version = "0.3.0", path = "./crates/monochange_npm" }
+monochange_semver = { version = "0.3.0", path = "./crates/monochange_semver" }
+monochange_test_helpers = { version = "0.0.3", path = "./crates/monochange_test_helpers" }
 
 [workspace.metadata.bin]
 cargo-deny = { version = "0.19.0" }
