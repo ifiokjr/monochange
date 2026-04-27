@@ -7,6 +7,8 @@ use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use semver::Version;
 
+use crate::PythonAdapter;
+use crate::PythonVersionedFileKind;
 use crate::discover_python_packages;
 use crate::extract_version_constraint;
 use crate::normalize_python_package_name;
@@ -14,8 +16,6 @@ use crate::parse_dependency_name;
 use crate::parse_pep440_as_semver;
 use crate::update_dependency_specifier;
 use crate::update_versioned_file_text;
-use crate::PythonAdapter;
-use crate::PythonVersionedFileKind;
 
 fn fixture_path(relative: &str) -> PathBuf {
 	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)

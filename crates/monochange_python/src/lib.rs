@@ -32,7 +32,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use glob::glob;
-use monochange_core::normalize_path;
 use monochange_core::AdapterDiscovery;
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
@@ -44,6 +43,7 @@ use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::normalize_path;
 use semver::Version;
 use toml::Value;
 use toml_edit::DocumentMut;
@@ -254,11 +254,7 @@ fn parse_dependency_name(spec: &str) -> Option<String> {
 		.chars()
 		.take_while(|ch| ch.is_alphanumeric() || *ch == '-' || *ch == '_' || *ch == '.')
 		.collect();
-	if name.is_empty() {
-		None
-	} else {
-		Some(name)
-	}
+	if name.is_empty() { None } else { Some(name) }
 }
 
 /// Normalize a Python package name per PEP 503: lowercase, replace [-_.]+
@@ -524,10 +520,12 @@ fn parse_poetry_dependencies(poetry: &Value) -> Vec<PackageDependency> {
 			}
 			let constraint = match value {
 				Value::String(version) => Some(version.clone()),
-				Value::Table(table) => table
-					.get("version")
-					.and_then(Value::as_str)
-					.map(ToString::to_string),
+				Value::Table(table) => {
+					table
+						.get("version")
+						.and_then(Value::as_str)
+						.map(ToString::to_string)
+				}
 				_ => None,
 			};
 			deps.push(PackageDependency {
@@ -550,10 +548,12 @@ fn parse_poetry_dependencies(poetry: &Value) -> Vec<PackageDependency> {
 				for (name, value) in group_deps {
 					let constraint = match value {
 						Value::String(version) => Some(version.clone()),
-						Value::Table(table) => table
-							.get("version")
-							.and_then(Value::as_str)
-							.map(ToString::to_string),
+						Value::Table(table) => {
+							table
+								.get("version")
+								.and_then(Value::as_str)
+								.map(ToString::to_string)
+						}
 						_ => None,
 					};
 					deps.push(PackageDependency {

@@ -645,11 +645,13 @@ pub(crate) fn resolve_versioned_prefix(
 		monochange_core::EcosystemType::Dart => {
 			context.configuration.dart.dependency_version_prefix.clone()
 		}
-		monochange_core::EcosystemType::Python => context
-			.configuration
-			.python
-			.dependency_version_prefix
-			.clone(),
+		monochange_core::EcosystemType::Python => {
+			context
+				.configuration
+				.python
+				.dependency_version_prefix
+				.clone()
+		}
 		_ => None,
 	};
 	ecosystem_prefix.unwrap_or_else(|| ecosystem_type.default_prefix().to_string())

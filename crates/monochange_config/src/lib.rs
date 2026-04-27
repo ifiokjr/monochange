@@ -1175,8 +1175,12 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		normalize_ecosystem_settings(&contents, "deno", EcosystemType::Deno, ecosystems.deno)?;
 	let dart_ecosystem =
 		normalize_ecosystem_settings(&contents, "dart", EcosystemType::Dart, ecosystems.dart)?;
-	let python_ecosystem =
-		normalize_ecosystem_settings(&contents, "python", EcosystemType::Python, ecosystems.python)?;
+	let python_ecosystem = normalize_ecosystem_settings(
+		&contents,
+		"python",
+		EcosystemType::Python,
+		ecosystems.python,
+	)?;
 	let defaults_changelog_policy = defaults
 		.changelog
 		.as_ref()

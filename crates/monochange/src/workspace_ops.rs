@@ -807,9 +807,18 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	let mut warnings = Vec::new();
 	let mut packages = Vec::new();
 
-	#[cfg(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart", feature = "python"))]
+	#[cfg(all(
+		feature = "cargo",
+		feature = "npm",
+		feature = "deno",
+		feature = "dart",
+		feature = "python"
+	))]
 	{
-		let ((cargo_discovery, npm_discovery), (deno_discovery, (dart_discovery, python_discovery))) = rayon::join(
+		let (
+			(cargo_discovery, npm_discovery),
+			(deno_discovery, (dart_discovery, python_discovery)),
+		) = rayon::join(
 			|| {
 				rayon::join(
 					|| discover_cargo_packages(root),
@@ -819,10 +828,12 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 			|| {
 				rayon::join(
 					|| discover_deno_packages(root),
-					|| rayon::join(
-						|| discover_dart_packages(root),
-						|| discover_python_packages(root),
-					),
+					|| {
+						rayon::join(
+							|| discover_dart_packages(root),
+							|| discover_python_packages(root),
+						)
+					},
 				)
 			},
 		);
@@ -838,7 +849,13 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 		}
 	}
 
-	#[cfg(not(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart", feature = "python")))]
+	#[cfg(not(all(
+		feature = "cargo",
+		feature = "npm",
+		feature = "deno",
+		feature = "dart",
+		feature = "python"
+	)))]
 	{
 		#[cfg(feature = "cargo")]
 		{
