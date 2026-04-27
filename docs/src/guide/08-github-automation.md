@@ -9,7 +9,7 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 - `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload
 - `mc publish-release` previews or publishes provider releases from the structured release notes
 - `mc release-pr` previews or opens an idempotent provider release request
-- `mc affected` evaluates pull-request changeset policy from CI-supplied changed paths and labels
+- `mc step:affected-packages` evaluates pull-request changeset policy from CI-supplied changed paths and labels without requiring a config-defined wrapper command
 
 <!-- {/githubAutomationOverview} -->
 
@@ -46,7 +46,7 @@ This single command generates:
 mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
-mc affected --format json --changed-paths crates/monochange/src/lib.rs
+mc step:affected-packages --format json --verify --changed-paths crates/monochange/src/lib.rs
 ```
 
 <!-- {/githubAutomationWorkflowCommands} -->
@@ -303,7 +303,7 @@ jobs:
           set -euo pipefail
 
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(verify --format json)
+          args=(step:affected-packages --format json --verify)
 
           for path in $CHANGED_FILES; do
             args+=(--changed-paths "$path")
@@ -327,7 +327,7 @@ jobs:
 The monochange repository itself can dogfood this model by:
 
 - declaring `[source]`, `[source.releases]`, and `[source.pull_requests]` in `monochange.toml`
-- running a real `changeset-policy` GitHub Actions workflow that shells into `mc affected`
+- running a real `changeset-policy` GitHub Actions workflow that shells into `mc step:affected-packages`
 
 <!-- {/githubAutomationDogfoodNotes} -->
 

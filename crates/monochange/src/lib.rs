@@ -32,10 +32,12 @@
 //!
 //! - aggregate all supported ecosystem adapters
 //! - load `monochange.toml`
-//! - start from the built-in default CLI commands and let matching config entries replace them
+//! - load config-defined `[cli.*]` workflow commands from `monochange.toml`
+//! - expose hardcoded binary commands such as `init`, `validate`, `check`, `analyze`, `mcp`, `help`, and `version`
+//! - generate immutable `mc step:*` commands from the built-in step schemas
 //! - resolve change input files
 //! - render discovery and release command output in text or JSON
-//! - execute configured CLI commands plus built-in MCP commands
+//! - execute configured workflow commands plus built-in MCP commands
 //! - preview or publish provider releases from prepared release data
 //! - evaluate pull-request changeset policy from CI-supplied changed paths and labels
 //! - expose JSON-first MCP tools for assistant workflows

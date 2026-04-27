@@ -30,7 +30,7 @@ Generate a starter config from the packages monochange detects:
 mc init
 ```
 
-`mc init` writes an annotated `monochange.toml`, so most first-time users can start with the generated file instead of hand-authoring config. If you later want editable copies of the built-in CLI commands, run `mc populate` to append any missing default command definitions to `monochange.toml`.
+`mc init` writes an annotated `monochange.toml`, including starter `[cli.*]` workflow commands such as `discover`, `change`, `release`, `publish`, and `affected`. Those generated tables are the editable source of truth for named workflow commands; the binary also exposes immutable `mc step:*` commands for every built-in step when you need a direct, config-free entry point.
 
 For automated CI setup, include the `--provider` flag:
 
@@ -117,6 +117,8 @@ Recent `monochange` improvements made package publishing guidance and diagnostic
 ## Command and automation matrix
 
 <!-- {=projectCommandAutomationMatrix} -->
+
+These are the commands most repositories use after running `mc init`. With the new CLI model, workflow names such as `discover`, `change`, `release`, `publish`, and `affected` come from `[cli.*]` tables in `monochange.toml`; hardcoded binary commands such as `validate`, `check`, `init`, and `mcp` stay built in. The underlying built-in steps are always available directly as immutable `mc step:*` commands.
 
 | Goal                             | Command                                                     | Use it when                                                                                              |
 | -------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |

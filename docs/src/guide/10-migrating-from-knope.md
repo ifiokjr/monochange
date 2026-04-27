@@ -443,7 +443,7 @@ For PR-based release flows with monochange, add a changeset policy workflow:
 ```yaml
 - name: run changeset policy
   run: |
-    mc affected --format json \
+    mc step:affected-packages --format json --verify \
       --changed-paths file1.rs \
       --changed-paths file2.rs
 ```
@@ -598,11 +598,7 @@ required = true
 [[cli.change.steps]]
 type = "CreateChangeFile"
 
-[cli.validate]
-help_text = "Validate monochange configuration and changesets"
-
-[[cli.validate.steps]]
-type = "Validate"
+# `validate` is hardcoded; run `mc validate` directly instead of defining [cli.validate].
 ```
 
 ## Migration checklist

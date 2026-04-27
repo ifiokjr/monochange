@@ -361,9 +361,13 @@ lockfile_commands = [
 
 ## CLI commands
 
-CLI commands are user-defined top-level commands. monochange starts from its built-in default command set, then applies each `[cli.<command>]` entry as a full command override when the name matches or as an additional command when it does not. Each resulting command becomes invocable as `mc <command>`.
+CLI workflow commands are user-defined top-level commands. Each `[cli.<command>]` table in `monochange.toml` becomes `mc <command>`, with its own help text, inputs, and ordered step list.
 
-If you want editable copies of the built-in commands in your config file, run `mc populate`. It appends only the missing default command definitions to `monochange.toml` and leaves existing `[cli.<command>]` entries unchanged.
+`mc init` writes starter workflow tables for common commands such as `discover`, `change`, `release`, `versions`, `publish`, `publish-plan`, `affected`, `diagnostics`, and `repair-release`. After initialization those names are ordinary config-driven commands: edit the tables to customize behavior, or delete commands you do not want to expose.
+
+Built-in steps are also available directly as immutable `mc step:*` commands. The binary generates those commands from the step schemas, so `mc step:discover`, `mc step:prepare-release`, `mc step:affected-packages`, and the other step commands do not require config entries. Use `step:*` in CI when you want a stable built-in operation without depending on a repository-defined wrapper.
+
+Some top-level names are reserved for hardcoded binary commands, including `init`, `mcp`, `help`, `version`, `analyze`, `check`, and `validate`. The `step:` prefix is also reserved. Do not define `[cli.validate]` or `[cli.step:*]` tables.
 
 <!-- {=configurationWorkflowsSnippet} -->
 

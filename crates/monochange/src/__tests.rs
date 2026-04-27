@@ -2977,7 +2977,7 @@ fn release_planning_guide_describes_release_cli_command_requirements() {
 		fs::read_to_string(release_guide).unwrap_or_else(|error| panic!("release guide: {error}"));
 
 	for expected in [
-		"`mc release` is part of monochange's built-in default command set.",
+		"`mc release` is a config-driven workflow command.",
 		"`.changeset/*.md`",
 		"`--dry-run`",
 	] {

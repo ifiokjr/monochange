@@ -77,11 +77,18 @@ Typical pattern:
 
 <!-- {=cliStepValidateExample} -->
 
-```toml
-[cli.validate]
-help_text = "Validate monochange configuration and changesets"
+```bash
+mc validate
+mc step:validate
+```
 
-[[cli.validate.steps]]
+`validate` is a hardcoded binary command, so do not define `[cli.validate]` in `monochange.toml`. Use `mc validate` for the normal workspace preflight, use `mc step:validate` when you want the immutable step command form, or compose the step under a non-reserved workflow name:
+
+```toml
+[cli.preflight]
+help_text = "Run the workspace validation preflight"
+
+[[cli.preflight.steps]]
 type = "Validate"
 ```
 

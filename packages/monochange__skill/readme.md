@@ -48,7 +48,7 @@ monochange-skill --copy ~/.pi/agent/skills/monochange
 The bundled skill explains how to:
 
 - plan adoption in `quickstart`, `standard`, `full`, or `migration` mode
-- create or refine `monochange.toml` with `mc init`, `mc populate`, and `mc validate`
+- create or refine `monochange.toml` with `mc init`, generated `[cli.*]` workflow commands, `mc step:*`, and `mc validate`
 - inspect the normalized model with `mc discover --format json`
 - create, update, and audit explicit change files with `mc change` and `mc diagnostics`, including dependency-follow-up notes with `caused_by`
 - preview release effects with `mc release --dry-run --format json` and `mc release --dry-run --diff`

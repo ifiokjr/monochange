@@ -14,13 +14,9 @@ mc init
 
 `mc init` detects packages, writes an annotated `monochange.toml`, and gives you a better starting point than hand-authoring a first config from scratch.
 
-The generated file becomes the source of truth for commands like `mc validate`, `mc discover`, `mc change`, and `mc release`. If you later want editable copies of the built-in CLI commands, run:
+The generated file becomes the source of truth for named workflow commands like `mc discover`, `mc change`, and `mc release`. Those commands come from generated `[cli.*]` tables, so you can edit or delete them like any other config.
 
-```bash
-mc populate
-```
-
-That appends any missing default command definitions to `monochange.toml` without overwriting commands you already defined.
+`mc validate` is different: it is a hardcoded binary command that always runs the validation preflight. Every built-in step is also available directly as an immutable `mc step:*` command, for example `mc step:discover`, `mc step:create-change-file`, and `mc step:prepare-release`, even when no matching `[cli.*]` workflow exists.
 
 ### Automated CI setup with `--provider`
 
@@ -274,13 +270,6 @@ name = "production"
 trigger = "release_pr_merge"
 release_targets = ["sdk"]
 requires = ["main"]
-
-[cli.validate]
-help_text = "Validate monochange configuration and changesets"
-
-[[cli.validate.steps]]
-name = "validate workspace"
-type = "Validate"
 
 [cli.discover]
 help_text = "Discover packages across supported ecosystems"

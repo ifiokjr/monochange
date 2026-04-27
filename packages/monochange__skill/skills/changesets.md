@@ -225,7 +225,7 @@ mc diagnostics --format json
 mc release --dry-run --format json
 ```
 
-Use `mc affected --changed-paths ...` in CI or review workflows when you need to prove all changed packages are covered.
+Use `mc step:affected-packages --verify --changed-paths ...` in CI or review workflows when you need to prove all changed packages are covered without depending on a config-defined wrapper.
 
 ## Changeset cleanup job
 
@@ -320,7 +320,7 @@ Before finalizing cleanup:
 
 - [ ] `mc validate` passes
 - [ ] `mc diagnostics --format json` loads all remaining changesets without error
-- [ ] `mc affected --changed-paths <files>` confirms coverage for recent changes
+- [ ] `mc step:affected-packages --verify --changed-paths <files>` confirms coverage for recent changes
 - [ ] No duplicate summaries across changesets
 - [ ] No changesets reference reverted features
 - [ ] All changesets have user-facing descriptions per [changeset-guide.md](./changeset-guide.md)
