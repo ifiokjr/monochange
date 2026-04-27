@@ -525,7 +525,7 @@ mod tests {
 		assert!(matches!(error, MonochangeError::Config(_)));
 		assert_eq!(
 			error.to_string(),
-			"config error: CLI command `affected` uses `AffectedPackages` but `[changesets.verify].enabled` is false"
+			"config error: changeset verification requires `[changesets.verify].enabled = true`"
 		);
 	}
 

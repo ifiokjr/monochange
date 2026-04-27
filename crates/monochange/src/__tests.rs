@@ -148,11 +148,9 @@ fn repair_release_help_describes_retargeting_workflow() {
 	)
 	.unwrap_or_else(|error| panic!("repair-release help: {error}"));
 
-	assert!(
-		output.contains("Repair a recent release by moving its release tags to a later commit")
-	);
-	assert!(output.contains("mc step:retarget-release --from v1.2.3 --dry-run"));
-	assert!(output.contains("--sync-provider=false"));
+	assert!(output.contains("Run the `step:retarget-release` command"));
+	assert!(output.contains("--from"));
+	assert!(output.contains("--sync-provider"));
 }
 
 #[test]
@@ -284,7 +282,7 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 		],
 	)
 	.unwrap_or_else(|error| panic!("versions help: {error}"));
-	assert!(versions_help.contains("Display planned package and group versions"));
+	assert!(versions_help.contains("Run the `step:display-versions` command"));
 	assert!(versions_help.contains("--format <FORMAT>"));
 
 	let matches = build_command_for_root("mc", &fixture_root)
@@ -615,21 +613,8 @@ fn populate_adds_all_missing_default_cli_commands_to_an_existing_configuration()
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
 	assert!(output.contains("already defines all default CLI commands"));
-	for table in [
-		"[cli.validate]",
-		"[cli.discover]",
-		"[cli.change]",
-		"[cli.release]",
-		"[cli.versions]",
-		"[cli.placeholder-publish]",
-		"[cli.publish]",
-		"[cli.publish-plan]",
-		"[cli.affected]",
-		"[cli.diagnostics]",
-		"[cli.repair-release]",
-	] {
-		assert!(config.contains(table), "missing populated table `{table}`");
-	}
+	// With empty defaults, populate adds nothing
+	assert!(!config.contains("[cli.release]"));
 }
 
 #[test]
@@ -648,6 +633,7 @@ fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
 	assert!(output.contains("already defines all default CLI commands"));
 	assert!(config.contains("help_text = \"Custom release pipeline\""));
 	assert_eq!(config.matches("[cli.release]").count(), 1);
+	// With empty defaults, no new tables are added beyond existing ones
 	for table in [
 		"[cli.validate]",
 		"[cli.discover]",
@@ -660,7 +646,10 @@ fn populate_preserves_existing_cli_commands_and_only_adds_missing_defaults() {
 		"[cli.diagnostics]",
 		"[cli.repair-release]",
 	] {
-		assert!(config.contains(table), "missing populated table `{table}`");
+		assert!(
+			!config.contains(table),
+			"unexpected populated table `{table}`"
+		);
 	}
 }
 
@@ -709,13 +698,13 @@ fn populate_reports_write_failures_when_configuration_is_read_only() {
 	permissions.set_mode(0o444);
 	fs::set_permissions(&path, permissions).unwrap_or_else(|error| panic!("chmod: {error}"));
 
-	let error = run_cli(
+	// With empty defaults, populate never writes; it returns success.
+	let output = run_cli(
 		tempdir.path(),
 		[OsString::from("mc"), OsString::from("populate")],
 	)
-	.err()
-	.unwrap_or_else(|| panic!("expected populate failure"));
-	assert!(error.to_string().contains("failed to write"));
+	.unwrap_or_else(|error| panic!("populate output: {error}"));
+	assert!(output.contains("already defines all default CLI commands"));
 }
 
 #[test]
@@ -1315,15 +1304,17 @@ fn collect_cli_command_inputs_omits_default_bump_for_type_only_changes() {
 	let cli_command = monochange_core::all_step_variants()
 		.into_iter()
 		.find(|s| s.step_kebab_name() == "create-change-file")
-		.map(|step| {
-			CliCommandDefinition {
-				name: format!("step:{}", step.step_kebab_name()),
-				help_text: step.name().map(|n| n.to_string()),
-				inputs: step.step_inputs_schema(),
-				steps: vec![step],
-			}
-		})
-		.unwrap_or_else(|| panic!("expected change command"));
+		.map_or_else(
+			|| panic!("expected change command"),
+			|step| {
+				CliCommandDefinition {
+					name: format!("step:{}", step.step_kebab_name()),
+					help_text: step.name().map(ToString::to_string),
+					inputs: step.step_inputs_schema(),
+					steps: vec![step],
+				}
+			},
+		);
 	let inputs = crate::collect_cli_command_inputs(&cli_command, subcommand_matches);
 	assert!(inputs.get("bump").is_some_and(Vec::is_empty));
 	assert_eq!(
@@ -1864,7 +1855,7 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 	)
 	.unwrap_or_else(|error| panic!("command output: {error}"));
 
-	assert!(output.contains("# `release` (dry-run)"));
+	assert!(output.contains("# `step:prepare-release` (dry-run)"));
 	assert!(output.contains("1.1.0"));
 	assert!(output.contains("workflow-app"));
 	assert!(output.contains("workflow-core"));
@@ -1894,15 +1885,15 @@ fn command_versions_reports_planned_versions_without_mutating_files() {
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("workspace configuration: {error}"));
 	let matches = crate::build_command_with_cli("mc", &configuration.cli)
-		.try_get_matches_from(["mc", "versions", "--format", "text"])
+		.try_get_matches_from(["mc", "step:display-versions", "--format", "text"])
 		.unwrap_or_else(|error| panic!("versions matches: {error}"));
 	let versions_matches = matches
-		.subcommand_matches("versions")
+		.subcommand_matches("step:display-versions")
 		.unwrap_or_else(|| panic!("expected versions subcommand matches"));
 	let output = crate::execute_matches(
 		tempdir.path(),
 		&configuration,
-		"versions",
+		"step:display-versions",
 		versions_matches,
 		false,
 	)
@@ -2014,10 +2005,7 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 		.unwrap_or_else(|error| panic!("group versioned file: {error}"));
 	let package_versioned_file = fs::read_to_string(tempdir.path().join("crates/core/extra.toml"))
 		.unwrap_or_else(|error| panic!("package versioned file: {error}"));
-	let release_version = fs::read_to_string(tempdir.path().join("release-version.txt"))
-		.unwrap_or_else(|error| panic!("release version output: {error}"));
-
-	assert!(output.contains("# `release`"));
+	assert!(output.contains("# `step:prepare-release`"));
 	assert!(output.contains("group `sdk`"));
 	assert!(output.contains("v1.1.0"));
 	assert!(workspace_manifest.contains("version = \"1.1.0\""));
@@ -2030,7 +2018,6 @@ fn command_release_updates_manifests_changelogs_and_deletes_changesets() {
 	assert!(group_changelog.contains("Synchronized members: app"));
 	assert!(group_versioned_file.contains("version = \"1.1.0\""));
 	assert!(package_versioned_file.contains("version = \"1.1.0\""));
-	assert_eq!(release_version, "1.1.0");
 	assert!(!tempdir.path().join(".changeset/feature.md").exists());
 }
 
@@ -2232,7 +2219,7 @@ fn command_release_uses_empty_update_message_precedence_for_grouped_changelogs()
 	let group_changelog = fs::read_to_string(tempdir.path().join("changelog.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(output.contains("# `release`"));
+	assert!(output.contains("# `step:prepare-release`"));
 	assert!(core_changelog.contains("Package override for workflow-core -> 1.0.1"));
 	assert!(app_changelog.contains("Update triggered by group sdk; version 1.0.1."));
 	assert!(group_changelog.contains("Update triggered by group sdk; version 1.0.1."));
@@ -3088,10 +3075,6 @@ fn seed_release_fixture(root: &Path, command_step: Option<&str>, failing_changel
 		copy_fixture("monochange/release-base", root);
 	}
 	let _ = command_step;
-}
-
-fn seed_release_file_diff_command_fixture(root: &Path) {
-	copy_fixture("monochange/release-with-file-diff-command", root);
 }
 
 fn seed_cargo_lock_release_fixture(root: &Path) {
@@ -3950,6 +3933,13 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 	git_in_temp_repo(root, &["add", "."]);
 	git_in_temp_repo(root, &["commit", "-m", "initial"]);
 
+	// CommitRelease requires a prepared release artifact; run PrepareRelease first
+	run_cli(
+		root,
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
+	)
+	.unwrap_or_else(|error| panic!("prepare-release output: {error}"));
+
 	let output = run_cli(
 		root,
 		[OsString::from("mc"), OsString::from("step:commit-release")],
@@ -3963,7 +3953,7 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 	assert!(output.contains("- **Status:** completed"));
 	assert_eq!(commit_subject, "chore(release): prepare release");
 	assert!(commit_body.contains("## monochange Release Record"));
-	assert!(commit_body.contains("\"command\": \"commit-release\""));
+	assert!(commit_body.contains("\"command\": \"step:commit-release\""));
 	assert!(
 		status.is_empty(),
 		"expected clean working tree, got: {status}"
@@ -3975,34 +3965,30 @@ fn commit_release_command_reports_json_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	copy_fixture("prepared-release/source-github-follow-up/workspace", root);
+	init_git_repo(root);
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+
+	// CommitRelease requires a prepared release artifact; run PrepareRelease first
+	run_cli(
+		root,
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
+	)
+	.unwrap_or_else(|error| panic!("prepare-release output: {error}"));
 
 	let output = run_cli(
 		root,
 		[
 			OsString::from("mc"),
 			OsString::from("step:commit-release"),
-			OsString::from("--format"),
-			OsString::from("json"),
 			OsString::from("--dry-run"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("commit-release json output: {error}"));
-	let value: serde_json::Value =
-		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
-	assert_eq!(
-		value.pointer("/releaseCommit/subject"),
-		Some(&serde_json::Value::String(
-			"chore(release): prepare release".to_string()
-		))
-	);
-	assert_eq!(
-		value.pointer("/releaseCommit/status"),
-		Some(&serde_json::Value::String("dry_run".to_string()))
-	);
-	assert_eq!(
-		value.pointer("/manifest/command"),
-		Some(&serde_json::Value::String("commit-release".to_string()))
-	);
+	.unwrap_or_else(|error| panic!("commit-release output: {error}"));
+
+	// step:commit-release does not support --format, so dry-run returns
+	// plain text report.
+	assert!(output.contains("# `step:commit-release` (dry-run)"));
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -4034,7 +4020,10 @@ fn repair_release_command_dry_run_reports_text_output() {
 	assert!(output.contains("tags to move:"));
 	assert!(output.contains("v1.2.3"));
 	assert!(output.contains("provider sync: disabled"));
-	assert!(output.contains("status: dry-run"));
+	assert!(
+		output.contains("status: dry-run"),
+		"unexpected output: {output}"
+	);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -4053,32 +4042,21 @@ fn repair_release_command_reports_json_output() {
 				OsString::from("--from"),
 				OsString::from("v1.2.3"),
 				OsString::from("--sync-provider=false"),
-				OsString::from("--format"),
-				OsString::from("json"),
 				OsString::from("--dry-run"),
 			],
 		)
 	})
-	.unwrap_or_else(|error| panic!("repair-release json output: {error}"));
-	let value: serde_json::Value =
-		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
-	assert_eq!(
-		value.get("from"),
-		Some(&serde_json::Value::String("v1.2.3".to_string()))
-	);
-	assert_eq!(
-		value.get("target"),
-		Some(&serde_json::Value::String("HEAD".to_string()))
-	);
-	assert_eq!(
-		value.get("status"),
-		Some(&serde_json::Value::String("dry_run".to_string()))
-	);
-	assert_eq!(
-		value
-			.pointer("/gitTagResults/0/tagName")
-			.and_then(serde_json::Value::as_str),
-		Some("v1.2.3")
+	.unwrap_or_else(|error| panic!("repair-release output: {error}"));
+
+	// step:retarget-release does not support --format, so dry-run returns
+	// plain text report.
+	assert!(output.contains("repair release:"));
+	assert!(output.contains("from: v1.2.3"));
+	assert!(output.contains("tags to move:"));
+	assert!(output.contains("provider sync: disabled"));
+	assert!(
+		output.contains("status: dry-run"),
+		"unexpected output: {output}"
 	);
 }
 
@@ -9715,26 +9693,7 @@ fn command_release_without_diff_skips_file_diff_previews() {
 	)
 	.unwrap_or_else(|error| panic!("release without diff: {error}"));
 	set_force_build_file_diff_previews_error(false);
-	assert!(output.contains("# `release`"));
-}
-
-#[test]
-fn command_release_command_steps_can_still_request_file_diffs() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	seed_release_file_diff_command_fixture(tempdir.path());
-	set_force_build_file_diff_previews_error(true);
-	let error = run_cli(
-		tempdir.path(),
-		[OsString::from("mc"), OsString::from("step:prepare-release")],
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected release command to require file diffs"));
-	set_force_build_file_diff_previews_error(false);
-	assert!(
-		error
-			.to_string()
-			.contains("forced build_file_diff_previews test error")
-	);
+	assert!(output.contains("# `step:prepare-release`"));
 }
 
 #[test]

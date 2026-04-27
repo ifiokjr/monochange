@@ -931,13 +931,13 @@ where
 				})?;
 			let synthetic = CliCommandDefinition {
 				name: cli_command_name.to_string(),
-				help_text: step.name().map(|n| n.to_string()),
+				help_text: step.name().map(ToString::to_string),
 				inputs: step.step_inputs_schema(),
 				steps: vec![step],
 			};
 			let inputs = collect_cli_command_inputs(&synthetic, cli_command_matches);
-			execute_cli_command(root, &configuration, &synthetic, quiet, inputs)?;
-			Ok(String::new())
+			let dry_run = quiet || cli_command_matches.get_flag("dry-run");
+			execute_cli_command(root, &configuration, &synthetic, dry_run, inputs)
 		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;

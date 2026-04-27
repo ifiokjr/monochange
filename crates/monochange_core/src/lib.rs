@@ -2104,13 +2104,7 @@ impl CliStepDefinition {
 					_ => None,
 				}
 			}
-			Self::RetargetRelease { .. } => {
-				match name {
-					"sync_provider" => Some(&["github", "gitlab"]),
-					_ => None,
-				}
-			}
-			_ => None,
+			Self::RetargetRelease { .. } | _ => None,
 		}
 	}
 
@@ -2238,12 +2232,17 @@ impl CliStepDefinition {
 						c.iter().map(|s| s.to_string()).collect::<Vec<_>>()
 					})
 					.unwrap_or_default();
+				let default = if *name == "sync_provider" {
+					Some("true".to_string())
+				} else {
+					None
+				};
 				CliInputDefinition {
 					name: name.to_string(),
 					kind,
 					help_text: None,
 					required: false,
-					default: None,
+					default,
 					choices,
 					short: None,
 				}

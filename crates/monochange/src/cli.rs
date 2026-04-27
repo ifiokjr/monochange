@@ -222,7 +222,7 @@ When provided, the generated config includes:\n\
 		let kebab = step.step_kebab_name();
 		let synthetic = CliCommandDefinition {
 			name: format!("step:{kebab}"),
-			help_text: step.name().map(|n| n.to_string()),
+			help_text: step.name().map(ToString::to_string),
 			inputs: step.step_inputs_schema(),
 			steps: vec![step],
 		};
