@@ -27,7 +27,6 @@ fn generate_fixture(root: &Path, num_packages: usize, num_changesets: usize) {
 		let _ = write!(config, "[package.pkg-{i}]\npath = \"crates/pkg-{i}\"\n\n");
 	}
 	config.push_str("[ecosystems.cargo]\nenabled = true\n\n");
-	config.push_str("[cli.validate]\n[[cli.validate.steps]]\ntype = \"Validate\"\n\n");
 	config.push_str("[cli.discover]\n[[cli.discover.steps]]\ntype = \"Discover\"\n\n");
 	config.push_str("[cli.release]\n[[cli.release.steps]]\ntype = \"PrepareRelease\"\n");
 	fs::write(root.join("monochange.toml"), &config).unwrap();
