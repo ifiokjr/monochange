@@ -3374,6 +3374,13 @@ mod tests {
 			.unwrap_or_else(|error| panic!("expected default cli command `{name}`: {error}"))
 	}
 
+	#[test]
+	fn default_cli_command_accepts_prefixed_step_names() {
+		let command = default_cli_command("step:discover");
+
+		assert_eq!(command.name, "step:discover");
+	}
+
 	fn sample_package_publish_outcome(
 		status: package_publish::PackagePublishStatus,
 		trust_status: package_publish::TrustedPublishingStatus,
