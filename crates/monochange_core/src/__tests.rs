@@ -858,121 +858,8 @@ fn changeset_verification_settings_default_to_enabled_enforcement() {
 }
 
 #[test]
-fn default_cli_commands_expose_versions_and_publish_flows_alongside_release_planning() {
-	let cli = default_cli_commands();
-	let cli_command_names = cli
-		.iter()
-		.map(|cli_command| cli_command.name.as_str())
-		.collect::<Vec<_>>();
-	assert_eq!(
-		cli_command_names,
-		vec![
-			"validate",
-			"discover",
-			"change",
-			"release",
-			"versions",
-			"placeholder-publish",
-			"publish",
-			"publish-plan",
-			"affected",
-			"diagnostics",
-			"repair-release"
-		]
-	);
-	let validate_cli_command = cli
-		.first()
-		.unwrap_or_else(|| panic!("expected validate cli command"));
-	assert_eq!(
-		validate_cli_command.steps,
-		vec![CliStepDefinition::Validate {
-			name: Some("validate workspace".to_string()),
-			when: None,
-			inputs: BTreeMap::new(),
-		}]
-	);
-
-	let placeholder_publish = cli
-		.iter()
-		.find(|command| command.name == "placeholder-publish")
-		.unwrap_or_else(|| panic!("expected placeholder-publish cli command"));
-	assert_eq!(
-		placeholder_publish.steps,
-		vec![CliStepDefinition::PlaceholderPublish {
-			name: Some("publish placeholder packages".to_string()),
-			when: None,
-			inputs: BTreeMap::new(),
-		}]
-	);
-
-	let publish = cli
-		.iter()
-		.find(|command| command.name == "publish")
-		.unwrap_or_else(|| panic!("expected publish cli command"));
-	assert_eq!(
-		publish.steps,
-		vec![CliStepDefinition::PublishPackages {
-			name: Some("publish packages".to_string()),
-			when: None,
-			inputs: BTreeMap::new(),
-		}]
-	);
-
-	let publish_plan = cli
-		.iter()
-		.find(|command| command.name == "publish-plan")
-		.unwrap_or_else(|| panic!("expected publish-plan cli command"));
-	assert_eq!(
-		publish_plan.steps,
-		vec![CliStepDefinition::PlanPublishRateLimits {
-			name: Some("plan publish rate limits".to_string()),
-			when: None,
-			inputs: BTreeMap::new(),
-		}]
-	);
-}
-
-#[test]
-fn default_release_and_versions_commands_use_expected_output_defaults() {
-	let commands = default_cli_commands();
-	let release = commands
-		.iter()
-		.find(|command| command.name == "release")
-		.unwrap_or_else(|| panic!("expected release command"));
-	let release_format = release
-		.inputs
-		.iter()
-		.find(|input| input.name == "format")
-		.unwrap_or_else(|| panic!("expected release format input"));
-	assert_eq!(release_format.default.as_deref(), Some("markdown"));
-	assert_eq!(
-		release_format.choices,
-		vec![
-			"markdown".to_string(),
-			"text".to_string(),
-			"json".to_string(),
-		]
-	);
-	assert!(release.inputs.iter().all(|input| input.name != "versions"));
-
-	let versions = commands
-		.iter()
-		.find(|command| command.name == "versions")
-		.unwrap_or_else(|| panic!("expected versions command"));
-	let versions_format = versions
-		.inputs
-		.iter()
-		.find(|input| input.name == "format")
-		.unwrap_or_else(|| panic!("expected versions format input"));
-	assert_eq!(versions_format.default.as_deref(), Some("text"));
-	assert_eq!(
-		versions_format.choices,
-		vec![
-			"text".to_string(),
-			"markdown".to_string(),
-			"json".to_string(),
-		]
-	);
+fn default_cli_commands_are_empty() {
+	assert!(default_cli_commands().is_empty());
 }
 
 #[test]
@@ -1341,29 +1228,6 @@ fn valid_input_names_returns_expected_names_for_create_change_file() {
 	] {
 		assert!(names.contains(&expected), "missing: {expected}");
 	}
-}
-
-#[test]
-fn default_change_command_supports_none_bump_and_omits_legacy_evidence_input() {
-	let change = default_cli_commands()
-		.into_iter()
-		.find(|command| command.name == "change")
-		.unwrap_or_else(|| panic!("expected change command"));
-	let bump = change
-		.inputs
-		.iter()
-		.find(|input| input.name == "bump")
-		.unwrap_or_else(|| panic!("expected bump input"));
-	assert_eq!(
-		bump.choices,
-		vec![
-			"none".to_string(),
-			"patch".to_string(),
-			"minor".to_string(),
-			"major".to_string(),
-		]
-	);
-	assert!(change.inputs.iter().all(|input| input.name != "evidence"));
 }
 
 #[test]
