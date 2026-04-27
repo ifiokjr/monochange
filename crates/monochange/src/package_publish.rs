@@ -222,11 +222,46 @@ pub(crate) fn run_publish_packages(
 	selected_packages: &BTreeSet<String>,
 	dry_run: bool,
 ) -> MonochangeResult<PackagePublishReport> {
-	let discovery = discover_workspace(root)?;
 	let publication_targets =
 		release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
+	run_publish_packages_with_publications(
+		root,
+		configuration,
+		&publication_targets,
+		selected_packages,
+		dry_run,
+	)
+}
+
+pub(crate) fn run_publish_packages_from_ref(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	release_ref: &str,
+	selected_packages: &BTreeSet<String>,
+	dry_run: bool,
+) -> MonochangeResult<PackagePublishReport> {
+	let publication_targets = discover_release_record(root, release_ref)?
+		.record
+		.package_publications;
+	run_publish_packages_with_publications(
+		root,
+		configuration,
+		&publication_targets,
+		selected_packages,
+		dry_run,
+	)
+}
+
+fn run_publish_packages_with_publications(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	publication_targets: &[PackagePublicationTarget],
+	selected_packages: &BTreeSet<String>,
+	dry_run: bool,
+) -> MonochangeResult<PackagePublishReport> {
+	let discovery = discover_workspace(root)?;
 	#[rustfmt::skip]
-	let requests = build_release_requests(configuration, &discovery.packages, &publication_targets, selected_packages)?;
+	let requests = build_release_requests(configuration, &discovery.packages, publication_targets, selected_packages)?;
 	let env_map = current_env_map();
 	let endpoints = RegistryEndpoints::from_env();
 	let client = registry_client()?;

@@ -35,6 +35,7 @@ error: Unknown command `nonexistent`
   mcp                  Start the monochange MCP server over stdin/stdout
   validate             Validate monochange configuration and changesets
   discover             Discover packages across supported ecosystems
+  publish-readiness    Check package registry publishing readiness without publishing packages
   placeholder-publish  Publish placeholder versions for missing registry packages
   publish-packages     Publish package versions from release state
 

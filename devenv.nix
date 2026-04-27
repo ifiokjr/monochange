@@ -301,6 +301,9 @@ in
     "lint:test" = {
       exec = ''
         set -euo pipefail
+        while IFS= read -r name; do
+          unset "$name"
+        done < <(git rev-parse --local-env-vars)
         lint:all;
         test:all;
       '';

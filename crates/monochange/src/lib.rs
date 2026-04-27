@@ -302,6 +302,7 @@ mod mcp;
 mod package_publish;
 mod prepared_release_cache;
 mod publish_rate_limits;
+mod publish_readiness;
 mod release_artifacts;
 mod release_record;
 mod skill;
@@ -883,6 +884,34 @@ where
 					parse_output_format(value)
 				})?;
 			render_release_record_discovery(root, from, format)
+		}
+		Some(("publish-readiness", publish_readiness_matches)) => {
+			let configuration = configuration?;
+			let from = publish_readiness_matches
+				.get_one::<String>("from")
+				.cloned()
+				.ok_or(MonochangeError::Config(
+					"missing publish-readiness ref".to_string(),
+				))?;
+			let selected_packages = publish_readiness_matches
+				.get_many::<String>("package")
+				.map(|values| values.cloned().collect::<BTreeSet<_>>())
+				.unwrap_or_default();
+			let format = publish_readiness_matches
+				.get_one::<String>("format")
+				.map_or(Ok(OutputFormat::Markdown), |value| {
+					parse_output_format(value)
+				})?;
+			let output = publish_readiness_matches
+				.get_one::<String>("output")
+				.map(PathBuf::from);
+			let options = publish_readiness::PublishReadinessOptions {
+				from,
+				selected_packages,
+				format,
+				output,
+			};
+			publish_readiness::run_publish_readiness(root, &configuration, &options)
 		}
 		Some(("tag-release", tag_release_matches)) => {
 			let from = tag_release_matches
