@@ -567,6 +567,77 @@ fn release_record_supports_json_output() {
 }
 
 #[test]
+fn publish_readiness_dispatches_from_release_record_and_writes_artifact() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	create_release_record_commit(root);
+	let output_path = root.join(".monochange/readiness.json");
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("publish-readiness"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--package"),
+			OsString::from("missing"),
+			OsString::from("--format"),
+			OsString::from("text"),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("publish-readiness output: {error}"));
+
+	assert!(output.contains("publish readiness: ready"));
+	assert!(output.contains("release ref: HEAD"));
+	assert!(output.contains("packages: none"));
+
+	let artifact = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read readiness artifact: {error}"));
+	assert!(artifact.contains("\"status\": \"ready\""));
+	assert!(artifact.contains("\"from\": \"HEAD\""));
+	assert!(artifact.contains("\"packages\": []"));
+}
+
+#[test]
+fn publish_readiness_reports_release_ref_and_output_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	create_release_record_commit(root);
+
+	let missing_ref = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("publish-readiness"),
+			OsString::from("--from"),
+			OsString::from("missing-ref"),
+		],
+	)
+	.expect_err("missing release ref should fail readiness");
+	assert!(missing_ref.to_string().contains("missing-ref"));
+
+	let output_error = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("publish-readiness"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--output"),
+			root.into(),
+		],
+	)
+	.expect_err("directory output should fail readiness artifact write");
+	assert!(
+		output_error
+			.to_string()
+			.contains("failed to write publish readiness output")
+	);
+}
+
+#[test]
 fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/init-scan", tempdir.path());

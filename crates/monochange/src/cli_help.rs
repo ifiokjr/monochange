@@ -817,6 +817,53 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			see_also: &["validate", "init"],
 		},
 		CommandHelp {
+			name: "publish-readiness",
+			summary: "Check package registry publishing readiness without publishing packages",
+			description: "Evaluates the package publications recorded on a release commit against the\
+				current workspace configuration and target registries. The command is read-only: it\
+				runs registry existence checks in dry-run mode, reports packages that are ready,\
+				already published, or unsupported by built-in publishing, and can write a JSON\
+				readiness artifact for later publish orchestration.",
+			usage: "mc publish-readiness --from <REF> [OPTIONS]",
+			options: &[
+				(
+					"--from",
+					"<REF>",
+					"Tag or commit-ish used to locate the release record",
+				),
+				(
+					"--format",
+					"<FORMAT>",
+					"text, markdown, json (default: markdown)",
+				),
+				(
+					"--package",
+					"<PACKAGE>",
+					"Restrict to specific package ids (repeatable)",
+				),
+				("--output", "<PATH>", "Write a JSON readiness artifact"),
+			],
+			examples: &[
+				(
+					"Check the current release commit:",
+					"mc publish-readiness --from HEAD",
+				),
+				(
+					"Write a readiness artifact:",
+					"mc publish-readiness --from HEAD --output .monochange/readiness.json",
+				),
+				(
+					"JSON for one package:",
+					"mc publish-readiness --from v1.2.3 --package core --format json",
+				),
+			],
+			tips: &[
+				"Run readiness before mutating registry state with mc publish.",
+				"Already-published versions are reported as resumable instead of blocking.",
+			],
+			see_also: &["publish-plan", "publish", "placeholder-publish"],
+		},
+		CommandHelp {
 			name: "placeholder-publish",
 			summary: "Publish placeholder versions for missing registry packages",
 			description: "Packages that have never been published to their target registry (crates.io, \
@@ -1398,6 +1445,13 @@ mod tests {
 	fn render_command_help_for_release_record() {
 		let out = render_command_help("mc", "release-record");
 		assert!(out.contains("release-record"));
+	}
+
+	#[test]
+	fn render_command_help_for_publish_readiness() {
+		let out = render_command_help("mc", "publish-readiness");
+		assert!(out.contains("publish-readiness"));
+		assert!(out.contains("readiness artifact"));
 	}
 
 	#[test]

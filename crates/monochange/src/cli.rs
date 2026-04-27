@@ -206,6 +206,7 @@ When provided, the generated config includes:\n\
 			.subcommand(build_subagents_subcommand())
 			.subcommand(build_analyze_subcommand())
 			.subcommand(build_release_record_subcommand())
+			.subcommand(build_publish_readiness_subcommand())
 			.subcommand(build_tag_release_subcommand())
 			.subcommand(build_lint_subcommand())
 			.subcommand(Command::new("mcp").about(
@@ -414,6 +415,50 @@ Inspection notes:
 				.required(true)
 				.value_name("REF")
 				.help("Tag or commit-ish used to locate the release record"),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format")
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
+		)
+}
+
+pub(crate) fn build_publish_readiness_subcommand() -> Command {
+	Command::new("publish-readiness")
+		.about("Check package registry publishing readiness without publishing packages")
+		.after_help(
+			r"Examples:
+  mc publish-readiness --from HEAD
+  mc publish-readiness --from v1.2.3 --package core --format json
+  mc publish-readiness --from HEAD --output .monochange/readiness.json
+
+Readiness notes:
+  - Uses the release record at the supplied ref to select package versions.
+  - Checks registry state in dry-run mode and reports already-published packages as resumable.
+  - Treats packages configured for external publishing as blocked for built-in publishing.",
+		)
+		.arg(
+			Arg::new("from")
+				.long("from")
+				.required(true)
+				.value_name("REF")
+				.help("Tag or commit-ish used to locate the release record"),
+		)
+		.arg(
+			Arg::new("package")
+				.long("package")
+				.short('p')
+				.help("Limit readiness to one or more package ids")
+				.value_name("PACKAGE")
+				.action(ArgAction::Append),
+		)
+		.arg(
+			Arg::new("output")
+				.long("output")
+				.help("Write a JSON readiness artifact to this path")
+				.value_name("PATH"),
 		)
 		.arg(
 			Arg::new("format")
