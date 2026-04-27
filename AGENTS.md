@@ -32,6 +32,7 @@
 
 - [Tooling and commands](docs/agents/tooling.md)
 - [Workflow expectations](docs/agents/workflow.md)
+- [GitHub templates](docs/agents/github-templates.md)
 - [Testing requirements](docs/agents/testing.md)
 - [Documentation workflow](docs/agents/documentation.md)
 - [Architecture boundaries](docs/agents/architecture.md)
