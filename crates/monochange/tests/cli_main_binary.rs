@@ -48,7 +48,7 @@ fn monochange_binary_accepts_equals_format_flags() {
 	assert_cmd_snapshot!(
 		monochange_cli()
 			.current_dir(root)
-			.arg("discover")
+			.arg("step:discover")
 			.arg("--format=json")
 	);
 }

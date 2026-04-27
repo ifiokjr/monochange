@@ -106,7 +106,10 @@ fn change_cli_rejects_unknown_change_type_for_configured_target() {
 		.unwrap_or_else(|error| panic!("change output: {error}"));
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
-	assert!(stderr.contains("invalid value 'security'"));
+	assert!(
+		stderr.contains("invalid value 'security'"),
+		"unexpected stderr: {stderr}"
+	);
 	assert!(stderr.contains("[possible values: docs, test]"));
 }
 

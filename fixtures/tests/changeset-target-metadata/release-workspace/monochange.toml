@@ -36,11 +36,6 @@ version_format = "primary"
 [ecosystems.cargo]
 enabled = true
 
-[cli.validate]
-
-[[cli.validate.steps]]
-type = "Validate"
-
 [cli.release]
 
 [[cli.release.inputs]]

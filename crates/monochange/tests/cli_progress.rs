@@ -11,6 +11,7 @@ use test_support::current_test_name;
 use test_support::monochange_command;
 use test_support::run_in_tty;
 use test_support::setup_fixture;
+use test_support::setup_scenario_workspace;
 use test_support::snapshot_settings;
 
 fn normalize_duration_text(text: &str) -> String {
@@ -227,7 +228,7 @@ fn release_progress_renders_skipped_failed_steps_and_stderr_on_tty() {
 #[test]
 #[cfg(unix)]
 fn interactive_change_cli_hides_progress_output_on_tty() {
-	let tempdir = setup_fixture("monochange/release-base");
+	let tempdir = setup_scenario_workspace("monochange/release-base");
 	let output_path = tempdir.path().join(".changeset/interactive.md");
 
 	let (status, transcript) = run_tty_interactive_change(tempdir.path(), &output_path);
