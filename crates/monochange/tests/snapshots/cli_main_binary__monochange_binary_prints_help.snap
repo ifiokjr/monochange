@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
+assertion_line: 19
 info:
   program: monochange
   args:
@@ -15,28 +16,32 @@ Manage versions and releases for your multiplatform, multilanguage monorepo
 Usage: monochange [OPTIONS] <COMMAND>
 
 Commands:
-  init                 Generate monochange.toml with detected packages, groups, and default CLI commands
-  populate             Add any missing built-in CLI commands to monochange.toml so you can customize them
-  skill                Install the monochange skill bundle into the current project with the skills CLI
-  subagents            Generate repo-local monochange subagents and agent guidance files
-  analyze              Analyze semantic changes for one package across main, head, and optional release baselines
-  release-record       Inspect the monochange release record associated with a tag or commit
-  tag-release          Create and push release tags from the monochange release record on a commit
-  lint                 Inspect and scaffold manifest lint rules
-  mcp                  Start the monochange MCP (Model Context Protocol) server over stdin/stdout
-  check                Validate configuration, changesets, and run manifest lint rules
-  help                 Show detailed help for a command
-  validate             Validate monochange configuration and changesets
-  discover             Discover packages across supported ecosystems
-  change               Create a change file for one or more packages
-  release              Prepare a release from discovered change files
-  versions             Display planned package and group versions from discovered change files
-  placeholder-publish  Publish placeholder package versions for packages missing from their registries
-  publish              Publish package versions from monochange release state using built-in workflows
-  publish-plan         Plan package-registry publish work against known ecosystem rate limits
-  affected             Show packages affected by file changes and their changeset coverage
-  diagnostics          Show per-changeset diagnostics including context and commit/PR context
-  repair-release       Repair a recent release by moving its release tags to a later commit
+  init                           Generate monochange.toml with detected packages, groups, and default CLI commands
+  populate                       Add any missing built-in CLI commands to monochange.toml so you can customize them
+  skill                          Install the monochange skill bundle into the current project with the skills CLI
+  subagents                      Generate repo-local monochange subagents and agent guidance files
+  analyze                        Analyze semantic changes for one package across main, head, and optional release baselines
+  release-record                 Inspect the monochange release record associated with a tag or commit
+  tag-release                    Create and push release tags from the monochange release record on a commit
+  lint                           Inspect and scaffold manifest lint rules
+  mcp                            Start the monochange MCP (Model Context Protocol) server over stdin/stdout
+  check                          Validate configuration, changesets, and run manifest lint rules
+  help                           Show detailed help for a command
+  step:validate                  Run the `step:validate` command
+  step:discover                  Run the `step:discover` command
+  step:display-versions          Run the `step:display-versions` command
+  step:create-change-file        Run the `step:create-change-file` command
+  step:prepare-release           Run the `step:prepare-release` command
+  step:commit-release            Run the `step:commit-release` command
+  step:publish-release           Run the `step:publish-release` command
+  step:placeholder-publish       Run the `step:placeholder-publish` command
+  step:publish-packages          Run the `step:publish-packages` command
+  step:plan-publish-rate-limits  Run the `step:plan-publish-rate-limits` command
+  step:open-release-request      Run the `step:open-release-request` command
+  step:comment-released-issues   Run the `step:comment-released-issues` command
+  step:affected-packages         Run the `step:affected-packages` command
+  step:diagnose-changesets       Run the `step:diagnose-changesets` command
+  step:retarget-release          Run the `step:retarget-release` command
 
 Options:
   -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported

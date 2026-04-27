@@ -2071,6 +2071,43 @@ impl CliStepDefinition {
 		}
 	}
 
+	/// Returns the valid choice values for a named input on this step, if any.
+	#[must_use]
+	pub fn valid_input_choices(&self, name: &str) -> Option<&'static [&'static str]> {
+		match self {
+			Self::Discover { .. }
+			| Self::DisplayVersions { .. }
+			| Self::PrepareRelease { .. }
+			| Self::PublishRelease { .. }
+			| Self::CommentReleasedIssues { .. }
+			| Self::OpenReleaseRequest { .. }
+			| Self::AffectedPackages { .. }
+			| Self::DiagnoseChangesets { .. }
+			| Self::PlaceholderPublish { .. }
+			| Self::PublishPackages { .. } => {
+				match name {
+					"format" => Some(&["text", "json", "md"]),
+					_ => None,
+				}
+			}
+			Self::PlanPublishRateLimits { .. } => {
+				match name {
+					"format" => Some(&["text", "json", "md"]),
+					"mode" => Some(&["local", "ci"]),
+					"ci" => Some(&["github", "gitlab", "generic"]),
+					_ => None,
+				}
+			}
+			Self::CreateChangeFile { .. } => {
+				match name {
+					"bump" => Some(&["major", "minor", "patch", "none"]),
+					_ => None,
+				}
+			}
+			Self::RetargetRelease { .. } | _ => None,
+		}
+	}
+
 	/// Returns the expected [`CliInputKind`] for a named input on this step,
 	/// or `None` when the step is a `Command` (accepts anything) or the name
 	/// is unrecognised.
@@ -2155,6 +2192,62 @@ impl CliStepDefinition {
 				}
 			}
 		}
+	}
+
+	pub fn step_kebab_name(&self) -> String {
+		let name = self.kind_name();
+		let mut result = String::new();
+		let mut prev_upper = false;
+		for ch in name.chars() {
+			if ch.is_uppercase() {
+				if !result.is_empty() && !prev_upper {
+					result.push('-');
+				}
+				result.push(ch.to_ascii_lowercase());
+				prev_upper = true;
+			} else {
+				result.push(ch);
+				prev_upper = false;
+			}
+		}
+		result
+	}
+
+	/// Return the set of input definitions for this step kind.
+	#[must_use]
+	pub fn step_inputs_schema(&self) -> Vec<CliInputDefinition> {
+		let Some(names) = self.valid_input_names() else {
+			return Vec::new();
+		};
+		names
+			.iter()
+			.map(|name| {
+				let kind = self
+					.expected_input_kind(name)
+					.unwrap_or(CliInputKind::String);
+				let choices = self
+					.valid_input_choices(name)
+					.map(|c| {
+						#[allow(clippy::redundant_closure_for_method_calls)]
+						c.iter().map(|s| s.to_string()).collect::<Vec<_>>()
+					})
+					.unwrap_or_default();
+				let default = if *name == "sync_provider" {
+					Some("true".to_string())
+				} else {
+					None
+				};
+				CliInputDefinition {
+					name: name.to_string(),
+					kind,
+					help_text: None,
+					required: false,
+					default,
+					choices,
+					short: None,
+				}
+			})
+			.collect()
 	}
 }
 
@@ -3608,475 +3701,90 @@ impl WorkspaceConfiguration {
 /// Return the built-in CLI command definitions used when config omits them.
 #[must_use]
 pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
+	vec![]
+}
+
+/// Return all built-in step variants except `Command`.
+#[must_use]
+pub fn all_step_variants() -> Vec<CliStepDefinition> {
 	vec![
-		CliCommandDefinition {
-			name: "validate".to_string(),
-			help_text: Some("Validate monochange configuration and changesets".to_string()),
-			inputs: Vec::new(),
-			steps: vec![CliStepDefinition::Validate {
-				name: Some("validate workspace".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::Validate {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "discover".to_string(),
-			help_text: Some("Discover packages across supported ecosystems".to_string()),
-			inputs: vec![CliInputDefinition {
-				name: "format".to_string(),
-				kind: CliInputKind::Choice,
-				help_text: Some("Output format".to_string()),
-				required: false,
-				default: Some("text".to_string()),
-				choices: vec!["text".to_string(), "json".to_string()],
-				short: None,
-			}],
-			steps: vec![CliStepDefinition::Discover {
-				name: Some("discover packages".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::Discover {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "change".to_string(),
-			help_text: Some("Create a change file for one or more packages".to_string()),
-			inputs: vec![
-				CliInputDefinition {
-					name: "interactive".to_string(),
-					kind: CliInputKind::Boolean,
-					help_text: Some(
-						"Select packages, bumps, and options interactively".to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: Some('i'),
-				},
-				CliInputDefinition {
-					name: "package".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some("Package or group to include in the change".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "bump".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Requested semantic version bump".to_string()),
-					required: false,
-					default: Some("patch".to_string()),
-					choices: vec![
-						"none".to_string(),
-						"patch".to_string(),
-						"minor".to_string(),
-						"major".to_string(),
-					],
-					short: None,
-				},
-				CliInputDefinition {
-					name: "version".to_string(),
-					kind: CliInputKind::String,
-					help_text: Some("Pin an explicit version for this release".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "reason".to_string(),
-					kind: CliInputKind::String,
-					help_text: Some("Short release-note summary for this change".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "type".to_string(),
-					kind: CliInputKind::String,
-					help_text: Some(
-						"Optional release-note type such as `security` or `note`".to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "caused_by".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some(
-						"Package or group ids that caused this dependent change".to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "details".to_string(),
-					kind: CliInputKind::String,
-					help_text: Some("Optional multi-line release-note details".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "output".to_string(),
-					kind: CliInputKind::Path,
-					help_text: Some(
-						"Write the generated change file to a specific path".to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-			],
-			steps: vec![CliStepDefinition::CreateChangeFile {
-				show_progress: None,
-				name: Some("create change file".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::DisplayVersions {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "release".to_string(),
-			help_text: Some("Prepare a release from discovered change files".to_string()),
-			inputs: vec![CliInputDefinition {
-				name: "format".to_string(),
-				kind: CliInputKind::Choice,
-				help_text: Some("Output format".to_string()),
-				required: false,
-				default: Some("markdown".to_string()),
-				choices: vec![
-					"markdown".to_string(),
-					"text".to_string(),
-					"json".to_string(),
-				],
-				short: None,
-			}],
-			steps: vec![CliStepDefinition::PrepareRelease {
-				name: Some("prepare release".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::CreateChangeFile {
+			name: None,
+			when: None,
+			show_progress: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "versions".to_string(),
-			help_text: Some(
-				"Display planned package and group versions from discovered change files"
-					.to_string(),
-			),
-			inputs: vec![CliInputDefinition {
-				name: "format".to_string(),
-				kind: CliInputKind::Choice,
-				help_text: Some("Output format".to_string()),
-				required: false,
-				default: Some("text".to_string()),
-				choices: vec![
-					"text".to_string(),
-					"markdown".to_string(),
-					"json".to_string(),
-				],
-				short: None,
-			}],
-			steps: vec![CliStepDefinition::DisplayVersions {
-				name: Some("display versions".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::PrepareRelease {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "placeholder-publish".to_string(),
-			help_text: Some(
-				"Publish placeholder package versions for packages missing from their registries"
-					.to_string(),
-			),
-			inputs: vec![
-				CliInputDefinition {
-					name: "format".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Output format".to_string()),
-					required: false,
-					default: Some("text".to_string()),
-					choices: vec![
-						"text".to_string(),
-						"markdown".to_string(),
-						"json".to_string(),
-					],
-					short: None,
-				},
-				CliInputDefinition {
-					name: "package".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some(
-						"Restrict placeholder publishing to explicit package ids".to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-			],
-			steps: vec![CliStepDefinition::PlaceholderPublish {
-				name: Some("publish placeholder packages".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::CommitRelease {
+			name: None,
+			when: None,
+			no_verify: false,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "publish".to_string(),
-			help_text: Some(
-				"Publish package versions from monochange release state using built-in workflows"
-					.to_string(),
-			),
-			inputs: vec![
-				CliInputDefinition {
-					name: "format".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Output format".to_string()),
-					required: false,
-					default: Some("text".to_string()),
-					choices: vec![
-						"text".to_string(),
-						"markdown".to_string(),
-						"json".to_string(),
-					],
-					short: None,
-				},
-				CliInputDefinition {
-					name: "package".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some("Restrict publishing to explicit package ids".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-			],
-			steps: vec![CliStepDefinition::PublishPackages {
-				name: Some("publish packages".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::PublishRelease {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "publish-plan".to_string(),
-			help_text: Some(
-				"Plan package-registry publish work against known ecosystem rate limits"
-					.to_string(),
-			),
-			inputs: vec![
-				CliInputDefinition {
-					name: "format".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Output format".to_string()),
-					required: false,
-					default: Some("text".to_string()),
-					choices: vec![
-						"text".to_string(),
-						"markdown".to_string(),
-						"json".to_string(),
-					],
-					short: None,
-				},
-				CliInputDefinition {
-					name: "mode".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Plan release publishes or placeholder publishes".to_string()),
-					required: false,
-					default: Some("publish".to_string()),
-					choices: vec!["publish".to_string(), "placeholder".to_string()],
-					short: None,
-				},
-				CliInputDefinition {
-					name: "package".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some("Restrict planning to explicit package ids".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "ci".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Render a CI snippet for the planned batches".to_string()),
-					required: false,
-					default: None,
-					choices: vec!["github-actions".to_string(), "gitlab-ci".to_string()],
-					short: None,
-				},
-			],
-			steps: vec![CliStepDefinition::PlanPublishRateLimits {
-				name: Some("plan publish rate limits".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::PlaceholderPublish {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "affected".to_string(),
-			help_text: Some(
-				"Show packages affected by file changes and their changeset coverage".to_string(),
-			),
-			inputs: vec![
-				CliInputDefinition {
-					name: "format".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Output format".to_string()),
-					required: false,
-					default: Some("text".to_string()),
-					choices: vec!["text".to_string(), "json".to_string()],
-					short: None,
-				},
-				CliInputDefinition {
-					name: "changed_paths".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some(
-						"Explicit changed paths (mutually exclusive with --since)".to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "since".to_string(),
-					kind: CliInputKind::String,
-					help_text: Some(
-						"Git revision to compare against (branch, tag, commit, or HEAD)"
-							.to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "verify".to_string(),
-					kind: CliInputKind::Boolean,
-					help_text: Some(
-						"Enforce that affected packages are covered by changesets (exit non-zero if not)"
-							.to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "label".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some("Labels that may skip verification".to_string()),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-			],
-			steps: vec![CliStepDefinition::AffectedPackages {
-				name: Some("evaluate affected packages".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::PublishPackages {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "diagnostics".to_string(),
-			help_text: Some(
-				"Show per-changeset diagnostics including context and commit/PR context"
-					.to_string(),
-			),
-			inputs: vec![
-				CliInputDefinition {
-					name: "format".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Output format".to_string()),
-					required: false,
-					default: Some("text".to_string()),
-					choices: vec!["text".to_string(), "json".to_string()],
-					short: None,
-				},
-				CliInputDefinition {
-					name: "changeset".to_string(),
-					kind: CliInputKind::StringList,
-					help_text: Some(
-						"Changeset path(s) to inspect, relative to .changeset (omit for all changesets)".to_string(),
-					),
-					required: false,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-			],
-			steps: vec![CliStepDefinition::DiagnoseChangesets {
-				name: Some("diagnose changesets".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::PlanPublishRateLimits {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
-		CliCommandDefinition {
-			name: "repair-release".to_string(),
-			help_text: Some(
-				"Repair a recent release by moving its release tags to a later commit".to_string(),
-			),
-			inputs: vec![
-				CliInputDefinition {
-					name: "from".to_string(),
-					kind: CliInputKind::String,
-					help_text: Some(
-						"Tag or commit-ish used to locate the release record".to_string(),
-					),
-					required: true,
-					default: None,
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "target".to_string(),
-					kind: CliInputKind::String,
-					help_text: Some("Commit-ish the release set should move to".to_string()),
-					required: false,
-					default: Some("HEAD".to_string()),
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "force".to_string(),
-					kind: CliInputKind::Boolean,
-					help_text: Some("Allow non-descendant retargets".to_string()),
-					required: false,
-					default: Some("false".to_string()),
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "sync_provider".to_string(),
-					kind: CliInputKind::Boolean,
-					help_text: Some("Sync hosted release state after tag movement".to_string()),
-					required: false,
-					default: Some("true".to_string()),
-					choices: Vec::new(),
-					short: None,
-				},
-				CliInputDefinition {
-					name: "format".to_string(),
-					kind: CliInputKind::Choice,
-					help_text: Some("Output format".to_string()),
-					required: false,
-					default: Some("text".to_string()),
-					choices: vec!["text".to_string(), "json".to_string()],
-					short: None,
-				},
-			],
-			steps: vec![CliStepDefinition::RetargetRelease {
-				name: Some("retarget release".to_string()),
-				when: None,
-				inputs: BTreeMap::new(),
-			}],
+		CliStepDefinition::OpenReleaseRequest {
+			name: None,
+			when: None,
+			no_verify: false,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::CommentReleasedIssues {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::AffectedPackages {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::DiagnoseChangesets {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::RetargetRelease {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
 		},
 	]
 }

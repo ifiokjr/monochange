@@ -4,8 +4,8 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[cli.validate]
+[cli.inspect]
 
-[[cli.validate.steps]]
+[[cli.inspect.steps]]
 type = "Validate"
 inputs = { format = "json" }

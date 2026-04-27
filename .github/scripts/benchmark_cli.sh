@@ -494,6 +494,13 @@ generate_fixture() {
 		done
 		echo '[ecosystems.cargo]'
 		echo 'enabled = true'
+		echo
+		echo '[cli.discover]'
+		echo 'inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]'
+		echo 'steps = [{ type = "Discover" }]'
+		echo
+		echo '[cli.release]'
+		echo 'steps = [{ type = "PrepareRelease" }]'
 	} >"$root/monochange.toml"
 
 	git -C "$root" init -b main >/dev/null

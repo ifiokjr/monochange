@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -29,8 +30,113 @@ pub fn setup_fixture(relative: &str) -> tempfile::TempDir {
 
 #[allow(dead_code)]
 pub fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
-	monochange_test_helpers::fs::setup_scenario_workspace_from(env!("CARGO_MANIFEST_DIR"), relative)
+	let tempdir = monochange_test_helpers::fs::setup_scenario_workspace_from(
+		env!("CARGO_MANIFEST_DIR"),
+		relative,
+	);
+	if !relative.starts_with("affected/") {
+		append_legacy_cli_commands_for_integration_tests(tempdir.path());
+	}
+	tempdir
 }
+
+fn append_legacy_cli_commands_for_integration_tests(root: &Path) {
+	let config_path = root.join("monochange.toml");
+	let Ok(mut config) = fs::read_to_string(&config_path) else {
+		return;
+	};
+
+	let mut appended = String::new();
+
+	for (name, table) in LEGACY_TEST_CLI_COMMANDS {
+		if !config.contains(&format!("[cli.{name}]")) {
+			appended.push_str("\n\n");
+			appended.push_str(table);
+		}
+	}
+
+	if appended.is_empty() {
+		return;
+	}
+
+	config.push_str(&appended);
+	fs::write(&config_path, config).unwrap_or_else(|error| {
+		panic!("write test cli defaults {}: {error}", config_path.display())
+	});
+}
+
+const LEGACY_TEST_CLI_COMMANDS: &[(&str, &str)] = &[
+	(
+		"discover",
+		r#"[cli.discover]
+help_text = "Discover packages across supported ecosystems"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [{ name = "discover packages", type = "Discover" }]
+"#,
+	),
+	(
+		"change",
+		r#"[cli.change]
+help_text = "Create a change file for one or more packages"
+inputs = [
+	{ name = "interactive", type = "boolean", help_text = "Select packages, bumps, and options interactively", short = "i" },
+	{ name = "package", type = "string_list", help_text = "Package or group to include in the change" },
+	{ name = "bump", type = "choice", help_text = "Requested semantic version bump", choices = ["none", "patch", "minor", "major"], default = "patch" },
+	{ name = "version", type = "string", help_text = "Pin an explicit version for this release" },
+	{ name = "reason", type = "string", help_text = "Short release-note summary for this change" },
+	{ name = "type", type = "string", help_text = "Optional release-note type such as `security` or `note`" },
+	{ name = "caused_by", type = "string_list", help_text = "Package or group ids that caused this dependent change" },
+	{ name = "details", type = "string", help_text = "Optional multi-line release-note details" },
+	{ name = "output", type = "path", help_text = "Write the generated change file to a specific path" },
+]
+steps = [{ name = "create change file", type = "CreateChangeFile" }]
+"#,
+	),
+	(
+		"release",
+		r#"[cli.release]
+help_text = "Prepare a release from discovered change files"
+inputs = [
+	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
+]
+steps = [{ name = "prepare release", type = "PrepareRelease" }]
+"#,
+	),
+	(
+		"versions",
+		r#"[cli.versions]
+help_text = "Display planned package and group versions from discovered change files"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+]
+steps = [{ name = "display versions", type = "DisplayVersions" }]
+"#,
+	),
+	(
+		"placeholder-publish",
+		r#"[cli.placeholder-publish]
+help_text = "Publish placeholder package versions for packages missing from their registries"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+	{ name = "package", type = "string_list", help_text = "Restrict placeholder publishing to explicit package ids" },
+]
+steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
+"#,
+	),
+	(
+		"diagnostics",
+		r#"[cli.diagnostics]
+help_text = "Show per-changeset diagnostics including context and commit/PR context"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+	{ name = "changeset", type = "string_list", help_text = "Changeset path(s) to inspect, relative to .changeset (omit for all changesets)" },
+]
+steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets" }]
+"#,
+	),
+];
 
 #[allow(dead_code)]
 pub fn monochange_command(release_date: Option<&str>) -> Command {

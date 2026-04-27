@@ -48,20 +48,25 @@ pub(crate) fn execute_matches(
 	cli_command_matches: &ArgMatches,
 	quiet: bool,
 ) -> MonochangeResult<String> {
-	let Some(cli_command) = configuration
-		.cli
-		.iter()
-		.find(|cli_command| cli_command.name == cli_command_name)
-	else {
+	let cli_command = if cli_command_name.starts_with("step:") {
+		Some(synthetic_step_command_definition(cli_command_name)?)
+	} else {
+		configuration
+			.cli
+			.iter()
+			.find(|cli_command| cli_command.name == cli_command_name)
+			.cloned()
+	};
+	let Some(cli_command) = cli_command else {
 		return Err(MonochangeError::Config(format!(
 			"unknown command `{cli_command_name}`"
 		)));
 	};
 
-	let inputs = collect_cli_command_inputs(cli_command, cli_command_matches);
+	let inputs = collect_cli_command_inputs(&cli_command, cli_command_matches);
 	let dry_run = quiet || cli_command_matches.get_flag("dry-run");
 	let show_diff =
-		command_supports_release_diff_preview(cli_command) && cli_command_matches.get_flag("diff");
+		command_supports_release_diff_preview(&cli_command) && cli_command_matches.get_flag("diff");
 	let progress_format = cli_command_matches
 		.get_one::<String>("progress-format")
 		.map_or_else(
@@ -74,7 +79,7 @@ pub(crate) fn execute_matches(
 			},
 			|value| parse_progress_format(value),
 		)?;
-	let prepared_release_path = command_supports_release_diff_preview(cli_command)
+	let prepared_release_path = command_supports_release_diff_preview(&cli_command)
 		.then(|| cli_command_matches.get_one::<String>("prepared-release"))
 		.flatten()
 		.map(PathBuf::from);
@@ -82,7 +87,7 @@ pub(crate) fn execute_matches(
 		execute_cli_command_with_options(
 			root,
 			configuration,
-			cli_command,
+			&cli_command,
 			ExecuteCliCommandOptions {
 				dry_run,
 				quiet,
@@ -96,7 +101,7 @@ pub(crate) fn execute_matches(
 		execute_cli_command_with_options(
 			root,
 			configuration,
-			cli_command,
+			&cli_command,
 			ExecuteCliCommandOptions {
 				dry_run,
 				quiet,
@@ -3353,16 +3358,27 @@ mod tests {
 		let configuration = load_workspace_configuration(root)
 			.unwrap_or_else(|error| panic!("workspace configuration: {error}"));
 		let matches = build_command_with_cli("mc", &configuration.cli)
-			.try_get_matches_from(["mc", "validate"])
-			.unwrap_or_else(|error| panic!("validate matches: {error}"));
+			.try_get_matches_from(["mc", "step:discover"])
+			.unwrap_or_else(|error| panic!("discover matches: {error}"));
 		(configuration, matches)
 	}
 
 	fn default_cli_command(name: &str) -> CliCommandDefinition {
-		monochange_core::default_cli_commands()
-			.into_iter()
-			.find(|command| command.name == name)
-			.unwrap_or_else(|| panic!("expected default cli command `{name}`"))
+		let command_name = if name.starts_with("step:") {
+			name.to_string()
+		} else {
+			format!("step:{name}")
+		};
+
+		synthetic_step_command_definition(&command_name)
+			.unwrap_or_else(|error| panic!("expected default cli command `{name}`: {error}"))
+	}
+
+	#[test]
+	fn default_cli_command_accepts_prefixed_step_names() {
+		let command = default_cli_command("step:discover");
+
+		assert_eq!(command.name, "step:discover");
 	}
 
 	fn sample_package_publish_outcome(
@@ -3609,7 +3625,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_results_include_release_details_policy_and_logs() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		context.show_diff = true;
 		context.release_manifest_path = Some(PathBuf::from(".monochange/release.json"));
@@ -4287,29 +4303,29 @@ path = "crates/core"
 
 		temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("json"), || {
 			let (configuration, matches) = parse_validate_matches(tempdir.path());
-			let validate_matches = matches
-				.subcommand_matches("validate")
-				.unwrap_or_else(|| panic!("validate subcommand matches"));
+			let step_matches = matches
+				.subcommand_matches("step:discover")
+				.unwrap_or_else(|| panic!("step:discover subcommand matches"));
 			execute_matches(
 				tempdir.path(),
 				&configuration,
-				"validate",
-				validate_matches,
+				"step:discover",
+				step_matches,
 				false,
 			)
-			.unwrap_or_else(|error| panic!("validate with env progress format: {error}"));
+			.unwrap_or_else(|error| panic!("step:discover with env progress format: {error}"));
 		});
 
 		temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("wat"), || {
 			let (configuration, matches) = parse_validate_matches(tempdir.path());
-			let validate_matches = matches
-				.subcommand_matches("validate")
-				.unwrap_or_else(|| panic!("validate subcommand matches"));
+			let step_matches = matches
+				.subcommand_matches("step:discover")
+				.unwrap_or_else(|| panic!("step:discover subcommand matches"));
 			let error = execute_matches(
 				tempdir.path(),
 				&configuration,
-				"validate",
-				validate_matches,
+				"step:discover",
+				step_matches,
 				false,
 			)
 			.unwrap_err();
@@ -4613,7 +4629,7 @@ path = "crates/core"
 		let output = execute_cli_command_with_options(
 			&root,
 			&configuration,
-			&default_cli_command("versions"),
+			&default_cli_command("display-versions"),
 			ExecuteCliCommandOptions {
 				dry_run: false,
 				quiet: false,
@@ -4645,7 +4661,7 @@ path = "crates/core"
 		let error = execute_cli_command_with_options(
 			&root,
 			&configuration,
-			&default_cli_command("versions"),
+			&default_cli_command("display-versions"),
 			ExecuteCliCommandOptions {
 				dry_run: false,
 				quiet: false,
@@ -4683,7 +4699,7 @@ path = "crates/core"
 		let error = execute_cli_command_with_options(
 			&root,
 			&configuration,
-			&default_cli_command("versions"),
+			&default_cli_command("display-versions"),
 			ExecuteCliCommandOptions {
 				dry_run: false,
 				quiet: false,
@@ -4728,7 +4744,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_result_includes_release_results_and_changed_files() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		let mut prepared_release = sample_prepared_release();
 		prepared_release.changed_files = vec![PathBuf::from("Cargo.toml")];
@@ -4823,7 +4839,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_result_and_markdown_cover_empty_and_fallback_paths() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		context.command_logs = vec!["ran command".to_string()];
 		let text = render_cli_command_result(&cli_command, &context);
@@ -4836,7 +4852,7 @@ path = "crates/core"
 
 	#[test]
 	fn render_cli_command_result_and_markdown_include_release_target_details_without_diffs() {
-		let cli_command = default_cli_command("release");
+		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		context.prepared_release = Some(PreparedRelease {
 			plan: ReleasePlan {

@@ -152,7 +152,13 @@ fn change_cli_help_documents_package_and_group_targeting_rules() {
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
 
-	assert_cmd_snapshot!(monochange_command(None).arg("change").arg("--help"));
+	let tempdir = setup_scenario_workspace("changeset-target-metadata/render-workspace");
+	assert_cmd_snapshot!(
+		monochange_command(None)
+			.current_dir(tempdir.path())
+			.arg("change")
+			.arg("--help")
+	);
 }
 
 #[test]

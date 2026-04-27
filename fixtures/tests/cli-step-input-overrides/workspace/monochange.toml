@@ -28,10 +28,10 @@ version_format = "primary"
 [ecosystems.cargo]
 enabled = true
 
-[cli.validate]
+[cli.inspect]
 help_text = "Validate the workspace"
 
-[[cli.validate.steps]]
+[[cli.inspect.steps]]
 type = "Validate"
 
 [cli.discover]
