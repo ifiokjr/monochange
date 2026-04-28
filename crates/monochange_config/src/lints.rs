@@ -561,6 +561,7 @@ impl LintRuleRunner for BumpScopeRule {
 
 // ── Trait extension for LintRuleConfig ─────────────────────────────────────
 
+#[allow(dead_code)]
 trait LintRuleConfigExt {
 	fn bool_option(&self, key: &str, default: bool) -> bool;
 	fn string_list_option(&self, key: &str) -> Option<Vec<String>>;

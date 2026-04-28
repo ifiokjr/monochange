@@ -1314,7 +1314,7 @@ struct ChangeTypeLookup {
 
 #[derive(Debug)]
 pub struct ChangesetLoadContext<'a> {
-	configuration: &'a WorkspaceConfiguration,
+	_configuration: &'a WorkspaceConfiguration,
 	package_ids: HashSet<&'a str>,
 	groups_by_id: HashMap<&'a str, &'a GroupDefinition>,
 	package_reference_matches: HashMap<String, Vec<&'a str>>,
@@ -1382,7 +1382,7 @@ pub fn build_changeset_load_context<'a>(
 		);
 	}
 	ChangesetLoadContext {
-		configuration,
+		_configuration: configuration,
 		package_ids,
 		groups_by_id,
 		package_reference_matches,
@@ -2430,6 +2430,7 @@ fn lint_bump_option(
 	})
 }
 
+#[allow(dead_code)]
 fn lint_markdown_changeset(
 	body: &str,
 	changes: &[RawChangeEntry],
@@ -2458,6 +2459,7 @@ fn lint_markdown_changeset(
 	Ok(())
 }
 
+#[allow(dead_code)]
 fn lint_markdown_no_section_headings(
 	body: &str,
 	changes: &[RawChangeEntry],
@@ -2478,6 +2480,7 @@ fn lint_markdown_no_section_headings(
 	Ok(())
 }
 
+#[allow(dead_code)]
 fn changeset_type_lint_settings<'settings>(
 	settings: &'settings ChangesetLintSettings,
 	change_type: &str,
@@ -2491,6 +2494,7 @@ fn changeset_type_lint_settings<'settings>(
 	})
 }
 
+#[allow(dead_code)]
 fn lint_markdown_summary(
 	body: &str,
 	settings: &ChangesetLintSettings,
@@ -2562,6 +2566,7 @@ fn lint_markdown_summary(
 	Ok(())
 }
 
+#[allow(dead_code)]
 fn lint_markdown_scope(
 	body: &str,
 	change: &RawChangeEntry,
@@ -2671,6 +2676,7 @@ pub(crate) fn has_conventional_commit_prefix(summary: &str) -> bool {
 	)
 }
 
+#[allow(dead_code)]
 fn changeset_lint_error(path: &Path, message: impl Into<String>) -> MonochangeError {
 	MonochangeError::Config(format!(
 		"changeset lint failed for {}: {}",
