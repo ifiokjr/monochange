@@ -493,14 +493,14 @@ publish_npm:
     - corepack enable
     - git fetch --force --tags origin
     - |
-        set -euo pipefail
-        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-          mc tag-release --from HEAD
-          mc publish-readiness --from HEAD --output .monochange/readiness.json
-          mc publish --readiness .monochange/readiness.json
-        else
-          echo "not a release commit"
-        fi
+      set -euo pipefail
+      if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+        mc tag-release --from HEAD
+        mc publish-readiness --from HEAD --output .monochange/readiness.json
+        mc publish --readiness .monochange/readiness.json
+      else
+        echo "not a release commit"
+      fi
 ```
 
 If your npm flow needs registry-token setup or a custom `.npmrc`, do that in CI before running `mc publish-readiness` and `mc publish --readiness`.
@@ -527,14 +527,14 @@ publish_cargo:
   script:
     - git fetch --force --tags origin
     - |
-        set -euo pipefail
-        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-          mc tag-release --from HEAD
-          mc publish-readiness --from HEAD --output .monochange/readiness.json
-          mc publish --readiness .monochange/readiness.json
-        else
-          echo "not a release commit"
-        fi
+      set -euo pipefail
+      if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+        mc tag-release --from HEAD
+        mc publish-readiness --from HEAD --output .monochange/readiness.json
+        mc publish --readiness .monochange/readiness.json
+      else
+        echo "not a release commit"
+      fi
 ```
 
 If you need a crates.io token or a more customized release process, inject the credential in GitLab CI or switch the package to `mode = "external"`.
@@ -562,14 +562,14 @@ publish_jsr:
   script:
     - git fetch --force --tags origin
     - |
-        set -euo pipefail
-        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-          mc tag-release --from HEAD
-          mc publish-readiness --from HEAD --output .monochange/readiness.json
-          mc publish --readiness .monochange/readiness.json
-        else
-          echo "not a release commit"
-        fi
+      set -euo pipefail
+      if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+        mc tag-release --from HEAD
+        mc publish-readiness --from HEAD --output .monochange/readiness.json
+        mc publish --readiness .monochange/readiness.json
+      else
+        echo "not a release commit"
+      fi
 ```
 
 If your JSR auth bootstrap is more specialized than the built-in path expects, prefer `mode = "external"` and run the native publish command yourself.
@@ -597,14 +597,14 @@ publish_pub_dev:
   script:
     - git fetch --force --tags origin
     - |
-        set -euo pipefail
-        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-          mc tag-release --from HEAD
-          mc publish-readiness --from HEAD --output .monochange/readiness.json
-          mc publish --readiness .monochange/readiness.json
-        else
-          echo "not a release commit"
-        fi
+      set -euo pipefail
+      if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+        mc tag-release --from HEAD
+        mc publish-readiness --from HEAD --output .monochange/readiness.json
+        mc publish --readiness .monochange/readiness.json
+      else
+        echo "not a release commit"
+      fi
 ```
 
 As with JSR, use `mode = "external"` when you need CI-specific auth or publish orchestration outside monochange's built-in assumptions.
@@ -717,14 +717,14 @@ release_pr_or_publish:
   script:
     - git fetch --force --tags origin
     - |
-        set -euo pipefail
-        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-          mc tag-release --from HEAD
-          mc publish-readiness --from HEAD --output .monochange/readiness.json
-          mc publish --readiness .monochange/readiness.json
-        else
-          mc release-pr
-        fi
+      set -euo pipefail
+      if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+        mc tag-release --from HEAD
+        mc publish-readiness --from HEAD --output .monochange/readiness.json
+        mc publish --readiness .monochange/readiness.json
+      else
+        mc release-pr
+      fi
 ```
 
 ## Choosing a CI pattern

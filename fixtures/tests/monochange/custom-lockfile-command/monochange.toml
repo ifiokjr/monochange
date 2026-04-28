@@ -6,9 +6,7 @@ changelog = false
 path = "packages/app"
 
 [ecosystems.npm]
-lockfile_commands = [
-  { command = "custom-lock", cwd = "packages/app", shell = true },
-]
+lockfile_commands = [{ command = "custom-lock", cwd = "packages/app", shell = true }]
 
 [cli.release]
 

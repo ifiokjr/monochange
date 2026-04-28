@@ -249,16 +249,16 @@ Examples:
 # Good: separate changesets for distinct features in the same package
 
 ---
-core: minor
----
+
+## core: minor
 
 #### add file diff preview
 
 ...
 
 ---
-core: minor
----
+
+## core: minor
 
 #### add changelog format detection
 
@@ -269,10 +269,9 @@ core: minor
 # Good: combine similar package notes into one related multi-package changeset
 
 ---
-github: patch
-gitlab: none
-gitea: none
-hosting: none
+
+github: patch gitlab: none gitea: none hosting: none
+
 ---
 
 #### align provider manifests with package publication metadata
@@ -284,8 +283,8 @@ hosting: none
 # Good: update an existing changeset when the same feature grows
 
 ---
-cli: minor
----
+
+## cli: minor
 
 #### add --verbose and --debug flags
 
@@ -299,8 +298,8 @@ Adds two related debugging flags:
 # Good: dedicate a separate changeset to a breaking change
 
 ---
-config: major
----
+
+## config: major
 
 #### rename `WorkflowDefinition` to `CliCommandDefinition`
 

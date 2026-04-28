@@ -5,12 +5,12 @@ version = "2.0.0"
 [tool.poetry.dependencies]
 python = "^3.10"
 django = "^4.2"
-celery = {version = "^5.3", optional = true}
-local-pkg = {path = "../shared", develop = true}
+celery = { version = "^5.3", optional = true }
+local-pkg = { path = "../shared", develop = true }
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.0"
-coverage = {version = "^7.0", extras = ["toml"]}
+coverage = { version = "^7.0", extras = ["toml"] }
 
 [tool.poetry.group.lint.dependencies]
 ruff = "*"

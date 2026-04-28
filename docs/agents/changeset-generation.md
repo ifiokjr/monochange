@@ -42,20 +42,20 @@ Introduces unified diff output for dry-run releases.
 # ❌ Don't do this
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### add --show-diff flag
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### add PreparedFileDiff type
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### suppress lockfile diffs
 ```
@@ -66,9 +66,9 @@ Introduces unified diff output for dry-run releases.
 # ❌ Don't do this
 
 ---
-"@monochange/core": minor
-"@monochange/cli": patch
-"@monochange/config": minor
+
+"@monochange/core": minor "@monochange/cli": patch "@monochange/config": minor
+
 ---
 
 #### various updates
@@ -129,14 +129,14 @@ monochange_github: patch
 #### align release manifest example with package publications
 
 ---
-monochange_gitlab: none
----
+
+## monochange_gitlab: none
 
 #### align release manifest fixture with package publications
 
 ---
-monochange_gitea: none
----
+
+## monochange_gitea: none
 
 #### align release manifest fixture with package publications
 ```
@@ -164,8 +164,8 @@ All affected provider-facing crates now use the expanded `ReleaseManifest` shape
 # Initial changeset
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### add config validation
 
@@ -178,8 +178,8 @@ Later, validation expands to include schema checking:
 # ✅ Update existing (same feature, expanded scope)
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### add config validation with schema checking
 
@@ -205,8 +205,8 @@ rm .changeset/config-validation.md
 # ✅ Create new changeset (don't update existing)
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### add lockfile validation
 
@@ -1057,24 +1057,24 @@ When a PR contains multiple unrelated features:
 # ✅ Good: Separate changesets for separate features
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### add file diff preview
 
 ...
 
 ---
-"@monochange/core": minor
----
+
+## "@monochange/core": minor
 
 #### add changelog format detection
 
 ...
 
 ---
-"@monochange/cli": patch
----
+
+## "@monochange/cli": patch
 
 #### improve error messages
 

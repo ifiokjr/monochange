@@ -2,14 +2,22 @@
 	"name": "@monochange/skill",
 	"version": "0.2.0",
 	"description": "Skill for monochange adoption, release planning, and publishing guidance",
+	"keywords": [
+		"agent",
+		"mcp",
+		"monochange",
+		"monorepo",
+		"releases",
+		"skill"
+	],
+	"homepage": "https://github.com/monochange/monochange",
+	"bugs": {
+		"url": "https://github.com/monochange/monochange/issues"
+	},
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/monochange/monochange.git"
-	},
-	"homepage": "https://github.com/monochange/monochange",
-	"bugs": {
-		"url": "https://github.com/monochange/monochange/issues"
 	},
 	"files": [
 		"SKILL.md",
@@ -30,13 +38,5 @@
 	},
 	"engines": {
 		"node": ">=20"
-	},
-	"keywords": [
-		"monochange",
-		"skill",
-		"agent",
-		"mcp",
-		"releases",
-		"monorepo"
-	]
+	}
 }

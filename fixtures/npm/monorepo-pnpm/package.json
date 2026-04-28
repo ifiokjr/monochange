@@ -1,4 +1,4 @@
 {
-  "private": true,
-  "name": "npm-monorepo-pnpm"
+  "name": "npm-monorepo-pnpm",
+  "private": true
 }

@@ -1,15 +1,15 @@
 {#
-  monochange.init.toml -- minijinja template for mc init
+monochange.init.toml -- minijinja template for mc init
 
-  Compiled into the binary via include_str! and rendered at runtime with
-  context from package discovery.  Edit this file directly when config
-  options change.
+Compiled into the binary via include_str! and rendered at runtime with
+context from package discovery.  Edit this file directly when config
+options change.
 
-  Template context:
-    packages         -- list of { id, path, type, changelog? }
-    has_group        -- true when more than one package was discovered
-    package_ids_toml -- pre-formatted TOML array contents
-    has_cargo / has_npm / has_deno / has_dart / has_python -- ecosystem detected flags
+Template context:
+packages         -- list of { id, path, type, changelog? }
+has_group        -- true when more than one package was discovered
+package_ids_toml -- pre-formatted TOML array contents
+has_cargo / has_npm / has_deno / has_dart / has_python -- ecosystem detected flags
 #}
 # =============================================================================
 # monochange.toml — repository configuration for monochange
@@ -55,11 +55,10 @@ warn_on_group_mismatch = true
 # Default: none (each package must declare its own type)
 # package_type = "cargo"
 
-# Default changelog configuration applied to every package that doesn't
+{% raw -%}{% endraw -%}{% raw -%}{% endraw -%}# Default changelog configuration applied to every package that doesn't
 # declare its own `changelog` field.
 #
 # Accepts three forms:
-{% raw -%}
 #   true                           → use "{{ path }}/CHANGELOG.md" for every package
 #   false                          → disable changelogs by default
 #   "{{ path }}/changelog.md"      → pattern where {{ path }} is replaced with each package path
@@ -68,14 +67,11 @@ warn_on_group_mismatch = true
 #   [defaults.changelog]
 #   path = "{{ path }}/changelog.md"
 #   format = "keep_a_changelog"
-{% endraw -%}
 #
 # Supported formats: "monochange" (default), "keep_a_changelog"
 # Default: none (changelogs are disabled unless configured)
 # [defaults.changelog]
-{% raw -%}
 # path = "{{ path }}/changelog.md"
-{% endraw -%}
 # format = "keep_a_changelog"
 
 # Default changelog configuration. When [changelog] is not specified,
@@ -142,13 +138,12 @@ warn_on_group_mismatch = true
 # perf = { heading = "perf" }
 
 
-# Default empty_update_message applied when a package is bumped but has no
+{% raw -%}{% endraw -%}{% raw -%}{% endraw %}# Default empty_update_message applied when a package is bumped but has no
 # direct changeset entries (e.g. transitive dependency bumps or group
 # synchronization). Template placeholders are interpolated at render time
 # using minijinja syntax.
 #
 # Available placeholders:
-{% raw -%}
 #   {{ package }}, {{ package_name }}, {{ package_id }}
 #   {{ group }}, {{ group_name }}, {{ group_id }}
 #   {{ version }}, {{ new_version }}, {{ current_version }}, {{ previous_version }}
@@ -156,33 +151,26 @@ warn_on_group_mismatch = true
 #   {{ release_owner }}, {{ release_owner_kind }}
 #   {{ members }}, {{ member_count }}  (group changelogs only)
 #   {{ reasons }}
-{% endraw -%}
 #
 # Precedence: package → group → defaults → built-in message
 # Default: built-in message varies by grouped/ungrouped context
 #
-{% raw -%}
 # empty_update_message = "No direct changes; {{ package }} updated to {{ version }}."
-{% endraw %}
 
-# Default release_title applied when creating provider releases.
+{% raw -%}{% endraw -%}{% raw -%}{% endraw %}# Default release_title applied when creating provider releases.
 # This is a plain-text title used for GitHub, GitLab, and Gitea releases.
 #
 # Available placeholders:
-{% raw -%}
 #   {{ version }}, {{ id }}, {{ date }}, {{ time }}, {{ datetime }}
 #   {{ changes_count }}, {{ tag_url }}, {{ compare_url }}
-{% endraw -%}
 #
 # Defaults:
 #   Primary versioning:    "{{ version }} ({{ date }})"
 #   Namespaced versioning: "{{ id }} {{ version }} ({{ date }})"
 #
-{% raw -%}
 # release_title = "{{ version }} ({{ date }})"
-{% endraw %}
 
-# Default changelog_version_title controls how changelog version headings render.
+{% raw -%}{% endraw -%}{% raw -%}{% endraw %}# Default changelog_version_title controls how changelog version headings render.
 # This is markdown-capable and supports links.
 #
 # Available placeholders: same as release_title above.
@@ -192,23 +180,18 @@ warn_on_group_mismatch = true
 #   Namespaced: "{{ id }} [{{ version }}]({{ tag_url }}) ({{ date }})"
 #
 # To restore headings without dates (the previous default), set:
-{% raw -%}
 #   changelog_version_title = "{{ version }}"
-{% endraw -%}
 #
-{% raw -%}
 # changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
-{% endraw %}
 
 # =============================================================================
 # [changelog] — workspace-wide changelog configuration
 # =============================================================================
 
-# [changelog]
+{% raw -%}{% endraw %}# [changelog]
 # Templates that control how individual change entries render in changelogs.
 # Each template is tried in order; the first one whose required variables are
 # all present wins (uses minijinja strict mode — all referenced variables must
-{% raw -%}
 # be defined). If none match, falls back to "- {{ summary }}".
 #
 # Available variables:
@@ -236,7 +219,6 @@ warn_on_group_mismatch = true
 #   "#### {{ summary }}\n\n{{ details }}",
 #   "- {{ summary }}",
 # ]
-{% endraw %}
 
 # =============================================================================
 # [package.*] — declare each release-managed package explicitly
@@ -314,12 +296,10 @@ warn_on_group_mismatch = true
 #                             may use "primary"
 
 {% for pkg in packages %}
-[package.{{ pkg.id }}]
-path = "{{ pkg.path }}"
+[package.{{ pkg.id}}]
+{% if pkg.changelog %}{% endif %}path = "{{ pkg.path }}"
 type = "{{ pkg.type }}"
-{% if pkg.changelog %}
 changelog = "{{ pkg.changelog }}"
-{% endif %}
 # [package.{{ pkg.id }}.publish]
 # enabled = true
 # mode = "builtin"
@@ -380,13 +360,11 @@ changelog = "{{ pkg.changelog }}"
 {% if has_group %}
 [group.main]
 packages = [{{ package_ids_toml }}]
-tag = true
+{% endif %}# [group.main.changelog]tag = true
 release = true
 version_format = "primary"
-# [group.main.changelog]
 # path = "changelog.md"
 # include = ["package-id"]
-{% endif %}
 
 # =============================================================================
 # [[deployments]] — deployment intent definitions
@@ -504,11 +482,9 @@ version_format = "primary"
 
 {% if has_cargo %}
 [ecosystems.cargo]
-enabled = true
-{% else %}
-# [ecosystems.cargo]
+{% else %}enabled = true
+{% endif %}# [ecosystems.cargo]
 # enabled = true
-{% endif %}
 # [ecosystems.cargo.publish]
 # enabled = true
 # mode = "builtin"
@@ -520,11 +496,9 @@ enabled = true
 
 {% if has_npm %}
 [ecosystems.npm]
-enabled = true
-{% else %}
-# [ecosystems.npm]
+{% else %}enabled = true
+{% endif %}# [ecosystems.npm]
 # enabled = true
-{% endif %}
 # [ecosystems.npm.publish]
 # enabled = true
 # mode = "builtin"
@@ -536,11 +510,9 @@ enabled = true
 
 {% if has_deno %}
 [ecosystems.deno]
-enabled = true
-{% else %}
-# [ecosystems.deno]
+{% else %}enabled = true
+{% endif %}# [ecosystems.deno]
 # enabled = true
-{% endif %}
 # [ecosystems.deno.publish]
 # enabled = true
 # mode = "builtin"
@@ -552,11 +524,9 @@ enabled = true
 
 {% if has_dart %}
 [ecosystems.dart]
-enabled = true
-{% else %}
-# [ecosystems.dart]
+{% else %}enabled = true
+{% endif %}# [ecosystems.dart]
 # enabled = true
-{% endif %}
 # [ecosystems.dart.publish]
 # enabled = true
 # mode = "builtin"
@@ -568,13 +538,11 @@ enabled = true
 
 {% if has_python %}
 [ecosystems.python]
-enabled = true
-{% else %}
-# [ecosystems.python]
+{% else %}enabled = true
+{% endif %}# [ecosystems.python]
 # enabled = true
-{% endif %}
 
-# =============================================================================
+{% if provider %}# =============================================================================
 # [source] — source-control provider configuration
 # =============================================================================
 #
@@ -589,7 +557,6 @@ enabled = true
 # Optional fields:
 #   host    — custom host URL for self-hosted instances
 #   api_url — custom API URL (e.g. for GitHub Enterprise)
-{% if provider %}
 
 [source]
 provider = "{{ provider }}"
@@ -615,13 +582,12 @@ enforce_for_commit = false
 # Controls the OpenReleaseRequest CLI step which creates or updates a release
 # PR with version bumps, changelog updates, and changeset cleanup.
 [source.pull_requests]
-enabled = true
+{% else %}enabled = true
 branch_prefix = "monochange/release"
 base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
-{% else %}
 #
 # [source]
 # provider = "github"
@@ -679,7 +645,7 @@ auto_merge = false
 # labels = ["release", "automated"]
 # auto_merge = false
 
-# [source.bot.changesets] — changeset policy for provider-aware automation
+{% endif %}# [source.bot.changesets] — changeset policy for provider-aware automation
 #
 # These settings feed the AffectedPackages step when it needs to know which
 # paths matter for a pull request on the configured source provider.
@@ -703,7 +669,6 @@ auto_merge = false
 # comment_on_failure = true
 # changed_paths = []
 # ignored_paths = []
-{% endif %}
 
 # =============================================================================
 # [changesets.verify] — changeset verification settings
@@ -736,7 +701,7 @@ skip_labels = []
 # Default: true
 comment_on_failure = true
 
-# =============================================================================
+{% raw -%}{% endraw -%}{% raw -%}{% endraw -%}{% raw -%}{% endraw -%}# =============================================================================
 # [cli.*] — user-defined CLI commands
 # =============================================================================
 #
@@ -792,9 +757,7 @@ comment_on_failure = true
 #                     If the expression resolves to false, the step is skipped.
 #   inputs          — optional map of step-local input overrides. Values can be
 #                     strings, booleans, or string arrays.
-{% raw -%}
 #                     Use direct template references like "{{ inputs.label }}"
-{% endraw -%}
 #                     to forward values from command inputs without losing
 #                     list/boolean types.
 #   show_progress   — optional boolean for interactive CreateChangeFile / Command
@@ -821,17 +784,13 @@ comment_on_failure = true
 #   affected.*      — from AffectedPackages: status, summary
 #   steps.ID.*      — from Command steps with id: stdout, stderr
 #
-{% raw -%}
 # Built-in command variables (available as {{ var }} in command templates):
 #   {{ version }}, {{ group_version }}, {{ released_packages }},
 #   {{ changed_files }}, {{ changesets }}
 #   {{ released_packages_list }}  — array form, supports filters like
 #                                   {{ released_packages_list | join(", ") }}
 #   {{ inputs.name }}             — namespaced CLI inputs for any step override
-{% endraw -%}
-{% raw -%}
 # CLI inputs are available as {{ inputs.name }} in command templates.
-{% endraw -%}
 
 [cli.validate]
 help_text = "Validate monochange configuration and changesets"
@@ -839,125 +798,157 @@ steps = [{ name = "validate workspace", type = "Validate" }]
 
 [cli.discover]
 help_text = "Discover packages across supported ecosystems"
-inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
-]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
 steps = [{ name = "discover packages", type = "Discover" }]
 
 [cli.change]
 help_text = "Create a change file for one or more packages"
 inputs = [
-	{ name = "package", type = "string_list", required = true },
-	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
-	{ name = "reason", type = "string", required = true },
-	{ name = "type", type = "string" },
-	{ name = "caused_by", type = "string_list" },
-	{ name = "details", type = "string" },
-	{ name = "output", type = "path" },
+  { name = "package", type = "string_list", required = true },
+  { name = "bump", type = "choice", choices = [
+    "none",
+    "patch",
+    "minor",
+    "major",
+  ], default = "patch" },
+  { name = "reason", type = "string", required = true },
+  { name = "type", type = "string" },
+  { name = "caused_by", type = "string_list" },
+  { name = "details", type = "string" },
+  { name = "output", type = "path" },
 ]
 steps = [{ name = "create change file", type = "CreateChangeFile" }]
 
 [cli.release]
 help_text = "Prepare a release from discovered change files"
 inputs = [
-	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
+  { name = "format", type = "choice", choices = [
+    "markdown",
+    "text",
+    "json",
+  ], default = "markdown" },
 ]
 steps = [{ name = "prepare release", type = "PrepareRelease" }]
 
 [cli.versions]
 help_text = "Display planned package and group versions from discovered change files"
 inputs = [
-	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+  { name = "format", type = "choice", choices = [
+    "text",
+    "markdown",
+    "json",
+  ], default = "text" },
 ]
 steps = [{ name = "display versions", type = "DisplayVersions" }]
 
 [cli.placeholder-publish]
 help_text = "Publish placeholder package versions for missing registry packages"
 inputs = [
-	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
-	{ name = "package", type = "string_list" },
+  { name = "format", type = "choice", choices = [
+    "text",
+    "markdown",
+    "json",
+  ], default = "text" },
+  { name = "package", type = "string_list" },
 ]
 steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
 
 [cli.publish]
 help_text = "Publish package versions from monochange release state using built-in workflows"
 inputs = [
-	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
-	{ name = "package", type = "string_list" },
-	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; required when publishing for real" },
-	{ name = "resume", type = "path", help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped" },
-	{ name = "output", type = "path", help_text = "Write the package publish result JSON artifact for retry/resume" },
+  { name = "format", type = "choice", choices = [
+    "text",
+    "markdown",
+    "json",
+  ], default = "text" },
+  { name = "package", type = "string_list" },
+  { name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; required when publishing for real" },
+  { name = "resume", type = "path", help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped" },
+  { name = "output", type = "path", help_text = "Write the package publish result JSON artifact for retry/resume" },
 ]
 steps = [{ name = "publish packages", type = "PublishPackages" }]
 
 [cli.publish-plan]
 help_text = "Plan package-registry publish work against known ecosystem rate limits"
 inputs = [
-	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
-	{ name = "mode", type = "choice", choices = ["publish", "placeholder"], default = "publish" },
-	{ name = "package", type = "string_list" },
-	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; limits publish plans to ready package work" },
-	{ name = "ci", type = "choice", choices = ["github-actions", "gitlab-ci"] },
+  { name = "format", type = "choice", choices = [
+    "text",
+    "markdown",
+    "json",
+  ], default = "text" },
+  { name = "mode", type = "choice", choices = [
+    "publish",
+    "placeholder",
+  ], default = "publish" },
+  { name = "package", type = "string_list" },
+  { name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; limits publish plans to ready package work" },
+  { name = "ci", type = "choice", choices = [
+    "github-actions",
+    "gitlab-ci",
+  ] },
 ]
 steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]
 
 [cli.affected]
-help_text = "Evaluate pull-request changeset policy"
-inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
-	{ name = "changed_paths", type = "string_list", required = true },
-	{ name = "label", type = "string_list" },
+{% raw -%}help_text = "Evaluate pull-request changeset policy"
+{% endraw -%}# Step inputs example: { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }inputs = [
+  { name = "format", type = "choice", choices = [
+    "text",
+    "json",
+  ], default = "text" },
+  { name = "changed_paths", type = "string_list", required = true },
+  { name = "label", type = "string_list" },
 ]
-{% raw -%}
-# Step inputs example: { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
-{% endraw -%}
 steps = [{ name = "evaluate affected packages", type = "AffectedPackages" }]
 
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"
 inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
-	{ name = "changeset", type = "string_list", help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)" },
+  { name = "format", type = "choice", choices = [
+    "text",
+    "json",
+  ], default = "text" },
+  { name = "changeset", type = "string_list", help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)" },
 ]
 steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets" }]
 
 [cli.repair-release]
-help_text = "Repair a recent release by moving its release tags to a later commit"
+{% if provider %}help_text = "Repair a recent release by moving its release tags to a later commit"
 inputs = [
-	{ name = "from", type = "string", help_text = "tag or commit-ish used to locate the release record", required = true },
-	{ name = "target", type = "string", help_text = "commit-ish the release set should move to", default = "HEAD" },
-	{ name = "force", type = "boolean", help_text = "allow non-descendant retargets", default = "false" },
-	{ name = "sync_provider", type = "boolean", help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)", default = "true" },
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+  { name = "from", type = "string", help_text = "tag or commit-ish used to locate the release record", required = true },
+  { name = "target", type = "string", help_text = "commit-ish the release set should move to", default = "HEAD" },
+  { name = "force", type = "boolean", help_text = "allow non-descendant retargets", default = "false" },
+  { name = "sync_provider", type = "boolean", help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)", default = "true" },
+  { name = "format", type = "choice", choices = [
+    "text",
+    "json",
+  ], default = "text" },
 ]
 steps = [{ name = "retarget release", type = "RetargetRelease" }]
-{% if provider %}
 
 [cli.commit-release]
 help_text = "Prepare a release, commit it, and open or update a release PR"
-inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
-]
-steps = [
-	{ type = "PrepareRelease" },
-	{ type = "CommitRelease" },
-	{ type = "OpenReleaseRequest" },
-]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
+steps = [{ type = "PrepareRelease" }, { type = "CommitRelease" }, { type = "OpenReleaseRequest" }]
 
 [cli.publish-release]
 help_text = "Create provider releases from a durable release record"
 inputs = [
-	{ name = "from-ref", type = "string", default = "HEAD" },
-	{ name = "draft", type = "boolean", default = false },
-	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "text" },
+  { name = "from-ref", type = "string", default = "HEAD" },
+  { name = "draft", type = "boolean", default = false },
+  { name = "format", type = "choice", choices = [
+    "text",
+    "json",
+    "markdown",
+  ], default = "text" },
 ]
 steps = [{ name = "publish release", type = "PublishRelease" }]
 
 [cli.comment-released-issues]
 help_text = "Comment on and optionally close issues referenced in released changesets"
 inputs = [
-	{ name = "from-ref", type = "string", default = "HEAD" },
-	{ name = "auto-close-issues", type = "boolean", default = false },
+  { name = "from-ref", type = "string", default = "HEAD" },
+  { name = "auto-close-issues", type = "boolean", default = false },
 ]
 steps = [{ name = "comment on released issues", type = "CommentReleasedIssues" }]
 

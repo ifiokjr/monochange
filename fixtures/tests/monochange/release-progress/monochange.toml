@@ -35,20 +35,20 @@ type = "PrepareRelease"
 [cli.progress-release]
 help_text = "Exercise progress output"
 steps = [
-	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "Command", name = "stream summary", shell = true, command = "printf 'streamed line 1\n'; sleep 0.01; printf 'streamed line 2\n'" },
+  { type = "PrepareRelease", name = "plan release" },
+  { type = "Command", name = "stream summary", shell = true, command = "printf 'streamed line 1\n'; sleep 0.01; printf 'streamed line 2\n'" },
 ]
 
 [cli.progress-ascii]
 help_text = "Exercise progress output"
 steps = [
-	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "Command", name = "stream summary", shell = true, command = "printf 'line one\n\nline three\n'" },
+  { type = "PrepareRelease", name = "plan release" },
+  { type = "Command", name = "stream summary", shell = true, command = "printf 'line one\n\nline three\n'" },
 ]
 
 [cli.progress-json]
 help_text = "Exercise progress output"
 steps = [
-	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "Command", name = "stream summary", shell = true, command = "printf 'stdout line\n'; printf 'stderr line\n' >&2" },
+  { type = "PrepareRelease", name = "plan release" },
+  { type = "Command", name = "stream summary", shell = true, command = "printf 'stdout line\n'; printf 'stderr line\n' >&2" },
 ]

@@ -6,8 +6,8 @@ changelog = "{{ path }}/changelog.md"
 [package.core]
 path = "crates/core"
 versioned_files = [
-    { path = "crates/core/extra.toml", type = "cargo" },
-    { path = "README.md", regex = 'https:\/\/example.com\/download\/v(?<version>\d+\.\d+\.\d+)\.tgz' },
+  { path = "crates/core/extra.toml", type = "cargo" },
+  { path = "README.md", regex = 'https:\/\/example.com\/download\/v(?<version>\d+\.\d+\.\d+)\.tgz' },
 ]
 
 [package.app]

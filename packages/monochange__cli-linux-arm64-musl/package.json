@@ -2,15 +2,18 @@
 	"name": "@monochange/cli-linux-arm64-musl",
 	"version": "0.2.0",
 	"description": "Prebuilt monochange binary for Linux arm64 (musl)",
+	"homepage": "https://github.com/monochange/monochange",
+	"bugs": {
+		"url": "https://github.com/monochange/monochange/issues"
+	},
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/monochange/monochange.git"
 	},
-	"homepage": "https://github.com/monochange/monochange",
-	"bugs": {
-		"url": "https://github.com/monochange/monochange/issues"
-	},
+	"files": [
+		"bin"
+	],
 	"os": [
 		"linux"
 	],
@@ -19,9 +22,6 @@
 	],
 	"libc": [
 		"musl"
-	],
-	"files": [
-		"bin"
 	],
 	"publishConfig": {
 		"access": "public",

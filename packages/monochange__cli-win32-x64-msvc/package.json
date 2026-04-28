@@ -2,23 +2,23 @@
 	"name": "@monochange/cli-win32-x64-msvc",
 	"version": "0.2.0",
 	"description": "Prebuilt monochange binary for Windows x64",
+	"homepage": "https://github.com/monochange/monochange",
+	"bugs": {
+		"url": "https://github.com/monochange/monochange/issues"
+	},
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/monochange/monochange.git"
 	},
-	"homepage": "https://github.com/monochange/monochange",
-	"bugs": {
-		"url": "https://github.com/monochange/monochange/issues"
-	},
+	"files": [
+		"bin"
+	],
 	"os": [
 		"win32"
 	],
 	"cpu": [
 		"x64"
-	],
-	"files": [
-		"bin"
 	],
 	"publishConfig": {
 		"access": "public",

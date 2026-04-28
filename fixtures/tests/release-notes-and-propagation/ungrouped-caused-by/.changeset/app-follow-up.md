@@ -1,7 +1,7 @@
 ---
 app:
   bump: patch
-  caused_by: ["core"]
+  caused_by: ['core']
 ---
 
 #### update dependency on core

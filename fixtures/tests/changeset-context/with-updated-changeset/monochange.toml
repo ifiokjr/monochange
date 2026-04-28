@@ -6,7 +6,11 @@ path = "{{ path }}/CHANGELOG.md"
 format = "monochange"
 
 [changelog]
-templates = ["#### {{ summary }}\n\n{{ details }}\n\n{{ context }}", "#### {{ summary }}\n\n{{ context }}", "- {{ summary }}"]
+templates = [
+  "#### {{ summary }}\n\n{{ details }}\n\n{{ context }}",
+  "#### {{ summary }}\n\n{{ context }}",
+  "- {{ summary }}",
+]
 
 [package.core]
 path = "crates/core"

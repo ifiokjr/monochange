@@ -46,7 +46,9 @@ help_text = "Create a hardcoded change"
 
 [[cli.change.steps]]
 type = "CreateChangeFile"
-inputs = { package = ["core"], bump = "minor", reason = "hardcoded change", output = ".changeset/hardcoded.md" }
+inputs = { package = [
+  "core",
+], bump = "minor", reason = "hardcoded change", output = ".changeset/hardcoded.md" }
 
 [cli.release]
 help_text = "Prepare a release"
@@ -61,7 +63,11 @@ help_text = "Evaluate affected packages"
 
 [[cli.affected.steps]]
 type = "AffectedPackages"
-inputs = { format = "json", changed_paths = ["crates/core/CHANGELOG.md"], label = ["no-changeset-required"], verify = true }
+inputs = { format = "json", changed_paths = [
+  "crates/core/CHANGELOG.md",
+], label = [
+  "no-changeset-required",
+], verify = true }
 
 [cli.announce]
 help_text = "Write a hardcoded message"

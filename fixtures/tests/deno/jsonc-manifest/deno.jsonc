@@ -3,6 +3,6 @@
   "name": "jsonc-tool",
   "version": "1.0.0",
   "imports": {
-    "core": "^1.0.0"
-  }
+    "core": "^1.0.0",
+  },
 }
