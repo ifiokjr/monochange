@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -116,6 +117,26 @@ pub(crate) fn validate_publish_readiness_artifact(
 	validate_publish_readiness_report(&artifact, &current_report)
 }
 
+pub(crate) fn publish_plan_package_filter_from_readiness_artifact(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	selected_packages: &BTreeSet<String>,
+	artifact_path: &Path,
+) -> MonochangeResult<BTreeSet<String>> {
+	let artifact = read_report_artifact(artifact_path)?;
+	#[rustfmt::skip]
+	let current_report = build_publish_readiness_report_for_publish(root, configuration, prepared_release, selected_packages)?;
+	validate_publish_readiness_plan_artifact(&artifact, &current_report)?;
+
+	let artifact_ready_packages = publish_plan_ready_package_ids(&artifact);
+	let current_ready_packages = publish_plan_ready_package_ids(&current_report);
+	Ok(current_ready_packages
+		.intersection(&artifact_ready_packages)
+		.cloned()
+		.collect())
+}
+
 fn build_publish_readiness_report(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
@@ -215,6 +236,26 @@ fn readiness_status_from_publish_status(
 	}
 }
 
+fn publish_plan_ready_package_ids(report: &PublishReadinessReport) -> BTreeSet<String> {
+	let mut package_readiness = BTreeMap::<String, bool>::new();
+
+	for package in &report.packages {
+		let is_ready = matches!(
+			package.status,
+			PublishReadinessPackageStatus::Ready | PublishReadinessPackageStatus::AlreadyPublished
+		);
+		package_readiness
+			.entry(package.package.clone())
+			.and_modify(|ready| *ready &= is_ready)
+			.or_insert(is_ready);
+	}
+
+	package_readiness
+		.into_iter()
+		.filter_map(|(package, ready)| ready.then_some(package))
+		.collect()
+}
+
 fn write_report_artifact(output: &Path, report: &PublishReadinessReport) -> MonochangeResult<()> {
 	output
 		.parent()
@@ -249,6 +290,15 @@ fn validate_publish_readiness_report(
 	validate_readiness_current_status(current)?;
 	validate_readiness_release_commit(artifact, current)?;
 	validate_readiness_packages(artifact, current)
+}
+
+fn validate_publish_readiness_plan_artifact(
+	artifact: &PublishReadinessReport,
+	current: &PublishReadinessReport,
+) -> MonochangeResult<()> {
+	validate_readiness_artifact_header(artifact)?;
+	validate_readiness_release_commit(artifact, current)?;
+	validate_readiness_package_subset(artifact, current)
 }
 
 fn validate_readiness_artifact_header(report: &PublishReadinessReport) -> MonochangeResult<()> {
@@ -325,6 +375,35 @@ fn validate_readiness_packages(
 		"publish readiness artifact package set is stale or does not match selected packages (missing: {}; stale: {})",
 		render_package_identity_list(&missing),
 		render_package_identity_list(&stale)
+	)))
+}
+
+fn validate_readiness_package_subset(
+	artifact: &PublishReadinessReport,
+	current: &PublishReadinessReport,
+) -> MonochangeResult<()> {
+	let artifact_packages = package_identities(&artifact.packages)?;
+	let current_packages = package_identities(&current.packages)?;
+
+	if artifact.package_set_fingerprint != package_set_fingerprint(&artifact.packages) {
+		return Err(MonochangeError::Config(
+			"publish readiness artifact package fingerprint does not match its package list"
+				.to_string(),
+		));
+	}
+
+	let missing = current_packages
+		.difference(&artifact_packages)
+		.map(render_package_identity)
+		.collect::<Vec<_>>();
+
+	if missing.is_empty() {
+		return Ok(());
+	}
+
+	Err(MonochangeError::Config(format!(
+		"publish readiness artifact does not cover selected packages: {}",
+		render_package_identity_list(&missing)
 	)))
 }
 
@@ -540,6 +619,20 @@ mod tests {
 			version: "1.2.3".to_string(),
 			status: PublishReadinessPackageStatus::Ready,
 			message: "ready to publish core 1.2.3".to_string(),
+		}
+	}
+
+	fn readiness_package(
+		package: &str,
+		registry: &str,
+		status: PublishReadinessPackageStatus,
+	) -> PublishReadinessPackage {
+		PublishReadinessPackage {
+			package: package.to_string(),
+			registry: registry.to_string(),
+			status,
+			message: format!("{package} readiness"),
+			..sample_readiness_package()
 		}
 	}
 
@@ -797,6 +890,114 @@ mod tests {
 			&artifact_path,
 		)
 		.unwrap_or_else(|error| panic!("validate readiness artifact: {error}"));
+	}
+
+	#[test]
+	fn publish_plan_ready_package_ids_requires_every_package_row_to_be_ready() {
+		let report = sample_readiness_report(vec![
+			readiness_package("core", "crates.io", PublishReadinessPackageStatus::Ready),
+			readiness_package(
+				"core",
+				"npm",
+				PublishReadinessPackageStatus::AlreadyPublished,
+			),
+			readiness_package("web", "crates.io", PublishReadinessPackageStatus::Ready),
+			readiness_package("web", "npm", PublishReadinessPackageStatus::Blocked),
+			readiness_package(
+				"docs",
+				"crates.io",
+				PublishReadinessPackageStatus::AlreadyPublished,
+			),
+			readiness_package(
+				"external",
+				"crates.io",
+				PublishReadinessPackageStatus::Unsupported,
+			),
+		]);
+
+		let ready_packages = publish_plan_ready_package_ids(&report);
+
+		assert_eq!(
+			ready_packages,
+			BTreeSet::from(["core".to_string(), "docs".to_string()])
+		);
+	}
+
+	#[test]
+	fn validate_publish_readiness_plan_artifact_accepts_blocked_subset_reports() {
+		let artifact = sample_readiness_report(vec![
+			readiness_package("core", "crates.io", PublishReadinessPackageStatus::Ready),
+			readiness_package("web", "crates.io", PublishReadinessPackageStatus::Blocked),
+			readiness_package("extra", "crates.io", PublishReadinessPackageStatus::Ready),
+		]);
+		let current = PublishReadinessReport {
+			status: PublishReadinessGlobalStatus::Blocked,
+			packages: vec![
+				readiness_package("core", "crates.io", PublishReadinessPackageStatus::Ready),
+				readiness_package("web", "crates.io", PublishReadinessPackageStatus::Blocked),
+			],
+			..sample_readiness_report(Vec::new())
+		};
+
+		validate_publish_readiness_plan_artifact(&artifact, &current)
+			.unwrap_or_else(|error| panic!("planning readiness artifact: {error}"));
+	}
+
+	#[test]
+	fn validate_publish_readiness_plan_artifact_rejects_tampering_and_missing_coverage() {
+		let current = sample_readiness_report(vec![
+			readiness_package("core", "crates.io", PublishReadinessPackageStatus::Ready),
+			readiness_package("web", "crates.io", PublishReadinessPackageStatus::Ready),
+		]);
+
+		let mut tampered = current.clone();
+		tampered.package_set_fingerprint = "tampered".to_string();
+		let tampered_error = validate_publish_readiness_plan_artifact(&tampered, &current)
+			.expect_err("tampered planning artifact should fail validation");
+		assert!(tampered_error.to_string().contains("package fingerprint"));
+
+		let missing = sample_readiness_report(vec![readiness_package(
+			"core",
+			"crates.io",
+			PublishReadinessPackageStatus::Ready,
+		)]);
+		let missing_error = validate_publish_readiness_plan_artifact(&missing, &current)
+			.expect_err("planning artifact missing current package should fail");
+		assert!(
+			missing_error
+				.to_string()
+				.contains("does not cover selected packages")
+		);
+	}
+
+	#[test]
+	fn publish_plan_package_filter_from_readiness_artifact_accepts_empty_prepared_release() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let artifact_path = root.join("readiness.json");
+		let configuration = sample_configuration(root);
+		let prepared_release = sample_prepared_release(root);
+		let selected_packages = BTreeSet::new();
+		let report = build_publish_readiness_report_for_publish(
+			root,
+			&configuration,
+			Some(&prepared_release),
+			&selected_packages,
+		)
+		.unwrap_or_else(|error| panic!("prepared release readiness: {error}"));
+
+		write_report_artifact(&artifact_path, &report)
+			.unwrap_or_else(|error| panic!("write readiness artifact: {error}"));
+		let planned_packages = publish_plan_package_filter_from_readiness_artifact(
+			root,
+			&configuration,
+			Some(&prepared_release),
+			&selected_packages,
+			&artifact_path,
+		)
+		.unwrap_or_else(|error| panic!("publish plan readiness filter: {error}"));
+
+		assert!(planned_packages.is_empty());
 	}
 
 	#[test]

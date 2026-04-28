@@ -14,6 +14,7 @@ Use it when you want to answer questions like:
 - `format` — `text`, `markdown`, or `json`
 - `mode` — `publish` (default) or `placeholder`
 - `package` — optional repeated package ids used to filter the plan
+- `readiness` — optional path to a JSON artifact from `mc publish-readiness`; only valid when `mode = "publish"`
 - `ci` — optional `github-actions` or `gitlab-ci` snippet renderer
 
 ## Produces
@@ -25,6 +26,7 @@ A structured publish-rate-limit report containing:
 - explicit package ids per batch
 - evidence and confidence metadata for each built-in policy
 - only versions that are still missing from their registries, so reruns reflect the remaining work
+- when `readiness` is provided, only package ids ready in both the artifact and the fresh local readiness check
 
 ## Examples
 
@@ -40,10 +42,17 @@ type = "choice"
 default = "json"
 choices = ["text", "markdown", "json"]
 
+[[cli.publish-plan.inputs]]
+name = "readiness"
+type = "path"
+help_text = "JSON artifact from mc publish-readiness; limits publish plans to ready package work"
+
 [[cli.publish-plan.steps]]
 name = "plan publish rate limits"
 type = "PlanPublishRateLimits"
 ```
+
+A readiness-backed plan validates the artifact header, release record commit, selected package coverage, and package-set fingerprint before planning. The artifact may contain non-ready packages, but those package ids are excluded from the plan. Placeholder plans reject `readiness`; use `mode = "placeholder"` without an artifact for first-time bootstrap planning.
 
 ### Plan placeholder bootstrap publishing
 

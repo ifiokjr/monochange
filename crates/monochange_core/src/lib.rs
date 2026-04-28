@@ -2048,7 +2048,9 @@ impl CliStepDefinition {
 			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package"]),
 			Self::PublishPackages { .. } => Some(&["format", "package", "readiness"]),
-			Self::PlanPublishRateLimits { .. } => Some(&["format", "mode", "package", "ci"]),
+			Self::PlanPublishRateLimits { .. } => {
+				Some(&["format", "mode", "package", "ci", "readiness"])
+			}
 			Self::CreateChangeFile { .. } => {
 				Some(&[
 					"interactive",
@@ -2161,6 +2163,7 @@ impl CliStepDefinition {
 			Self::PlanPublishRateLimits { .. } => {
 				match name {
 					"package" => Some(CliInputKind::StringList),
+					"readiness" => Some(CliInputKind::Path),
 					"format" | "mode" | "ci" => Some(CliInputKind::Choice),
 					_ => None,
 				}

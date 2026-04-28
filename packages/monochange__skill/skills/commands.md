@@ -93,6 +93,7 @@ mc release --dry-run --format json
 mc commit-release --dry-run --diff
 mc publish --dry-run --format json
 mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish --readiness .monochange/readiness.json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
@@ -148,7 +149,7 @@ Then choose the next step:
 
 - `mc release` to apply
 - `mc commit-release` to produce the local release commit
-- `mc publish-readiness --from HEAD --output <path>` and `mc publish --readiness <path>` to publish package artifacts
+- `mc publish-readiness --from HEAD --output <path>`, `mc publish-plan --readiness <path>`, and `mc publish --readiness <path>` to plan and publish package artifacts
 - `mc publish-release` to create provider releases
 - `mc release-pr` to update a release request instead
 

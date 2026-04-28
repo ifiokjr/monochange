@@ -1219,7 +1219,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 		inputs: BTreeMap::new(),
 	};
 	let names = plan.valid_input_names().unwrap();
-	for expected in ["format", "mode", "package", "ci"] {
+	for expected in ["format", "mode", "package", "ci", "readiness"] {
 		assert!(names.contains(&expected), "missing: {expected}");
 	}
 }
@@ -1380,6 +1380,10 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		Some(CliInputKind::StringList)
 	);
 	assert_eq!(plan.expected_input_kind("ci"), Some(CliInputKind::Choice));
+	assert_eq!(
+		plan.expected_input_kind("readiness"),
+		Some(CliInputKind::Path)
+	);
 	assert_eq!(plan.expected_input_kind("unknown"), None);
 }
 
