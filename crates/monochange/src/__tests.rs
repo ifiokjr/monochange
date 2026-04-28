@@ -70,6 +70,83 @@ where
 }
 
 #[test]
+fn verify_release_branch_step_reports_matching_branch() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases]
+branches = ["main"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	git_in_temp_repo(tempdir.path(), &["init", "-b", "main"]);
+	git_in_temp_repo(
+		tempdir.path(),
+		&["config", "user.email", "test@example.com"],
+	);
+	git_in_temp_repo(tempdir.path(), &["config", "user.name", "Test User"]);
+	git_in_temp_repo(tempdir.path(), &["config", "commit.gpgsign", "false"]);
+	fs::write(tempdir.path().join("README.md"), "release branch\n")
+		.unwrap_or_else(|error| panic!("write readme: {error}"));
+	git_in_temp_repo(tempdir.path(), &["add", "."]);
+	git_in_temp_repo(tempdir.path(), &["commit", "-m", "initial"]);
+	git_in_temp_repo(tempdir.path(), &["tag", "v1.0.0"]);
+
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("step:verify-release-branch"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("verify release branch: {error}"));
+
+	assert!(output.contains("release branch verified"));
+	assert!(output.contains("main"));
+
+	let tag_output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("step:verify-release-branch"),
+			OsString::from("--from"),
+			OsString::from("v1.0.0"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("verify release branch tag: {error}"));
+	assert!(tag_output.contains("v1.0.0"));
+}
+
+#[test]
+fn verify_release_branch_step_requires_source_configuration() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(tempdir.path().join("monochange.toml"), "")
+		.unwrap_or_else(|error| panic!("write config: {error}"));
+	git_in_temp_repo(tempdir.path(), &["init", "-b", "main"]);
+
+	let error = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("step:verify-release-branch"),
+		],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected source configuration error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("`VerifyReleaseBranch` requires `[source]` configuration")
+	);
+}
+
+#[test]
 fn shared_fs_test_support_current_test_name_covers_plain_and_case_prefixes() {
 	assert_eq!(
 		current_test_name(),
@@ -6268,7 +6345,7 @@ fn execute_release_retarget_delegates_github_provider_sync() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some() || std::env::var_os("CARGO_LLVM_COV").is_some())]
 fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -6308,6 +6385,7 @@ fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 		.unwrap_or_else(|error| panic!("write second release file: {error}"));
 	git_in_temp_repo(&repo, &["add", "release.txt"]);
 	git_in_temp_repo(&repo, &["commit", "-m", "second"]);
+	let target_commit = git_output_in_temp_repo(&repo, &["rev-parse", "HEAD"]);
 	let discovery = monochange_core::ReleaseRecordDiscovery {
 		input_ref: "v1.2.3".to_string(),
 		resolved_commit: record_commit.clone(),
@@ -6315,8 +6393,9 @@ fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	let result = crate::retarget_release(&repo, &discovery, "HEAD", false, false, false, None)
-		.unwrap_or_else(|error| panic!("retarget release: {error}"));
+	let result =
+		crate::retarget_release(&repo, &discovery, &target_commit, false, false, false, None)
+			.unwrap_or_else(|error| panic!("retarget release: {error}"));
 	assert_eq!(result.git_tag_results.len(), 1);
 }
 
@@ -11713,7 +11792,18 @@ fn build_issue_comment_results_includes_closed_operation() {
 #[test]
 fn execute_cli_command_publish_release_falls_back_to_release_record_from_git() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	write_blank_monochange_config(tempdir.path());
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases]
+branches = ["release/*"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
 		.args(["init", "-b", "main"])
@@ -11729,6 +11819,11 @@ fn execute_cli_command_publish_release_falls_back_to_release_record_from_git() {
 		.args(["config", "user.name", "Test User"])
 		.output()
 		.unwrap_or_else(|error| panic!("git config name: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "commit.gpgsign", "false"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config signing: {error}"));
 	fs::write(tempdir.path().join("tracked.txt"), "test\n")
 		.unwrap_or_else(|error| panic!("write tracked: {error}"));
 	std::process::Command::new("git")
@@ -11824,14 +11919,14 @@ fn execute_cli_command_publish_release_falls_back_to_release_record_from_git() {
 		tempdir.path(),
 		&configuration,
 		&cli_command,
-		true,
+		false,
 		BTreeMap::new(),
 	);
-	// It will fail because there's no source configured, but it should get past the fallback
+	// It will fail on release branch policy, but it should get past the fallback.
 	let error = result.err().unwrap_or_else(|| panic!("expected error"));
 	let message = error.to_string();
 	assert!(
-		message.contains("source") || message.contains("publish"),
+		message.contains("configured release branch pattern [release/*]"),
 		"unexpected error: {message}"
 	);
 }

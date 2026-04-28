@@ -778,6 +778,7 @@ mod tests {
 				prerelease: false,
 				generate_notes: false,
 				source: ProviderReleaseNotesSource::GitHubGenerated,
+				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
 			bot: ProviderBotSettings::default(),
@@ -810,6 +811,7 @@ mod tests {
 				prerelease: false,
 				generate_notes: false,
 				source: ProviderReleaseNotesSource::Monochange,
+				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
 			bot: ProviderBotSettings::default(),
@@ -858,6 +860,7 @@ mod tests {
 				prerelease: false,
 				generate_notes: false,
 				source: ProviderReleaseNotesSource::Monochange,
+				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
 			bot: ProviderBotSettings::default(),
@@ -888,6 +891,7 @@ mod tests {
 				prerelease: false,
 				generate_notes: false,
 				source: ProviderReleaseNotesSource::Monochange,
+				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
 			bot: ProviderBotSettings::default(),

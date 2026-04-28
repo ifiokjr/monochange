@@ -49,6 +49,12 @@ draft = false
 prerelease = false
 source = "monochange"
 
+[source.releases]
+branches = ["main", "release/*"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
+
 [source.pull_requests]
 enabled = true
 branch_prefix = "monochange/release"

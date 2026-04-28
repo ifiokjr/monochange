@@ -304,6 +304,7 @@ mod prepared_release_cache;
 mod publish_rate_limits;
 mod publish_readiness;
 mod release_artifacts;
+mod release_branch_policy;
 mod release_record;
 mod skill;
 mod subagents;
@@ -914,6 +915,7 @@ where
 			publish_readiness::run_publish_readiness(root, &configuration, &options)
 		}
 		Some(("tag-release", tag_release_matches)) => {
+			let configuration = configuration?;
 			let from = tag_release_matches
 				.get_one::<String>("from")
 				.map(String::as_str)
@@ -927,6 +929,8 @@ where
 				.get_one::<String>("push")
 				.is_none_or(|value| value == "true");
 			let dry_run = quiet || tag_release_matches.get_flag("dry-run");
+			#[rustfmt::skip]
+			release_branch_policy::verify_release_ref_for_tags(root, configuration.source.as_ref(), from)?;
 			render_release_tag_report(root, from, format, push, dry_run)
 		}
 		Some(("check", check_matches)) => {

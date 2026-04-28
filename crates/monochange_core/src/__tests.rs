@@ -16,6 +16,7 @@ use crate::ChangelogSettings;
 use crate::ChangelogTarget;
 use crate::ChangesetPolicyStatus;
 use crate::ChangesetVerificationSettings;
+use crate::CliInputKind;
 use crate::CliStepDefinition;
 use crate::DependencyKind;
 use crate::Ecosystem;
@@ -1170,6 +1171,18 @@ fn valid_input_names_returns_empty_for_commit_release() {
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.valid_input_names(), Some(["no_verify"].as_slice()));
+}
+
+#[test]
+fn valid_input_names_returns_from_for_verify_release_branch() {
+	let step = CliStepDefinition::VerifyReleaseBranch {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(step.valid_input_names(), Some(["from"].as_slice()));
+	assert_eq!(step.expected_input_kind("from"), Some(CliInputKind::String));
+	assert_eq!(step.expected_input_kind("unknown"), None);
 }
 
 #[test]
