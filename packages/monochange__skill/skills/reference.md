@@ -10,6 +10,7 @@ Use it when a repository needs one release-planning model across:
 - npm / pnpm / Bun
 - Deno
 - Dart / Flutter
+- Python
 
 It discovers packages, normalizes dependency relationships, applies package and group rules from `monochange.toml`, reads explicit `.changeset/*.md` files, and turns those inputs into deterministic release plans.
 
@@ -440,7 +441,8 @@ Lockfile refresh is command-driven. monochange infers defaults when not configur
 
 - Cargo: `cargo generate-lockfile`
 - npm-family: detects owned lockfiles and runs the matching command (`npm install --package-lock-only`, `pnpm install --lockfile-only`, `bun install --lockfile-only`)
-- Dart / Flutter: `dart pub get` or `flutter pub get`
+- Dart / Flutter: direct `pubspec.lock` updates by default; configure `dart pub get` or `flutter pub get` when needed
+- Python: `uv.lock` infers `uv lock`, `poetry.lock` infers `poetry lock --no-update`, and unknown Python lockfiles are skipped
 - Deno: no inferred default
 
 Explicit configuration overrides inference:
@@ -469,6 +471,8 @@ Built-in package publishing currently supports only the canonical public registr
 - npm packages → `npm`
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
+
+Python package discovery and release planning are supported, but PyPI publishing is not built in yet. Use `mode = "external"` for Python, private registries, or unsupported publishing flows.
 
 For Cargo, readiness uses the current `Cargo.toml` as a pre-mutation guard. Built-in crates.io publishing is blocked by `publish = false`, by `publish = [...]` when the list omits `crates-io`, by a missing `description`, or by a missing `license`/`license-file`. Workspace-inherited `description`, `license`, and `license-file` values are accepted.
 

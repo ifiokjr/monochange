@@ -164,20 +164,21 @@ These are the commands most repositories use after running `mc init`. With the n
 
 <!-- {=projectCapabilityMatrix} -->
 
-| Capability                                                               | Current status                                                                               |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter                                                     |
-| Package release planning                                                 | Built in                                                                                     |
-| Grouped/shared versioning                                                | Built in                                                                                     |
-| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                                   |
-| Durable release history and post-merge tagging                           | Built in via `ReleaseRecord`, `mc release-record`, `mc tag-release`, and `mc repair-release` |
-| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                                        |
-| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                                        |
-| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`                                                         |
-| GitHub npm trusted-publishing automation                                 | Built in                                                                                     |
-| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                                   |
-| GitLab trusted-publishing auto-derivation                                | Not built in today                                                                           |
-| Release-retarget sync for hosted releases                                | GitHub first                                                                                 |
+| Capability                                                               | Current status                                                                                |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, Python                                              |
+| Package release planning                                                 | Built in                                                                                      |
+| Grouped/shared versioning                                                | Built in                                                                                      |
+| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                                    |
+| Durable release history and post-merge tagging                           | Built in via `ReleaseRecord`, `mc release-record`, `mc tag-release`, and `mc repair-release`  |
+| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                                         |
+| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                                         |
+| Python release planning                                                  | Built in for discovery, version rewrites, dependency rewrites, and lockfile command inference |
+| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`; use external mode for PyPI and custom registries        |
+| GitHub npm trusted-publishing automation                                 | Built in                                                                                      |
+| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                                    |
+| GitLab trusted-publishing auto-derivation                                | Not built in today                                                                            |
+| Release-retarget sync for hosted releases                                | GitHub first                                                                                  |
 
 <!-- {/projectCapabilityMatrix} -->
 

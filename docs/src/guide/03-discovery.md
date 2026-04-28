@@ -1,6 +1,6 @@
 # Discovery
 
-`monochange` discovers packages from native manifests and workspace definitions.
+`monochange` discovers packages from native manifests and workspace definitions. For a capability-by-capability comparison of each adapter, see [Ecosystems](./ecosystems.md).
 
 Supported sources today:
 

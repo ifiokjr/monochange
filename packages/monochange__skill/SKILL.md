@@ -159,12 +159,12 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 
 ### Lockfile commands
 
-Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, and Dart/Flutter. Explicit configuration overrides inference.
+Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, Dart/Flutter, and Python (`uv lock` / `poetry lock --no-update`). Explicit configuration overrides inference.
 
 ### Publishing and trust
 
 - Package publishing is configured through `publish` on packages and ecosystems.
-- Built-in publishing currently supports only the canonical public registries: `crates.io`, `npm`, `jsr`, and `pub.dev`.
+- Built-in publishing currently supports only the canonical public registries: `crates.io`, `npm`, `jsr`, and `pub.dev`. Python packages are release-planned but PyPI publishing should use `mode = "external"` or custom CI today.
 - `mc publish-readiness` blocks built-in Cargo publishes to crates.io when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`. Workspace-inherited Cargo metadata is accepted.
 - `mc publish-plan --readiness <path>` validates a readiness artifact for the current release record and excludes package ids that are not ready in both the artifact and the fresh local readiness check. Placeholder planning does not accept readiness artifacts.
 - `mc placeholder-publish` exists for first-release bootstrap. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
