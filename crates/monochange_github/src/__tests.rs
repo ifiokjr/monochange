@@ -952,7 +952,7 @@ fn publish_release_pull_request_can_enable_auto_merge() {
 		when.method(POST).path("/graphql");
 		then.status(200)
 			.header("content-type", "application/json")
-			.body("{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":8}}}");
+			.body("{\"data\":{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":8}}}}");
 	});
 	let mut request = sample_pull_request_request();
 	request.auto_merge = true;
@@ -1364,7 +1364,7 @@ fn publish_release_pull_request_marks_matching_auto_merge_request_as_updated() {
 		when.method(POST).path("/graphql");
 		then.status(200)
 			.header("content-type", "application/json")
-			.body("{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":9}}}");
+			.body("{\"data\":{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":9}}}}");
 	});
 	let mut request = sample_pull_request_request();
 	request.auto_merge = true;
@@ -1473,7 +1473,7 @@ fn publish_release_pull_request_reports_auto_merge_payload_errors() {
 		when.method(POST).path("/graphql");
 		then.status(200)
 			.header("content-type", "application/json")
-			.body("{\"enablePullRequestAutoMerge\":null}");
+			.body("{\"data\":{\"enablePullRequestAutoMerge\":null}}");
 	});
 	let mut request = sample_pull_request_request();
 	request.auto_merge = true;
@@ -1832,7 +1832,7 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}"#,
+				r#"{"data":{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}}"#,
 			);
 	});
 	let github = SourceConfiguration {
@@ -2137,7 +2137,7 @@ fn batch_review_request_lookup_reports_missing_repository_payload_and_parses_bod
 		then.status(200)
 			.header("content-type", "application/json")
 			.body(
-				r#"{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7, #9 and owner/repo#11\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}"#,
+				r#"{"data":{"repository":{"commit_0":{"associatedPullRequests":{"nodes":[{"number":42,"title":"Add release context","url":"https://example.com/pulls/42","body":"Closes #7, #9 and owner/repo#11\nRefs #8","author":{"login":"ifiokjr","url":"https://example.com/users/1"}}]}}}}}"#,
 			);
 	});
 	github_runtime()
