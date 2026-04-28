@@ -145,6 +145,7 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("step:plan-publish-rate-limits"));
 	assert!(output.contains("step:retarget-release"));
 	assert!(output.contains("release-record"));
+	assert!(output.contains("publish-bootstrap"));
 	assert!(output.contains("tag-release"));
 }
 
@@ -598,6 +599,109 @@ fn publish_readiness_dispatches_from_release_record_and_writes_artifact() {
 	assert!(artifact.contains("\"status\": \"ready\""));
 	assert!(artifact.contains("\"from\": \"HEAD\""));
 	assert!(artifact.contains("\"packages\": []"));
+}
+
+#[test]
+fn publish_bootstrap_dispatches_from_release_record_and_writes_artifact() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	create_release_record_commit(root);
+	let output_path = root.join(".monochange/bootstrap-result.json");
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("publish-bootstrap"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--package"),
+			OsString::from("missing"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("text"),
+			OsString::from("--output"),
+			output_path.clone().into_os_string(),
+		],
+	)
+	.unwrap_or_else(|error| panic!("publish-bootstrap output: {error}"));
+
+	assert!(output.contains("publish bootstrap: planned"));
+	assert!(output.contains("release ref: HEAD"));
+	assert!(output.contains("dry-run: yes"));
+	assert!(output.contains("packages: none"));
+
+	let artifact = fs::read_to_string(&output_path)
+		.unwrap_or_else(|error| panic!("read bootstrap artifact: {error}"));
+	assert!(artifact.contains("\"kind\": \"monochange.publishBootstrap\""));
+	assert!(artifact.contains("\"status\": \"planned\""));
+	assert!(artifact.contains("\"from\": \"HEAD\""));
+	assert!(artifact.contains("\"selectedPackages\": []"));
+}
+
+#[test]
+fn publish_bootstrap_dispatches_with_release_record_package_publications() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	create_release_record_commit_with_package_publication(root, "missing");
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("publish-bootstrap"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--package"),
+			OsString::from("missing"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("publish-bootstrap output: {error}"));
+
+	assert!(output.contains("\"selectedPackages\": [\n    \"missing\"\n  ]"));
+	assert!(output.contains("\"packages\": []"));
+}
+
+#[test]
+fn publish_bootstrap_propagates_placeholder_publish_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	create_release_record_commit_with_package_publication(root, "missing");
+	fs::create_dir_all(root.join("crates/missing/src"))
+		.unwrap_or_else(|error| panic!("create package source: {error}"));
+	fs::write(
+		root.join("crates/missing/Cargo.toml"),
+		"[package]\nname = \"missing\"\nversion = \"1.2.3\"\nedition = \"2021\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		root.join("crates/missing/src/lib.rs"),
+		"pub fn value() -> u8 { 1 }\n",
+	)
+	.unwrap_or_else(|error| panic!("write package source: {error}"));
+	fs::write(
+		root.join("monochange.toml"),
+		"[package.missing]\npath = \"crates/missing\"\ntype = \"cargo\"\n\n[package.missing.publish.placeholder]\nreadme_file = \"missing-placeholder.md\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange config: {error}"));
+
+	let error = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("publish-bootstrap"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--package"),
+			OsString::from("missing"),
+			OsString::from("--dry-run"),
+		],
+	)
+	.unwrap_err()
+	.to_string();
+
+	assert!(error.contains("failed to read placeholder README"));
 }
 
 #[test]
@@ -8668,13 +8772,35 @@ fn create_release_record_history(root: &Path) {
 }
 
 fn create_release_record_commit(root: &Path) -> String {
+	let record = sample_release_record_for_retarget();
+	create_release_record_commit_from_record(root, &record)
+}
+
+fn create_release_record_commit_with_package_publication(root: &Path, package: &str) -> String {
+	let mut record = sample_release_record_for_retarget();
+	record.package_publications = vec![monochange_core::PackagePublicationTarget {
+		package: package.to_string(),
+		ecosystem: Ecosystem::Cargo,
+		registry: Some(monochange_core::PublishRegistry::Builtin(
+			monochange_core::RegistryKind::CratesIo,
+		)),
+		version: "1.2.3".to_string(),
+		mode: monochange_core::PublishMode::Builtin,
+		trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+	}];
+	create_release_record_commit_from_record(root, &record)
+}
+
+fn create_release_record_commit_from_record(
+	root: &Path,
+	record: &monochange_core::ReleaseRecord,
+) -> String {
 	init_git_repo(root);
 	write_blank_monochange_config(root);
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git_in_temp_repo(root, &["add", "monochange.toml", "release.txt"]);
-	let record = sample_release_record_for_retarget();
-	let release_record = monochange_core::render_release_record_block(&record)
+	let release_record = monochange_core::render_release_record_block(record)
 		.unwrap_or_else(|error| panic!("render release record: {error}"));
 	git_in_temp_repo(
 		root,

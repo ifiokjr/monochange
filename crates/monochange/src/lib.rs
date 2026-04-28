@@ -301,6 +301,7 @@ mod lint_check_reporter;
 mod mcp;
 mod package_publish;
 mod prepared_release_cache;
+mod publish_bootstrap;
 mod publish_rate_limits;
 mod publish_readiness;
 mod release_artifacts;
@@ -912,6 +913,35 @@ where
 				output,
 			};
 			publish_readiness::run_publish_readiness(root, &configuration, &options)
+		}
+		Some(("publish-bootstrap", publish_bootstrap_matches)) => {
+			let configuration = configuration?;
+			let from = publish_bootstrap_matches
+				.get_one::<String>("from")
+				.cloned()
+				.ok_or(MonochangeError::Config(
+					"missing publish-bootstrap ref".to_string(),
+				))?;
+			let selected_packages = publish_bootstrap_matches
+				.get_many::<String>("package")
+				.map(|values| values.cloned().collect::<BTreeSet<_>>())
+				.unwrap_or_default();
+			let format = publish_bootstrap_matches
+				.get_one::<String>("format")
+				.map_or(Ok(OutputFormat::Markdown), |value| {
+					parse_output_format(value)
+				})?;
+			let output = publish_bootstrap_matches
+				.get_one::<String>("output")
+				.map(PathBuf::from);
+			let options = publish_bootstrap::PublishBootstrapOptions {
+				from,
+				selected_packages,
+				format,
+				output,
+				dry_run: quiet || publish_bootstrap_matches.get_flag("dry-run"),
+			};
+			publish_bootstrap::run_publish_bootstrap(root, &configuration, &options)
 		}
 		Some(("tag-release", tag_release_matches)) => {
 			let from = tag_release_matches

@@ -459,7 +459,8 @@ lockfile_commands = [
 
 Package publishing is separate from provider release publishing:
 
-- `mc placeholder-publish` bootstraps missing registry packages with placeholder `0.0.0` releases
+- `mc publish-bootstrap --from HEAD --output <path>` bootstraps release-record packages with placeholder `0.0.0` releases and writes a JSON result artifact
+- `mc placeholder-publish` is the lower-level command for reserving missing registry packages outside a release-scoped bootstrap flow
 - `mc publish-readiness --from HEAD --output <path>` checks package-registry readiness from release state
 - `mc publish-plan --readiness <path>` validates readiness for planning and excludes non-ready package ids from rate-limit batches
 - `mc publish --readiness <path>` validates readiness and runs built-in package-registry publishing

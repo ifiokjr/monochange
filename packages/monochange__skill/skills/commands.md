@@ -72,17 +72,17 @@ mc step:affected-packages --verify --changed-paths crates/monochange/src/lib.rs 
 
 ### Plan or execute a release
 
-| Goal                                      | Command                          | When to use it                                                           |
-| ----------------------------------------- | -------------------------------- | ------------------------------------------------------------------------ |
-| Preview a release safely                  | `mc release --dry-run`           | You want the computed plan without mutating files                        |
-| Preview file diffs too                    | `mc release --dry-run --diff`    | You want to see version/changelog patches before applying them           |
-| Apply the release locally                 | `mc release`                     | You are ready to update files on disk                                    |
-| Create a release commit locally           | `mc commit-release`              | You want the prepared commit before provider publishing                  |
-| Publish package artifacts                 | `mc publish --readiness <path>`  | Built-in package publishing is configured and readiness passed           |
-| Create provider releases                  | `mc publish-release`             | Source/provider publishing is configured                                 |
-| Open or update a release PR               | `mc release-pr`                  | You want provider-hosted release-request automation                      |
-| Publish placeholders for missing packages | `mc placeholder-publish`         | A package must exist in the public registry before automation can finish |
-| Retarget a recent release                 | `mc repair-release --from <ref>` | A just-created release needs to move forward to a later commit           |
+| Goal                            | Command                            | When to use it                                                                   |
+| ------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------- |
+| Preview a release safely        | `mc release --dry-run`             | You want the computed plan without mutating files                                |
+| Preview file diffs too          | `mc release --dry-run --diff`      | You want to see version/changelog patches before applying them                   |
+| Apply the release locally       | `mc release`                       | You are ready to update files on disk                                            |
+| Create a release commit locally | `mc commit-release`                | You want the prepared commit before provider publishing                          |
+| Publish package artifacts       | `mc publish --readiness <path>`    | Built-in package publishing is configured and readiness passed                   |
+| Create provider releases        | `mc publish-release`               | Source/provider publishing is configured                                         |
+| Open or update a release PR     | `mc release-pr`                    | You want provider-hosted release-request automation                              |
+| Bootstrap release packages      | `mc publish-bootstrap --from HEAD` | A release package must exist in the public registry before automation can finish |
+| Retarget a recent release       | `mc repair-release --from <ref>`   | A just-created release needs to move forward to a later commit                   |
 
 Examples:
 
@@ -92,6 +92,8 @@ mc release --dry-run --diff
 mc release --dry-run --format json
 mc commit-release --dry-run --diff
 mc publish --dry-run --format json
+mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
 mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish --readiness .monochange/readiness.json
@@ -149,7 +151,7 @@ Then choose the next step:
 
 - `mc release` to apply
 - `mc commit-release` to produce the local release commit
-- `mc publish-readiness --from HEAD --output <path>`, `mc publish-plan --readiness <path>`, and `mc publish --readiness <path>` to plan and publish package artifacts
+- `mc publish-readiness --from HEAD --output <path>`, optional `mc publish-bootstrap --from HEAD --output <path>`, `mc publish-plan --readiness <path>`, and `mc publish --readiness <path>` to plan/bootstrap/publish package artifacts
 - `mc publish-release` to create provider releases
 - `mc release-pr` to update a release request instead
 

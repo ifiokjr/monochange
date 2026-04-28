@@ -207,6 +207,7 @@ When provided, the generated config includes:\n\
 			.subcommand(build_analyze_subcommand())
 			.subcommand(build_release_record_subcommand())
 			.subcommand(build_publish_readiness_subcommand())
+			.subcommand(build_publish_bootstrap_subcommand())
 			.subcommand(build_tag_release_subcommand())
 			.subcommand(build_lint_subcommand())
 			.subcommand(Command::new("mcp").about(
@@ -459,6 +460,58 @@ Readiness notes:
 				.long("output")
 				.help("Write a JSON readiness artifact to this path")
 				.value_name("PATH"),
+		)
+		.arg(
+			Arg::new("format")
+				.long("format")
+				.help("Output format")
+				.default_value("markdown")
+				.value_parser(["text", "json", "markdown", "md"]),
+		)
+}
+
+pub(crate) fn build_publish_bootstrap_subcommand() -> Command {
+	Command::new("publish-bootstrap")
+		.about("Publish first-time placeholder package versions for a release record")
+		.after_help(
+			r"Examples:
+  mc publish-bootstrap --from HEAD --dry-run
+  mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
+  mc publish-bootstrap --from HEAD --package core --format json
+
+Bootstrap notes:
+  - Uses the release record at the supplied ref to select package ids.
+  - Publishes missing placeholder versions only; existing placeholders are skipped as resumable.
+  - Run `mc publish-readiness` again after bootstrap before real package publishing.",
+		)
+		.arg(
+			Arg::new("from")
+				.long("from")
+				.required(true)
+				.value_name("REF")
+				.help("Tag or commit-ish used to locate the release record"),
+		)
+		.arg(
+			Arg::new("package")
+				.long("package")
+				.short('p')
+				.help(
+					"Limit bootstrap publishing to one or more package ids from the release record",
+				)
+				.value_name("PACKAGE")
+				.action(ArgAction::Append),
+		)
+		.arg(
+			Arg::new("output")
+				.long("output")
+				.help("Write a JSON publish bootstrap result artifact to this path")
+				.value_name("PATH"),
+		)
+		.arg(
+			Arg::new("dry-run")
+				.long("dry-run")
+				.help("Plan placeholder publication without publishing packages")
+				.action(ArgAction::SetTrue),
 		)
 		.arg(
 			Arg::new("format")

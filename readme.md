@@ -151,14 +151,14 @@ These are the commands most repositories use after running `mc init`. With the n
 | Check package publish readiness  | `mc publish-readiness --from HEAD --output <path>`          | You need a validated readiness artifact before package publication                                       |
 | Plan ready package publishing    | `mc publish-plan --readiness <path>`                        | You want rate-limit batches that exclude non-ready package work                                          |
 | Publish packages to registries   | `mc publish --readiness <path>`                             | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
-| Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
+| Bootstrap release packages       | `mc publish-bootstrap --from HEAD --output <path>`          | You need a release-record-scoped placeholder bootstrap artifact before rerunning readiness               |
 | Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
 | Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
 | Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
 
 <!-- {/projectCommandAutomationMatrix} -->
 
-`mc publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking when the readiness artifact still matches the current package set. `mc publish-plan --readiness <path>` validates the same artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check.
+`mc publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking when the readiness artifact still matches the current package set. `mc publish-plan --readiness <path>` validates the same artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check. If readiness shows missing first-time registry packages, run `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json`, then rerun readiness before real publishing.
 
 ## Capability matrix
 
@@ -320,6 +320,8 @@ mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc release-record --from v1.2.3
 mc tag-release --from HEAD --dry-run --format json
+mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
 mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish --readiness .monochange/readiness.json

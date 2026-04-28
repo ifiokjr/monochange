@@ -25,7 +25,7 @@ These are the commands most repositories use after running `mc init`. With the n
 | Check package publish readiness  | `mc publish-readiness --from HEAD --output <path>`          | You need a validated readiness artifact before package publication                                       |
 | Plan ready package publishing    | `mc publish-plan --readiness <path>`                        | You want rate-limit batches that exclude non-ready package work                                          |
 | Publish packages to registries   | `mc publish --readiness <path>`                             | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
-| Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
+| Bootstrap release packages       | `mc publish-bootstrap --from HEAD --output <path>`          | You need a release-record-scoped placeholder bootstrap artifact before rerunning readiness               |
 | Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
 | Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
 | Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
@@ -45,7 +45,7 @@ A practical rule of thumb:
 monochange has three related but different automation layers:
 
 1. **Release planning** — `mc release --dry-run`, `mc release`, `mc diagnostics`
-2. **Package registries** — `mc placeholder-publish`, `mc publish-readiness`, `mc publish-plan --readiness <path>`, `mc publish --readiness <path>`
+2. **Package registries** — `mc publish-readiness`, `mc publish-bootstrap --from HEAD`, `mc publish-plan --readiness <path>`, `mc publish --readiness <path>`, and lower-level `mc placeholder-publish`
 3. **Hosted providers** — `mc release-pr`, `mc publish-release`, `mc repair-release`
 
 Keeping those layers separate is important. Package publication and hosted-release publication are not the same job.
@@ -94,9 +94,9 @@ For GitHub Actions, the most common structure is:
 4. that workflow creates the declared tags and publishes packages from the durable release commit
 5. hosted release objects or extra assets come either from downstream tag-driven workflows or from a separate workflow that still uses `mc publish-release`
 
-The important current implementation detail is that `mc publish-readiness` can write a readiness artifact from the `ReleaseRecord` on `HEAD`, `mc publish --readiness <path>` can validate that artifact before package registry mutation, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state when you want a manifest-driven hosted-release job.
+The important current implementation detail is that `mc publish-readiness` can write a readiness artifact from the `ReleaseRecord` on `HEAD`, `mc publish-bootstrap --from HEAD --output <path>` can run release-record-scoped first-time placeholder setup and record the result, `mc publish --readiness <path>` can validate readiness before package registry mutation, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state when you want a manifest-driven hosted-release job.
 
-If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection, then run `mc publish-readiness --from HEAD --output <path>`, optionally inspect `mc publish-plan --readiness <path>`, and finally run `mc publish --readiness <path>`.
+If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection, then run `mc publish-readiness --from HEAD --output <path>`, use `mc publish-bootstrap --from HEAD --output <path>` only when first-time package setup is required, optionally inspect `mc publish-plan --readiness <path>`, and finally run `mc publish --readiness <path>`.
 
 ### GitHub + npm trusted publishing
 
@@ -275,7 +275,7 @@ Important current behavior:
 Recommended setup:
 
 1. configure `trusted_publishing = true`
-2. bootstrap missing packages with `mc placeholder-publish` if needed
+2. bootstrap missing release packages with `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json` if needed, then rerun readiness
 3. manually enroll the repository/workflow in `crates.io`
 4. choose either:
    - `mode = "builtin"` and let monochange own the publish command, or
@@ -734,7 +734,7 @@ Use this decision rule:
 - **Need a durable local release commit?** → use `mc commit-release`
 - **Need package registries after merge?** → detect `ReleaseRecord` on `HEAD`, run `mc tag-release --from HEAD`, then run `mc publish-readiness --from HEAD --output <path>` and `mc publish --readiness <path>`
 - **Need hosted provider releases from prepared release state?** → use `mc publish-release`
-- **Need to bootstrap a package that does not exist yet?** → use `mc placeholder-publish`
+- **Need to bootstrap release packages that do not exist yet?** → use `mc publish-bootstrap --from HEAD --output <path>`; reserve names outside a release with lower-level `mc placeholder-publish`
 - **Need GitHub npm trusted publishing with the least custom glue?** → use `trusted_publishing = true` with `mc publish-readiness` and `mc publish --readiness <path>`
 - **Need GitLab CI with custom auth/bootstrap?** → keep `mode = "external"` as the escape hatch
 

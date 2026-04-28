@@ -864,6 +864,66 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			see_also: &["publish-plan", "publish", "placeholder-publish"],
 		},
 		CommandHelp {
+			name: "publish-bootstrap",
+			summary: "Publish first-time placeholder package versions for a release record",
+			description: "Reads the package publications embedded in a release commit, narrows them with\
+				optional package filters, and runs placeholder publishing for that release package set.\
+				The command can write a JSON bootstrap result artifact for CI logs or manual retry\
+				notes. Use --dry-run first to inspect work without mutating registries.",
+			usage: "mc publish-bootstrap --from <REF> [OPTIONS]",
+			options: &[
+				(
+					"--from",
+					"<REF>",
+					"Tag or commit-ish used to locate the release record",
+				),
+				(
+					"--format",
+					"<FORMAT>",
+					"text, markdown, json (default: markdown)",
+				),
+				(
+					"--package",
+					"<PACKAGE>",
+					"Restrict to release-record package ids (repeatable)",
+				),
+				(
+					"--dry-run",
+					"",
+					"Preview placeholder publishing without publishing",
+				),
+				(
+					"--output",
+					"<PATH>",
+					"Write a JSON publish bootstrap result artifact",
+				),
+			],
+			examples: &[
+				(
+					"Preview bootstrap work:",
+					"mc publish-bootstrap --from HEAD --dry-run",
+				),
+				(
+					"Write a bootstrap result:",
+					"mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json",
+				),
+				(
+					"JSON for one package:",
+					"mc publish-bootstrap --from HEAD --package core --format json",
+				),
+			],
+			tips: &[
+				"Run mc publish-readiness again after bootstrap before mc publish.",
+				"Existing placeholder versions are skipped and treated as resumable.",
+			],
+			see_also: &[
+				"publish-readiness",
+				"publish-plan",
+				"publish",
+				"placeholder-publish",
+			],
+		},
+		CommandHelp {
 			name: "placeholder-publish",
 			summary: "Publish placeholder versions for missing registry packages",
 			description: "Packages that have never been published to their target registry (crates.io, \
@@ -1452,6 +1512,13 @@ mod tests {
 		let out = render_command_help("mc", "publish-readiness");
 		assert!(out.contains("publish-readiness"));
 		assert!(out.contains("readiness artifact"));
+	}
+
+	#[test]
+	fn render_command_help_for_publish_bootstrap() {
+		let out = render_command_help("mc", "publish-bootstrap");
+		assert!(out.contains("publish-bootstrap"));
+		assert!(out.contains("bootstrap result artifact"));
 	}
 
 	#[test]
