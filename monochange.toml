@@ -731,6 +731,7 @@ steps = [
 help_text = "Publish packages from this release using built-in publishing workflows"
 inputs = [
 	{ name = "package", type = "string_list" },
+	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; required when publishing for real" },
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 ]
 steps = [{ name = "publish packages", type = "PublishPackages" }]

@@ -1,6 +1,6 @@
 # Multi-package publishing patterns
 
-Use this guide when one repository publishes more than one public package and the publish workflow cannot be explained by a single generic `mc publish` example.
+Use this guide when one repository publishes more than one public package and the publish workflow cannot be explained by a single generic `mc publish-readiness` plus `mc publish --readiness` example.
 
 This is the practical companion to [trusted-publishing.md](./trusted-publishing.md).
 
@@ -19,7 +19,7 @@ A good default rollout is:
 2. decide which packages use built-in publishing and which use `mode = "external"`
 3. keep each registry's trusted-publishing enrollment aligned with the exact workflow, tag pattern, and working directory that will publish that package
 
-## Pattern 1: one post-merge `mc publish` job
+## Pattern 1: one post-merge `mc publish-readiness` and `mc publish --readiness` job
 
 Use this when most packages can stay on monochange's built-in publishing path.
 
@@ -55,7 +55,9 @@ jobs:
           fi
 
       - name: publish packages
-        run: devenv shell -- mc publish
+        run: |
+          devenv shell -- mc publish-readiness --from HEAD --output .monochange/readiness.json
+          devenv shell -- mc publish --readiness .monochange/readiness.json
 ```
 
 This is the best fit when:
@@ -163,12 +165,12 @@ This pattern is especially useful when multiple packages live in the same ecosys
 
 ## Registry-specific recommendations
 
-| Registry  | Recommended multi-package pattern                                    | Why                                                                   |
-| --------- | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| npm       | one post-merge `mc publish` job when possible                        | monochange can automate npm trusted-publishing setup on GitHub        |
-| crates.io | one job per crate when using external OIDC auth                      | trusted publishing is enrolled per crate and workflow context matters |
-| jsr       | built-in `mc publish` is often fine, but keep setup package-specific | registry linking is still manual today                                |
-| pub.dev   | package-specific tags and often one workflow per package             | automated publishing is tag-driven and package-specific               |
+| Registry  | Recommended multi-package pattern                                                                         | Why                                                                   |
+| --------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| npm       | one post-merge `mc publish-readiness` + `mc publish --readiness` job when possible                        | monochange can automate npm trusted-publishing setup on GitHub        |
+| crates.io | one job per crate when using external OIDC auth                                                           | trusted publishing is enrolled per crate and workflow context matters |
+| jsr       | built-in `mc publish-readiness` + `mc publish --readiness` is often fine, but keep setup package-specific | registry linking is still manual today                                |
+| pub.dev   | package-specific tags and often one workflow per package                                                  | automated publishing is tag-driven and package-specific               |
 
 ## Keep config, tags, and workflows aligned
 

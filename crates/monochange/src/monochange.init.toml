@@ -860,6 +860,7 @@ help_text = "Publish package versions from monochange release state using built-
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 	{ name = "package", type = "string_list" },
+	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; required when publishing for real" },
 ]
 steps = [{ name = "publish packages", type = "PublishPackages" }]
 

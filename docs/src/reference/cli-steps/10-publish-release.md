@@ -6,7 +6,7 @@
 
 For example, with a configured source provider it can create or update the outward release objects that correspond to monochange's prepared release targets.
 
-It does not publish package artifacts to registries. Package publishing lives in the built-in top-level `mc publish` and `mc placeholder-publish` commands.
+It does not publish package artifacts to registries. Package publishing lives in the built-in top-level `mc publish-readiness`, `mc publish --readiness <path>`, and `mc placeholder-publish` commands.
 
 ## Why use it
 
@@ -19,7 +19,7 @@ That gives you:
 - a typed boundary between planning and provider mutation
 - source-provider integration driven by the same manifest and release target model as the rest of monochange
 
-Use `mc publish` instead when you want monochange to run `cargo publish`, `pnpm publish`, `dart pub publish`, `flutter pub publish`, or `deno publish` style package-registry commands.
+Use `mc publish-readiness --from HEAD --output <path>` followed by `mc publish --readiness <path>` instead when you want monochange to run `cargo publish`, `pnpm publish`, `dart pub publish`, `flutter pub publish`, or `deno publish` style package-registry commands.
 
 ## Inputs
 

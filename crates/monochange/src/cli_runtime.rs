@@ -671,6 +671,12 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::PublishPackages { .. } => {
 					let selected_packages = selected_package_ids(&step_inputs);
+					if !context.dry_run {
+						let readiness_path =
+							required_publish_readiness_artifact_path(&step_inputs)?;
+						#[rustfmt::skip]
+						publish_readiness::validate_publish_readiness_artifact(root, configuration, context.prepared_release.as_ref(), &selected_packages, &readiness_path)?;
+					}
 					#[rustfmt::skip]
 					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Publish, context.dry_run)?;
 					if !context.dry_run {
@@ -1884,6 +1890,21 @@ fn selected_package_ids(inputs: &BTreeMap<String, Vec<String>>) -> BTreeSet<Stri
 		.flatten()
 		.map(ToString::to_string)
 		.collect()
+}
+
+fn required_publish_readiness_artifact_path(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<PathBuf> {
+	inputs
+		.get("readiness")
+		.and_then(|values| values.first())
+		.filter(|path| !path.trim().is_empty())
+		.map(PathBuf::from)
+		.ok_or_else(|| {
+			MonochangeError::Config(
+				"`PublishPackages` requires `--readiness <PATH>` when publishing; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
+			)
+		})
 }
 
 fn publish_rate_limit_mode_from_inputs(
@@ -4937,5 +4958,34 @@ path = "crates/core"
 				assert!(!stdout_supports_color());
 			},
 		);
+	}
+
+	#[test]
+	fn required_publish_readiness_artifact_path_rejects_missing_and_blank_values() {
+		let missing = BTreeMap::new();
+		let missing_error = required_publish_readiness_artifact_path(&missing)
+			.expect_err("missing readiness artifact path should fail");
+		assert!(
+			missing_error
+				.to_string()
+				.contains("requires `--readiness <PATH>`")
+		);
+
+		let blank = BTreeMap::from([("readiness".to_string(), vec!["  ".to_string()])]);
+		let blank_error = required_publish_readiness_artifact_path(&blank)
+			.expect_err("blank readiness artifact path should fail");
+		assert!(blank_error.to_string().contains("mc publish-readiness"));
+	}
+
+	#[test]
+	fn required_publish_readiness_artifact_path_returns_configured_path() {
+		let inputs = BTreeMap::from([(
+			"readiness".to_string(),
+			vec![".monochange/readiness.json".to_string()],
+		)]);
+		let path = required_publish_readiness_artifact_path(&inputs)
+			.unwrap_or_else(|error| panic!("readiness artifact path: {error}"));
+
+		assert_eq!(path, PathBuf::from(".monochange/readiness.json"));
 	}
 }

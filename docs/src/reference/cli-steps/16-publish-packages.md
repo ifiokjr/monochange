@@ -4,6 +4,8 @@
 
 `PublishPackages` publishes package versions to their target registries using monochange's built-in ecosystem workflows.
 
+For real (non-dry-run) publishes, the step first validates the configured `readiness` artifact from `mc publish-readiness --from HEAD --output <PATH>`. The artifact must be a ready monochange publish-readiness artifact for the same release record and selected package set before any registry mutation starts.
+
 For each package with a planned release version, the step:
 
 - resolves the registry from the package's publish configuration
@@ -32,6 +34,7 @@ Use `PlaceholderPublish` instead when you need to bootstrap a package that does 
 
 - `format` — `text`, `markdown`, or `json`
 - `package` — optional repeated package ids used to filter the publish set
+- `readiness` — path to the JSON artifact written by `mc publish-readiness`; required for real publishes and ignored by dry runs
 
 ## Step-level `when` condition
 
@@ -45,12 +48,13 @@ when = "{{ inputs.enabled }}"
 
 ## Prerequisites
 
-- a previous `PrepareRelease` step in the same command, or a release record discoverable from `HEAD` that contains the package publication targets
+- a release record discoverable from `HEAD` that contains the package publication targets
+- for real publishes, a readiness artifact generated from that same release record and package selection with `mc publish-readiness --from HEAD --output <PATH>`
 
 ## Side effects and outputs
 
-- in dry-run mode, plans and previews publish operations without touching registries
-- in normal mode, publishes package versions to their configured registries
+- in dry-run mode, plans and previews publish operations without touching registries and without requiring a readiness artifact
+- in normal mode, validates the readiness artifact before any registry mutation and then publishes package versions to their configured registries
 - contributes `publish.*` and `publish_rate_limits.*` template context to the command result
 
 ## Example
@@ -71,6 +75,11 @@ default = "text"
 name = "package"
 type = "string_list"
 
+[[cli.publish.inputs]]
+name = "readiness"
+type = "path"
+help_text = "JSON artifact from mc publish-readiness; required when publishing for real"
+
 [[cli.publish.steps]]
 name = "publish packages"
 type = "PublishPackages"
@@ -80,25 +89,16 @@ type = "PublishPackages"
 
 ## Composition ideas
 
-### Publish after preparing a release
+### Publish after checking readiness
 
-```toml
-[cli.release-and-publish]
-help_text = "Prepare a release and publish packages"
+Generate a readiness artifact from the merged release record first:
 
-[[cli.release-and-publish.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.release-and-publish.steps]]
-type = "PrepareRelease"
-
-[[cli.release-and-publish.steps]]
-name = "publish packages"
-type = "PublishPackages"
+```bash
+mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc publish --readiness .monochange/readiness.json
 ```
+
+Keep release preparation and real package publication as separate phases so the readiness artifact can be reviewed before registry mutation.
 
 ### Publish only a specific package
 
@@ -109,6 +109,11 @@ help_text = "Publish a specific package"
 [[cli.publish-core.inputs]]
 name = "package"
 type = "string_list"
+required = true
+
+[[cli.publish-core.inputs]]
+name = "readiness"
+type = "path"
 required = true
 
 [[cli.publish-core.steps]]
@@ -146,5 +151,6 @@ Because `PublishPackages` understands:
 ## Common mistakes
 
 - confusing `PublishPackages` with `PublishRelease`: the former publishes to package registries, the latter creates hosted provider releases (such as GitHub releases)
-- forgetting that `PublishPackages` needs a previous `PrepareRelease` step or a release record in `HEAD`
+- forgetting that real `PublishPackages` runs need a readiness artifact generated from the same `HEAD` release record and selected package set
+- rerunning `mc publish --package <id>` with a readiness artifact generated for a different package selection
 - running `PublishPackages` without rate-limit planning: use `PlanPublishRateLimits` first when you are unsure about registry windows

@@ -77,7 +77,8 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 | `mc change`                 | Create a `.changeset/*.md` file                                        |
 | `mc release`                | Prepare a release plan from changesets and refresh the cached manifest |
 | `mc placeholder-publish`    | Publish placeholder versions for packages missing from registries      |
-| `mc publish`                | Publish package artifacts using built-in registry workflows            |
+| `mc publish-readiness`      | Check package-registry readiness and write a validation artifact       |
+| `mc publish --readiness`    | Publish package artifacts using built-in registry workflows            |
 | `mc commit-release`         | Prepare a release and create a local commit                            |
 | `mc publish-release`        | Create provider releases                                               |
 | `mc release-pr`             | Open or update a release pull request                                  |
@@ -170,7 +171,7 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
 - Prefer the official GitHub publishing workflows for manual registries when they exist: `rust-lang/crates-io-auth-action@v1` for `crates.io` and `dart-lang/setup-dart/.github/workflows/publish.yml@v1` for `pub.dev`.
 - See [skills/trusted-publishing.md](skills/trusted-publishing.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
-- See [skills/multi-package-publishing.md](skills/multi-package-publishing.md) when one repository publishes multiple packages and you need to choose between shared `mc publish` flows, package-specific jobs, or external workflows.
+- See [skills/multi-package-publishing.md](skills/multi-package-publishing.md) when one repository publishes multiple packages and you need to choose between shared readiness-enforced `mc publish` flows, package-specific jobs, or external workflows.
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
 
 ### Release titles

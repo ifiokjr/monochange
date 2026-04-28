@@ -1210,7 +1210,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 	};
 	assert_eq!(
 		publish.valid_input_names(),
-		Some(["format", "package"].as_slice())
+		Some(["format", "package", "readiness"].as_slice())
 	);
 
 	let plan = CliStepDefinition::PlanPublishRateLimits {
@@ -1344,7 +1344,26 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		publish.expected_input_kind("package"),
 		Some(CliInputKind::StringList)
 	);
+	assert_eq!(
+		publish.expected_input_kind("readiness"),
+		Some(CliInputKind::Path)
+	);
 	assert_eq!(publish.expected_input_kind("unknown"), None);
+
+	let placeholder = CliStepDefinition::PlaceholderPublish {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		placeholder.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		placeholder.expected_input_kind("package"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(placeholder.expected_input_kind("readiness"), None);
 
 	let plan = CliStepDefinition::PlanPublishRateLimits {
 		name: None,

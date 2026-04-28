@@ -1,98 +1,101 @@
-# Publish readiness command
+# Publish readiness enforcement
 
 ## Status
 
-- Branch: `feat/publish-readiness-command`
-- Pull request: <https://github.com/monochange/monochange/pull/292>
-- Current slice: initial top-level, non-mutating `mc publish-readiness` command
+- Previous slice: `mc publish-readiness` shipped in PR #292.
+- Current branch: `feat/publish-readiness-enforcement`.
+- Current slice: require and validate a readiness artifact before real `mc publish` registry mutation.
 
 ## Problem
 
-Package publishing currently starts from release state and registry dry-run behavior without a standalone readiness artifact that CI can inspect before mutating registries. monochange needs a CLI-first readiness boundary so future publishing can fail early for blocked, stale, ambiguous, or unsupported package publish state.
+Package publishing now has a standalone, non-mutating readiness command, but `mc publish` can still start registry mutation without proving that readiness was checked against the same release record and package selection. monochange needs an explicit artifact boundary so CI can fail before mutation when readiness is missing, blocked, stale, malformed, or generated for a different package set.
 
 ## Scope
 
-This plan covers the first incremental slice:
+This slice covers the first enforcement step:
 
-- Add `mc publish-readiness` as a top-level command.
-- Reuse existing dry-run package publish checks to report initial readiness.
-- Support package filtering and machine-readable artifacts.
-- Document the command in CLI docs and command matrices.
-- Keep the implementation non-mutating.
+- Extend the publish-readiness JSON artifact with a schema version, kind, release-record commit metadata, and package-set fingerprint.
+- Add `readiness` as a publish workflow input.
+- Require `--readiness <PATH>` for real `PublishPackages` runs.
+- Keep `--dry-run` publish previews usable without a readiness artifact.
+- Validate artifact kind, schema, status, release-record commit, duplicate package entries, package fingerprint, and selected package set before registry mutation.
+- Treat already-published packages as non-blocking when the artifact and current readiness agree.
+- Update reference docs, CI guides, templates, and generated docs for the new publish flow.
 
 ## Non-goals for this slice
 
-- Require readiness artifacts from `mc publish`.
-- Add fingerprint/freshness validation.
-- Add `mc publish-bootstrap`.
-- Redesign `monochange/actions` publishing APIs.
-- Implement full ecosystem-specific blocker/remediation semantics.
+- Full config/manifests/lockfile hashing.
+- `mc publish-plan --readiness` integration.
+- `mc publish-bootstrap` or first-time placeholder orchestration changes.
+- `monochange/actions` publishing API redesign.
+- Cargo-specific metadata/remediation blockers beyond the existing dry-run publish checks.
 
 ## Affected files
 
-- `crates/monochange/src/cli.rs`
-- `crates/monochange/src/cli_help.rs`
-- `crates/monochange/src/lib.rs`
+- `crates/monochange/src/cli_runtime.rs`
+- `crates/monochange/src/monochange.init.toml`
 - `crates/monochange/src/package_publish.rs`
 - `crates/monochange/src/publish_readiness.rs`
-- `crates/monochange/tests/snapshots/`
+- `monochange.toml`
+- `.templates/cli-steps.t.md`
 - `.templates/project.t.md`
 - `readme.md`
 - `docs/src/readme.md`
+- `docs/src/guide/02-setup.md`
+- `docs/src/guide/07-trusted-publishing.md`
+- `docs/src/guide/08-github-automation.md`
 - `docs/src/guide/13-ci-and-publishing.md`
-- `.changeset/publish-readiness-command.md`
-- `tsconfig.json`
-- `devenv.nix`
+- `docs/src/guide/14-multi-package-publishing.md`
+- `docs/src/guide/15-publish-rate-limits.md`
+- `docs/src/reference/cli-steps/00-index.md`
+- `docs/src/reference/cli-steps/10-publish-release.md`
+- `docs/src/reference/cli-steps/16-publish-packages.md`
+- `.changeset/publish-readiness-enforcement.md`
 
 ## Checklist
 
-- [x] Create isolated worktree and branch `feat/publish-readiness-command`.
-- [x] Add `mc publish-readiness` CLI definition with `--from`, `--package`, `--output`, and `--format`.
-- [x] Wire command dispatch through `crates/monochange/src/lib.rs`.
-- [x] Refactor package publishing dry-run execution for reuse by release ref.
-- [x] Add `publish_readiness` report model and renderers for Markdown, text, and JSON.
-- [x] Map existing package publish statuses to initial readiness statuses.
-- [x] Add unit coverage for status mapping and render formats.
-- [x] Add CLI help coverage for `publish-readiness`.
-- [x] Update generated docs and command matrices.
-- [x] Add changeset for the `monochange` crate.
-- [x] Add root `tsconfig.json` so JS type linting has a project configuration.
-- [x] Fix local worktree git configuration so pre-push tests run against isolated fixture repositories.
-- [x] Update CLI snapshots for the new command.
-- [x] Run targeted validation.
-- [x] Run full local `devenv shell lint:test` successfully.
-- [x] Create PR #292.
-- [x] Raise patch coverage to 100% after the initial PR coverage failure.
-- [ ] Wait for PR checks to complete.
-- [ ] Fix any failed PR checks.
-- [ ] Merge PR #292 after required checks pass.
-- [ ] Move this plan to `docs/plans/completed/` after merge, or keep remaining readiness-enforcement work in a follow-up plan.
+- [x] Create isolated worktree and branch `feat/publish-readiness-enforcement`.
+- [x] Extend readiness artifacts with stable schema/kind and release-record metadata.
+- [x] Add package-set fingerprint validation.
+- [x] Add artifact loading and validation helpers.
+- [x] Require `--readiness <PATH>` for real `PublishPackages` runs.
+- [x] Keep dry-run publish previews artifact-free.
+- [x] Add unit coverage for successful validation and all validation failure classes.
+- [x] Add unit coverage for missing and blank readiness paths.
+- [x] Update publish command config in root and init templates.
+- [x] Update docs and templates for the readiness-enforced publish flow.
+- [x] Run generated docs update.
+- [x] Run formatting and lint checks.
+- [x] Run targeted tests.
+- [x] Run full validation.
+- [x] Run coverage and confirm 100% patch coverage.
+- [ ] Push branch and open PR.
+- [ ] Merge after required checks pass.
 
 ## Validation log
 
-- [x] `devenv shell cargo test -p monochange publish_readiness --lib`
-- [x] `devenv shell cargo test -p monochange cli_help::tests::render_command_help_for_publish_readiness --lib`
-- [x] `devenv shell cargo check -p monochange`
+- [x] `devenv shell cargo test -p monochange readiness --lib` (initial implementation; passed with warnings that were fixed afterward)
+- [x] `devenv shell cargo test -p monochange execute_cli_command_requires_readiness_for_package_publish_steps_without_matching_packages --lib`
+- [x] `devenv shell cargo test -p monochange_core display_and_publish --lib`
 - [x] `devenv shell cargo fmt --check`
-- [x] `devenv shell dprint check ...`
 - [x] `git diff --check`
-- [x] `devenv shell cargo test -p monochange --test cli_help`
+- [x] `devenv shell mdt update`
 - [x] `devenv shell lint:test`
+- [x] `devenv shell mc validate`
 - [x] `devenv shell coverage:all`
-- [x] `devenv shell coverage:patch` (`PATCH_COVERAGE 419/419 (100.00%)`)
+- [x] `devenv shell coverage:patch` (`PATCH_COVERAGE 395/395 (100.00%)`)
 
 ## Decisions
 
-- `publish-readiness` is intentionally top-level instead of hidden inside `mc publish`.
-- The first implementation reuses existing publish dry-run checks to avoid duplicating registry logic prematurely.
-- The artifact is JSON when written with `--output`, while display output defaults to Markdown for CI summaries.
-- `already_published` is non-blocking so retries can skip consistently published versions.
-- `unsupported` is blocking in the initial global status calculation.
+- Real package publication requires a readiness artifact; dry-runs remain frictionless.
+- Artifact validation happens immediately before the existing rate-limit plan and package publish execution, so failures happen before registry mutation.
+- The first fingerprint is intentionally a deterministic package-set identity rather than a cryptographic digest; it covers package id, ecosystem, registry, and version.
+- `already_published` remains non-blocking as long as current readiness and the artifact agree.
+- `unsupported` remains blocking because monochange cannot mutate unsupported ecosystem publications safely.
 
 ## Follow-up roadmap
 
-- [ ] Add readiness artifact fingerprinting for commit, release ref, selected packages, config, manifests, lockfiles, and schema version.
-- [ ] Add `mc publish --readiness <PATH>` and reject missing, blocked, stale, or mismatched readiness.
+- [ ] Add deeper freshness checks for workspace config, manifests, lockfiles, and publish tooling inputs.
 - [ ] Add optional readiness consumption to `mc publish-plan`.
 - [ ] Expand Cargo readiness semantics first.
 - [ ] Expand npm readiness semantics second.

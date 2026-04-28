@@ -2046,9 +2046,8 @@ impl CliStepDefinition {
 			| Self::PublishRelease { .. }
 			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
 			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
-			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
-				Some(&["format", "package"])
-			}
+			Self::PlaceholderPublish { .. } => Some(&["format", "package"]),
+			Self::PublishPackages { .. } => Some(&["format", "package", "readiness"]),
 			Self::PlanPublishRateLimits { .. } => Some(&["format", "mode", "package", "ci"]),
 			Self::CreateChangeFile { .. } => {
 				Some(&[
@@ -2144,10 +2143,18 @@ impl CliStepDefinition {
 					_ => None,
 				}
 			}
-			Self::PlaceholderPublish { .. } | Self::PublishPackages { .. } => {
+			Self::PlaceholderPublish { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					"package" => Some(CliInputKind::StringList),
+					_ => None,
+				}
+			}
+			Self::PublishPackages { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"package" => Some(CliInputKind::StringList),
+					"readiness" => Some(CliInputKind::Path),
 					_ => None,
 				}
 			}
