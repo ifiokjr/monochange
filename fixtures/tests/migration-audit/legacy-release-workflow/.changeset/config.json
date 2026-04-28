@@ -1,0 +1,4 @@
+{
+  "changelog": ["@changesets/changelog-github", { "repo": "monochange/example" }],
+  "commit": false
+}

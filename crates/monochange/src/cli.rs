@@ -205,6 +205,7 @@ When provided, the generated config includes:\n\
 			.subcommand(build_skill_subcommand())
 			.subcommand(build_subagents_subcommand())
 			.subcommand(build_analyze_subcommand())
+			.subcommand(build_migrate_subcommand())
 			.subcommand(build_release_record_subcommand())
 			.subcommand(build_publish_readiness_subcommand())
 			.subcommand(build_publish_bootstrap_subcommand())
@@ -394,6 +395,34 @@ Analysis notes:
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"])
 				.help("Output format"),
+		)
+}
+
+pub(crate) fn build_migrate_subcommand() -> Command {
+	Command::new("migrate")
+		.about("Audit release automation before migrating to monochange")
+		.subcommand_required(true)
+		.arg_required_else_help(true)
+		.subcommand(
+			Command::new("audit")
+				.about("Report existing release tools, changelog providers, and CI migration work")
+				.after_help(
+					r"Examples:
+  mc migrate audit
+  mc migrate audit --format json
+
+Audit notes:
+  - Looks for known release tools such as knope, Changesets, release-please, semantic-release, and cargo-release.
+  - Scans GitHub Actions workflows for legacy release actions and commands.
+  - Reports changelog providers and trusted-publishing migration recommendations.",
+				)
+				.arg(
+					Arg::new("format")
+						.long("format")
+						.help("Output format")
+						.default_value("text")
+						.value_parser(["text", "json", "markdown", "md"]),
+				),
 		)
 }
 

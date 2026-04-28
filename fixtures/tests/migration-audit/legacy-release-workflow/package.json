@@ -1,0 +1,10 @@
+{
+  "name": "legacy-release-workflow",
+  "private": true,
+  "scripts": {
+    "release": "changeset version && knope release"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.0"
+  }
+}

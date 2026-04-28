@@ -137,6 +137,7 @@ pub(crate) use git_support::run_git_capture;
 pub(crate) use git_support::run_git_process;
 #[cfg(test)]
 pub(crate) use git_support::run_git_status;
+use migration_audit::run_migration_command;
 use minijinja::Environment;
 use minijinja::UndefinedBehavior;
 #[cfg(feature = "cargo")]
@@ -299,6 +300,7 @@ mod interactive;
 mod lint;
 mod lint_check_reporter;
 mod mcp;
+mod migration_audit;
 mod package_publish;
 mod prepared_release_cache;
 mod publish_bootstrap;
@@ -874,6 +876,7 @@ where
 				format,
 			)
 		}
+		Some(("migrate", migrate_matches)) => run_migration_command(root, quiet, migrate_matches),
 		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server),
 		Some(("release-record", release_record_matches)) => {
 			let from = release_record_matches
