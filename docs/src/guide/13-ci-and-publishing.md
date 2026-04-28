@@ -264,6 +264,9 @@ Important current behavior:
 
 - monochange can carry the trust expectation in config
 - monochange can report the setup URL and enforce that trust is configured before built-in release publishing continues
+- for built-in crates.io publishing, `mc publish-readiness` now blocks packages whose current `Cargo.toml` cannot be published: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`
+- workspace-inherited Cargo metadata such as `description = { workspace = true }` and `license = { workspace = true }` is accepted when `[workspace.package]` supplies the value
+- already-published Cargo versions remain non-blocking and are skipped when current readiness and the saved readiness artifact agree
 - monochange does **not** currently auto-configure `crates.io` trust the way it can for npm on GitHub
 - if you want the most literal crates.io/OIDC workflow today, `mode = "external"` plus `rust-lang/crates-io-auth-action@v1` is the clearest path
 

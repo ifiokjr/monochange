@@ -2152,6 +2152,7 @@ fn package_publish_status_label(status: package_publish::PackagePublishStatus) -
 		package_publish::PackagePublishStatus::Published => "published",
 		package_publish::PackagePublishStatus::SkippedExisting => "skipped-existing",
 		package_publish::PackagePublishStatus::SkippedExternal => "skipped-external",
+		package_publish::PackagePublishStatus::Blocked => "blocked",
 	}
 }
 
@@ -3975,6 +3976,10 @@ path = "crates/core"
 		assert_eq!(
 			package_publish_status_label(package_publish::PackagePublishStatus::SkippedExternal),
 			"skipped-external"
+		);
+		assert_eq!(
+			package_publish_status_label(package_publish::PackagePublishStatus::Blocked),
+			"blocked"
 		);
 	}
 

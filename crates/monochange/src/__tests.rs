@@ -5112,6 +5112,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 			"resolver = \"2\"\n\n",
 			"[workspace.package]\n",
 			"version = \"1.0.0\"\n",
+			"description = \"Workflow packages\"\n",
 			"license = \"Unlicense\"\n\n",
 			"[workspace.dependencies]\n",
 			"workflow-core = { path = \"./crates/core\", version = \"1.0.0\" }\n",
@@ -5127,6 +5128,32 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 		.unwrap_or_else(|error| panic!("core src file: {error}"));
 	fs::write(root.join("crates/app/src/lib.rs"), "pub fn app() {}\n")
 		.unwrap_or_else(|error| panic!("app src file: {error}"));
+	fs::write(
+		root.join("crates/core/Cargo.toml"),
+		concat!(
+			"[package]\n",
+			"name = \"workflow-core\"\n",
+			"version = { workspace = true }\n",
+			"description = { workspace = true }\n",
+			"license = { workspace = true }\n",
+			"edition = \"2021\"\n",
+		),
+	)
+	.unwrap_or_else(|error| panic!("core manifest: {error}"));
+	fs::write(
+		root.join("crates/app/Cargo.toml"),
+		concat!(
+			"[package]\n",
+			"name = \"workflow-app\"\n",
+			"version = { workspace = true }\n",
+			"description = { workspace = true }\n",
+			"license = { workspace = true }\n",
+			"edition = \"2021\"\n\n",
+			"[dependencies]\n",
+			"workflow-core = { workspace = true }\n",
+		),
+	)
+	.unwrap_or_else(|error| panic!("app manifest: {error}"));
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 	let server = MockServer::start();
@@ -5190,7 +5217,10 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 			)
 			.unwrap_or_else(|error| panic!("publish packages: {error}"));
 			assert!(publish_output.contains("package publishing:"));
-			assert!(publish_output.contains("would publish workflow-core"));
+			assert!(
+				publish_output.contains("would publish workflow-core"),
+				"publish output:\n{publish_output}"
+			);
 			assert!(publish_output.contains("publish rate limits:"));
 		},
 	);

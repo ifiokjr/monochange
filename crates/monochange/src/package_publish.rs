@@ -56,6 +56,7 @@ pub(crate) enum PackagePublishStatus {
 	Published,
 	SkippedExisting,
 	SkippedExternal,
+	Blocked,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
@@ -444,6 +445,108 @@ fn packages_by_config_id(packages: &[PackageRecord]) -> BTreeMap<&str, &PackageR
 		.collect()
 }
 
+fn cargo_publish_readiness_blockers(
+	root: &Path,
+	request: &PublishRequest,
+) -> MonochangeResult<Vec<String>> {
+	if request.ecosystem != Ecosystem::Cargo || request.registry != RegistryKind::CratesIo {
+		return Ok(Vec::new());
+	}
+
+	let contents = fs::read_to_string(&request.manifest_path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to read Cargo manifest {}: {error}",
+			request.manifest_path.display()
+		))
+	})?;
+	let parsed = toml::from_str::<TomlValue>(&contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {}: {error}",
+			request.manifest_path.display()
+		))
+	})?;
+	let Some(package) = parsed.get("package").and_then(TomlValue::as_table) else {
+		return Ok(vec!["Cargo manifest is missing [package]".to_string()]);
+	};
+	let workspace_package = read_workspace_package_table(root)?;
+	let mut blockers = Vec::new();
+
+	if package.get("publish").and_then(TomlValue::as_bool) == Some(false) {
+		blockers.push("package.publish is false".to_string());
+	}
+
+	if cargo_publish_array_excludes_crates_io(package) {
+		blockers.push("package.publish does not include crates-io".to_string());
+	}
+
+	if !cargo_string_field_is_present(package, workspace_package.as_ref(), "description") {
+		blockers.push("package.description is required for crates.io".to_string());
+	}
+
+	if !cargo_string_field_is_present(package, workspace_package.as_ref(), "license")
+		&& !cargo_string_field_is_present(package, workspace_package.as_ref(), "license-file")
+	{
+		blockers
+			.push("package.license or package.license-file is required for crates.io".to_string());
+	}
+
+	Ok(blockers)
+}
+
+fn cargo_publish_array_excludes_crates_io(package: &WorkspacePackageTable) -> bool {
+	let Some(publish) = package.get("publish") else {
+		return false;
+	};
+	let Some(registries) = publish.as_array() else {
+		return false;
+	};
+
+	!registries
+		.iter()
+		.filter_map(TomlValue::as_str)
+		.any(|registry| registry == "crates-io")
+}
+
+fn cargo_string_field_is_present(
+	package: &WorkspacePackageTable,
+	workspace_package: Option<&WorkspacePackageTable>,
+	field: &str,
+) -> bool {
+	if package
+		.get(field)
+		.and_then(TomlValue::as_str)
+		.is_some_and(|value| !value.trim().is_empty())
+	{
+		return true;
+	}
+
+	let inherits_workspace_field = package
+		.get(field)
+		.and_then(TomlValue::as_table)
+		.and_then(|table| table.get("workspace"))
+		.and_then(TomlValue::as_bool)
+		.unwrap_or(false);
+
+	if !inherits_workspace_field {
+		return false;
+	}
+
+	workspace_package
+		.and_then(|package| package.get(field))
+		.and_then(TomlValue::as_str)
+		.is_some_and(|value| !value.trim().is_empty())
+}
+
+fn publish_blocked_message(request: &PublishRequest, blockers: &[String]) -> String {
+	format!(
+		"{} {} is not ready to publish to {}: {}",
+		request.package_name,
+		request.version,
+		request.registry,
+		blockers.join("; ")
+	)
+}
+
 fn resolve_registry_kind(
 	registry: Option<&PublishRegistry>,
 	ecosystem: Ecosystem,
@@ -545,6 +648,31 @@ fn execute_publish_requests(
 				trusted_publishing: trust_outcome_for_skip(request, source, root, env_map),
 			});
 			continue;
+		}
+
+		let blockers = if mode == PackagePublishRunMode::Release {
+			cargo_publish_readiness_blockers(root, request)?
+		} else {
+			Vec::new()
+		};
+		if !blockers.is_empty() {
+			let message = publish_blocked_message(request, &blockers);
+
+			if dry_run {
+				outcomes.push(PackagePublishOutcome {
+					package: request.package_id.clone(),
+					ecosystem: request.ecosystem,
+					registry: request.registry.to_string(),
+					version: request.version.clone(),
+					status: PackagePublishStatus::Blocked,
+					message,
+					placeholder: mode == PackagePublishRunMode::Placeholder,
+					trusted_publishing: planned_trust_outcome(request, source, root, env_map),
+				});
+				continue;
+			}
+
+			return Err(MonochangeError::Config(message));
 		}
 
 		let placeholder_dir = if mode == PackagePublishRunMode::Placeholder {
@@ -3928,6 +4056,224 @@ jobs:
 				.to_string()
 				.contains("set `publish.trusted_publishing.workflow`")
 		);
+	}
+
+	fn write_cargo_manifest(root: &Path, contents: &str) -> PathBuf {
+		let package_root = root.join("pkg");
+		fs::create_dir_all(&package_root).expect("package dir");
+		let manifest_path = package_root.join("Cargo.toml");
+		fs::write(&manifest_path, contents).expect("write Cargo manifest");
+		manifest_path
+	}
+
+	fn sample_cargo_request(root: &Path, manifest_path: &Path) -> PublishRequest {
+		PublishRequest {
+			manifest_path: manifest_path.to_path_buf(),
+			package_root: root.join("pkg"),
+			..sample_request(RegistryKind::CratesIo)
+		}
+	}
+
+	#[test]
+	fn cargo_publish_readiness_blockers_require_crates_io_metadata_and_publish_access() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let manifest_path = write_cargo_manifest(
+			root.path(),
+			r#"
+[package]
+name = "pkg"
+version = "1.2.3"
+publish = ["internal"]
+"#,
+		);
+		let request = sample_cargo_request(root.path(), &manifest_path);
+
+		let blockers = cargo_publish_readiness_blockers(root.path(), &request).expect("blockers");
+
+		assert!(blockers.contains(&"package.publish does not include crates-io".to_string()));
+		assert!(blockers.contains(&"package.description is required for crates.io".to_string()));
+		assert!(blockers.contains(
+			&"package.license or package.license-file is required for crates.io".to_string()
+		));
+	}
+
+	#[test]
+	fn cargo_publish_readiness_blockers_ignore_non_cargo_requests() {
+		let blockers =
+			cargo_publish_readiness_blockers(Path::new("."), &sample_request(RegistryKind::Npm))
+				.expect("blockers");
+
+		assert!(blockers.is_empty());
+	}
+
+	#[test]
+	fn cargo_publish_readiness_blockers_report_manifest_errors() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let missing = root.path().join("pkg/Cargo.toml");
+		let missing_request = sample_cargo_request(root.path(), &missing);
+		let missing_error = cargo_publish_readiness_blockers(root.path(), &missing_request)
+			.expect_err("expected read error");
+		assert!(
+			missing_error
+				.to_string()
+				.contains("failed to read Cargo manifest")
+		);
+
+		let invalid = write_cargo_manifest(root.path(), "not valid toml");
+		let invalid_request = sample_cargo_request(root.path(), &invalid);
+		let invalid_error = cargo_publish_readiness_blockers(root.path(), &invalid_request)
+			.expect_err("expected parse error");
+		assert!(invalid_error.to_string().contains("failed to parse"));
+	}
+
+	#[test]
+	fn cargo_publish_readiness_blockers_report_missing_package_table() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let manifest_path = write_cargo_manifest(root.path(), "[workspace]\nmembers = []\n");
+		let request = sample_cargo_request(root.path(), &manifest_path);
+
+		let blockers = cargo_publish_readiness_blockers(root.path(), &request).expect("blockers");
+
+		assert_eq!(
+			blockers,
+			vec!["Cargo manifest is missing [package]".to_string()]
+		);
+	}
+
+	#[test]
+	fn cargo_publish_readiness_blockers_reject_publish_false() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let manifest_path = write_cargo_manifest(
+			root.path(),
+			r#"
+[package]
+name = "pkg"
+version = "1.2.3"
+description = "A package"
+license = "MIT"
+publish = false
+"#,
+		);
+		let request = sample_cargo_request(root.path(), &manifest_path);
+
+		let blockers = cargo_publish_readiness_blockers(root.path(), &request).expect("blockers");
+
+		assert_eq!(blockers, vec!["package.publish is false".to_string()]);
+	}
+
+	#[test]
+	fn cargo_publish_readiness_blockers_accept_workspace_inherited_metadata() {
+		let root = tempfile::tempdir().expect("tempdir");
+		fs::write(
+			root.path().join("Cargo.toml"),
+			r#"
+[workspace.package]
+description = "Workspace description"
+license = "MIT"
+"#,
+		)
+		.expect("write workspace manifest");
+		let manifest_path = write_cargo_manifest(
+			root.path(),
+			r#"
+[package]
+name = "pkg"
+version = "1.2.3"
+description = { workspace = true }
+license = { workspace = true }
+publish = ["crates-io"]
+"#,
+		);
+		let request = sample_cargo_request(root.path(), &manifest_path);
+
+		let blockers = cargo_publish_readiness_blockers(root.path(), &request).expect("blockers");
+
+		assert!(blockers.is_empty());
+	}
+
+	#[test]
+	fn execute_publish_requests_marks_dry_run_cargo_metadata_blockers() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/pkg");
+			then.status(404);
+		});
+		let manifest_path = write_cargo_manifest(
+			root.path(),
+			r#"
+[package]
+name = "pkg"
+version = "1.2.3"
+"#,
+		);
+		let client = Client::builder().build().expect("http client:");
+		let endpoints = sample_endpoints(&server.base_url());
+		let request = sample_cargo_request(root.path(), &manifest_path);
+		let mut executor = FakeExecutor::new(Vec::new());
+
+		let report = execute_publish_requests(
+			root.path(),
+			Some(&sample_source()),
+			PackagePublishRunMode::Release,
+			true,
+			&[request],
+			&client,
+			&endpoints,
+			&BTreeMap::new(),
+			&mut executor,
+		)
+		.expect("report");
+
+		assert_eq!(report.packages[0].status, PackagePublishStatus::Blocked);
+		assert!(
+			report.packages[0]
+				.message
+				.contains("package.description is required for crates.io")
+		);
+		assert!(executor.commands.is_empty());
+	}
+
+	#[test]
+	fn execute_publish_requests_rejects_real_cargo_metadata_blockers() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/crates/pkg");
+			then.status(404);
+		});
+		let manifest_path = write_cargo_manifest(
+			root.path(),
+			r#"
+[package]
+name = "pkg"
+version = "1.2.3"
+"#,
+		);
+		let client = Client::builder().build().expect("http client:");
+		let endpoints = sample_endpoints(&server.base_url());
+		let request = sample_cargo_request(root.path(), &manifest_path);
+		let mut executor = FakeExecutor::new(Vec::new());
+
+		let error = execute_publish_requests(
+			root.path(),
+			Some(&sample_source()),
+			PackagePublishRunMode::Release,
+			false,
+			&[request],
+			&client,
+			&endpoints,
+			&BTreeMap::new(),
+			&mut executor,
+		)
+		.expect_err("expected readiness blocker");
+
+		assert!(
+			error
+				.to_string()
+				.contains("pkg 1.2.3 is not ready to publish to crates_io")
+		);
+		assert!(executor.commands.is_empty());
 	}
 
 	#[test]

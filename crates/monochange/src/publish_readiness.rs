@@ -40,6 +40,7 @@ pub(crate) enum PublishReadinessPackageStatus {
 	Ready,
 	AlreadyPublished,
 	Unsupported,
+	Blocked,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -167,10 +168,12 @@ fn build_report_from_publish_report(
 			}
 		})
 		.collect::<Vec<_>>();
-	let status = if packages
-		.iter()
-		.any(|package| package.status == PublishReadinessPackageStatus::Unsupported)
-	{
+	let status = if packages.iter().any(|package| {
+		matches!(
+			package.status,
+			PublishReadinessPackageStatus::Unsupported | PublishReadinessPackageStatus::Blocked
+		)
+	}) {
 		PublishReadinessGlobalStatus::Blocked
 	} else {
 		PublishReadinessGlobalStatus::Ready
@@ -208,6 +211,7 @@ fn readiness_status_from_publish_status(
 		package_publish::PackagePublishStatus::SkippedExternal => {
 			PublishReadinessPackageStatus::Unsupported
 		}
+		package_publish::PackagePublishStatus::Blocked => PublishReadinessPackageStatus::Blocked,
 	}
 }
 
@@ -469,6 +473,7 @@ fn readiness_package_status_label(status: PublishReadinessPackageStatus) -> &'st
 		PublishReadinessPackageStatus::Ready => "ready",
 		PublishReadinessPackageStatus::AlreadyPublished => "already_published",
 		PublishReadinessPackageStatus::Unsupported => "unsupported",
+		PublishReadinessPackageStatus::Blocked => "blocked",
 	}
 }
 
@@ -590,6 +595,7 @@ mod tests {
 				sample_publish_outcome(package_publish::PackagePublishStatus::Planned),
 				sample_publish_outcome(package_publish::PackagePublishStatus::SkippedExisting),
 				sample_publish_outcome(package_publish::PackagePublishStatus::SkippedExternal),
+				sample_publish_outcome(package_publish::PackagePublishStatus::Blocked),
 			],
 		};
 		let readiness = build_report_from_publish_report(sample_source(), &report);
@@ -611,6 +617,10 @@ mod tests {
 		assert_eq!(
 			readiness.packages[2].status,
 			PublishReadinessPackageStatus::Unsupported
+		);
+		assert_eq!(
+			readiness.packages[3].status,
+			PublishReadinessPackageStatus::Blocked
 		);
 		assert!(!readiness.package_set_fingerprint.is_empty());
 	}
@@ -682,6 +692,11 @@ mod tests {
 				status: PublishReadinessPackageStatus::Unsupported,
 				..sample_readiness_package()
 			},
+			PublishReadinessPackage {
+				package: "blocked".to_string(),
+				status: PublishReadinessPackageStatus::Blocked,
+				..sample_readiness_package()
+			},
 		];
 		let report = PublishReadinessReport {
 			status: PublishReadinessGlobalStatus::Blocked,
@@ -695,6 +710,7 @@ mod tests {
 		assert!(markdown.contains("Status: `blocked`"));
 		assert!(markdown.contains("already_published"));
 		assert!(markdown.contains("unsupported"));
+		assert!(markdown.contains("blocked"));
 	}
 
 	#[test]
