@@ -70,6 +70,160 @@ where
 }
 
 #[test]
+fn migrate_audit_reports_legacy_release_tooling() {
+	let tempdir = setup_fixture("migration-audit/legacy-release-workflow");
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("migration audit: {error}"));
+
+	assert!(output.contains("migration audit: migration-needed"));
+	assert!(output.contains("legacy-release-tool knope at knope.toml"));
+	assert!(output.contains("ci-workflow changesets at .github/workflows/release.yml"));
+	assert!(output.contains("Plan trusted publishing per package"));
+
+	let json_output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("migration audit json: {error}"));
+	let parsed: serde_json::Value = serde_json::from_str(&json_output)
+		.unwrap_or_else(|error| panic!("parse migration audit json: {error}"));
+
+	assert_eq!(parsed["status"], serde_json::json!("migration-needed"));
+	assert!(parsed["signals"].as_array().is_some_and(|signals| {
+		signals.iter().any(|signal| {
+			signal["tool"] == serde_json::json!("knope")
+				&& signal["path"] == serde_json::json!("knope.toml")
+		})
+	}));
+	assert!(parsed["recommendations"].as_array().is_some_and(|items| {
+		items
+			.iter()
+			.any(|item| item["id"] == serde_json::json!("audit-changelogs"))
+	}));
+}
+
+#[test]
+fn migrate_audit_reports_ready_workspace_and_quiet_mode() {
+	let tempdir = setup_fixture("migration-audit/ready-monochange");
+	let output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+			OsString::from("--format"),
+			OsString::from("markdown"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("migration audit ready: {error}"));
+
+	assert!(output.contains("migration audit: ready"));
+	assert!(output.contains("monochange-config monochange at monochange.toml"));
+	assert!(output.contains("- no migration-specific recommendations detected"));
+
+	let quiet_output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("--quiet"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("migration audit quiet: {error}"));
+	assert_eq!(quiet_output, "");
+
+	let empty_tempdir = setup_fixture("migration-audit/empty-workspace");
+	let empty_output = run_cli(
+		empty_tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("migration audit empty: {error}"));
+	assert!(empty_output.contains("- none detected"));
+	assert!(empty_output.contains("Generate monochange configuration"));
+}
+
+#[test]
+fn migrate_audit_reports_fixture_read_errors() {
+	let package_json_dir = setup_fixture("migration-audit/unreadable-package-json");
+	fs::rename(
+		package_json_dir.path().join("package-json-dir"),
+		package_json_dir.path().join("package.json"),
+	)
+	.unwrap_or_else(|error| panic!("rename package.json directory fixture: {error}"));
+	let package_error = run_cli(
+		package_json_dir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+		],
+	)
+	.unwrap_err();
+	assert!(package_error.to_string().contains("failed to read"));
+	assert!(package_error.to_string().contains("package.json"));
+
+	let workflow_root_file = setup_fixture("migration-audit/unreadable-workflow-root");
+	fs::rename(
+		workflow_root_file.path().join(".github/workflows-file"),
+		workflow_root_file.path().join(".github/workflows"),
+	)
+	.unwrap_or_else(|error| panic!("rename workflows file fixture: {error}"));
+	let workflow_root_error = run_cli(
+		workflow_root_file.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+		],
+	)
+	.unwrap_err();
+	assert!(
+		workflow_root_error
+			.to_string()
+			.contains(".github/workflows")
+	);
+
+	let workflow_file_dir = setup_fixture("migration-audit/unreadable-workflow-file");
+	fs::rename(
+		workflow_file_dir
+			.path()
+			.join(".github/workflows/release-yml-dir"),
+		workflow_file_dir
+			.path()
+			.join(".github/workflows/release.yml"),
+	)
+	.unwrap_or_else(|error| panic!("rename workflow directory fixture: {error}"));
+	let workflow_file_error = run_cli(
+		workflow_file_dir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("audit"),
+		],
+	)
+	.unwrap_err();
+	assert!(workflow_file_error.to_string().contains("release.yml"));
+}
+
+#[test]
 fn verify_release_branch_step_reports_matching_branch() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
