@@ -142,6 +142,7 @@ When you are ready to move beyond planning:
 
 - use `mc placeholder-publish --dry-run --format json` if some packages still need a bootstrap `0.0.0` release so they exist in their registries first
 - use `mc publish --dry-run --format json` to preview built-in package publication to `crates.io`, `npm`, `jsr`, or `pub.dev`
+- before real package publication, write a readiness artifact with `mc publish-readiness --from HEAD --output .monochange/readiness.json` and pass it to `mc publish --readiness .monochange/readiness.json`
 - use `mc publish-release --dry-run --format json` only for hosted/provider releases such as GitHub releases
 
 ## Package ids vs. group ids

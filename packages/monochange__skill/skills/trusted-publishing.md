@@ -85,7 +85,8 @@ Use this sequence when adopting trusted publishing across an existing workspace:
 3. If needed, run `mc placeholder-publish` so the package exists in the registry first.
 4. Complete the registry-side trusted-publishing setup for each package.
 5. Run `mc publish --dry-run` to confirm monochange now sees the trust configuration it expects.
-6. Publish from CI with `mc publish`.
+6. Generate a readiness artifact with `mc publish-readiness --from HEAD --output .monochange/readiness.json`.
+7. Publish from CI with `mc publish --readiness .monochange/readiness.json`.
 
 Placeholder publishing is especially useful when the package name is reserved but the real release is not ready yet.
 

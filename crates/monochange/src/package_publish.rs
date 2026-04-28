@@ -233,26 +233,7 @@ pub(crate) fn run_publish_packages(
 	)
 }
 
-pub(crate) fn run_publish_packages_from_ref(
-	root: &Path,
-	configuration: &WorkspaceConfiguration,
-	release_ref: &str,
-	selected_packages: &BTreeSet<String>,
-	dry_run: bool,
-) -> MonochangeResult<PackagePublishReport> {
-	let publication_targets = discover_release_record(root, release_ref)?
-		.record
-		.package_publications;
-	run_publish_packages_with_publications(
-		root,
-		configuration,
-		&publication_targets,
-		selected_packages,
-		dry_run,
-	)
-}
-
-fn run_publish_packages_with_publications(
+pub(crate) fn run_publish_packages_with_publications(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	publication_targets: &[PackagePublicationTarget],

@@ -78,7 +78,7 @@ mc step:affected-packages --verify --changed-paths crates/monochange/src/lib.rs 
 | Preview file diffs too                    | `mc release --dry-run --diff`    | You want to see version/changelog patches before applying them           |
 | Apply the release locally                 | `mc release`                     | You are ready to update files on disk                                    |
 | Create a release commit locally           | `mc commit-release`              | You want the prepared commit before provider publishing                  |
-| Publish package artifacts                 | `mc publish`                     | Built-in package publishing is configured                                |
+| Publish package artifacts                 | `mc publish --readiness <path>`  | Built-in package publishing is configured and readiness passed           |
 | Create provider releases                  | `mc publish-release`             | Source/provider publishing is configured                                 |
 | Open or update a release PR               | `mc release-pr`                  | You want provider-hosted release-request automation                      |
 | Publish placeholders for missing packages | `mc placeholder-publish`         | A package must exist in the public registry before automation can finish |
@@ -92,6 +92,8 @@ mc release --dry-run --diff
 mc release --dry-run --format json
 mc commit-release --dry-run --diff
 mc publish --dry-run --format json
+mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc publish --readiness .monochange/readiness.json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
 mc placeholder-publish --dry-run --format json
@@ -146,7 +148,7 @@ Then choose the next step:
 
 - `mc release` to apply
 - `mc commit-release` to produce the local release commit
-- `mc publish` to publish package artifacts
+- `mc publish-readiness --from HEAD --output <path>` and `mc publish --readiness <path>` to publish package artifacts
 - `mc publish-release` to create provider releases
 - `mc release-pr` to update a release request instead
 

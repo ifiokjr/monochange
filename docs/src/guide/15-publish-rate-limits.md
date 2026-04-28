@@ -26,11 +26,11 @@ The report includes:
 - `jsr` — official publish-window metadata
 - `pub.dev` — conservative daily publish planning metadata for CI batching
 
-Use `mc publish-plan` before `mc publish` when you want CI to fail early instead of discovering registry throttling mid-release.
+Use `mc publish-plan` before `mc publish-readiness` and `mc publish --readiness <path>` when you want CI to fail early instead of discovering registry throttling mid-release.
 
 ## Filtering and enforcement
 
-Both `mc publish` and `mc placeholder-publish` accept repeated `--package <id>` filters so you can execute one planned batch at a time.
+Both `mc publish` and `mc placeholder-publish` accept repeated `--package <id>` filters so you can execute one planned batch at a time. For real `mc publish --package <id>` runs, generate the readiness artifact with the same `--package <id>` selection.
 
 If you want monochange to block risky built-in publishes instead of only warning, enable:
 
@@ -47,4 +47,4 @@ That setting is inherited by matching packages and causes monochange to stop bef
 
 `mc publish-plan --ci gitlab-ci` renders a GitLab CI matrix snippet.
 
-Both snippets use explicit `mc publish --package ...` invocations for each planned batch so you can wire the batches into manual, scheduled, or follow-up pipelines without relying on long sleeps inside CI.
+Both snippets use explicit `mc publish --package ...` invocations for each planned batch so you can wire the batches into manual, scheduled, or follow-up pipelines without relying on long sleeps inside CI. Pair each real batch with `mc publish-readiness --from HEAD --package ... --output <path>` and pass that artifact to `mc publish --readiness <path> --package ...`.

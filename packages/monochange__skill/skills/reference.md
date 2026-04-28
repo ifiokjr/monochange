@@ -458,7 +458,8 @@ lockfile_commands = [
 Package publishing is separate from provider release publishing:
 
 - `mc placeholder-publish` bootstraps missing registry packages with placeholder `0.0.0` releases
-- `mc publish` runs built-in package-registry publishing for prepared release state
+- `mc publish-readiness --from HEAD --output <path>` checks package-registry readiness from release state
+- `mc publish --readiness <path>` validates readiness and runs built-in package-registry publishing
 - `mc publish-release` publishes hosted/provider releases such as GitHub releases
 
 Built-in package publishing currently supports only the canonical public registries:
