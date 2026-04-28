@@ -2,16 +2,57 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
+use std::process::Stdio;
 
 use crate::CommitMessage;
 use crate::MonochangeError;
 use crate::MonochangeResult;
+
+fn stable_process_path() -> Option<&'static std::ffi::OsStr> {
+	static PATH: std::sync::OnceLock<Option<std::ffi::OsString>> = std::sync::OnceLock::new();
+	PATH.get_or_init(resolve_stable_process_path).as_deref()
+}
+
+fn resolve_stable_process_path() -> Option<std::ffi::OsString> {
+	resolve_process_path(
+		std::env::var_os("PATH"),
+		option_env!("PATH").map(std::ffi::OsString::from),
+	)
+}
+
+fn resolve_process_path(
+	current: Option<std::ffi::OsString>,
+	fallback: Option<std::ffi::OsString>,
+) -> Option<std::ffi::OsString> {
+	if current.as_deref().is_some_and(path_contains_git) {
+		return current;
+	}
+
+	fallback.filter(|path| path_contains_git(path)).or(current)
+}
+
+fn path_contains_git(path: &std::ffi::OsStr) -> bool {
+	std::env::split_paths(path).any(|entry| entry.join(git_executable_name()).is_file())
+}
+
+#[cfg(windows)]
+fn git_executable_name() -> &'static str {
+	"git.exe"
+}
+
+#[cfg(not(windows))]
+fn git_executable_name() -> &'static str {
+	"git"
+}
 
 /// Build a `git` command scoped to `root` with conflicting git env removed.
 #[must_use]
 pub fn git_command(root: &Path) -> Command {
 	let mut command = Command::new("git");
 	command.current_dir(root);
+	if let Some(path) = stable_process_path() {
+		command.env("PATH", path);
+	}
 
 	for variable in [
 		"GIT_DIR",
@@ -46,6 +87,15 @@ pub fn git_stage_paths_command(root: &Path, tracked_paths: &[PathBuf]) -> Comman
 	command
 }
 
+/// Render a complete git commit message from the supplied monochange commit message.
+#[must_use]
+pub fn git_commit_message_text(message: &CommitMessage) -> String {
+	match &message.body {
+		Some(body) => format!("{}\n\n{}", message.subject, body),
+		None => message.subject.clone(),
+	}
+}
+
 /// Build a `git commit` command for the supplied monochange commit message.
 #[must_use]
 pub fn git_commit_paths_command(root: &Path, message: &CommitMessage, no_verify: bool) -> Command {
@@ -58,6 +108,18 @@ pub fn git_commit_paths_command(root: &Path, message: &CommitMessage, no_verify:
 	if let Some(body) = &message.body {
 		command.arg("--message").arg(body);
 	}
+	command
+}
+
+/// Build a `git commit` command that reads the full commit message from stdin.
+#[must_use]
+pub fn git_commit_paths_stdin_command(root: &Path, no_verify: bool) -> Command {
+	let mut command = git_command(root);
+	command.arg("commit");
+	if no_verify {
+		command.arg("--no-verify");
+	}
+	command.arg("--file").arg("-").stdin(Stdio::piped());
 	command
 }
 
@@ -181,4 +243,111 @@ pub fn run_commit_command_allow_nothing_to_commit(
 		"failed to {action}: {}",
 		git_error_detail(&output)
 	)))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn git_command_reuses_stable_path_for_child_processes() {
+		let command = git_command(Path::new("."));
+		let path = command
+			.get_envs()
+			.find_map(|(key, value)| (key == "PATH").then_some(value))
+			.flatten()
+			.unwrap_or_else(|| panic!("expected PATH override"));
+
+		assert!(path_contains_git(path));
+	}
+
+	#[test]
+	fn resolve_process_path_prefers_current_path_when_it_contains_git() {
+		let current = temp_path_with_git();
+		let fallback = tempdir("create fallback dir");
+
+		let path = resolve_process_path(
+			Some(current.path().as_os_str().to_owned()),
+			Some(fallback.path().as_os_str().to_owned()),
+		)
+		.unwrap_or_else(|| panic!("expected current PATH"));
+
+		assert_eq!(path, current.path().as_os_str());
+	}
+
+	#[test]
+	fn resolve_process_path_uses_fallback_when_current_path_lacks_git() {
+		let current = tempdir("create current dir");
+		let fallback = temp_path_with_git();
+
+		let path = resolve_process_path(
+			Some(current.path().as_os_str().to_owned()),
+			Some(fallback.path().as_os_str().to_owned()),
+		)
+		.unwrap_or_else(|| panic!("expected fallback PATH"));
+
+		assert_eq!(path, fallback.path().as_os_str());
+	}
+
+	#[test]
+	fn resolve_process_path_keeps_current_path_when_no_path_contains_git() {
+		let current = tempdir("create current dir");
+		let fallback = tempdir("create fallback dir");
+
+		let path = resolve_process_path(
+			Some(current.path().as_os_str().to_owned()),
+			Some(fallback.path().as_os_str().to_owned()),
+		)
+		.unwrap_or_else(|| panic!("expected current PATH"));
+
+		assert_eq!(path, current.path().as_os_str());
+	}
+
+	fn temp_path_with_git() -> tempfile::TempDir {
+		let directory = tempdir("create PATH dir");
+		std::fs::write(directory.path().join(git_executable_name()), "")
+			.unwrap_or_else(|error| panic!("write git shim: {error}"));
+		directory
+	}
+
+	fn tempdir(context: &str) -> tempfile::TempDir {
+		tempfile::tempdir().unwrap_or_else(|error| panic!("{context}: {error}"))
+	}
+
+	#[test]
+	fn git_commit_message_text_renders_subject_and_body() {
+		let message = CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: Some("Prepare release.\n\n<!-- release record -->".to_string()),
+		};
+
+		assert_eq!(
+			git_commit_message_text(&message),
+			"chore(release): prepare release\n\nPrepare release.\n\n<!-- release record -->"
+		);
+	}
+
+	#[test]
+	fn git_commit_message_text_renders_subject_without_body() {
+		let message = CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		};
+
+		assert_eq!(
+			git_commit_message_text(&message),
+			"chore(release): prepare release"
+		);
+	}
+
+	#[test]
+	fn git_commit_paths_stdin_command_reads_message_from_stdin() {
+		let command = git_commit_paths_stdin_command(Path::new("."), true);
+		let args = command
+			.get_args()
+			.map(|arg| arg.to_string_lossy().into_owned())
+			.collect::<Vec<_>>();
+
+		assert_eq!(args, vec!["commit", "--no-verify", "--file", "-"]);
+	}
 }
