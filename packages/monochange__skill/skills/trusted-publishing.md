@@ -85,7 +85,7 @@ Use this sequence when adopting trusted publishing across an existing workspace:
 3. If readiness shows first-time package setup is needed, run `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json`.
 4. Complete the registry-side trusted-publishing setup for each package.
 5. Rerun `mc publish-readiness --from HEAD --output .monochange/readiness.json`.
-6. Publish from CI with `mc publish --readiness .monochange/readiness.json`.
+6. Publish from CI with `mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json`.
 
 Placeholder publishing is especially useful when the package name is reserved but the real release is not ready yet.
 

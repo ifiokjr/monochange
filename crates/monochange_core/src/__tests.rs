@@ -1219,7 +1219,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 	};
 	assert_eq!(
 		publish.valid_input_names(),
-		Some(["format", "package", "readiness"].as_slice())
+		Some(["format", "output", "package", "readiness", "resume"].as_slice())
 	);
 
 	let plan = CliStepDefinition::PlanPublishRateLimits {
@@ -1355,6 +1355,14 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	);
 	assert_eq!(
 		publish.expected_input_kind("readiness"),
+		Some(CliInputKind::Path)
+	);
+	assert_eq!(
+		publish.expected_input_kind("resume"),
+		Some(CliInputKind::Path)
+	);
+	assert_eq!(
+		publish.expected_input_kind("output"),
 		Some(CliInputKind::Path)
 	);
 	assert_eq!(publish.expected_input_kind("unknown"), None);

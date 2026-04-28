@@ -21,6 +21,7 @@ use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use serde_yaml_ng::Value as YamlValue;
@@ -42,14 +43,14 @@ const DART_TRUST_DOCS_URL: &str = "https://dart.dev/tools/pub/automated-publishi
 #[cfg(test)]
 const JSR_TRUST_DOCS_URL: &str = "https://jsr.io/docs/publishing-packages";
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PackagePublishRunMode {
 	Placeholder,
 	Release,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PackagePublishStatus {
 	Planned,
@@ -57,9 +58,10 @@ pub(crate) enum PackagePublishStatus {
 	SkippedExisting,
 	SkippedExternal,
 	Blocked,
+	Failed,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum TrustedPublishingStatus {
 	Disabled,
@@ -68,7 +70,7 @@ pub(crate) enum TrustedPublishingStatus {
 	ManualActionRequired,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TrustedPublishingOutcome {
 	pub status: TrustedPublishingStatus,
@@ -79,7 +81,7 @@ pub(crate) struct TrustedPublishingOutcome {
 	pub message: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PackagePublishOutcome {
 	pub package: String,
@@ -92,7 +94,7 @@ pub(crate) struct PackagePublishOutcome {
 	pub trusted_publishing: TrustedPublishingOutcome,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PackagePublishReport {
 	pub mode: PackagePublishRunMode,
@@ -223,14 +225,33 @@ pub(crate) fn run_publish_packages(
 	selected_packages: &BTreeSet<String>,
 	dry_run: bool,
 ) -> MonochangeResult<PackagePublishReport> {
+	run_publish_packages_with_resume(
+		root,
+		configuration,
+		prepared_release,
+		selected_packages,
+		dry_run,
+		None,
+	)
+}
+
+pub(crate) fn run_publish_packages_with_resume(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	selected_packages: &BTreeSet<String>,
+	dry_run: bool,
+	resume_path: Option<&Path>,
+) -> MonochangeResult<PackagePublishReport> {
 	let publication_targets =
 		release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	run_publish_packages_with_publications(
+	run_publish_packages_with_publications_and_resume(
 		root,
 		configuration,
 		&publication_targets,
 		selected_packages,
 		dry_run,
+		resume_path,
 	)
 }
 
@@ -241,9 +262,45 @@ pub(crate) fn run_publish_packages_with_publications(
 	selected_packages: &BTreeSet<String>,
 	dry_run: bool,
 ) -> MonochangeResult<PackagePublishReport> {
+	run_publish_packages_with_publications_and_resume(
+		root,
+		configuration,
+		publication_targets,
+		selected_packages,
+		dry_run,
+		None,
+	)
+}
+
+fn run_publish_packages_with_publications_and_resume(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	publication_targets: &[PackagePublicationTarget],
+	selected_packages: &BTreeSet<String>,
+	dry_run: bool,
+	resume_path: Option<&Path>,
+) -> MonochangeResult<PackagePublishReport> {
 	let discovery = discover_workspace(root)?;
 	#[rustfmt::skip]
 	let requests = build_release_requests(configuration, &discovery.packages, publication_targets, selected_packages)?;
+	let previous_report = resume_path.map(read_publish_report_artifact).transpose()?;
+	let (requests, resumed_outcomes) =
+		resume_publish_requests(&requests, previous_report.as_ref())?;
+	let report = execute_release_publish_requests(root, configuration, dry_run, &requests)?;
+	Ok(merge_publish_resume_report(
+		PackagePublishRunMode::Release,
+		dry_run,
+		resumed_outcomes,
+		report,
+	))
+}
+
+fn execute_release_publish_requests(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	dry_run: bool,
+	requests: &[PublishRequest],
+) -> MonochangeResult<PackagePublishReport> {
 	let env_map = current_env_map();
 	let endpoints = RegistryEndpoints::from_env();
 	let client = registry_client()?;
@@ -253,12 +310,172 @@ pub(crate) fn run_publish_packages_with_publications(
 		configuration.source.as_ref(),
 		PackagePublishRunMode::Release,
 		dry_run,
-		&requests,
+		requests,
 		&client,
 		&endpoints,
 		&env_map,
 		&mut executor,
 	)
+}
+
+pub(crate) fn read_publish_report_artifact(path: &Path) -> MonochangeResult<PackagePublishReport> {
+	let body = fs::read_to_string(path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to read package publish resume artifact {}: {error}",
+			path.display()
+		))
+	})?;
+	serde_json::from_str(&body).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse package publish resume artifact {}: {error}",
+			path.display()
+		))
+	})
+}
+
+pub(crate) fn write_publish_report_artifact(
+	path: &Path,
+	report: &PackagePublishReport,
+) -> MonochangeResult<()> {
+	path.parent()
+		.filter(|parent| !parent.as_os_str().is_empty())
+		.map(create_publish_report_directory)
+		.transpose()?;
+	let body = serde_json::to_string_pretty(report).map_err(publish_report_json_error)?;
+	fs::write(path, format!("{body}\n")).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write package publish output {}: {error}",
+			path.display()
+		))
+	})
+}
+
+pub(crate) fn ensure_publish_report_succeeded(
+	report: &PackagePublishReport,
+) -> MonochangeResult<()> {
+	let Some(failed) = report
+		.packages
+		.iter()
+		.find(|outcome| outcome.status == PackagePublishStatus::Failed)
+	else {
+		return Ok(());
+	};
+
+	Err(MonochangeError::Discovery(format!(
+		"package publish failed for {} {}: {}",
+		failed.package, failed.version, failed.message
+	)))
+}
+
+fn create_publish_report_directory(parent: &Path) -> MonochangeResult<()> {
+	fs::create_dir_all(parent).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to create package publish output directory {}: {error}",
+			parent.display()
+		))
+	})
+}
+
+fn publish_report_json_error(error: impl std::fmt::Display) -> MonochangeError {
+	MonochangeError::Config(format!(
+		"failed to serialize package publish report: {error}"
+	))
+}
+
+type PublishResumeKey = (String, String, String);
+
+fn resume_publish_requests(
+	requests: &[PublishRequest],
+	previous_report: Option<&PackagePublishReport>,
+) -> MonochangeResult<(Vec<PublishRequest>, Vec<PackagePublishOutcome>)> {
+	let Some(previous_report) = previous_report else {
+		return Ok((requests.to_vec(), Vec::new()));
+	};
+	validate_resume_report(previous_report)?;
+
+	let request_keys = requests
+		.iter()
+		.map(publish_request_resume_key)
+		.collect::<BTreeSet<_>>();
+	let completed_keys = previous_report
+		.packages
+		.iter()
+		.filter(|outcome| package_publish_status_is_resumable_complete(outcome.status))
+		.map(package_publish_outcome_resume_key)
+		.collect::<BTreeSet<_>>();
+	let resumed_outcomes = previous_report
+		.packages
+		.iter()
+		.filter(|outcome| {
+			request_keys.contains(&package_publish_outcome_resume_key(outcome))
+				&& package_publish_status_is_resumable_complete(outcome.status)
+		})
+		.cloned()
+		.collect::<Vec<_>>();
+	let pending_requests = requests
+		.iter()
+		.filter(|request| !completed_keys.contains(&publish_request_resume_key(request)))
+		.cloned()
+		.collect::<Vec<_>>();
+
+	Ok((pending_requests, resumed_outcomes))
+}
+
+fn validate_resume_report(report: &PackagePublishReport) -> MonochangeResult<()> {
+	if report.mode != PackagePublishRunMode::Release {
+		return Err(MonochangeError::Config(
+			"package publish resume artifact must come from `mc publish`".to_string(),
+		));
+	}
+	if report.dry_run {
+		return Err(MonochangeError::Config(
+			"package publish resume artifact must come from a real publish run".to_string(),
+		));
+	}
+	Ok(())
+}
+
+fn publish_request_resume_key(request: &PublishRequest) -> PublishResumeKey {
+	(
+		request.package_id.clone(),
+		request.registry.to_string(),
+		request.version.clone(),
+	)
+}
+
+fn package_publish_outcome_resume_key(outcome: &PackagePublishOutcome) -> PublishResumeKey {
+	(
+		outcome.package.clone(),
+		outcome.registry.clone(),
+		outcome.version.clone(),
+	)
+}
+
+fn package_publish_status_is_resumable_complete(status: PackagePublishStatus) -> bool {
+	matches!(
+		status,
+		PackagePublishStatus::Published
+			| PackagePublishStatus::SkippedExisting
+			| PackagePublishStatus::SkippedExternal
+	)
+}
+
+fn merge_publish_resume_report(
+	mode: PackagePublishRunMode,
+	dry_run: bool,
+	mut resumed_outcomes: Vec<PackagePublishOutcome>,
+	mut current_report: PackagePublishReport,
+) -> PackagePublishReport {
+	if resumed_outcomes.is_empty() {
+		return current_report;
+	}
+
+	resumed_outcomes.append(&mut current_report.packages);
+	PackagePublishReport {
+		mode,
+		dry_run,
+		packages: resumed_outcomes,
+	}
 }
 
 pub(crate) fn release_record_package_publications_from_prepared_or_head(
@@ -701,13 +918,24 @@ fn execute_publish_requests(
 			enforce_release_trust_prerequisites(request, source, root, env_map)?;
 		}
 
-		let output = executor.run(&publish_command)?;
+		let output = match executor.run(&publish_command) {
+			Ok(output) => output,
+			Err(error) => {
+				outcomes.push(failed_publish_outcome(mode, request, error.to_string()));
+				break;
+			}
+		};
 		if !output.success {
-			return Err(MonochangeError::Discovery(format!(
-				"`{}` failed: {}",
-				render_command(&publish_command),
-				render_command_error(&output)
-			)));
+			outcomes.push(failed_publish_outcome(
+				mode,
+				request,
+				format!(
+					"`{}` failed: {}",
+					render_command(&publish_command),
+					render_command_error(&output)
+				),
+			));
+			break;
 		}
 
 		let trusted_publishing = if !request.trusted_publishing.enabled {
@@ -738,6 +966,23 @@ fn execute_publish_requests(
 		dry_run,
 		packages: outcomes,
 	})
+}
+
+fn failed_publish_outcome(
+	mode: PackagePublishRunMode,
+	request: &PublishRequest,
+	message: String,
+) -> PackagePublishOutcome {
+	PackagePublishOutcome {
+		package: request.package_id.clone(),
+		ecosystem: request.ecosystem,
+		registry: request.registry.to_string(),
+		version: request.version.clone(),
+		status: PackagePublishStatus::Failed,
+		message,
+		placeholder: mode == PackagePublishRunMode::Placeholder,
+		trusted_publishing: disabled_trust_outcome(),
+	}
 }
 
 fn planned_publish_message(mode: PackagePublishRunMode, request: &PublishRequest) -> String {
@@ -1933,6 +2178,22 @@ mod tests {
 				environment: None,
 			},
 			placeholder_readme: "placeholder".to_string(),
+		}
+	}
+
+	fn sample_publish_outcome(
+		package: &str,
+		status: PackagePublishStatus,
+	) -> PackagePublishOutcome {
+		PackagePublishOutcome {
+			package: package.to_string(),
+			ecosystem: Ecosystem::Npm,
+			registry: RegistryKind::Npm.to_string(),
+			version: "1.2.3".to_string(),
+			status,
+			message: format!("{status:?}"),
+			placeholder: false,
+			trusted_publishing: disabled_trust_outcome(),
 		}
 	}
 
@@ -4059,6 +4320,157 @@ jobs:
 		);
 	}
 
+	#[test]
+	fn ensure_publish_report_succeeded_reports_failed_outcomes() {
+		let report = PackagePublishReport {
+			mode: PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![sample_publish_outcome(
+				"failed-pkg",
+				PackagePublishStatus::Failed,
+			)],
+		};
+		let error = ensure_publish_report_succeeded(&report)
+			.expect_err("failed publish outcome should fail command");
+		assert!(error.to_string().contains("failed-pkg 1.2.3"));
+
+		let report = PackagePublishReport {
+			mode: PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![sample_publish_outcome(
+				"done",
+				PackagePublishStatus::SkippedExisting,
+			)],
+		};
+		ensure_publish_report_succeeded(&report)
+			.unwrap_or_else(|error| panic!("successful publish report: {error}"));
+	}
+
+	#[test]
+	fn resume_publish_requests_skips_completed_versions_and_retries_failed_work() {
+		let mut completed = sample_request(RegistryKind::Npm);
+		completed.package_id = "done".to_string();
+		let mut failed = sample_request(RegistryKind::Npm);
+		failed.package_id = "retry".to_string();
+		let previous = PackagePublishReport {
+			mode: PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![
+				sample_publish_outcome("done", PackagePublishStatus::Published),
+				sample_publish_outcome("retry", PackagePublishStatus::Failed),
+			],
+		};
+
+		let (pending, resumed) = resume_publish_requests(&[completed, failed], Some(&previous))
+			.unwrap_or_else(|error| panic!("resume requests: {error}"));
+
+		assert_eq!(resumed.len(), 1);
+		assert_eq!(resumed[0].package, "done");
+		assert_eq!(pending.len(), 1);
+		assert_eq!(pending[0].package_id, "retry");
+	}
+
+	#[test]
+	fn merge_publish_resume_report_preserves_current_or_prepends_resumed_outcomes() {
+		let current = PackagePublishReport {
+			mode: PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![sample_publish_outcome(
+				"current",
+				PackagePublishStatus::Published,
+			)],
+		};
+
+		let unchanged = merge_publish_resume_report(
+			PackagePublishRunMode::Release,
+			false,
+			Vec::new(),
+			current.clone(),
+		);
+		assert_eq!(unchanged, current);
+
+		let merged = merge_publish_resume_report(
+			PackagePublishRunMode::Release,
+			false,
+			vec![sample_publish_outcome(
+				"resumed",
+				PackagePublishStatus::SkippedExisting,
+			)],
+			current,
+		);
+		assert_eq!(merged.packages.len(), 2);
+		assert_eq!(merged.packages[0].package, "resumed");
+		assert_eq!(merged.packages[1].package, "current");
+	}
+
+	#[test]
+	fn resume_publish_requests_rejects_dry_run_and_placeholder_reports() {
+		let report = PackagePublishReport {
+			mode: PackagePublishRunMode::Release,
+			dry_run: true,
+			packages: Vec::new(),
+		};
+		let error = resume_publish_requests(&[], Some(&report))
+			.expect_err("dry-run resume report should fail");
+		assert!(error.to_string().contains("real publish run"));
+
+		let report = PackagePublishReport {
+			mode: PackagePublishRunMode::Placeholder,
+			dry_run: false,
+			packages: Vec::new(),
+		};
+		let error = resume_publish_requests(&[], Some(&report))
+			.expect_err("placeholder resume report should fail");
+		assert!(error.to_string().contains("mc publish"));
+	}
+
+	#[test]
+	fn publish_report_artifact_round_trips_and_reports_io_errors() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let report = PackagePublishReport {
+			mode: PackagePublishRunMode::Release,
+			dry_run: false,
+			packages: vec![sample_publish_outcome(
+				"done",
+				PackagePublishStatus::SkippedExisting,
+			)],
+		};
+		let output = tempdir.path().join("nested/publish-result.json");
+
+		write_publish_report_artifact(&output, &report)
+			.unwrap_or_else(|error| panic!("write report: {error}"));
+		let read_report = read_publish_report_artifact(&output)
+			.unwrap_or_else(|error| panic!("read report: {error}"));
+		assert_eq!(read_report, report);
+
+		let missing_error = read_publish_report_artifact(&tempdir.path().join("missing.json"))
+			.expect_err("missing artifact should fail");
+		assert!(missing_error.to_string().contains("failed to read"));
+
+		let invalid_json_path = tempdir.path().join("invalid.json");
+		fs::write(&invalid_json_path, "not json")
+			.unwrap_or_else(|error| panic!("write invalid json: {error}"));
+		let parse_error = read_publish_report_artifact(&invalid_json_path)
+			.expect_err("invalid artifact should fail");
+		assert!(parse_error.to_string().contains("failed to parse"));
+
+		let write_error = write_publish_report_artifact(tempdir.path(), &report)
+			.expect_err("directory output path should fail");
+		assert!(write_error.to_string().contains("failed to write"));
+
+		let parent_file = tempdir.path().join("file-parent");
+		fs::write(&parent_file, "not a directory")
+			.unwrap_or_else(|error| panic!("write file parent: {error}"));
+		let create_error = write_publish_report_artifact(&parent_file.join("result.json"), &report)
+			.expect_err("file parent should fail directory creation");
+		assert!(create_error.to_string().contains("failed to create"));
+		assert!(
+			publish_report_json_error("bad json")
+				.to_string()
+				.contains("failed to serialize package publish report")
+		);
+	}
+
 	fn write_cargo_manifest(root: &Path, contents: &str) -> PathBuf {
 		let package_root = root.join("pkg");
 		fs::create_dir_all(&package_root).expect("package dir");
@@ -4564,7 +4976,7 @@ version = "1.2.3"
 			stderr: "boom".to_string(),
 		}]);
 
-		let error = execute_publish_requests(
+		let report = execute_publish_requests(
 			Path::new("."),
 			None,
 			PackagePublishRunMode::Release,
@@ -4575,10 +4987,31 @@ version = "1.2.3"
 			&BTreeMap::new(),
 			&mut executor,
 		)
-		.expect_err("expected publish error");
-		let text = error.to_string();
-		assert!(text.contains("npm publish"));
-		assert!(text.contains("boom"));
+		.expect("publish report");
+
+		assert_eq!(report.packages[0].status, PackagePublishStatus::Failed);
+		assert!(report.packages[0].message.contains("npm publish"));
+		assert!(report.packages[0].message.contains("boom"));
+
+		let mut executor = FakeExecutor::new(Vec::new());
+		let report = execute_publish_requests(
+			Path::new("."),
+			None,
+			PackagePublishRunMode::Release,
+			false,
+			&[sample_request(RegistryKind::Npm)],
+			&client,
+			&endpoints,
+			&BTreeMap::new(),
+			&mut executor,
+		)
+		.expect("publish report");
+		assert_eq!(report.packages[0].status, PackagePublishStatus::Failed);
+		assert!(
+			report.packages[0]
+				.message
+				.contains("missing fake command output")
+		);
 	}
 
 	#[test]

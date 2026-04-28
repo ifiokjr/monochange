@@ -463,7 +463,7 @@ Package publishing is separate from provider release publishing:
 - `mc placeholder-publish` is the lower-level command for reserving missing registry packages outside a release-scoped bootstrap flow
 - `mc publish-readiness --from HEAD --output <path>` checks package-registry readiness from release state
 - `mc publish-plan --readiness <path>` validates readiness for planning and excludes non-ready package ids from rate-limit batches
-- `mc publish --readiness <path>` validates readiness and runs built-in package-registry publishing
+- `mc publish --readiness <path> --output <path>` validates readiness, runs built-in package-registry publishing, and writes a result artifact that can be reused with `--resume <path>` after partial failures
 - `mc publish-release` publishes hosted/provider releases such as GitHub releases
 
 Built-in package publishing currently supports only the canonical public registries:

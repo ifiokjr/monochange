@@ -232,7 +232,8 @@ fn readiness_status_from_publish_status(
 		package_publish::PackagePublishStatus::SkippedExternal => {
 			PublishReadinessPackageStatus::Unsupported
 		}
-		package_publish::PackagePublishStatus::Blocked => PublishReadinessPackageStatus::Blocked,
+		package_publish::PackagePublishStatus::Blocked
+		| package_publish::PackagePublishStatus::Failed => PublishReadinessPackageStatus::Blocked,
 	}
 }
 
