@@ -160,12 +160,12 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 
 ### Lockfile commands
 
-Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, Dart/Flutter, and Python (`uv lock` / `poetry lock --no-update`). Explicit configuration overrides inference.
+Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, Dart/Flutter, Python (`uv lock` / `poetry lock --no-update`), and Go (`go mod tidy`). Explicit configuration overrides inference.
 
 ### Publishing and trust
 
 - Package publishing is configured through `publish` on packages and ecosystems.
-- Built-in publishing currently supports only the canonical public registries: `crates.io`, `npm`, `jsr`, `pub.dev`, and `pypi`. Use `mode = "external"` for private registries or custom publication flows.
+- Built-in publishing currently supports the canonical public registries and Go proxy/tag flow: `crates.io`, `npm`, `jsr`, `pub.dev`, `pypi`, and `go_proxy`. Use `mode = "external"` for private registries or custom publication flows.
 - `mc publish-readiness` blocks built-in Cargo publishes to crates.io when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`. Workspace-inherited Cargo metadata is accepted.
 - `mc publish-plan --readiness <path>` validates a readiness artifact for the current release record, selected package set, and publish input fingerprint, then excludes package ids that are not ready in both the artifact and the fresh local readiness check. Placeholder planning does not accept readiness artifacts.
 - `mc publish-bootstrap --from HEAD --output <path>` is the release-scoped first-release bootstrap command. It reads package ids from the release record, runs placeholder publishing, writes a JSON result artifact, and should be followed by a fresh `mc publish-readiness` run.
@@ -174,9 +174,9 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - Placeholder README content can come from `publish.placeholder.readme` or `publish.placeholder.readme_file`.
 - `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.
 - npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, and monochange verifies the trust state before changing it.
-- Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
+- Cargo, `jsr`, `pub.dev`, and PyPI currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
 - Prefer the official GitHub publishing workflows for manual registries when they exist: `rust-lang/crates-io-auth-action@v1` for `crates.io` and `dart-lang/setup-dart/.github/workflows/publish.yml@v1` for `pub.dev`.
-- See [skills/trusted-publishing.md](skills/trusted-publishing.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, and `pub.dev`.
+- See [skills/trusted-publishing.md](skills/trusted-publishing.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, `pub.dev`, PyPI, and Go module tags.
 - See [skills/multi-package-publishing.md](skills/multi-package-publishing.md) when one repository publishes multiple packages and you need to choose between shared readiness-enforced `mc publish` flows, package-specific jobs, or external workflows.
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
 

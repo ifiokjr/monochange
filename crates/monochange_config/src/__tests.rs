@@ -1128,6 +1128,66 @@ type = "python"
 }
 
 #[test]
+fn load_workspace_configuration_normalizes_go_ecosystem_settings() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("packages/api"))
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+	std::fs::write(
+		root.join("packages/api/go.mod"),
+		"module github.com/example/repo/api\n\ngo 1.22\n",
+	)
+	.unwrap_or_else(|error| panic!("write go.mod: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"[ecosystems.go]
+dependency_version_prefix = "v"
+versioned_files = ["go.mod"]
+
+[ecosystems.go.publish.placeholder]
+readme = "Go placeholder"
+
+[package.api]
+path = "packages/api"
+type = "go"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	assert_eq!(
+		configuration.go.dependency_version_prefix.as_deref(),
+		Some("v")
+	);
+	let package = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "api")
+		.unwrap_or_else(|| panic!("expected api package"));
+
+	assert_eq!(package.package_type, monochange_core::PackageType::Go);
+	assert_eq!(
+		package
+			.versioned_files
+			.first()
+			.map(|definition| definition.ecosystem_type),
+		Some(Some(EcosystemType::Go))
+	);
+	assert_eq!(
+		package
+			.versioned_files
+			.first()
+			.map(|definition| definition.path.as_str()),
+		Some("go.mod")
+	);
+	assert_eq!(
+		package.publish.registry,
+		Some(PublishRegistry::Builtin(RegistryKind::GoProxy))
+	);
+}
+
+#[test]
 fn load_workspace_configuration_reports_python_ecosystem_normalization_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -2170,6 +2230,14 @@ fn default_publish_registry_for_ecosystem_covers_all_supported_types() {
 	assert_eq!(
 		crate::default_publish_registry_for_ecosystem(EcosystemType::Dart),
 		Some(PublishRegistry::Builtin(RegistryKind::PubDev))
+	);
+	assert_eq!(
+		crate::default_publish_registry_for_ecosystem(EcosystemType::Python),
+		Some(PublishRegistry::Builtin(RegistryKind::Pypi))
+	);
+	assert_eq!(
+		crate::default_publish_registry_for_ecosystem(EcosystemType::Go),
+		Some(PublishRegistry::Builtin(RegistryKind::GoProxy))
 	);
 }
 
@@ -4643,6 +4711,33 @@ fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths()
 		dart_unsupported_match
 			.to_string()
 			.contains("for ecosystem `dart`")
+	);
+
+	assert!(crate::path_is_supported_for_ecosystem(
+		Path::new("go.mod"),
+		EcosystemType::Go
+	));
+	let go_unsupported_match = crate::validate_versioned_files(
+		tempdir.path(),
+		config_contents,
+		&[monochange_core::VersionedFileDefinition {
+			path: "packages/*/package.json".to_string(),
+			ecosystem_type: Some(EcosystemType::Go),
+			name: None,
+			fields: None,
+			prefix: None,
+			regex: None,
+		}],
+		&declared_packages,
+		"package",
+		"core",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported go match error"));
+	assert!(
+		go_unsupported_match
+			.to_string()
+			.contains("for ecosystem `go`")
 	);
 
 	let empty_template = crate::validate_changelog_configuration(

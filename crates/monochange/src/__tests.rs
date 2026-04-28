@@ -9288,6 +9288,7 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 		deno: monochange_core::EcosystemSettings::default(),
 		dart: monochange_core::EcosystemSettings::default(),
 		python: monochange_core::EcosystemSettings::default(),
+		go: monochange_core::EcosystemSettings::default(),
 	};
 	assert_eq!(
 		crate::configured_change_type_choices(&configuration),
@@ -9385,6 +9386,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 		deno: monochange_core::EcosystemSettings::default(),
 		dart: monochange_core::EcosystemSettings::default(),
 		python: monochange_core::EcosystemSettings::default(),
+		go: monochange_core::EcosystemSettings::default(),
 	};
 	let mut cli = vec![
 		CliCommandDefinition {
@@ -9447,6 +9449,7 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 		deno: monochange_core::EcosystemSettings::default(),
 		dart: monochange_core::EcosystemSettings::default(),
 		python: monochange_core::EcosystemSettings::default(),
+		go: monochange_core::EcosystemSettings::default(),
 	};
 	let mut cli = vec![CliCommandDefinition {
 		name: "change".to_string(),

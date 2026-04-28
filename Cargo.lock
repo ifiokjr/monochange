@@ -2057,6 +2057,7 @@ dependencies = [
  "monochange_gitea",
  "monochange_github",
  "monochange_gitlab",
+ "monochange_go",
  "monochange_graph",
  "monochange_lint",
  "monochange_npm",
@@ -2170,6 +2171,7 @@ dependencies = [
  "monochange_gitea",
  "monochange_github",
  "monochange_gitlab",
+ "monochange_go",
  "monochange_npm",
  "monochange_python",
  "monochange_test_helpers",
@@ -2312,6 +2314,23 @@ dependencies = [
  "tempfile",
  "tracing",
  "urlencoding",
+]
+
+[[package]]
+name = "monochange_go"
+version = "0.2.0"
+dependencies = [
+ "glob",
+ "insta",
+ "monochange_core",
+ "monochange_test_helpers",
+ "regex",
+ "rstest",
+ "semver",
+ "similar-asserts",
+ "tempfile",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]

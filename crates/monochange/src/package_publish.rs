@@ -113,6 +113,7 @@ pub(crate) struct PublishRequest {
 	pub(crate) package_root: PathBuf,
 	pub(crate) registry: RegistryKind,
 	pub(crate) package_manager: Option<String>,
+	pub(crate) package_metadata: BTreeMap<String, String>,
 	pub(crate) mode: PublishMode,
 	pub(crate) version: String,
 	pub(crate) placeholder: bool,
@@ -176,6 +177,7 @@ pub(crate) struct RegistryEndpoints {
 	pub(crate) pub_dev_api: String,
 	pub(crate) jsr_base: String,
 	pub(crate) pypi_api: String,
+	pub(crate) go_proxy: String,
 }
 
 impl RegistryEndpoints {
@@ -193,6 +195,8 @@ impl RegistryEndpoints {
 				.unwrap_or_else(|_| "https://jsr.io".to_string()),
 			pypi_api: env::var("MONOCHANGE_PYPI_API_URL")
 				.unwrap_or_else(|_| "https://pypi.org/pypi".to_string()),
+			go_proxy: env::var("MONOCHANGE_GO_PROXY_URL")
+				.unwrap_or_else(|_| "https://proxy.golang.org".to_string()),
 		}
 	}
 }
@@ -552,6 +556,7 @@ pub(crate) fn build_placeholder_requests(
 					package.ecosystem,
 				)?,
 				package_manager: package.metadata.get("manager").cloned(),
+				package_metadata: package.metadata.clone(),
 				mode: package_definition.publish.mode,
 				version: PLACEHOLDER_VERSION.to_string(),
 				placeholder: true,
@@ -614,6 +619,7 @@ pub(crate) fn build_release_requests(
 				.to_path_buf(),
 			registry: resolve_registry_kind(publication.registry.as_ref(), package.ecosystem)?,
 			package_manager: package.metadata.get("manager").cloned(),
+			package_metadata: package.metadata.clone(),
 			mode: publication.mode,
 			version: publication.version.clone(),
 			placeholder: false,
@@ -791,6 +797,7 @@ fn default_registry_kind_for_ecosystem(ecosystem: &str) -> MonochangeResult<Regi
 		"deno" => Ok(RegistryKind::Jsr),
 		"dart" | "flutter" => Ok(RegistryKind::PubDev),
 		"python" => Ok(RegistryKind::Pypi),
+		"go" => Ok(RegistryKind::GoProxy),
 		_ => {
 			Err(MonochangeError::Config(format!(
 				"built-in package publishing does not support ecosystem `{ecosystem}`"
@@ -1360,6 +1367,8 @@ fn build_publish_command(
 		));
 	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Release {
 		command = Some(build_python_publish_command(request, &request.package_root));
+	} else if request.registry == RegistryKind::GoProxy {
+		command = Some(build_go_publish_command(request));
 	}
 	if is_jsr_release {
 		command = Some(build_jsr_publish_command(&request.package_root));
@@ -1375,7 +1384,7 @@ fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, d
 		return;
 	}
 
-	if registry == RegistryKind::Pypi {
+	if registry == RegistryKind::Pypi || registry == RegistryKind::GoProxy {
 		return;
 	}
 
@@ -1494,6 +1503,71 @@ fn build_python_publish_command(request: &PublishRequest, cwd: &Path) -> Command
 	}
 }
 
+fn build_go_publish_command(request: &PublishRequest) -> CommandSpec {
+	CommandSpec {
+		program: "git".to_string(),
+		args: vec!["tag".to_string(), go_module_tag_name(request)],
+		cwd: request.package_root.clone(),
+	}
+}
+
+fn go_module_tag_name(request: &PublishRequest) -> String {
+	let version = go_proxy_version(&request.version);
+	let root = request
+		.package_metadata
+		.get("relative_path")
+		.cloned()
+		.unwrap_or_else(|| fallback_go_tag_prefix(request));
+	let root = root.trim_matches('/');
+	if root.is_empty() || root == "." {
+		return version;
+	}
+	format!("{root}/{version}")
+}
+
+fn fallback_go_tag_prefix(request: &PublishRequest) -> String {
+	env::current_dir()
+		.ok()
+		.and_then(|root| {
+			request
+				.package_root
+				.strip_prefix(root)
+				.ok()
+				.map(Path::to_path_buf)
+		})
+		.unwrap_or_else(|| request.package_root.clone())
+		.to_string_lossy()
+		.to_string()
+}
+
+fn go_module_path(request: &PublishRequest) -> &str {
+	request
+		.package_metadata
+		.get("module_path")
+		.map_or(request.package_name.as_str(), String::as_str)
+}
+
+fn go_proxy_version(version: &str) -> String {
+	if version.starts_with('v') {
+		version.to_string()
+	} else {
+		format!("v{version}")
+	}
+}
+
+fn go_proxy_module_path(module: &str) -> String {
+	let mut escaped = String::with_capacity(module.len());
+	for character in module.chars() {
+		if character.is_ascii_uppercase() {
+			escaped.push('!');
+			escaped.push(character.to_ascii_lowercase());
+		} else {
+			escaped.push(character);
+		}
+	}
+	escaped
+}
+
 fn build_placeholder_directory(
 	root: &Path,
 	request: &PublishRequest,
@@ -1534,6 +1608,8 @@ fn build_placeholder_directory(
 			request,
 			source,
 		));
+	} else if request.registry == RegistryKind::GoProxy {
+		manifest_result = Some(write_go_placeholder_manifest(tempdir_path, request));
 	}
 	if is_jsr_registry {
 		manifest_result = Some(write_jsr_placeholder_manifest(
@@ -1545,6 +1621,18 @@ fn build_placeholder_directory(
 	manifest_result.expect("unsupported built-in publish registry")?;
 
 	Ok(tempdir)
+}
+
+fn write_go_placeholder_manifest(dir: &Path, request: &PublishRequest) -> MonochangeResult<()> {
+	let contents = format!(
+		"module {}
+
+go 1.22
+",
+		go_module_path(request)
+	);
+	fs::write(dir.join("go.mod"), contents)
+		.map_err(|error| MonochangeError::Io(format!("failed to write go.mod: {error}")))
 }
 
 fn write_npm_placeholder_manifest(
@@ -1985,6 +2073,26 @@ fn registry_version_exists(
 		return Ok(exists);
 	}
 
+	if request.registry == RegistryKind::GoProxy {
+		let url = format!(
+			"{}/{}/@v/{}.info",
+			endpoints.go_proxy.trim_end_matches('/'),
+			go_proxy_module_path(go_module_path(request)),
+			go_proxy_version(&request.version)
+		);
+		let response = client
+			.get(url)
+			.send()
+			.map_err(http_error("Go proxy version lookup"))?;
+		if response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::GONE {
+			return Ok(false);
+		}
+		response
+			.error_for_status()
+			.map_err(http_error("Go proxy version lookup"))?;
+		return Ok(true);
+	}
+
 	let url = format!(
 		"{}/{}/meta.json",
 		endpoints.jsr_base.trim_end_matches('/'),
@@ -2195,6 +2303,8 @@ fn manual_setup_url(request: &PublishRequest) -> String {
 			"https://pypi.org/manage/project/{}/settings/publishing/",
 			request.package_name
 		)
+	} else if request.registry == RegistryKind::GoProxy {
+		format!("https://pkg.go.dev/{}", go_module_path(request))
 	} else {
 		format!(
 			"https://www.npmjs.com/package/{}/access",
@@ -2213,6 +2323,8 @@ fn trust_docs_url(registry: RegistryKind) -> &'static str {
 		JSR_TRUST_DOCS_URL
 	} else if registry == RegistryKind::Pypi {
 		PYPI_TRUST_DOCS_URL
+	} else if registry == RegistryKind::GoProxy {
+		"https://go.dev/ref/mod#publishing"
 	} else {
 		NPM_TRUST_DOCS_URL
 	}) as _
@@ -2292,6 +2404,8 @@ mod tests {
 				Ecosystem::Dart
 			} else if registry == RegistryKind::Pypi {
 				Ecosystem::Python
+			} else if registry == RegistryKind::GoProxy {
+				Ecosystem::Go
 			} else {
 				Ecosystem::Deno
 			},
@@ -2299,6 +2413,7 @@ mod tests {
 			package_root: PathBuf::from("/workspace/pkg"),
 			registry,
 			package_manager: (registry == RegistryKind::Npm).then(|| "npm".to_string()),
+			package_metadata: BTreeMap::new(),
 			mode: PublishMode::Builtin,
 			version: "1.2.3".to_string(),
 			placeholder: false,
@@ -2383,6 +2498,7 @@ mod tests {
 			pub_dev_api: base_url.to_string(),
 			jsr_base: base_url.to_string(),
 			pypi_api: base_url.to_string(),
+			go_proxy: base_url.to_string(),
 		}
 	}
 
@@ -2448,6 +2564,7 @@ mod tests {
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
 			python: monochange_core::EcosystemSettings::default(),
+			go: monochange_core::EcosystemSettings::default(),
 		}
 	}
 
@@ -2955,6 +3072,111 @@ jobs:
 		);
 		assert_eq!(pypi_release.cwd, PathBuf::from("/workspace/pkg"));
 		assert!(render_command(&pypi_release).contains("uv publish --trusted-publishing always"));
+
+		let go_request = PublishRequest {
+			ecosystem: Ecosystem::Go,
+			package_name: "api".to_string(),
+			package_root: PathBuf::from("/workspace/api"),
+			package_metadata: BTreeMap::from([
+				(
+					"module_path".to_string(),
+					"github.com/example/api".to_string(),
+				),
+				("relative_path".to_string(), "api".to_string()),
+			]),
+			..sample_request(RegistryKind::GoProxy)
+		};
+		let go = build_publish_command(&go_request, PackagePublishRunMode::Release, None, false);
+		assert_eq!(go.program, "git");
+		assert_eq!(go.args, vec!["tag".to_string(), "api/v1.2.3".to_string()]);
+	}
+
+	#[test]
+	fn go_publish_command_uses_root_tag_when_relative_path_is_current_directory() {
+		let request = PublishRequest {
+			version: "v2.0.0".to_string(),
+			package_metadata: BTreeMap::from([("relative_path".to_string(), ".".to_string())]),
+			..sample_request(RegistryKind::GoProxy)
+		};
+
+		let command = build_publish_command(&request, PackagePublishRunMode::Release, None, false);
+
+		assert_eq!(command.args, vec!["tag".to_string(), "v2.0.0".to_string()]);
+	}
+
+	#[test]
+	fn go_publish_command_falls_back_to_package_root_prefix() {
+		let cwd = env::current_dir().expect("current dir");
+		let request = PublishRequest {
+			version: "1.2.3".to_string(),
+			package_root: cwd.join("api"),
+			package_metadata: BTreeMap::new(),
+			..sample_request(RegistryKind::GoProxy)
+		};
+
+		let command = build_publish_command(&request, PackagePublishRunMode::Release, None, false);
+
+		assert_eq!(
+			command.args,
+			vec!["tag".to_string(), "api/v1.2.3".to_string()]
+		);
+	}
+
+	#[test]
+	fn build_placeholder_directory_writes_go_mod_for_go_proxy() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let request = PublishRequest {
+			package_metadata: BTreeMap::from([(
+				"module_path".to_string(),
+				"github.com/example/repo/api".to_string(),
+			)]),
+			..sample_request(RegistryKind::GoProxy)
+		};
+
+		let placeholder = build_placeholder_directory(root.path(), &request, None)
+			.expect("go placeholder directory");
+		let go_mod = fs::read_to_string(placeholder.path().join("go.mod")).expect("go.mod");
+
+		assert_eq!(go_mod, "module github.com/example/repo/api\n\ngo 1.22\n");
+	}
+
+	#[test]
+	fn build_placeholder_directory_uses_package_name_when_go_module_metadata_is_missing() {
+		let root = tempfile::tempdir().expect("tempdir");
+		let request = PublishRequest {
+			package_name: "github.com/example/fallback".to_string(),
+			package_metadata: BTreeMap::new(),
+			..sample_request(RegistryKind::GoProxy)
+		};
+
+		let placeholder = build_placeholder_directory(root.path(), &request, None)
+			.expect("go placeholder directory");
+		let go_mod = fs::read_to_string(placeholder.path().join("go.mod")).expect("go.mod");
+
+		assert_eq!(go_mod, "module github.com/example/fallback\n\ngo 1.22\n");
+	}
+
+	#[test]
+	fn registry_version_exists_returns_false_for_missing_go_proxy_version() {
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET)
+				.path("/github.com/example/repo/@v/v1.2.3.info");
+			then.status(404);
+		});
+		let client = Client::builder().build().expect("http client:");
+		let endpoints = sample_endpoints(&server.base_url());
+		let request = PublishRequest {
+			package_metadata: BTreeMap::from([(
+				"module_path".to_string(),
+				"github.com/example/repo".to_string(),
+			)]),
+			..sample_request(RegistryKind::GoProxy)
+		};
+
+		assert!(
+			!registry_version_exists(&client, &endpoints, &request).expect("missing go version")
+		);
 	}
 
 	#[test]
@@ -3001,6 +3223,14 @@ jobs:
 			true,
 		);
 		assert!(!render_command(&pypi).contains("--dry-run"));
+
+		let go = build_publish_command(
+			&sample_request(RegistryKind::GoProxy),
+			PackagePublishRunMode::Release,
+			None,
+			true,
+		);
+		assert!(!go.args.contains(&"--dry-run".to_string()));
 	}
 
 	#[test]
@@ -3073,6 +3303,14 @@ jobs:
 			manual_setup_url(&sample_request(RegistryKind::Pypi)),
 			"https://pypi.org/manage/project/pkg/settings/publishing/".to_string()
 		);
+		let go_request = PublishRequest {
+			package_name: "github.com/example/pkg".to_string(),
+			..sample_request(RegistryKind::GoProxy)
+		};
+		assert_eq!(
+			manual_setup_url(&go_request),
+			"https://pkg.go.dev/github.com/example/pkg".to_string()
+		);
 		assert_eq!(trust_docs_url(RegistryKind::Npm), NPM_TRUST_DOCS_URL);
 		assert_eq!(
 			trust_docs_url(RegistryKind::CratesIo),
@@ -3081,6 +3319,10 @@ jobs:
 		assert_eq!(trust_docs_url(RegistryKind::PubDev), DART_TRUST_DOCS_URL);
 		assert_eq!(trust_docs_url(RegistryKind::Jsr), JSR_TRUST_DOCS_URL);
 		assert_eq!(trust_docs_url(RegistryKind::Pypi), PYPI_TRUST_DOCS_URL);
+		assert_eq!(
+			trust_docs_url(RegistryKind::GoProxy),
+			"https://go.dev/ref/mod#publishing"
+		);
 	}
 
 	#[test]
@@ -3152,6 +3394,14 @@ jobs:
 				"releases": { "1.2.3": [] }
 			}));
 		});
+		server.mock(|when, then| {
+			when.method(GET)
+				.path("/github.com/example/!repo/api/@v/v1.2.3.info");
+			then.status(200).json_body_obj(&serde_json::json!({
+				"Version": "v1.2.3",
+				"Time": "2026-04-28T00:00:00Z"
+			}));
+		});
 		let client = Client::builder().build().expect("http client:");
 		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
@@ -3160,6 +3410,7 @@ jobs:
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
 			pypi_api: server.base_url(),
+			go_proxy: server.base_url(),
 		};
 
 		assert!(
@@ -3182,6 +3433,14 @@ jobs:
 			registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::Pypi))
 				.expect("PyPI exists:")
 		);
+		let go_request = PublishRequest {
+			package_metadata: BTreeMap::from([(
+				"module_path".to_string(),
+				"github.com/example/Repo/api".to_string(),
+			)]),
+			..sample_request(RegistryKind::GoProxy)
+		};
+		assert!(registry_version_exists(&client, &endpoints, &go_request).expect("Go exists:"));
 	}
 
 	#[test]
@@ -3414,6 +3673,7 @@ jobs:
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
 			pypi_api: server.base_url(),
+			go_proxy: server.base_url(),
 		};
 		let request = sample_request(RegistryKind::Npm);
 		let request = PublishRequest {
@@ -4981,6 +5241,7 @@ version = "1.2.3"
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
 			pypi_api: server.base_url(),
+			go_proxy: server.base_url(),
 		};
 		let request = PublishRequest {
 			mode: PublishMode::External,
@@ -5711,7 +5972,10 @@ version = "1.2.3"
 			current_version: Some(Version::parse("1.0.0").expect("version:")),
 			publish_state: PublishState::Public,
 			version_group_id: None,
-			metadata: BTreeMap::from([("config_id".to_string(), "pkg".to_string())]),
+			metadata: BTreeMap::from([
+				("config_id".to_string(), "pkg".to_string()),
+				("manager".to_string(), "pnpm".to_string()),
+			]),
 			declared_dependencies: Vec::new(),
 		};
 		let publication = PackagePublicationTarget {
@@ -5728,7 +5992,13 @@ version = "1.2.3"
 			build_release_requests(&configuration, &[package], &[publication], &BTreeSet::new())
 				.expect("requests:");
 		assert_eq!(requests.len(), 1);
-		assert_eq!(requests[0].version, "1.2.3");
-		assert_eq!(requests[0].package_name, "pkg");
+		let request = requests.first().expect("request");
+		assert_eq!(request.version, "1.2.3");
+		assert_eq!(request.package_name, "pkg");
+		assert_eq!(request.package_manager.as_deref(), Some("pnpm"));
+		assert_eq!(
+			request.package_metadata.get("manager").map(String::as_str),
+			Some("pnpm")
+		);
 	}
 }

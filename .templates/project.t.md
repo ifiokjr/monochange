@@ -4,7 +4,7 @@
 
 It discovers packages, normalizes dependency data, applies group rules, turns explicit change files into release plans, and can run config-defined release preparation from those same inputs.
 
-Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, Dart/Flutter, and Python.
+Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, Dart/Flutter, Python, and Go.
 
 <!-- {/projectReadmeOverview} -->
 
@@ -44,12 +44,14 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust)](https://crates.io/crates/monochange_dart) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs)](https://docs.rs/monochange_dart/)
 - `monochange_python` — Python uv workspace, Poetry, and pyproject.toml discovery.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__python-orange?logo=rust)](https://crates.io/crates/monochange_python) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__python-1f425f?logo=docs.rs)](https://docs.rs/monochange_python/)
+- `monochange_go` — Go module discovery, go.mod dependency rewrites, and tag-based release metadata.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__go-orange?logo=rust)](https://crates.io/crates/monochange_go) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__go-1f425f?logo=docs.rs)](https://docs.rs/monochange_go/)
 
 <!-- {/projectCrateCatalog} -->
 
 <!-- {@projectMilestoneCapabilities} -->
 
-- discover Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, and Python packages
+- discover Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, Python, and Go packages
 - normalize dependency edges across ecosystems
 - coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input
@@ -107,13 +109,13 @@ These are the commands most repositories use after running `mc init`. With the n
 
 <!-- {/projectCommandAutomationMatrix} -->
 
-`mc publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking when the readiness artifact still matches the current package set and publish input fingerprint. The artifact fingerprints `monochange.toml`, package manifests, lockfiles, and registry/tooling files, so rerun `mc publish-readiness` after those inputs change. `mc publish-plan --readiness <path>` validates the same artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check. If readiness shows missing first-time registry packages, run `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json`, then rerun readiness before real publishing. Python packages support built-in PyPI publishing with `uv build` and `uv publish`; keep `mode = "external"` for private registries or custom Python publication flows.
+`mc publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking when the readiness artifact still matches the current package set and publish input fingerprint. The artifact fingerprints `monochange.toml`, package manifests, lockfiles, and registry/tooling files, so rerun `mc publish-readiness` after those inputs change. `mc publish-plan --readiness <path>` validates the same artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check. If readiness shows missing first-time registry packages, run `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json`, then rerun readiness before real publishing. Python packages support built-in PyPI publishing with `uv build` and `uv publish`. Go packages publish by creating VCS tags (`v1.2.3` for root modules, `path/v1.2.3` for submodules) and checking visibility through the Go module proxy. Keep `mode = "external"` for private registries or custom publication flows.
 
 <!-- {@projectCapabilityMatrix} -->
 
 | Capability                                                                     | Current status                                                                                                 |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| Multi-ecosystem discovery                                                      | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, Python                                                               |
+| Multi-ecosystem discovery                                                      | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, Python, Go                                                           |
 | Package release planning                                                       | Built in                                                                                                       |
 | Grouped/shared versioning                                                      | Built in                                                                                                       |
 | Dry-run release diff previews                                                  | Built in via `mc release --dry-run --diff`                                                                     |
@@ -121,7 +123,8 @@ These are the commands most repositories use after running `mc init`. With the n
 | Hosted provider releases                                                       | GitHub, GitLab, Gitea                                                                                          |
 | Hosted release requests                                                        | GitHub, GitLab, Gitea                                                                                          |
 | Python release planning                                                        | Built in for discovery, version rewrites, dependency rewrites, lockfile command inference, and PyPI publishing |
-| Built-in registry publishing                                                   | `crates.io`, `npm`, `jsr`, `pub.dev`, `pypi`; use external mode for custom registries                          |
+| Go release planning                                                            | Built in for `go.mod` discovery, dependency rewrites, `go mod tidy` inference, and Go proxy tag publishing     |
+| Built-in registry publishing                                                   | `crates.io`, `npm`, `jsr`, `pub.dev`, `pypi`, Go proxy tags; use external mode for custom registries           |
 | GitHub npm trusted-publishing automation                                       | Built in                                                                                                       |
 | GitHub trusted-publishing guidance for `crates.io`, `jsr`, `pub.dev`, and PyPI | Built in, but manual registry enrollment is still required                                                     |
 | GitLab trusted-publishing auto-derivation                                      | Not built in today                                                                                             |

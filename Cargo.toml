@@ -79,6 +79,7 @@ monochange_ecmascript = { version = "0.2.0", path = "./crates/monochange_ecmascr
 monochange_gitea = { version = "0.2.0", path = "./crates/monochange_gitea" }
 monochange_github = { version = "0.2.0", path = "./crates/monochange_github" }
 monochange_gitlab = { version = "0.2.0", path = "./crates/monochange_gitlab" }
+monochange_go = { version = "0.2.0", path = "./crates/monochange_go" }
 monochange_graph = { version = "0.2.0", path = "./crates/monochange_graph" }
 monochange_hosting = { version = "0.2.0", path = "./crates/monochange_hosting" }
 monochange_lint = { version = "0.2.0", path = "./crates/monochange_lint" }

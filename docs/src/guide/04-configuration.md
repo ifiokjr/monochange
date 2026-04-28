@@ -168,6 +168,8 @@ Built-in publishing currently targets only the canonical public registry for eac
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
 - Python packages → `pypi`
+- Go modules → `go_proxy` via VCS tags
+- Python packages → `pypi`
 
 Private registries and custom publication flows are still external. For those packages, set `mode = "external"` and handle publication outside monochange.
 
@@ -604,6 +606,11 @@ lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
 [ecosystems.python]
 enabled = true
 lockfile_commands = [{ command = "uv lock" }]
+
+[ecosystems.go]
+enabled = true
+# monochange infers `go mod tidy` for go.mod / go.sum refreshes.
+lockfile_commands = [{ command = "go mod tidy" }]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

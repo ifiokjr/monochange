@@ -135,6 +135,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run coverage
+        env:
+          CARGO_BUILD_JOBS: 1
         run: coverage:all
         shell: devenv shell -- bash -e {0}
 

@@ -13,7 +13,7 @@ This package bundles:
 - `skills/linting.md` — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
 - `examples/readme.md` — condensed scenario examples for quick recommendations
 - `skills/reference.md` — high-context reference with broader examples
-- `skills/trusted-publishing.md` — GitHub/OIDC setup guidance for `npm`, `crates.io`, `jsr`, and `pub.dev`
+- `skills/trusted-publishing.md` — GitHub/OIDC setup guidance for `npm`, `crates.io`, `jsr`, `pub.dev`, PyPI, and Go module tags
 - `skills/multi-package-publishing.md` — monorepo-oriented publishing patterns for multiple public packages
 - `monochange-skill` — helper executable for printing or copying the bundled skill
 

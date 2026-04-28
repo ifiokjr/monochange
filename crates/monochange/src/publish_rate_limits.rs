@@ -380,6 +380,20 @@ fn registry_policies() -> Vec<RegistryRateLimitPolicy> {
 				notes: "official trusted-publisher workflow guidance but no exact package publish quota".to_string(),
 			}],
 		},
+		RegistryRateLimitPolicy {
+			registry: RegistryKind::GoProxy,
+			operation: RateLimitOperation::Publish,
+			limit: None,
+			window_seconds: None,
+			confidence: RateLimitConfidence::Low,
+			notes: "Go modules are published by pushing VCS tags; the public proxy does not document a precise publish quota".to_string(),
+			evidence: vec![RateLimitEvidence {
+				title: "Go module publishing reference".to_string(),
+				url: "https://go.dev/ref/mod#publishing".to_string(),
+				kind: RateLimitEvidenceKind::Official,
+				notes: "official module publishing guidance documents tag-based publication".to_string(),
+			}],
+		},
 	]
 }
 
@@ -445,6 +459,7 @@ mod tests {
 			package_root: Path::new("workspace").to_path_buf(),
 			registry,
 			package_manager: Some("pnpm".to_string()),
+			package_metadata: BTreeMap::new(),
 			mode,
 			version: Version::new(1, 0, 0).to_string(),
 			placeholder: false,
@@ -558,6 +573,7 @@ mod tests {
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
 			pypi_api: server.base_url(),
+			go_proxy: server.base_url(),
 		};
 		let requests = build_release_plan_requests_with_transport(
 			tempdir.path(),
@@ -657,6 +673,7 @@ mod tests {
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
 			python: monochange_core::EcosystemSettings::default(),
+			go: monochange_core::EcosystemSettings::default(),
 		};
 		let packages = vec![
 			monochange_core::PackageRecord {
@@ -822,6 +839,7 @@ mod tests {
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
 			pypi_api: server.base_url(),
+			go_proxy: server.base_url(),
 		};
 		let requests = build_release_plan_requests_with_transport(
 			tempdir.path(),
@@ -892,6 +910,7 @@ mod tests {
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
 			pypi_api: server.base_url(),
+			go_proxy: server.base_url(),
 		};
 		let requests = build_placeholder_plan_requests_with_transport(
 			tempdir.path(),
@@ -973,6 +992,7 @@ mod tests {
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
 			pypi_api: server.base_url(),
+			go_proxy: server.base_url(),
 		};
 		let requests = build_placeholder_plan_requests_with_transport(
 			tempdir.path(),
@@ -1073,6 +1093,7 @@ mod tests {
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
 			python: monochange_core::EcosystemSettings::default(),
+			go: monochange_core::EcosystemSettings::default(),
 		};
 		let unenforced = PublishRateLimitReport {
 			dry_run: true,
@@ -1133,6 +1154,7 @@ mod tests {
 					package_root: Path::new("pkg-a").to_path_buf(),
 					registry: RegistryKind::PubDev,
 					package_manager: None,
+					package_metadata: BTreeMap::new(),
 					mode: PublishMode::Builtin,
 					version: Version::new(1, 0, 0).to_string(),
 					placeholder: false,
@@ -1185,6 +1207,7 @@ mod tests {
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
 			python: monochange_core::EcosystemSettings::default(),
+			go: monochange_core::EcosystemSettings::default(),
 		};
 		let error =
 			enforce_publish_rate_limits(&configuration, &report, PublishRateLimitMode::Publish)

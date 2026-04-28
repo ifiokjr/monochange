@@ -246,6 +246,9 @@ path = "crates/monochange_dart"
 [package.monochange_python]
 path = "crates/monochange_python"
 
+[package.monochange_go]
+path = "crates/monochange_go"
+
 [package.monochange_graph]
 path = "crates/monochange_graph"
 
@@ -377,6 +380,7 @@ packages = [
 	"monochange_ecmascript",
 	"monochange_dart",
 	"monochange_python",
+	"monochange_go",
 	"monochange_graph",
 	"monochange_semver",
 	"monochange_telemtry",

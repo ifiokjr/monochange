@@ -18,7 +18,7 @@
 
 It discovers packages, normalizes dependency data, applies group rules, turns explicit change files into release plans, and can run config-defined release preparation from those same inputs.
 
-Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, Dart/Flutter, and Python.
+Use it when your repository has outgrown one-ecosystem release tooling and you want one model for Cargo, npm/pnpm/Bun, Deno, Dart/Flutter, Python, and Go.
 
 <!-- {/projectReadmeOverview} -->
 
@@ -168,7 +168,7 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
 
 <!-- {=projectMilestoneCapabilities} -->
 
-- discover Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, and Python packages
+- discover Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, Python, and Go packages
 - normalize dependency edges across ecosystems
 - coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input
@@ -216,6 +216,8 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__dart-orange?logo=rust)](https://crates.io/crates/monochange_dart) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__dart-1f425f?logo=docs.rs)](https://docs.rs/monochange_dart/)
 - `monochange_python` — Python uv workspace, Poetry, and pyproject.toml discovery.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__python-orange?logo=rust)](https://crates.io/crates/monochange_python) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__python-1f425f?logo=docs.rs)](https://docs.rs/monochange_python/)
+- `monochange_go` — Go module discovery, go.mod dependency rewrites, and tag-based release metadata.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__go-orange?logo=rust)](https://crates.io/crates/monochange_go) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__go-1f425f?logo=docs.rs)](https://docs.rs/monochange_go/)
 
 <!-- {/projectCrateCatalog} -->
 

@@ -5,6 +5,7 @@
 - Deno workspaces and standalone `deno.json` / `deno.jsonc` packages
 - Dart and Flutter workspaces plus standalone `pubspec.yaml` packages
 - Python uv workspaces, Poetry projects, and standalone `pyproject.toml` packages
+- Go modules discovered from standalone `go.mod` files
 
 <!-- {/discoverySupportedSources} -->
 
@@ -450,6 +451,11 @@ lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
 [ecosystems.python]
 enabled = true
 lockfile_commands = [{ command = "uv lock" }]
+
+[ecosystems.go]
+enabled = true
+# monochange infers `go mod tidy` for go.mod / go.sum refreshes.
+lockfile_commands = [{ command = "go mod tidy" }]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

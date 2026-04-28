@@ -11,6 +11,7 @@ Supported sources today:
 - Deno workspaces and standalone `deno.json` / `deno.jsonc` packages
 - Dart and Flutter workspaces plus standalone `pubspec.yaml` packages
 - Python uv workspaces, Poetry projects, and standalone `pyproject.toml` packages
+- Go modules discovered from standalone `go.mod` files
 
 <!-- {/discoverySupportedSources} -->
 

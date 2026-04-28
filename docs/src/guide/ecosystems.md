@@ -17,6 +17,7 @@ monochange uses ecosystem adapters to translate native package-manager files int
 | Deno           | `deno`            | Deno workspaces and standalone `deno.json` / `deno.jsonc` packages                      | Deno manifest versions, exports/imports metadata, and dependency references                | Direct `deno.lock` update when possible; no inferred lockfile command                                                                                   | `jsr`                        |
 | Dart / Flutter | `dart`, `flutter` | Dart and Flutter workspaces plus standalone `pubspec.yaml` packages                     | `pubspec.yaml` versions and dependency ranges                                              | Direct `pubspec.lock` update by default; configure `dart pub get` or `flutter pub get` when you need full solver refreshes                              | `pub.dev`                    |
 | Python         | `python`          | uv workspaces, Poetry projects, and standalone `pyproject.toml` packages                | PEP 621 `[project]` and Poetry `[tool.poetry]` package versions plus dependency specifiers | Does not mutate `uv.lock` or `poetry.lock` directly; infers `uv lock` and `poetry lock --no-update` commands; unknown Python lockfiles are skipped      | `pypi`                       |
+| Go             | `go`              | Standalone `go.mod` modules                                                             | Internal `require` directives in `go.mod`; package versions stay in VCS tags               | Does not mutate `go.sum` directly; infers `go mod tidy` so the Go toolchain refreshes `go.mod` and checksum data                                        | Go module proxy via VCS tags |
 
 The built-in publishing column is intentionally narrower than release planning. It lists only the canonical public registry for each supported ecosystem; private registries and custom publication flows should use `mode = "external"`.
 
@@ -174,8 +175,49 @@ dependency_version_prefix = ">="
 lockfile_commands = [{ command = "uv lock", cwd = "." }]
 ```
 
+## Go
+
+Go support is centered on `go.mod` files. Go module versions live in VCS tags rather than manifest fields, so monochange updates internal `require` directives and records enough metadata for tag-based publishing.
+
+Use Go support when your repository has:
+
+- one or more modules declared by `go.mod`
+- multi-module layouts where submodules need path-prefixed tags such as `api/v1.2.3`
+- internal module dependencies that should receive version bumps alongside released workspace modules
+- packages published through normal Go module proxy discovery
+
+Go behavior:
+
+- package ids come from the module path in the `module` directive
+- internal dependency ranges default to exact Go module versions with a leading `v`, matching Go module semantics
+- `require` directives participate in dependency updates, including grouped `require (...)` blocks
+- Go v2+ semantic import versioning remains encoded in module paths, not a separate manifest version field
+- `go.sum` is treated as checksum data, not as a lockfile to patch directly
+- monochange infers `go mod tidy` when `go.mod` / `go.sum` changes need package-manager refreshes
+- built-in publishing creates VCS tags: root modules use `v1.2.3`, while submodules use path-prefixed tags such as `api/v1.2.3`
+- readiness and publish checks query the Go module proxy for `<module>/@v/<version>.info` visibility
+
+Example Go package configuration:
+
+```toml
+[package.api]
+path = "services/api"
+type = "go"
+changelog = true
+
+[package.api.publish]
+enabled = true
+mode = "builtin"
+registry = "go_proxy"
+trusted_publishing = false
+
+[ecosystems.go]
+# Optional: override inferred tidy commands.
+lockfile_commands = [{ command = "go mod tidy", cwd = "services/api" }]
+```
+
 ## Choosing external publishing
 
-Use `mode = "external"` when an ecosystem or registry is not handled by monochange's built-in publisher, or when your organization needs custom signing, provenance, approval, rate-limit, private-registry behavior, or a Python publishing toolchain other than the built-in `uv build` / `uv publish` flow.
+Use `mode = "external"` when an ecosystem or registry is not handled by monochange's built-in publisher, or when your organization needs custom signing, provenance, approval, rate-limit, private-registry behavior, a Python publishing toolchain other than the built-in `uv build` / `uv publish` flow, or a Go publishing workflow that signs, pushes, or annotates tags outside monochange.
 
 That keeps the package in release planning while leaving upload mechanics to your existing publishing workflow.
