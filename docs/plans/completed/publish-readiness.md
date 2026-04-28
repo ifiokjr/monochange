@@ -2,9 +2,11 @@
 
 ## Status
 
+Completed in PR #324: https://github.com/monochange/monochange/pull/324
+
+- Merge commit: `69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb`
 - Previous publish-readiness slices shipped `mc publish-readiness`, readiness enforcement in `mc publish`, Cargo readiness blockers, readiness-backed publish planning, `mc publish-bootstrap`, and package publish resume artifacts.
-- Current branch: `feat/publish-readiness-freshness`.
-- Current slice: add deeper freshness checks for readiness artifacts by fingerprinting publish inputs that affect registry behavior.
+- This completed slice added deeper freshness checks for readiness artifacts by fingerprinting publish inputs that affect registry behavior.
 
 ## Problem
 
@@ -52,8 +54,8 @@ This slice extends readiness artifacts so they include a deterministic `inputFin
 - [x] Update docs, skill guidance, and changeset.
 - [x] Run formatting and validation.
 - [x] Run coverage and confirm 100% patch coverage after commit.
-- [ ] Push branch and open PR.
-- [ ] Merge after required checks pass.
+- [x] Push branch and open PR — PR #324.
+- [x] Merge after required checks pass — merge commit `69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb`.
 
 ## Validation log
 
@@ -67,6 +69,7 @@ This slice extends readiness artifacts so they include a deterministic `inputFin
 - [x] `devenv shell coverage:all`
 - [x] `devenv shell coverage:patch` after commit — `PATCH_COVERAGE 267/267 (100.00%)`
 - [x] `CI=false devenv shell build:all`
+- [x] GitHub required checks for PR #324: `lint`, `test`, `build`, `coverage`, `codecov/patch`, `benchmark`, `benchmark-binary`, and changeset policy `check`
 
 ## Decisions
 
