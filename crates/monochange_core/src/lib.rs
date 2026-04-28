@@ -3229,6 +3229,8 @@ pub struct ProviderMergeRequestSettings {
 	pub labels: Vec<String>,
 	#[serde(default)]
 	pub auto_merge: bool,
+	#[serde(default)]
+	pub verified_commits: bool,
 }
 
 impl Default for ProviderMergeRequestSettings {
@@ -3240,6 +3242,7 @@ impl Default for ProviderMergeRequestSettings {
 			title: default_pull_request_title(),
 			labels: default_pull_request_labels(),
 			auto_merge: false,
+			verified_commits: false,
 		}
 	}
 }

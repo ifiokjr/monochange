@@ -1017,9 +1017,42 @@ fn publish_release_pull_request_updates_existing_pull_request_via_octocrab() {
 }
 
 #[test]
+fn release_pull_request_commit_verification_is_opt_in() {
+	let disabled_source = sample_source(None);
+	let enabled_source = sample_source_with_verified_commits(None);
+
+	temp_env::with_vars(
+		[
+			("GITHUB_ACTIONS", None),
+			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
+		],
+		|| {
+			assert!(!github_actions_release_commit_verification_enabled(
+				&enabled_source
+			))
+		},
+	);
+
+	temp_env::with_vars(
+		[
+			("GITHUB_ACTIONS", Some("true")),
+			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
+		],
+		|| {
+			assert!(!github_actions_release_commit_verification_enabled(
+				&disabled_source
+			));
+			assert!(github_actions_release_commit_verification_enabled(
+				&enabled_source
+			));
+		},
+	);
+}
+
+#[test]
 fn release_pull_request_commit_verification_uses_github_git_database_api() {
 	let server = MockServer::start();
-	let source = sample_source(Some(server.base_url()));
+	let source = sample_source_with_verified_commits(Some(server.base_url()));
 	let request = sample_pull_request_request();
 	let fallback = "1111111111111111111111111111111111111111";
 	let verified = "2222222222222222222222222222222222222222";
@@ -1085,7 +1118,7 @@ fn release_pull_request_commit_verification_uses_github_git_database_api() {
 #[test]
 fn release_pull_request_commit_verification_falls_back_when_github_does_not_verify_commit() {
 	let server = MockServer::start();
-	let source = sample_source(Some(server.base_url()));
+	let source = sample_source_with_verified_commits(Some(server.base_url()));
 	let request = sample_pull_request_request();
 	let fallback = "1111111111111111111111111111111111111111";
 	let unverified = "2222222222222222222222222222222222222222";
@@ -1198,7 +1231,7 @@ fn release_pull_request_commit_verification_rejects_unexpected_updated_ref() {
 fn publish_release_pull_request_falls_back_when_verified_commit_is_unavailable() {
 	let server = MockServer::start();
 	let (_tempdir, repo) = seed_git_repository();
-	let source = sample_source(Some(server.base_url()));
+	let source = sample_source_with_verified_commits(Some(server.base_url()));
 	let request = sample_pull_request_request();
 	let list_pull_requests = server.mock(|when, then| {
 		when.method(GET).path("/repos/ifiokjr/monochange/pulls");
@@ -2314,6 +2347,16 @@ fn sample_source(api_url: Option<String>) -> SourceConfiguration {
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
 		bot: ProviderBotSettings::default(),
+	}
+}
+
+fn sample_source_with_verified_commits(api_url: Option<String>) -> SourceConfiguration {
+	SourceConfiguration {
+		pull_requests: ProviderMergeRequestSettings {
+			verified_commits: true,
+			..ProviderMergeRequestSettings::default()
+		},
+		..sample_source(api_url)
 	}
 }
 

@@ -1181,6 +1181,9 @@ fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
 }
 
 fn github_actions_release_commit_verification_enabled(source: &SourceConfiguration) -> bool {
+	if !source.pull_requests.verified_commits {
+		return false;
+	}
 	if env::var("GITHUB_ACTIONS").as_deref() != Ok("true") {
 		return false;
 	}

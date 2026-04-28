@@ -592,8 +592,9 @@ source = "monochange"
 #   branch_prefix — branch name prefix for release PRs (default: "monochange/release")
 #   base          — target branch for the release PR (default: "main")
 #   title         — PR title template (default: "chore(release): prepare release")
-#   labels        — labels applied to the release PR (default: ["release", "automated"])
-#   auto_merge    — enable auto-merge on the PR when supported (default: false)
+#   labels           — labels applied to the release PR (default: ["release", "automated"])
+#   auto_merge       — enable auto-merge on the PR when supported (default: false)
+#   verified_commits — opt in to provider-verified release PR commits when supported (default: false)
 [source.pull_requests]
 enabled = true
 branch_prefix = "monochange/release"
@@ -601,6 +602,7 @@ base = "main"
 title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
+verified_commits = true
 
 # [source.bot.changesets] — changeset policy for the AffectedPackages / `mc affected` step
 #
