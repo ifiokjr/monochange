@@ -259,6 +259,15 @@ monochange now includes a release workflow modeled around long-running release P
 
 That split keeps tag creation on the default branch side of the merge and lets downstream automation consume the exact durable release metadata that monochange stored in git history.
 
+For release asset workflows, prefer tag or manual dispatch triggers over draft `release.created` triggers. Draft releases do not reliably emit `release.created`, and immutable releases need every archive to be uploaded and attested before the release is finalized. A hardened GitHub release asset job should request `contents: write`, `id-token: write`, and `attestations: write`, upload the `.tar.gz` and `.zip` archives, then attest the archive files directly instead of treating checksum files as a substitute.
+
+After a release finishes, verify an archive with GitHub's attestation CLI:
+
+```bash
+gh attestation verify monochange-x86_64-unknown-linux-gnu-v1.2.3.tar.gz \
+  --repo monochange/monochange
+```
+
 For release repair, GitHub is also the first provider with hosted-release retarget sync support. monochange uses the durable release record plus tag names from that record to keep the hosted release view aligned with moved tags.
 
 ## GitHub Actions policy workflow
