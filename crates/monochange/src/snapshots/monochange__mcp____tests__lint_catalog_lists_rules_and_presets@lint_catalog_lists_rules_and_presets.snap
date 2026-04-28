@@ -33,6 +33,15 @@ expression: content_text(&result)
       }
     },
     {
+      "description": "Balanced changeset linting for typical monochange repositories",
+      "id": "changesets/recommended",
+      "maturity": "stable",
+      "name": "Changesets recommended",
+      "rules": {
+        "changesets/summary": "error"
+      }
+    },
+    {
       "description": "Balanced Dart manifest linting for metadata, publishability, and baseline SDK hygiene",
       "id": "dart/recommended",
       "maturity": "stable",
@@ -176,6 +185,60 @@ expression: content_text(&result)
           "name": "fix"
         }
       ]
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires changesets with bump `major` to satisfy scope rules",
+      "id": "changesets/bump/major",
+      "maturity": "stable",
+      "name": "Changeset major scope",
+      "options": []
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires changesets with bump `minor` to satisfy scope rules",
+      "id": "changesets/bump/minor",
+      "maturity": "stable",
+      "name": "Changeset minor scope",
+      "options": []
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires changesets with bump `none` to satisfy scope rules",
+      "id": "changesets/bump/none",
+      "maturity": "stable",
+      "name": "Changeset none scope",
+      "options": []
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires changesets with bump `patch` to satisfy scope rules",
+      "id": "changesets/bump/patch",
+      "maturity": "stable",
+      "name": "Changeset patch scope",
+      "options": []
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires changeset body to not use change types as headings",
+      "id": "changesets/no_section_headings",
+      "maturity": "stable",
+      "name": "Changeset no section headings",
+      "options": []
+    },
+    {
+      "autofixable": false,
+      "category": "correctness",
+      "description": "Requires changeset body to start with a summary heading",
+      "id": "changesets/summary",
+      "maturity": "stable",
+      "name": "Changeset summary heading",
+      "options": []
     },
     {
       "autofixable": true,
@@ -430,5 +493,5 @@ expression: content_text(&result)
       ]
     }
   ],
-  "summary": "Loaded 22 lint rule(s) and 6 preset(s)."
+  "summary": "Loaded 28 lint rule(s) and 7 preset(s)."
 }

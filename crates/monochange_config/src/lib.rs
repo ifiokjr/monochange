@@ -474,7 +474,7 @@ struct RawChangeFile {
 	changes: Vec<RawChangeEntry>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct RawChangeEntry {
 	package: String,
 	#[serde(default)]
@@ -1794,9 +1794,6 @@ fn parse_markdown_change_file_with_context(
 		});
 	}
 
-	let lint_settings = changeset_lint_settings_from_rules(&context.configuration.lints.rules)?;
-	lint_markdown_changeset(body, &changes, &lint_settings, changes_path)?;
-
 	Ok(RawChangeFile { changes })
 }
 
@@ -2186,7 +2183,7 @@ fn parse_changeset_frontmatter(
 	})
 }
 
-fn markdown_heading_level(line: &str) -> Option<usize> {
+pub(crate) fn markdown_heading_level(line: &str) -> Option<usize> {
 	let trimmed = line.trim_start();
 	let level = trimmed
 		.chars()
@@ -2628,14 +2625,14 @@ fn lint_markdown_scope(
 	Ok(())
 }
 
-fn first_non_empty_line(markdown: &str) -> Option<&str> {
+pub(crate) fn first_non_empty_line(markdown: &str) -> Option<&str> {
 	markdown.lines().find_map(|line| {
 		let trimmed = line.trim();
 		(!trimmed.is_empty()).then_some(trimmed)
 	})
 }
 
-fn markdown_heading_text(line: &str) -> Option<String> {
+pub(crate) fn markdown_heading_text(line: &str) -> Option<String> {
 	let level = markdown_heading_level(line)?;
 	let text = line
 		.trim_start()
@@ -2649,20 +2646,20 @@ fn markdown_heading_text(line: &str) -> Option<String> {
 	Some(text)
 }
 
-fn markdown_has_heading(markdown: &str, heading: &str) -> bool {
+pub(crate) fn markdown_has_heading(markdown: &str, heading: &str) -> bool {
 	markdown.lines().any(|line| {
 		markdown_heading_text(line).is_some_and(|text| text.eq_ignore_ascii_case(heading.trim()))
 	})
 }
 
-fn markdown_has_code_block(markdown: &str) -> bool {
+pub(crate) fn markdown_has_code_block(markdown: &str) -> bool {
 	markdown.lines().any(|line| {
 		let trimmed = line.trim_start();
 		trimmed.starts_with("```") || trimmed.starts_with("~~~")
 	})
 }
 
-fn has_conventional_commit_prefix(summary: &str) -> bool {
+pub(crate) fn has_conventional_commit_prefix(summary: &str) -> bool {
 	let Some((prefix, _)) = summary.split_once(':') else {
 		return false;
 	};
@@ -2891,7 +2888,7 @@ fn parse_markdown_change_target(
 	Ok((bump, version, change_type, caused_by))
 }
 
-fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {
+pub(crate) fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {
 	match value {
 		"none" => Some(BumpSeverity::None),
 		"major" => Some(BumpSeverity::Major),
@@ -5059,6 +5056,8 @@ fn validate_changeset_targets(
 
 	Ok(())
 }
+
+pub mod lints;
 
 #[cfg(test)]
 #[cfg(test)]

@@ -31,6 +31,7 @@ fn lint_suites() -> Vec<Box<dyn LintSuite>> {
 	suites.push(Box::new(monochange_npm::lints::lint_suite()));
 	#[cfg(feature = "dart")]
 	suites.push(Box::new(monochange_dart::lints::lint_suite()));
+	suites.push(Box::new(monochange_config::lints::lint_suite()));
 	suites
 }
 
