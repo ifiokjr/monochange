@@ -131,6 +131,7 @@ monochange can promote one prepared release into several source-provider automat
 - `mc release --dry-run --format json` refreshes the cached manifest and shows downstream automation data, including authored changesets plus linked release context metadata
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
+- when `mc release-pr` runs on GitHub Actions for the configured GitHub repository, the GitHub provider pushes a normal release branch commit first, then attempts to replace it with a Git Database API commit that GitHub reports as verified; if verification or the API update fails, the normal pushed commit remains in place
 - `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
 - `mc tag-release --from HEAD --dry-run --format json` previews the post-merge release tag set declared by that durable record
 - `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
