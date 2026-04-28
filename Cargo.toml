@@ -86,6 +86,7 @@ monochange_lint_testing = { version = "0.2.0", path = "./crates/monochange_lint_
 monochange_linting = { version = "0.2.0", path = "./crates/monochange_linting" }
 monochange_npm = { version = "0.2.0", path = "./crates/monochange_npm" }
 monochange_semver = { version = "0.2.0", path = "./crates/monochange_semver" }
+monochange_telemtry = { version = "0.2.0", path = "./crates/monochange_telemtry" }
 monochange_test_helpers = { version = "0.0.2", path = "./crates/monochange_test_helpers" }
 
 [workspace.metadata.bin]

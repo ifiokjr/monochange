@@ -249,6 +249,9 @@ path = "crates/monochange_graph"
 [package.monochange_semver]
 path = "crates/monochange_semver"
 
+[package.monochange_telemtry]
+path = "crates/monochange_telemtry"
+
 [package.monochange_github]
 path = "crates/monochange_github"
 
@@ -372,6 +375,7 @@ packages = [
 	"monochange_dart",
 	"monochange_graph",
 	"monochange_semver",
+	"monochange_telemtry",
 	"monochange_github",
 	"monochange_gitlab",
 	"monochange_gitea",

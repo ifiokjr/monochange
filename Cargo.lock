@@ -2061,6 +2061,7 @@ dependencies = [
  "monochange_lint",
  "monochange_npm",
  "monochange_semver",
+ "monochange_telemtry",
  "monochange_test_helpers",
  "portable-pty",
  "rayon",
@@ -2397,6 +2398,19 @@ dependencies = [
  "rstest",
  "semver",
  "similar-asserts",
+]
+
+[[package]]
+name = "monochange_telemtry"
+version = "0.2.0"
+dependencies = [
+ "monochange_core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]

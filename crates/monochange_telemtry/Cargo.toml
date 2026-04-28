@@ -1,0 +1,33 @@
+[package]
+name = "monochange_telemtry"
+version = { workspace = true }
+authors = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_telemtry"
+edition = { workspace = true }
+homepage = { workspace = true }
+include = ["src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "readme.md"]
+keywords = ["cli", "telemetry", "jsonl", "tracing", "monorepo"]
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Local telemetry primitives for monochange"
+
+[features]
+default = []
+http = ["monochange_core/http"]
+
+[dependencies]
+monochange_core = { workspace = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
+
+[dev-dependencies]
+reqwest = { workspace = true, default-features = true, features = ["blocking"] }
+temp-env = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

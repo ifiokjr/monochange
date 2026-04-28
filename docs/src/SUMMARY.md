@@ -25,6 +25,7 @@
 
 - [Manifest linting with `mc check`](reference/linting.md)
 - [Progress output](reference/progress-output.md)
+- [Telemetry](reference/telemetry.md)
 - [Hosted release benchmarks](reference/hosted-release-benchmarks.md)
 - [CLI step reference](reference/cli-steps/00-index.md)
   - [Validate](reference/cli-steps/01-validate.md)

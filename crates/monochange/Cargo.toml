@@ -51,6 +51,7 @@ monochange_graph = { workspace = true }
 monochange_lint = { workspace = true }
 monochange_npm = { workspace = true, optional = true }
 monochange_semver = { workspace = true }
+monochange_telemtry = { workspace = true }
 rayon = { workspace = true, default-features = true }
 regex = { workspace = true, default-features = true }
 reqwest = { workspace = true, default-features = true, features = ["blocking"] }
