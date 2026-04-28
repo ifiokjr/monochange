@@ -1494,7 +1494,11 @@ fn load_changeset_file_lints_configured_summary_requirements() {
 	// Changeset linting now runs through `mc check` rather than during config loading,
 	// so `load_changeset_file` should succeed even when the changeset body violates lint rules.
 	let _file = load_changeset_file(&root.join("change.md"), &configuration, &packages)
-		.expect("changeset should load successfully; lint errors are reported by `mc check`");
+		.unwrap_or_else(|error| {
+			panic!(
+				"changeset should load successfully; lint errors are reported by `mc check`: {error}"
+			)
+		});
 }
 
 #[test]
@@ -1513,7 +1517,11 @@ fn load_changeset_file_lints_configured_bump_and_type_rules() {
 
 	// Changeset linting now runs through `mc check` rather than during config loading.
 	let _file = load_changeset_file(&root.join("change.md"), &configuration, &packages)
-		.expect("changeset should load successfully; lint errors are reported by `mc check`");
+		.unwrap_or_else(|error| {
+			panic!(
+				"changeset should load successfully; lint errors are reported by `mc check`: {error}"
+			)
+		});
 }
 
 #[test]
@@ -1539,7 +1547,11 @@ fn load_changeset_file_lints_configured_custom_type_rule() {
 
 	// Changeset linting now runs through `mc check` rather than during config loading.
 	let _file = load_changeset_file(&root.join("change.md"), &configuration, &packages)
-		.expect("changeset should load successfully; lint errors are reported by `mc check`");
+		.unwrap_or_else(|error| {
+			panic!(
+				"changeset should load successfully; lint errors are reported by `mc check`: {error}"
+			)
+		});
 }
 
 #[test]
