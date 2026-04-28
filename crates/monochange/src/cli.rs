@@ -171,6 +171,13 @@ pub(crate) fn build_command_with_cli(
 					.value_name("FORMAT")
 					.value_parser(["auto", "unicode", "ascii", "json"]),
 			)
+			.arg(
+				Arg::new("jq")
+					.long("jq")
+					.global(true)
+					.help("Filter JSON output with a jq-style expression, such as `.assets[].name`")
+					.value_name("EXPRESSION"),
+			)
 			.subcommand(
 				Command::new("init")
 					.about(

@@ -49,6 +49,7 @@ Commands:
 Options:
   -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
       --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
+      --jq <EXPRESSION>           Filter JSON output with a jq-style expression, such as `.assets[].name`
   -h, --help                      Print help
 
 

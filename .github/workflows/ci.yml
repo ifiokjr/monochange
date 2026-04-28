@@ -94,15 +94,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-            resolved_commit="$(jq -r '.resolvedCommit' /tmp/release-record.json)"
-            record_commit="$(jq -r '.recordCommit' /tmp/release-record.json)"
-
-            if [ "$resolved_commit" = "$record_commit" ]; then
-              echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
-            fi
+          if is_release_commit="$(mc release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+            echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi
@@ -368,15 +361,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-            resolved_commit="$(jq -r '.resolvedCommit' /tmp/release-record.json)"
-            record_commit="$(jq -r '.recordCommit' /tmp/release-record.json)"
-
-            if [ "$resolved_commit" = "$record_commit" ]; then
-              echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
-            fi
+          if is_release_commit="$(mc release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+            echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi
@@ -399,6 +385,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
     steps:
       - name: checkout repository
@@ -420,25 +407,34 @@ jobs:
         run: |
           set -euo pipefail
 
-          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-            resolved_commit="$(jq -r .resolvedCommit /tmp/release-record.json)"
-            record_commit="$(jq -r .recordCommit /tmp/release-record.json)"
-
-            if [ "$resolved_commit" = "$record_commit" ]; then
-              echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+          if is_release_commit="$(mc release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+            echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
+            if [ "${is_release_commit}" = "true" ]; then
               mc tag-release --from HEAD --push=true --format json | tee /tmp/tag-report.json
-            else
-              echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: publish release
+      - name: create draft releases
         if: steps.tag_release.outputs.is_release_commit == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mc publish-release --from-ref="${{ inputs.from-ref }}"
+        run: mc publish-release --from-ref="HEAD" --draft --format json | tee /tmp/publish-release.json
+        shell: devenv shell -- bash -e {0}
+
+      - name: upload release assets to drafts
+        if: steps.tag_release.outputs.is_release_commit == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          tag="$(mc release-record --from HEAD --format json --jq '.record.releaseTargets[] | select(.id == "main" and .kind == "group" and .release == true) | .tagName')"
+          gh workflow run release.yml \
+            --repo "${{ github.repository }}" \
+            --ref "main" \
+            -f "tag=${tag}"
         shell: devenv shell -- bash -e {0}
 
       - name: comment on released issues

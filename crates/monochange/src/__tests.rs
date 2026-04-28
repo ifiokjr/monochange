@@ -223,7 +223,48 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("step:retarget-release"));
 	assert!(output.contains("release-record"));
 	assert!(output.contains("publish-bootstrap"));
+	assert!(output.contains("publish-release"));
+	assert!(output.contains("comment-released-issues"));
 	assert!(output.contains("tag-release"));
+}
+
+#[test]
+fn publish_release_help_documents_draft_release_options() {
+	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+	let output = run_with_args_in_dir(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("publish-release"),
+			OsString::from("--help"),
+		],
+		&root,
+	)
+	.unwrap_or_else(|error| panic!("publish-release help: {error}"));
+
+	assert!(output.contains("Create provider releases from a durable release record"));
+	assert!(output.contains("--from-ref <FROM-REF>"));
+	assert!(output.contains("--draft"));
+	assert!(output.contains("--format <FORMAT>"));
+}
+
+#[test]
+fn comment_released_issues_help_documents_post_merge_options() {
+	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+	let output = run_with_args_in_dir(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("comment-released-issues"),
+			OsString::from("--help"),
+		],
+		&root,
+	)
+	.unwrap_or_else(|error| panic!("comment-released-issues help: {error}"));
+
+	assert!(output.contains("Comment on and optionally close issues"));
+	assert!(output.contains("--from-ref <FROM-REF>"));
+	assert!(output.contains("--auto-close-issues"));
 }
 
 #[test]
@@ -642,6 +683,58 @@ fn release_record_supports_json_output() {
 	assert!(output.contains("\"record\""));
 	assert!(output.contains("\"recordCommit\""));
 	assert!(output.contains("\"resolvedCommit\""));
+}
+
+#[test]
+fn release_record_jq_filters_json_output_for_ci() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let mut record = sample_release_record_for_retarget();
+	record.release_targets[0].id = "main".to_string();
+	create_release_record_commit_from_record(root, &record);
+	let subscriber = tracing_subscriber::fmt()
+		.with_max_level(tracing::Level::TRACE)
+		.with_writer(std::io::sink)
+		.finish();
+	let traced_discovery = tracing::subscriber::with_default(subscriber, || {
+		crate::release_record::discover_release_record(root, "HEAD")
+	})
+	.unwrap_or_else(|error| panic!("trace release-record discovery: {error}"));
+	assert_eq!(traced_discovery.record.release_targets[0].id, "main");
+
+	let tag = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("release-record"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--format"),
+			OsString::from("json"),
+			OsString::from("--jq"),
+			OsString::from(
+				r#".record.releaseTargets[] | select(.id == "main" and .kind == "group" and .release == true) | .tagName"#,
+			),
+		],
+	)
+	.unwrap_or_else(|error| panic!("release-record jq tag output: {error}"));
+	assert_eq!(tag, "v1.2.3");
+
+	let is_release_commit = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("release-record"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--format"),
+			OsString::from("json"),
+			OsString::from("--jq"),
+			OsString::from(".resolvedCommit == .recordCommit"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("release-record jq commit output: {error}"));
+	assert_eq!(is_release_commit, "true");
 }
 
 #[test]

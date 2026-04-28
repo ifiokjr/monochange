@@ -338,6 +338,19 @@ fn ensure_prepared_release_for_consumer_step(
 	Ok(())
 }
 
+fn publish_release_source_configuration(
+	configured_source: Option<&SourceConfiguration>,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<SourceConfiguration> {
+	let mut source = configured_source.cloned().ok_or_else(|| {
+		MonochangeError::Config("`PublishRelease` requires `[source]` configuration".to_string())
+	})?;
+	if parse_boolean_step_input(step_inputs, "draft")?.unwrap_or(false) {
+		source.releases.draft = true;
+	}
+	Ok(source)
+}
+
 pub(crate) fn build_release_results(
 	dry_run: bool,
 	requests: &[SourceReleaseRequest],
@@ -723,15 +736,14 @@ pub(crate) fn execute_cli_command_with_options(
 						let discovery = discover_release_record(root, &from_ref)?;
 						build_release_manifest_from_record(&discovery.record)
 					};
+					let source = publish_release_source_configuration(
+						configuration.source.as_ref(),
+						&step_inputs,
+					)?;
 					if !context.dry_run {
 						#[rustfmt::skip]
-						release_branch_policy::verify_release_ref_for_publish(root, configuration.source.as_ref(), &verify_ref)?;
+						release_branch_policy::verify_release_ref_for_publish(root, Some(&source), &verify_ref)?;
 					}
-					let source = configuration.source.clone().ok_or_else(|| {
-						MonochangeError::Config(
-							"`PublishRelease` requires `[source]` configuration".to_string(),
-						)
-					})?;
 					context.release_requests = build_source_release_requests(&source, &manifest);
 					#[rustfmt::skip]
 						let results = build_release_results_for_source(context.dry_run, &source, &context.release_requests)?;
@@ -3480,6 +3492,7 @@ mod tests {
 	use monochange_core::ReleaseOwnerKind;
 	use monochange_core::ReleasePlan;
 	use monochange_core::ShellConfig;
+	use monochange_core::SourceProvider;
 	use monochange_core::VersionFormat;
 	use serde::Serialize;
 	use tempfile::tempdir;
@@ -3513,6 +3526,63 @@ mod tests {
 			step_outputs: BTreeMap::new(),
 			command_logs: Vec::new(),
 		}
+	}
+
+	fn sample_source_configuration() -> SourceConfiguration {
+		let provider = serde_json::from_str::<SourceProvider>("\"github\"")
+			.unwrap_or_else(|error| panic!("source provider: {error}"));
+		SourceConfiguration {
+			provider,
+			owner: "monochange".to_string(),
+			repo: "monochange".to_string(),
+			host: None,
+			api_url: None,
+			releases: monochange_core::ProviderReleaseSettings::default(),
+			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+			bot: monochange_core::ProviderBotSettings::default(),
+		}
+	}
+
+	#[test]
+	fn publish_release_source_configuration_preserves_configured_draft_default() {
+		let mut source = sample_source_configuration();
+		source.releases.draft = true;
+
+		let configured = publish_release_source_configuration(Some(&source), &BTreeMap::new())
+			.unwrap_or_else(|error| panic!("publish source: {error}"));
+
+		assert!(configured.releases.draft);
+	}
+
+	#[test]
+	fn publish_release_source_configuration_applies_draft_step_override() {
+		let source = sample_source_configuration();
+		let inputs = BTreeMap::from([("draft".to_string(), vec!["true".to_string()])]);
+
+		let configured = publish_release_source_configuration(Some(&source), &inputs)
+			.unwrap_or_else(|error| panic!("publish source: {error}"));
+
+		assert!(configured.releases.draft);
+		assert!(!source.releases.draft);
+	}
+
+	#[test]
+	fn publish_release_source_configuration_keeps_draft_disabled_without_override() {
+		let source = sample_source_configuration();
+
+		let configured = publish_release_source_configuration(Some(&source), &BTreeMap::new())
+			.unwrap_or_else(|error| panic!("publish source: {error}"));
+
+		assert!(!configured.releases.draft);
+	}
+
+	#[test]
+	fn publish_release_source_configuration_requires_source_configuration() {
+		let error = publish_release_source_configuration(None, &BTreeMap::new())
+			.err()
+			.unwrap_or_else(|| panic!("expected source configuration error"));
+
+		assert!(error.to_string().contains("[source]"));
 	}
 
 	fn sample_configuration(root: &Path) -> monochange_core::WorkspaceConfiguration {

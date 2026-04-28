@@ -2063,11 +2063,13 @@ impl CliStepDefinition {
 			Self::Validate { .. } => Some(&["fix"]),
 			Self::CommitRelease { .. } => Some(&["no_verify"]),
 			Self::VerifyReleaseBranch { .. } => Some(&["from"]),
-			Self::Discover { .. }
-			| Self::DisplayVersions { .. }
-			| Self::PrepareRelease { .. }
-			| Self::PublishRelease { .. }
-			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
+			Self::Discover { .. } | Self::DisplayVersions { .. } | Self::PrepareRelease { .. } => {
+				Some(&["format"])
+			}
+			Self::CommentReleasedIssues { .. } => {
+				Some(&["format", "from-ref", "auto-close-issues"])
+			}
+			Self::PublishRelease { .. } => Some(&["format", "from-ref", "draft"]),
 			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package"]),
 			Self::PublishPackages { .. } => {
@@ -2159,13 +2161,22 @@ impl CliStepDefinition {
 				}
 			}
 			Self::Command { .. } => None,
-			Self::Discover { .. }
-			| Self::DisplayVersions { .. }
-			| Self::PrepareRelease { .. }
-			| Self::PublishRelease { .. }
-			| Self::CommentReleasedIssues { .. } => {
+			Self::Discover { .. } | Self::DisplayVersions { .. } | Self::PrepareRelease { .. } => {
+				matches!(name, "format").then_some(CliInputKind::Choice)
+			}
+			Self::CommentReleasedIssues { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
+					"from-ref" => Some(CliInputKind::String),
+					"auto-close-issues" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
+			Self::PublishRelease { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"from-ref" => Some(CliInputKind::String),
+					"draft" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}

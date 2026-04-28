@@ -948,6 +948,8 @@ steps = [
 help_text = "Create provider releases from a durable release record"
 inputs = [
 	{ name = "from-ref", type = "string", default = "HEAD" },
+	{ name = "draft", type = "boolean", default = false },
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "text" },
 ]
 steps = [{ name = "publish release", type = "PublishRelease" }]
 
@@ -955,7 +957,7 @@ steps = [{ name = "publish release", type = "PublishRelease" }]
 help_text = "Comment on and optionally close issues referenced in released changesets"
 inputs = [
 	{ name = "from-ref", type = "string", default = "HEAD" },
-	{ name = "auto-close-issues", type = "string", default = "false" },
+	{ name = "auto-close-issues", type = "boolean", default = false },
 ]
 steps = [{ name = "comment on released issues", type = "CommentReleasedIssues" }]
 
