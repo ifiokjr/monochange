@@ -127,11 +127,7 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 		.into_iter()
 		.filter_map(|lockfile| {
 			let file_name = lockfile.file_name()?.to_str()?;
-			let command = match file_name {
-				UV_LOCK_FILE => "uv lock",
-				POETRY_LOCK_FILE => "poetry lock --no-update",
-				_ => return None,
-			};
+			let command = lockfile_command(file_name)?;
 			Some(LockfileCommandExecution {
 				command: command.to_string(),
 				cwd: lockfile
@@ -142,6 +138,14 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 			})
 		})
 		.collect()
+}
+
+fn lockfile_command(file_name: &str) -> Option<&'static str> {
+	match file_name {
+		UV_LOCK_FILE => Some("uv lock"),
+		POETRY_LOCK_FILE => Some("poetry lock --no-update"),
+		_ => None,
+	}
 }
 
 pub fn update_versioned_file_text(

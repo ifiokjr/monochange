@@ -859,6 +859,7 @@ fn default_lockfile_commands_handles_uv_poetry_and_unknown_lockfiles() {
 		.collect::<Vec<_>>();
 
 	assert_eq!(command_names, vec!["uv lock", "poetry lock --no-update"]);
+	assert_eq!(crate::lockfile_command("requirements.lock"), None);
 	let root_name = root.file_name().unwrap_or_else(|| panic!("temp root name"));
 	assert!(
 		commands
@@ -956,6 +957,32 @@ fn private_package_parser_covers_error_and_dependency_value_branches() {
 		.unwrap_or_else(|| panic!("expected parse package error"));
 	assert!(parse_error.to_string().contains("failed to parse"));
 
+	let project = toml::from_str::<toml::Value>(
+		r#"
+[project]
+dependencies = ["requests>=2", 1]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", 1]
+empty = "not-an-array"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("parse project fixture: {error}"));
+	let project_table = project
+		.get("project")
+		.unwrap_or_else(|| panic!("expected project table"));
+	let pep621_deps = crate::parse_pep621_dependencies(project_table);
+	assert!(
+		pep621_deps
+			.iter()
+			.any(|dep| dep.name == "requests" && !dep.optional)
+	);
+	assert!(
+		pep621_deps
+			.iter()
+			.any(|dep| dep.name == "pytest" && dep.optional)
+	);
+
 	let poetry = toml::from_str::<toml::Value>(
 		r#"
 [dependencies]
@@ -965,6 +992,12 @@ celery = { version = "^5.3" }
 local = { path = "../local" }
 unknown = 1
 
+[group]
+metadata = "not-a-group-table"
+
+[group.empty]
+dependencies = "not-a-dependency-table"
+
 [group.dev.dependencies]
 pytest = "^8.0"
 ruff = { version = "^0.4" }
@@ -973,6 +1006,9 @@ numbered = 1
 "#,
 	)
 	.unwrap_or_else(|error| panic!("parse poetry fixture: {error}"));
+	let empty_poetry = toml::Value::Table(toml::map::Map::new());
+	assert!(crate::parse_poetry_dependencies(&empty_poetry).is_empty());
+
 	let deps = crate::parse_poetry_dependencies(&poetry);
 	assert!(
 		deps.iter()

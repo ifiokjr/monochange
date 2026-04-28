@@ -8426,8 +8426,12 @@ fn apply_versioned_file_definition_reports_python_error_paths() {
 	.unwrap_or_else(|| panic!("expected unsupported python path error"));
 	assert!(error.to_string().contains("python"));
 
-	fs::write(tempdir.path().join("pyproject.toml"), "[project\n")
-		.unwrap_or_else(|error| panic!("write invalid manifest: {error}"));
+	let manifest_path = tempdir.path().join("pyproject.toml");
+	fs::write(
+		&manifest_path,
+		"[project]\nname = \"python-core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write manifest: {error}"));
 	let manifest_definition = monochange_core::VersionedFileDefinition {
 		path: "pyproject.toml".to_string(),
 		ecosystem_type: Some(monochange_core::EcosystemType::Python),
@@ -8436,6 +8440,10 @@ fn apply_versioned_file_definition_reports_python_error_paths() {
 		name: None,
 		regex: None,
 	};
+	updates.insert(
+		manifest_path,
+		crate::CachedDocument::Text("[project\n".to_string()),
+	);
 	let error = crate::apply_versioned_file_definition(
 		tempdir.path(),
 		&mut updates,

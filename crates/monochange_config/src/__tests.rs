@@ -4506,6 +4506,33 @@ fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths()
 			.contains("for ecosystem `cargo`")
 	);
 
+	assert!(crate::path_is_supported_for_ecosystem(
+		Path::new("pubspec.yaml"),
+		EcosystemType::Dart
+	));
+	let dart_unsupported_match = crate::validate_versioned_files(
+		tempdir.path(),
+		config_contents,
+		&[monochange_core::VersionedFileDefinition {
+			path: "packages/*/package.json".to_string(),
+			ecosystem_type: Some(EcosystemType::Dart),
+			name: None,
+			fields: None,
+			prefix: None,
+			regex: None,
+		}],
+		&declared_packages,
+		"package",
+		"core",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported dart match error"));
+	assert!(
+		dart_unsupported_match
+			.to_string()
+			.contains("for ecosystem `dart`")
+	);
+
 	let empty_template = crate::validate_changelog_configuration(
 		"",
 		&crate::RawChangelogSettings {

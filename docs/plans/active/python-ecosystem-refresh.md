@@ -67,6 +67,10 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] `cargo test -p monochange --features python apply_versioned_file_definition_reports_python_error_paths --lib`
 - [x] `cargo test -p monochange --features python inferred_lockfile_ecosystem_type_maps_python_when_commands_are_not_configured --lib`
 - [x] `cargo test -p monochange --features python render_annotated_init_config_includes_python_package_type --lib`
+- [x] `cargo test -p monochange_python private_package_parser_covers_error_and_dependency_value_branches --lib`
+- [x] `cargo test -p monochange_config validate_versioned_files_and_release_notes_cover_remaining_validation_paths --lib`
+- [x] `devenv shell coverage:all`
+- [x] `MONOCHANGE_PATCH_COVERAGE_BASE=$(git merge-base origin/main HEAD) MONOCHANGE_PATCH_COVERAGE_HEAD=HEAD devenv shell coverage:patch` (`PATCH_COVERAGE 573/573 (100.00%)`)
 
 ## Notes
 
