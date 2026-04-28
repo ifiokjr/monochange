@@ -434,6 +434,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			python: EcosystemSettings::default(),
 		}
 	}
 
@@ -705,6 +706,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			python: EcosystemSettings::default(),
 		};
 		let displays = build_selectable_targets(&configuration)
 			.into_iter()
@@ -782,6 +784,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			python: EcosystemSettings::default(),
 		};
 		let targets = build_selectable_targets(&configuration);
 		assert_eq!(targets.len(), 1);
@@ -843,6 +846,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			python: EcosystemSettings::default(),
 		};
 		let targets = build_selectable_targets(&configuration);
 		let ids: Vec<&str> = targets.iter().map(|t| t.id.as_str()).collect();
@@ -928,6 +932,7 @@ mod __tests {
 			npm: EcosystemSettings::default(),
 			deno: EcosystemSettings::default(),
 			dart: EcosystemSettings::default(),
+			python: EcosystemSettings::default(),
 		};
 		let target = build_selectable_targets(&configuration)
 			.into_iter()

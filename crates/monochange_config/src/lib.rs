@@ -345,6 +345,8 @@ struct RawEcosystems {
 	deno: RawEcosystemSettings,
 	#[serde(default)]
 	dart: RawEcosystemSettings,
+	#[serde(default)]
+	python: RawEcosystemSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -734,6 +736,7 @@ fn package_type_to_ecosystem_type(package_type: PackageType) -> EcosystemType {
 		PackageType::Npm => EcosystemType::Npm,
 		PackageType::Deno => EcosystemType::Deno,
 		PackageType::Dart | PackageType::Flutter => EcosystemType::Dart,
+		PackageType::Python => EcosystemType::Python,
 		_ => EcosystemType::Cargo,
 	}
 }
@@ -810,7 +813,8 @@ fn default_publish_registry_for_ecosystem(
 		EcosystemType::Cargo => Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
 		EcosystemType::Npm => Some(PublishRegistry::Builtin(RegistryKind::Npm)),
 		EcosystemType::Deno => Some(PublishRegistry::Builtin(RegistryKind::Jsr)),
-		EcosystemType::Dart => Some(PublishRegistry::Builtin(RegistryKind::PubDev)), _ => None,
+		EcosystemType::Dart => Some(PublishRegistry::Builtin(RegistryKind::PubDev)),
+		_ => None,
 	};
 	registry
 }
@@ -953,6 +957,7 @@ fn build_package_definitions(
 	npm_ecosystem: &EcosystemSettings,
 	deno_ecosystem: &EcosystemSettings,
 	dart_ecosystem: &EcosystemSettings,
+	python_ecosystem: &EcosystemSettings,
 ) -> MonochangeResult<Vec<PackageDefinition>> {
 	packages
 		.into_iter()
@@ -1001,6 +1006,7 @@ fn build_package_definitions(
 					EcosystemType::Npm => npm_ecosystem.versioned_files.clone(),
 					EcosystemType::Deno => deno_ecosystem.versioned_files.clone(),
 					EcosystemType::Dart => dart_ecosystem.versioned_files.clone(),
+					EcosystemType::Python => python_ecosystem.versioned_files.clone(),
 					_ => Vec::new(),
 				}
 			};
@@ -1022,7 +1028,8 @@ fn build_package_definitions(
 						EcosystemType::Cargo => &cargo_ecosystem.publish,
 						EcosystemType::Npm => &npm_ecosystem.publish,
 						EcosystemType::Deno => &deno_ecosystem.publish,
-						EcosystemType::Dart => &dart_ecosystem.publish, _ => unreachable!("unsupported ecosystem type for package publish"),
+						EcosystemType::Dart => &dart_ecosystem.publish,
+						_ => &python_ecosystem.publish,
 					};
 					publish
 				}),
@@ -1166,6 +1173,13 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		normalize_ecosystem_settings(&contents, "deno", EcosystemType::Deno, ecosystems.deno)?;
 	let dart_ecosystem =
 		normalize_ecosystem_settings(&contents, "dart", EcosystemType::Dart, ecosystems.dart)?;
+	let python_ecosystem_input = ecosystems.python;
+	let python_ecosystem = normalize_ecosystem_settings(
+		&contents,
+		"python",
+		EcosystemType::Python,
+		python_ecosystem_input,
+	)?;
 	let defaults_changelog_policy = defaults
 		.changelog
 		.as_ref()
@@ -1185,6 +1199,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		&npm_ecosystem,
 		&deno_ecosystem,
 		&dart_ecosystem,
+		&python_ecosystem,
 	)?;
 	let groups = build_group_definitions(&contents, group, default_changelog_format)?;
 	let source = resolve_source_configuration(source);
@@ -1198,6 +1213,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		("npm", &npm_ecosystem),
 		("deno", &deno_ecosystem),
 		("dart", &dart_ecosystem),
+		("python", &python_ecosystem),
 	] {
 		let declared_packages = packages
 			.iter()
@@ -1242,6 +1258,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		npm: npm_ecosystem,
 		deno: deno_ecosystem,
 		dart: dart_ecosystem,
+		python: python_ecosystem,
 	})
 }
 
@@ -2707,6 +2724,7 @@ fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -
 		EcosystemType::Npm => monochange_npm::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Deno => monochange_deno::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Dart => monochange_dart::supported_versioned_file_kind(path).is_some(),
+		EcosystemType::Python => monochange_python::supported_versioned_file_kind(path).is_some(),
 		_ => false,
 	}
 }
@@ -2802,6 +2820,7 @@ fn validate_versioned_files(
 							EcosystemType::Npm => "npm",
 							EcosystemType::Deno => "deno",
 							EcosystemType::Dart => "dart",
+							EcosystemType::Python => "python",
 							_ => "unknown",
 						}
 					),
@@ -2872,6 +2891,7 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 		PackageType::Npm => "package.json",
 		PackageType::Deno => "deno.json",
 		PackageType::Dart | PackageType::Flutter => "pubspec.yaml",
+		PackageType::Python => "pyproject.toml",
 		_ => "Cargo.toml",
 	}
 }
@@ -4223,6 +4243,7 @@ pub fn validate_versioned_files_content(root: &Path) -> MonochangeResult<Vec<Str
 		("npm", &configuration.npm),
 		("deno", &configuration.deno),
 		("dart", &configuration.dart),
+		("python", &configuration.python),
 	];
 	for &(eco_name, settings) in ecosystem_entries {
 		if !settings.versioned_files.is_empty() {

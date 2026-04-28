@@ -4,6 +4,7 @@
 - npm workspaces, pnpm workspaces, Bun workspaces, and standalone `package.json` packages
 - Deno workspaces and standalone `deno.json` / `deno.jsonc` packages
 - Dart and Flutter workspaces plus standalone `pubspec.yaml` packages
+- Python uv workspaces, Poetry projects, and standalone `pyproject.toml` packages
 
 <!-- {/discoverySupportedSources} -->
 
@@ -433,6 +434,10 @@ enabled = true
 [ecosystems.dart]
 enabled = true
 lockfile_commands = [{ command = "flutter pub get", cwd = "packages/mobile" }]
+
+[ecosystems.python]
+enabled = true
+lockfile_commands = [{ command = "uv lock" }]
 ```
 
 <!-- {/configurationEcosystemSettingsSnippet} -->

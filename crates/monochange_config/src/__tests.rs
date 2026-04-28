@@ -984,6 +984,114 @@ fn load_workspace_configuration_inherits_ecosystem_versioned_files_for_cargo_den
 }
 
 #[test]
+fn load_workspace_configuration_inherits_python_ecosystem_defaults() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("packages/app"))
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+	std::fs::write(
+		root.join("packages/app/pyproject.toml"),
+		"[project]\nname = \"python-app\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write pyproject: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"[ecosystems.python]
+dependency_version_prefix = "~="
+versioned_files = ["pyproject.toml"]
+
+[package.app]
+path = "packages/app"
+type = "python"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	assert_eq!(
+		configuration.python.dependency_version_prefix.as_deref(),
+		Some("~=")
+	);
+	let package = configuration
+		.packages
+		.iter()
+		.find(|package| package.id == "app")
+		.unwrap_or_else(|| panic!("expected app package"));
+	assert_eq!(package.package_type, monochange_core::PackageType::Python);
+	assert_eq!(
+		package
+			.versioned_files
+			.first()
+			.map(|definition| definition.ecosystem_type),
+		Some(Some(EcosystemType::Python))
+	);
+	assert_eq!(
+		package
+			.versioned_files
+			.first()
+			.map(|definition| definition.path.as_str()),
+		Some("pyproject.toml")
+	);
+	assert!(package.publish.registry.is_none());
+}
+
+#[test]
+fn load_workspace_configuration_reports_python_ecosystem_normalization_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"[ecosystems.python.publish]
+registry = "https://example.com/simple"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let error = load_workspace_configuration(root)
+		.expect_err("unsupported Python registry override should be rejected");
+	let message = error.to_string();
+	assert!(
+		message.contains("ecosystems `python` uses built-in publishing"),
+		"unexpected error: {message}"
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_python_versioned_file_glob_unsupported_files() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("packages/app"))
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+	std::fs::write(
+		root.join("packages/app/pyproject.toml"),
+		"[project]\nname = \"python-app\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write pyproject: {error}"));
+	std::fs::write(root.join("packages/app/unsupported.json"), "{}")
+		.unwrap_or_else(|error| panic!("write unsupported: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"[package.app]
+path = "packages/app"
+type = "python"
+versioned_files = ["packages/app/*.json"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let error = match load_workspace_configuration(root) {
+		Ok(configuration) => panic!("expected error: {configuration:?}"),
+		Err(error) => error,
+	};
+	let message = error.to_string();
+	assert!(
+		message.contains("ecosystem `python`"),
+		"unexpected error: {message}"
+	);
+}
+
+#[test]
 fn load_workspace_configuration_parses_ecosystem_lockfile_commands() {
 	let root = fixture_path("config/lockfile-commands");
 	let configuration = load_workspace_configuration(&root)
@@ -4417,6 +4525,33 @@ fn validate_versioned_files_and_release_notes_cover_remaining_validation_paths()
 		unsupported_match
 			.to_string()
 			.contains("for ecosystem `cargo`")
+	);
+
+	assert!(crate::path_is_supported_for_ecosystem(
+		Path::new("pubspec.yaml"),
+		EcosystemType::Dart
+	));
+	let dart_unsupported_match = crate::validate_versioned_files(
+		tempdir.path(),
+		config_contents,
+		&[monochange_core::VersionedFileDefinition {
+			path: "packages/*/package.json".to_string(),
+			ecosystem_type: Some(EcosystemType::Dart),
+			name: None,
+			fields: None,
+			prefix: None,
+			regex: None,
+		}],
+		&declared_packages,
+		"package",
+		"core",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported dart match error"));
+	assert!(
+		dart_unsupported_match
+			.to_string()
+			.contains("for ecosystem `dart`")
 	);
 
 	let empty_template = crate::validate_changelog_configuration(

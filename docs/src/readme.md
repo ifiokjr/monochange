@@ -146,7 +146,7 @@ These are the commands most repositories use after running `mc init`. With the n
 
 <!-- {=projectMilestoneCapabilities} -->
 
-- discover Cargo, npm/pnpm/Bun, Deno, Dart, and Flutter packages
+- discover Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, and Python packages
 - normalize dependency edges across ecosystems
 - coordinate shared package groups from `monochange.toml`
 - compute release plans from explicit change input

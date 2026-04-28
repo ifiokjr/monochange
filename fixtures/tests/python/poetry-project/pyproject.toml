@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "poetry-app"
+version = "3.1.0"
+description = "A Poetry-managed package"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+django = "^4.2"
+celery = "^5.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+black = "^23.0"

@@ -2060,6 +2060,7 @@ dependencies = [
  "monochange_graph",
  "monochange_lint",
  "monochange_npm",
+ "monochange_python",
  "monochange_semver",
  "monochange_test_helpers",
  "portable-pty",
@@ -2169,6 +2170,7 @@ dependencies = [
  "monochange_github",
  "monochange_gitlab",
  "monochange_npm",
+ "monochange_python",
  "monochange_test_helpers",
  "proptest",
  "regex",
@@ -2383,6 +2385,25 @@ dependencies = [
  "serde_yaml_ng",
  "similar-asserts",
  "thiserror 2.0.18",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
+name = "monochange_python"
+version = "0.2.0"
+dependencies = [
+ "glob",
+ "insta",
+ "monochange_core",
+ "monochange_test_helpers",
+ "rstest",
+ "semver",
+ "serde",
+ "similar-asserts",
+ "tempfile",
+ "toml",
+ "toml_edit",
  "tracing",
  "walkdir",
 ]

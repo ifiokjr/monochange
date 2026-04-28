@@ -42,6 +42,8 @@ use monochange_deno::load_configured_deno_package;
 use monochange_npm::discover_npm_packages;
 #[cfg(feature = "npm")]
 use monochange_npm::load_configured_npm_package;
+#[cfg(feature = "python")]
+use monochange_python::discover_python_packages;
 use serde_json::json;
 use typed_builder::TypedBuilder;
 
@@ -517,6 +519,7 @@ fn render_annotated_init_config(
 			PackageType::Deno => "deno",
 			PackageType::Dart => "dart",
 			PackageType::Flutter => "flutter",
+			PackageType::Python => "python",
 			_ => unreachable!(),
 		};
 
@@ -538,6 +541,7 @@ fn render_annotated_init_config(
 	let has_dart = packages
 		.iter()
 		.any(|p| p.ecosystem == Ecosystem::Dart || p.ecosystem == Ecosystem::Flutter);
+	let has_python = packages.iter().any(|p| p.ecosystem == Ecosystem::Python);
 
 	let package_ids_toml = package_ids
 		.iter()
@@ -553,6 +557,7 @@ fn render_annotated_init_config(
 		"has_npm": has_npm,
 		"has_deno": has_deno,
 		"has_dart": has_dart,
+		"has_python": has_python,
 		"provider": provider.unwrap_or(""),
 		"owner": remote.map_or("your-org", |r| r.owner.as_str()),
 		"repo": remote.map_or("your-repo", |r| r.repo.as_str()),
@@ -592,6 +597,8 @@ fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
 	packages.extend(discover_deno_packages(root)?.packages);
 	#[cfg(feature = "dart")]
 	packages.extend(discover_dart_packages(root)?.packages);
+	#[cfg(feature = "python")]
+	packages.extend(discover_python_packages(root)?.packages);
 
 	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
@@ -636,8 +643,33 @@ fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 		Ecosystem::Deno => PackageType::Deno,
 		Ecosystem::Dart => PackageType::Dart,
 		Ecosystem::Flutter => PackageType::Flutter,
+		Ecosystem::Python => PackageType::Python,
 		_ => PackageType::Cargo,
 	}
+}
+
+#[test]
+fn package_type_for_ecosystem_maps_python() {
+	assert_eq!(
+		package_type_for_ecosystem(Ecosystem::Python),
+		PackageType::Python
+	);
+	assert_eq!(PackageType::Python.as_str(), "python");
+}
+
+#[test]
+fn render_annotated_init_config_includes_python_package_type() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	fs::write(
+		root.join("pyproject.toml"),
+		"[project]\nname = \"python-app\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write pyproject: {error}"));
+
+	let rendered = render_annotated_init_config(root, None, None)
+		.unwrap_or_else(|error| panic!("render init config: {error}"));
+	assert!(rendered.contains("type = \"python\""), "{rendered}");
 }
 
 pub(crate) fn build_lockfile_command_executions(
@@ -661,6 +693,9 @@ pub(crate) fn build_lockfile_command_executions(
 	#[cfg(feature = "dart")]
 	#[rustfmt::skip]
 	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().any(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)))?;
+	#[cfg(feature = "python")]
+	#[rustfmt::skip]
+	let python_executions = resolve_lockfile_command_executions(root, &configuration.python.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Python && released_versions.contains_key(&package.id)))?;
 	let mut executions = Vec::new();
 	#[cfg(feature = "cargo")]
 	executions.extend(cargo_executions);
@@ -670,6 +705,8 @@ pub(crate) fn build_lockfile_command_executions(
 	executions.extend(deno_executions);
 	#[cfg(feature = "dart")]
 	executions.extend(dart_executions);
+	#[cfg(feature = "python")]
+	executions.extend(python_executions);
 	Ok(dedup_lockfile_command_executions(executions))
 }
 
@@ -794,9 +831,18 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	let mut warnings = Vec::new();
 	let mut packages = Vec::new();
 
-	#[cfg(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart"))]
+	#[cfg(all(
+		feature = "cargo",
+		feature = "npm",
+		feature = "deno",
+		feature = "dart",
+		feature = "python"
+	))]
 	{
-		let ((cargo_discovery, npm_discovery), (deno_discovery, dart_discovery)) = rayon::join(
+		let (
+			(cargo_discovery, npm_discovery),
+			(deno_discovery, (dart_discovery, python_discovery)),
+		) = rayon::join(
 			|| {
 				rayon::join(
 					|| discover_cargo_packages(root),
@@ -806,7 +852,12 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 			|| {
 				rayon::join(
 					|| discover_deno_packages(root),
-					|| discover_dart_packages(root),
+					|| {
+						rayon::join(
+							|| discover_dart_packages(root),
+							|| discover_python_packages(root),
+						)
+					},
 				)
 			},
 		);
@@ -815,13 +866,20 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 			npm_discovery?,
 			deno_discovery?,
 			dart_discovery?,
+			python_discovery?,
 		] {
 			warnings.extend(discovery.warnings);
 			packages.extend(discovery.packages);
 		}
 	}
 
-	#[cfg(not(all(feature = "cargo", feature = "npm", feature = "deno", feature = "dart")))]
+	#[cfg(not(all(
+		feature = "cargo",
+		feature = "npm",
+		feature = "deno",
+		feature = "dart",
+		feature = "python"
+	)))]
 	{
 		#[cfg(feature = "cargo")]
 		{
@@ -844,6 +902,12 @@ pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 		#[cfg(feature = "dart")]
 		{
 			let d = discover_dart_packages(root)?;
+			warnings.extend(d.warnings);
+			packages.extend(d.packages);
+		}
+		#[cfg(feature = "python")]
+		{
+			let d = discover_python_packages(root)?;
 			warnings.extend(d.warnings);
 			packages.extend(d.packages);
 		}
@@ -2017,6 +2081,7 @@ mod workspace_ops_tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		}
 	}
 
@@ -2242,6 +2307,7 @@ mod workspace_ops_tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let undetected_error = discover_release_workspace(undetected_root.path(), &undetected)
 			.err()
@@ -2291,6 +2357,7 @@ mod workspace_ops_tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let missing_manifest_error =
 			discover_release_workspace(missing_manifest_root.path(), &missing_manifest)

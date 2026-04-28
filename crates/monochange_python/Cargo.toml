@@ -1,0 +1,33 @@
+[package]
+name = "monochange_python"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_python"
+edition = { workspace = true }
+include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Python ecosystem adapter for monochange — discovers uv workspaces, Poetry, and setuptools projects"
+
+[dependencies]
+glob = { workspace = true, default-features = true }
+monochange_core = { workspace = true }
+semver = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+toml = { workspace = true, default-features = true }
+toml_edit = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
+walkdir = { workspace = true, default-features = true }
+
+[dev-dependencies]
+insta = { workspace = true, default-features = true }
+monochange_test_helpers = { workspace = true }
+rstest = { workspace = true, default-features = true }
+similar-asserts = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

@@ -48,6 +48,8 @@ pub(crate) enum VersionedFileKind {
 	Deno(monochange_deno::DenoVersionedFileKind),
 	#[cfg(feature = "dart")]
 	Dart(monochange_dart::DartVersionedFileKind),
+	#[cfg(feature = "python")]
+	Python(monochange_python::PythonVersionedFileKind),
 }
 
 pub(crate) fn versioned_file_kind(
@@ -70,6 +72,10 @@ pub(crate) fn versioned_file_kind(
 		#[cfg(feature = "dart")]
 		monochange_core::EcosystemType::Dart => {
 			monochange_dart::supported_versioned_file_kind(path).map(VersionedFileKind::Dart)
+		}
+		#[cfg(feature = "python")]
+		monochange_core::EcosystemType::Python => {
+			monochange_python::supported_versioned_file_kind(path).map(VersionedFileKind::Python)
 		}
 		_ => None,
 	}
@@ -322,6 +328,10 @@ fn inferred_lockfile_ecosystem_type(
 		Ecosystem::Dart | Ecosystem::Flutter if configuration.dart.lockfile_commands.is_empty() => {
 			Some(monochange_core::EcosystemType::Dart)
 		}
+		#[cfg(feature = "python")]
+		Ecosystem::Python if configuration.python.lockfile_commands.is_empty() => {
+			Some(monochange_core::EcosystemType::Python)
+		}
 		_ => None,
 	}
 }
@@ -422,6 +432,7 @@ pub(crate) fn read_cached_document(
 				monochange_core::EcosystemType::Npm => "npm",
 				monochange_core::EcosystemType::Deno => "deno",
 				monochange_core::EcosystemType::Dart => "dart",
+				monochange_core::EcosystemType::Python => "python",
 				_ => "unknown",
 			},
 		)));
@@ -534,6 +545,35 @@ pub(crate) fn read_cached_document(
 				})?;
 			Ok(CachedDocument::Text(contents))
 		}
+		#[cfg(feature = "python")]
+		VersionedFileKind::Python(monochange_python::PythonVersionedFileKind::Manifest) => {
+			let Some(contents) = text_contents else {
+				return Err(MonochangeError::Config(format!(
+					"{} is not valid UTF-8",
+					path.display()
+				)));
+			};
+			let contents = monochange_python::update_versioned_file_text(
+				&contents,
+				monochange_python::PythonVersionedFileKind::Manifest,
+				None,
+				&BTreeMap::new(),
+			)
+			.map_err(|error| {
+				MonochangeError::Config(format!("failed to parse {}: {error}", path.display()))
+			})?;
+			Ok(CachedDocument::Text(contents))
+		}
+		#[cfg(feature = "python")]
+		VersionedFileKind::Python(monochange_python::PythonVersionedFileKind::Lock) => {
+			let Some(contents) = text_contents else {
+				return Err(MonochangeError::Config(format!(
+					"{} is not valid UTF-8",
+					path.display()
+				)));
+			};
+			Ok(CachedDocument::Text(contents))
+		}
 		#[cfg(feature = "dart")]
 		VersionedFileKind::Dart(monochange_dart::DartVersionedFileKind::Manifest) => {
 			let Some(contents) = text_contents else {
@@ -604,6 +644,13 @@ pub(crate) fn resolve_versioned_prefix(
 		}
 		monochange_core::EcosystemType::Dart => {
 			context.configuration.dart.dependency_version_prefix.clone()
+		}
+		monochange_core::EcosystemType::Python => {
+			context
+				.configuration
+				.python
+				.dependency_version_prefix
+				.clone()
 		}
 		_ => None,
 	};
@@ -765,6 +812,7 @@ pub(crate) fn apply_versioned_file_definition(
 					monochange_core::EcosystemType::Npm => "npm",
 					monochange_core::EcosystemType::Deno => "deno",
 					monochange_core::EcosystemType::Dart => "dart",
+					monochange_core::EcosystemType::Python => "python",
 					_ => "unknown",
 				},
 			)));
@@ -923,6 +971,21 @@ pub(crate) fn apply_versioned_file_definition(
 			) => {
 				monochange_dart::update_pubspec_lock(mapping, &raw_versions);
 			}
+			#[cfg(feature = "python")]
+			(CachedDocument::Text(contents), VersionedFileKind::Python(kind)) => {
+				*contents = monochange_python::update_versioned_file_text(
+					contents,
+					kind,
+					Some(owner_version),
+					&versioned_deps,
+				)
+				.map_err(|error| {
+					MonochangeError::Config(format!(
+						"failed to parse {}: {error}",
+						resolved_path.display()
+					))
+				})?;
+			}
 			_ => {}
 		}
 		updates.insert(resolved_path, document);
@@ -941,4 +1004,33 @@ pub(crate) fn released_versions_by_record_id(plan: &ReleasePlan) -> BTreeMap<Str
 				.map(|version| (decision.package_id.clone(), version.to_string()))
 		})
 		.collect()
+}
+
+#[cfg(test)]
+mod tests {
+	use std::path::PathBuf;
+
+	use monochange_core::Ecosystem;
+	use monochange_core::EcosystemType;
+
+	use super::inferred_lockfile_ecosystem_type;
+
+	fn fixture_path(relative: &str) -> PathBuf {
+		PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests")
+			.join(relative)
+	}
+
+	#[test]
+	fn inferred_lockfile_ecosystem_type_maps_python_when_commands_are_not_configured() {
+		let configuration = monochange_config::load_workspace_configuration(&fixture_path(
+			"monochange/release-base",
+		))
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+		assert_eq!(
+			inferred_lockfile_ecosystem_type(&configuration, Ecosystem::Python),
+			Some(EcosystemType::Python)
+		);
+	}
 }

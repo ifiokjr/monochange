@@ -625,6 +625,7 @@ mod tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let packages = vec![
 			monochange_core::PackageRecord {
@@ -1037,6 +1038,7 @@ mod tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let unenforced = PublishRateLimitReport {
 			dry_run: true,
@@ -1148,6 +1150,7 @@ mod tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		};
 		let error =
 			enforce_publish_rate_limits(&configuration, &report, PublishRateLimitMode::Publish)

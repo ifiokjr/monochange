@@ -1,0 +1,8 @@
+[project]
+name = "empty-pattern"
+version = "1.0.0"
+
+[tool.uv.workspace]
+members = [
+	"nonexistent/*",
+]

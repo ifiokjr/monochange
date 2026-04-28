@@ -1,0 +1,9 @@
+[project]
+name = "my-monorepo"
+version = "0.1.0"
+
+[tool.uv.workspace]
+members = [
+	"packages/core",
+	"packages/cli",
+]
