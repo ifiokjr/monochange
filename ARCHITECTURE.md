@@ -67,6 +67,7 @@ These files are the current reviewed exceptions inside the orchestration/config 
 - `crates/monochange/src/release_record.rs`
 - `crates/monochange/src/workspace_ops.rs`
 - `crates/monochange/src/package_publish.rs`
+- `crates/monochange/src/trust_capabilities.rs`
 - `crates/monochange_config/src/lib.rs`
 
 ### Ecosystem dispatch
