@@ -5418,13 +5418,14 @@ fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matc
 				format!(
 					concat!(
 						"{{\n",
-						"  \"schemaVersion\": 1,\n",
+						"  \"schemaVersion\": 2,\n",
 						"  \"kind\": \"monochange.publishReadiness\",\n",
 						"  \"status\": \"ready\",\n",
 						"  \"from\": \"HEAD\",\n",
 						"  \"resolvedCommit\": \"{}\",\n",
 						"  \"recordCommit\": \"{}\",\n",
 						"  \"packageSetFingerprint\": \"\",\n",
+						"  \"inputFingerprint\": \"fnv1a64:0c546588318b4dae\",\n",
 						"  \"packages\": []\n",
 						"}}"
 					),

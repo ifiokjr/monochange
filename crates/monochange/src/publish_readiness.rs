@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PackageType;
 use monochange_core::ReleaseRecordDiscovery;
 use monochange_core::WorkspaceConfiguration;
 use serde::Deserialize;
@@ -18,7 +19,9 @@ use crate::discover_release_record;
 use crate::package_publish;
 
 const PUBLISH_READINESS_KIND: &str = "monochange.publishReadiness";
-const PUBLISH_READINESS_SCHEMA_VERSION: u64 = 1;
+const PUBLISH_READINESS_SCHEMA_VERSION: u64 = 2;
+const FNV_OFFSET_BASIS: u64 = 14_695_981_039_346_656_037;
+const FNV_PRIME: u64 = 1_099_511_628_211;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct PublishReadinessOptions {
@@ -67,6 +70,8 @@ pub(crate) struct PublishReadinessReport {
 	pub resolved_commit: String,
 	pub record_commit: String,
 	pub package_set_fingerprint: String,
+	#[serde(default = "default_publish_readiness_input_fingerprint")]
+	pub input_fingerprint: String,
 	pub packages: Vec<PublishReadinessPackage>,
 }
 
@@ -144,11 +149,13 @@ fn build_publish_readiness_report(
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<PublishReadinessReport> {
 	let discovery = discover_release_record(root, from)?;
+	let input_fingerprint = publish_readiness_input_fingerprint(root, configuration)?;
 	#[rustfmt::skip]
 	let publish_report = package_publish::run_publish_packages_with_publications(root, configuration, &discovery.record.package_publications, selected_packages, true)?;
 	Ok(build_report_from_publish_report(
 		source_from_discovery(&discovery),
 		&publish_report,
+		input_fingerprint,
 	))
 }
 
@@ -159,6 +166,7 @@ fn build_publish_readiness_report_for_publish(
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<PublishReadinessReport> {
 	if let Some(prepared_release) = prepared_release {
+		let input_fingerprint = publish_readiness_input_fingerprint(root, configuration)?;
 		#[rustfmt::skip]
 		let publish_report = package_publish::run_publish_packages(root, configuration, Some(prepared_release), selected_packages, true)?;
 		let source = PublishReadinessSource {
@@ -166,7 +174,11 @@ fn build_publish_readiness_report_for_publish(
 			resolved_commit: "prepared-release",
 			record_commit: "prepared-release",
 		};
-		return Ok(build_report_from_publish_report(source, &publish_report));
+		return Ok(build_report_from_publish_report(
+			source,
+			&publish_report,
+			input_fingerprint,
+		));
 	}
 	build_publish_readiness_report(root, configuration, "HEAD", selected_packages)
 }
@@ -174,6 +186,7 @@ fn build_publish_readiness_report_for_publish(
 fn build_report_from_publish_report(
 	source: PublishReadinessSource<'_>,
 	report: &package_publish::PackagePublishReport,
+	input_fingerprint: String,
 ) -> PublishReadinessReport {
 	let packages = report
 		.packages
@@ -208,6 +221,7 @@ fn build_report_from_publish_report(
 		resolved_commit: source.resolved_commit.to_string(),
 		record_commit: source.record_commit.to_string(),
 		package_set_fingerprint,
+		input_fingerprint,
 		packages,
 	}
 }
@@ -218,6 +232,147 @@ fn source_from_discovery(discovery: &ReleaseRecordDiscovery) -> PublishReadiness
 		resolved_commit: &discovery.resolved_commit,
 		record_commit: &discovery.record_commit,
 	}
+}
+
+fn publish_readiness_input_fingerprint(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+) -> MonochangeResult<String> {
+	let paths = publish_readiness_input_paths(root, configuration);
+	let mut hash = FNV_OFFSET_BASIS;
+	hash = update_input_fingerprint_hash(hash, b"monochange.publishReadiness.inputs.v1");
+
+	for path in paths {
+		let relative = readiness_relative_path(root, &path);
+		let contents = fs::read(&path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read publish readiness input {}: {error}",
+				path.display()
+			))
+		})?;
+		hash = update_input_fingerprint_hash(hash, relative.as_bytes());
+		hash = update_input_fingerprint_hash(hash, b"\0");
+		hash = update_input_fingerprint_hash(hash, contents.len().to_string().as_bytes());
+		hash = update_input_fingerprint_hash(hash, b"\0");
+		hash = update_input_fingerprint_hash(hash, &contents);
+		hash = update_input_fingerprint_hash(hash, b"\0");
+	}
+
+	Ok(format!("fnv1a64:{hash:016x}"))
+}
+
+fn publish_readiness_input_paths(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+) -> BTreeSet<PathBuf> {
+	let mut paths = BTreeSet::new();
+	insert_existing_path(&mut paths, root.join("monochange.toml"));
+
+	for package in &configuration.packages {
+		let package_root = root.join(&package.path);
+		for manifest in package_manifest_names(package.package_type) {
+			insert_existing_path(&mut paths, package_root.join(manifest));
+		}
+		insert_lockfile_paths(&mut paths, &package_root);
+	}
+
+	insert_publish_tooling_paths(&mut paths, root);
+	insert_lockfile_paths(&mut paths, root);
+	paths
+}
+
+fn insert_publish_tooling_paths(paths: &mut BTreeSet<PathBuf>, root: &Path) {
+	for path in [
+		"Cargo.toml",
+		"package.json",
+		"pnpm-workspace.yaml",
+		".npmrc",
+		".yarnrc",
+		".yarnrc.yml",
+		".cargo/config.toml",
+		".cargo/config",
+		"rust-toolchain.toml",
+		"rust-toolchain",
+		"pyproject.toml",
+		"setup.cfg",
+		"setup.py",
+		"uv.toml",
+		"poetry.toml",
+		"pdm.toml",
+		"deno.json",
+		"deno.jsonc",
+		"pubspec.yaml",
+	] {
+		insert_existing_path(paths, root.join(path));
+	}
+}
+
+fn insert_lockfile_paths(paths: &mut BTreeSet<PathBuf>, root: &Path) {
+	for path in [
+		"Cargo.lock",
+		"package-lock.json",
+		"npm-shrinkwrap.json",
+		"pnpm-lock.yaml",
+		"yarn.lock",
+		"bun.lock",
+		"bun.lockb",
+		"deno.lock",
+		"pubspec.lock",
+		"uv.lock",
+		"poetry.lock",
+		"pdm.lock",
+	] {
+		insert_existing_path(paths, root.join(path));
+	}
+}
+
+fn package_manifest_names(package_type: PackageType) -> &'static [&'static str] {
+	package_manifest_names_for_type(package_type.as_str())
+}
+
+fn package_manifest_names_for_type(package_type: &str) -> &'static [&'static str] {
+	match package_type {
+		"cargo" => &["Cargo.toml"],
+		"npm" => &["package.json"],
+		"deno" => &["deno.json", "deno.jsonc"],
+		"dart" | "flutter" => &["pubspec.yaml"],
+		"python" => &["pyproject.toml"],
+		_ => &[],
+	}
+}
+
+fn insert_existing_path(paths: &mut BTreeSet<PathBuf>, path: PathBuf) {
+	if path.is_file() {
+		paths.insert(path);
+	}
+}
+
+fn readiness_relative_path(root: &Path, path: &Path) -> String {
+	path.strip_prefix(root)
+		.unwrap_or(path)
+		.to_string_lossy()
+		.replace('\\', "/")
+}
+
+fn update_input_fingerprint_hash(mut hash: u64, bytes: &[u8]) -> u64 {
+	for byte in bytes {
+		hash ^= u64::from(*byte);
+		hash = hash.wrapping_mul(FNV_PRIME);
+	}
+	hash
+}
+
+fn validate_readiness_input_fingerprint(
+	artifact: &PublishReadinessReport,
+	current: &PublishReadinessReport,
+) -> MonochangeResult<()> {
+	if artifact.input_fingerprint == current.input_fingerprint {
+		return Ok(());
+	}
+
+	Err(MonochangeError::Config(
+		"publish readiness artifact inputs are stale; workspace config, manifests, lockfiles, or publish tooling inputs changed, so rerun `mc publish-readiness --from HEAD --output <PATH>`".to_string(),
+	))
 }
 
 fn readiness_status_from_publish_status(
@@ -290,6 +445,7 @@ fn validate_publish_readiness_report(
 	validate_readiness_artifact_status(artifact)?;
 	validate_readiness_current_status(current)?;
 	validate_readiness_release_commit(artifact, current)?;
+	validate_readiness_input_fingerprint(artifact, current)?;
 	validate_readiness_packages(artifact, current)
 }
 
@@ -299,6 +455,7 @@ fn validate_publish_readiness_plan_artifact(
 ) -> MonochangeResult<()> {
 	validate_readiness_artifact_header(artifact)?;
 	validate_readiness_release_commit(artifact, current)?;
+	validate_readiness_input_fingerprint(artifact, current)?;
 	validate_readiness_package_subset(artifact, current)
 }
 
@@ -565,6 +722,10 @@ fn default_publish_readiness_kind() -> String {
 	PUBLISH_READINESS_KIND.to_string()
 }
 
+fn default_publish_readiness_input_fingerprint() -> String {
+	String::new()
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -608,6 +769,7 @@ mod tests {
 			resolved_commit: "resolved123".to_string(),
 			record_commit: "record123".to_string(),
 			package_set_fingerprint: package_set_fingerprint(&packages),
+			input_fingerprint: "fnv1a64:sample".to_string(),
 			packages,
 		}
 	}
@@ -656,6 +818,31 @@ mod tests {
 		}
 	}
 
+	fn sample_package_definition(
+		id: &str,
+		path: &str,
+		package_type: PackageType,
+	) -> monochange_core::PackageDefinition {
+		monochange_core::PackageDefinition {
+			id: id.to_string(),
+			path: PathBuf::from(path),
+			package_type,
+			changelog: None,
+			excluded_changelog_types: Vec::new(),
+			empty_update_message: None,
+			release_title: None,
+			changelog_version_title: None,
+			versioned_files: Vec::new(),
+			ignore_ecosystem_versioned_files: false,
+			ignored_paths: Vec::new(),
+			additional_paths: Vec::new(),
+			tag: true,
+			release: true,
+			version_format: monochange_core::VersionFormat::default(),
+			publish: monochange_core::PublishSettings::default(),
+		}
+	}
+
 	fn sample_prepared_release(root: &Path) -> PreparedRelease {
 		PreparedRelease {
 			plan: monochange_core::ReleasePlan {
@@ -693,13 +880,18 @@ mod tests {
 				sample_publish_outcome(package_publish::PackagePublishStatus::Blocked),
 			],
 		};
-		let readiness = build_report_from_publish_report(sample_source(), &report);
+		let readiness = build_report_from_publish_report(
+			sample_source(),
+			&report,
+			"fnv1a64:sample".to_string(),
+		);
 
 		assert_eq!(readiness.schema_version, PUBLISH_READINESS_SCHEMA_VERSION);
 		assert_eq!(readiness.kind, PUBLISH_READINESS_KIND);
 		assert_eq!(readiness.from, "HEAD");
 		assert_eq!(readiness.resolved_commit, "resolved123");
 		assert_eq!(readiness.record_commit, "record123");
+		assert_eq!(readiness.input_fingerprint, "fnv1a64:sample");
 		assert_eq!(readiness.status, PublishReadinessGlobalStatus::Blocked);
 		assert_eq!(
 			readiness.packages[0].status,
@@ -718,6 +910,128 @@ mod tests {
 			PublishReadinessPackageStatus::Blocked
 		);
 		assert!(!readiness.package_set_fingerprint.is_empty());
+	}
+
+	#[test]
+	fn publish_readiness_input_fingerprint_tracks_publish_inputs() {
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let mut configuration = sample_configuration(root);
+		configuration.packages = vec![
+			sample_package_definition("cargo", "crates/core", PackageType::Cargo),
+			sample_package_definition("npm", "packages/web", PackageType::Npm),
+			sample_package_definition("deno", "packages/deno", PackageType::Deno),
+			sample_package_definition("dart", "packages/dart", PackageType::Dart),
+			sample_package_definition("flutter", "packages/flutter", PackageType::Flutter),
+			sample_package_definition("python", "packages/python", PackageType::Python),
+		];
+
+		write_test_file(root.join("monochange.toml"), b"[workspace]\n");
+		write_test_file(root.join("Cargo.toml"), b"[workspace]\n");
+		write_test_file(root.join("package.json"), br#"{"private":true}"#);
+		write_test_file(root.join("pnpm-lock.yaml"), b"lockfileVersion: '9.0'\n");
+		write_test_file(root.join(".npmrc"), b"provenance=true\n");
+		write_test_file(
+			root.join("crates/core/Cargo.toml"),
+			b"[package]\nname='core'\n",
+		);
+		write_test_file(root.join("crates/core/Cargo.lock"), b"version = 4\n");
+		write_test_file(root.join("packages/web/package.json"), br#"{"name":"web"}"#);
+		write_test_file(
+			root.join("packages/web/pnpm-lock.yaml"),
+			b"lockfileVersion: '9.0'\n",
+		);
+		write_test_file(root.join("packages/deno/deno.jsonc"), b"{}\n");
+		write_test_file(root.join("packages/dart/pubspec.yaml"), b"name: dart\n");
+		write_test_file(
+			root.join("packages/flutter/pubspec.yaml"),
+			b"name: flutter\n",
+		);
+		write_test_file(
+			root.join("packages/python/pyproject.toml"),
+			b"[project]\nname='python'\n",
+		);
+
+		let paths = publish_readiness_input_paths(root, &configuration);
+		let relative_paths: BTreeSet<_> = paths
+			.iter()
+			.map(|path| readiness_relative_path(root, path))
+			.collect();
+		let expected_paths = BTreeSet::from([
+			".npmrc".to_string(),
+			"Cargo.toml".to_string(),
+			"crates/core/Cargo.lock".to_string(),
+			"crates/core/Cargo.toml".to_string(),
+			"monochange.toml".to_string(),
+			"package.json".to_string(),
+			"packages/dart/pubspec.yaml".to_string(),
+			"packages/deno/deno.jsonc".to_string(),
+			"packages/flutter/pubspec.yaml".to_string(),
+			"packages/python/pyproject.toml".to_string(),
+			"packages/web/package.json".to_string(),
+			"packages/web/pnpm-lock.yaml".to_string(),
+			"pnpm-lock.yaml".to_string(),
+		]);
+		assert_eq!(relative_paths, expected_paths);
+		assert!(package_manifest_names_for_type("unknown").is_empty());
+
+		let initial_fingerprint = publish_readiness_input_fingerprint(root, &configuration)
+			.unwrap_or_else(|error| panic!("initial fingerprint: {error}"));
+		write_test_file(
+			root.join("packages/web/package.json"),
+			br#"{"name":"web","type":"module"}"#,
+		);
+		let changed_fingerprint = publish_readiness_input_fingerprint(root, &configuration)
+			.unwrap_or_else(|error| panic!("changed fingerprint: {error}"));
+
+		assert_ne!(initial_fingerprint, changed_fingerprint);
+		assert!(initial_fingerprint.starts_with("fnv1a64:"));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn publish_readiness_input_fingerprint_reports_read_errors() {
+		use std::os::unix::fs::PermissionsExt;
+
+		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let configuration = sample_configuration(root);
+		let input_path = root.join("monochange.toml");
+		write_test_file(&input_path, b"[workspace]\n");
+		fs::set_permissions(&input_path, fs::Permissions::from_mode(0o000))
+			.unwrap_or_else(|error| panic!("remove read permission: {error}"));
+
+		let error = publish_readiness_input_fingerprint(root, &configuration)
+			.expect_err("unreadable input should report a read error");
+
+		fs::set_permissions(&input_path, fs::Permissions::from_mode(0o600))
+			.unwrap_or_else(|error| panic!("restore read permission: {error}"));
+		assert!(
+			error
+				.to_string()
+				.contains("failed to read publish readiness input")
+		);
+	}
+
+	#[test]
+	fn validate_publish_readiness_report_rejects_stale_input_fingerprints() {
+		let mut artifact = sample_readiness_report(vec![sample_readiness_package()]);
+		let current = artifact.clone();
+		artifact.input_fingerprint = "fnv1a64:stale".to_string();
+
+		let error = validate_publish_readiness_report(&artifact, &current)
+			.expect_err("stale input fingerprint should be rejected");
+
+		assert!(error.to_string().contains("inputs are stale"));
+	}
+
+	fn write_test_file(path: impl AsRef<Path>, contents: &[u8]) {
+		let path = path.as_ref();
+		let parent = path.parent().unwrap_or(Path::new("."));
+		fs::create_dir_all(parent)
+			.unwrap_or_else(|error| panic!("create {}: {error}", parent.display()));
+		fs::write(path, contents)
+			.unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
 	}
 
 	#[test]
