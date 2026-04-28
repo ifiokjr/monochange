@@ -344,6 +344,21 @@ The monochange repository itself can dogfood this model by:
 
 - declaring `[source]`, `[source.releases]`, and `[source.pull_requests]` in `monochange.toml`
 - running a real `changeset-policy` GitHub Actions workflow that shells into `mc step:affected-packages`
+- publishing the CLI npm packages from `.github/workflows/publish.yml` with the protected `publisher` environment and `id-token: write`, without `NODE_AUTH_TOKEN` or `NPM_TOKEN`
+
+For monochange's own npm packages, register every package under the GitHub trusted-publishing context `monochange/monochange`, workflow file `publish.yml`, and environment `publisher` before the first tokenless publish:
+
+- `@monochange/cli`
+- `@monochange/cli-darwin-arm64`
+- `@monochange/cli-darwin-x64`
+- `@monochange/cli-linux-arm64-gnu`
+- `@monochange/cli-linux-arm64-musl`
+- `@monochange/cli-linux-x64-gnu`
+- `@monochange/cli-linux-x64-musl`
+- `@monochange/cli-win32-arm64-msvc`
+- `@monochange/cli-win32-x64-msvc`
+
+After publishing, verify npm provenance from the package page or with npm's provenance metadata for the released version. The expected publisher identity is the `publish.yml` workflow in `monochange/monochange`; a run that lacks npm trusted-publishing setup should fail instead of falling back to a long-lived registry token.
 
 <!-- {/githubAutomationDogfoodNotes} -->
 

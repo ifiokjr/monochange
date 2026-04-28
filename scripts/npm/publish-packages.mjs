@@ -18,6 +18,19 @@ export const PLATFORM_PACKAGE_DIRS = [
 
 export const CLI_PACKAGE_DIR = "monochange__cli";
 
+export const TRUSTED_PUBLISHING_REPOSITORY = "monochange/monochange";
+export const TRUSTED_PUBLISHING_WORKFLOW = "publish.yml";
+
+export const FORBIDDEN_NPM_TOKEN_ENV_KEYS = [
+	"NODE_AUTH_TOKEN",
+	"NPM_TOKEN",
+	"NPM_AUTH_TOKEN",
+	"NPM_CONFIG_TOKEN",
+	"NPM_CONFIG__AUTH_TOKEN",
+	"npm_config_token",
+	"npm_config__authToken",
+];
+
 let _spawnSync = nodeSpawnSync;
 
 export function _setSpawnSync(fn) {
@@ -51,6 +64,7 @@ export function run(command, args, options = {}) {
 		encoding: "utf8",
 		stdio: options.stdio ?? "pipe",
 		cwd: options.cwd,
+		env: options.env,
 	});
 
 	if (result.status !== 0) {
@@ -83,7 +97,55 @@ export function hasBinary(dir) {
 	return entries.some((entry) => entry.startsWith("monochange"));
 }
 
-export function publishPackage(dir) {
+export function assertTrustedPublishingContext(env = process.env) {
+	const configuredTokenKeys = FORBIDDEN_NPM_TOKEN_ENV_KEYS.filter((key) => env[key]);
+	if (configuredTokenKeys.length > 0) {
+		throw new Error(
+			`Refusing to publish npm packages with long-lived npm token environment variables: ${configuredTokenKeys.join(", ")}. ` +
+				"Remove npm token credentials so npm trusted publishing can use GitHub OIDC.",
+		);
+	}
+
+	const workflowRef = env.GITHUB_WORKFLOW_REF ?? "";
+	const expectedWorkflowPath = `${TRUSTED_PUBLISHING_REPOSITORY}/.github/workflows/${TRUSTED_PUBLISHING_WORKFLOW}@`;
+	const missing = [];
+
+	if (env.GITHUB_ACTIONS !== "true") {
+		missing.push("GITHUB_ACTIONS=true");
+	}
+	if (env.GITHUB_REPOSITORY !== TRUSTED_PUBLISHING_REPOSITORY) {
+		missing.push(`GITHUB_REPOSITORY=${TRUSTED_PUBLISHING_REPOSITORY}`);
+	}
+	if (!workflowRef.startsWith(expectedWorkflowPath)) {
+		missing.push(`GITHUB_WORKFLOW_REF=${expectedWorkflowPath}<ref>`);
+	}
+	if (!env.ACTIONS_ID_TOKEN_REQUEST_URL) {
+		missing.push("ACTIONS_ID_TOKEN_REQUEST_URL");
+	}
+	if (!env.ACTIONS_ID_TOKEN_REQUEST_TOKEN) {
+		missing.push("ACTIONS_ID_TOKEN_REQUEST_TOKEN");
+	}
+
+	if (missing.length > 0) {
+		throw new Error(
+			"Cannot publish npm packages without the trusted-publishing GitHub Actions context. " +
+				`Expected repository ${TRUSTED_PUBLISHING_REPOSITORY}, workflow ${TRUSTED_PUBLISHING_WORKFLOW}, environment publisher, and OIDC token permissions. ` +
+				`Missing or mismatched: ${missing.join(", ")}.`,
+		);
+	}
+}
+
+export function npmPublishEnv(env = process.env) {
+	const publishEnv = { ...env };
+	for (const key of FORBIDDEN_NPM_TOKEN_ENV_KEYS) {
+		delete publishEnv[key];
+	}
+	publishEnv.NPM_CONFIG_PROVENANCE = "true";
+	return publishEnv;
+}
+
+export function publishPackage(dir, options = {}) {
+	const env = options.env ?? process.env;
 	const pkg = packageMetadata(dir);
 	if (hasBinary(dir) === false) {
 		throw new Error(
@@ -92,19 +154,22 @@ export function publishPackage(dir) {
 		);
 	}
 
+	assertTrustedPublishingContext(env);
+
 	if (packageExists(pkg.name, pkg.version)) {
 		console.log(`Skipping ${pkg.name}@${pkg.version}; already published.`);
 		return;
 	}
 
-	console.log(`Publishing ${pkg.name}@${pkg.version}...`);
+	console.log(`Publishing ${pkg.name}@${pkg.version} with npm trusted publishing...`);
 	run("npm", ["publish", "--access", "public", "--provenance"], {
 		cwd: dir,
 		stdio: "inherit",
+		env: npmPublishEnv(env),
 	});
 }
 
-export function main(argv = process.argv.slice(2)) {
+export function main(argv = process.argv.slice(2), options = {}) {
 	const args = parseArgs(argv);
 	if (!args["packages-dir"]) {
 		throw new Error("usage: publish-packages.mjs --packages-dir <dir>");
@@ -112,11 +177,12 @@ export function main(argv = process.argv.slice(2)) {
 
 	const packagesDir = resolve(args["packages-dir"]);
 
+	const env = options.env ?? process.env;
 	for (const dirName of PLATFORM_PACKAGE_DIRS) {
-		publishPackage(join(packagesDir, dirName));
+		publishPackage(join(packagesDir, dirName), { env });
 	}
 
-	publishPackage(join(packagesDir, CLI_PACKAGE_DIR));
+	publishPackage(join(packagesDir, CLI_PACKAGE_DIR), { env });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
