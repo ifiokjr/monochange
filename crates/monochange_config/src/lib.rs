@@ -1029,8 +1029,7 @@ fn build_package_definitions(
 						EcosystemType::Npm => &npm_ecosystem.publish,
 						EcosystemType::Deno => &deno_ecosystem.publish,
 						EcosystemType::Dart => &dart_ecosystem.publish,
-						EcosystemType::Python => &python_ecosystem.publish,
-						_ => unreachable!("unsupported ecosystem type for package publish"),
+						_ => &python_ecosystem.publish,
 					};
 					publish
 				}),

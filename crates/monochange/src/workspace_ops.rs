@@ -657,6 +657,21 @@ fn package_type_for_ecosystem_maps_python() {
 	assert_eq!(PackageType::Python.as_str(), "python");
 }
 
+#[test]
+fn render_annotated_init_config_includes_python_package_type() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	fs::write(
+		root.join("pyproject.toml"),
+		"[project]\nname = \"python-app\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write pyproject: {error}"));
+
+	let rendered = render_annotated_init_config(root, None, None)
+		.unwrap_or_else(|error| panic!("render init config: {error}"));
+	assert!(rendered.contains("type = \"python\""), "{rendered}");
+}
+
 pub(crate) fn build_lockfile_command_executions(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,

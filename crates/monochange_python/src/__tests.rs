@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::PathBuf;
 
 use monochange_core::DependencyKind;
@@ -828,8 +829,173 @@ fn expand_workspace_members_handles_glob_matching_pyproject_files() {
 	assert_eq!(discovery.packages.first().unwrap().name, "core");
 }
 
-// parse_python_package invalid TOML is tested by
-// discover_python_packages_warns_on_invalid_toml_in_standalone_scan above
+#[test]
+fn default_lockfile_commands_handles_uv_poetry_and_unknown_lockfiles() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	fs::write(
+		root.join("pyproject.toml"),
+		"[project]\nname = \"app\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write pyproject: {error}"));
+	fs::write(root.join("uv.lock"), "").unwrap_or_else(|error| panic!("write uv.lock: {error}"));
+	fs::write(root.join("poetry.lock"), "")
+		.unwrap_or_else(|error| panic!("write poetry.lock: {error}"));
+	fs::write(root.join("requirements.lock"), "")
+		.unwrap_or_else(|error| panic!("write requirements.lock: {error}"));
+	let package = PackageRecord::new(
+		Ecosystem::Python,
+		"app",
+		root.join("pyproject.toml"),
+		root.to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Unpublished,
+	);
+
+	let commands = crate::default_lockfile_commands(&package);
+	let command_names = commands
+		.iter()
+		.map(|command| command.command.as_str())
+		.collect::<Vec<_>>();
+
+	assert_eq!(command_names, vec!["uv lock", "poetry lock --no-update"]);
+	let root_name = root.file_name().unwrap_or_else(|| panic!("temp root name"));
+	assert!(
+		commands
+			.iter()
+			.all(|command| command.cwd.ends_with(root_name))
+	);
+}
+
+#[test]
+fn update_versioned_file_text_returns_early_without_project_dependencies() {
+	let deps = BTreeMap::from([("core".to_string(), ">=2.0.0".to_string())]);
+
+	let without_project = update_versioned_file_text(
+		"[tool.custom]\nname = \"app\"\n",
+		PythonVersionedFileKind::Manifest,
+		Some("2.0.0"),
+		&deps,
+	)
+	.unwrap_or_else(|error| panic!("update without project: {error}"));
+	assert!(!without_project.contains("2.0.0"));
+
+	let without_dependencies = update_versioned_file_text(
+		"[project]\nname = \"app\"\nversion = \"1.0.0\"\n",
+		PythonVersionedFileKind::Manifest,
+		Some("2.0.0"),
+		&deps,
+	)
+	.unwrap_or_else(|error| panic!("update without dependencies: {error}"));
+	assert!(without_dependencies.contains("version = \"2.0.0\""));
+	assert!(!without_dependencies.contains("core>=2.0.0"));
+}
+
+#[test]
+fn private_workspace_helpers_cover_error_and_match_branches() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest_path = root.join("pyproject.toml");
+	let packages = root.join("packages");
+	let package_dir = packages.join("core");
+	fs::create_dir_all(&package_dir).unwrap_or_else(|error| panic!("create package dir: {error}"));
+	fs::write(
+		&manifest_path,
+		"[project]\nname = \"root\"\nversion = \"1.0.0\"\n\n[tool.uv.workspace]\nmembers = [\"packages/*\", \"packages/core/pyproject.toml\", \"README.md\", \"missing/*\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("write root pyproject: {error}"));
+	fs::write(
+		package_dir.join("pyproject.toml"),
+		"[project]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write core pyproject: {error}"));
+	fs::write(root.join("README.md"), "# docs\n")
+		.unwrap_or_else(|error| panic!("write readme: {error}"));
+
+	let members = crate::parse_uv_workspace_members(&manifest_path)
+		.unwrap_or_else(|error| panic!("parse uv members: {error}"))
+		.unwrap_or_else(|| panic!("expected uv workspace members"));
+	assert!(members.contains(&"packages/*".to_string()));
+
+	let missing_error = crate::parse_uv_workspace_members(&root.join("missing-pyproject.toml"))
+		.err()
+		.unwrap_or_else(|| panic!("expected missing pyproject error"));
+	assert!(missing_error.to_string().contains("failed to read"));
+
+	fs::write(root.join("invalid.toml"), "[project\n")
+		.unwrap_or_else(|error| panic!("write invalid toml: {error}"));
+	let parse_error = crate::parse_uv_workspace_members(&root.join("invalid.toml"))
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid toml error"));
+	assert!(parse_error.to_string().contains("failed to parse"));
+
+	let mut warnings = Vec::new();
+	let manifests = crate::expand_workspace_members(root, &members, &mut warnings);
+	assert!(
+		manifests
+			.iter()
+			.any(|manifest| manifest.ends_with("packages/core/pyproject.toml")),
+		"missing core manifest in {manifests:?}"
+	);
+	assert!(warnings.iter().any(|warning| warning.contains("missing/*")));
+}
+
+#[test]
+fn private_package_parser_covers_error_and_dependency_value_branches() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let missing_error = crate::parse_python_package(&root.join("missing.toml"), root)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing package error"));
+	assert!(missing_error.to_string().contains("failed to read"));
+
+	let invalid_path = root.join("invalid.toml");
+	fs::write(&invalid_path, "[project\n").unwrap_or_else(|error| panic!("write invalid: {error}"));
+	let parse_error = crate::parse_python_package(&invalid_path, root)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse package error"));
+	assert!(parse_error.to_string().contains("failed to parse"));
+
+	let poetry = toml::from_str::<toml::Value>(
+		r#"
+[dependencies]
+python = ">=3.11"
+django = "^4.2"
+celery = { version = "^5.3" }
+local = { path = "../local" }
+unknown = 1
+
+[group.dev.dependencies]
+pytest = "^8.0"
+ruff = { version = "^0.4" }
+tooling = { path = "../tooling" }
+numbered = 1
+"#,
+	)
+	.unwrap_or_else(|error| panic!("parse poetry fixture: {error}"));
+	let deps = crate::parse_poetry_dependencies(&poetry);
+	assert!(
+		deps.iter()
+			.any(|dep| dep.name == "django" && dep.version_constraint.as_deref() == Some("^4.2"))
+	);
+	assert!(
+		deps.iter()
+			.any(|dep| dep.name == "celery" && dep.version_constraint.as_deref() == Some("^5.3"))
+	);
+	assert!(
+		deps.iter()
+			.any(|dep| dep.name == "local" && dep.version_constraint.is_none())
+	);
+	assert!(
+		deps.iter()
+			.any(|dep| dep.name == "ruff" && dep.version_constraint.as_deref() == Some("^0.4"))
+	);
+	assert!(
+		deps.iter()
+			.any(|dep| dep.name == "tooling" && dep.version_constraint.is_none())
+	);
+	assert!(!deps.iter().any(|dep| dep.name == "python"));
+}
 
 // -- update_versioned_file with both version and deps --
 

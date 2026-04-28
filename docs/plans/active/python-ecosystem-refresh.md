@@ -62,6 +62,11 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] `cargo test -p monochange_core python_package_type_and_ecosystem_defaults_are_canonical`
 - [x] `cargo test -p monochange --features python apply_versioned_file_definition_updates_python_manifest_and_lock_variants`
 - [x] `cargo check -p monochange --all-features --tests`
+- [x] `cargo test -p monochange_python` after additional patch-coverage tests
+- [x] `cargo test -p monochange --features python read_cached_document_reports_python_error_paths --lib`
+- [x] `cargo test -p monochange --features python apply_versioned_file_definition_reports_python_error_paths --lib`
+- [x] `cargo test -p monochange --features python inferred_lockfile_ecosystem_type_maps_python_when_commands_are_not_configured --lib`
+- [x] `cargo test -p monochange --features python render_annotated_init_config_includes_python_package_type --lib`
 
 ## Notes
 

@@ -6799,6 +6799,57 @@ fn read_cached_document_parses_supported_document_formats() {
 }
 
 #[test]
+fn read_cached_document_reports_python_error_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let manifest_path = tempdir.path().join("pyproject.toml");
+	let lock_path = tempdir.path().join("uv.lock");
+	let unsupported_path = tempdir.path().join("unknown.txt");
+
+	fs::write(&manifest_path, [0xff, 0xfe])
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	let error = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&manifest_path,
+		monochange_core::EcosystemType::Python,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid UTF-8 manifest error"));
+	assert!(error.to_string().contains("is not valid UTF-8"));
+
+	fs::write(&lock_path, [0xff, 0xfe]).unwrap_or_else(|error| panic!("write lock: {error}"));
+	let error = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&lock_path,
+		monochange_core::EcosystemType::Python,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid UTF-8 lock error"));
+	assert!(error.to_string().contains("is not valid UTF-8"));
+
+	fs::write(&manifest_path, "[project\n")
+		.unwrap_or_else(|error| panic!("write invalid manifest: {error}"));
+	let error = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&manifest_path,
+		monochange_core::EcosystemType::Python,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid TOML manifest error"));
+	assert!(error.to_string().contains("failed to parse"));
+
+	fs::write(&unsupported_path, "text")
+		.unwrap_or_else(|error| panic!("write unsupported: {error}"));
+	let error = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&unsupported_path,
+		monochange_core::EcosystemType::Python,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported Python versioned file error"));
+	assert!(error.to_string().contains("python"));
+}
+
+#[test]
 fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 	let mut configuration = load_workspace_configuration(&fixture_path("monochange/release-base"))
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -8338,6 +8389,65 @@ dependencies = ["python-core>=1.0.0"]
 		lock_document,
 		crate::CachedDocument::Text(contents) if contents == "version = 1\n"
 	));
+}
+
+#[test]
+fn apply_versioned_file_definition_reports_python_error_paths() {
+	let configuration = versioned_test_configuration();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("python-core".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
+	let dep_names = vec!["python-core".to_string()];
+	let mut updates = BTreeMap::new();
+
+	fs::write(tempdir.path().join("unknown.txt"), "text")
+		.unwrap_or_else(|error| panic!("write unsupported: {error}"));
+	let unsupported_definition = monochange_core::VersionedFileDefinition {
+		path: "unknown.txt".to_string(),
+		ecosystem_type: Some(monochange_core::EcosystemType::Python),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&unsupported_definition,
+		"2.0.0",
+		None,
+		&dep_names,
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsupported python path error"));
+	assert!(error.to_string().contains("python"));
+
+	fs::write(tempdir.path().join("pyproject.toml"), "[project\n")
+		.unwrap_or_else(|error| panic!("write invalid manifest: {error}"));
+	let manifest_definition = monochange_core::VersionedFileDefinition {
+		path: "pyproject.toml".to_string(),
+		ecosystem_type: Some(monochange_core::EcosystemType::Python),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	let error = crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&manifest_definition,
+		"2.0.0",
+		None,
+		&dep_names,
+		&context,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid python manifest error"));
+	assert!(error.to_string().contains("failed to parse"));
 }
 
 #[test]

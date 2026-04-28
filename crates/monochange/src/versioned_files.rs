@@ -1005,3 +1005,32 @@ pub(crate) fn released_versions_by_record_id(plan: &ReleasePlan) -> BTreeMap<Str
 		})
 		.collect()
 }
+
+#[cfg(test)]
+mod tests {
+	use std::path::PathBuf;
+
+	use monochange_core::Ecosystem;
+	use monochange_core::EcosystemType;
+
+	use super::inferred_lockfile_ecosystem_type;
+
+	fn fixture_path(relative: &str) -> PathBuf {
+		PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+			.join("../../fixtures/tests")
+			.join(relative)
+	}
+
+	#[test]
+	fn inferred_lockfile_ecosystem_type_maps_python_when_commands_are_not_configured() {
+		let configuration = monochange_config::load_workspace_configuration(&fixture_path(
+			"monochange/release-base",
+		))
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+		assert_eq!(
+			inferred_lockfile_ecosystem_type(&configuration, Ecosystem::Python),
+			Some(EcosystemType::Python)
+		);
+	}
+}
