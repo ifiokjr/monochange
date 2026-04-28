@@ -42,6 +42,8 @@ const CRATES_TRUST_DOCS_URL: &str = "https://crates.io/docs/trusted-publishing";
 const DART_TRUST_DOCS_URL: &str = "https://dart.dev/tools/pub/automated-publishing";
 #[cfg(test)]
 const JSR_TRUST_DOCS_URL: &str = "https://jsr.io/docs/publishing-packages";
+#[cfg(test)]
+const PYPI_TRUST_DOCS_URL: &str = "https://docs.pypi.org/trusted-publishers/";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -173,6 +175,7 @@ pub(crate) struct RegistryEndpoints {
 	pub(crate) crates_io_index: String,
 	pub(crate) pub_dev_api: String,
 	pub(crate) jsr_base: String,
+	pub(crate) pypi_api: String,
 }
 
 impl RegistryEndpoints {
@@ -188,6 +191,8 @@ impl RegistryEndpoints {
 				.unwrap_or_else(|_| "https://pub.dev/api".to_string()),
 			jsr_base: env::var("MONOCHANGE_JSR_BASE_URL")
 				.unwrap_or_else(|_| "https://jsr.io".to_string()),
+			pypi_api: env::var("MONOCHANGE_PYPI_API_URL")
+				.unwrap_or_else(|_| "https://pypi.org/pypi".to_string()),
 		}
 	}
 }
@@ -785,6 +790,7 @@ fn default_registry_kind_for_ecosystem(ecosystem: &str) -> MonochangeResult<Regi
 		"npm" => Ok(RegistryKind::Npm),
 		"deno" => Ok(RegistryKind::Jsr),
 		"dart" | "flutter" => Ok(RegistryKind::PubDev),
+		"python" => Ok(RegistryKind::Pypi),
 		_ => {
 			Err(MonochangeError::Config(format!(
 				"built-in package publishing does not support ecosystem `{ecosystem}`"
@@ -1347,6 +1353,13 @@ fn build_publish_command(
 		command = Some(build_jsr_publish_command(
 			placeholder_path.expect("placeholder directory must exist"),
 		));
+	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Placeholder {
+		command = Some(build_python_publish_command(
+			request,
+			placeholder_path.expect("placeholder directory must exist"),
+		));
+	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Release {
+		command = Some(build_python_publish_command(request, &request.package_root));
 	}
 	if is_jsr_release {
 		command = Some(build_jsr_publish_command(&request.package_root));
@@ -1359,6 +1372,10 @@ fn build_publish_command(
 
 fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, dry_run: bool) {
 	if !dry_run {
+		return;
+	}
+
+	if registry == RegistryKind::Pypi {
 		return;
 	}
 
@@ -1461,6 +1478,22 @@ fn build_jsr_publish_command(cwd: &Path) -> CommandSpec {
 	}
 }
 
+fn build_python_publish_command(request: &PublishRequest, cwd: &Path) -> CommandSpec {
+	let trusted_publishing = if request.trusted_publishing.enabled {
+		"always"
+	} else {
+		"never"
+	};
+	let script = format!(
+		"uv build --out-dir dist && uv publish --trusted-publishing {trusted_publishing} dist/*"
+	);
+	CommandSpec {
+		program: "sh".to_string(),
+		args: vec!["-c".to_string(), script],
+		cwd: cwd.to_path_buf(),
+	}
+}
+
 fn build_placeholder_directory(
 	root: &Path,
 	request: &PublishRequest,
@@ -1491,6 +1524,12 @@ fn build_placeholder_directory(
 		));
 	} else if request.registry == RegistryKind::PubDev {
 		manifest_result = Some(write_dart_placeholder_manifest(
+			tempdir_path,
+			request,
+			source,
+		));
+	} else if request.registry == RegistryKind::Pypi {
+		manifest_result = Some(write_python_placeholder_manifest(
 			tempdir_path,
 			request,
 			source,
@@ -1787,6 +1826,63 @@ fn write_jsr_placeholder_manifest(
 	})
 }
 
+fn write_python_placeholder_manifest(
+	dir: &Path,
+	request: &PublishRequest,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<()> {
+	let module_name = python_placeholder_module_name(&request.package_name);
+	let project_urls = source.map(|source| {
+		format!(
+			"\n[project.urls]\nRepository = \"https://github.com/{}/{}\"\n",
+			source.owner, source.repo
+		)
+	});
+	let pyproject = format!(
+		"[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[project]\nname = \"{}\"\nversion = \"{}\"\ndescription = \"Placeholder package for {}\"\nreadme = \"README.md\"\nrequires-python = \">=3.8\"\n{}\n[tool.hatch.build.targets.wheel]\npackages = [\"src/{}\"]\n",
+		request.package_name,
+		request.version,
+		request.package_name,
+		project_urls.unwrap_or_default(),
+		module_name,
+	);
+	fs::write(dir.join("pyproject.toml"), pyproject).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write placeholder pyproject.toml: {error}"
+		))
+	})?;
+	let package_dir = dir.join("src").join(&module_name);
+	fs::create_dir_all(&package_dir).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to create placeholder Python package: {error}"
+		))
+	})?;
+	fs::write(
+		package_dir.join("__init__.py"),
+		"\"\"\"Placeholder package published by monochange.\"\"\"\n",
+	)
+	.map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write placeholder Python package module: {error}"
+		))
+	})
+}
+
+fn python_placeholder_module_name(package_name: &str) -> String {
+	let mut module = String::new();
+	for character in package_name.chars() {
+		if character.is_ascii_alphanumeric() || character == '_' {
+			module.push(character.to_ascii_lowercase());
+		} else {
+			module.push('_');
+		}
+	}
+	if module.is_empty() || module.starts_with(|character: char| character.is_ascii_digit()) {
+		module.insert_str(0, "placeholder_");
+	}
+	module
+}
+
 fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
 	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
 }
@@ -1859,6 +1955,32 @@ fn registry_version_exists(
 						version.get("version").and_then(JsonValue::as_str)
 							== Some(request.version.as_str())
 					})
+			});
+		return Ok(exists);
+	}
+
+	if request.registry == RegistryKind::Pypi {
+		let url = format!(
+			"{}/{}/json",
+			endpoints.pypi_api.trim_end_matches('/'),
+			encode(&request.package_name)
+		);
+		let response = client.get(url).send().map_err(http_error("PyPI lookup"))?;
+		if response.status() == StatusCode::NOT_FOUND {
+			return Ok(false);
+		}
+		let response = response
+			.error_for_status()
+			.map_err(http_error("PyPI lookup"))?;
+		let json = response
+			.json::<JsonValue>()
+			.map_err(http_error("PyPI decode"))?;
+		let exists = json
+			.get("releases")
+			.and_then(JsonValue::as_object)
+			.is_some_and(|releases| {
+				request.placeholder && !releases.is_empty()
+					|| releases.contains_key(&request.version)
 			});
 		return Ok(exists);
 	}
@@ -2068,6 +2190,11 @@ fn manual_setup_url(request: &PublishRequest) -> String {
 		format!("https://pub.dev/packages/{}/admin", request.package_name)
 	} else if request.registry == RegistryKind::Jsr {
 		format!("https://jsr.io/{}", request.package_name)
+	} else if request.registry == RegistryKind::Pypi {
+		format!(
+			"https://pypi.org/manage/project/{}/settings/publishing/",
+			request.package_name
+		)
 	} else {
 		format!(
 			"https://www.npmjs.com/package/{}/access",
@@ -2084,6 +2211,8 @@ fn trust_docs_url(registry: RegistryKind) -> &'static str {
 		DART_TRUST_DOCS_URL
 	} else if registry == RegistryKind::Jsr {
 		JSR_TRUST_DOCS_URL
+	} else if registry == RegistryKind::Pypi {
+		PYPI_TRUST_DOCS_URL
 	} else {
 		NPM_TRUST_DOCS_URL
 	}) as _
@@ -2161,6 +2290,8 @@ mod tests {
 				Ecosystem::Npm
 			} else if registry == RegistryKind::PubDev {
 				Ecosystem::Dart
+			} else if registry == RegistryKind::Pypi {
+				Ecosystem::Python
 			} else {
 				Ecosystem::Deno
 			},
@@ -2251,6 +2382,7 @@ mod tests {
 			crates_io_index: base_url.to_string(),
 			pub_dev_api: base_url.to_string(),
 			jsr_base: base_url.to_string(),
+			pypi_api: base_url.to_string(),
 		}
 	}
 
@@ -2797,6 +2929,32 @@ jobs:
 			false,
 		);
 		assert_eq!(jsr_release.cwd, PathBuf::from("/workspace/pkg"));
+		let pypi_placeholder = build_publish_command(
+			&sample_request(RegistryKind::Pypi),
+			PackagePublishRunMode::Placeholder,
+			Some(&tempdir),
+			false,
+		);
+		assert_eq!(pypi_placeholder.program, "sh");
+		assert_eq!(pypi_placeholder.cwd, tempdir.path());
+		assert!(
+			render_command(&pypi_placeholder).contains("uv publish --trusted-publishing never")
+		);
+		let pypi_release_request = PublishRequest {
+			trusted_publishing: TrustedPublishingSettings {
+				enabled: true,
+				..TrustedPublishingSettings::default()
+			},
+			..sample_request(RegistryKind::Pypi)
+		};
+		let pypi_release = build_publish_command(
+			&pypi_release_request,
+			PackagePublishRunMode::Release,
+			None,
+			false,
+		);
+		assert_eq!(pypi_release.cwd, PathBuf::from("/workspace/pkg"));
+		assert!(render_command(&pypi_release).contains("uv publish --trusted-publishing always"));
 	}
 
 	#[test]
@@ -2835,6 +2993,14 @@ jobs:
 			true,
 		);
 		assert_eq!(jsr.args.last(), Some(&"--dry-run".to_string()));
+
+		let pypi = build_publish_command(
+			&sample_request(RegistryKind::Pypi),
+			PackagePublishRunMode::Placeholder,
+			Some(&tempdir),
+			true,
+		);
+		assert!(!render_command(&pypi).contains("--dry-run"));
 	}
 
 	#[test]
@@ -2903,6 +3069,10 @@ jobs:
 			manual_setup_url(&sample_request(RegistryKind::Jsr)),
 			"https://jsr.io/@scope/pkg".to_string()
 		);
+		assert_eq!(
+			manual_setup_url(&sample_request(RegistryKind::Pypi)),
+			"https://pypi.org/manage/project/pkg/settings/publishing/".to_string()
+		);
 		assert_eq!(trust_docs_url(RegistryKind::Npm), NPM_TRUST_DOCS_URL);
 		assert_eq!(
 			trust_docs_url(RegistryKind::CratesIo),
@@ -2910,6 +3080,7 @@ jobs:
 		);
 		assert_eq!(trust_docs_url(RegistryKind::PubDev), DART_TRUST_DOCS_URL);
 		assert_eq!(trust_docs_url(RegistryKind::Jsr), JSR_TRUST_DOCS_URL);
+		assert_eq!(trust_docs_url(RegistryKind::Pypi), PYPI_TRUST_DOCS_URL);
 	}
 
 	#[test]
@@ -2975,6 +3146,12 @@ jobs:
 				"versions": { "1.2.3": {} }
 			}));
 		});
+		server.mock(|when, then| {
+			when.method(GET).path("/pkg/json");
+			then.status(200).json_body_obj(&serde_json::json!({
+				"releases": { "1.2.3": [] }
+			}));
+		});
 		let client = Client::builder().build().expect("http client:");
 		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
@@ -2982,6 +3159,7 @@ jobs:
 			crates_io_index: server.base_url(),
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
+			pypi_api: server.base_url(),
 		};
 
 		assert!(
@@ -2999,6 +3177,10 @@ jobs:
 		assert!(
 			registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::Jsr))
 				.expect("jsr exists:")
+		);
+		assert!(
+			registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::Pypi))
+				.expect("PyPI exists:")
 		);
 	}
 
@@ -3031,6 +3213,12 @@ jobs:
 				"versions": { "1.0.0": {} }
 			}));
 		});
+		server.mock(|when, then| {
+			when.method(GET).path("/pkg/json");
+			then.status(200).json_body_obj(&serde_json::json!({
+				"releases": { "1.0.0": [] }
+			}));
+		});
 		let client = Client::builder().build().expect("http client:");
 		let endpoints = sample_endpoints(&server.base_url());
 		let placeholder = |registry| {
@@ -3056,6 +3244,10 @@ jobs:
 		assert!(
 			registry_version_exists(&client, &endpoints, &placeholder(RegistryKind::Jsr))
 				.expect("jsr placeholder exists:")
+		);
+		assert!(
+			registry_version_exists(&client, &endpoints, &placeholder(RegistryKind::Pypi))
+				.expect("PyPI placeholder exists:")
 		);
 	}
 
@@ -3210,6 +3402,10 @@ jobs:
 			when.method(GET).path("/missing");
 			then.status(404);
 		});
+		server.mock(|when, then| {
+			when.method(GET).path("/missing/json");
+			then.status(404);
+		});
 		let client = Client::builder().build().expect("http client:");
 		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
@@ -3217,6 +3413,7 @@ jobs:
 			crates_io_index: server.base_url(),
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
+			pypi_api: server.base_url(),
 		};
 		let request = sample_request(RegistryKind::Npm);
 		let request = PublishRequest {
@@ -3224,6 +3421,13 @@ jobs:
 			..request
 		};
 		assert!(!registry_version_exists(&client, &endpoints, &request).expect("missing:"));
+		let pypi_request = PublishRequest {
+			package_name: "missing".to_string(),
+			..sample_request(RegistryKind::Pypi)
+		};
+		assert!(
+			!registry_version_exists(&client, &endpoints, &pypi_request).expect("PyPI missing:")
+		);
 	}
 
 	#[test]
@@ -3803,7 +4007,7 @@ jobs:
 	}
 
 	#[test]
-	fn write_placeholder_directory_builds_npm_jsr_and_dart_scaffolds() {
+	fn write_placeholder_directory_builds_npm_jsr_dart_and_python_scaffolds() {
 		let tempdir = tempfile::tempdir().expect("tempdir:");
 		let npm = build_placeholder_directory(
 			tempdir.path(),
@@ -3828,6 +4032,77 @@ jobs:
 		)
 		.expect("jsr placeholder:");
 		assert!(jsr.path().join("deno.json").is_file());
+
+		let python_request = PublishRequest {
+			package_name: "Example-Pkg.Name".to_string(),
+			..sample_request(RegistryKind::Pypi)
+		};
+		let python =
+			build_placeholder_directory(tempdir.path(), &python_request, Some(&sample_source()))
+				.expect("Python placeholder:");
+		let pyproject =
+			fs::read_to_string(python.path().join("pyproject.toml")).expect("read pyproject.toml");
+		assert!(pyproject.contains("name = \"Example-Pkg.Name\""));
+		assert!(pyproject.contains("packages = [\"src/example_pkg_name\"]"));
+		assert!(
+			python
+				.path()
+				.join("src")
+				.join("example_pkg_name")
+				.join("__init__.py")
+				.is_file()
+		);
+
+		let digit_request = PublishRequest {
+			package_name: "123-pkg".to_string(),
+			..sample_request(RegistryKind::Pypi)
+		};
+		let digit_python = build_placeholder_directory(tempdir.path(), &digit_request, None)
+			.expect("digit Python placeholder:");
+		assert!(
+			digit_python
+				.path()
+				.join("src")
+				.join("placeholder_123_pkg")
+				.join("__init__.py")
+				.is_file()
+		);
+	}
+
+	#[test]
+	fn python_placeholder_manifest_writers_report_io_errors() {
+		let request = sample_request(RegistryKind::Pypi);
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+		fs::create_dir(tempdir.path().join("pyproject.toml")).expect("create pyproject dir");
+		let error = write_python_placeholder_manifest(tempdir.path(), &request, None)
+			.expect_err("pyproject write should fail");
+		assert!(
+			error
+				.to_string()
+				.contains("failed to write placeholder pyproject.toml")
+		);
+
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+		fs::write(tempdir.path().join("src"), "not a directory").expect("write src file");
+		let error = write_python_placeholder_manifest(tempdir.path(), &request, None)
+			.expect_err("package directory create should fail");
+		assert!(
+			error
+				.to_string()
+				.contains("failed to create placeholder Python package")
+		);
+
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+		let module_dir = tempdir.path().join("src").join("pkg");
+		fs::create_dir_all(&module_dir).expect("create module dir");
+		fs::create_dir(module_dir.join("__init__.py")).expect("create init dir");
+		let error = write_python_placeholder_manifest(tempdir.path(), &request, None)
+			.expect_err("module write should fail");
+		assert!(
+			error
+				.to_string()
+				.contains("failed to write placeholder Python package module")
+		);
 	}
 
 	#[test]
@@ -4705,6 +4980,7 @@ version = "1.2.3"
 			crates_io_index: server.base_url(),
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
+			pypi_api: server.base_url(),
 		};
 		let request = PublishRequest {
 			mode: PublishMode::External,

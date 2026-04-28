@@ -10,15 +10,15 @@ monochange uses ecosystem adapters to translate native package-manager files int
 
 ## Capability matrix
 
-| Ecosystem      | Package type      | Discovery sources                                                                       | Version and dependency updates                                                             | Lockfile behavior                                                                                                                                       | Built-in registry publishing                                         |
-| -------------- | ----------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Cargo          | `cargo`           | `Cargo.toml` workspaces and standalone crates                                           | `Cargo.toml` package versions and internal dependency requirements                         | Direct `Cargo.lock` rewrite by default; configure `cargo generate-lockfile`, `cargo check`, or another command when you need package-manager resolution | `crates.io`                                                          |
-| npm-family     | `npm`             | npm workspaces, pnpm workspaces, Bun workspaces, and standalone `package.json` packages | `package.json` versions and dependency ranges                                              | Direct `package-lock.json`, `pnpm-lock.yaml`, `bun.lock`, and `bun.lockb` updates by default; command overrides support package-manager refreshes       | `npm`                                                                |
-| Deno           | `deno`            | Deno workspaces and standalone `deno.json` / `deno.jsonc` packages                      | Deno manifest versions, exports/imports metadata, and dependency references                | Direct `deno.lock` update when possible; no inferred lockfile command                                                                                   | `jsr`                                                                |
-| Dart / Flutter | `dart`, `flutter` | Dart and Flutter workspaces plus standalone `pubspec.yaml` packages                     | `pubspec.yaml` versions and dependency ranges                                              | Direct `pubspec.lock` update by default; configure `dart pub get` or `flutter pub get` when you need full solver refreshes                              | `pub.dev`                                                            |
-| Python         | `python`          | uv workspaces, Poetry projects, and standalone `pyproject.toml` packages                | PEP 621 `[project]` and Poetry `[tool.poetry]` package versions plus dependency specifiers | Does not mutate `uv.lock` or `poetry.lock` directly; infers `uv lock` and `poetry lock --no-update` commands; unknown Python lockfiles are skipped      | Not built in; use `mode = "external"` for PyPI or private registries |
+| Ecosystem      | Package type      | Discovery sources                                                                       | Version and dependency updates                                                             | Lockfile behavior                                                                                                                                       | Built-in registry publishing |
+| -------------- | ----------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Cargo          | `cargo`           | `Cargo.toml` workspaces and standalone crates                                           | `Cargo.toml` package versions and internal dependency requirements                         | Direct `Cargo.lock` rewrite by default; configure `cargo generate-lockfile`, `cargo check`, or another command when you need package-manager resolution | `crates.io`                  |
+| npm-family     | `npm`             | npm workspaces, pnpm workspaces, Bun workspaces, and standalone `package.json` packages | `package.json` versions and dependency ranges                                              | Direct `package-lock.json`, `pnpm-lock.yaml`, `bun.lock`, and `bun.lockb` updates by default; command overrides support package-manager refreshes       | `npm`                        |
+| Deno           | `deno`            | Deno workspaces and standalone `deno.json` / `deno.jsonc` packages                      | Deno manifest versions, exports/imports metadata, and dependency references                | Direct `deno.lock` update when possible; no inferred lockfile command                                                                                   | `jsr`                        |
+| Dart / Flutter | `dart`, `flutter` | Dart and Flutter workspaces plus standalone `pubspec.yaml` packages                     | `pubspec.yaml` versions and dependency ranges                                              | Direct `pubspec.lock` update by default; configure `dart pub get` or `flutter pub get` when you need full solver refreshes                              | `pub.dev`                    |
+| Python         | `python`          | uv workspaces, Poetry projects, and standalone `pyproject.toml` packages                | PEP 621 `[project]` and Poetry `[tool.poetry]` package versions plus dependency specifiers | Does not mutate `uv.lock` or `poetry.lock` directly; infers `uv lock` and `poetry lock --no-update` commands; unknown Python lockfiles are skipped      | `pypi`                       |
 
-The built-in publishing column is intentionally narrower than release planning. Python packages are fully supported for discovery, changesets, release plans, version rewrites, internal dependency rewrites, and lockfile command inference, but monochange does not publish to PyPI yet.
+The built-in publishing column is intentionally narrower than release planning. It lists only the canonical public registry for each supported ecosystem; private registries and custom publication flows should use `mode = "external"`.
 
 ## Shared behavior across ecosystems
 
@@ -152,7 +152,7 @@ Python lockfile behavior is command-based by design:
 - unknown Python lockfile names are ignored rather than guessed
 - configuring `[ecosystems.python].lockfile_commands` overrides the inferred commands
 
-Python publishing is external today. Keep package release planning in monochange, but publish with your existing PyPI, uv, Poetry, Hatch, or internal-registry workflow by setting package publishing to `mode = "external"` or by running your own CI step after `mc release`.
+Built-in Python publishing targets PyPI. monochange builds Python artifacts with `uv build --out-dir dist` and publishes them with `uv publish`, using `--trusted-publishing always` when trusted publishing is enabled and `--trusted-publishing never` otherwise. Placeholder publishing creates a minimal Hatchling project with a normalized module directory under `src/`.
 
 Example Python package configuration:
 
@@ -162,6 +162,12 @@ path = "services/api"
 type = "python"
 changelog = true
 
+[package.api.publish]
+enabled = true
+mode = "builtin"
+registry = "pypi"
+trusted_publishing = true
+
 [ecosystems.python]
 dependency_version_prefix = ">="
 # Optional: override inferred uv/Poetry lockfile commands.
@@ -170,14 +176,6 @@ lockfile_commands = [{ command = "uv lock", cwd = "." }]
 
 ## Choosing external publishing
 
-Use `mode = "external"` when an ecosystem or registry is not handled by monochange's built-in publisher, or when your organization needs custom signing, provenance, approval, rate-limit, or private-registry behavior.
-
-For Python, external publishing is currently the expected path:
-
-```toml
-[package.api.publish]
-enabled = true
-mode = "external"
-```
+Use `mode = "external"` when an ecosystem or registry is not handled by monochange's built-in publisher, or when your organization needs custom signing, provenance, approval, rate-limit, private-registry behavior, or a Python publishing toolchain other than the built-in `uv build` / `uv publish` flow.
 
 That keeps the package in release planning while leaving upload mechanics to your existing publishing workflow.

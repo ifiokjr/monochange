@@ -229,6 +229,7 @@ fn publish_mode_and_registry_kind_display_canonical_names() {
 	assert_eq!(RegistryKind::Npm.as_str(), "npm");
 	assert_eq!(RegistryKind::Jsr.as_str(), "jsr");
 	assert_eq!(RegistryKind::PubDev.as_str(), "pub_dev");
+	assert_eq!(RegistryKind::Pypi.as_str(), "pypi");
 }
 
 #[test]

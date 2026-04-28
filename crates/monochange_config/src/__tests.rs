@@ -1033,7 +1033,10 @@ type = "python"
 			.map(|definition| definition.path.as_str()),
 		Some("pyproject.toml")
 	);
-	assert!(package.publish.registry.is_none());
+	assert_eq!(
+		package.publish.registry,
+		Some(PublishRegistry::Builtin(RegistryKind::Pypi))
+	);
 }
 
 #[test]

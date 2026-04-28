@@ -6420,6 +6420,7 @@ fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 		.unwrap_or_else(|error| panic!("write second release file: {error}"));
 	git_in_temp_repo(&repo, &["add", "release.txt"]);
 	git_in_temp_repo(&repo, &["commit", "-m", "second"]);
+	let target_commit = git_output_in_temp_repo(&repo, &["rev-parse", "HEAD"]);
 	let discovery = monochange_core::ReleaseRecordDiscovery {
 		input_ref: "v1.2.3".to_string(),
 		resolved_commit: record_commit.clone(),
@@ -6427,8 +6428,9 @@ fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	let result = crate::retarget_release(&repo, &discovery, "HEAD", false, false, false, None)
-		.unwrap_or_else(|error| panic!("retarget release: {error}"));
+	let result =
+		crate::retarget_release(&repo, &discovery, &target_commit, false, false, false, None)
+			.unwrap_or_else(|error| panic!("retarget release: {error}"));
 	assert_eq!(result.git_tag_results.len(), 1);
 }
 
