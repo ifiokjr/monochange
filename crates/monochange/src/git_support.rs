@@ -1,19 +1,20 @@
+#[cfg(test)]
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+#[cfg(test)]
 use std::process::Stdio;
 
 use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::git::git_command_output;
-use monochange_core::git::git_commit_message_text;
-use monochange_core::git::git_commit_paths_stdin_command;
 use monochange_core::git::git_error_detail;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::git_stderr_trimmed;
 use monochange_core::git::git_stdout_trimmed;
+use monochange_core::git::run_git_commit_message;
 
 #[must_use = "the tag commit result must be checked"]
 pub(crate) fn resolve_git_tag_commit(root: &Path, tag_name: &str) -> MonochangeResult<String> {
@@ -283,11 +284,7 @@ pub(crate) fn git_commit_paths(
 	message: &CommitMessage,
 	no_verify: bool,
 ) -> MonochangeResult<()> {
-	run_git_process_with_stdin(
-		git_commit_paths_stdin_command(root, no_verify),
-		git_commit_message_text(message).as_bytes(),
-		"failed to create release commit",
-	)
+	run_git_commit_message(root, message, "create release commit", no_verify)
 }
 
 #[must_use = "the HEAD commit result must be checked"]
@@ -309,6 +306,7 @@ pub(crate) fn run_git_process(
 	handle_git_process_output(&output, error_message)
 }
 
+#[cfg(test)]
 pub(crate) fn run_git_process_with_stdin(
 	mut command: ProcessCommand,
 	input: &[u8],

@@ -135,14 +135,13 @@ use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
 use monochange_core::git::git_checkout_branch_command;
 use monochange_core::git::git_command_output;
-use monochange_core::git::git_commit_paths_command;
 use monochange_core::git::git_current_branch;
 use monochange_core::git::git_error_detail;
 use monochange_core::git::git_head_commit;
 use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
-use monochange_core::git::run_commit_command_allow_nothing_to_commit;
+use monochange_core::git::run_git_commit_message;
 use octocrab::Octocrab;
 use regex::Regex;
 use serde::Deserialize;
@@ -1823,9 +1822,11 @@ fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 }
 
 fn git_commit_paths(root: &Path, message: &CommitMessage, no_verify: bool) -> MonochangeResult<()> {
-	run_commit_command_allow_nothing_to_commit(
-		git_commit_paths_command(root, message, no_verify),
+	run_git_commit_message(
+		root,
+		message,
 		"commit release pull request changes",
+		no_verify,
 	)
 }
 

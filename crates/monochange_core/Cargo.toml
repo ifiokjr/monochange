@@ -21,6 +21,7 @@ reqwest = { workspace = true, optional = true, default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 tracing = { workspace = true, default-features = true }
 
@@ -31,7 +32,6 @@ proptest = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
-tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
