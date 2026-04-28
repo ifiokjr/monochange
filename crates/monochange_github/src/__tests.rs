@@ -1029,7 +1029,7 @@ fn release_pull_request_commit_verification_is_opt_in() {
 		|| {
 			assert!(!github_actions_release_commit_verification_enabled(
 				&enabled_source
-			))
+			));
 		},
 	);
 
