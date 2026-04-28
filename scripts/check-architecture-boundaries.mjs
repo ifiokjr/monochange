@@ -13,6 +13,7 @@ const allowlist = new Set([
 	"crates/monochange/src/versioned_files.rs",
 	"crates/monochange/src/workspace_ops.rs",
 	"crates/monochange/src/package_publish.rs",
+	"crates/monochange/src/trust_capabilities.rs",
 	"crates/monochange_config/src/lib.rs",
 ]);
 const forbiddenTokens = ["SourceProvider::", "EcosystemType::"];

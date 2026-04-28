@@ -32,6 +32,7 @@ use urlencoding::encode;
 use crate::PreparedRelease;
 use crate::discover_release_record;
 use crate::discover_workspace;
+use crate::trust_capabilities::trusted_publishing_capability_message_for_builtin;
 
 const PLACEHOLDER_VERSION: &str = "0.0.0";
 #[cfg(test)]
@@ -1026,7 +1027,13 @@ fn enforce_release_trust_prerequisites(
 	}
 
 	if request.registry == RegistryKind::Npm {
-		resolve_github_trust_context(root, source, &request.trusted_publishing, env_map).map(|_| ())
+		resolve_github_trust_context(root, source, &request.trusted_publishing, env_map)
+			.map(|_| ())
+			.map_err(|error| {
+				let capability_message =
+					trusted_publishing_capability_message_for_builtin(request.registry, env_map);
+				MonochangeError::Config(format!("{error}. {capability_message}"))
+			})
 	} else {
 		let setup_url = manual_setup_url(request);
 		match resolve_github_trust_context(root, source, &request.trusted_publishing, env_map) {
@@ -1039,8 +1046,10 @@ fn enforce_release_trust_prerequisites(
 				)))
 			}
 			Err(error) => {
+				let capability_message =
+					trusted_publishing_capability_message_for_builtin(request.registry, env_map);
 				Err(MonochangeError::Config(format!(
-					"`{}` requires trusted-publishing preflight configuration before built-in release publishing can continue: {}. Finish the GitHub context configuration first, then complete registry setup at {} and rerun `mc publish`.",
+					"`{}` requires trusted-publishing preflight configuration before built-in release publishing can continue: {}. {capability_message} Finish the GitHub context configuration first, then complete registry setup at {} and rerun `mc publish`.",
 					request.package_id, error, setup_url,
 				)))
 			}
@@ -2265,6 +2274,8 @@ fn manual_trust_outcome(
 			}
 		}
 		Err(error) => {
+			let capability_message =
+				trusted_publishing_capability_message_for_builtin(request.registry, env_map);
 			TrustedPublishingOutcome {
 				status: TrustedPublishingStatus::ManualActionRequired,
 				repository: request.trusted_publishing.repository.clone(),
@@ -2272,7 +2283,7 @@ fn manual_trust_outcome(
 				environment: request.trusted_publishing.environment.clone(),
 				setup_url: Some(setup_url.clone()),
 				message: format!(
-					"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and finish the GitHub context setup first: {}",
+					"configure trusted publishing manually for `{}` before the next built-in release publish; open {} and finish the GitHub context setup first: {}. {capability_message}",
 					request.package_name, setup_url, error,
 				),
 			}
@@ -4596,6 +4607,57 @@ jobs:
 			outcome
 				.message
 				.contains("set `publish.trusted_publishing.workflow`")
+		);
+	}
+
+	#[test]
+	fn release_trust_prerequisites_include_provider_capability_diagnostics() {
+		let request = trusted_request(RegistryKind::Npm);
+		let error = enforce_release_trust_prerequisites(
+			&request,
+			Some(&sample_source()),
+			Path::new("."),
+			&BTreeMap::new(),
+		)
+		.expect_err("missing GitHub context should block trusted npm release publishing");
+
+		let message = error.to_string();
+		assert!(message.contains("trusted publishing could not determine the GitHub workflow"));
+		assert!(message.contains("No supported CI provider identity was detected"));
+		assert!(message.contains("supported providers: GitHub Actions, GitLab CI/CD"));
+	}
+
+	#[test]
+	fn manual_trust_outcome_reports_unsupported_ci_provider_capability() {
+		let request = trusted_request(RegistryKind::Npm);
+		let env_map = BTreeMap::from([
+			("CIRCLECI".to_string(), "true".to_string()),
+			(
+				"CIRCLE_PROJECT_USERNAME".to_string(),
+				"monochange".to_string(),
+			),
+			(
+				"CIRCLE_PROJECT_REPONAME".to_string(),
+				"monochange".to_string(),
+			),
+			("CIRCLE_WORKFLOW_ID".to_string(), "workflow".to_string()),
+		]);
+
+		let outcome = manual_trust_outcome(&request, None, Path::new("."), &env_map);
+
+		assert_eq!(
+			outcome.status,
+			TrustedPublishingStatus::ManualActionRequired
+		);
+		assert!(
+			outcome
+				.message
+				.contains("CircleCI is not supported for npm trusted publishing")
+		);
+		assert!(
+			outcome
+				.message
+				.contains("supported providers: GitHub Actions, GitLab CI/CD")
 		);
 	}
 

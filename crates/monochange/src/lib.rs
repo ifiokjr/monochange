@@ -311,6 +311,7 @@ mod release_record;
 mod skill;
 mod subagents;
 mod tracing_setup;
+mod trust_capabilities;
 mod versioned_files;
 mod workspace_ops;
 
