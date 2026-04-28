@@ -8,12 +8,14 @@ import {
 	CLI_PACKAGE_DIR,
 	hasBinary,
 	main as publishMain,
+	npmPublishEnv,
 	packageExists,
 	packageMetadata,
 	parseArgs,
 	PLATFORM_PACKAGE_DIRS,
 	publishPackage,
 	run,
+	assertTrustedPublishingContext,
 } from "../publish-packages.mjs";
 
 function makeSandbox() {
@@ -21,6 +23,17 @@ function makeSandbox() {
 	const sandbox = join(base, `test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 	mkdirSync(sandbox, { recursive: true });
 	return sandbox;
+}
+
+function trustedPublishingEnv(overrides = {}) {
+	return {
+		GITHUB_ACTIONS: "true",
+		GITHUB_REPOSITORY: "monochange/monochange",
+		GITHUB_WORKFLOW_REF: "monochange/monochange/.github/workflows/publish.yml@refs/tags/v1.0.0",
+		ACTIONS_ID_TOKEN_REQUEST_URL: "https://token.actions.example/request",
+		ACTIONS_ID_TOKEN_REQUEST_TOKEN: "oidc-request-token",
+		...overrides,
+	};
 }
 
 afterEach(() => {
@@ -157,6 +170,36 @@ describe("hasBinary", () => {
 	});
 });
 
+describe("trusted publishing context", () => {
+	test("accepts the monochange publish workflow OIDC context", () => {
+		assert.doesNotThrow(() => assertTrustedPublishingContext(trustedPublishingEnv()));
+	});
+
+	test("rejects long-lived npm token environment variables", () => {
+		assert.throws(
+			() => assertTrustedPublishingContext(trustedPublishingEnv({ NODE_AUTH_TOKEN: "secret" })),
+			{
+				message: /long-lived npm token environment variables: NODE_AUTH_TOKEN/,
+			},
+		);
+	});
+
+	test("rejects missing GitHub OIDC context", () => {
+		assert.throws(() => assertTrustedPublishingContext({}), {
+			message: /Cannot publish npm packages without the trusted-publishing GitHub Actions context/,
+		});
+	});
+
+	test("removes npm token variables from publish environment", () => {
+		const env = npmPublishEnv(
+			trustedPublishingEnv({ NODE_AUTH_TOKEN: "secret", NPM_TOKEN: "secret" }),
+		);
+		assert.equal(env.NODE_AUTH_TOKEN, undefined);
+		assert.equal(env.NPM_TOKEN, undefined);
+		assert.equal(env.NPM_CONFIG_PROVENANCE, "true");
+	});
+});
+
 describe("publishPackage", () => {
 	test("throws when no binary is present", () => {
 		const sandbox = makeSandbox();
@@ -200,7 +243,7 @@ describe("publishPackage", () => {
 			}),
 		);
 		_setSpawnSync(() => ({ status: 0, stdout: '"1.0.0"' }));
-		publishPackage(sandbox);
+		publishPackage(sandbox, { env: trustedPublishingEnv() });
 	});
 
 	test("publishes when binary present and package not on npm", () => {
@@ -215,18 +258,21 @@ describe("publishPackage", () => {
 			}),
 		);
 		let publishCalled = false;
-		_setSpawnSync((cmd, args) => {
+		let publishOptions;
+		_setSpawnSync((cmd, args, options) => {
 			if (args[0] === "view") {
 				return { status: 1, stderr: "not found" };
 			}
 			if (args[0] === "publish") {
 				publishCalled = true;
+				publishOptions = options;
 				return { status: 0, stdout: "" };
 			}
 			return { status: 0, stdout: "" };
 		});
-		publishPackage(sandbox);
+		publishPackage(sandbox, { env: trustedPublishingEnv() });
 		assert.equal(publishCalled, true);
+		assert.equal(publishOptions.env.NPM_CONFIG_PROVENANCE, "true");
 	});
 });
 
@@ -264,7 +310,7 @@ describe("main", () => {
 			return { status: 0, stdout: "" };
 		});
 
-		publishMain(["--packages-dir", sandbox]);
+		publishMain(["--packages-dir", sandbox], { env: trustedPublishingEnv() });
 
 		assert.equal(publishedOrder.length, PLATFORM_PACKAGE_DIRS.length + 1);
 	});

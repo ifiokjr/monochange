@@ -74,8 +74,6 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: publish cli npm packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/npm/publish-packages.mjs \
             --packages-dir packages
