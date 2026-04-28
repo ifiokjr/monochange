@@ -1016,6 +1016,116 @@ fn publish_release_pull_request_updates_existing_pull_request_via_octocrab() {
 }
 
 #[test]
+fn release_pull_request_commit_verification_uses_github_git_database_api() {
+	let server = MockServer::start();
+	let source = sample_source(Some(server.base_url()));
+	let request = sample_pull_request_request();
+	let fallback = "1111111111111111111111111111111111111111";
+	let verified = "2222222222222222222222222222222222222222";
+	let original_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path(format!("/repos/ifiokjr/monochange/git/commits/{fallback}"));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(
+				r#"{{"sha":"{fallback}","message":"chore(release): prepare release\n\nbody","tree":{{"sha":"tree123"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":false,"reason":"unsigned"}}}}"#
+			));
+	});
+	let create_commit = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/commits")
+			.json_body(json!({
+				"message": "chore(release): prepare release\n\nbody",
+				"tree": "tree123",
+				"parents": ["parent123"],
+			}));
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(format!(
+				 r#"{{"sha":"{verified}","message":"chore(release): prepare release\n\nbody","tree":{{"sha":"tree123"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":true,"reason":"valid"}}}}"#
+			));
+	});
+	let get_ref = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/ref/heads/monochange/release/release");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{fallback}"}}}}"#));
+	});
+	let update_ref = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/git/refs/heads/monochange/release/release")
+			.json_body(json!({ "sha": verified, "force": true }));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{verified}"}}}}"#));
+	});
+
+	let result = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_ACTIONS", Some("true")),
+			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
+		],
+		|| {
+			maybe_replace_release_pull_request_commit_with_verified_github_commit(
+				&source, &request, fallback,
+			)
+		},
+	);
+
+	original_commit.assert();
+	create_commit.assert();
+	get_ref.assert();
+	update_ref.assert();
+	assert_eq!(result, Ok(verified.to_string()));
+}
+
+#[test]
+fn release_pull_request_commit_verification_falls_back_when_github_does_not_verify_commit() {
+	let server = MockServer::start();
+	let source = sample_source(Some(server.base_url()));
+	let request = sample_pull_request_request();
+	let fallback = "1111111111111111111111111111111111111111";
+	let unverified = "2222222222222222222222222222222222222222";
+	let original_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path(format!("/repos/ifiokjr/monochange/git/commits/{fallback}"));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(
+				r#"{{"sha":"{fallback}","message":"chore(release): prepare release","tree":{{"sha":"tree123"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":false,"reason":"unsigned"}}}}"#
+			));
+	});
+	let create_commit = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/commits");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(format!(
+				r#"{{"sha":"{unverified}","message":"chore(release): prepare release","tree":{{"sha":"tree123"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":false,"reason":"unsigned"}}}}"#
+			));
+	});
+
+	let result = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_ACTIONS", Some("true")),
+			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
+		],
+		|| {
+			maybe_replace_release_pull_request_commit_with_verified_github_commit(
+				&source, &request, fallback,
+			)
+		},
+	);
+
+	original_commit.assert();
+	create_commit.assert();
+	assert!(result.is_err_and(|message| message.contains("without verification (unsigned)")));
+}
+
+#[test]
 fn publish_release_pull_request_skips_matching_existing_pull_request() {
 	let server = MockServer::start();
 	let request = sample_pull_request_request();
