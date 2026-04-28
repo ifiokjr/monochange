@@ -8,7 +8,7 @@ monochange_gitlab: test
 monochange_hosting: test
 ---
 
-#### add changelog section thresholds for collapsed and ignored sections
+#### Add changelog section thresholds
 
 `monochange` changelog rendering can now hide or collapse sections based on each section's configured priority. This lets you keep high-signal sections expanded while moving low-priority notes into collapsible markdown blocks or omitting them entirely.
 

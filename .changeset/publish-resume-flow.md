@@ -5,4 +5,6 @@
 "@monochange/skill": patch
 ---
 
+#### Add publish resume support
+
 Add package publish result artifacts plus `mc publish --resume <path>` for retrying incomplete registry publishing after partial failures.

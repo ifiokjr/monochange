@@ -8,7 +8,7 @@ monochange_gitlab: minor
 monochange_hosting: minor
 ---
 
-#### add `no_verify` support to automated release commit and release request steps
+#### Add no-verify support to release automation
 
 > **Breaking change** — library consumers that construct `monochange_core::CliStepDefinition::CommitRelease` or `OpenReleaseRequest`, or that call the exported git/provider release helpers directly, must now handle the new `no_verify` field/argument.
 

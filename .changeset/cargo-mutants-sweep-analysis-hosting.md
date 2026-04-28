@@ -5,7 +5,7 @@ monochange_core: test
 monochange_hosting: test
 ---
 
-#### test
+#### Add mutation regression coverage
 
 Add cargo-mutants regression coverage for `monochange_analysis`, `monochange_config`, `monochange_core`, and `monochange_hosting`.
 
