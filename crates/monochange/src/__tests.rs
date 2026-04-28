@@ -6653,6 +6653,20 @@ fn versioned_file_kind_detects_supported_paths_across_ecosystems() {
 		),
 		Some(crate::VersionedFileKind::Dart(_))
 	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Python,
+			&fixture_path("python/standalone/pyproject.toml"),
+		),
+		Some(crate::VersionedFileKind::Python(_))
+	));
+	assert!(matches!(
+		crate::versioned_file_kind(
+			monochange_core::EcosystemType::Python,
+			&fixture_path("python/uv-workspace/uv.lock"),
+		),
+		Some(crate::VersionedFileKind::Python(_))
+	));
 }
 
 #[test]
@@ -6763,6 +6777,25 @@ fn read_cached_document_parses_supported_document_formats() {
 	)
 	.unwrap_or_else(|error| panic!("dart lock: {error}"));
 	assert!(matches!(dart_yaml, crate::CachedDocument::Yaml(_)));
+
+	let python_manifest = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("python/standalone/pyproject.toml"),
+		monochange_core::EcosystemType::Python,
+	)
+	.unwrap_or_else(|error| panic!("python manifest: {error}"));
+	assert!(matches!(
+		python_manifest,
+		crate::CachedDocument::Text(contents) if contents.contains("[project]")
+	));
+
+	let python_lock = crate::read_cached_document(
+		&mut BTreeMap::new(),
+		&fixture_path("python/uv-workspace/uv.lock"),
+		monochange_core::EcosystemType::Python,
+	)
+	.unwrap_or_else(|error| panic!("python lock: {error}"));
+	assert!(matches!(python_lock, crate::CachedDocument::Text(_)));
 }
 
 #[test]
@@ -6770,6 +6803,7 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 	let mut configuration = load_workspace_configuration(&fixture_path("monochange/release-base"))
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.npm.dependency_version_prefix = Some("workspace:".to_string());
+	configuration.python.dependency_version_prefix = Some("~=".to_string());
 	configuration.deno.dependency_version_prefix = None;
 	let context = crate::VersionedFileUpdateContext {
 		package_by_config_id: BTreeMap::new(),
@@ -6813,6 +6847,24 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 	assert_eq!(
 		crate::resolve_versioned_prefix(&fallback, &context),
 		monochange_core::EcosystemType::Deno.default_prefix()
+	);
+
+	let python = monochange_core::VersionedFileDefinition {
+		path: "packages/app/pyproject.toml".to_string(),
+		ecosystem_type: Some(monochange_core::EcosystemType::Python),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	assert_eq!(crate::resolve_versioned_prefix(&python, &context), "~=");
+	assert_eq!(
+		monochange_core::EcosystemType::Python.default_prefix(),
+		">="
+	);
+	assert_eq!(
+		monochange_core::EcosystemType::Python.default_fields(),
+		["dependencies"]
 	);
 }
 
@@ -8206,6 +8258,85 @@ fn apply_versioned_file_definition_updates_npm_manifest_and_lock_variants() {
 	assert!(matches!(
 		bun_document,
 		crate::CachedDocument::Text(contents) if contents.contains("\"left-pad\": \"2.0.0\"")
+	));
+}
+
+#[test]
+fn apply_versioned_file_definition_updates_python_manifest_and_lock_variants() {
+	let configuration = versioned_test_configuration();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let manifest_path = tempdir.path().join("pyproject.toml");
+	fs::write(
+		&manifest_path,
+		r#"[project]
+name = "python-app"
+version = "1.0.0"
+dependencies = ["python-core>=1.0.0"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write pyproject: {error}"));
+	let lock_path = tempdir.path().join("uv.lock");
+	fs::write(&lock_path, "version = 1\n").unwrap_or_else(|error| panic!("write lock: {error}"));
+
+	let context = versioned_test_context(
+		&configuration,
+		BTreeMap::from([("python-core".to_string(), "2.0.0".to_string())]),
+		&[],
+	);
+	let manifest_definition = monochange_core::VersionedFileDefinition {
+		path: "pyproject.toml".to_string(),
+		ecosystem_type: Some(monochange_core::EcosystemType::Python),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	let dep_names = vec!["python-core".to_string()];
+	let mut updates = BTreeMap::new();
+	crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&manifest_definition,
+		"2.0.0",
+		None,
+		&dep_names,
+		&context,
+	)
+	.unwrap_or_else(|error| panic!("python manifest update: {error}"));
+	let manifest_document = updates
+		.remove(&manifest_path)
+		.unwrap_or_else(|| panic!("expected python manifest update"));
+	assert!(matches!(
+		manifest_document,
+		crate::CachedDocument::Text(contents)
+			if contents.contains("version = \"2.0.0\"")
+				&& contents.contains("python-core>=2.0.0")
+	));
+
+	let lock_definition = monochange_core::VersionedFileDefinition {
+		path: "uv.lock".to_string(),
+		ecosystem_type: Some(monochange_core::EcosystemType::Python),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	crate::apply_versioned_file_definition(
+		tempdir.path(),
+		&mut updates,
+		&lock_definition,
+		"2.0.0",
+		None,
+		&dep_names,
+		&context,
+	)
+	.unwrap_or_else(|error| panic!("python lock update: {error}"));
+	let lock_document = updates
+		.remove(&lock_path)
+		.unwrap_or_else(|| panic!("expected python lock update"));
+	assert!(matches!(
+		lock_document,
+		crate::CachedDocument::Text(contents) if contents == "version = 1\n"
 	));
 }
 

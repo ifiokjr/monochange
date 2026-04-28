@@ -648,6 +648,15 @@ fn package_type_for_ecosystem(ecosystem: Ecosystem) -> PackageType {
 	}
 }
 
+#[test]
+fn package_type_for_ecosystem_maps_python() {
+	assert_eq!(
+		package_type_for_ecosystem(Ecosystem::Python),
+		PackageType::Python
+	);
+	assert_eq!(PackageType::Python.as_str(), "python");
+}
+
 pub(crate) fn build_lockfile_command_executions(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,

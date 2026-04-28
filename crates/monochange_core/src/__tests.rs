@@ -20,6 +20,7 @@ use crate::CliStepDefinition;
 use crate::DependencyKind;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
+use crate::EcosystemType;
 use crate::GroupChangelogInclude;
 use crate::GroupDefinition;
 use crate::HostedIssueCommentPlan;
@@ -228,6 +229,14 @@ fn publish_mode_and_registry_kind_display_canonical_names() {
 	assert_eq!(RegistryKind::Npm.as_str(), "npm");
 	assert_eq!(RegistryKind::Jsr.as_str(), "jsr");
 	assert_eq!(RegistryKind::PubDev.as_str(), "pub_dev");
+}
+
+#[test]
+fn python_package_type_and_ecosystem_defaults_are_canonical() {
+	assert_eq!(PackageType::Python.as_str(), "python");
+	assert_eq!(Ecosystem::Python.as_str(), "python");
+	assert_eq!(EcosystemType::Python.default_prefix(), ">=");
+	assert_eq!(EcosystemType::Python.default_fields(), ["dependencies"]);
 }
 
 #[test]
@@ -554,7 +563,7 @@ fn versioned_file_definition_uses_regex_returns_true_when_set() {
 fn versioned_file_definition_uses_regex_returns_false_when_unset() {
 	let definition = VersionedFileDefinition {
 		path: "Cargo.toml".to_string(),
-		ecosystem_type: Some(crate::EcosystemType::Cargo),
+		ecosystem_type: Some(EcosystemType::Cargo),
 		prefix: None,
 		fields: None,
 		name: None,

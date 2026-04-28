@@ -42,16 +42,26 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] run repository lint/test validation through the pre-push hook
 - [x] run workspace config validation (`mc validate`)
 - [x] update PR #152 branch
-- [ ] monitor GitHub checks
+- [x] monitor GitHub checks
+- [x] fix changeset coverage for packages reported by CI check
+- [x] add targeted patch-coverage tests for Python/versioned-file/config/core/workspace integration
 
 ## Validation
 
 - [x] `cargo check -p monochange --features python`
 - [x] `cargo test -p monochange_python`
+- [x] `cargo test -p monochange_config`
+- [x] `cargo test -p monochange --features python --lib`
 - [x] `cargo fmt --all`
 - [x] `devenv shell lint:all` phases through docs/lint/deny/validation completed before publish dry-run timeout in the interactive run
 - [x] pre-push `lint and test` hook completed successfully before force-push
 - [x] `mc validate`
+- [x] `cargo fmt --all --check`
+- [x] `cargo test -p monochange_config load_workspace_configuration_inherits_python_ecosystem_defaults`
+- [x] `cargo test -p monochange_config load_workspace_configuration_rejects_python_versioned_file_glob_unsupported_files`
+- [x] `cargo test -p monochange_core python_package_type_and_ecosystem_defaults_are_canonical`
+- [x] `cargo test -p monochange --features python apply_versioned_file_definition_updates_python_manifest_and_lock_variants`
+- [x] `cargo check -p monochange --all-features --tests`
 
 ## Notes
 
@@ -60,3 +70,4 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - Refresh branch: `feat/python-ecosystem-refresh`
 - PR branch updated: `worktree-feat-python-ecosystem`
 - Python lockfiles are handled through inferred commands (`uv lock`, `poetry lock --no-update`) instead of direct lockfile mutation.
+- CI follow-up found missing changeset package entries and patch coverage gaps; this pass adds targeted tests plus Python manifest-name validation for configured Python packages.

@@ -2891,6 +2891,7 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 		PackageType::Npm => "package.json",
 		PackageType::Deno => "deno.json",
 		PackageType::Dart | PackageType::Flutter => "pubspec.yaml",
+		PackageType::Python => "pyproject.toml",
 		_ => "Cargo.toml",
 	}
 }

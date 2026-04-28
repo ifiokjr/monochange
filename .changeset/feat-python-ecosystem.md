@@ -1,7 +1,10 @@
 ---
+"@monochange/cli": minor
 monochange: minor
 monochange_core: minor
 monochange_config: minor
+monochange_lint: minor
+monochange_python: minor
 ---
 
 #### add Python ecosystem support
