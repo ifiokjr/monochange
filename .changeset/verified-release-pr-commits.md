@@ -1,6 +1,7 @@
 ---
 monochange: patch
 monochange_github: patch
+"@monochange/cli": patch
 ---
 
 #### prefer verified GitHub release PR commits in Actions
