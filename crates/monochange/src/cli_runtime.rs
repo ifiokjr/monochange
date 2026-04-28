@@ -31,6 +31,10 @@ use monochange_core::SourceChangeRequestOutcome;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
+use monochange_telemtry::CommandTelemetry;
+use monochange_telemtry::StepTelemetry;
+use monochange_telemtry::TelemetryOutcome;
+use monochange_telemtry::TelemetrySink;
 use serde::Serialize;
 
 use crate::cli::command_supports_release_diff_preview;
@@ -120,6 +124,15 @@ fn parse_progress_format(value: &str) -> MonochangeResult<ProgressFormat> {
 			"unknown progress format `{value}`; expected one of: auto, unicode, ascii, json"
 		))
 	})
+}
+
+fn telemetry_progress_format(format: ProgressFormat) -> &'static str {
+	match format {
+		ProgressFormat::Auto => "auto",
+		ProgressFormat::Unicode => "unicode",
+		ProgressFormat::Ascii => "ascii",
+		ProgressFormat::Json => "json",
+	}
 }
 
 pub(crate) fn collect_cli_command_inputs(
@@ -518,15 +531,60 @@ pub(crate) fn execute_cli_command_with_options(
 	let mut output = None;
 	let command_started_at = Instant::now();
 	let mut progress = CliProgressReporter::new(cli_command, dry_run, quiet, progress_format);
+	let telemetry = CliTelemetry::new(
+		TelemetrySink::from_env(),
+		cli_command,
+		dry_run,
+		show_diff,
+		progress_format,
+		command_started_at,
+	);
 
 	for (step_index, step) in cli_command.steps.iter().enumerate() {
 		let step_started_at = Instant::now();
-		let step_inputs = resolve_step_inputs(&context, step)?;
+		let step_inputs = match resolve_step_inputs(&context, step) {
+			Ok(step_inputs) => step_inputs,
+			Err(error) => {
+				telemetry.capture_step(
+					step_index,
+					step,
+					false,
+					step_started_at.elapsed(),
+					TelemetryOutcome::Error,
+					Some(&error),
+				);
+				telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
+				return Err(error);
+			}
+		};
 		context.last_step_inputs = step_inputs.clone();
 		let show_progress = step_shows_progress(step, &step_inputs);
 
-		if !should_execute_cli_step(step, &context, &step_inputs)? {
+		let should_execute = match should_execute_cli_step(step, &context, &step_inputs) {
+			Ok(should_execute) => should_execute,
+			Err(error) => {
+				telemetry.capture_step(
+					step_index,
+					step,
+					false,
+					step_started_at.elapsed(),
+					TelemetryOutcome::Error,
+					Some(&error),
+				);
+				telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
+				return Err(error);
+			}
+		};
+		if !should_execute {
 			record_skipped_cli_step(&mut context, step, step_index, &mut progress, show_progress);
+			telemetry.capture_step(
+				step_index,
+				step,
+				true,
+				step_started_at.elapsed(),
+				TelemetryOutcome::Skipped,
+				None,
+			);
 			continue;
 		}
 
@@ -901,33 +959,114 @@ pub(crate) fn execute_cli_command_with_options(
 			}
 		})();
 		if let Err(error) = step_result {
+			let elapsed = step_started_at.elapsed();
 			report_cli_step_failure(
 				&mut progress,
 				show_progress,
 				step_index,
 				step,
-				step_started_at.elapsed(),
+				elapsed,
 				&error,
 			);
+			telemetry.capture_step(
+				step_index,
+				step,
+				false,
+				elapsed,
+				TelemetryOutcome::Error,
+				Some(&error),
+			);
+			telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
 
 			return Err(error);
 		}
+		let elapsed = step_started_at.elapsed();
 		if show_progress {
-			progress.step_finished(
-				step_index,
-				step,
-				step_started_at.elapsed(),
-				&step_phase_timings,
-			);
+			progress.step_finished(step_index, step, elapsed, &step_phase_timings);
 		}
+		telemetry.capture_step(
+			step_index,
+			step,
+			false,
+			elapsed,
+			TelemetryOutcome::Success,
+			None,
+		);
 	}
 
 	progress.command_finished(command_started_at.elapsed());
 
 	let artifact_path = prepared_release_path.as_deref();
-	save_prepared_release_artifact(root, configuration, &context, artifact_path)?;
+	let result = save_prepared_release_artifact(root, configuration, &context, artifact_path)
+		.and_then(|()| resolve_command_output(cli_command, &context, dry_run, output));
+	match &result {
+		Ok(_) => telemetry.capture_command(TelemetryOutcome::Success, None),
+		Err(error) => telemetry.capture_command(TelemetryOutcome::Error, Some(error)),
+	}
 
-	resolve_command_output(cli_command, &context, dry_run, output)
+	result
+}
+
+struct CliTelemetry<'a> {
+	sink: TelemetrySink,
+	cli_command: &'a CliCommandDefinition,
+	dry_run: bool,
+	show_diff: bool,
+	progress_format: ProgressFormat,
+	started_at: Instant,
+}
+
+impl<'a> CliTelemetry<'a> {
+	fn new(
+		sink: TelemetrySink,
+		cli_command: &'a CliCommandDefinition,
+		dry_run: bool,
+		show_diff: bool,
+		progress_format: ProgressFormat,
+		started_at: Instant,
+	) -> Self {
+		Self {
+			sink,
+			cli_command,
+			dry_run,
+			show_diff,
+			progress_format,
+			started_at,
+		}
+	}
+
+	fn capture_command(&self, outcome: TelemetryOutcome, error: Option<&MonochangeError>) {
+		self.sink.capture_command(CommandTelemetry {
+			command_name: &self.cli_command.name,
+			dry_run: self.dry_run,
+			show_diff: self.show_diff,
+			progress_format: telemetry_progress_format(self.progress_format),
+			step_count: self.cli_command.steps.len(),
+			duration: self.started_at.elapsed(),
+			outcome,
+			error,
+		});
+	}
+
+	fn capture_step(
+		&self,
+		step_index: usize,
+		step: &CliStepDefinition,
+		skipped: bool,
+		duration: Duration,
+		outcome: TelemetryOutcome,
+		error: Option<&MonochangeError>,
+	) {
+		self.sink.capture_step(StepTelemetry {
+			command_name: &self.cli_command.name,
+			step_index,
+			step_kind: step.kind_name(),
+			skipped,
+			duration,
+			outcome,
+			error,
+		});
+	}
 }
 
 pub(crate) fn should_execute_cli_step(
@@ -3444,6 +3583,28 @@ mod tests {
 			.unwrap_or_else(|error| panic!("expected default cli command `{name}`: {error}"))
 	}
 
+	fn read_telemetry_events(path: &Path) -> Vec<serde_json::Value> {
+		fs::read_to_string(path)
+			.unwrap_or_else(|error| panic!("telemetry file should be written: {error}"))
+			.lines()
+			.map(|line| {
+				serde_json::from_str(line)
+					.unwrap_or_else(|error| panic!("valid telemetry json: {error}"))
+			})
+			.collect()
+	}
+
+	#[test]
+	fn telemetry_progress_format_uses_stable_labels() {
+		assert_eq!(telemetry_progress_format(ProgressFormat::Auto), "auto");
+		assert_eq!(
+			telemetry_progress_format(ProgressFormat::Unicode),
+			"unicode"
+		);
+		assert_eq!(telemetry_progress_format(ProgressFormat::Ascii), "ascii");
+		assert_eq!(telemetry_progress_format(ProgressFormat::Json), "json");
+	}
+
 	#[test]
 	fn default_cli_command_accepts_prefixed_step_names() {
 		let command = default_cli_command("step:discover");
@@ -4563,6 +4724,105 @@ path = "crates/core"
 			error.to_string(),
 			"io error: failed to wait for command `echo hello`: wait failed"
 		);
+	}
+
+	#[test]
+	fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
+		let _guard = TEST_ENV_LOCK
+			.lock()
+			.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let telemetry_path = tempdir.path().join("telemetry-input-error.jsonl");
+		let telemetry_path_value = telemetry_path.to_string_lossy().to_string();
+		let configuration = sample_configuration(tempdir.path());
+		let cli_command = CliCommandDefinition {
+			name: "telemetry-input-error".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: vec![CliStepDefinition::Validate {
+				name: Some("invalid input".to_string()),
+				when: None,
+				inputs: BTreeMap::from([(
+					"target".to_string(),
+					CliStepInputValue::String("{{".to_string()),
+				)]),
+			}],
+		};
+
+		temp_env::with_vars(
+			[
+				("MC_TELEMETRY", None::<&str>),
+				("MC_TELEMETRY_FILE", Some(telemetry_path_value.as_str())),
+			],
+			|| {
+				let error = execute_cli_command(
+					tempdir.path(),
+					&configuration,
+					&cli_command,
+					true,
+					BTreeMap::new(),
+				)
+				.unwrap_err();
+				assert!(matches!(error, MonochangeError::Config(_)));
+			},
+		);
+
+		let events = read_telemetry_events(&telemetry_path);
+		assert_eq!(events.len(), 2);
+		assert_eq!(events[0]["body"]["string_value"], "command_step");
+		assert_eq!(events[0]["attributes"]["outcome"], "error");
+		assert_eq!(events[0]["attributes"]["error_kind"], "config_error");
+		assert_eq!(events[1]["body"]["string_value"], "command_run");
+		assert_eq!(events[1]["attributes"]["outcome"], "error");
+		assert_eq!(events[1]["attributes"]["error_kind"], "config_error");
+	}
+
+	#[test]
+	fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
+		let _guard = TEST_ENV_LOCK
+			.lock()
+			.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let telemetry_path = tempdir.path().join("telemetry-condition-error.jsonl");
+		let telemetry_path_value = telemetry_path.to_string_lossy().to_string();
+		let configuration = sample_configuration(tempdir.path());
+		let cli_command = CliCommandDefinition {
+			name: "telemetry-condition-error".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: vec![CliStepDefinition::Validate {
+				name: Some("invalid condition".to_string()),
+				when: Some("{{ missing.path }}".to_string()),
+				inputs: BTreeMap::new(),
+			}],
+		};
+
+		temp_env::with_vars(
+			[
+				("MC_TELEMETRY", None::<&str>),
+				("MC_TELEMETRY_FILE", Some(telemetry_path_value.as_str())),
+			],
+			|| {
+				let error = execute_cli_command(
+					tempdir.path(),
+					&configuration,
+					&cli_command,
+					true,
+					BTreeMap::new(),
+				)
+				.unwrap_err();
+				assert!(matches!(error, MonochangeError::Config(_)));
+			},
+		);
+
+		let events = read_telemetry_events(&telemetry_path);
+		assert_eq!(events.len(), 2);
+		assert_eq!(events[0]["body"]["string_value"], "command_step");
+		assert_eq!(events[0]["attributes"]["outcome"], "error");
+		assert_eq!(events[0]["attributes"]["error_kind"], "config_error");
+		assert_eq!(events[1]["body"]["string_value"], "command_run");
+		assert_eq!(events[1]["attributes"]["outcome"], "error");
+		assert_eq!(events[1]["attributes"]["error_kind"], "config_error");
 	}
 
 	#[test]

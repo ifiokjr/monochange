@@ -32,6 +32,8 @@ Use it when your repository has outgrown one-ecosystem release tooling and you w
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__github-orange?logo=rust)](https://crates.io/crates/monochange_github) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__github-1f425f?logo=docs.rs)](https://docs.rs/monochange_github/)
 - `monochange_semver` — merges requested bumps with compatibility-provider evidence.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust)](https://crates.io/crates/monochange_semver) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs)](https://docs.rs/monochange_semver/)
+- `monochange_telemtry` — local-only telemetry event sink and privacy-preserving event schema helpers.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__telemtry-orange?logo=rust)](https://crates.io/crates/monochange_telemtry) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__telemtry-1f425f?logo=docs.rs)](https://docs.rs/monochange_telemtry/)
 - `monochange_cargo` — Cargo discovery plus Rust semver evidence integration.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__cargo-orange?logo=rust)](https://crates.io/crates/monochange_cargo) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__cargo-1f425f?logo=docs.rs)](https://docs.rs/monochange_cargo/)
 - `monochange_npm` — npm, pnpm, and Bun workspace discovery.
