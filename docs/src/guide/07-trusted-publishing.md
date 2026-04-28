@@ -7,7 +7,7 @@ monochange supports built-in package publishing for the canonical public registr
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
 
-For those registries, monochange can also manage or verify **trusted publishing** when the registry supports publishing directly from a verified GitHub Actions identity.
+For those registries, monochange can also manage or verify **trusted publishing** when the registry supports publishing directly from a verified GitHub Actions identity. Python packages are supported for release planning, but PyPI publishing and PyPI trusted-publisher setup are external to monochange today.
 
 Different registries use different names for the same general pattern:
 
@@ -31,7 +31,7 @@ The goal is the same in every case:
 | deno           | jsr       | GitHub Actions publishing | Yes                         | Reports the setup URL; repository linking is still manual                             |
 | dart / flutter | pub.dev   | Automated publishing      | Yes                         | Reports the setup URL; admin-page setup is still manual                               |
 
-npm is currently the only ecosystem where monochange performs bulk trusted-publishing setup itself.
+npm is currently the only ecosystem where monochange performs bulk trusted-publishing setup itself. Use `mode = "external"` for Python/PyPI and for any registry workflow that should stay outside monochange's built-in publisher.
 
 For `crates.io`, `jsr`, and `pub.dev`, monochange reports the setup URL for each package and blocks the next built-in registry publish until the trust configuration has been completed manually. It also preflights the GitHub trusted-publishing context for those registries, surfacing the repository, workflow, and environment it expects when that context can be resolved.
 

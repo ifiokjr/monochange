@@ -54,20 +54,21 @@ Keeping those layers separate is important. Package publication and hosted-relea
 
 <!-- {=projectCapabilityMatrix} -->
 
-| Capability                                                               | Current status                                                                               |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter                                                     |
-| Package release planning                                                 | Built in                                                                                     |
-| Grouped/shared versioning                                                | Built in                                                                                     |
-| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                                   |
-| Durable release history and post-merge tagging                           | Built in via `ReleaseRecord`, `mc release-record`, `mc tag-release`, and `mc repair-release` |
-| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                                        |
-| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                                        |
-| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`                                                         |
-| GitHub npm trusted-publishing automation                                 | Built in                                                                                     |
-| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                                   |
-| GitLab trusted-publishing auto-derivation                                | Not built in today                                                                           |
-| Release-retarget sync for hosted releases                                | GitHub first                                                                                 |
+| Capability                                                               | Current status                                                                                |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Multi-ecosystem discovery                                                | Cargo, npm/pnpm/Bun, Deno, Dart, Flutter, Python                                              |
+| Package release planning                                                 | Built in                                                                                      |
+| Grouped/shared versioning                                                | Built in                                                                                      |
+| Dry-run release diff previews                                            | Built in via `mc release --dry-run --diff`                                                    |
+| Durable release history and post-merge tagging                           | Built in via `ReleaseRecord`, `mc release-record`, `mc tag-release`, and `mc repair-release`  |
+| Hosted provider releases                                                 | GitHub, GitLab, Gitea                                                                         |
+| Hosted release requests                                                  | GitHub, GitLab, Gitea                                                                         |
+| Python release planning                                                  | Built in for discovery, version rewrites, dependency rewrites, and lockfile command inference |
+| Built-in registry publishing                                             | `crates.io`, `npm`, `jsr`, `pub.dev`; use external mode for PyPI and custom registries        |
+| GitHub npm trusted-publishing automation                                 | Built in                                                                                      |
+| GitHub trusted-publishing guidance for `crates.io`, `jsr`, and `pub.dev` | Built in, but manual registry enrollment is still required                                    |
+| GitLab trusted-publishing auto-derivation                                | Not built in today                                                                            |
+| Release-retarget sync for hosted releases                                | GitHub first                                                                                  |
 
 <!-- {/projectCapabilityMatrix} -->
 
@@ -76,7 +77,7 @@ Keeping those layers separate is important. Package publication and hosted-relea
 The workflow sketches below assume the job already has:
 
 - the `monochange` CLI available as `mc`
-- the native ecosystem toolchain it needs (`npm`/`pnpm`, `cargo`, `deno`, `dart`, or `flutter`)
+- the native ecosystem toolchain it needs (`npm`/`pnpm`, `cargo`, `deno`, `dart`, `flutter`, `uv`, `poetry`, or your Python publishing tool)
 - repository checkout with enough history for release-record inspection
 
 In the monochange repository itself, that usually means entering the `devenv` shell. In other repositories, it may mean installing `@monochange/cli` or `monochange` explicitly before the publish step.

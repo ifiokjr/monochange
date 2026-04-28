@@ -64,6 +64,7 @@ Supported `type` values:
 - `deno`
 - `dart`
 - `flutter`
+- `python`
 
 Optional package fields:
 
@@ -167,7 +168,7 @@ Built-in publishing currently targets only the canonical public registry for eac
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
 
-If you need a private or custom registry, set `mode = "external"` and handle publication outside monochange.
+Python package discovery and release planning are supported, but built-in PyPI publishing is not available yet. For Python packages, private registries, or any other custom publication flow, set `mode = "external"` and handle publication outside monochange.
 
 ### Placeholder publishing
 
@@ -343,7 +344,7 @@ Built-in direct lockfile updates cover:
 - Deno: `deno.lock`
 - Dart / Flutter: `pubspec.lock`
 
-For Python projects, monochange infers package-manager lockfile commands instead of mutating lockfiles directly: `uv.lock` uses `uv lock`, and `poetry.lock` uses `poetry lock --no-update`.
+For Python projects, monochange infers package-manager lockfile commands instead of mutating lockfiles directly: `uv.lock` uses `uv lock`, and `poetry.lock` uses `poetry lock --no-update`. Unknown Python lockfile names are skipped rather than guessed.
 
 If you configure `lockfile_commands` for an ecosystem, monochange stops using the built-in direct updater for that ecosystem and those commands fully own lockfile refresh. Use that escape hatch only when your workspace needs package-manager-side regeneration beyond version rewrites.
 

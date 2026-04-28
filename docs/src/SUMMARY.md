@@ -8,6 +8,7 @@
 - [Installation](guide/01-installation.md)
 - [Your first release plan](guide/02-setup.md)
 - [Discovery](guide/03-discovery.md)
+- [Ecosystems](guide/ecosystems.md)
 - [Configuration reference](guide/04-configuration.md)
 - [Groups and shared release identity](guide/05-version-groups.md)
 - [Release planning](guide/06-release-planning.md)

@@ -6,20 +6,20 @@ monochange was originally inspired by knope and shares many of the same ideas â€
 
 ## Quick comparison
 
-| Feature                | knope                         | monochange                                |
-| ---------------------- | ----------------------------- | ----------------------------------------- |
-| Config file            | `knope.toml`                  | `monochange.toml`                         |
-| CLI binary             | `knope`                       | `monochange` / `mc`                       |
-| Changeset directory    | `.changeset/`                 | `.changeset/`                             |
-| Changeset format       | Markdown frontmatter          | Markdown frontmatter                      |
-| Conventional commits   | Supported                     | Not supported                             |
-| Single-package config  | `[package]`                   | `[package.<id>]`                          |
-| Multi-package config   | `[packages.<name>]`           | `[package.<id>]`                          |
-| Version groups         | Implicit (single `[package]`) | Explicit `[group.<id>]`                   |
-| Workflows              | `[[workflows]]`               | `[cli.<command>]`                         |
-| GitHub config          | `[github]`                    | `[source]` (provider-neutral)             |
-| Ecosystem support      | Rust, Go, JS                  | Rust, npm, pnpm, Bun, Deno, Dart, Flutter |
-| Dependency propagation | Not built-in                  | Automatic parent bumps                    |
+| Feature                | knope                         | monochange                                        |
+| ---------------------- | ----------------------------- | ------------------------------------------------- |
+| Config file            | `knope.toml`                  | `monochange.toml`                                 |
+| CLI binary             | `knope`                       | `monochange` / `mc`                               |
+| Changeset directory    | `.changeset/`                 | `.changeset/`                                     |
+| Changeset format       | Markdown frontmatter          | Markdown frontmatter                              |
+| Conventional commits   | Supported                     | Not supported                                     |
+| Single-package config  | `[package]`                   | `[package.<id>]`                                  |
+| Multi-package config   | `[packages.<name>]`           | `[package.<id>]`                                  |
+| Version groups         | Implicit (single `[package]`) | Explicit `[group.<id>]`                           |
+| Workflows              | `[[workflows]]`               | `[cli.<command>]`                                 |
+| GitHub config          | `[github]`                    | `[source]` (provider-neutral)                     |
+| Ecosystem support      | Rust, Go, JS                  | Rust, npm, pnpm, Bun, Deno, Dart, Flutter, Python |
+| Dependency propagation | Not built-in                  | Automatic parent bumps                            |
 
 ## Step 1 â€” Replace the config file
 
