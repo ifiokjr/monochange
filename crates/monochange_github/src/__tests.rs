@@ -42,6 +42,7 @@ use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
 use monochange_test_helpers::git;
 use monochange_test_helpers::git_output;
+use regex::Regex;
 use tempfile::tempdir;
 
 use super::*;
@@ -1123,6 +1124,147 @@ fn release_pull_request_commit_verification_falls_back_when_github_does_not_veri
 	original_commit.assert();
 	create_commit.assert();
 	assert!(result.is_err_and(|message| message.contains("without verification (unsigned)")));
+}
+
+#[test]
+fn release_pull_request_commit_verification_rejects_moved_branch() {
+	let server = MockServer::start();
+	let request = sample_pull_request_request();
+	let get_ref = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/ref/heads/monochange/release/release");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"object":{"sha":"3333333333333333333333333333333333333333"}}"#);
+	});
+
+	let result = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			update_github_branch_ref_to_verified_commit(
+				&client,
+				&request,
+				"1111111111111111111111111111111111111111",
+				"2222222222222222222222222222222222222222",
+			)
+			.await
+		});
+
+	get_ref.assert();
+	assert!(
+		result.is_err_and(|message| {
+			message.contains("release branch monochange/release/release moved")
+		})
+	);
+}
+
+#[test]
+fn release_pull_request_commit_verification_rejects_unexpected_updated_ref() {
+	let server = MockServer::start();
+	let request = sample_pull_request_request();
+	let fallback = "1111111111111111111111111111111111111111";
+	let verified = "2222222222222222222222222222222222222222";
+	let unexpected = "3333333333333333333333333333333333333333";
+	let get_ref = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/ref/heads/monochange/release/release");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{fallback}"}}}}"#));
+	});
+	let update_ref = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/git/refs/heads/monochange/release/release")
+			.json_body(json!({ "sha": verified, "force": true }));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{unexpected}"}}}}"#));
+	});
+
+	let result = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			update_github_branch_ref_to_verified_commit(&client, &request, fallback, verified).await
+		});
+
+	get_ref.assert();
+	update_ref.assert();
+	assert!(result.is_err_and(|message| {
+		message.contains("expected 2222222222222222222222222222222222222222")
+	}));
+}
+
+#[etest::etest(skip=env::var_os("PRE_COMMIT").is_some())]
+fn publish_release_pull_request_falls_back_when_verified_commit_is_unavailable() {
+	let server = MockServer::start();
+	let (_tempdir, repo) = seed_git_repository();
+	let source = sample_source(Some(server.base_url()));
+	let request = sample_pull_request_request();
+	let list_pull_requests = server.mock(|when, then| {
+		when.method(GET).path("/repos/ifiokjr/monochange/pulls");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+	let original_commit = server.mock(|when, then| {
+		when.method(GET).path_matches(
+			Regex::new(r"^/repos/ifiokjr/monochange/git/commits/[0-9a-f]{40}$")
+				.unwrap_or_else(|error| panic!("regex: {error}")),
+		);
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"1111111111111111111111111111111111111111","message":"chore(release): prepare release","tree":{"sha":"tree123"},"parents":[{"sha":"parent123"}],"verification":{"verified":false,"reason":"unsigned"}}"#);
+	});
+	let create_commit = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/commits");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"2222222222222222222222222222222222222222","message":"chore(release): prepare release","tree":{"sha":"tree123"},"parents":[{"sha":"parent123"}],"verification":{"verified":false,"reason":"unsigned"}}"#);
+	});
+	let create_pull_request = server.mock(|when, then| {
+		when.method(POST).path("/repos/ifiokjr/monochange/pulls");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(
+				"{\"number\":7,\"html_url\":\"https://example.com/pr/7\",\"node_id\":\"PR_node\"}",
+			);
+	});
+	let add_labels = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/issues/7/labels");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body("[]");
+	});
+
+	let outcome = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_ACTIONS", Some("true")),
+			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
+		],
+		|| {
+			publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			)
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		},
+	);
+
+	list_pull_requests.assert();
+	original_commit.assert();
+	create_commit.assert();
+	create_pull_request.assert();
+	add_labels.assert();
+	assert_eq!(outcome.operation, GitHubPullRequestOperation::Created);
+	assert_eq!(outcome.number, 7);
 }
 
 #[test]
