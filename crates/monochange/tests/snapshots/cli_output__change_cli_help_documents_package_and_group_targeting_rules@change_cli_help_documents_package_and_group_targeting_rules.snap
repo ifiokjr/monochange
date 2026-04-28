@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 156
 info:
   program: mc
   args:
@@ -24,6 +23,7 @@ Options:
       --package <PACKAGE>         Package or group to include in the change
       --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
       --bump <BUMP>               Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
+      --jq <EXPRESSION>           Filter JSON output with a jq-style expression, such as `.assets[].name`
       --version <VERSION>         Pin an explicit version for this release
       --reason <REASON>           Short release-note summary for this change
       --type <TYPE>               Optional release-note type such as `security` or `note` [possible values: security, test]

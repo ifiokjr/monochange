@@ -296,6 +296,7 @@ mod cli_theme;
 mod git_support;
 mod hosted_sources;
 mod interactive;
+mod jq_filter;
 mod lint;
 mod lint_check_reporter;
 mod mcp;
@@ -768,7 +769,8 @@ where
 		Err(error) => return Err(MonochangeError::Config(error.to_string())),
 	};
 
-	match matches.subcommand() {
+	let jq_expression = matches.get_one::<String>("jq").cloned();
+	let output = match matches.subcommand() {
 		Some(("help", help_matches)) => {
 			let command_name = help_matches
 				.get_one::<String>("command")
@@ -1022,6 +1024,12 @@ where
 			)
 		}
 		None => Err(MonochangeError::Config("Usage: mc".to_string())),
+	}?;
+
+	if let Some(expression) = jq_expression {
+		jq_filter::apply_jq_filter(&output, &expression)
+	} else {
+		Ok(output)
 	}
 }
 

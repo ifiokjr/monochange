@@ -169,8 +169,26 @@ jobs:
             echo "::endgroup::"
           done
 
-  trigger_publish:
+  publish_draft:
     needs: upload_assets
+    environment: publisher
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    permissions:
+      contents: write
+    if: >-
+      github.repository_owner == 'monochange' &&
+      startsWith(inputs.tag || github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: publish draft release
+        run: gh release edit "${RELEASE_TAG}" --draft=false --latest --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  trigger_publish:
+    needs: publish_draft
     environment: publisher
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}

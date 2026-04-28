@@ -1226,6 +1226,16 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 		Some(["format"].as_slice())
 	);
 
+	let publish_release = CliStepDefinition::PublishRelease {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		publish_release.valid_input_names(),
+		Some(["format", "from-ref", "draft"].as_slice())
+	);
+
 	let publish = CliStepDefinition::PublishPackages {
 		name: None,
 		when: None,
@@ -1353,6 +1363,44 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	);
 	assert_eq!(prepare.expected_input_kind("versions"), None);
 	assert_eq!(prepare.expected_input_kind("unknown"), None);
+
+	let comment_released_issues = CliStepDefinition::CommentReleasedIssues {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		comment_released_issues.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		comment_released_issues.expected_input_kind("from-ref"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		comment_released_issues.expected_input_kind("auto-close-issues"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(comment_released_issues.expected_input_kind("unknown"), None);
+
+	let publish_release = CliStepDefinition::PublishRelease {
+		name: None,
+		when: None,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(
+		publish_release.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		publish_release.expected_input_kind("from-ref"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		publish_release.expected_input_kind("draft"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(publish_release.expected_input_kind("unknown"), None);
 
 	let publish = CliStepDefinition::PublishPackages {
 		name: None,
