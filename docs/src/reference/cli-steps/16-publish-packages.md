@@ -4,7 +4,7 @@
 
 `PublishPackages` publishes package versions to their target registries using monochange's built-in ecosystem workflows.
 
-For real (non-dry-run) publishes, the step first validates the configured `readiness` artifact from `mc publish-readiness --from HEAD --output <PATH>`. The artifact must be a ready monochange publish-readiness artifact for the same release record and selected package set before any registry mutation starts.
+For real (non-dry-run) publishes, the step first validates the configured `readiness` artifact from `mc publish-readiness --from HEAD --output <PATH>`. The artifact must be a ready monochange publish-readiness artifact for the same release record, selected package set, and current publish inputs before any registry mutation starts. Publish inputs include `monochange.toml`, package manifests, lockfiles, and registry/tooling files such as `.npmrc`, `.cargo/config.toml`, `rust-toolchain.toml`, workspace `Cargo.toml`, `pnpm-workspace.yaml`, and ecosystem manifest files.
 
 For each package with a planned release version, the step:
 
@@ -51,7 +51,7 @@ when = "{{ inputs.enabled }}"
 ## Prerequisites
 
 - a release record discoverable from `HEAD` that contains the package publication targets
-- for real publishes, a readiness artifact generated from that same release record and package selection with `mc publish-readiness --from HEAD --output <PATH>`
+- for real publishes, a readiness artifact generated from that same release record, package selection, and publish input state with `mc publish-readiness --from HEAD --output <PATH>`
 - for built-in Cargo publishes to crates.io, a publishable current `Cargo.toml`: no `publish = false`, any `publish = [...]` list includes `crates-io`, `description` is set, and either `license` or `license-file` is set; workspace-inherited values are accepted
 
 ## Side effects and outputs
@@ -112,7 +112,7 @@ mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json
 ```
 
-Keep release preparation and real package publication as separate phases so the readiness artifact can be reviewed before registry mutation. If a real publish fails after writing `.monochange/publish-result.json`, rerun with `mc publish --readiness .monochange/readiness.json --resume .monochange/publish-result.json --output .monochange/publish-result.json` after fixing the registry/auth issue.
+Keep release preparation and real package publication as separate phases so the readiness artifact can be reviewed before registry mutation. Rerun `mc publish-readiness` whenever workspace config, package manifests, lockfiles, or registry/tooling files change after the artifact was written. If a real publish fails after writing `.monochange/publish-result.json`, rerun with `mc publish --readiness .monochange/readiness.json --resume .monochange/publish-result.json --output .monochange/publish-result.json` after fixing the registry/auth issue.
 
 ### Publish only a specific package
 
@@ -165,7 +165,7 @@ Because `PublishPackages` understands:
 ## Common mistakes
 
 - confusing `PublishPackages` with `PublishRelease`: the former publishes to package registries, the latter creates hosted provider releases (such as GitHub releases)
-- forgetting that real `PublishPackages` runs need a readiness artifact generated from the same `HEAD` release record and selected package set
+- forgetting that real `PublishPackages` runs need a readiness artifact generated from the same `HEAD` release record, selected package set, and current publish inputs
 - omitting `output` in CI, which makes partial registry failures harder to resume safely
 - rerunning `mc publish --package <id>` with a readiness artifact generated for a different package selection
 - running `PublishPackages` without rate-limit planning: use `PlanPublishRateLimits` first when you are unsure about registry windows

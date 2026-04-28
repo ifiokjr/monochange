@@ -5453,13 +5453,14 @@ path = "crates/core"
 		let configuration = sample_configuration(tempdir.path());
 		let artifact_path = tempdir.path().join("readiness.json");
 		let report = publish_readiness::PublishReadinessReport {
-			schema_version: 1,
+			schema_version: 2,
 			kind: "monochange.publishReadiness".to_string(),
 			status: publish_readiness::PublishReadinessGlobalStatus::Ready,
 			from: "prepared-release".to_string(),
 			resolved_commit: "prepared-release".to_string(),
 			record_commit: "prepared-release".to_string(),
 			package_set_fingerprint: String::new(),
+			input_fingerprint: "fnv1a64:3a84781749cb9027".to_string(),
 			packages: Vec::new(),
 		};
 		let inputs = BTreeMap::from([(

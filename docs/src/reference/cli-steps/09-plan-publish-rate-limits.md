@@ -52,7 +52,7 @@ name = "plan publish rate limits"
 type = "PlanPublishRateLimits"
 ```
 
-A readiness-backed plan validates the artifact header, release record commit, selected package coverage, and package-set fingerprint before planning. The artifact may contain non-ready packages, but those package ids are excluded from the plan. Placeholder plans reject `readiness`; use `mode = "placeholder"` without an artifact for first-time bootstrap planning.
+A readiness-backed plan validates the artifact header, release record commit, selected package coverage, package-set fingerprint, and publish input fingerprint before planning. The artifact may contain non-ready packages, but those package ids are excluded from the plan. Rerun `mc publish-readiness` if workspace config, package manifests, lockfiles, or registry/tooling files changed after the artifact was written. Placeholder plans reject `readiness`; use `mode = "placeholder"` without an artifact for first-time bootstrap planning.
 
 ### Plan placeholder bootstrap publishing
 

@@ -94,9 +94,9 @@ For GitHub Actions, the most common structure is:
 4. that workflow creates the declared tags and publishes packages from the durable release commit
 5. hosted release objects or extra assets come either from downstream tag-driven workflows or from a separate workflow that still uses `mc publish-release`
 
-The important current implementation detail is that `mc publish-readiness` can write a readiness artifact from the `ReleaseRecord` on `HEAD`, `mc publish-bootstrap --from HEAD --output <path>` can run release-record-scoped first-time placeholder setup and record the result, `mc publish --readiness <path>` can validate readiness before package registry mutation, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state when you want a manifest-driven hosted-release job.
+The important current implementation detail is that `mc publish-readiness` can write a readiness artifact from the `ReleaseRecord` on `HEAD`, `mc publish-bootstrap --from HEAD --output <path>` can run release-record-scoped first-time placeholder setup and record the result, `mc publish --readiness <path>` can validate readiness before package registry mutation, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state when you want a manifest-driven hosted-release job. The readiness artifact also fingerprints publish inputs that affect registry behavior: `monochange.toml`, package manifests, lockfiles, and registry/tooling files such as `.npmrc`, `.cargo/config.toml`, `rust-toolchain.toml`, workspace `Cargo.toml`, and ecosystem manifests.
 
-If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection, then run `mc publish-readiness --from HEAD --output <path>`, use `mc publish-bootstrap --from HEAD --output <path>` only when first-time package setup is required, optionally inspect `mc publish-plan --readiness <path>`, and finally run `mc publish --readiness <path> --output .monochange/publish-result.json`. If a registry command fails after some packages were published, fix the cause and rerun `mc publish --readiness <path> --resume .monochange/publish-result.json --output .monochange/publish-result.json`; monochange skips completed package versions from the previous result and retries the remaining release work.
+If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection, then run `mc publish-readiness --from HEAD --output <path>`, use `mc publish-bootstrap --from HEAD --output <path>` only when first-time package setup is required, optionally inspect `mc publish-plan --readiness <path>`, and finally run `mc publish --readiness <path> --output .monochange/publish-result.json`. Rerun `mc publish-readiness` if CI setup edits publish inputs after the artifact is written. If a registry command fails after some packages were published, fix the cause and rerun `mc publish --readiness <path> --resume .monochange/publish-result.json --output .monochange/publish-result.json`; monochange skips completed package versions from the previous result and retries the remaining release work.
 
 ### GitHub + npm trusted publishing
 
@@ -453,7 +453,7 @@ If you want package publication to happen **after** the release PR merges, the s
 4. run `mc publish --readiness .monochange/readiness.json` only after readiness succeeds
 5. if release-record detection or readiness fails, exit early before registry mutation
 
-That pattern works well because `mc publish-readiness` and `mc publish --readiness` consume the durable `ReleaseRecord` from `HEAD` and validate the same package set before publishing.
+That pattern works well because `mc publish-readiness` and `mc publish --readiness` consume the durable `ReleaseRecord` from `HEAD` and validate the same package set and publish input fingerprint before publishing.
 
 ## GitLab flows
 
