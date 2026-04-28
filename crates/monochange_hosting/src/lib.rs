@@ -40,12 +40,11 @@ use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::git::git_checkout_branch_command;
-use monochange_core::git::git_commit_paths_command;
 use monochange_core::git::git_current_branch;
 use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
-use monochange_core::git::run_commit_command_allow_nothing_to_commit;
+use monochange_core::git::run_git_commit_message;
 use reqwest::blocking::Client;
 use reqwest::header::HeaderMap;
 use serde::Serialize;
@@ -397,10 +396,7 @@ pub fn git_commit_paths(
 	context: &str,
 	no_verify: bool,
 ) -> MonochangeResult<()> {
-	run_commit_command_allow_nothing_to_commit(
-		git_commit_paths_command(root, message, no_verify),
-		context,
-	)
+	run_git_commit_message(root, message, context, no_verify)
 }
 
 /// Push the release branch to `origin` with `--force-with-lease`.
