@@ -558,6 +558,7 @@ mod tests {
 			npm: monochange_core::EcosystemSettings::default(),
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
+			python: monochange_core::EcosystemSettings::default(),
 		}
 	}
 

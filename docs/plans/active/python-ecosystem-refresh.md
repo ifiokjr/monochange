@@ -45,6 +45,8 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] monitor GitHub checks
 - [x] fix changeset coverage for packages reported by CI check
 - [x] add targeted patch-coverage tests for Python/versioned-file/config/core/workspace integration
+- [x] rebase refreshed PR branch over the latest `origin/main` publish-readiness changes
+- [x] fix latest CI compile/lint/test/coverage failures after the base branch advanced
 
 ## Validation
 
@@ -53,7 +55,7 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] `cargo test -p monochange_config`
 - [x] `cargo test -p monochange --features python --lib`
 - [x] `cargo fmt --all`
-- [x] `devenv shell lint:all` phases through docs/lint/deny/validation completed before publish dry-run timeout in the interactive run
+- [x] `devenv shell lint:all` completed; publish dry-run reported expected unpublished internal dependency warnings plus the Python crate readme warning without lint failures
 - [x] pre-push `lint and test` hook completed successfully before force-push
 - [x] `mc validate`
 - [x] `cargo fmt --all --check`
@@ -62,6 +64,7 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] `cargo test -p monochange_core python_package_type_and_ecosystem_defaults_are_canonical`
 - [x] `cargo test -p monochange --features python apply_versioned_file_definition_updates_python_manifest_and_lock_variants`
 - [x] `cargo check -p monochange --all-features --tests`
+- [x] `cargo check --workspace --all-features --all-targets`
 - [x] `cargo test -p monochange_python` after additional patch-coverage tests
 - [x] `cargo test -p monochange --features python read_cached_document_reports_python_error_paths --lib`
 - [x] `cargo test -p monochange --features python apply_versioned_file_definition_reports_python_error_paths --lib`
@@ -69,8 +72,9 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] `cargo test -p monochange --features python render_annotated_init_config_includes_python_package_type --lib`
 - [x] `cargo test -p monochange_python private_package_parser_covers_error_and_dependency_value_branches --lib`
 - [x] `cargo test -p monochange_config validate_versioned_files_and_release_notes_cover_remaining_validation_paths --lib`
+- [x] `cargo test -p monochange_config load_workspace_configuration_reports_python_ecosystem_normalization_errors --lib`
 - [x] `devenv shell coverage:all`
-- [x] `MONOCHANGE_PATCH_COVERAGE_BASE=$(git merge-base origin/main HEAD) MONOCHANGE_PATCH_COVERAGE_HEAD=HEAD devenv shell coverage:patch` (`PATCH_COVERAGE 573/573 (100.00%)`)
+- [x] `MONOCHANGE_PATCH_COVERAGE_BASE=$(git merge-base origin/main HEAD) MONOCHANGE_PATCH_COVERAGE_HEAD=HEAD devenv shell coverage:patch` (`PATCH_COVERAGE 575/575 (100.00%)`)
 
 ## Notes
 

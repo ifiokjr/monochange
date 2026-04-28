@@ -1037,6 +1037,27 @@ type = "python"
 }
 
 #[test]
+fn load_workspace_configuration_reports_python_ecosystem_normalization_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"[ecosystems.python.publish]
+registry = "https://example.com/simple"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let error = load_workspace_configuration(root)
+		.expect_err("unsupported Python registry override should be rejected");
+	let message = error.to_string();
+	assert!(
+		message.contains("ecosystems `python` uses built-in publishing"),
+		"unexpected error: {message}"
+	);
+}
+
+#[test]
 fn load_workspace_configuration_rejects_python_versioned_file_glob_unsupported_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
