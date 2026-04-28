@@ -150,7 +150,7 @@ These are the commands most repositories use after running `mc init`. With the n
 | Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
 | Check package publish readiness  | `mc publish-readiness --from HEAD --output <path>`          | You need a validated readiness artifact before package publication                                       |
 | Plan ready package publishing    | `mc publish-plan --readiness <path>`                        | You want rate-limit batches that exclude non-ready package work                                          |
-| Publish packages to registries   | `mc publish --readiness <path>`                             | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
+| Publish packages to registries   | `mc publish --readiness <path> --output <path>`             | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
 | Bootstrap release packages       | `mc publish-bootstrap --from HEAD --output <path>`          | You need a release-record-scoped placeholder bootstrap artifact before rerunning readiness               |
 | Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
 | Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
@@ -324,7 +324,7 @@ mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
 mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
-mc publish --readiness .monochange/readiness.json
+mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc release
 ```

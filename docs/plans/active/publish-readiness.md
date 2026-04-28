@@ -1,60 +1,60 @@
-# Publish readiness, planning, and bootstrap
+# Publish readiness, planning, bootstrap, and resume
 
 ## Status
 
-- Previous slices shipped `mc publish-readiness` (PR #292), readiness artifact enforcement in `mc publish` (PR #301), Cargo-first publish-readiness blockers (PR #303), and `mc publish-plan --readiness <path>` (PR #305).
-- Current branch: `feat/publish-bootstrap-command`.
-- Current slice: add `mc publish-bootstrap --from <ref> --output <path>` so first-time placeholder package setup is release-record scoped and leaves a JSON result artifact.
+- Previous slices shipped `mc publish-readiness` (PR #292), readiness artifact enforcement in `mc publish` (PR #301), Cargo-first publish-readiness blockers (PR #303), `mc publish-plan --readiness <path>` (PR #305), and `mc publish-bootstrap --from <ref> --output <path>` (PR #318).
+- Current branch: `feat/publish-resume-flow`.
+- Current slice: add package publish result artifacts and retry/resume semantics for real `mc publish` runs.
 
 ## Problem
 
-`mc placeholder-publish` can reserve package names, but it is not tied to a durable release record and does not write an artifact that explains which release package set was bootstrapped. The recommended package publishing lifecycle now uses readiness artifacts as a boundary before real registry mutation. First-time package setup needs the same explicit, CLI-first shape:
-
-1. generate readiness for the release commit,
-2. bootstrap missing packages if readiness identifies first-time registry setup,
-3. rerun readiness,
-4. plan/publish from the fresh readiness artifact.
+A package registry publish can fail after earlier packages were already published. Before this slice, `mc publish` surfaced the command failure but did not preserve a structured result artifact that CI could use for a safe follow-up run. Operators needed to infer which packages completed and which ones still needed a retry.
 
 ## Scope
 
-This slice adds a top-level `mc publish-bootstrap` command that:
+This slice extends `PublishPackages`/`mc publish` so it can:
 
-- requires `--from <ref>` and discovers the release record from that ref,
-- selects package ids from the release record, optionally intersected with repeated `--package <id>` filters,
-- runs the existing placeholder publishing flow for the selected release package set,
-- supports `--dry-run`, `--format text|markdown|json`, and `--output <path>`,
-- writes a JSON artifact with `kind = "monochange.publishBootstrap"`, the resolved/release-record commits, selected package ids, and the placeholder publish report.
+- accept `--output <path>` and write a JSON package publish result artifact,
+- preserve failed publish attempts as `PackagePublishStatus::Failed` rows in the report,
+- write the result artifact before returning a non-zero error for failed publish outcomes,
+- accept `--resume <path>` from an earlier real `mc publish` run,
+- skip completed package versions from the prior result (`published`, `skipped_existing`, and `skipped_external`),
+- retry failed or pending work using the same readiness validation boundary,
+- reject resume artifacts from dry-run or placeholder publish flows.
 
 ## Non-goals for this slice
 
-- Retry/resume semantics for real package publishing.
-- Readiness artifact validation of bootstrap result artifacts.
-- Automated registry-side trusted-publisher enrollment.
-- Replacing the lower-level `mc placeholder-publish` command.
+- Replacing `mc publish-readiness`; real `mc publish` still validates readiness before registry mutation.
+- Treating bootstrap artifacts as publish resume artifacts.
+- Adding registry-specific transactionality. This remains a best-effort orchestration layer over external registries.
+- Redesigning `monochange/actions`; actions can adapt after the CLI contract stabilizes.
 
 ## Affected files
 
+- `crates/monochange/src/package_publish.rs`
+- `crates/monochange/src/cli_runtime.rs`
 - `crates/monochange/src/publish_bootstrap.rs`
-- `crates/monochange/src/cli.rs`
-- `crates/monochange/src/lib.rs`
-- `crates/monochange/src/cli_help.rs`
-- `crates/monochange/src/__tests.rs`
-- `docs/src/guide/13-ci-and-publishing.md`
-- `docs/src/readme.md`
-- `readme.md`
+- `crates/monochange/src/publish_readiness.rs`
+- `crates/monochange/src/monochange.init.toml`
+- `crates/monochange_core/src/lib.rs`
+- `monochange.toml`
+- `.templates/cli-steps.t.md`
 - `.templates/project.t.md`
-- `packages/monochange__skill/SKILL.md`
-- `packages/monochange__skill/skills/commands.md`
-- `packages/monochange__skill/skills/reference.md`
-- `packages/monochange__skill/skills/trusted-publishing.md`
-- `.changeset/publish-bootstrap-command.md`
+- `docs/src/guide/13-ci-and-publishing.md`
+- `docs/src/reference/cli-steps/16-publish-packages.md`
+- `packages/monochange__skill/*`
+- `.changeset/publish-resume-flow.md`
 
 ## Checklist
 
-- [x] Create isolated worktree and branch `feat/publish-bootstrap-command`.
-- [x] Add release-record-scoped publish bootstrap command.
-- [x] Add JSON bootstrap result artifact writing.
-- [x] Add focused unit and CLI dispatch coverage.
+- [x] Create isolated worktree and branch `feat/publish-resume-flow`.
+- [x] Add deserialization support for package publish reports.
+- [x] Add `PackagePublishStatus::Failed` and failure-preserving publish execution.
+- [x] Add `--output` artifact writing for `PublishPackages`.
+- [x] Add `--resume` filtering from previous real publish reports.
+- [x] Return non-zero after writing output artifacts for failed publish outcomes.
+- [x] Update command metadata and input validation.
+- [x] Add focused unit coverage for resume filtering, artifact I/O, status labels, and failure surfacing.
 - [x] Update user docs and packaged skill docs.
 - [x] Run formatting and lint checks.
 - [x] Run full validation.
@@ -64,27 +64,30 @@ This slice adds a top-level `mc publish-bootstrap` command that:
 
 ## Validation log
 
-- [x] `devenv shell cargo fmt`
-- [x] `devenv shell cargo test -p monochange publish_bootstrap --lib`
-- [x] `devenv shell cargo test -p monochange publish_bootstrap_dispatches_from_release_record_and_writes_artifact --lib`
-- [x] `devenv shell cargo test -p monochange render_command_help_for_publish_bootstrap --lib`
-- [x] `devenv shell cargo test -p monochange cli_help_returns_success_output --lib`
+- [x] `devenv shell cargo test -p monochange package_publish --lib`
+- [x] `devenv shell cargo test -p monochange_core display_and_publish_steps --lib`
+- [x] `devenv shell cargo test -p monochange optional_publish_resume_and_output_paths_trim_and_reject_blank_values --lib`
+- [x] `devenv shell cargo fmt --check`
+- [x] `git diff --check`
+- [x] `devenv shell dprint check`
+- [x] `devenv shell mdt check`
 - [x] `devenv shell mc validate`
 - [x] `devenv shell lint:test`
-- [x] `devenv shell mdt check`
 - [x] `devenv shell coverage:all`
-- [x] `CI=false devenv shell build:all`
 - [ ] `devenv shell coverage:patch` after commit
+- [x] `CI=false devenv shell build:all`
 
 ## Decisions
 
-- Keep bootstrap separate from readiness. A bootstrap artifact records first-time setup work, but `mc publish` still requires a fresh readiness artifact before real package publishing.
-- Scope bootstrap selection to the release record. Repeated `--package` filters intersect with release-record package ids instead of bootstrapping arbitrary workspace packages.
-- Keep `mc placeholder-publish` available as the lower-level escape hatch for reserving names outside a release-scoped lifecycle.
+- Resume artifacts must come from real `mc publish` reports (`mode = release`, `dry_run = false`). Placeholder and dry-run reports are rejected.
+- Completed statuses for resume are `published`, `skipped_existing`, and `skipped_external`; failed or blocked work remains retryable/pending.
+- Result artifacts use the existing `PackagePublishReport` JSON shape so rendered CLI output, readiness plumbing, and resume parsing share one contract.
+- `--output` is optional for compatibility, but CI documentation should recommend it for all real publish jobs.
+- A failed package publish report is still non-zero after the artifact is written.
 
 ## Follow-up roadmap
 
 - [ ] Add deeper freshness checks for workspace config, manifests, lockfiles, and publish tooling inputs.
 - [ ] Expand npm readiness semantics second.
 - [x] Add `mc publish-bootstrap` for first-time package setup.
-- [ ] Design retry/resume around explicit readiness for remaining work.
+- [x] Add retry/resume around explicit readiness for remaining work.

@@ -5412,6 +5412,7 @@ fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matc
 			let release_configuration = load_workspace_configuration(release_root)
 				.unwrap_or_else(|error| panic!("release configuration: {error}"));
 			let readiness_path = release_root.join("readiness.json");
+			let publish_result_path = release_root.join("publish-result.json");
 			fs::write(
 				&readiness_path,
 				format!(
@@ -5453,11 +5454,18 @@ fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matc
 						"readiness".to_string(),
 						vec![readiness_path.to_string_lossy().to_string()],
 					),
+					(
+						"output".to_string(),
+						vec![publish_result_path.to_string_lossy().to_string()],
+					),
 				]),
 			)
 			.unwrap_or_else(|error| panic!("publish packages with readiness: {error}"));
 			assert!(publish_output.contains("package publishing:"));
 			assert!(publish_output.contains("no packages matched the publishing criteria"));
+			let publish_result = fs::read_to_string(&publish_result_path)
+				.unwrap_or_else(|error| panic!("read publish result: {error}"));
+			assert!(publish_result.contains("\"mode\": \"release\""));
 
 			let plan_command = CliCommandDefinition {
 				name: "publish-plan".to_string(),

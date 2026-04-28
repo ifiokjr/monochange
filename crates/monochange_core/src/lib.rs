@@ -2054,7 +2054,9 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { .. } => Some(&["format"]),
 			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package"]),
-			Self::PublishPackages { .. } => Some(&["format", "package", "readiness"]),
+			Self::PublishPackages { .. } => {
+				Some(&["format", "output", "package", "readiness", "resume"])
+			}
 			Self::PlanPublishRateLimits { .. } => {
 				Some(&["format", "mode", "package", "ci", "readiness"])
 			}
@@ -2163,7 +2165,7 @@ impl CliStepDefinition {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					"package" => Some(CliInputKind::StringList),
-					"readiness" => Some(CliInputKind::Path),
+					"output" | "readiness" | "resume" => Some(CliInputKind::Path),
 					_ => None,
 				}
 			}

@@ -729,6 +729,8 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::PublishPackages { .. } => {
 					let selected_packages = selected_package_ids(&step_inputs);
+					let resume_path = optional_publish_resume_artifact_path(&step_inputs)?;
+					let output_path = optional_publish_output_artifact_path(&step_inputs)?;
 					if !context.dry_run {
 						let readiness_path =
 							required_publish_readiness_artifact_path(&step_inputs)?;
@@ -742,7 +744,11 @@ pub(crate) fn execute_cli_command_with_options(
 						publish_rate_limits::enforce_publish_rate_limits(configuration, &rate_limit_report, publish_rate_limits::PublishRateLimitMode::Publish)?;
 					}
 					#[rustfmt::skip]
-					let report = package_publish::run_publish_packages(root, configuration, context.prepared_release.as_ref(), &selected_packages, context.dry_run)?;
+					let report = package_publish::run_publish_packages_with_resume(root, configuration, context.prepared_release.as_ref(), &selected_packages, context.dry_run, resume_path.as_deref())?;
+					if let Some(output_path) = output_path.as_deref() {
+						package_publish::write_publish_report_artifact(output_path, &report)?;
+					}
+					package_publish::ensure_publish_report_succeeded(&report)?;
 					context.package_publish_report = Some(report);
 					context.rate_limit_report = Some(rate_limit_report);
 					output = None;
@@ -2052,17 +2058,40 @@ fn required_publish_readiness_artifact_path(
 fn optional_publish_readiness_artifact_path(
 	inputs: &BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<Option<PathBuf>> {
-	let Some(path) = inputs.get("readiness").and_then(|values| values.first()) else {
+	optional_path_input(inputs, "readiness", "PublishPackages")
+}
+
+fn optional_publish_resume_artifact_path(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<Option<PathBuf>> {
+	optional_path_input(inputs, "resume", "PublishPackages")
+}
+
+fn optional_publish_output_artifact_path(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<Option<PathBuf>> {
+	optional_path_input(inputs, "output", "PublishPackages")
+}
+
+fn optional_path_input(
+	inputs: &BTreeMap<String, Vec<String>>,
+	name: &str,
+	step_name: &str,
+) -> MonochangeResult<Option<PathBuf>> {
+	let Some(path) = inputs.get(name).and_then(|values| values.first()) else {
 		return Ok(None);
 	};
 
-	if path.trim().is_empty() {
-		return Err(MonochangeError::Config(
-			"`--readiness <PATH>` must not be blank; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
-		));
+	let trimmed = path.trim();
+	if trimmed.is_empty() {
+		let message = match name {
+			"readiness" => "`--readiness <PATH>` must not be blank; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
+			_ => format!("`{step_name}` received a blank `{name}` path"),
+		};
+		return Err(MonochangeError::Config(message));
 	}
 
-	Ok(Some(PathBuf::from(path)))
+	Ok(Some(PathBuf::from(trimmed)))
 }
 
 fn publish_rate_limit_selected_package_ids(
@@ -2338,6 +2367,7 @@ fn package_publish_status_label(status: package_publish::PackagePublishStatus) -
 		package_publish::PackagePublishStatus::SkippedExisting => "skipped-existing",
 		package_publish::PackagePublishStatus::SkippedExternal => "skipped-external",
 		package_publish::PackagePublishStatus::Blocked => "blocked",
+		package_publish::PackagePublishStatus::Failed => "failed",
 	}
 }
 
@@ -4190,6 +4220,10 @@ path = "crates/core"
 			package_publish_status_label(package_publish::PackagePublishStatus::Blocked),
 			"blocked"
 		);
+		assert_eq!(
+			package_publish_status_label(package_publish::PackagePublishStatus::Failed),
+			"failed"
+		);
 	}
 
 	#[test]
@@ -5466,6 +5500,38 @@ path = "crates/core"
 		let blank_error = required_publish_readiness_artifact_path(&blank)
 			.expect_err("blank readiness artifact path should fail");
 		assert!(blank_error.to_string().contains("mc publish-readiness"));
+	}
+
+	#[test]
+	fn optional_publish_resume_and_output_paths_trim_and_reject_blank_values() {
+		let inputs = BTreeMap::from([
+			(
+				"resume".to_string(),
+				vec![" .monochange/previous-result.json ".to_string()],
+			),
+			(
+				"output".to_string(),
+				vec![" .monochange/publish-result.json ".to_string()],
+			),
+		]);
+
+		let resume = optional_publish_resume_artifact_path(&inputs)
+			.unwrap_or_else(|error| panic!("resume path: {error}"));
+		let output = optional_publish_output_artifact_path(&inputs)
+			.unwrap_or_else(|error| panic!("output path: {error}"));
+		assert_eq!(
+			resume,
+			Some(PathBuf::from(".monochange/previous-result.json"))
+		);
+		assert_eq!(
+			output,
+			Some(PathBuf::from(".monochange/publish-result.json"))
+		);
+
+		let blank = BTreeMap::from([("resume".to_string(), vec!["  ".to_string()])]);
+		let error = optional_publish_resume_artifact_path(&blank)
+			.expect_err("blank resume path should fail");
+		assert!(error.to_string().contains("blank `resume` path"));
 	}
 
 	#[test]

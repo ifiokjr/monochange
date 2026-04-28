@@ -132,6 +132,7 @@ fn bootstrap_status(report: &package_publish::PackagePublishReport) -> PublishBo
 		matches!(
 			package.status,
 			package_publish::PackagePublishStatus::Blocked
+				| package_publish::PackagePublishStatus::Failed
 				| package_publish::PackagePublishStatus::SkippedExternal
 		)
 	});
@@ -282,6 +283,7 @@ fn package_publish_status_label(status: package_publish::PackagePublishStatus) -
 		package_publish::PackagePublishStatus::SkippedExisting => "already-published",
 		package_publish::PackagePublishStatus::SkippedExternal => "external",
 		package_publish::PackagePublishStatus::Blocked => "blocked",
+		package_publish::PackagePublishStatus::Failed => "failed",
 	}
 }
 
@@ -424,6 +426,7 @@ mod tests {
 				package_publish::PackagePublishStatus::SkippedExternal,
 			),
 			sample_publish_outcome("blocked", package_publish::PackagePublishStatus::Blocked),
+			sample_publish_outcome("failed", package_publish::PackagePublishStatus::Failed),
 		]);
 
 		let json = render_publish_bootstrap_report(&report, OutputFormat::Json)
@@ -432,9 +435,10 @@ mod tests {
 
 		let text = render_publish_bootstrap_report(&report, OutputFormat::Text)
 			.unwrap_or_else(|error| panic!("render text: {error}"));
-		assert!(text.contains("packages: planned, published, existing, external, blocked"));
+		assert!(text.contains("packages: planned, published, existing, external, blocked, failed"));
 		assert!(text.contains("[already-published]"));
 		assert!(text.contains("[external]"));
+		assert!(text.contains("[failed]"));
 
 		let markdown = render_publish_bootstrap_report(&report, OutputFormat::Markdown)
 			.unwrap_or_else(|error| panic!("render markdown: {error}"));

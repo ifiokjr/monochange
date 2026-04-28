@@ -83,7 +83,7 @@ mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
 mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
-mc publish --readiness .monochange/readiness.json
+mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc release
 ```

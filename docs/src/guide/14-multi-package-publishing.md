@@ -67,7 +67,7 @@ jobs:
       - name: publish packages
         run: |
           devenv shell -- mc publish-readiness --from HEAD --output .monochange/readiness.json
-          devenv shell -- mc publish --readiness .monochange/readiness.json
+          devenv shell -- mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json
 ```
 
 This is the best fit when:

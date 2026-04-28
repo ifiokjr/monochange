@@ -35,6 +35,8 @@ Use `PlaceholderPublish` instead when you need to bootstrap a package that does 
 - `format` — `text`, `markdown`, or `json`
 - `package` — optional repeated package ids used to filter the publish set
 - `readiness` — path to the JSON artifact written by `mc publish-readiness`; required for real publishes and ignored by dry runs
+- `resume` — optional path to a JSON result artifact from an earlier real `mc publish` run; completed package versions are skipped and failed or pending work is retried
+- `output` — optional path where monochange writes the package publish result JSON artifact for retry/resume workflows
 
 ## Step-level `when` condition
 
@@ -56,6 +58,7 @@ when = "{{ inputs.enabled }}"
 
 - in dry-run mode, plans and previews publish operations without touching registries and without requiring a readiness artifact
 - in normal mode, validates the readiness artifact before any registry mutation and then publishes package versions to their configured registries
+- when `output` is set, writes the package publish result artifact even if a registry publish command fails, then exits non-zero for failed package outcomes
 - contributes `publish.*` and `publish_rate_limits.*` template context to the command result
 
 ## Example
@@ -81,6 +84,16 @@ name = "readiness"
 type = "path"
 help_text = "JSON artifact from mc publish-readiness; required when publishing for real"
 
+[[cli.publish.inputs]]
+name = "resume"
+type = "path"
+help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped"
+
+[[cli.publish.inputs]]
+name = "output"
+type = "path"
+help_text = "Write the package publish result JSON artifact for retry/resume"
+
 [[cli.publish.steps]]
 name = "publish packages"
 type = "PublishPackages"
@@ -96,10 +109,10 @@ Generate a readiness artifact from the merged release record first:
 
 ```bash
 mc publish-readiness --from HEAD --output .monochange/readiness.json
-mc publish --readiness .monochange/readiness.json
+mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json
 ```
 
-Keep release preparation and real package publication as separate phases so the readiness artifact can be reviewed before registry mutation.
+Keep release preparation and real package publication as separate phases so the readiness artifact can be reviewed before registry mutation. If a real publish fails after writing `.monochange/publish-result.json`, rerun with `mc publish --readiness .monochange/readiness.json --resume .monochange/publish-result.json --output .monochange/publish-result.json` after fixing the registry/auth issue.
 
 ### Publish only a specific package
 
@@ -153,5 +166,6 @@ Because `PublishPackages` understands:
 
 - confusing `PublishPackages` with `PublishRelease`: the former publishes to package registries, the latter creates hosted provider releases (such as GitHub releases)
 - forgetting that real `PublishPackages` runs need a readiness artifact generated from the same `HEAD` release record and selected package set
+- omitting `output` in CI, which makes partial registry failures harder to resume safely
 - rerunning `mc publish --package <id>` with a readiness artifact generated for a different package selection
 - running `PublishPackages` without rate-limit planning: use `PlanPublishRateLimits` first when you are unsure about registry windows

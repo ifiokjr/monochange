@@ -455,6 +455,16 @@ name = "readiness"
 type = "path"
 help_text = "JSON artifact from mc publish-readiness; required when publishing for real"
 
+[[cli.publish.inputs]]
+name = "resume"
+type = "path"
+help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped"
+
+[[cli.publish.inputs]]
+name = "output"
+type = "path"
+help_text = "Write the package publish result JSON artifact for retry/resume"
+
 [[cli.publish.steps]]
 name = "publish packages"
 type = "PublishPackages"
