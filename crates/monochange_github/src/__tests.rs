@@ -1152,11 +1152,9 @@ fn release_pull_request_commit_verification_rejects_moved_branch() {
 		});
 
 	get_ref.assert();
-	assert!(
-		result.is_err_and(|message| {
-			message.contains("release branch monochange/release/release moved")
-		})
-	);
+	assert!(result.is_err_and(|message| {
+		message.contains("release branch monochange/release/release moved")
+	}));
 }
 
 #[test]
