@@ -167,8 +167,9 @@ Built-in publishing currently targets only the canonical public registry for eac
 - npm packages → `npm`
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
+- Python packages → `pypi`
 
-Python package discovery and release planning are supported, but built-in PyPI publishing is not available yet. For Python packages, private registries, or any other custom publication flow, set `mode = "external"` and handle publication outside monochange.
+Private registries and custom publication flows are still external. For those packages, set `mode = "external"` and handle publication outside monochange.
 
 ### Placeholder publishing
 
@@ -203,7 +204,7 @@ When `trusted_publishing` is enabled:
 
 - npm packages can be configured automatically with `npm trust github ...`
 - pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, so workspace protocol and catalog dependency handling stays aligned with the workspace manager
-- Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks built-in release publishing until trust is configured
+- Cargo, `jsr`, `pub.dev`, and PyPI currently require manual trusted-publishing setup; monochange reports the setup URL and blocks built-in release publishing until trust is configured
 
 For a GitHub-focused setup guide with exact registry fields, commands, and workflow requirements, see [Trusted publishing and OIDC](./07-trusted-publishing.md). For monorepo workflow and tag-shape recommendations, see [Multi-package publishing patterns](./14-multi-package-publishing.md).
 
@@ -221,7 +222,7 @@ The built-in package publishing flow is intentionally narrow for now:
 
 - no private or custom registry support in `mode = "builtin"`
 - rate-limit planning can batch work and enforce single-window safety, but monochange still does not sleep across windows or requeue later batches automatically
-- manual trusted-publishing setup is still required for `crates.io`, `jsr`, and `pub.dev`
+- manual trusted-publishing setup is still required for `crates.io`, `jsr`, `pub.dev`, and PyPI
 
 If your workflow needs any of those today, keep the package on `mode = "external"` and let your own CI or scripts own publication.
 

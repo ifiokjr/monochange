@@ -23,6 +23,7 @@ const CRATES_IO_SOURCE: &str = "https://github.com/rust-lang/crates.io";
 const NPM_TRUST_DOCS: &str = "https://docs.npmjs.com/trusted-publishers";
 const PUB_DEV_AUTOMATED_PUBLISHING: &str = "https://dart.dev/tools/pub/automated-publishing";
 const JSR_PUBLISHING_DOCS: &str = "https://jsr.io/docs/publishing-packages";
+const PYPI_TRUSTED_PUBLISHERS_DOCS: &str = "https://docs.pypi.org/trusted-publishers/";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum PublishRateLimitMode {
@@ -365,6 +366,20 @@ fn registry_policies() -> Vec<RegistryRateLimitPolicy> {
 				notes: "official automation docs; limit itself is enforced operationally but not clearly enumerated on this page".to_string(),
 			}],
 		},
+		RegistryRateLimitPolicy {
+			registry: RegistryKind::Pypi,
+			operation: RateLimitOperation::Publish,
+			limit: None,
+			window_seconds: None,
+			confidence: RateLimitConfidence::Low,
+			notes: "PyPI does not publish a precise package publish quota; use sequential CI publishing with retries".to_string(),
+			evidence: vec![RateLimitEvidence {
+				title: "PyPI trusted publishers documentation".to_string(),
+				url: PYPI_TRUSTED_PUBLISHERS_DOCS.to_string(),
+				kind: RateLimitEvidenceKind::Official,
+				notes: "official trusted-publisher workflow guidance but no exact package publish quota".to_string(),
+			}],
+		},
 	]
 }
 
@@ -449,6 +464,21 @@ mod tests {
 	}
 
 	#[test]
+	fn registry_policies_include_pypi_without_a_fixed_quota() {
+		let pypi = registry_policies()
+			.into_iter()
+			.find(|policy| policy.registry == RegistryKind::Pypi)
+			.expect("PyPI policy should exist");
+
+		assert_eq!(pypi.limit, None);
+		assert_eq!(pypi.window_seconds, None);
+		assert_eq!(pypi.confidence, RateLimitConfidence::Low);
+		assert!(pypi.notes.contains("PyPI does not publish"));
+		let evidence = pypi.evidence.first().expect("PyPI policy evidence");
+		assert_eq!(evidence.url, PYPI_TRUSTED_PUBLISHERS_DOCS);
+	}
+
+	#[test]
 	fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -527,6 +557,7 @@ mod tests {
 			crates_io_index: server.base_url(),
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
+			pypi_api: server.base_url(),
 		};
 		let requests = build_release_plan_requests_with_transport(
 			tempdir.path(),
@@ -790,6 +821,7 @@ mod tests {
 			crates_io_index: server.base_url(),
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
+			pypi_api: server.base_url(),
 		};
 		let requests = build_release_plan_requests_with_transport(
 			tempdir.path(),
@@ -859,6 +891,7 @@ mod tests {
 			crates_io_index: server.base_url(),
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
+			pypi_api: server.base_url(),
 		};
 		let requests = build_placeholder_plan_requests_with_transport(
 			tempdir.path(),
@@ -939,6 +972,7 @@ mod tests {
 			crates_io_index: server.base_url(),
 			pub_dev_api: server.base_url(),
 			jsr_base: server.base_url(),
+			pypi_api: server.base_url(),
 		};
 		let requests = build_placeholder_plan_requests_with_transport(
 			tempdir.path(),

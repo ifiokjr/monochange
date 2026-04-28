@@ -1382,6 +1382,7 @@ pub enum RegistryKind {
 	Npm,
 	Jsr,
 	PubDev,
+	Pypi,
 }
 
 impl RegistryKind {
@@ -1393,6 +1394,7 @@ impl RegistryKind {
 			Self::Npm => "npm",
 			Self::Jsr => "jsr",
 			Self::PubDev => "pub_dev",
+			Self::Pypi => "pypi",
 		}
 	}
 }

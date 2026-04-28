@@ -6,8 +6,9 @@ monochange supports built-in package publishing for the canonical public registr
 - npm packages → `npm`
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
+- Python packages → `pypi`
 
-For those registries, monochange can also manage or verify **trusted publishing** when the registry supports publishing directly from a verified GitHub Actions identity. Python packages are supported for release planning, but PyPI publishing and PyPI trusted-publisher setup are external to monochange today.
+For those registries, monochange can also manage or verify **trusted publishing** when the registry supports publishing directly from a verified GitHub Actions identity. PyPI is supported by the built-in publisher through `uv build` and `uv publish`; PyPI trusted-publisher enrollment is still completed manually in the PyPI project settings.
 
 Different registries use different names for the same general pattern:
 
@@ -30,10 +31,11 @@ The goal is the same in every case:
 | cargo          | crates.io | Trusted Publishing        | Yes                         | Can publish with a temporary token after you finish registry-side setup               |
 | deno           | jsr       | GitHub Actions publishing | Yes                         | Reports the setup URL; repository linking is still manual                             |
 | dart / flutter | pub.dev   | Automated publishing      | Yes                         | Reports the setup URL; admin-page setup is still manual                               |
+| python         | PyPI      | Trusted publishers        | Yes                         | Reports the setup URL; project settings setup is still manual                         |
 
-npm is currently the only ecosystem where monochange performs bulk trusted-publishing setup itself. Use `mode = "external"` for Python/PyPI and for any registry workflow that should stay outside monochange's built-in publisher.
+npm is currently the only ecosystem where monochange performs bulk trusted-publishing setup itself. Use `mode = "external"` for any registry workflow that should stay outside monochange's built-in publisher.
 
-For `crates.io`, `jsr`, and `pub.dev`, monochange reports the setup URL for each package and blocks the next built-in registry publish until the trust configuration has been completed manually. It also preflights the GitHub trusted-publishing context for those registries, surfacing the repository, workflow, and environment it expects when that context can be resolved.
+For `crates.io`, `jsr`, `pub.dev`, and PyPI, monochange reports the setup URL for each package and blocks the next built-in registry publish until the trust configuration has been completed manually. It also preflights the GitHub trusted-publishing context for those registries, surfacing the repository, workflow, and environment it expects when that context can be resolved.
 
 ## monochange configuration
 
@@ -55,6 +57,9 @@ trusted_publishing = true
 trusted_publishing = true
 
 [ecosystems.dart.publish]
+trusted_publishing = true
+
+[ecosystems.python.publish]
 trusted_publishing = true
 
 [package.cli.publish.trusted_publishing]
@@ -444,17 +449,18 @@ In those cases, you can still use the same registry-side trusted-publishing setu
 
 monochange is intentionally conservative here.
 
-Today, npm is the only registry where monochange performs trusted-publishing enrollment itself. For `crates.io`, `jsr`, and `pub.dev`, monochange currently focuses on setup guidance, preflight checks, and actionable diagnostics instead of trying to mutate registry-side trust records automatically.
+Today, npm is the only registry where monochange performs trusted-publishing enrollment itself. For `crates.io`, `jsr`, `pub.dev`, and PyPI, monochange currently focuses on setup guidance, preflight checks, and actionable diagnostics instead of trying to mutate registry-side trust records automatically.
 
 Areas that may become more automated later, where the registry and CI contracts make it safe enough, include:
 
 - **`crates.io`** — stronger preflight validation around explicit workflow filenames, environment alignment, and clearer checks for first-publish bootstrap versus post-bootstrap trusted publishing
 - **`jsr`** — better repository-link diagnostics and package metadata checks before publish, especially when the package already exists but repository-side linking is incomplete
 - **`pub.dev`** — stronger validation that tag patterns, workflow triggers, working directories, and optional environments still match the automated-publishing setup expected by pub.dev
+- **PyPI** — stronger validation that the project trusted-publisher settings match the workflow name, environment, and package path monochange expects before running `uv publish`
 
 Areas that monochange does **not** promise today:
 
-- auto-enrolling registry-side trusted-publisher records for `crates.io`, `jsr`, or `pub.dev`
+- auto-enrolling registry-side trusted-publisher records for `crates.io`, `jsr`, `pub.dev`, or PyPI
 - bypassing browser-confirmed or admin-page-only steps that the registry intentionally keeps manual
 - inferring enough registry-side state to claim a package is fully enrolled when the registry does not expose that state safely or consistently
 
