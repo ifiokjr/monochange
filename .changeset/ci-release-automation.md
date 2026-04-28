@@ -4,7 +4,7 @@ monochange_core: minor
 monochange_github: minor
 ---
 
-## add post-merge release automation and release PR merge guards
+#### Add post-merge release automation
 
 - Add `release-pr-manual-merge-blocker` job to CI that fails on PRs from `monochange/release/*` branches, forcing the `/merge` slash-command workflow
 - Protect the `release-pr` job with `environment: publisher` so branch-protection rules apply

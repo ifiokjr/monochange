@@ -2,7 +2,7 @@
 monochange: patch
 ---
 
-#### publish CLI npm packages with trusted publishing
+#### Publish CLI npm packages with trusted publishing
 
 monochange's own CLI npm package workflow now publishes without `NODE_AUTH_TOKEN` or `NPM_TOKEN`. The publish job keeps the protected `publisher` environment and `id-token: write` permission so npm can use GitHub OIDC trusted publishing and produce provenance for the CLI packages.
 

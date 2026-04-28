@@ -3,7 +3,7 @@
 "monochange_core": patch
 ---
 
-#### make release commits handle large messages reliably
+#### Handle large release commit messages reliably
 
 Release commit creation now streams the generated commit message through standard input instead of passing the full release record as a command-line argument. This avoids operating-system argument length limits for large release records.
 

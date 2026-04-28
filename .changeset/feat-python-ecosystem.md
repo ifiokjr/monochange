@@ -7,7 +7,7 @@ monochange_lint: minor
 monochange_python: minor
 ---
 
-#### add Python ecosystem support
+#### Add Python ecosystem support
 
 monochange now discovers and manages Python packages from uv workspaces, Poetry projects, and standalone `pyproject.toml` files.
 

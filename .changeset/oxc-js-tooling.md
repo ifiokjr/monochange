@@ -2,6 +2,8 @@
 "@monochange/cli": patch
 ---
 
+#### Add OXC JavaScript tooling
+
 Add OXC tooling for all JavaScript and TypeScript in the project
 
 - Integrate `dprint-plugin-oxc` as the formatter for JS/TS files, replacing the dprint typescript plugin.

@@ -2,6 +2,8 @@
 "monochange": patch
 ---
 
+#### Fix CLI help colors
+
 Fix `--help` (`-h`) color output and unify CLI color palette.
 
 - `mc --help` now emits ANSI colors in terminal emulators, matching `mc help <command>` behavior
