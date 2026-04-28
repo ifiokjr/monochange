@@ -347,6 +347,8 @@ struct RawEcosystems {
 	dart: RawEcosystemSettings,
 	#[serde(default)]
 	python: RawEcosystemSettings,
+	#[serde(default)]
+	go: RawEcosystemSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -737,6 +739,7 @@ fn package_type_to_ecosystem_type(package_type: PackageType) -> EcosystemType {
 		PackageType::Deno => EcosystemType::Deno,
 		PackageType::Dart | PackageType::Flutter => EcosystemType::Dart,
 		PackageType::Python => EcosystemType::Python,
+		PackageType::Go => EcosystemType::Go,
 		_ => EcosystemType::Cargo,
 	}
 }
@@ -815,6 +818,7 @@ fn default_publish_registry_for_ecosystem(
 		EcosystemType::Deno => Some(PublishRegistry::Builtin(RegistryKind::Jsr)),
 		EcosystemType::Dart => Some(PublishRegistry::Builtin(RegistryKind::PubDev)),
 		EcosystemType::Python => Some(PublishRegistry::Builtin(RegistryKind::Pypi)),
+		EcosystemType::Go => Some(PublishRegistry::Builtin(RegistryKind::GoProxy)),
 		_ => None,
 	};
 	registry
@@ -959,6 +963,7 @@ fn build_package_definitions(
 	deno_ecosystem: &EcosystemSettings,
 	dart_ecosystem: &EcosystemSettings,
 	python_ecosystem: &EcosystemSettings,
+	go_ecosystem: &EcosystemSettings,
 ) -> MonochangeResult<Vec<PackageDefinition>> {
 	packages
 		.into_iter()
@@ -1008,6 +1013,7 @@ fn build_package_definitions(
 					EcosystemType::Deno => deno_ecosystem.versioned_files.clone(),
 					EcosystemType::Dart => dart_ecosystem.versioned_files.clone(),
 					EcosystemType::Python => python_ecosystem.versioned_files.clone(),
+					EcosystemType::Go => go_ecosystem.versioned_files.clone(),
 					_ => Vec::new(),
 				}
 			};
@@ -1026,11 +1032,12 @@ fn build_package_definitions(
 				Some({
 					#[rustfmt::skip]
 					let publish = match inferred_ecosystem_type {
-						EcosystemType::Cargo => &cargo_ecosystem.publish,
 						EcosystemType::Npm => &npm_ecosystem.publish,
 						EcosystemType::Deno => &deno_ecosystem.publish,
 						EcosystemType::Dart => &dart_ecosystem.publish,
-						_ => &python_ecosystem.publish,
+						EcosystemType::Python => &python_ecosystem.publish,
+						EcosystemType::Go => &go_ecosystem.publish,
+						_ => &cargo_ecosystem.publish,
 					};
 					publish
 				}),
@@ -1181,6 +1188,8 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		EcosystemType::Python,
 		python_ecosystem_input,
 	)?;
+	let go_ecosystem =
+		normalize_ecosystem_settings(&contents, "go", EcosystemType::Go, ecosystems.go)?;
 	let defaults_changelog_policy = defaults
 		.changelog
 		.as_ref()
@@ -1201,6 +1210,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		&deno_ecosystem,
 		&dart_ecosystem,
 		&python_ecosystem,
+		&go_ecosystem,
 	)?;
 	let groups = build_group_definitions(&contents, group, default_changelog_format)?;
 	let source = resolve_source_configuration(source);
@@ -1215,6 +1225,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		("deno", &deno_ecosystem),
 		("dart", &dart_ecosystem),
 		("python", &python_ecosystem),
+		("go", &go_ecosystem),
 	] {
 		let declared_packages = packages
 			.iter()
@@ -1260,6 +1271,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		deno: deno_ecosystem,
 		dart: dart_ecosystem,
 		python: python_ecosystem,
+		go: go_ecosystem,
 	})
 }
 
@@ -2726,6 +2738,7 @@ fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -
 		EcosystemType::Deno => monochange_deno::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Dart => monochange_dart::supported_versioned_file_kind(path).is_some(),
 		EcosystemType::Python => monochange_python::supported_versioned_file_kind(path).is_some(),
+		EcosystemType::Go => monochange_go::supported_versioned_file_kind(path).is_some(),
 		_ => false,
 	}
 }
@@ -2822,6 +2835,7 @@ fn validate_versioned_files(
 							EcosystemType::Deno => "deno",
 							EcosystemType::Dart => "dart",
 							EcosystemType::Python => "python",
+							EcosystemType::Go => "go",
 							_ => "unknown",
 						}
 					),
@@ -2893,6 +2907,7 @@ fn expected_manifest_name(package_type: PackageType) -> &'static str {
 		PackageType::Deno => "deno.json",
 		PackageType::Dart | PackageType::Flutter => "pubspec.yaml",
 		PackageType::Python => "pyproject.toml",
+		PackageType::Go => "go.mod",
 		_ => "Cargo.toml",
 	}
 }

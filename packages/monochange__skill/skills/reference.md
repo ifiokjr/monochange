@@ -443,6 +443,7 @@ Lockfile refresh is command-driven. monochange infers defaults when not configur
 - npm-family: detects owned lockfiles and runs the matching command (`npm install --package-lock-only`, `pnpm install --lockfile-only`, `bun install --lockfile-only`)
 - Dart / Flutter: direct `pubspec.lock` updates by default; configure `dart pub get` or `flutter pub get` when needed
 - Python: `uv.lock` infers `uv lock`, `poetry.lock` infers `poetry lock --no-update`, and unknown Python lockfiles are skipped
+- Go: `go.mod` / `go.sum` refreshes infer `go mod tidy`; `go.sum` is checksum data, not a directly patched lockfile
 - Deno: no inferred default
 
 Explicit configuration overrides inference:
@@ -473,6 +474,8 @@ Built-in package publishing currently supports only the canonical public registr
 - npm packages → `npm`
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
+- Python packages → `pypi`
+- Go modules → `go_proxy` via VCS tags
 
 Python package discovery and release planning are supported, but PyPI publishing is not built in yet. Use `mode = "external"` for Python, private registries, or unsupported publishing flows.
 
@@ -500,7 +503,7 @@ Placeholder README content can come from:
 
 - npm trusted publishing can be configured automatically from GitHub Actions context; monochange verifies the current state first, then runs `npm trust github <package> --repo <owner/repo> --file <workflow> [--env <environment>] --yes` or the `pnpm exec npm trust ...` equivalent for pnpm workspaces
 - Cargo, `jsr`, and `pub.dev` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks the next built-in release publish until trust is configured
-- See [trusted-publishing.md](./trusted-publishing.md) for a GitHub-focused setup guide covering the exact registry fields and commands for `npm`, `crates.io`, `jsr`, and `pub.dev`
+- See [trusted-publishing.md](./trusted-publishing.md) for a GitHub-focused setup guide covering the exact registry fields and commands for `npm`, `crates.io`, `jsr`, `pub.dev`, PyPI, and Go module tags
 - See [multi-package-publishing.md](./multi-package-publishing.md) when one repository publishes multiple public packages and you need to choose between shared built-in flows and package-specific external workflows
 - Built-in publishing does not yet manage registry rate-limit retries or delayed requeues; use `mode = "external"` when your workflow needs custom scheduling
 

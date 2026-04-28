@@ -7,6 +7,7 @@ monochange supports built-in package publishing for the canonical public registr
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
 - Python packages → `pypi`
+- Go modules → `go_proxy` via VCS tags
 
 For those registries, monochange can also manage or verify **trusted publishing** when the registry supports publishing directly from a verified GitHub Actions identity. PyPI is supported by the built-in publisher through `uv build` and `uv publish`; PyPI trusted-publisher enrollment is still completed manually in the PyPI project settings.
 
@@ -32,8 +33,11 @@ The goal is the same in every case:
 | deno           | jsr       | GitHub Actions publishing | Yes                         | Reports the setup URL; repository linking is still manual                             |
 | dart / flutter | pub.dev   | Automated publishing      | Yes                         | Reports the setup URL; admin-page setup is still manual                               |
 | python         | PyPI      | Trusted publishers        | Yes                         | Reports the setup URL; project settings setup is still manual                         |
+| go             | Go proxy  | VCS tags                  | N/A                         | Creates module tags; the proxy discovers versions from source control                 |
 
 npm is currently the only ecosystem where monochange performs bulk trusted-publishing setup itself. Use `mode = "external"` for any registry workflow that should stay outside monochange's built-in publisher.
+
+Go module publishing is included in the built-in package publisher, but it is not an OIDC trusted-publishing flow. Go versions are published by creating VCS tags. monochange uses `git tag`, choosing `v1.2.3` for a root module and path-prefixed tags such as `api/v1.2.3` for submodules, then checks availability through the Go module proxy.
 
 For `crates.io`, `jsr`, `pub.dev`, and PyPI, monochange reports the setup URL for each package and blocks the next built-in registry publish until the trust configuration has been completed manually. It also preflights the GitHub trusted-publishing context for those registries, surfacing the repository, workflow, and environment it expects when that context can be resolved.
 

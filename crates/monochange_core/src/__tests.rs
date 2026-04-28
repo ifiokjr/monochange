@@ -231,6 +231,16 @@ fn publish_mode_and_registry_kind_display_canonical_names() {
 	assert_eq!(RegistryKind::Jsr.as_str(), "jsr");
 	assert_eq!(RegistryKind::PubDev.as_str(), "pub_dev");
 	assert_eq!(RegistryKind::Pypi.as_str(), "pypi");
+	assert_eq!(RegistryKind::GoProxy.as_str(), "go_proxy");
+	assert_eq!(RegistryKind::GoProxy.to_string(), "go_proxy");
+}
+
+#[test]
+fn go_package_type_and_ecosystem_defaults_are_canonical() {
+	assert_eq!(PackageType::Go.as_str(), "go");
+	assert_eq!(Ecosystem::Go.as_str(), "go");
+	assert_eq!(EcosystemType::Go.default_prefix(), "");
+	assert_eq!(EcosystemType::Go.default_fields(), ["require"]);
 }
 
 #[test]
@@ -1775,6 +1785,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 		deno: EcosystemSettings::default(),
 		dart: EcosystemSettings::default(),
 		python: EcosystemSettings::default(),
+		go: EcosystemSettings::default(),
 	}
 }
 

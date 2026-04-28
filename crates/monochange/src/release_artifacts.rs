@@ -1501,6 +1501,7 @@ mod tests {
 			deno: monochange_core::EcosystemSettings::default(),
 			dart: monochange_core::EcosystemSettings::default(),
 			python: monochange_core::EcosystemSettings::default(),
+			go: monochange_core::EcosystemSettings::default(),
 		}
 	}
 

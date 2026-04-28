@@ -230,6 +230,7 @@ pub enum Ecosystem {
 	Dart,
 	Flutter,
 	Python,
+	Go,
 }
 
 impl Ecosystem {
@@ -243,6 +244,7 @@ impl Ecosystem {
 			Self::Dart => "dart",
 			Self::Flutter => "flutter",
 			Self::Python => "python",
+			Self::Go => "go",
 		}
 	}
 }
@@ -492,6 +494,7 @@ pub enum PackageType {
 	Dart,
 	Flutter,
 	Python,
+	Go,
 }
 
 impl PackageType {
@@ -505,6 +508,7 @@ impl PackageType {
 			Self::Dart => "dart",
 			Self::Flutter => "flutter",
 			Self::Python => "python",
+			Self::Go => "go",
 		}
 	}
 }
@@ -527,6 +531,7 @@ pub enum EcosystemType {
 	Deno,
 	Dart,
 	Python,
+	Go,
 }
 
 impl EcosystemType {
@@ -534,7 +539,7 @@ impl EcosystemType {
 	#[must_use]
 	pub fn default_prefix(self) -> &'static str {
 		match self {
-			Self::Cargo => "",
+			Self::Cargo | Self::Go => "",
 			Self::Npm | Self::Deno | Self::Dart => "^",
 			Self::Python => ">=",
 		}
@@ -549,6 +554,7 @@ impl EcosystemType {
 			Self::Deno => &["imports"],
 			Self::Dart => &["dependencies", "dev_dependencies"],
 			Self::Python => &["dependencies"],
+			Self::Go => &["require"],
 		}
 	}
 }
@@ -1383,6 +1389,7 @@ pub enum RegistryKind {
 	Jsr,
 	PubDev,
 	Pypi,
+	GoProxy,
 }
 
 impl RegistryKind {
@@ -1395,6 +1402,7 @@ impl RegistryKind {
 			Self::Jsr => "jsr",
 			Self::PubDev => "pub_dev",
 			Self::Pypi => "pypi",
+			Self::GoProxy => "go_proxy",
 		}
 	}
 }
@@ -3706,6 +3714,7 @@ pub struct WorkspaceConfiguration {
 	pub deno: EcosystemSettings,
 	pub dart: EcosystemSettings,
 	pub python: EcosystemSettings,
+	pub go: EcosystemSettings,
 }
 
 impl WorkspaceConfiguration {
