@@ -159,6 +159,8 @@ pub type GitHubPullRequestRequest = SourceChangeRequest;
 pub type GitHubPullRequestOperation = SourceChangeRequestOperation;
 pub type GitHubPullRequestOutcome = SourceChangeRequestOutcome;
 
+type GitHubVerifiedCommitAttempt = Result<String, String>;
+
 /// Return the hosted-source capabilities supported by the GitHub provider.
 #[must_use]
 pub const fn source_capabilities() -> SourceCapabilities {
@@ -292,6 +294,54 @@ struct GitHubPullRequestUpdatePayload<'a> {
 #[derive(Debug, Serialize)]
 struct GitHubLabelsPayload<'a> {
 	labels: &'a [String],
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubCreateCommitPayload {
+	message: String,
+	tree: String,
+	parents: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubUpdateRefPayload<'a> {
+	sha: &'a str,
+	force: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubGitCommitResponse {
+	sha: String,
+	message: String,
+	tree: GitHubGitCommitTree,
+	parents: Vec<GitHubGitCommitParent>,
+	verification: GitHubGitCommitVerification,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubGitCommitTree {
+	sha: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubGitCommitParent {
+	sha: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubGitCommitVerification {
+	verified: bool,
+	reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubGitRefResponse {
+	object: GitHubGitRefObject,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubGitRefObject {
+	sha: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1065,7 +1115,7 @@ pub fn publish_release_pull_request(
 	git_checkout_branch(root, &request.head_branch)?;
 	git_stage_paths(root, tracked_paths)?;
 	git_commit_paths(root, &request.commit_message, no_verify)?;
-	let head_commit = git_head_commit(root)?;
+	let mut head_commit = git_head_commit(root)?;
 	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
 	let head_matches_existing = existing
 		.as_ref()
@@ -1073,6 +1123,18 @@ pub fn publish_release_pull_request(
 		== Some(head_commit.as_str());
 	if !head_matches_existing {
 		git_push_branch(root, &request.head_branch, no_verify)?;
+		// Commits created through GitHub's Git Database API from GitHub Actions can be
+		// marked verified by GitHub. Keep the pushed git commit as the fallback if the
+		// API commit cannot be created, verified, or moved onto the release branch.
+		head_commit = maybe_replace_release_pull_request_commit_with_verified_github_commit(
+			source,
+			request,
+			&head_commit,
+		)
+		.unwrap_or_else(|warning| {
+			tracing::warn!(%warning, commit = %head_commit, "falling back to regular release pull request commit");
+			head_commit.clone()
+		});
 	}
 
 	let runtime = github_runtime()?;
@@ -1087,6 +1149,136 @@ pub fn publish_release_pull_request(
 		)
 		.await
 	})
+}
+
+fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
+	source: &SourceConfiguration,
+	request: &GitHubPullRequestRequest,
+	fallback_commit: &str,
+) -> GitHubVerifiedCommitAttempt {
+	if !github_actions_release_commit_verification_enabled(source) {
+		return Ok(fallback_commit.to_string());
+	}
+
+	let runtime = github_runtime().map_err(|error| error.to_string())?;
+	runtime.block_on(async {
+		let client = github_client_from_env(source).map_err(|error| error.to_string())?;
+		let verified_commit = create_verified_github_commit_for_release_pull_request(
+			&client,
+			request,
+			fallback_commit,
+		)
+		.await?;
+		update_github_branch_ref_to_verified_commit(
+			&client,
+			request,
+			fallback_commit,
+			&verified_commit,
+		)
+		.await?;
+		Ok(verified_commit)
+	})
+}
+
+fn github_actions_release_commit_verification_enabled(source: &SourceConfiguration) -> bool {
+	if !source.pull_requests.verified_commits {
+		return false;
+	}
+	if env::var("GITHUB_ACTIONS").as_deref() != Ok("true") {
+		return false;
+	}
+	let repository = format!("{}/{}", source.owner, source.repo);
+	env::var("GITHUB_REPOSITORY").is_ok_and(|value| value.eq_ignore_ascii_case(&repository))
+}
+
+async fn create_verified_github_commit_for_release_pull_request(
+	client: &Octocrab,
+	request: &GitHubPullRequestRequest,
+	fallback_commit: &str,
+) -> GitHubVerifiedCommitAttempt {
+	let commit_path = format!(
+		"/repos/{}/{}/git/commits/{}",
+		request.owner, request.repo, fallback_commit
+	);
+	let original: GitHubGitCommitResponse = get_json(client, &commit_path)
+		.await
+		.map_err(|error| error.to_string())?;
+	let payload = GitHubCreateCommitPayload {
+		message: original.message,
+		tree: original.tree.sha,
+		parents: original
+			.parents
+			.into_iter()
+			.map(|parent| parent.sha)
+			.collect(),
+	};
+	let create_path = format!("/repos/{}/{}/git/commits", request.owner, request.repo);
+	let commit: GitHubGitCommitResponse = post_json(client, &create_path, &payload)
+		.await
+		.map_err(|error| error.to_string())?;
+	if commit.verification.verified {
+		tracing::info!(
+			commit = %commit.sha,
+			reason = ?commit.verification.reason,
+			"created verified GitHub release pull request commit"
+		);
+		return Ok(commit.sha);
+	}
+	Err(format!(
+		"GitHub Git Database API created commit {} without verification ({})",
+		commit.sha,
+		commit
+			.verification
+			.reason
+			.unwrap_or_else(|| "unknown reason".to_string())
+	))
+}
+
+async fn update_github_branch_ref_to_verified_commit(
+	client: &Octocrab,
+	request: &GitHubPullRequestRequest,
+	fallback_commit: &str,
+	verified_commit: &str,
+) -> GitHubVerifiedCommitAttempt {
+	let get_ref_path = github_head_ref_get_path(request);
+	let current: GitHubGitRefResponse = get_json(client, &get_ref_path)
+		.await
+		.map_err(|error| error.to_string())?;
+	if current.object.sha != fallback_commit {
+		return Err(format!(
+			"release branch {} moved from {} to {}; refusing to replace it with verified commit {}",
+			request.head_branch, fallback_commit, current.object.sha, verified_commit
+		));
+	}
+	let payload = GitHubUpdateRefPayload {
+		sha: verified_commit,
+		force: true,
+	};
+	let update_ref_path = github_head_ref_update_path(request);
+	let updated: GitHubGitRefResponse = patch_json(client, &update_ref_path, &payload)
+		.await
+		.map_err(|error| error.to_string())?;
+	if updated.object.sha != verified_commit {
+		return Err(format!(
+			"GitHub returned {} after updating {}, expected {}",
+			updated.object.sha, request.head_branch, verified_commit
+		));
+	}
+	Ok(updated.object.sha)
+}
+
+fn github_head_ref_get_path(request: &GitHubPullRequestRequest) -> String {
+	format!(
+		"/repos/{}/{}/git/ref/heads/{}",
+		request.owner, request.repo, request.head_branch
+	)
+}
+
+fn github_head_ref_update_path(request: &GitHubPullRequestRequest) -> String {
+	format!(
+		"/repos/{}/{}/git/refs/heads/{}",
+		request.owner, request.repo, request.head_branch
+	)
 }
 
 /// Sync existing GitHub releases so retargeted tags point at the new commits.

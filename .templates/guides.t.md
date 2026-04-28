@@ -684,7 +684,7 @@ That means one set of `.changeset/*.md` inputs can drive all of these commands a
 
 - `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload
 - `mc publish-release` previews or publishes provider releases from the structured release notes
-- `mc release-pr` previews or opens an idempotent provider release request
+- `mc release-pr` previews or opens an idempotent provider release request; when `[source.pull_requests].verified_commits = true` and the command runs on GitHub Actions for the configured repository, the GitHub provider pushes a normal release branch commit as a fallback and then only moves the branch to a Git Database API replacement commit when GitHub reports that replacement as verified
 - `mc step:affected-packages` evaluates pull-request changeset policy from CI-supplied changed paths and labels without requiring a config-defined wrapper command
 
 <!-- {/githubAutomationOverview} -->

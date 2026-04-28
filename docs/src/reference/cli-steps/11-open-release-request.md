@@ -41,6 +41,26 @@ when = "{{ inputs.enabled }}"
 - in normal mode, performs git and provider operations needed to open or update the request
 - contributes release-request data to the command result
 
+## GitHub Actions verified commit behavior
+
+<!-- {=cliStepOpenReleaseRequestGitHubActionsVerifiedCommitBehavior} -->
+
+When `OpenReleaseRequest` publishes a GitHub release pull request in normal mode, monochange first uses local git as the durable fallback path: it checks out the release branch, stages the tracked release files, creates the release commit, and pushes that branch before opening or updating the pull request.
+
+When `[source.pull_requests].verified_commits = true` and the command is running inside GitHub Actions for the same repository as `[source]`, the GitHub provider then tries to replace that pushed fallback commit with a GitHub-verified commit:
+
+1. It builds the GitHub API client from `GITHUB_TOKEN` or `GH_TOKEN`.
+2. It reads the pushed fallback commit through the Git Database API.
+3. It creates a new Git commit object with the same message, tree, and parents.
+4. It accepts the replacement only when GitHub returns `verification.verified = true` for the new commit.
+5. It confirms the release branch still points at the fallback commit, then moves the branch ref to the verified commit.
+
+Verified commit replacement is opt-in and defaults to off. Any failure keeps the original pushed git commit in place. That includes missing tokens, non-GitHub Actions environments, repository mismatches, GitHub returning an unverified commit, API errors, or the release branch moving between the fallback push and the ref update. The fallback is intentional: release PR automation should keep working even when verified commit replacement is unavailable.
+
+Dry runs never create commits, push branches, or call the provider APIs. Non-GitHub providers continue to use their normal release-request behavior.
+
+<!-- {/cliStepOpenReleaseRequestGitHubActionsVerifiedCommitBehavior} -->
+
 ## Example
 
 <!-- {=cliStepOpenReleaseRequestExample} -->
