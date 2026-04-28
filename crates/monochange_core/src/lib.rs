@@ -1808,6 +1808,15 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+	/// Verify a commit is reachable from one of the configured release branches.
+	VerifyReleaseBranch {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	/// Publish hosted releases from a prepared `monochange` release.
 	///
 	/// Requires a previous `PrepareRelease` step and `[source]`
@@ -1940,6 +1949,7 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { inputs, .. }
 			| Self::PrepareRelease { inputs, .. }
 			| Self::CommitRelease { inputs, .. }
+			| Self::VerifyReleaseBranch { inputs, .. }
 			| Self::PublishRelease { inputs, .. }
 			| Self::PlaceholderPublish { inputs, .. }
 			| Self::PublishPackages { inputs, .. }
@@ -1963,6 +1973,7 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { name, .. }
 			| Self::PrepareRelease { name, .. }
 			| Self::CommitRelease { name, .. }
+			| Self::VerifyReleaseBranch { name, .. }
 			| Self::PublishRelease { name, .. }
 			| Self::PlaceholderPublish { name, .. }
 			| Self::PublishPackages { name, .. }
@@ -1992,6 +2003,7 @@ impl CliStepDefinition {
 			| Self::CreateChangeFile { when, .. }
 			| Self::PrepareRelease { when, .. }
 			| Self::CommitRelease { when, .. }
+			| Self::VerifyReleaseBranch { when, .. }
 			| Self::PublishRelease { when, .. }
 			| Self::PlaceholderPublish { when, .. }
 			| Self::PublishPackages { when, .. }
@@ -2026,6 +2038,7 @@ impl CliStepDefinition {
 			Self::CreateChangeFile { .. } => "CreateChangeFile",
 			Self::PrepareRelease { .. } => "PrepareRelease",
 			Self::CommitRelease { .. } => "CommitRelease",
+			Self::VerifyReleaseBranch { .. } => "VerifyReleaseBranch",
 			Self::PublishRelease { .. } => "PublishRelease",
 			Self::PlaceholderPublish { .. } => "PlaceholderPublish",
 			Self::PublishPackages { .. } => "PublishPackages",
@@ -2049,6 +2062,7 @@ impl CliStepDefinition {
 		match self {
 			Self::Validate { .. } => Some(&["fix"]),
 			Self::CommitRelease { .. } => Some(&["no_verify"]),
+			Self::VerifyReleaseBranch { .. } => Some(&["from"]),
 			Self::Discover { .. }
 			| Self::DisplayVersions { .. }
 			| Self::PrepareRelease { .. }
@@ -2135,6 +2149,12 @@ impl CliStepDefinition {
 			Self::CommitRelease { .. } => {
 				match name {
 					"no_verify" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
+			Self::VerifyReleaseBranch { .. } => {
+				match name {
+					"from" => Some(CliInputKind::String),
 					_ => None,
 				}
 			}
@@ -3211,6 +3231,14 @@ pub struct ProviderReleaseSettings {
 	pub generate_notes: bool,
 	#[serde(default)]
 	pub source: ProviderReleaseNotesSource,
+	#[serde(default = "default_release_branch_patterns")]
+	pub branches: Vec<String>,
+	#[serde(default = "default_true")]
+	pub enforce_for_tags: bool,
+	#[serde(default = "default_true")]
+	pub enforce_for_publish: bool,
+	#[serde(default)]
+	pub enforce_for_commit: bool,
 }
 
 impl Default for ProviderReleaseSettings {
@@ -3221,6 +3249,10 @@ impl Default for ProviderReleaseSettings {
 			prerelease: false,
 			generate_notes: false,
 			source: ProviderReleaseNotesSource::default(),
+			branches: default_release_branch_patterns(),
+			enforce_for_tags: true,
+			enforce_for_publish: true,
+			enforce_for_commit: false,
 		}
 	}
 }
@@ -3350,6 +3382,10 @@ impl fmt::Display for ChangesetPolicyStatus {
 	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
 		formatter.write_str(self.as_str())
 	}
+}
+
+fn default_release_branch_patterns() -> Vec<String> {
+	vec!["main".to_string()]
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -3763,6 +3799,11 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			name: None,
 			when: None,
 			no_verify: false,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::VerifyReleaseBranch {
+			name: None,
+			when: None,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishRelease {

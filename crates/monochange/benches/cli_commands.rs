@@ -521,6 +521,10 @@ fn bench_prepare_release_apply_cargo_lockfile_refresh(c: &mut Criterion) {
 }
 
 fn bench_prepare_release_with_git_history(c: &mut Criterion) {
+	if std::env::var_os("CARGO_LLVM_COV").is_some() {
+		return;
+	}
+
 	let mut group = c.benchmark_group("prepare_release_git_history");
 	group.sample_size(10);
 

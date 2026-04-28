@@ -42,6 +42,7 @@ use crate::cli_progress::CliProgressReporter;
 use crate::cli_progress::CommandStream;
 use crate::cli_progress::ProgressFormat;
 use crate::maybe_load_prepared_release_execution;
+use crate::release_branch_policy;
 use crate::save_prepared_release_execution;
 use crate::*;
 
@@ -688,7 +689,29 @@ pub(crate) fn execute_cli_command_with_options(
 					output = None;
 					Ok(())
 				}
+				CliStepDefinition::VerifyReleaseBranch { .. } => {
+					let from_ref = step_inputs
+						.get("from")
+						.and_then(|v| v.first().cloned())
+						.unwrap_or_else(|| "HEAD".to_string());
+					let source = configuration.source.as_ref().ok_or_else(|| {
+						MonochangeError::Config(
+							"`VerifyReleaseBranch` requires `[source]` configuration".to_string(),
+						)
+					})?;
+					#[rustfmt::skip]
+					let report = release_branch_policy::verify_release_ref(root, &source.releases, &from_ref)?;
+					output = Some(format!(
+						"release branch verified: `{}` is reachable from `{}`",
+						from_ref, report.matched_branch
+					));
+					Ok(())
+				}
 				CliStepDefinition::PublishRelease { .. } => {
+					let verify_ref = step_inputs
+						.get("from-ref")
+						.and_then(|v| v.first().cloned())
+						.unwrap_or_else(|| "HEAD".to_string());
 					let manifest = if let Some(prepared_release) = context.prepared_release.as_ref()
 					{
 						build_release_manifest(cli_command, prepared_release, &context.command_logs)
@@ -700,6 +723,10 @@ pub(crate) fn execute_cli_command_with_options(
 						let discovery = discover_release_record(root, &from_ref)?;
 						build_release_manifest_from_record(&discovery.record)
 					};
+					if !context.dry_run {
+						#[rustfmt::skip]
+						release_branch_policy::verify_release_ref_for_publish(root, configuration.source.as_ref(), &verify_ref)?;
+					}
 					let source = configuration.source.clone().ok_or_else(|| {
 						MonochangeError::Config(
 							"`PublishRelease` requires `[source]` configuration".to_string(),
@@ -732,6 +759,8 @@ pub(crate) fn execute_cli_command_with_options(
 					let resume_path = optional_publish_resume_artifact_path(&step_inputs)?;
 					let output_path = optional_publish_output_artifact_path(&step_inputs)?;
 					if !context.dry_run {
+						#[rustfmt::skip]
+						release_branch_policy::verify_release_ref_for_publish(root, configuration.source.as_ref(), "HEAD")?;
 						let readiness_path =
 							required_publish_readiness_artifact_path(&step_inputs)?;
 						#[rustfmt::skip]
@@ -770,6 +799,8 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::CommitRelease { no_verify, .. } => {
+					#[rustfmt::skip]
+					release_branch_policy::verify_release_ref_for_commit(root, configuration.source.as_ref(), "HEAD")?;
 					ensure_prepared_release_for_consumer_step(
 						root,
 						configuration,

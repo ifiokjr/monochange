@@ -63,6 +63,7 @@ These files are the current reviewed exceptions inside the orchestration/config 
 
 - `crates/monochange/src/hosted_sources.rs`
 - `crates/monochange/src/release_artifacts.rs`
+- `crates/monochange/src/release_branch_policy.rs`
 - `crates/monochange/src/release_record.rs`
 - `crates/monochange/src/workspace_ops.rs`
 - `crates/monochange/src/package_publish.rs`

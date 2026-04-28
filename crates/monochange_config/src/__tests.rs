@@ -361,6 +361,94 @@ fn load_workspace_configuration_parses_github_release_settings() {
 }
 
 #[test]
+fn load_workspace_configuration_parses_release_branch_policy() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases]
+branches = ["main", "release/*"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = true
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let source = configuration
+		.source
+		.unwrap_or_else(|| panic!("expected source config"));
+
+	assert_eq!(source.releases.branches, vec!["main", "release/*"]);
+	assert!(source.releases.enforce_for_tags);
+	assert!(source.releases.enforce_for_publish);
+	assert!(source.releases.enforce_for_commit);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_blank_release_branch_policy_values() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases]
+branches = ["main", " "]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected blank release branch policy value error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].branches must not include empty values")
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_empty_release_branch_policy() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases]
+branches = []
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected config error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].branches must contain at least one branch pattern")
+	);
+}
+
+#[test]
 fn load_workspace_configuration_parses_github_changeset_bot_settings() {
 	let root = fixture_path("config/github-bot-settings");
 	let configuration = load_workspace_configuration(&root)

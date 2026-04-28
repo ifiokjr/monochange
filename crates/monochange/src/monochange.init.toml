@@ -596,13 +596,19 @@ provider = "{{ provider }}"
 owner = "{{ owner }}"
 repo = "{{ repo }}"
 
-# [source.releases] — provider release settings
+# [source.releases] — provider release settings and release branch policy
 #
 # Controls whether and how releases are created on the provider when the
-# PublishRelease CLI step runs.
+# PublishRelease CLI step runs. Release refs are verified by commit reachability.
+# Tags and publish steps are enforced by default; commit-release stays flexible
+# unless you opt in.
 [source.releases]
 enabled = true
 source = "monochange"
+branches = ["main"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
 
 # [source.pull_requests] — release pull request settings
 #
@@ -622,25 +628,35 @@ auto_merge = false
 # owner = "your-org"
 # repo = "your-repo"
 
-# [source.releases] — provider release settings
+# [source.releases] — provider release settings and release branch policy
 #
 # Controls whether and how releases are created on the provider when the
-# PublishRelease CLI step runs.
+# PublishRelease CLI step runs. Release refs are verified by commit reachability.
+# Tags and publish steps are enforced by default; commit-release stays flexible
+# unless you opt in.
 #
 # Fields:
-#   enabled        — enable/disable release creation (default: true)
-#   draft          — create releases as drafts (default: false)
-#   prerelease     — mark releases as pre-releases (default: false)
-#   generate_notes — ask the provider to auto-generate release notes (default: false)
-#   source         — release notes source: "monochange" (use monochange-rendered
-#                    notes) or "github_generated" (use provider-generated notes)
-#                    Default: "monochange"
+#   enabled             — enable/disable release creation (default: true)
+#   draft               — create releases as drafts (default: false)
+#   prerelease          — mark releases as pre-releases (default: false)
+#   generate_notes      — ask the provider to auto-generate release notes (default: false)
+#   source              — release notes source: "monochange" (use monochange-rendered
+#                         notes) or "github_generated" (use provider-generated notes)
+#                         Default: "monochange"
+#   branches            — release branch names or globs, e.g. ["main", "release/*"]
+#   enforce_for_tags    — reject unsafe tag-release refs (default: true)
+#   enforce_for_publish — reject unsafe publish refs (default: true)
+#   enforce_for_commit  — reject unsafe commit-release refs (default: false)
 #
 # [source.releases]
 # enabled = true
 # draft = false
 # prerelease = false
 # source = "monochange"
+# branches = ["main"]
+# enforce_for_tags = true
+# enforce_for_publish = true
+# enforce_for_commit = false
 
 # [source.pull_requests] — release pull request settings
 #

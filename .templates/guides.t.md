@@ -44,6 +44,12 @@ draft = false
 prerelease = false
 source = "monochange"
 
+[source.releases]
+branches = ["main", "release/*"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
+
 [source.pull_requests]
 enabled = true
 branch_prefix = "monochange/release"
@@ -378,6 +384,12 @@ draft = false
 prerelease = false
 source = "monochange"
 
+[source.releases]
+branches = ["main", "release/*"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
+
 [source.pull_requests]
 enabled = true
 branch_prefix = "monochange/release"
@@ -459,7 +471,7 @@ Current implementation notes:
 - `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven CLI commands documented here
 - `[ecosystems.*].enabled/roots/exclude` are parsed, but discovery still scans all supported ecosystems regardless of those settings today
 - `defaults.strict_version_conflicts` controls whether conflicting explicit `version` entries across changesets warn-and-pick-highest (default) or fail planning outright
-- source automation expects `[source]` with provider-specific settings under `[source.releases]`, `[source.pull_requests]`, and `[source.bot.changesets]`; GitHub remains the default provider
+- source automation expects `[source]` with provider release settings and release branch policy under `[source.releases]`, pull request settings under `[source.pull_requests]`, and bot settings under `[source.bot.changesets]`; GitHub remains the default provider
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
@@ -727,6 +739,12 @@ repo = "monochange"
 [source.releases]
 enabled = true
 source = "monochange"
+
+[source.releases]
+branches = ["main"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
 
 [source.pull_requests]
 enabled = true

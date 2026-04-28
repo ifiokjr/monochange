@@ -3088,6 +3088,21 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 			"[source.pull_requests].title must not be empty".to_string(),
 		));
 	}
+	if source.releases.branches.is_empty() {
+		return Err(MonochangeError::Config(
+			"[source.releases].branches must contain at least one branch pattern".to_string(),
+		));
+	}
+	if source
+		.releases
+		.branches
+		.iter()
+		.any(|branch| branch.trim().is_empty())
+	{
+		return Err(MonochangeError::Config(
+			"[source.releases].branches must not include empty values".to_string(),
+		));
+	}
 	if source
 		.pull_requests
 		.labels

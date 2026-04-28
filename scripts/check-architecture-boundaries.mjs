@@ -8,6 +8,7 @@ const monitoredRoots = ["crates/monochange/src", "crates/monochange_config/src"]
 const allowlist = new Set([
 	"crates/monochange/src/hosted_sources.rs",
 	"crates/monochange/src/release_artifacts.rs",
+	"crates/monochange/src/release_branch_policy.rs",
 	"crates/monochange/src/release_record.rs",
 	"crates/monochange/src/versioned_files.rs",
 	"crates/monochange/src/workspace_ops.rs",

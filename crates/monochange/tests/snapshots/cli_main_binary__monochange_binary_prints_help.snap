@@ -35,6 +35,7 @@ Commands:
   step:create-change-file        Run the `step:create-change-file` command
   step:prepare-release           Run the `step:prepare-release` command
   step:commit-release            Run the `step:commit-release` command
+  step:verify-release-branch     Run the `step:verify-release-branch` command
   step:publish-release           Run the `step:publish-release` command
   step:placeholder-publish       Run the `step:placeholder-publish` command
   step:publish-packages          Run the `step:publish-packages` command
