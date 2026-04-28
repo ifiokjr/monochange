@@ -2808,6 +2808,10 @@ jobs:
 			manual_setup_url(&sample_request(RegistryKind::Jsr)),
 			"https://jsr.io/@scope/pkg".to_string()
 		);
+		assert_eq!(
+			manual_setup_url(&sample_request(RegistryKind::Pypi)),
+			"https://pypi.org/manage/project/pkg/settings/publishing/".to_string()
+		);
 		assert_eq!(trust_docs_url(RegistryKind::Npm), NPM_TRUST_DOCS_URL);
 		assert_eq!(
 			trust_docs_url(RegistryKind::CratesIo),
@@ -2815,6 +2819,7 @@ jobs:
 		);
 		assert_eq!(trust_docs_url(RegistryKind::PubDev), DART_TRUST_DOCS_URL);
 		assert_eq!(trust_docs_url(RegistryKind::Jsr), JSR_TRUST_DOCS_URL);
+		assert_eq!(trust_docs_url(RegistryKind::Pypi), PYPI_TRUST_DOCS_URL);
 	}
 
 	#[test]
@@ -3136,6 +3141,10 @@ jobs:
 			when.method(GET).path("/missing");
 			then.status(404);
 		});
+		server.mock(|when, then| {
+			when.method(GET).path("/missing/json");
+			then.status(404);
+		});
 		let client = Client::builder().build().expect("http client:");
 		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
@@ -3151,6 +3160,13 @@ jobs:
 			..request
 		};
 		assert!(!registry_version_exists(&client, &endpoints, &request).expect("missing:"));
+		let pypi_request = PublishRequest {
+			package_name: "missing".to_string(),
+			..sample_request(RegistryKind::Pypi)
+		};
+		assert!(
+			!registry_version_exists(&client, &endpoints, &pypi_request).expect("PyPI missing:")
+		);
 	}
 
 	#[test]
@@ -3774,6 +3790,57 @@ jobs:
 				.join("example_pkg_name")
 				.join("__init__.py")
 				.is_file()
+		);
+
+		let digit_request = PublishRequest {
+			package_name: "123-pkg".to_string(),
+			..sample_request(RegistryKind::Pypi)
+		};
+		let digit_python = build_placeholder_directory(tempdir.path(), &digit_request, None)
+			.expect("digit Python placeholder:");
+		assert!(
+			digit_python
+				.path()
+				.join("src")
+				.join("placeholder_123_pkg")
+				.join("__init__.py")
+				.is_file()
+		);
+	}
+
+	#[test]
+	fn python_placeholder_manifest_writers_report_io_errors() {
+		let request = sample_request(RegistryKind::Pypi);
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+		fs::create_dir(tempdir.path().join("pyproject.toml")).expect("create pyproject dir");
+		let error = write_python_placeholder_manifest(tempdir.path(), &request, None)
+			.expect_err("pyproject write should fail");
+		assert!(
+			error
+				.to_string()
+				.contains("failed to write placeholder pyproject.toml")
+		);
+
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+		fs::write(tempdir.path().join("src"), "not a directory").expect("write src file");
+		let error = write_python_placeholder_manifest(tempdir.path(), &request, None)
+			.expect_err("package directory create should fail");
+		assert!(
+			error
+				.to_string()
+				.contains("failed to create placeholder Python package")
+		);
+
+		let tempdir = tempfile::tempdir().expect("tempdir:");
+		let module_dir = tempdir.path().join("src").join("pkg");
+		fs::create_dir_all(&module_dir).expect("create module dir");
+		fs::create_dir(module_dir.join("__init__.py")).expect("create init dir");
+		let error = write_python_placeholder_manifest(tempdir.path(), &request, None)
+			.expect_err("module write should fail");
+		assert!(
+			error
+				.to_string()
+				.contains("failed to write placeholder Python package module")
 		);
 	}
 
