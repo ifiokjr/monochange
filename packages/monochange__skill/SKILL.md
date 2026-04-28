@@ -77,6 +77,7 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 | `mc change`                   | Create a `.changeset/*.md` file                                        |
 | `mc release`                  | Prepare a release plan from changesets and refresh the cached manifest |
 | `mc placeholder-publish`      | Publish placeholder versions for packages missing from registries      |
+| `mc publish-bootstrap`        | Bootstrap release package placeholders and write a result artifact     |
 | `mc publish-readiness`        | Check package-registry readiness and write a validation artifact       |
 | `mc publish-plan --readiness` | Plan rate-limit batches from ready package work only                   |
 | `mc publish --readiness`      | Publish package artifacts using built-in registry workflows            |
@@ -167,7 +168,8 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - Built-in publishing currently supports only the canonical public registries: `crates.io`, `npm`, `jsr`, and `pub.dev`. Python packages are release-planned but PyPI publishing should use `mode = "external"` or custom CI today.
 - `mc publish-readiness` blocks built-in Cargo publishes to crates.io when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`. Workspace-inherited Cargo metadata is accepted.
 - `mc publish-plan --readiness <path>` validates a readiness artifact for the current release record and excludes package ids that are not ready in both the artifact and the fresh local readiness check. Placeholder planning does not accept readiness artifacts.
-- `mc placeholder-publish` exists for first-release bootstrap. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
+- `mc publish-bootstrap --from HEAD --output <path>` is the release-scoped first-release bootstrap command. It reads package ids from the release record, runs placeholder publishing, writes a JSON result artifact, and should be followed by a fresh `mc publish-readiness` run.
+- `mc placeholder-publish` remains the lower-level bootstrap command. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
 - Placeholder README content can come from `publish.placeholder.readme` or `publish.placeholder.readme_file`.
 - `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.
 - npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, and monochange verifies the trust state before changing it.

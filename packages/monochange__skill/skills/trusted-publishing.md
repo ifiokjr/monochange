@@ -81,12 +81,11 @@ Use the same environment name in both places.
 Use this sequence when adopting trusted publishing across an existing workspace:
 
 1. Set `publish.trusted_publishing = true` for the target ecosystem or package.
-2. Run `mc placeholder-publish --dry-run` to see which packages do not exist yet.
-3. If needed, run `mc placeholder-publish` so the package exists in the registry first.
+2. Generate readiness with `mc publish-readiness --from HEAD --output .monochange/readiness.json`.
+3. If readiness shows first-time package setup is needed, run `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json`.
 4. Complete the registry-side trusted-publishing setup for each package.
-5. Run `mc publish --dry-run` to confirm monochange now sees the trust configuration it expects.
-6. Generate a readiness artifact with `mc publish-readiness --from HEAD --output .monochange/readiness.json`.
-7. Publish from CI with `mc publish --readiness .monochange/readiness.json`.
+5. Rerun `mc publish-readiness --from HEAD --output .monochange/readiness.json`.
+6. Publish from CI with `mc publish --readiness .monochange/readiness.json`.
 
 Placeholder publishing is especially useful when the package name is reserved but the real release is not ready yet.
 
@@ -184,7 +183,7 @@ Trusted publishing on crates.io exchanges your CI identity for a short-lived pub
 - you must be an owner of the crate on `crates.io`
 - the repository must live on GitHub or GitLab
 
-If the crate does not exist yet, bootstrap it first with a real initial release or `mc placeholder-publish`. The first publish still uses the normal crates.io token flow.
+If the crate does not exist yet, bootstrap it first with a real initial release or `mc publish-bootstrap --from HEAD --output <path>`. The first publish still uses the normal crates.io token flow.
 
 **UI path**
 
@@ -309,7 +308,7 @@ Automated publishing on pub.dev authenticates with a temporary GitHub-signed OID
 - you must be an uploader or admin for the package
 - the repository must be on GitHub
 
-If the package does not exist yet, publish it once first or use `mc placeholder-publish`.
+If the package does not exist yet, publish it once first or use `mc publish-bootstrap --from HEAD --output <path>`.
 
 **UI path**
 

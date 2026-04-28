@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_help.rs
+assertion_line: 47
 info:
   program: mc
   args:
@@ -36,6 +37,7 @@ error: Unknown command `nonexistent`
   validate             Validate monochange configuration and changesets
   discover             Discover packages across supported ecosystems
   publish-readiness    Check package registry publishing readiness without publishing packages
+  publish-bootstrap    Publish first-time placeholder package versions for a release record
   placeholder-publish  Publish placeholder versions for missing registry packages
   publish-packages     Publish package versions from release state
 

@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
+assertion_line: 19
 info:
   program: monochange
   args:
@@ -22,6 +23,7 @@ Commands:
   analyze                        Analyze semantic changes for one package across main, head, and optional release baselines
   release-record                 Inspect the monochange release record associated with a tag or commit
   publish-readiness              Check package registry publishing readiness without publishing packages
+  publish-bootstrap              Publish first-time placeholder package versions for a release record
   tag-release                    Create and push release tags from the monochange release record on a commit
   lint                           Inspect and scaffold manifest lint rules
   mcp                            Start the monochange MCP (Model Context Protocol) server over stdin/stdout

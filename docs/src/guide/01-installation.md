@@ -80,6 +80,8 @@ mc release-pr --dry-run --format json
 mc release-record --from v1.2.3
 mc tag-release --from HEAD --dry-run --format json
 mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
+mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish --readiness .monochange/readiness.json
 mc repair-release --from v1.2.3 --target HEAD --dry-run

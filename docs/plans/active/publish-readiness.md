@@ -1,83 +1,90 @@
-# Publish readiness and publish planning
+# Publish readiness, planning, and bootstrap
 
 ## Status
 
-- Previous slices: `mc publish-readiness` shipped in PR #292; readiness artifact enforcement shipped in PR #301; Cargo-first publish-readiness blockers shipped in PR #303.
-- Current branch: `feat/publish-plan-readiness`.
-- Current slice: add readiness-artifact support to `mc publish-plan --readiness <path>` so publish rate-limit plans exclude non-ready package work.
+- Previous slices shipped `mc publish-readiness` (PR #292), readiness artifact enforcement in `mc publish` (PR #301), Cargo-first publish-readiness blockers (PR #303), and `mc publish-plan --readiness <path>` (PR #305).
+- Current branch: `feat/publish-bootstrap-command`.
+- Current slice: add `mc publish-bootstrap --from <ref> --output <path>` so first-time placeholder package setup is release-record scoped and leaves a JSON result artifact.
 
 ## Problem
 
-Readiness artifacts protect `mc publish` from stale package sets, but the readiness check still mostly reflected registry dry-run status. Cargo packages can be known to fail crates.io publication before mutation when the current manifest opts out of publication or omits required crates.io metadata. monochange should catch those blockers during readiness and enforce the same result before real publish.
+`mc placeholder-publish` can reserve package names, but it is not tied to a durable release record and does not write an artifact that explains which release package set was bootstrapped. The recommended package publishing lifecycle now uses readiness artifacts as a boundary before real registry mutation. First-time package setup needs the same explicit, CLI-first shape:
+
+1. generate readiness for the release commit,
+2. bootstrap missing packages if readiness identifies first-time registry setup,
+3. rerun readiness,
+4. plan/publish from the fresh readiness artifact.
 
 ## Scope
 
-This slice covers built-in Cargo publishes to crates.io:
+This slice adds a top-level `mc publish-bootstrap` command that:
 
-- Block current manifests with `publish = false`.
-- Block current manifests with `publish = [...]` when the registry list does not include `crates-io`.
-- Block missing `description`.
-- Block missing both `license` and `license-file`.
-- Accept workspace-inherited `description`, `license`, and `license-file` from `[workspace.package]`.
-- Keep already-published versions non-blocking when current readiness and the saved artifact agree.
-- Surface blocked dry-runs as readiness `blocked`, and reject real publishing before any publish command runs.
+- requires `--from <ref>` and discovers the release record from that ref,
+- selects package ids from the release record, optionally intersected with repeated `--package <id>` filters,
+- runs the existing placeholder publishing flow for the selected release package set,
+- supports `--dry-run`, `--format text|markdown|json`, and `--output <path>`,
+- writes a JSON artifact with `kind = "monochange.publishBootstrap"`, the resolved/release-record commits, selected package ids, and the placeholder publish report.
 
 ## Non-goals for this slice
 
-- Cargo dependency packaging checks beyond existing `cargo publish` behavior.
-- Automated crates.io trusted-publisher enrollment.
-- npm, JSR, or pub.dev metadata-specific readiness expansion.
-- Full manifest/lockfile artifact hashing.
-- Retry/resume or `mc publish-bootstrap` implementation.
+- Retry/resume semantics for real package publishing.
+- Readiness artifact validation of bootstrap result artifacts.
+- Automated registry-side trusted-publisher enrollment.
+- Replacing the lower-level `mc placeholder-publish` command.
 
 ## Affected files
 
-- `crates/monochange/src/package_publish.rs`
-- `crates/monochange/src/publish_readiness.rs`
-- `crates/monochange/src/cli_runtime.rs`
+- `crates/monochange/src/publish_bootstrap.rs`
+- `crates/monochange/src/cli.rs`
+- `crates/monochange/src/lib.rs`
+- `crates/monochange/src/cli_help.rs`
+- `crates/monochange/src/__tests.rs`
 - `docs/src/guide/13-ci-and-publishing.md`
-- `docs/src/reference/cli-steps/16-publish-packages.md`
 - `docs/src/readme.md`
 - `readme.md`
+- `.templates/project.t.md`
 - `packages/monochange__skill/SKILL.md`
+- `packages/monochange__skill/skills/commands.md`
 - `packages/monochange__skill/skills/reference.md`
 - `packages/monochange__skill/skills/trusted-publishing.md`
-- `.changeset/publish-readiness-cargo-guards.md`
+- `.changeset/publish-bootstrap-command.md`
 
 ## Checklist
 
-- [x] Create isolated worktree and branch `feat/publish-readiness-cargo-guards`.
-- [x] Add Cargo manifest readiness blockers.
-- [x] Map blocked publish dry-runs to blocked readiness status.
-- [x] Reject real publish before registry mutation when blockers are present.
-- [x] Add focused unit coverage for missing metadata, `publish = false`, publish registry arrays, workspace inheritance, dry-run blocking, and real-publish rejection.
-- [x] Update user docs and packaged skill docs for Cargo readiness behavior.
-- [ ] Run formatting and lint checks.
-- [ ] Run full validation.
-- [ ] Run coverage and confirm 100% patch coverage.
+- [x] Create isolated worktree and branch `feat/publish-bootstrap-command`.
+- [x] Add release-record-scoped publish bootstrap command.
+- [x] Add JSON bootstrap result artifact writing.
+- [x] Add focused unit and CLI dispatch coverage.
+- [x] Update user docs and packaged skill docs.
+- [x] Run formatting and lint checks.
+- [x] Run full validation.
+- [ ] Run coverage and confirm 100% patch coverage after commit.
 - [ ] Push branch and open PR.
 - [ ] Merge after required checks pass.
 
 ## Validation log
 
 - [x] `devenv shell cargo fmt`
-- [x] `devenv shell cargo test -p monochange cargo_publish_readiness_blockers --lib`
-- [x] `devenv shell cargo test -p monochange execute_publish_requests_marks_dry_run_cargo_metadata_blockers --lib`
-- [x] `devenv shell cargo test -p monochange execute_publish_requests_rejects_real_cargo_metadata_blockers --lib`
-- [x] `devenv shell cargo test -p monochange publish_readiness --lib`
-- [x] `devenv shell cargo test -p monochange package_publish_status_label --lib`
+- [x] `devenv shell cargo test -p monochange publish_bootstrap --lib`
+- [x] `devenv shell cargo test -p monochange publish_bootstrap_dispatches_from_release_record_and_writes_artifact --lib`
+- [x] `devenv shell cargo test -p monochange render_command_help_for_publish_bootstrap --lib`
+- [x] `devenv shell cargo test -p monochange cli_help_returns_success_output --lib`
+- [x] `devenv shell mc validate`
+- [x] `devenv shell lint:test`
+- [x] `devenv shell mdt check`
+- [x] `devenv shell coverage:all`
+- [x] `CI=false devenv shell build:all`
+- [ ] `devenv shell coverage:patch` after commit
 
 ## Decisions
 
-- Validate the current manifest immediately after registry existence checks. Already-published versions are still skipped before manifest checks, which preserves idempotent/resumable publishes.
-- Limit this first ecosystem-specific guard to built-in Cargo publishes targeting crates.io.
-- Treat `repository`, `homepage`, and `documentation` as useful recommendations but not hard blockers for this slice.
-- Keep first-time bootstrap separate from readiness; `publish = false` or missing crates.io metadata should be fixed before built-in publication.
+- Keep bootstrap separate from readiness. A bootstrap artifact records first-time setup work, but `mc publish` still requires a fresh readiness artifact before real package publishing.
+- Scope bootstrap selection to the release record. Repeated `--package` filters intersect with release-record package ids instead of bootstrapping arbitrary workspace packages.
+- Keep `mc placeholder-publish` available as the lower-level escape hatch for reserving names outside a release-scoped lifecycle.
 
 ## Follow-up roadmap
 
 - [ ] Add deeper freshness checks for workspace config, manifests, lockfiles, and publish tooling inputs.
-- [x] Add optional readiness consumption to `mc publish-plan`.
 - [ ] Expand npm readiness semantics second.
-- [ ] Add `mc publish-bootstrap` for first-time package setup.
+- [x] Add `mc publish-bootstrap` for first-time package setup.
 - [ ] Design retry/resume around explicit readiness for remaining work.
