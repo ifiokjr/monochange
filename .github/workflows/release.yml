@@ -18,6 +18,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ inputs.tag || github.event.release.tag_name }}
   cancel-in-progress: true
 
+env:
+  RELEASE_BRANCH: main
+
 jobs:
   upload_assets:
     env:
@@ -57,6 +60,31 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ inputs.checkout_ref && github.ref_name || env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: verify release ref is on release branch
+        shell: bash
+        run: |
+          git fetch --no-tags origin \
+            "+refs/heads/${RELEASE_BRANCH}:refs/remotes/origin/${RELEASE_BRANCH}"
+
+          tag_commit="$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")"
+          branch_ref="refs/remotes/origin/${RELEASE_BRANCH}"
+          checkout_commit="$(git rev-parse --verify HEAD)"
+
+          echo "Release tag: ${RELEASE_TAG} (${tag_commit})"
+          echo "Release branch: ${branch_ref} ($(git rev-parse --verify "${branch_ref}"))"
+          echo "Checked out commit: ${checkout_commit}"
+
+          if ! git merge-base --is-ancestor "${tag_commit}" "${branch_ref}"; then
+            echo "::error::Release tag ${RELEASE_TAG} (${tag_commit}) is not reachable from origin/${RELEASE_BRANCH}."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "${checkout_commit}" "${branch_ref}"; then
+            echo "::error::Checked out release source ${checkout_commit} is not reachable from origin/${RELEASE_BRANCH}."
+            exit 1
+          fi
 
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@stable
