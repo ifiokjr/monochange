@@ -1,0 +1,14 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[changelog.sections.magic]
+heading = "Magic"
+priority = 100
+
+[changelog.types.unicorns]
+section = "magic"
+bump = "minor"
+
+[lints.rules]
+"changesets/types/unicorns" = { level = "error", required_bump = "minor", required_sections = ["Rainbow"] }

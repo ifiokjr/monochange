@@ -126,6 +126,10 @@ use monochange_core::VersionedFileDefinition;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
 use monochange_core::default_cli_commands;
+use monochange_core::lint::ChangesetLintSettings;
+use monochange_core::lint::ChangesetScopedLintSettings;
+use monochange_core::lint::ChangesetSummaryLintSettings;
+use monochange_core::lint::LintRuleConfig;
 use monochange_core::lint::WorkspaceLintSettings;
 use monochange_core::relative_to_root;
 use regex::Regex;
@@ -1218,6 +1222,9 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 	validate_cli(&cli)?;
 	validate_changelog_configuration(&contents, &changelog, &packages, &groups)?;
 	validate_changesets_configuration(&changesets, &packages)?;
+	let changelog = build_changelog_settings(changelog);
+	let changeset_lints = changeset_lint_settings_from_rules(&lints.rules)?;
+	validate_changeset_lint_settings(&changeset_lints, &changelog)?;
 	validate_source_configuration(source.as_ref())?;
 	for (ecosystem_id, ecosystem_settings) in [
 		("cargo", &cargo_ecosystem),
@@ -1259,7 +1266,7 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 			release_title: defaults.release_title,
 			changelog_version_title: defaults.changelog_version_title,
 		},
-		changelog: build_changelog_settings(changelog),
+		changelog,
 		packages,
 		groups,
 		cli,
@@ -1283,6 +1290,7 @@ struct ChangeTypeLookup {
 
 #[derive(Debug)]
 pub struct ChangesetLoadContext<'a> {
+	configuration: &'a WorkspaceConfiguration,
 	package_ids: HashSet<&'a str>,
 	groups_by_id: HashMap<&'a str, &'a GroupDefinition>,
 	package_reference_matches: HashMap<String, Vec<&'a str>>,
@@ -1350,6 +1358,7 @@ pub fn build_changeset_load_context<'a>(
 		);
 	}
 	ChangesetLoadContext {
+		configuration,
 		package_ids,
 		groups_by_id,
 		package_reference_matches,
@@ -1760,6 +1769,9 @@ fn parse_markdown_change_file_with_context(
 			caused_by,
 		});
 	}
+
+	let lint_settings = changeset_lint_settings_from_rules(&context.configuration.lints.rules)?;
+	lint_markdown_changeset(body, &changes, &lint_settings, changes_path)?;
 
 	Ok(RawChangeFile { changes })
 }
@@ -2241,6 +2253,409 @@ fn markdown_change_text(body: &str) -> (Option<String>, Option<String>) {
 			Some(normalized_details)
 		},
 	)
+}
+
+fn changeset_lint_settings_from_rules(
+	rules: &BTreeMap<String, LintRuleConfig>,
+) -> MonochangeResult<ChangesetLintSettings> {
+	let mut settings = ChangesetLintSettings::default();
+	for (rule_id, config) in rules {
+		if !rule_id.starts_with("changesets/") || !config.severity().is_enabled() {
+			continue;
+		}
+		match rule_id.as_str() {
+			"changesets/duplicate" => {}
+			"changesets/no_section_headings" => settings.no_section_headings = true,
+			"changesets/summary" => {
+				settings.summary = changeset_summary_lint_settings_from_rule(rule_id, config)?;
+			}
+			_ => {
+				if let Some(bump) = rule_id.strip_prefix("changesets/bump/") {
+					let Some(bump) = parse_bump_severity(bump) else {
+						return Err(MonochangeError::Config(format!(
+							"[lints.rules].{rule_id} uses an unknown bump severity"
+						)));
+					};
+					settings.bump.insert(
+						bump,
+						changeset_scoped_lint_settings_from_rule(rule_id, config)?,
+					);
+				} else if let Some(change_type) = rule_id.strip_prefix("changesets/types/") {
+					if change_type.trim().is_empty() {
+						return Err(MonochangeError::Config(
+							"[lints.rules].changesets/types/<type> must include a type name"
+								.to_string(),
+						));
+					}
+					settings.types.insert(
+						change_type.to_string(),
+						changeset_scoped_lint_settings_from_rule(rule_id, config)?,
+					);
+				}
+			}
+		}
+	}
+	Ok(settings)
+}
+
+fn changeset_summary_lint_settings_from_rule(
+	rule_id: &str,
+	config: &LintRuleConfig,
+) -> MonochangeResult<ChangesetSummaryLintSettings> {
+	Ok(ChangesetSummaryLintSettings {
+		required: lint_bool_option(rule_id, config, "required")?.unwrap_or(false),
+		heading_level: lint_usize_option(rule_id, config, "heading_level")?,
+		min_length: lint_usize_option(rule_id, config, "min_length")?,
+		max_length: lint_usize_option(rule_id, config, "max_length")?,
+		forbid_trailing_period: lint_bool_option(rule_id, config, "forbid_trailing_period")?
+			.unwrap_or(false),
+		forbid_conventional_commit_prefix: lint_bool_option(
+			rule_id,
+			config,
+			"forbid_conventional_commit_prefix",
+		)?
+		.unwrap_or(false),
+	})
+}
+
+fn changeset_scoped_lint_settings_from_rule(
+	rule_id: &str,
+	config: &LintRuleConfig,
+) -> MonochangeResult<ChangesetScopedLintSettings> {
+	Ok(ChangesetScopedLintSettings {
+		required_sections: lint_string_list_option(rule_id, config, "required_sections")?
+			.unwrap_or_default(),
+		min_body_chars: lint_usize_option(rule_id, config, "min_body_chars")?,
+		max_body_chars: lint_usize_option(rule_id, config, "max_body_chars")?,
+		require_code_block: lint_bool_option(rule_id, config, "require_code_block")?
+			.unwrap_or(false),
+		required_bump: lint_bump_option(rule_id, config, "required_bump")?,
+		forbidden_headings: lint_string_list_option(rule_id, config, "forbidden_headings")?
+			.unwrap_or_default(),
+	})
+}
+
+fn lint_bool_option(
+	rule_id: &str,
+	config: &LintRuleConfig,
+	key: &str,
+) -> MonochangeResult<Option<bool>> {
+	let Some(value) = config.option(key) else {
+		return Ok(None);
+	};
+	value.as_bool().map(Some).ok_or_else(|| {
+		MonochangeError::Config(format!("[lints.rules].{rule_id}.{key} must be a boolean"))
+	})
+}
+
+fn lint_usize_option(
+	rule_id: &str,
+	config: &LintRuleConfig,
+	key: &str,
+) -> MonochangeResult<Option<usize>> {
+	let Some(value) = config.option(key) else {
+		return Ok(None);
+	};
+	let Some(value) = value.as_u64().and_then(|value| usize::try_from(value).ok()) else {
+		return Err(MonochangeError::Config(format!(
+			"[lints.rules].{rule_id}.{key} must be a non-negative integer"
+		)));
+	};
+	Ok(Some(value))
+}
+
+fn lint_string_list_option(
+	rule_id: &str,
+	config: &LintRuleConfig,
+	key: &str,
+) -> MonochangeResult<Option<Vec<String>>> {
+	let Some(value) = config.option(key) else {
+		return Ok(None);
+	};
+	let Some(values) = value.as_array() else {
+		return Err(MonochangeError::Config(format!(
+			"[lints.rules].{rule_id}.{key} must be a string array"
+		)));
+	};
+	let mut strings = Vec::new();
+	for value in values {
+		let Some(value) = value.as_str() else {
+			return Err(MonochangeError::Config(format!(
+				"[lints.rules].{rule_id}.{key} must be a string array"
+			)));
+		};
+		strings.push(value.to_string());
+	}
+	Ok(Some(strings))
+}
+
+fn lint_bump_option(
+	rule_id: &str,
+	config: &LintRuleConfig,
+	key: &str,
+) -> MonochangeResult<Option<BumpSeverity>> {
+	let Some(value) = config.option(key) else {
+		return Ok(None);
+	};
+	let Some(value) = value.as_str() else {
+		return Err(MonochangeError::Config(format!(
+			"[lints.rules].{rule_id}.{key} must be a bump severity string"
+		)));
+	};
+	parse_bump_severity(value).map(Some).ok_or_else(|| {
+		MonochangeError::Config(format!(
+			"[lints.rules].{rule_id}.{key} uses an unknown bump severity"
+		))
+	})
+}
+
+fn lint_markdown_changeset(
+	body: &str,
+	changes: &[RawChangeEntry],
+	settings: &ChangesetLintSettings,
+	changes_path: &Path,
+) -> MonochangeResult<()> {
+	lint_markdown_summary(body, settings, changes_path)?;
+
+	if settings.no_section_headings {
+		lint_markdown_no_section_headings(body, changes, changes_path)?;
+	}
+
+	for change in changes {
+		if let Some(bump) = change.bump
+			&& let Some(scoped) = settings.bump.get(&bump)
+		{
+			lint_markdown_scope(body, change, scoped, changes_path)?;
+		}
+		if let Some(change_type) = &change.change_type
+			&& let Some(scoped) = changeset_type_lint_settings(settings, change_type)
+		{
+			lint_markdown_scope(body, change, scoped, changes_path)?;
+		}
+	}
+
+	Ok(())
+}
+
+fn lint_markdown_no_section_headings(
+	body: &str,
+	changes: &[RawChangeEntry],
+	changes_path: &Path,
+) -> MonochangeResult<()> {
+	let change_types = changes
+		.iter()
+		.filter_map(|change| change.change_type.as_deref())
+		.collect::<BTreeSet<_>>();
+	for change_type in change_types {
+		if markdown_has_heading(body, change_type) {
+			return Err(changeset_lint_error(
+				changes_path,
+				format!("changeset type `{change_type}` must not also be used as a heading"),
+			));
+		}
+	}
+	Ok(())
+}
+
+fn changeset_type_lint_settings<'settings>(
+	settings: &'settings ChangesetLintSettings,
+	change_type: &str,
+) -> Option<&'settings ChangesetScopedLintSettings> {
+	settings.types.get(change_type).or_else(|| {
+		settings.types.iter().find_map(|(configured_type, scoped)| {
+			configured_type
+				.eq_ignore_ascii_case(change_type)
+				.then_some(scoped)
+		})
+	})
+}
+
+fn lint_markdown_summary(
+	body: &str,
+	settings: &ChangesetLintSettings,
+	changes_path: &Path,
+) -> MonochangeResult<()> {
+	let summary_settings = &settings.summary;
+	let Some(first_line) = first_non_empty_line(body) else {
+		if summary_settings.required {
+			return Err(changeset_lint_error(
+				changes_path,
+				"changeset body must start with a summary heading",
+			));
+		}
+		return Ok(());
+	};
+
+	let heading_level = markdown_heading_level(first_line);
+	if summary_settings.required && heading_level.is_none() {
+		return Err(changeset_lint_error(
+			changes_path,
+			"changeset body must start with a summary heading",
+		));
+	}
+	if let (Some(required_level), Some(actual_level)) =
+		(summary_settings.heading_level, heading_level)
+		&& actual_level != required_level
+	{
+		return Err(changeset_lint_error(
+			changes_path,
+			format!(
+				"changeset summary heading must use level {required_level}, found level {actual_level}"
+			),
+		));
+	}
+
+	let summary =
+		markdown_heading_text(first_line).unwrap_or_else(|| first_line.trim().to_string());
+	if let Some(min_length) = summary_settings.min_length
+		&& summary.chars().count() < min_length
+	{
+		return Err(changeset_lint_error(
+			changes_path,
+			format!("changeset summary must be at least {min_length} characters"),
+		));
+	}
+	if let Some(max_length) = summary_settings.max_length
+		&& summary.chars().count() > max_length
+	{
+		return Err(changeset_lint_error(
+			changes_path,
+			format!("changeset summary must be at most {max_length} characters"),
+		));
+	}
+	if summary_settings.forbid_trailing_period && summary.ends_with('.') {
+		return Err(changeset_lint_error(
+			changes_path,
+			"changeset summary must not end with a period",
+		));
+	}
+	if summary_settings.forbid_conventional_commit_prefix
+		&& has_conventional_commit_prefix(&summary)
+	{
+		return Err(changeset_lint_error(
+			changes_path,
+			"changeset summary must not use a conventional-commit prefix",
+		));
+	}
+
+	Ok(())
+}
+
+fn lint_markdown_scope(
+	body: &str,
+	change: &RawChangeEntry,
+	settings: &ChangesetScopedLintSettings,
+	changes_path: &Path,
+) -> MonochangeResult<()> {
+	if let Some(required_bump) = settings.required_bump
+		&& change.bump != Some(required_bump)
+	{
+		let actual = change
+			.bump
+			.map_or_else(|| "auto".to_string(), |bump| bump.to_string());
+		return Err(changeset_lint_error(
+			changes_path,
+			format!(
+				"changeset type `{}` requires bump `{required_bump}`, found `{actual}`",
+				change.change_type.as_deref().unwrap_or("<unknown>")
+			),
+		));
+	}
+
+	for section in &settings.required_sections {
+		if !markdown_has_heading(body, section) {
+			return Err(changeset_lint_error(
+				changes_path,
+				format!("changeset must include a `{section}` section"),
+			));
+		}
+	}
+	for heading in &settings.forbidden_headings {
+		if markdown_has_heading(body, heading) {
+			return Err(changeset_lint_error(
+				changes_path,
+				format!("changeset must not use `{heading}` as a heading"),
+			));
+		}
+	}
+	if let Some(min_body_chars) = settings.min_body_chars
+		&& body.trim().chars().count() < min_body_chars
+	{
+		return Err(changeset_lint_error(
+			changes_path,
+			format!("changeset body must be at least {min_body_chars} characters"),
+		));
+	}
+	if let Some(max_body_chars) = settings.max_body_chars
+		&& body.trim().chars().count() > max_body_chars
+	{
+		return Err(changeset_lint_error(
+			changes_path,
+			format!("changeset body must be at most {max_body_chars} characters"),
+		));
+	}
+	if settings.require_code_block && !markdown_has_code_block(body) {
+		return Err(changeset_lint_error(
+			changes_path,
+			"changeset must include a fenced code block",
+		));
+	}
+
+	Ok(())
+}
+
+fn first_non_empty_line(markdown: &str) -> Option<&str> {
+	markdown.lines().find_map(|line| {
+		let trimmed = line.trim();
+		(!trimmed.is_empty()).then_some(trimmed)
+	})
+}
+
+fn markdown_heading_text(line: &str) -> Option<String> {
+	let level = markdown_heading_level(line)?;
+	let text = line
+		.trim_start()
+		.chars()
+		.skip(level)
+		.collect::<String>()
+		.trim()
+		.trim_end_matches('#')
+		.trim()
+		.to_string();
+	Some(text)
+}
+
+fn markdown_has_heading(markdown: &str, heading: &str) -> bool {
+	markdown.lines().any(|line| {
+		markdown_heading_text(line).is_some_and(|text| text.eq_ignore_ascii_case(heading.trim()))
+	})
+}
+
+fn markdown_has_code_block(markdown: &str) -> bool {
+	markdown.lines().any(|line| {
+		let trimmed = line.trim_start();
+		trimmed.starts_with("```") || trimmed.starts_with("~~~")
+	})
+}
+
+fn has_conventional_commit_prefix(summary: &str) -> bool {
+	let Some((prefix, _)) = summary.split_once(':') else {
+		return false;
+	};
+	let prefix = prefix.trim();
+	let kind = prefix.split('(').next().unwrap_or(prefix);
+	matches!(
+		kind,
+		"build" | "chore" | "ci" | "docs" | "feat" | "fix" | "perf" | "refactor" | "style" | "test"
+	)
+}
+
+fn changeset_lint_error(path: &Path, message: impl Into<String>) -> MonochangeError {
+	MonochangeError::Config(format!(
+		"changeset lint failed for {}: {}",
+		path.display(),
+		message.into()
+	))
 }
 
 fn configured_change_sections<'config>(
@@ -3238,6 +3653,82 @@ fn validate_changesets_configuration(
 				})?;
 			}
 		}
+	}
+	Ok(())
+}
+
+fn validate_changeset_lint_settings(
+	settings: &ChangesetLintSettings,
+	changelog: &ChangelogSettings,
+) -> MonochangeResult<()> {
+	if let Some(level) = settings.summary.heading_level
+		&& !(1..=6).contains(&level)
+	{
+		return Err(MonochangeError::Config(
+			"[lints.rules].changesets/summary.heading_level must be between 1 and 6".to_string(),
+		));
+	}
+	if let (Some(min_length), Some(max_length)) =
+		(settings.summary.min_length, settings.summary.max_length)
+		&& min_length > max_length
+	{
+		return Err(MonochangeError::Config(
+			"[lints.rules].changesets/summary.min_length must not exceed max_length".to_string(),
+		));
+	}
+	for (bump, scoped) in &settings.bump {
+		validate_changeset_scoped_lint_settings(
+			scoped,
+			&format!("[lints.rules].changesets/bump/{bump}"),
+		)?;
+	}
+	for (change_type, scoped) in &settings.types {
+		if !changelog
+			.types
+			.keys()
+			.any(|configured| configured.eq_ignore_ascii_case(change_type))
+		{
+			return Err(MonochangeError::Config(format!(
+				"[lints.rules].changesets/types/{change_type} references an unknown changeset type"
+			)));
+		}
+		validate_changeset_scoped_lint_settings(
+			scoped,
+			&format!("[lints.rules].changesets/types/{change_type}"),
+		)?;
+	}
+	Ok(())
+}
+
+fn validate_changeset_scoped_lint_settings(
+	settings: &ChangesetScopedLintSettings,
+	path: &str,
+) -> MonochangeResult<()> {
+	if let (Some(min_body_chars), Some(max_body_chars)) =
+		(settings.min_body_chars, settings.max_body_chars)
+		&& min_body_chars > max_body_chars
+	{
+		return Err(MonochangeError::Config(format!(
+			"{path}.min_body_chars must not exceed max_body_chars"
+		)));
+	}
+	if settings
+		.required_sections
+		.iter()
+		.any(|section| section.trim().is_empty())
+	{
+		return Err(MonochangeError::Config(format!(
+			"{path}.required_sections must not include empty values"
+		)));
+	}
+	if settings
+		.forbidden_headings
+		.iter()
+		.any(|heading| heading.trim().is_empty())
+	{
+		return Err(MonochangeError::Config(format!(
+			"{path}.forbidden_headings must not include empty values"
+		)));
 	}
 	Ok(())
 }

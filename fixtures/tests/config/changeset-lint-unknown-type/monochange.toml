@@ -1,0 +1,6 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[lints.rules]
+"changesets/types/unicorns" = "error"
