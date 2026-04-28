@@ -469,6 +469,8 @@ Built-in package publishing currently supports only the canonical public registr
 - Deno packages → `jsr`
 - Dart / Flutter packages → `pub.dev`
 
+For Cargo, readiness uses the current `Cargo.toml` as a pre-mutation guard. Built-in crates.io publishing is blocked by `publish = false`, by `publish = [...]` when the list omits `crates-io`, by a missing `description`, or by a missing `license`/`license-file`. Workspace-inherited `description`, `license`, and `license-file` values are accepted.
+
 If a workspace uses `pnpm`, monochange uses `pnpm publish` and `pnpm exec npm trust ...` instead of raw `npm` commands so workspace protocol and catalog dependency handling stays aligned with the workspace manager.
 
 Publishing is configured through `publish` on packages and ecosystems:

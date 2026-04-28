@@ -50,6 +50,7 @@ when = "{{ inputs.enabled }}"
 
 - a release record discoverable from `HEAD` that contains the package publication targets
 - for real publishes, a readiness artifact generated from that same release record and package selection with `mc publish-readiness --from HEAD --output <PATH>`
+- for built-in Cargo publishes to crates.io, a publishable current `Cargo.toml`: no `publish = false`, any `publish = [...]` list includes `crates-io`, `description` is set, and either `license` or `license-file` is set; workspace-inherited values are accepted
 
 ## Side effects and outputs
 

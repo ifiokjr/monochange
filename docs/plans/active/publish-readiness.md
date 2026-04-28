@@ -1,103 +1,83 @@
-# Publish readiness enforcement
+# Publish readiness Cargo guards
 
 ## Status
 
-- Previous slice: `mc publish-readiness` shipped in PR #292.
-- Current branch: `feat/publish-readiness-enforcement`.
-- Current slice: require and validate a readiness artifact before real `mc publish` registry mutation.
+- Previous slices: `mc publish-readiness` shipped in PR #292; readiness artifact enforcement shipped in PR #301.
+- Current branch: `feat/publish-readiness-cargo-guards`.
+- Current slice: add Cargo-first publish-readiness blockers for current manifest publishability before built-in crates.io mutation.
 
 ## Problem
 
-Package publishing now has a standalone, non-mutating readiness command, but `mc publish` can still start registry mutation without proving that readiness was checked against the same release record and package selection. monochange needs an explicit artifact boundary so CI can fail before mutation when readiness is missing, blocked, stale, malformed, or generated for a different package set.
+Readiness artifacts protect `mc publish` from stale package sets, but the readiness check still mostly reflected registry dry-run status. Cargo packages can be known to fail crates.io publication before mutation when the current manifest opts out of publication or omits required crates.io metadata. monochange should catch those blockers during readiness and enforce the same result before real publish.
 
 ## Scope
 
-This slice covers the first enforcement step:
+This slice covers built-in Cargo publishes to crates.io:
 
-- Extend the publish-readiness JSON artifact with a schema version, kind, release-record commit metadata, and package-set fingerprint.
-- Add `readiness` as a publish workflow input.
-- Require `--readiness <PATH>` for real `PublishPackages` runs.
-- Keep `--dry-run` publish previews usable without a readiness artifact.
-- Validate artifact kind, schema, status, release-record commit, duplicate package entries, package fingerprint, and selected package set before registry mutation.
-- Treat already-published packages as non-blocking when the artifact and current readiness agree.
-- Update reference docs, CI guides, templates, and generated docs for the new publish flow.
+- Block current manifests with `publish = false`.
+- Block current manifests with `publish = [...]` when the registry list does not include `crates-io`.
+- Block missing `description`.
+- Block missing both `license` and `license-file`.
+- Accept workspace-inherited `description`, `license`, and `license-file` from `[workspace.package]`.
+- Keep already-published versions non-blocking when current readiness and the saved artifact agree.
+- Surface blocked dry-runs as readiness `blocked`, and reject real publishing before any publish command runs.
 
 ## Non-goals for this slice
 
-- Full config/manifests/lockfile hashing.
+- Cargo dependency packaging checks beyond existing `cargo publish` behavior.
+- Automated crates.io trusted-publisher enrollment.
+- npm, JSR, or pub.dev metadata-specific readiness expansion.
+- Full manifest/lockfile artifact hashing.
 - `mc publish-plan --readiness` integration.
-- `mc publish-bootstrap` or first-time placeholder orchestration changes.
-- `monochange/actions` publishing API redesign.
-- Cargo-specific metadata/remediation blockers beyond the existing dry-run publish checks.
 
 ## Affected files
 
-- `crates/monochange/src/cli_runtime.rs`
-- `crates/monochange/src/monochange.init.toml`
 - `crates/monochange/src/package_publish.rs`
 - `crates/monochange/src/publish_readiness.rs`
-- `monochange.toml`
-- `.templates/cli-steps.t.md`
-- `.templates/project.t.md`
-- `readme.md`
-- `docs/src/readme.md`
-- `docs/src/guide/02-setup.md`
-- `docs/src/guide/07-trusted-publishing.md`
-- `docs/src/guide/08-github-automation.md`
+- `crates/monochange/src/cli_runtime.rs`
 - `docs/src/guide/13-ci-and-publishing.md`
-- `docs/src/guide/14-multi-package-publishing.md`
-- `docs/src/guide/15-publish-rate-limits.md`
-- `docs/src/reference/cli-steps/00-index.md`
-- `docs/src/reference/cli-steps/10-publish-release.md`
 - `docs/src/reference/cli-steps/16-publish-packages.md`
-- `.changeset/publish-readiness-enforcement.md`
+- `docs/src/readme.md`
+- `readme.md`
+- `packages/monochange__skill/SKILL.md`
+- `packages/monochange__skill/skills/reference.md`
+- `packages/monochange__skill/skills/trusted-publishing.md`
+- `.changeset/publish-readiness-cargo-guards.md`
 
 ## Checklist
 
-- [x] Create isolated worktree and branch `feat/publish-readiness-enforcement`.
-- [x] Extend readiness artifacts with stable schema/kind and release-record metadata.
-- [x] Add package-set fingerprint validation.
-- [x] Add artifact loading and validation helpers.
-- [x] Require `--readiness <PATH>` for real `PublishPackages` runs.
-- [x] Keep dry-run publish previews artifact-free.
-- [x] Add unit coverage for successful validation and all validation failure classes.
-- [x] Add unit coverage for missing and blank readiness paths.
-- [x] Update publish command config in root and init templates.
-- [x] Update docs and templates for the readiness-enforced publish flow.
-- [x] Run generated docs update.
-- [x] Run formatting and lint checks.
-- [x] Run targeted tests.
-- [x] Run full validation.
-- [x] Run coverage and confirm 100% patch coverage.
+- [x] Create isolated worktree and branch `feat/publish-readiness-cargo-guards`.
+- [x] Add Cargo manifest readiness blockers.
+- [x] Map blocked publish dry-runs to blocked readiness status.
+- [x] Reject real publish before registry mutation when blockers are present.
+- [x] Add focused unit coverage for missing metadata, `publish = false`, publish registry arrays, workspace inheritance, dry-run blocking, and real-publish rejection.
+- [x] Update user docs and packaged skill docs for Cargo readiness behavior.
+- [ ] Run formatting and lint checks.
+- [ ] Run full validation.
+- [ ] Run coverage and confirm 100% patch coverage.
 - [ ] Push branch and open PR.
 - [ ] Merge after required checks pass.
 
 ## Validation log
 
-- [x] `devenv shell cargo test -p monochange readiness --lib` (initial implementation; passed with warnings that were fixed afterward)
-- [x] `devenv shell cargo test -p monochange execute_cli_command_requires_readiness_for_package_publish_steps_without_matching_packages --lib`
-- [x] `devenv shell cargo test -p monochange_core display_and_publish --lib`
-- [x] `devenv shell cargo fmt --check`
-- [x] `git diff --check`
-- [x] `devenv shell mdt update`
-- [x] `devenv shell lint:test`
-- [x] `devenv shell mc validate`
-- [x] `devenv shell coverage:all`
-- [x] `devenv shell coverage:patch` (`PATCH_COVERAGE 395/395 (100.00%)`)
+- [x] `devenv shell cargo fmt`
+- [x] `devenv shell cargo test -p monochange cargo_publish_readiness_blockers --lib`
+- [x] `devenv shell cargo test -p monochange execute_publish_requests_marks_dry_run_cargo_metadata_blockers --lib`
+- [x] `devenv shell cargo test -p monochange execute_publish_requests_rejects_real_cargo_metadata_blockers --lib`
+- [x] `devenv shell cargo test -p monochange publish_readiness --lib`
+- [x] `devenv shell cargo test -p monochange package_publish_status_label --lib`
 
 ## Decisions
 
-- Real package publication requires a readiness artifact; dry-runs remain frictionless.
-- Artifact validation happens immediately before the existing rate-limit plan and package publish execution, so failures happen before registry mutation.
-- The first fingerprint is intentionally a deterministic package-set identity rather than a cryptographic digest; it covers package id, ecosystem, registry, and version.
-- `already_published` remains non-blocking as long as current readiness and the artifact agree.
-- `unsupported` remains blocking because monochange cannot mutate unsupported ecosystem publications safely.
+- Validate the current manifest immediately after registry existence checks. Already-published versions are still skipped before manifest checks, which preserves idempotent/resumable publishes.
+- Limit this first ecosystem-specific guard to built-in Cargo publishes targeting crates.io.
+- Treat `repository`, `homepage`, and `documentation` as useful recommendations but not hard blockers for this slice.
+- Keep first-time bootstrap separate from readiness; `publish = false` or missing crates.io metadata should be fixed before built-in publication.
 
 ## Follow-up roadmap
 
 - [ ] Add deeper freshness checks for workspace config, manifests, lockfiles, and publish tooling inputs.
 - [ ] Add optional readiness consumption to `mc publish-plan`.
-- [ ] Expand Cargo readiness semantics first.
 - [ ] Expand npm readiness semantics second.
 - [ ] Add `mc publish-bootstrap` for first-time package setup.
 - [ ] Design retry/resume around explicit readiness for remaining work.

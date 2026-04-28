@@ -102,6 +102,8 @@ These are the commands most repositories use after running `mc init`. With the n
 
 <!-- {/projectCommandAutomationMatrix} -->
 
+`mc publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking when the readiness artifact still matches the current package set.
+
 <!-- {@projectCapabilityMatrix} -->
 
 | Capability                                                               | Current status                                                                               |

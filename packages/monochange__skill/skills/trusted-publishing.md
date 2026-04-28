@@ -232,6 +232,7 @@ If you configure an environment on crates.io, the GitHub job must use the same e
 ### Monochange notes
 
 - monochange does **not** create the crates.io trusted-publisher record for you yet.
+- `mc publish-readiness` also verifies the current crate manifest before built-in crates.io publishing: `publish = false` blocks, `publish = [...]` must include `crates-io`, `description` is required, and either `license` or `license-file` is required. Workspace-inherited values are accepted.
 - Once the registry-side configuration exists, monochange can publish with the temporary token exposed by `rust-lang/crates-io-auth-action@v1`.
 - crates.io issues a short-lived publish token; the current docs describe these tokens as expiring after 30 minutes.
 - Use a specific workflow filename and, when needed, a protected GitHub environment to reduce the publish attack surface.

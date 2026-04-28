@@ -164,6 +164,7 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 
 - Package publishing is configured through `publish` on packages and ecosystems.
 - Built-in publishing currently supports only the canonical public registries: `crates.io`, `npm`, `jsr`, and `pub.dev`.
+- `mc publish-readiness` blocks built-in Cargo publishes to crates.io when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`. Workspace-inherited Cargo metadata is accepted.
 - `mc placeholder-publish` exists for first-release bootstrap. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
 - Placeholder README content can come from `publish.placeholder.readme` or `publish.placeholder.readme_file`.
 - `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.
