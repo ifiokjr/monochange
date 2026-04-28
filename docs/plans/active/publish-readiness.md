@@ -1,10 +1,10 @@
-# Publish readiness Cargo guards
+# Publish readiness and publish planning
 
 ## Status
 
-- Previous slices: `mc publish-readiness` shipped in PR #292; readiness artifact enforcement shipped in PR #301.
-- Current branch: `feat/publish-readiness-cargo-guards`.
-- Current slice: add Cargo-first publish-readiness blockers for current manifest publishability before built-in crates.io mutation.
+- Previous slices: `mc publish-readiness` shipped in PR #292; readiness artifact enforcement shipped in PR #301; Cargo-first publish-readiness blockers shipped in PR #303.
+- Current branch: `feat/publish-plan-readiness`.
+- Current slice: add readiness-artifact support to `mc publish-plan --readiness <path>` so publish rate-limit plans exclude non-ready package work.
 
 ## Problem
 
@@ -28,7 +28,7 @@ This slice covers built-in Cargo publishes to crates.io:
 - Automated crates.io trusted-publisher enrollment.
 - npm, JSR, or pub.dev metadata-specific readiness expansion.
 - Full manifest/lockfile artifact hashing.
-- `mc publish-plan --readiness` integration.
+- Retry/resume or `mc publish-bootstrap` implementation.
 
 ## Affected files
 
@@ -77,7 +77,7 @@ This slice covers built-in Cargo publishes to crates.io:
 ## Follow-up roadmap
 
 - [ ] Add deeper freshness checks for workspace config, manifests, lockfiles, and publish tooling inputs.
-- [ ] Add optional readiness consumption to `mc publish-plan`.
+- [x] Add optional readiness consumption to `mc publish-plan`.
 - [ ] Expand npm readiness semantics second.
 - [ ] Add `mc publish-bootstrap` for first-time package setup.
 - [ ] Design retry/resume around explicit readiness for remaining work.

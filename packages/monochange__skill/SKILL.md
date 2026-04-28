@@ -67,27 +67,28 @@ Release-oriented commands default to markdown output. Use `--format json` for au
 
 ## CLI commands
 
-| Command                     | Purpose                                                                |
-| --------------------------- | ---------------------------------------------------------------------- |
-| `mc init`                   | Generate a starter `monochange.toml` from detected packages            |
-| `mc validate`               | Validate config and changeset targets                                  |
-| `mc check`                  | Validate config and run lint rules against package manifests           |
-| `mc lint`                   | Inspect registered lint rules and presets                              |
-| `mc discover`               | Discover packages across ecosystems                                    |
-| `mc change`                 | Create a `.changeset/*.md` file                                        |
-| `mc release`                | Prepare a release plan from changesets and refresh the cached manifest |
-| `mc placeholder-publish`    | Publish placeholder versions for packages missing from registries      |
-| `mc publish-readiness`      | Check package-registry readiness and write a validation artifact       |
-| `mc publish --readiness`    | Publish package artifacts using built-in registry workflows            |
-| `mc commit-release`         | Prepare a release and create a local commit                            |
-| `mc publish-release`        | Create provider releases                                               |
-| `mc release-pr`             | Open or update a release pull request                                  |
-| `mc step:affected-packages` | Evaluate changeset policy from changed paths without a config wrapper  |
-| `mc diagnostics`            | Show changeset context with git and review metadata                    |
-| `mc release-record`         | Inspect a durable release declaration from git history                 |
-| `mc repair-release`         | Repair a recent release by retargeting tags                            |
-| `mc subagents`              | Generate repo-local monochange agent, subagent, and rule files         |
-| `mc mcp`                    | Start the stdio MCP server                                             |
+| Command                       | Purpose                                                                |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `mc init`                     | Generate a starter `monochange.toml` from detected packages            |
+| `mc validate`                 | Validate config and changeset targets                                  |
+| `mc check`                    | Validate config and run lint rules against package manifests           |
+| `mc lint`                     | Inspect registered lint rules and presets                              |
+| `mc discover`                 | Discover packages across ecosystems                                    |
+| `mc change`                   | Create a `.changeset/*.md` file                                        |
+| `mc release`                  | Prepare a release plan from changesets and refresh the cached manifest |
+| `mc placeholder-publish`      | Publish placeholder versions for packages missing from registries      |
+| `mc publish-readiness`        | Check package-registry readiness and write a validation artifact       |
+| `mc publish-plan --readiness` | Plan rate-limit batches from ready package work only                   |
+| `mc publish --readiness`      | Publish package artifacts using built-in registry workflows            |
+| `mc commit-release`           | Prepare a release and create a local commit                            |
+| `mc publish-release`          | Create provider releases                                               |
+| `mc release-pr`               | Open or update a release pull request                                  |
+| `mc step:affected-packages`   | Evaluate changeset policy from changed paths without a config wrapper  |
+| `mc diagnostics`              | Show changeset context with git and review metadata                    |
+| `mc release-record`           | Inspect a durable release declaration from git history                 |
+| `mc repair-release`           | Repair a recent release by retargeting tags                            |
+| `mc subagents`                | Generate repo-local monochange agent, subagent, and rule files         |
+| `mc mcp`                      | Start the stdio MCP server                                             |
 
 ## CLI step types
 
@@ -165,6 +166,7 @@ Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. 
 - Package publishing is configured through `publish` on packages and ecosystems.
 - Built-in publishing currently supports only the canonical public registries: `crates.io`, `npm`, `jsr`, and `pub.dev`.
 - `mc publish-readiness` blocks built-in Cargo publishes to crates.io when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`. Workspace-inherited Cargo metadata is accepted.
+- `mc publish-plan --readiness <path>` validates a readiness artifact for the current release record and excludes package ids that are not ready in both the artifact and the fresh local readiness check. Placeholder planning does not accept readiness artifacts.
 - `mc placeholder-publish` exists for first-release bootstrap. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
 - Placeholder README content can come from `publish.placeholder.readme` or `publish.placeholder.readme_file`.
 - `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.

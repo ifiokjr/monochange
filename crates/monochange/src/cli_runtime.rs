@@ -691,8 +691,16 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::PlanPublishRateLimits { .. } => {
+					let mode = publish_rate_limit_mode_from_inputs(&step_inputs)?;
+					let selected_packages = publish_rate_limit_selected_package_ids(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&step_inputs,
+						mode,
+					)?;
 					#[rustfmt::skip]
-					let report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_package_ids(&step_inputs), publish_rate_limit_mode_from_inputs(&step_inputs)?, context.dry_run)?;
+					let report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, mode, context.dry_run)?;
 					context.rate_limit_report = Some(report);
 					output = None;
 					Ok(())
@@ -1895,16 +1903,54 @@ fn selected_package_ids(inputs: &BTreeMap<String, Vec<String>>) -> BTreeSet<Stri
 fn required_publish_readiness_artifact_path(
 	inputs: &BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<PathBuf> {
-	inputs
-		.get("readiness")
-		.and_then(|values| values.first())
-		.filter(|path| !path.trim().is_empty())
-		.map(PathBuf::from)
-		.ok_or_else(|| {
-			MonochangeError::Config(
-				"`PublishPackages` requires `--readiness <PATH>` when publishing; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
-			)
-		})
+	optional_publish_readiness_artifact_path(inputs)?.ok_or_else(|| {
+		MonochangeError::Config(
+			"`PublishPackages` requires `--readiness <PATH>` when publishing; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
+		)
+	})
+}
+
+fn optional_publish_readiness_artifact_path(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<Option<PathBuf>> {
+	let Some(path) = inputs.get("readiness").and_then(|values| values.first()) else {
+		return Ok(None);
+	};
+
+	if path.trim().is_empty() {
+		return Err(MonochangeError::Config(
+			"`--readiness <PATH>` must not be blank; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
+		));
+	}
+
+	Ok(Some(PathBuf::from(path)))
+}
+
+fn publish_rate_limit_selected_package_ids(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	inputs: &BTreeMap<String, Vec<String>>,
+	mode: publish_rate_limits::PublishRateLimitMode,
+) -> MonochangeResult<BTreeSet<String>> {
+	let selected_packages = selected_package_ids(inputs);
+	let Some(readiness_path) = optional_publish_readiness_artifact_path(inputs)? else {
+		return Ok(selected_packages);
+	};
+
+	if mode != publish_rate_limits::PublishRateLimitMode::Publish {
+		return Err(MonochangeError::Config(
+			"`--readiness <PATH>` is only supported for publish rate-limit plans".to_string(),
+		));
+	}
+
+	publish_readiness::publish_plan_package_filter_from_readiness_artifact(
+		root,
+		configuration,
+		prepared_release,
+		&selected_packages,
+		&readiness_path,
+	)
 }
 
 fn publish_rate_limit_mode_from_inputs(
@@ -3217,6 +3263,7 @@ fn resolve_command_output(
 #[cfg(test)]
 mod tests {
 	use std::collections::BTreeMap;
+	use std::collections::BTreeSet;
 	use std::fs;
 	use std::io;
 	use std::path::Path;
@@ -4637,6 +4684,96 @@ path = "crates/core"
 	}
 
 	#[test]
+	fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_release_artifact() {
+		let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+			.unwrap_or_else(|error| panic!("workspace root: {error}"));
+		let configuration = sample_configuration(&root);
+		let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let artifact_path = artifact_dir.path().join("prepared-release.json");
+		let cli_command = CliCommandDefinition {
+			name: "publish-plan".to_string(),
+			help_text: Some("plan publish rate limits".to_string()),
+			inputs: Vec::new(),
+			steps: vec![
+				CliStepDefinition::PrepareRelease {
+					name: None,
+					when: None,
+					inputs: BTreeMap::new(),
+				},
+				CliStepDefinition::PlanPublishRateLimits {
+					name: None,
+					when: None,
+					inputs: BTreeMap::new(),
+				},
+			],
+		};
+		save_prepared_release_execution(
+			&root,
+			&configuration,
+			&sample_prepared_release(),
+			&[],
+			Some(artifact_path.as_path()),
+		)
+		.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
+
+		let output = execute_cli_command_with_options(
+			&root,
+			&configuration,
+			&cli_command,
+			ExecuteCliCommandOptions {
+				dry_run: true,
+				quiet: false,
+				show_diff: false,
+				inputs: BTreeMap::new(),
+				prepared_release_path: Some(artifact_path),
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.unwrap_or_else(|error| panic!("execute publish-plan command: {error}"));
+
+		assert!(output.contains("reused prepared release artifact"));
+	}
+
+	#[test]
+	fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_plans() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let cli_command = CliCommandDefinition {
+			name: "publish-plan".to_string(),
+			help_text: Some("plan publish rate limits".to_string()),
+			inputs: Vec::new(),
+			steps: vec![CliStepDefinition::PlanPublishRateLimits {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		};
+
+		let error = execute_cli_command_with_options(
+			tempdir.path(),
+			&sample_configuration(tempdir.path()),
+			&cli_command,
+			ExecuteCliCommandOptions {
+				dry_run: true,
+				quiet: true,
+				show_diff: false,
+				inputs: BTreeMap::from([
+					("mode".to_string(), vec!["placeholder".to_string()]),
+					("readiness".to_string(), vec!["readiness.json".to_string()]),
+				]),
+				prepared_release_path: None,
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.expect_err("placeholder publish plans should reject readiness artifacts");
+
+		assert!(
+			error
+				.to_string()
+				.contains("only supported for publish rate-limit plans")
+		);
+	}
+
+	#[test]
 	fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
 		let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
 			.unwrap_or_else(|error| panic!("workspace root: {error}"));
@@ -4963,6 +5100,93 @@ path = "crates/core"
 				assert!(!stdout_supports_color());
 			},
 		);
+	}
+
+	#[test]
+	fn publish_rate_limit_selected_package_ids_uses_package_inputs_without_readiness() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let configuration = sample_configuration(tempdir.path());
+		let inputs = BTreeMap::from([(
+			"package".to_string(),
+			vec!["core".to_string(), "web".to_string()],
+		)]);
+
+		let selected = publish_rate_limit_selected_package_ids(
+			tempdir.path(),
+			&configuration,
+			None,
+			&inputs,
+			publish_rate_limits::PublishRateLimitMode::Placeholder,
+		)
+		.unwrap_or_else(|error| panic!("selected packages: {error}"));
+
+		assert_eq!(
+			selected,
+			BTreeSet::from(["core".to_string(), "web".to_string()])
+		);
+	}
+
+	#[test]
+	fn publish_rate_limit_selected_package_ids_rejects_readiness_for_placeholder_plans() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let configuration = sample_configuration(tempdir.path());
+		let inputs = BTreeMap::from([(
+			"readiness".to_string(),
+			vec![".monochange/readiness.json".to_string()],
+		)]);
+
+		let error = publish_rate_limit_selected_package_ids(
+			tempdir.path(),
+			&configuration,
+			Some(&sample_prepared_release()),
+			&inputs,
+			publish_rate_limits::PublishRateLimitMode::Placeholder,
+		)
+		.expect_err("placeholder publish plans should reject readiness artifacts");
+
+		assert!(
+			error
+				.to_string()
+				.contains("only supported for publish rate-limit plans")
+		);
+	}
+
+	#[test]
+	fn publish_rate_limit_selected_package_ids_uses_readiness_artifact_for_publish_plans() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let configuration = sample_configuration(tempdir.path());
+		let artifact_path = tempdir.path().join("readiness.json");
+		let report = publish_readiness::PublishReadinessReport {
+			schema_version: 1,
+			kind: "monochange.publishReadiness".to_string(),
+			status: publish_readiness::PublishReadinessGlobalStatus::Ready,
+			from: "prepared-release".to_string(),
+			resolved_commit: "prepared-release".to_string(),
+			record_commit: "prepared-release".to_string(),
+			package_set_fingerprint: String::new(),
+			packages: Vec::new(),
+		};
+		let inputs = BTreeMap::from([(
+			"readiness".to_string(),
+			vec![artifact_path.display().to_string()],
+		)]);
+		fs::write(
+			&artifact_path,
+			serde_json::to_string_pretty(&report)
+				.unwrap_or_else(|error| panic!("serialize readiness artifact: {error}")),
+		)
+		.unwrap_or_else(|error| panic!("write readiness artifact: {error}"));
+
+		let selected = publish_rate_limit_selected_package_ids(
+			tempdir.path(),
+			&configuration,
+			Some(&sample_prepared_release()),
+			&inputs,
+			publish_rate_limits::PublishRateLimitMode::Publish,
+		)
+		.unwrap_or_else(|error| panic!("selected packages from readiness: {error}"));
+
+		assert!(selected.is_empty());
 	}
 
 	#[test]

@@ -3,7 +3,8 @@
 `mc publish-plan` previews package-registry publish work against monochange's built-in ecosystem rate-limit metadata.
 
 ```bash
-mc publish-plan --format json
+mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish-plan --mode placeholder --format json
 mc publish-plan --ci github-actions
 ```
@@ -17,7 +18,7 @@ The report includes:
 - a provider-agnostic batch schedule with package ids per batch
 - evidence links and confidence levels for the built-in limits
 
-`mc publish-plan` only counts package versions that are still missing from their registries. If you rerun a release after some packages were already published, the remaining batches shrink automatically.
+`mc publish-plan` only counts package versions that are still missing from their registries. If you rerun a release after some packages were already published, the remaining batches shrink automatically. When you pass `--readiness <path>`, the plan first validates that the readiness artifact covers the current release record and selected package set, then excludes package ids that are not ready in both the artifact and the fresh local readiness check.
 
 ## Current built-in coverage
 
@@ -26,11 +27,11 @@ The report includes:
 - `jsr` — official publish-window metadata
 - `pub.dev` — conservative daily publish planning metadata for CI batching
 
-Use `mc publish-plan` before `mc publish-readiness` and `mc publish --readiness <path>` when you want CI to fail early instead of discovering registry throttling mid-release.
+Use `mc publish-readiness --from HEAD --output <path>`, then `mc publish-plan --readiness <path>`, then `mc publish --readiness <path>` when you want CI to fail early instead of discovering registry throttling mid-release. The `--readiness` input is only valid for normal publish planning; placeholder planning still uses `mc publish-plan --mode placeholder` without a readiness artifact.
 
 ## Filtering and enforcement
 
-Both `mc publish` and `mc placeholder-publish` accept repeated `--package <id>` filters so you can execute one planned batch at a time. For real `mc publish --package <id>` runs, generate the readiness artifact with the same `--package <id>` selection.
+Both `mc publish` and `mc placeholder-publish` accept repeated `--package <id>` filters so you can execute one planned batch at a time. For real `mc publish --package <id>` runs, generate the readiness artifact with the same `--package <id>` selection, or pass a broader readiness artifact to `mc publish-plan --readiness <path> --package <id>` so the plan can validate that the artifact covers the selected package subset.
 
 If you want monochange to block risky built-in publishes instead of only warning, enable:
 

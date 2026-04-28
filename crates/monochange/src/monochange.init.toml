@@ -870,6 +870,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 	{ name = "mode", type = "choice", choices = ["publish", "placeholder"], default = "publish" },
 	{ name = "package", type = "string_list" },
+	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; limits publish plans to ready package work" },
 	{ name = "ci", type = "choice", choices = ["github-actions", "gitlab-ci"] },
 ]
 steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]

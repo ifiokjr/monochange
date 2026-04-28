@@ -23,6 +23,7 @@ These are the commands most repositories use after running `mc init`. With the n
 | Open or update a release request | `mc release-pr`                                             | You want a long-lived release PR/MR branch updated from current release state                            |
 | Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
 | Check package publish readiness  | `mc publish-readiness --from HEAD --output <path>`          | You need a validated readiness artifact before package publication                                       |
+| Plan ready package publishing    | `mc publish-plan --readiness <path>`                        | You want rate-limit batches that exclude non-ready package work                                          |
 | Publish packages to registries   | `mc publish --readiness <path>`                             | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
 | Bootstrap missing packages       | `mc placeholder-publish`                                    | A package must exist in its registry before later automation can work                                    |
 | Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
@@ -44,7 +45,7 @@ A practical rule of thumb:
 monochange has three related but different automation layers:
 
 1. **Release planning** — `mc release --dry-run`, `mc release`, `mc diagnostics`
-2. **Package registries** — `mc placeholder-publish`, `mc publish-readiness`, `mc publish --readiness <path>`
+2. **Package registries** — `mc placeholder-publish`, `mc publish-readiness`, `mc publish-plan --readiness <path>`, `mc publish --readiness <path>`
 3. **Hosted providers** — `mc release-pr`, `mc publish-release`, `mc repair-release`
 
 Keeping those layers separate is important. Package publication and hosted-release publication are not the same job.
@@ -94,7 +95,7 @@ For GitHub Actions, the most common structure is:
 
 The important current implementation detail is that `mc publish-readiness` can write a readiness artifact from the `ReleaseRecord` on `HEAD`, `mc publish --readiness <path>` can validate that artifact before package registry mutation, `mc tag-release` can create the declared release tags from that same durable record, and `mc publish-release` still works from prepared release state when you want a manifest-driven hosted-release job.
 
-If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection, then run `mc publish-readiness --from HEAD --output <path>` before `mc publish --readiness <path>`.
+If the same post-merge job is responsible for both tags and package publication, run `mc tag-release --from HEAD` immediately after release-commit detection, then run `mc publish-readiness --from HEAD --output <path>`, optionally inspect `mc publish-plan --readiness <path>`, and finally run `mc publish --readiness <path>`.
 
 ### GitHub + npm trusted publishing
 
