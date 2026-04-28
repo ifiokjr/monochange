@@ -142,11 +142,18 @@ mode = "builtin"
 registry = "npm"
 trusted_publishing = true
 
+[ecosystems.npm.publish.trusted_publishing]
+workflow = "publish.yml"
+environment = "publisher"
+
 [package.web.publish]
 mode = "builtin"
 
 [package.web.publish.placeholder]
 readme_file = "docs/web-placeholder.md"
+
+[package.legacy.publish]
+trusted_publishing = false
 ```
 
 Supported fields:
@@ -159,7 +166,7 @@ Supported fields:
 - `placeholder.readme` — inline placeholder README content
 - `placeholder.readme_file` — workspace-relative file to use as placeholder README content
 
-Inheritance flows from `[ecosystems.<name>.publish]` to matching packages, and package-level values override the inherited defaults.
+Inheritance flows from `[ecosystems.<name>.publish]` to matching packages, and package-level values override the inherited ecosystem defaults. Configure shared trusted-publishing policy and context on the ecosystem, then use package-level publish settings for opt-outs or package-specific workflows.
 
 Built-in publishing currently targets only the canonical public registry for each supported ecosystem:
 
@@ -195,11 +202,16 @@ For each managed package with built-in publishing enabled, monochange:
 [ecosystems.npm.publish]
 trusted_publishing = true
 
-[package.cli.publish.trusted_publishing]
-enabled = true
+[ecosystems.npm.publish.trusted_publishing]
 repository = "owner/repo"
 workflow = "publish.yml"
 environment = "publisher"
+
+[package.cli.publish.trusted_publishing]
+workflow = "publish-cli.yml"
+
+[package.legacy.publish]
+trusted_publishing = false
 ```
 
 When `trusted_publishing` is enabled:
