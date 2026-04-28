@@ -1043,6 +1043,27 @@ Rule configuration supports two forms:
 - simple severity: `"rule-id" = "error"`, `"warning"`, or `"off"`
 - detailed config: `{ level = "error", ...rule_specific_options }`
 
+## Changeset lint rules
+
+Changeset lint rules use the same `[lints.rules]` table as manifest rules. They are evaluated while markdown changesets are loaded by validation and release workflows.
+
+```toml
+[lints.rules]
+"changesets/duplicate" = "error"
+"changesets/no_section_headings" = "error"
+"changesets/summary" = { level = "error", required = true, heading_level = 2, min_length = 12, max_length = 80, forbid_trailing_period = true, forbid_conventional_commit_prefix = true }
+"changesets/bump/major" = { level = "error", required_sections = ["Impact", "Migration"], min_body_chars = 120, require_code_block = true }
+"changesets/types/breaking" = { level = "error", forbidden_headings = ["Breaking", "Breaking changes"], required_sections = ["Impact", "Migration"], required_bump = "major" }
+```
+
+Supported changeset rule ids:
+
+- `changesets/duplicate` — validates that a changeset does not target the same effective package more than once.
+- `changesets/no_section_headings` — rejects headings that duplicate a change type used by that changeset.
+- `changesets/summary` — configures the one-line summary heading. Options: `required`, `heading_level`, `min_length`, `max_length`, `forbid_trailing_period`, `forbid_conventional_commit_prefix`.
+- `changesets/bump/<severity>` — configures rules for `major`, `minor`, or `patch` entries. Options: `required_sections`, `forbidden_headings`, `min_body_chars`, `max_body_chars`, `require_code_block`, `required_bump`.
+- `changesets/types/<type>` — configures rules for a configured changelog type such as `breaking`, `feature`, `fix`, `security`, or a custom type like `unicorns`. It accepts the same scoped options as bump rules. The `<type>` segment must match a configured changelog type.
+
 ## Current rule coverage
 
 Today, built-in manifest lint rules exist for:

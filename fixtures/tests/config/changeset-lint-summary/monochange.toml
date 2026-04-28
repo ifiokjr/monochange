@@ -1,0 +1,6 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[lints.rules]
+"changesets/summary" = { level = "error", required = true, heading_level = 2, min_length = 12, max_length = 80, forbid_trailing_period = true, forbid_conventional_commit_prefix = true }

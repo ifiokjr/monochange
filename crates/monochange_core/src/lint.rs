@@ -14,6 +14,8 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::BumpSeverity;
+
 /// The severity level of a lint.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -478,6 +480,52 @@ pub struct LintScopeConfig {
 	pub presets: Vec<String>,
 	#[serde(default)]
 	pub rules: BTreeMap<String, LintRuleConfig>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct ChangesetSummaryLintSettings {
+	/// Require the first non-empty body line to be a markdown heading.
+	#[serde(default)]
+	pub required: bool,
+	/// Require the summary heading to use this markdown level.
+	#[serde(default)]
+	pub heading_level: Option<usize>,
+	#[serde(default)]
+	pub min_length: Option<usize>,
+	#[serde(default)]
+	pub max_length: Option<usize>,
+	#[serde(default)]
+	pub forbid_trailing_period: bool,
+	#[serde(default)]
+	pub forbid_conventional_commit_prefix: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct ChangesetScopedLintSettings {
+	#[serde(default)]
+	pub required_sections: Vec<String>,
+	#[serde(default)]
+	pub min_body_chars: Option<usize>,
+	#[serde(default)]
+	pub max_body_chars: Option<usize>,
+	#[serde(default)]
+	pub require_code_block: bool,
+	#[serde(default)]
+	pub required_bump: Option<BumpSeverity>,
+	#[serde(default)]
+	pub forbidden_headings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct ChangesetLintSettings {
+	#[serde(default)]
+	pub no_section_headings: bool,
+	#[serde(default)]
+	pub summary: ChangesetSummaryLintSettings,
+	#[serde(default)]
+	pub bump: BTreeMap<BumpSeverity, ChangesetScopedLintSettings>,
+	#[serde(default)]
+	pub types: BTreeMap<String, ChangesetScopedLintSettings>,
 }
 
 /// Top-level workspace lint settings from `monochange.toml`.

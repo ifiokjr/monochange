@@ -1,0 +1,15 @@
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[changelog.sections.breaking]
+heading = "Breaking changes"
+priority = 100
+
+[changelog.types.breaking]
+section = "breaking"
+bump = "major"
+
+[lints.rules]
+"changesets/bump/major" = { level = "error", required_sections = ["Impact", "Migration"], min_body_chars = 120, require_code_block = true }
+"changesets/types/breaking" = { level = "error", required_bump = "major", forbidden_headings = ["Breaking", "Breaking changes"], required_sections = ["Impact", "Migration"] }

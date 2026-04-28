@@ -6,6 +6,7 @@ use miette::LabeledSpan;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangelogDefinition;
 use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangelogTarget;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
@@ -22,6 +23,11 @@ use monochange_core::PublishState;
 use monochange_core::RegistryKind;
 use monochange_core::ShellConfig;
 use monochange_core::SourceProvider;
+use monochange_core::lint::ChangesetLintSettings;
+use monochange_core::lint::ChangesetScopedLintSettings;
+use monochange_core::lint::ChangesetSummaryLintSettings;
+use monochange_core::lint::LintRuleConfig;
+use monochange_core::lint::LintSeverity;
 use monochange_test_helpers::current_test_name;
 use monochange_test_helpers::snapshot_settings;
 use semver::Version;
@@ -1402,6 +1408,553 @@ fn load_change_signals_parses_explicit_versions_and_infers_bumps() {
 	assert_eq!(target.explicit_version, Some(Version::new(1, 2, 0)));
 	assert_eq!(signal.requested_bump, Some(BumpSeverity::Minor));
 	assert_eq!(signal.explicit_version, Some(Version::new(1, 2, 0)));
+}
+
+#[test]
+fn load_changeset_file_lints_configured_summary_requirements() {
+	let root = fixture_path("config/changeset-lint-summary");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let summary_rule = configuration
+		.lints
+		.rules
+		.get("changesets/summary")
+		.unwrap_or_else(|| panic!("expected changesets/summary rule"));
+	assert_eq!(summary_rule.severity(), LintSeverity::Error);
+	assert!(summary_rule.bool_option("required", false));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.expect_err("summary lint should reject a body that does not start with a heading");
+	let message = error.to_string();
+
+	assert!(
+		message.contains("changeset body must start with a summary heading"),
+		"unexpected error: {message}"
+	);
+}
+
+#[test]
+fn load_changeset_file_lints_configured_bump_and_type_rules() {
+	let root = fixture_path("config/changeset-lint-bump-type");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.expect_err("type lint should reject a forbidden heading");
+	let message = error.to_string();
+
+	assert!(
+		message.contains("changeset must not use `Breaking` as a heading"),
+		"unexpected error: {message}"
+	);
+}
+
+#[test]
+fn load_changeset_file_lints_configured_custom_type_rule() {
+	let root = fixture_path("config/changeset-lint-custom-type");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	assert!(configuration.changelog.types.contains_key("unicorns"));
+	assert!(
+		configuration
+			.lints
+			.rules
+			.contains_key("changesets/types/unicorns")
+	);
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"cargo-core",
+		root.join("crates/core/Cargo.toml"),
+		root.clone(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.expect_err("custom type lint should reject a missing required section");
+	let message = error.to_string();
+
+	assert!(
+		message.contains("changeset must include a `Rainbow` section"),
+		"unexpected error: {message}"
+	);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_unknown_changeset_type_lint_rule() {
+	let root = fixture_path("config/changeset-lint-unknown-type");
+	let error = load_workspace_configuration(&root)
+		.expect_err("unknown changeset type lint rule should be rejected");
+	let message = error.to_string();
+
+	assert!(
+		message.contains(
+			"[lints.rules].changesets/types/unicorns references an unknown changeset type"
+		),
+		"unexpected error: {message}"
+	);
+}
+
+fn detailed_lint_rule(options: &[(&str, serde_json::Value)]) -> LintRuleConfig {
+	LintRuleConfig::Detailed {
+		level: LintSeverity::Error,
+		options: options
+			.iter()
+			.map(|(key, value)| ((*key).to_string(), value.clone()))
+			.collect(),
+	}
+}
+
+fn changeset_lint_rules(entries: &[(&str, LintRuleConfig)]) -> BTreeMap<String, LintRuleConfig> {
+	entries
+		.iter()
+		.map(|(key, value)| ((*key).to_string(), value.clone()))
+		.collect()
+}
+
+fn raw_change(bump: Option<BumpSeverity>, change_type: Option<&str>) -> crate::RawChangeEntry {
+	crate::RawChangeEntry {
+		package: "cargo-core".to_string(),
+		bump,
+		version: None,
+		reason: None,
+		details: None,
+		change_type: change_type.map(str::to_string),
+		caused_by: Vec::new(),
+	}
+}
+
+fn expect_config_error(result: monochange_core::MonochangeResult<()>, expected: &str) {
+	let error = result.expect_err("expected config error").to_string();
+	assert!(error.contains(expected), "unexpected error: {error}");
+}
+
+#[test]
+fn changeset_lint_rule_parsing_covers_enabled_disabled_and_invalid_options() {
+	let settings = crate::changeset_lint_settings_from_rules(&changeset_lint_rules(&[
+		(
+			"packages/name",
+			LintRuleConfig::Severity(LintSeverity::Error),
+		),
+		(
+			"changesets/duplicate",
+			LintRuleConfig::Severity(LintSeverity::Off),
+		),
+		(
+			"changesets/no_section_headings",
+			LintRuleConfig::Severity(LintSeverity::Error),
+		),
+		(
+			"changesets/summary",
+			detailed_lint_rule(&[
+				("required", serde_json::json!(true)),
+				("heading_level", serde_json::json!(2)),
+				("min_length", serde_json::json!(3)),
+				("max_length", serde_json::json!(80)),
+				("forbid_trailing_period", serde_json::json!(true)),
+				("forbid_conventional_commit_prefix", serde_json::json!(true)),
+			]),
+		),
+		(
+			"changesets/bump/minor",
+			detailed_lint_rule(&[
+				("required_sections", serde_json::json!(["Impact"])),
+				("min_body_chars", serde_json::json!(12)),
+				("max_body_chars", serde_json::json!(200)),
+				("require_code_block", serde_json::json!(true)),
+				("required_bump", serde_json::json!("minor")),
+				("forbidden_headings", serde_json::json!(["Minor"])),
+			]),
+		),
+		(
+			"changesets/types/Feature",
+			detailed_lint_rule(&[("required_sections", serde_json::json!(["Usage"]))]),
+		),
+		(
+			"changesets/unknown",
+			LintRuleConfig::Severity(LintSeverity::Error),
+		),
+	]))
+	.unwrap_or_else(|error| panic!("parse changeset lints: {error}"));
+
+	assert!(settings.no_section_headings);
+	assert!(settings.summary.required);
+	assert_eq!(settings.summary.heading_level, Some(2));
+	assert!(settings.bump.contains_key(&BumpSeverity::Minor));
+	assert!(settings.types.contains_key("Feature"));
+
+	for (rule_id, config, expected) in [
+		(
+			"changesets/bump/mega",
+			LintRuleConfig::Severity(LintSeverity::Error),
+			"uses an unknown bump severity",
+		),
+		(
+			"changesets/types/",
+			LintRuleConfig::Severity(LintSeverity::Error),
+			"must include a type name",
+		),
+		(
+			"changesets/summary",
+			detailed_lint_rule(&[("required", serde_json::json!("yes"))]),
+			"required must be a boolean",
+		),
+		(
+			"changesets/summary",
+			detailed_lint_rule(&[(
+				"forbid_conventional_commit_prefix",
+				serde_json::json!("yes"),
+			)]),
+			"forbid_conventional_commit_prefix must be a boolean",
+		),
+		(
+			"changesets/summary",
+			detailed_lint_rule(&[("heading_level", serde_json::json!("2"))]),
+			"heading_level must be a non-negative integer",
+		),
+		(
+			"changesets/bump/major",
+			detailed_lint_rule(&[("required_sections", serde_json::json!("Impact"))]),
+			"required_sections must be a string array",
+		),
+		(
+			"changesets/bump/major",
+			detailed_lint_rule(&[("required_sections", serde_json::json!([1]))]),
+			"required_sections must be a string array",
+		),
+		(
+			"changesets/bump/major",
+			detailed_lint_rule(&[("required_bump", serde_json::json!(1))]),
+			"required_bump must be a bump severity string",
+		),
+		(
+			"changesets/bump/major",
+			detailed_lint_rule(&[("required_bump", serde_json::json!("mega"))]),
+			"required_bump uses an unknown bump severity",
+		),
+	] {
+		let error =
+			crate::changeset_lint_settings_from_rules(&changeset_lint_rules(&[(rule_id, config)]))
+				.expect_err("invalid lint rule should be rejected")
+				.to_string();
+		assert!(error.contains(expected), "unexpected error: {error}");
+	}
+}
+
+#[test]
+fn changeset_lint_validation_covers_summary_and_scoped_rule_errors() {
+	let changelog = ChangelogSettings::default();
+	let mut valid = ChangesetLintSettings::default();
+	valid.bump.insert(
+		BumpSeverity::Minor,
+		ChangesetScopedLintSettings {
+			required_sections: vec!["Impact".to_string()],
+			min_body_chars: Some(5),
+			max_body_chars: Some(200),
+			require_code_block: false,
+			required_bump: None,
+			forbidden_headings: Vec::new(),
+		},
+	);
+	valid.types.insert(
+		"feat".to_string(),
+		ChangesetScopedLintSettings {
+			required_sections: vec!["Usage".to_string()],
+			min_body_chars: None,
+			max_body_chars: None,
+			require_code_block: false,
+			required_bump: Some(BumpSeverity::Minor),
+			forbidden_headings: vec!["Feature".to_string()],
+		},
+	);
+	crate::validate_changeset_lint_settings(&valid, &changelog)
+		.unwrap_or_else(|error| panic!("valid lint settings: {error}"));
+
+	let invalid_cases = [
+		(
+			ChangesetLintSettings {
+				summary: ChangesetSummaryLintSettings {
+					heading_level: Some(7),
+					..ChangesetSummaryLintSettings::default()
+				},
+				..ChangesetLintSettings::default()
+			},
+			"heading_level must be between 1 and 6",
+		),
+		(
+			ChangesetLintSettings {
+				summary: ChangesetSummaryLintSettings {
+					min_length: Some(20),
+					max_length: Some(10),
+					..ChangesetSummaryLintSettings::default()
+				},
+				..ChangesetLintSettings::default()
+			},
+			"min_length must not exceed max_length",
+		),
+	];
+	for (settings, expected) in invalid_cases {
+		let error = crate::validate_changeset_lint_settings(&settings, &changelog)
+			.expect_err("invalid lint settings should be rejected")
+			.to_string();
+		assert!(error.contains(expected), "unexpected error: {error}");
+	}
+
+	for (scoped, expected) in [
+		(
+			ChangesetScopedLintSettings {
+				min_body_chars: Some(20),
+				max_body_chars: Some(10),
+				..ChangesetScopedLintSettings::default()
+			},
+			"min_body_chars must not exceed max_body_chars",
+		),
+		(
+			ChangesetScopedLintSettings {
+				required_sections: vec![" ".to_string()],
+				..ChangesetScopedLintSettings::default()
+			},
+			"required_sections must not include empty values",
+		),
+		(
+			ChangesetScopedLintSettings {
+				forbidden_headings: vec![String::new()],
+				..ChangesetScopedLintSettings::default()
+			},
+			"forbidden_headings must not include empty values",
+		),
+	] {
+		let mut settings = ChangesetLintSettings::default();
+		settings.bump.insert(BumpSeverity::Patch, scoped);
+		let error = crate::validate_changeset_lint_settings(&settings, &changelog)
+			.expect_err("invalid scoped lint settings should be rejected")
+			.to_string();
+		assert!(error.contains(expected), "unexpected error: {error}");
+	}
+
+	let mut invalid_type_settings = ChangesetLintSettings::default();
+	invalid_type_settings.types.insert(
+		"feat".to_string(),
+		ChangesetScopedLintSettings {
+			required_sections: vec![String::new()],
+			..ChangesetScopedLintSettings::default()
+		},
+	);
+	let error = crate::validate_changeset_lint_settings(&invalid_type_settings, &changelog)
+		.expect_err("invalid type scoped lint settings should be rejected")
+		.to_string();
+	assert!(
+		error.contains("changesets/types/feat.required_sections must not include empty values"),
+		"unexpected error: {error}"
+	);
+}
+
+#[test]
+fn lint_markdown_changeset_covers_summary_type_and_scope_failures() {
+	let path = Path::new("change.md");
+	let changes = [raw_change(Some(BumpSeverity::Minor), Some("Feature"))];
+	let mut settings = ChangesetLintSettings::default();
+	assert!(crate::lint_markdown_changeset("", &changes, &settings, path).is_ok());
+
+	settings.summary.required = true;
+	expect_config_error(
+		crate::lint_markdown_changeset("", &changes, &settings, path),
+		"changeset body must start with a summary heading",
+	);
+	expect_config_error(
+		crate::lint_markdown_changeset("plain summary", &changes, &settings, path),
+		"changeset body must start with a summary heading",
+	);
+
+	settings.summary.heading_level = Some(2);
+	expect_config_error(
+		crate::lint_markdown_changeset("# Wrong level", &changes, &settings, path),
+		"summary heading must use level 2",
+	);
+
+	settings.summary.min_length = Some(20);
+	expect_config_error(
+		crate::lint_markdown_changeset("## Short", &changes, &settings, path),
+		"summary must be at least 20 characters",
+	);
+	settings.summary.min_length = None;
+	settings.summary.max_length = Some(5);
+	expect_config_error(
+		crate::lint_markdown_changeset("## Summary too long", &changes, &settings, path),
+		"summary must be at most 5 characters",
+	);
+	settings.summary.max_length = None;
+	settings.summary.forbid_trailing_period = true;
+	expect_config_error(
+		crate::lint_markdown_changeset("## Summary.", &changes, &settings, path),
+		"summary must not end with a period",
+	);
+	settings.summary.forbid_trailing_period = false;
+	settings.summary.forbid_conventional_commit_prefix = true;
+	expect_config_error(
+		crate::lint_markdown_changeset("## feat(core): add behavior", &changes, &settings, path),
+		"summary must not use a conventional-commit prefix",
+	);
+	assert!(!crate::has_conventional_commit_prefix("Add behavior"));
+
+	settings.summary = ChangesetSummaryLintSettings::default();
+	settings.no_section_headings = true;
+	expect_config_error(
+		crate::lint_markdown_changeset("# Summary\n\n## Feature", &changes, &settings, path),
+		"must not also be used as a heading",
+	);
+	assert!(
+		crate::lint_markdown_changeset("# Summary\n\n## Details", &changes, &settings, path)
+			.is_ok()
+	);
+
+	settings.no_section_headings = false;
+	settings.types.insert(
+		"feature".to_string(),
+		ChangesetScopedLintSettings {
+			required_sections: vec!["Impact".to_string()],
+			..ChangesetScopedLintSettings::default()
+		},
+	);
+	expect_config_error(
+		crate::lint_markdown_changeset("# Summary", &changes, &settings, path),
+		"changeset must include a `Impact` section",
+	);
+	assert!(
+		crate::lint_markdown_changeset("# Summary\n\n## Impact", &changes, &settings, path).is_ok()
+	);
+}
+
+#[test]
+fn lint_markdown_scope_covers_each_configured_requirement() {
+	let path = Path::new("change.md");
+	let body = "# Summary\n\n## Impact\n\n```rust\nlet value = 1;\n```";
+	let change = raw_change(Some(BumpSeverity::Patch), Some("breaking"));
+
+	expect_config_error(
+		crate::lint_markdown_scope(
+			body,
+			&change,
+			&ChangesetScopedLintSettings {
+				required_bump: Some(BumpSeverity::Major),
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		),
+		"requires bump `major`, found `patch`",
+	);
+	expect_config_error(
+		crate::lint_markdown_scope(
+			body,
+			&raw_change(None, Some("breaking")),
+			&ChangesetScopedLintSettings {
+				required_bump: Some(BumpSeverity::Major),
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		),
+		"requires bump `major`, found `auto`",
+	);
+	expect_config_error(
+		crate::lint_markdown_scope(
+			"# Summary",
+			&change,
+			&ChangesetScopedLintSettings {
+				required_sections: vec!["Impact".to_string()],
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		),
+		"changeset must include a `Impact` section",
+	);
+	expect_config_error(
+		crate::lint_markdown_scope(
+			body,
+			&change,
+			&ChangesetScopedLintSettings {
+				forbidden_headings: vec!["Impact".to_string()],
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		),
+		"changeset must not use `Impact` as a heading",
+	);
+	assert!(
+		crate::lint_markdown_scope(
+			body,
+			&change,
+			&ChangesetScopedLintSettings {
+				forbidden_headings: vec!["Missing".to_string()],
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		)
+		.is_ok()
+	);
+	expect_config_error(
+		crate::lint_markdown_scope(
+			"# Tiny",
+			&change,
+			&ChangesetScopedLintSettings {
+				min_body_chars: Some(20),
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		),
+		"body must be at least 20 characters",
+	);
+	expect_config_error(
+		crate::lint_markdown_scope(
+			body,
+			&change,
+			&ChangesetScopedLintSettings {
+				max_body_chars: Some(10),
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		),
+		"body must be at most 10 characters",
+	);
+	expect_config_error(
+		crate::lint_markdown_scope(
+			"# Summary\n\n## Impact",
+			&change,
+			&ChangesetScopedLintSettings {
+				require_code_block: true,
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		),
+		"must include a fenced code block",
+	);
+	assert!(
+		crate::lint_markdown_scope(
+			"# Summary\n\n~~~text\ncode\n~~~",
+			&change,
+			&ChangesetScopedLintSettings {
+				require_code_block: true,
+				..ChangesetScopedLintSettings::default()
+			},
+			path,
+		)
+		.is_ok()
+	);
 }
 
 #[test]
@@ -5012,8 +5565,8 @@ fn load_workspace_configuration_parses_top_level_lints_and_scopes() {
 			.lints
 			.rules
 			.get("cargo/internal-dependency-workspace")
-			.map(monochange_core::lint::LintRuleConfig::severity),
-		Some(monochange_core::lint::LintSeverity::Error)
+			.map(LintRuleConfig::severity),
+		Some(LintSeverity::Error)
 	);
 	assert_eq!(
 		configuration.lints.include,
