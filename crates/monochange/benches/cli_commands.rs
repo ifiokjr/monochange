@@ -354,8 +354,6 @@ fn generate_fixture_with_git_history(
 	num_changesets: usize,
 	num_history_commits: usize,
 ) {
-	use std::process::Command;
-
 	// Create workspace structure first (no git yet).
 	generate_fixture(root, num_packages, num_changesets);
 	// Remove changesets — we'll add them interleaved with history.
@@ -367,9 +365,10 @@ fn generate_fixture_with_git_history(
 
 	// Init git repo.
 	let git = |args: &[&str]| {
-		let output = Command::new("git")
+		let output = monochange_core::git::git_command(root)
+			.arg("-c")
+			.arg("gc.auto=0")
 			.args(args)
-			.current_dir(root)
 			.env("GIT_AUTHOR_NAME", "bench")
 			.env("GIT_AUTHOR_EMAIL", "bench@test")
 			.env("GIT_COMMITTER_NAME", "bench")

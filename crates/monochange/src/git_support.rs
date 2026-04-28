@@ -1,12 +1,15 @@
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::process::Stdio;
 
 use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::git::git_command_output;
-use monochange_core::git::git_commit_paths_command;
+use monochange_core::git::git_commit_message_text;
+use monochange_core::git::git_commit_paths_stdin_command;
 use monochange_core::git::git_error_detail;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::git_stderr_trimmed;
@@ -280,8 +283,9 @@ pub(crate) fn git_commit_paths(
 	message: &CommitMessage,
 	no_verify: bool,
 ) -> MonochangeResult<()> {
-	run_git_process(
-		git_commit_paths_command(root, message, no_verify),
+	run_git_process_with_stdin(
+		git_commit_paths_stdin_command(root, no_verify),
+		git_commit_message_text(message).as_bytes(),
 		"failed to create release commit",
 	)
 }
@@ -302,8 +306,36 @@ pub(crate) fn run_git_process(
 	let output = command
 		.output()
 		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
+	handle_git_process_output(&output, error_message)
+}
+
+pub(crate) fn run_git_process_with_stdin(
+	mut command: ProcessCommand,
+	input: &[u8],
+	error_message: &str,
+) -> MonochangeResult<()> {
+	let mut child = command
+		.stdout(Stdio::piped())
+		.stderr(Stdio::piped())
+		.spawn()
+		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
+	if let Some(mut stdin) = child.stdin.take() {
+		stdin
+			.write_all(input)
+			.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
+	}
+	let output = child
+		.wait_with_output()
+		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
+	handle_git_process_output(&output, error_message)
+}
+
+fn handle_git_process_output(
+	output: &std::process::Output,
+	error_message: &str,
+) -> MonochangeResult<()> {
 	if !output.status.success() {
-		let stderr = git_error_detail(&output);
+		let stderr = git_error_detail(output);
 		let detail = [error_message, stderr.as_str()]
 			.into_iter()
 			.filter(|part| !part.is_empty())
@@ -357,6 +389,35 @@ mod tests {
 		git(root, &["config", "user.name", "monochange tests"]);
 		git(root, &["config", "user.email", "monochange@example.com"]);
 		git(root, &["config", "commit.gpgsign", "false"]);
+	}
+
+	#[test]
+	fn git_commit_paths_supports_large_commit_message_bodies() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		init_git_repo(root);
+		fs::write(root.join("release.txt"), "release\n")
+			.unwrap_or_else(|error| panic!("write release file: {error}"));
+		git(root, &["add", "release.txt"]);
+		git(root, &["commit", "-m", "initial"]);
+
+		fs::write(root.join("release.txt"), "release\nupdated\n")
+			.unwrap_or_else(|error| panic!("update release file: {error}"));
+		git(root, &["add", "release.txt"]);
+		let body = "release record entry\n".repeat(16_384);
+		git_commit_paths(
+			root,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: Some(body.clone()),
+			},
+			false,
+		)
+		.unwrap_or_else(|error| panic!("git commit paths: {error}"));
+
+		let commit_body = git_output(root, &["log", "-1", "--format=%B"]);
+		assert!(commit_body.contains("chore(release): prepare release"));
+		assert!(commit_body.contains(body.trim_end()));
 	}
 
 	#[test]
@@ -472,6 +533,43 @@ mod tests {
 			.err()
 			.unwrap_or_else(|| panic!("expected failed git process"));
 		assert!(error.to_string().contains("process failure"));
+		assert!(
+			error
+				.to_string()
+				.contains("definitely-not-a-real-git-command")
+		);
+	}
+
+	#[test]
+	fn run_git_process_with_stdin_allows_commands_without_piped_stdin() {
+		let mut command = ProcessCommand::new("git");
+		command.arg("--version");
+
+		run_git_process_with_stdin(command, b"message", "stdin process")
+			.unwrap_or_else(|error| panic!("stdin process should succeed: {error}"));
+	}
+
+	#[test]
+	fn run_git_process_with_stdin_reports_spawn_failures() {
+		let command = ProcessCommand::new("definitely-not-a-real-monochange-test-command");
+
+		let error = run_git_process_with_stdin(command, b"message", "stdin process failure")
+			.err()
+			.unwrap_or_else(|| panic!("expected failed stdin git process"));
+		assert!(error.to_string().contains("stdin process failure"));
+	}
+
+	#[test]
+	fn run_git_process_with_stdin_reports_nonzero_exit_status_details() {
+		let mut command = ProcessCommand::new("git");
+		command
+			.arg("definitely-not-a-real-git-command")
+			.stdin(Stdio::piped());
+
+		let error = run_git_process_with_stdin(command, b"message", "stdin process failure")
+			.err()
+			.unwrap_or_else(|| panic!("expected failed stdin git process"));
+		assert!(error.to_string().contains("stdin process failure"));
 		assert!(
 			error
 				.to_string()
