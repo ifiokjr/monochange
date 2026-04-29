@@ -656,7 +656,9 @@ verified_commits = true
 #
 # Each [cli.<name>] table becomes a top-level `mc <name>` command.
 #
-# Reserved names that cannot be used: "init", "help", "version"
+# Reserved names that cannot be used include hardcoded commands such as
+# "agent", "agents", "analyze", "check", "fix", "help", "init", "lint",
+# "lsp", "mcp", "skill", "skills", "subagents", "validate", and "version".
 #
 # Fields:
 #   help_text — description shown in `mc --help`
@@ -698,6 +700,81 @@ verified_commits = true
 # Command templates can also use {{ inputs.name }} for CLI inputs.
 # {{ version }}, {{ group_version }}, {{ released_packages }}, {{changed_files}}, {{ changesets }}
 
+[cli.discover]
+help_text = "Discover packages across supported ecosystems"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [{ name = "discover packages", type = "Discover" }]
+
+[cli.change]
+help_text = "Create a change file for one or more packages"
+inputs = [
+	{ name = "package", type = "string_list", required = true },
+	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
+	{ name = "reason", type = "string", required = true },
+	{ name = "version", type = "string" },
+	{ name = "type", type = "string" },
+	{ name = "caused_by", type = "string_list" },
+	{ name = "details", type = "string" },
+	{ name = "output", type = "path" },
+]
+steps = [{ name = "create change file", type = "CreateChangeFile" }]
+
+[cli.versions]
+help_text = "Display planned package and group versions from discovered change files"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+]
+steps = [{ name = "display versions", type = "DisplayVersions" }]
+
+[cli.placeholder-publish]
+help_text = "Publish placeholder package versions for missing registry packages"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+	{ name = "package", type = "string_list" },
+]
+steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
+
+[cli.publish-plan]
+help_text = "Plan package-registry publish work against known ecosystem rate limits"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
+	{ name = "mode", type = "choice", choices = ["publish", "placeholder"], default = "publish" },
+	{ name = "package", type = "string_list" },
+	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; limits publish plans to ready package work" },
+	{ name = "ci", type = "choice", choices = ["github-actions", "gitlab-ci"] },
+]
+steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]
+
+[cli.affected]
+help_text = "Evaluate pull-request changeset policy"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+	{ name = "changed_paths", type = "string_list", required = true },
+	{ name = "label", type = "string_list" },
+]
+steps = [{ name = "evaluate affected packages", type = "AffectedPackages" }]
+
+[cli.diagnostics]
+help_text = "Show changeset diagnostics and context"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+	{ name = "changeset", type = "string_list", help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)" },
+]
+steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets" }]
+
+[cli.repair-release]
+help_text = "Repair a recent release by moving its release tags to a later commit"
+inputs = [
+	{ name = "from", type = "string", help_text = "tag or commit-ish used to locate the release record", required = true },
+	{ name = "target", type = "string", help_text = "commit-ish the release set should move to", default = "HEAD" },
+	{ name = "force", type = "boolean", help_text = "allow non-descendant retargets", default = false },
+	{ name = "sync_provider", type = "boolean", help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)", default = true },
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [{ name = "retarget release", type = "RetargetRelease" }]
+
 [cli.release]
 help_text = "Prepare a release from discovered change files"
 inputs = [
@@ -730,6 +807,16 @@ steps = [
 	{ type = "Command", name = "refresh shared markdown", command = "mdt update" },
 	{ type = "CommitRelease", name = "create release commit", inputs = { no_verify = "{{ inputs.no_verify }}" } },
 	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+]
+
+[cli.commit-release]
+help_text = "Prepare a release and create a local release commit"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [
+	{ type = "PrepareRelease" },
+	{ type = "CommitRelease" },
 ]
 
 [cli.publish-release]

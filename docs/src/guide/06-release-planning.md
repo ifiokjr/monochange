@@ -224,7 +224,7 @@ The binary no longer ships a hidden default workflow set for commands such as `d
 
 `mc validate` remains a hardcoded binary command for normal preflight checks. The matching immutable step form is also available as `mc step:validate`. Do not define `[cli.validate]` or any `[cli.step:*]` command in `monochange.toml`; those names are reserved for built-in commands.
 
-Commands like `commit-release` combine `PrepareRelease` with later stateful steps such as `CommitRelease` and `OpenReleaseRequest`. Keep them as explicit `[cli.*]` workflow commands when you want a durable, named release process.
+Commands like `commit-release` combine `PrepareRelease` with later stateful steps such as `CommitRelease`. Provider request workflows such as `release-pr` can add `OpenReleaseRequest`. Keep both as explicit `[cli.*]` workflow commands when you want a durable, named release process.
 
 Current `PrepareRelease` behavior:
 

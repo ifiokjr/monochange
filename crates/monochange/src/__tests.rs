@@ -1082,7 +1082,7 @@ fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	assert!(config.contains("[package.core]"));
 	assert!(config.contains("[package.web]"));
 	assert!(config.contains("[group.main]"));
-	assert!(config.contains("[cli.validate]"));
+	assert!(!config.contains("[cli.validate]"));
 	assert!(config.contains("[cli.discover]"));
 	assert!(config.contains("[cli.change]"));
 	assert!(config.contains("[cli.release]"));
@@ -1094,6 +1094,29 @@ fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	assert!(config.contains("type = \"CreateChangeFile\""));
 	assert!(config.contains("type = \"PlaceholderPublish\""));
 	assert!(config.contains("type = \"PublishPackages\""));
+
+	load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("generated config should parse: {error}"));
+}
+
+#[test]
+fn init_writes_configuration_that_validates_in_empty_workspace() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("init")],
+	)
+	.unwrap_or_else(|error| panic!("init output: {error}"));
+	let config = fs::read_to_string(tempdir.path().join("monochange.toml"))
+		.unwrap_or_else(|error| panic!("config: {error}"));
+
+	assert!(!config.contains("[cli.validate]"));
+	run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("validate")],
+	)
+	.unwrap_or_else(|error| panic!("generated config should validate: {error}"));
 }
 
 #[test]
@@ -11859,6 +11882,10 @@ fn init_with_provider_writes_source_section_and_commit_release_command() {
 		"expected [cli.commit-release] command"
 	);
 	assert!(
+		config.contains("[cli.release-pr]"),
+		"expected [cli.release-pr] command"
+	);
+	assert!(
 		config.contains("type = \"PrepareRelease\""),
 		"expected PrepareRelease step"
 	);
@@ -11870,6 +11897,8 @@ fn init_with_provider_writes_source_section_and_commit_release_command() {
 		config.contains("type = \"OpenReleaseRequest\""),
 		"expected OpenReleaseRequest step"
 	);
+	load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("generated provider config should parse: {error}"));
 }
 
 #[test]
