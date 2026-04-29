@@ -2897,6 +2897,76 @@ enforce = true
 }
 
 #[test]
+fn load_workspace_configuration_inherits_ecosystem_publish_trusted_publishing_defaults() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("packages/web"))
+		.unwrap_or_else(|error| panic!("create web package: {error}"));
+	std::fs::create_dir_all(root.join("packages/legacy"))
+		.unwrap_or_else(|error| panic!("create legacy package: {error}"));
+	std::fs::write(
+		root.join("packages/web/package.json"),
+		r#"{ "name": "web", "version": "1.0.0" }"#,
+	)
+	.unwrap_or_else(|error| panic!("write web manifest: {error}"));
+	std::fs::write(
+		root.join("packages/legacy/package.json"),
+		r#"{ "name": "legacy", "version": "1.0.0" }"#,
+	)
+	.unwrap_or_else(|error| panic!("write legacy manifest: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[ecosystems.npm.publish.trusted_publishing]
+enabled = true
+repository = "monochange/monochange"
+workflow = "publish.yml"
+environment = "publisher"
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[package.legacy]
+path = "packages/legacy"
+type = "npm"
+
+[package.legacy.publish]
+trusted_publishing = false
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let web = configuration
+		.package_by_id("web")
+		.unwrap_or_else(|| panic!("expected web package"));
+	let legacy = configuration
+		.package_by_id("legacy")
+		.unwrap_or_else(|| panic!("expected legacy package"));
+
+	assert!(web.publish.trusted_publishing.enabled);
+	assert_eq!(
+		web.publish.trusted_publishing.repository.as_deref(),
+		Some("monochange/monochange")
+	);
+	assert_eq!(
+		web.publish.trusted_publishing.workflow.as_deref(),
+		Some("publish.yml")
+	);
+	assert_eq!(
+		web.publish.trusted_publishing.environment.as_deref(),
+		Some("publisher")
+	);
+	assert!(!legacy.publish.trusted_publishing.enabled);
+	assert_eq!(
+		legacy.publish.trusted_publishing.workflow.as_deref(),
+		Some("publish.yml")
+	);
+}
+
+#[test]
 fn load_workspace_configuration_merges_trusted_publishing_details() {
 	let root = fixture_path("config/publish-trusted-publishing-overrides");
 	let configuration = load_workspace_configuration(&root)

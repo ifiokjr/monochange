@@ -48,7 +48,7 @@ For `crates.io`, `jsr`, `pub.dev`, and PyPI, monochange reports the setup URL fo
 
 ## monochange configuration
 
-Start by enabling trusted publishing for the relevant ecosystem or package.
+Start by enabling trusted publishing for the relevant ecosystem. Packages inherit the ecosystem publish setting by default and can override it when needed.
 
 ```toml
 [source]
@@ -58,6 +58,10 @@ repo = "monochange"
 
 [ecosystems.npm.publish]
 trusted_publishing = true
+
+[ecosystems.npm.publish.trusted_publishing]
+workflow = "publish.yml"
+environment = "publisher"
 
 [ecosystems.cargo.publish]
 trusted_publishing = true
@@ -72,9 +76,13 @@ trusted_publishing = true
 trusted_publishing = true
 
 [package.cli.publish.trusted_publishing]
-workflow = "publish.yml"
-environment = "publisher"
+workflow = "publish-cli.yml"
+
+[package.legacy.publish]
+trusted_publishing = false
 ```
+
+Use ecosystem publish settings for the shared trust policy and GitHub context. Use package publish settings only for package-specific workflows, environments, or opt-outs.
 
 monochange resolves the GitHub trust context from:
 
@@ -110,7 +118,7 @@ Use the same environment name in GitHub Actions and in the registry configuratio
 
 Use this sequence when adopting trusted publishing for an existing workspace:
 
-1. Set `publish.trusted_publishing = true` for the target ecosystem or package.
+1. Set `publish.trusted_publishing = true` for the target ecosystem, then override individual packages only when they differ.
 2. Run `mc placeholder-publish --dry-run` to see which packages do not exist yet.
 3. If needed, run `mc placeholder-publish` so the package exists in the registry first.
 4. Complete the registry-side trusted-publishing setup for each package.
