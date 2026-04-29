@@ -295,6 +295,7 @@ fn yes_no(value: bool) -> &'static str {
 mod tests {
 	use monochange_core::Ecosystem;
 	use monochange_core::PackagePublicationTarget;
+	use monochange_core::PublishAttestationSettings;
 	use monochange_core::PublishMode;
 	use monochange_core::PublishRegistry;
 	use monochange_core::RegistryKind;
@@ -311,6 +312,7 @@ mod tests {
 			version: "1.2.3".to_string(),
 			mode: PublishMode::Builtin,
 			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
 		}];
 		let selected = BTreeSet::from(["core".to_string(), "docs".to_string()]);
 
@@ -356,6 +358,7 @@ mod tests {
 			version: "1.2.3".to_string(),
 			mode: PublishMode::Builtin,
 			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
 		}];
 
 		assert_eq!(

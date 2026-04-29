@@ -404,6 +404,7 @@ mod tests {
 	use httpmock::Method::GET;
 	use httpmock::MockServer;
 	use monochange_core::PackagePublicationTarget;
+	use monochange_core::PublishAttestationSettings;
 	use monochange_core::PublishMode;
 	use monochange_core::PublishRegistry;
 	use monochange_core::TrustedPublishingSettings;
@@ -464,6 +465,7 @@ mod tests {
 			version: Version::new(1, 0, 0).to_string(),
 			placeholder: false,
 			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
 			placeholder_readme: String::new(),
 		}
 	}
@@ -521,6 +523,7 @@ mod tests {
 					version: Version::new(1, 0, 0).to_string(),
 					mode: PublishMode::Builtin,
 					trusted_publishing: TrustedPublishingSettings::default(),
+					attestations: PublishAttestationSettings::default(),
 				},
 				PackagePublicationTarget {
 					package: "docs".to_string(),
@@ -529,6 +532,7 @@ mod tests {
 					version: Version::new(1, 0, 0).to_string(),
 					mode: PublishMode::Builtin,
 					trusted_publishing: TrustedPublishingSettings::default(),
+					attestations: PublishAttestationSettings::default(),
 				},
 				PackagePublicationTarget {
 					package: "web".to_string(),
@@ -537,6 +541,7 @@ mod tests {
 					version: Version::new(1, 0, 0).to_string(),
 					mode: PublishMode::Builtin,
 					trusted_publishing: TrustedPublishingSettings::default(),
+					attestations: PublishAttestationSettings::default(),
 				},
 			],
 			version: None,
@@ -721,6 +726,7 @@ mod tests {
 				version: Version::new(1, 0, 1).to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 			PackagePublicationTarget {
 				package: "private".to_string(),
@@ -729,6 +735,7 @@ mod tests {
 				version: Version::new(1, 0, 1).to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 			PackagePublicationTarget {
 				package: "docs".to_string(),
@@ -737,6 +744,7 @@ mod tests {
 				version: Version::new(1, 0, 1).to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 		];
 		let requests = package_publish::build_release_requests(
@@ -786,6 +794,7 @@ mod tests {
 					version: Version::new(1, 0, 0).to_string(),
 					mode: PublishMode::Builtin,
 					trusted_publishing: TrustedPublishingSettings::default(),
+					attestations: PublishAttestationSettings::default(),
 				},
 				PackagePublicationTarget {
 					package: "docs".to_string(),
@@ -794,6 +803,7 @@ mod tests {
 					version: Version::new(1, 0, 0).to_string(),
 					mode: PublishMode::Builtin,
 					trusted_publishing: TrustedPublishingSettings::default(),
+					attestations: PublishAttestationSettings::default(),
 				},
 				PackagePublicationTarget {
 					package: "web".to_string(),
@@ -802,6 +812,7 @@ mod tests {
 					version: Version::new(1, 0, 0).to_string(),
 					mode: PublishMode::Builtin,
 					trusted_publishing: TrustedPublishingSettings::default(),
+					attestations: PublishAttestationSettings::default(),
 				},
 			],
 			version: None,
@@ -1159,6 +1170,7 @@ mod tests {
 					version: Version::new(1, 0, 0).to_string(),
 					placeholder: false,
 					trusted_publishing: TrustedPublishingSettings::default(),
+					attestations: PublishAttestationSettings::default(),
 					placeholder_readme: String::new(),
 				}
 			})

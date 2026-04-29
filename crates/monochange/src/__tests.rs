@@ -9122,6 +9122,7 @@ fn create_release_record_commit_with_package_publication(root: &Path, package: &
 		version: "1.2.3".to_string(),
 		mode: monochange_core::PublishMode::Builtin,
 		trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+		attestations: monochange_core::PublishAttestationSettings::default(),
 	}];
 	create_release_record_commit_from_record(root, &record)
 }
