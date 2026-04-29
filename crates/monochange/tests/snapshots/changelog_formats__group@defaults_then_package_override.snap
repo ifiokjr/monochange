@@ -1,7 +1,14 @@
 ---
 source: crates/monochange/tests/changelog_formats.rs
+assertion_line: 41
 expression: group_changelog
 ---
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+This changelog is managed by [monochange](https://github.com/monochange/monochange).
+
 ## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.

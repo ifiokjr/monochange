@@ -2,6 +2,12 @@
 source: crates/monochange/tests/release_notes_and_propagation.rs
 expression: changelog
 ---
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+This changelog is managed by [monochange](https://github.com/monochange/monochange).
+
 ## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.

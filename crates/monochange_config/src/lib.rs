@@ -270,6 +270,8 @@ struct RawChangelogTable {
 	#[serde(default)]
 	format: Option<ChangelogFormat>,
 	#[serde(default)]
+	initial_header: Option<String>,
+	#[serde(default)]
 	include: Option<RawGroupChangelogInclude>,
 }
 
@@ -591,6 +593,19 @@ impl RawChangelogConfig {
 		match self {
 			Self::Legacy(_) => None,
 			Self::Detailed(table) => table.include.as_ref(),
+		}
+	}
+
+	fn initial_header(&self) -> Option<String> {
+		match self {
+			Self::Legacy(_) => None,
+			Self::Detailed(table) => {
+				table
+					.initial_header
+					.as_ref()
+					.filter(|header| !header.trim().is_empty())
+					.cloned()
+			}
 		}
 	}
 
@@ -1018,13 +1033,17 @@ fn build_package_definitions(
 					definition.resolve_for_package(&package.path, false).map(|path| ChangelogTarget {
 						path,
 						format: definition.format().unwrap_or(default_changelog_format),
+						initial_header: definition
+							.initial_header()
+							.or_else(|| default_package_changelog.and_then(RawChangelogConfig::initial_header)),
 					})
 				})
 				.or_else(|| {
-					default_package_changelog.as_ref().and_then(|definition| {
+					default_package_changelog.and_then(|definition| {
 						definition.resolve_for_package(&package.path, true).map(|path| ChangelogTarget {
 							path,
 							format: definition.format().unwrap_or(default_changelog_format),
+							initial_header: definition.initial_header(),
 						})
 					})
 				});
@@ -1098,6 +1117,7 @@ fn build_group_definitions(
 	contents: &str,
 	groups: BTreeMap<String, RawGroupDefinition>,
 	default_changelog_format: ChangelogFormat,
+	default_changelog_initial_header: Option<&str>,
 ) -> MonochangeResult<Vec<GroupDefinition>> {
 	groups
 		.into_iter()
@@ -1108,6 +1128,9 @@ fn build_group_definitions(
 					Some(path) => Some(ChangelogTarget {
 						path,
 						format: definition.format().unwrap_or(default_changelog_format),
+						initial_header: definition
+							.initial_header()
+							.or_else(|| default_changelog_initial_header.map(str::to_string)),
 					}),
 					None if definition.is_disabled() => None,
 					None => {
@@ -1236,7 +1259,16 @@ pub fn load_workspace_configuration(root: &Path) -> MonochangeResult<WorkspaceCo
 		&python_ecosystem,
 		&go_ecosystem,
 	)?;
-	let groups = build_group_definitions(&contents, group, default_changelog_format)?;
+	let default_changelog_initial_header = defaults
+		.changelog
+		.as_ref()
+		.and_then(RawChangelogConfig::initial_header);
+	let groups = build_group_definitions(
+		&contents,
+		group,
+		default_changelog_format,
+		default_changelog_initial_header.as_deref(),
+	)?;
 	let source = resolve_source_configuration(source);
 
 	validate_cli(&cli)?;

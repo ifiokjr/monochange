@@ -91,6 +91,23 @@ Optional package fields:
 
 A package-level `changelog` value overrides the default for that package.
 
+The table form also accepts `initial_header`. monochange renders this Markdown only when a changelog file is created from empty content. Existing changelog preambles are preserved and are not rewritten on later releases. If `initial_header` is omitted or blank, monochange uses the selected format's built-in header: `keep_a_changelog` gets the Keep a Changelog/SemVer preamble, and `monochange` gets the monochange-managed preamble. Package and group changelog tables can override the default header.
+
+```toml
+[defaults.changelog]
+path = "{{ path }}/changelog.md"
+format = "keep_a_changelog"
+initial_header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+This changelog is managed by [monochange](https://github.com/monochange/monochange).
+"""
+```
+
+`initial_header` templates can use release context such as `{{ monochange_version }}`, `{{ config_path }}`, `{{ monochange_config_path }}`, `{{ workspace_root }}`, `{{ changelog_path }}`, `{{ changelog_format }}`, `{{ package }}`, `{{ package_name }}`, `{{ package_id }}`, `{{ package_path }}`, `{{ group }}`, `{{ group_name }}`, `{{ group_id }}`, `{{ member_count }}`, `{{ members }}`, `{{ release_owner }}`, `{{ release_owner_kind }}`, `{{ version }}`, `{{ new_version }}`, and `{{ current_version }}`.
+
 `empty_update_message` lets changelog targets render a readable fallback entry when a version update is required but no direct release notes were recorded for that target. This is especially useful for grouped packages that keep their own changelog entries even when only another member of the group changed.
 
 `empty_update_message` can be set on:

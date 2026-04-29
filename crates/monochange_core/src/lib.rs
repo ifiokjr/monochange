@@ -85,6 +85,11 @@ pub const DEFAULT_CHANGELOG_VERSION_TITLE_PRIMARY: &str =
 /// Default changelog version title for namespaced versioning (markdown-linked when source configured).
 pub const DEFAULT_CHANGELOG_VERSION_TITLE_NAMESPACED: &str = "{% if tag_url %}{{ id }} [{{ version }}]({{ tag_url }}){% else %}{{ id }} {{ version }}{% endif %} ({{ date }})";
 
+/// Default initial changelog header for the `monochange` changelog format.
+pub const DEFAULT_INITIAL_CHANGELOG_HEADER_MONOCHANGE: &str = "# Changelog\n\nAll notable changes to this project will be documented in this file.\n\nThis changelog is managed by [monochange](https://github.com/monochange/monochange).";
+/// Default initial changelog header for the `keep_a_changelog` changelog format.
+pub const DEFAULT_INITIAL_CHANGELOG_HEADER_KEEP_A_CHANGELOG: &str = "# Changelog\n\nAll notable changes to this project will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).";
+
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum MonochangeError {
@@ -1037,6 +1042,8 @@ pub struct ChangelogTarget {
 	pub path: PathBuf,
 	#[serde(default)]
 	pub format: ChangelogFormat,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub initial_header: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

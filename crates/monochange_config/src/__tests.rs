@@ -321,6 +321,7 @@ fn load_workspace_configuration_parses_package_group_and_cli_command_declaration
 		Some(ChangelogTarget {
 			path: PathBuf::from("crates/core/changelog.md"),
 			format: ChangelogFormat::Monochange,
+			initial_header: None,
 		})
 	);
 	assert_eq!(
@@ -629,6 +630,7 @@ fn load_workspace_configuration_uses_defaults_changelog_pattern_when_package_cha
 		Some(ChangelogTarget {
 			path: PathBuf::from("crates/core/changelog.md"),
 			format: ChangelogFormat::Monochange,
+			initial_header: None,
 		})
 	);
 }
@@ -657,6 +659,7 @@ fn load_workspace_configuration_supports_package_changelog_true_false_and_string
 		Some(ChangelogTarget {
 			path: PathBuf::from("crates/core/CHANGELOG.md"),
 			format: ChangelogFormat::Monochange,
+			initial_header: None,
 		})
 	);
 	assert_eq!(app.changelog, None);
@@ -665,6 +668,7 @@ fn load_workspace_configuration_supports_package_changelog_true_false_and_string
 		Some(ChangelogTarget {
 			path: PathBuf::from("docs/tool-release-notes.md"),
 			format: ChangelogFormat::Monochange,
+			initial_header: None,
 		})
 	);
 }
@@ -694,6 +698,7 @@ fn load_workspace_configuration_supports_changelog_format_tables_and_overrides()
 		Some(ChangelogTarget {
 			path: PathBuf::from("crates/core/CHANGELOG.md"),
 			format: ChangelogFormat::KeepAChangelog,
+			initial_header: Some("Default {{ release_owner }} changelog".to_string()),
 		})
 	);
 	assert_eq!(
@@ -701,6 +706,7 @@ fn load_workspace_configuration_supports_changelog_format_tables_and_overrides()
 		Some(ChangelogTarget {
 			path: PathBuf::from("docs/app-release-notes.md"),
 			format: ChangelogFormat::Monochange,
+			initial_header: Some("App {{ package_name }} changelog".to_string()),
 		})
 	);
 	assert_eq!(
@@ -708,6 +714,7 @@ fn load_workspace_configuration_supports_changelog_format_tables_and_overrides()
 		Some(ChangelogTarget {
 			path: PathBuf::from("docs/group-release-notes.md"),
 			format: ChangelogFormat::KeepAChangelog,
+			initial_header: Some("Default {{ release_owner }} changelog".to_string()),
 		})
 	);
 }
@@ -4065,6 +4072,7 @@ fn raw_changelog_config_resolves_package_and_group_paths() {
 		enabled: Some(false),
 		path: Some("group/CHANGELOG.md".to_string()),
 		format: None,
+		initial_header: None,
 		include: None,
 	});
 	assert!(detailed_disabled.is_disabled());
@@ -4078,6 +4086,7 @@ fn raw_changelog_config_resolves_package_and_group_paths() {
 		enabled: Some(true),
 		path: None,
 		format: None,
+		initial_header: Some("Header".to_string()),
 		include: Some(crate::RawGroupChangelogInclude::Mode(
 			"group-only".to_string(),
 		)),

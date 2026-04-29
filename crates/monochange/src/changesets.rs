@@ -850,6 +850,7 @@ pub(crate) fn resolve_changelog_targets(
 			ChangelogTarget {
 				path: resolve_config_path(&configuration.root_path, &changelog_path.path),
 				format: changelog_path.format,
+				initial_header: changelog_path.initial_header.clone(),
 			},
 		);
 	}
@@ -862,6 +863,7 @@ pub(crate) fn resolve_changelog_targets(
 			ChangelogTarget {
 				path: resolve_config_path(&configuration.root_path, &changelog_path.path),
 				format: changelog_path.format,
+				initial_header: changelog_path.initial_header.clone(),
 			},
 		);
 	}
