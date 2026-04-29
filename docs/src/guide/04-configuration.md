@@ -146,6 +146,9 @@ trusted_publishing = true
 workflow = "publish.yml"
 environment = "publisher"
 
+[ecosystems.npm.publish.attestations]
+require_registry_provenance = true
+
 [package.web.publish]
 mode = "builtin"
 
@@ -162,11 +165,12 @@ Supported fields:
 - `mode` — `builtin` or `external`
 - `registry` — public registry override for the package ecosystem
 - `trusted_publishing` — `true`/`false` or a table with `enabled`, `repository`, `workflow`, and `environment`
+- `attestations.require_registry_provenance` — require registry-native package provenance when the selected registry/provider capability supports it
 - `rate_limits.enforce` — block built-in publish runs when the selected package set exceeds a known single registry window
 - `placeholder.readme` — inline placeholder README content
 - `placeholder.readme_file` — workspace-relative file to use as placeholder README content
 
-Inheritance flows from `[ecosystems.<name>.publish]` to matching packages, and package-level values override the inherited ecosystem defaults. Configure shared trusted-publishing policy and context on the ecosystem, then use package-level publish settings for opt-outs or package-specific workflows.
+Inheritance flows from `[ecosystems.<name>.publish]` to matching packages, and package-level values override the inherited ecosystem defaults. Configure shared trusted-publishing, attestation, and context policy on the ecosystem, then use package-level publish settings for opt-outs or package-specific workflows.
 
 Built-in publishing currently targets only the canonical public registry for each supported ecosystem:
 
@@ -219,6 +223,30 @@ When `trusted_publishing` is enabled:
 - npm packages can be configured automatically with `npm trust github ...`
 - pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, so workspace protocol and catalog dependency handling stays aligned with the workspace manager
 - Cargo, `jsr`, `pub.dev`, and PyPI currently require manual trusted-publishing setup; monochange reports the setup URL and blocks built-in release publishing until trust is configured
+
+### Attestation policy
+
+`publish.attestations.require_registry_provenance` is separate from `publish.trusted_publishing`. Trusted publishing must be enabled first, then the attestation policy tells monochange to require registry-native package provenance where the selected registry and CI provider support it.
+
+```toml
+[ecosystems.npm.publish]
+trusted_publishing = true
+
+[ecosystems.npm.publish.attestations]
+require_registry_provenance = true
+
+[package.legacy.publish.attestations]
+require_registry_provenance = false
+```
+
+monochange currently treats npm provenance and JSR package provenance as enforceable built-in registry provenance. PyPI PEP 740 attestations are modeled in the capability matrix, but `require_registry_provenance` is rejected for PyPI until the built-in Python publisher exposes a publish command that can require uploading those attestations. `crates.io`, `pub.dev`, Go proxy publishing, and custom registries are also rejected when this requirement is enabled because monochange cannot verify equivalent registry-native package attestations for those flows.
+
+GitHub release asset attestations are a separate release policy under `[source.releases.attestations]` and are valid only for the GitHub source provider:
+
+```toml
+[source.releases.attestations]
+require_github_artifact_attestations = true
+```
 
 For a GitHub-focused setup guide with exact registry fields, commands, and workflow requirements, see [Trusted publishing and OIDC](./07-trusted-publishing.md). For monorepo workflow and tag-shape recommendations, see [Multi-package publishing patterns](./14-multi-package-publishing.md).
 

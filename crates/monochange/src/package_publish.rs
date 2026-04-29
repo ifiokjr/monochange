@@ -12,6 +12,7 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackagePublicationTarget;
 use monochange_core::PackageRecord;
+use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishState;
@@ -125,6 +126,7 @@ pub(crate) struct PublishRequest {
 	pub(crate) version: String,
 	pub(crate) placeholder: bool,
 	pub(crate) trusted_publishing: TrustedPublishingSettings,
+	pub(crate) attestations: PublishAttestationSettings,
 	pub(crate) placeholder_readme: String,
 }
 
@@ -568,6 +570,7 @@ pub(crate) fn build_placeholder_requests(
 				version: PLACEHOLDER_VERSION.to_string(),
 				placeholder: true,
 				trusted_publishing: package_definition.publish.trusted_publishing.clone(),
+				attestations: package_definition.publish.attestations.clone(),
 				placeholder_readme: resolve_placeholder_readme(
 					root,
 					package_definition.publish.placeholder.readme.as_deref(),
@@ -631,6 +634,7 @@ pub(crate) fn build_release_requests(
 			version: publication.version.clone(),
 			placeholder: false,
 			trusted_publishing: publication.trusted_publishing.clone(),
+			attestations: publication.attestations.clone(),
 			placeholder_readme: default_placeholder_readme(&package.name),
 		});
 	}
@@ -936,6 +940,7 @@ fn execute_publish_requests(
 
 		if mode == PackagePublishRunMode::Release {
 			enforce_release_trust_prerequisites(request, source, root, env_map)?;
+			enforce_release_attestation_prerequisites(request, env_map)?;
 		}
 
 		let output = match executor.run(&publish_command) {
@@ -1078,6 +1083,54 @@ fn enforce_release_trust_prerequisites(
 		workflow.as_deref(),
 		environment.as_deref(),
 	)
+}
+
+fn enforce_release_attestation_prerequisites(
+	request: &PublishRequest,
+	env_map: &BTreeMap<String, String>,
+) -> MonochangeResult<()> {
+	if !request.attestations.require_registry_provenance {
+		return Ok(());
+	}
+
+	if !request.trusted_publishing.enabled {
+		return Err(MonochangeError::Config(format!(
+			"`{}` requires registry-native package provenance, but trusted publishing is disabled. Registry provenance is only enforceable for built-in publishing from a verifiable CI/OIDC identity; set `publish.trusted_publishing = true` or set `publish.attestations.require_registry_provenance = false` to opt out.",
+			request.package_id,
+		)));
+	}
+
+	let registry = PublishRegistry::Builtin(request.registry);
+	let identity = detect_trusted_publishing_identity(env_map);
+	let capability_message = trusted_publishing_capability_message(&registry, &identity);
+	if !identity.is_verifiable_by_env() {
+		return Err(MonochangeError::Config(format!(
+			"`{}` requires registry-native package provenance from a verifiable CI/OIDC identity, but the current publishing context is local or unverifiable. {capability_message} Run `mc publish` from the configured CI workflow or set `publish.attestations.require_registry_provenance = false` to opt out.",
+			request.package_id,
+		)));
+	}
+
+	let capability = provider_registry_trust_capability(&registry, identity.provider());
+	if !capability.registry_native_provenance {
+		return Err(MonochangeError::Config(format!(
+			"`{}` cannot require registry-native package provenance for {} from {}. {capability_message} This registry/provider combination does not expose provenance monochange can require; set `publish.attestations.require_registry_provenance = false` to opt out or use an external publisher that enforces its own attestation policy.",
+			request.package_id,
+			request.registry,
+			identity.provider().label(),
+		)));
+	}
+	if !builtin_publish_command_supports_registry_provenance(request.registry) {
+		return Err(MonochangeError::Config(format!(
+			"`{}` cannot require registry-native package provenance for {} yet. {capability_message} The registry supports provenance, but monochange's current built-in publisher for this ecosystem does not expose a publish command that can require it; set `publish.attestations.require_registry_provenance = false` to opt out or use an external publisher that enforces its own attestation policy.",
+			request.package_id, request.registry,
+		)));
+	}
+
+	Ok(())
+}
+
+fn builtin_publish_command_supports_registry_provenance(registry: RegistryKind) -> bool {
+	matches!(registry, RegistryKind::Npm | RegistryKind::Jsr)
 }
 
 fn reject_npm_token_environment(
@@ -1562,13 +1615,17 @@ fn build_npm_placeholder_publish_command(
 }
 
 fn build_npm_release_publish_command(request: &PublishRequest) -> CommandSpec {
+	let mut args = vec![
+		"publish".to_string(),
+		"--access".to_string(),
+		"public".to_string(),
+	];
+	if request.attestations.require_registry_provenance {
+		args.push("--provenance".to_string());
+	}
 	CommandSpec {
 		program: npm_publish_program(request).to_string(),
-		args: vec![
-			"publish".to_string(),
-			"--access".to_string(),
-			"public".to_string(),
-		],
+		args,
 		cwd: request.package_root.clone(),
 	}
 }
@@ -2573,6 +2630,7 @@ mod tests {
 				workflow: None,
 				environment: None,
 			},
+			attestations: PublishAttestationSettings::default(),
 			placeholder_readme: "placeholder".to_string(),
 		}
 	}
@@ -2638,6 +2696,35 @@ mod tests {
 		let mut request = sample_request(registry);
 		request.trusted_publishing.enabled = true;
 		request
+	}
+
+	fn trusted_provenance_request(registry: RegistryKind) -> PublishRequest {
+		let mut request = trusted_request(registry);
+		request.attestations.require_registry_provenance = true;
+		request
+	}
+
+	fn github_oidc_env() -> BTreeMap<String, String> {
+		BTreeMap::from([
+			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
+				"GITHUB_WORKFLOW_REF".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+			),
+			("GITHUB_ACTIONS".to_string(), "true".to_string()),
+			("GITHUB_JOB".to_string(), "release".to_string()),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL.to_string(),
+				"https://token.actions.githubusercontent.com".to_string(),
+			),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN.to_string(),
+				"request-token".to_string(),
+			),
+		])
 	}
 
 	fn sample_endpoints(base_url: &str) -> RegistryEndpoints {
@@ -4282,6 +4369,7 @@ jobs:
 				version: "1.0.0".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 			PackagePublicationTarget {
 				package: "pkg".to_string(),
@@ -4290,6 +4378,7 @@ jobs:
 				version: "1.2.3".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 		];
 
@@ -4328,6 +4417,7 @@ jobs:
 			version: "1.2.3".to_string(),
 			mode: PublishMode::Builtin,
 			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
 		}];
 
 		let requests = build_release_requests(&configuration, &[], &publications, &BTreeSet::new())
@@ -4389,6 +4479,7 @@ jobs:
 				version: "1.0.1".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 			PackagePublicationTarget {
 				package: "disabled".to_string(),
@@ -4397,6 +4488,7 @@ jobs:
 				version: "1.0.1".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 			PackagePublicationTarget {
 				package: "private".to_string(),
@@ -4405,6 +4497,7 @@ jobs:
 				version: "1.0.1".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			},
 		];
 
@@ -5080,6 +5173,85 @@ jobs:
 				.to_string()
 				.contains("expected GitHub workflow `release.yml`, but detected `publish.yml`")
 		);
+	}
+
+	#[test]
+	fn trusted_publishing_without_attestation_policy_does_not_request_npm_provenance() {
+		let mut request = trusted_request(RegistryKind::Npm);
+
+		let command = build_npm_release_publish_command(&request);
+		assert!(!command.args.contains(&"--provenance".to_string()));
+
+		request.attestations.require_registry_provenance = true;
+
+		let command = build_npm_release_publish_command(&request);
+		assert!(command.args.contains(&"--provenance".to_string()));
+	}
+
+	#[test]
+	fn enforce_release_attestation_prerequisites_accepts_supported_registry_provenance() {
+		let env_map = github_oidc_env();
+
+		enforce_release_attestation_prerequisites(
+			&trusted_provenance_request(RegistryKind::Npm),
+			&env_map,
+		)
+		.expect("expected npm provenance policy success");
+
+		enforce_release_attestation_prerequisites(
+			&trusted_provenance_request(RegistryKind::Jsr),
+			&env_map,
+		)
+		.expect("expected JSR provenance policy success");
+	}
+
+	#[test]
+	fn enforce_release_attestation_prerequisites_rejects_disabled_trusted_publishing() {
+		let mut request = sample_request(RegistryKind::Npm);
+		request.attestations.require_registry_provenance = true;
+
+		let error = enforce_release_attestation_prerequisites(&request, &github_oidc_env())
+			.expect_err("disabled trusted publishing should reject provenance policy");
+
+		let message = error.to_string();
+		assert!(message.contains("requires registry-native package provenance"));
+		assert!(message.contains("trusted publishing is disabled"));
+	}
+
+	#[test]
+	fn enforce_release_attestation_prerequisites_rejects_local_contexts() {
+		let error = enforce_release_attestation_prerequisites(
+			&trusted_provenance_request(RegistryKind::Npm),
+			&BTreeMap::new(),
+		)
+		.expect_err("local trusted publishing should reject provenance policy");
+
+		let message = error.to_string();
+		assert!(message.contains("local or unverifiable"));
+		assert!(message.contains("No supported CI provider identity was detected"));
+	}
+
+	#[test]
+	fn enforce_release_attestation_prerequisites_rejects_unsupported_registry_provenance() {
+		let error = enforce_release_attestation_prerequisites(
+			&trusted_provenance_request(RegistryKind::CratesIo),
+			&github_oidc_env(),
+		)
+		.expect_err("crates.io should reject registry provenance policy");
+
+		let message = error.to_string();
+		assert!(message.contains("cannot require registry-native package provenance"));
+		assert!(message.contains("registry-native provenance is not available"));
+
+		let error = enforce_release_attestation_prerequisites(
+			&trusted_provenance_request(RegistryKind::Pypi),
+			&github_oidc_env(),
+		)
+		.expect_err("PyPI should reject until the built-in publisher can require attestations");
+
+		let message = error.to_string();
+		assert!(message.contains("registry supports provenance"));
+		assert!(message.contains("built-in publisher"));
 	}
 
 	#[test]
@@ -6111,6 +6283,7 @@ version = "1.2.3"
 				version: "1.2.3".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			}],
 		);
 
@@ -6177,6 +6350,7 @@ version = "1.2.3"
 				version: "1.2.3".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
 			}],
 		);
 		let discovered =
@@ -6437,6 +6611,7 @@ version = "1.2.3"
 			version: "1.2.3".to_string(),
 			mode: PublishMode::Builtin,
 			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
 		};
 		let configuration =
 			sample_configuration(&[("pkg", monochange_core::PackageType::Npm, true)]);

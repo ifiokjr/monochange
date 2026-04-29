@@ -113,6 +113,7 @@ use monochange_core::PackageType;
 use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseSettings;
+use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishSettings;
@@ -392,9 +393,17 @@ struct RawPublishSettings {
 	#[serde(default)]
 	trusted_publishing: Option<RawTrustedPublishingSettings>,
 	#[serde(default)]
+	attestations: RawPublishAttestationSettings,
+	#[serde(default)]
 	rate_limits: RawPublishRateLimitSettings,
 	#[serde(default)]
 	placeholder: RawPlaceholderSettings,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawPublishAttestationSettings {
+	#[serde(default)]
+	require_registry_provenance: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -858,6 +867,17 @@ fn normalize_trusted_publishing_settings(
 	settings
 }
 
+fn normalize_publish_attestation_settings(
+	base: Option<&PublishAttestationSettings>,
+	raw: &RawPublishAttestationSettings,
+) -> PublishAttestationSettings {
+	let mut settings = base.cloned().unwrap_or_default();
+	if let Some(require_registry_provenance) = raw.require_registry_provenance {
+		settings.require_registry_provenance = require_registry_provenance;
+	}
+	settings
+}
+
 fn normalize_publish_settings(
 	contents: &str,
 	base: Option<&PublishSettings>,
@@ -885,6 +905,10 @@ fn normalize_publish_settings(
 	settings.trusted_publishing = normalize_trusted_publishing_settings(
 		base.map(|settings| &settings.trusted_publishing),
 		raw.trusted_publishing,
+	);
+	settings.attestations = normalize_publish_attestation_settings(
+		base.map(|settings| &settings.attestations),
+		&raw.attestations,
 	);
 	if let Some(enforce) = raw.rate_limits.enforce {
 		settings.rate_limits.enforce = enforce;
@@ -3531,6 +3555,17 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 	{
 		return Err(MonochangeError::Config(
 			"[source.releases].branches must not include empty values".to_string(),
+		));
+	}
+	if source
+		.releases
+		.attestations
+		.require_github_artifact_attestations
+		&& source.provider != SourceProvider::GitHub
+	{
+		return Err(MonochangeError::Config(
+			"[source.releases.attestations].require_github_artifact_attestations requires [source].provider = \"github\""
+				.to_string(),
 		));
 	}
 	if source

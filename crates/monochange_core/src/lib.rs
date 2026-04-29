@@ -1446,6 +1446,32 @@ pub struct TrustedPublishingSettings {
 	pub environment: Option<String>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct PublishAttestationSettings {
+	#[serde(default)]
+	pub require_registry_provenance: bool,
+}
+
+impl PublishAttestationSettings {
+	#[must_use]
+	pub fn is_default(&self) -> bool {
+		self == &Self::default()
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct ReleaseAttestationSettings {
+	#[serde(default)]
+	pub require_github_artifact_attestations: bool,
+}
+
+impl ReleaseAttestationSettings {
+	#[must_use]
+	pub fn is_default(&self) -> bool {
+		self == &Self::default()
+	}
+}
+
 impl Default for TrustedPublishingSettings {
 	fn default() -> Self {
 		Self {
@@ -1468,6 +1494,11 @@ pub struct PublishSettings {
 	pub registry: Option<PublishRegistry>,
 	#[serde(default)]
 	pub trusted_publishing: TrustedPublishingSettings,
+	#[serde(
+		default,
+		skip_serializing_if = "PublishAttestationSettings::is_default"
+	)]
+	pub attestations: PublishAttestationSettings,
 	#[serde(default)]
 	pub rate_limits: PublishRateLimitSettings,
 	#[serde(default)]
@@ -1481,6 +1512,7 @@ impl Default for PublishSettings {
 			mode: PublishMode::default(),
 			registry: None,
 			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
 			rate_limits: PublishRateLimitSettings::default(),
 			placeholder: PlaceholderSettings::default(),
 		}
@@ -2483,6 +2515,11 @@ pub struct PackagePublicationTarget {
 	pub mode: PublishMode,
 	#[serde(default)]
 	pub trusted_publishing: TrustedPublishingSettings,
+	#[serde(
+		default,
+		skip_serializing_if = "PublishAttestationSettings::is_default"
+	)]
+	pub attestations: PublishAttestationSettings,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -3258,6 +3295,11 @@ pub struct ProviderReleaseSettings {
 	pub enforce_for_publish: bool,
 	#[serde(default)]
 	pub enforce_for_commit: bool,
+	#[serde(
+		default,
+		skip_serializing_if = "ReleaseAttestationSettings::is_default"
+	)]
+	pub attestations: ReleaseAttestationSettings,
 }
 
 impl Default for ProviderReleaseSettings {
@@ -3272,6 +3314,7 @@ impl Default for ProviderReleaseSettings {
 			enforce_for_tags: true,
 			enforce_for_publish: true,
 			enforce_for_commit: false,
+			attestations: ReleaseAttestationSettings::default(),
 		}
 	}
 }

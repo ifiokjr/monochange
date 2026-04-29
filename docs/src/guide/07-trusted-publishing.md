@@ -56,6 +56,9 @@ provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
+[source.releases.attestations]
+require_github_artifact_attestations = true
+
 [ecosystems.npm.publish]
 trusted_publishing = true
 
@@ -63,11 +66,17 @@ trusted_publishing = true
 workflow = "publish.yml"
 environment = "publisher"
 
+[ecosystems.npm.publish.attestations]
+require_registry_provenance = true
+
 [ecosystems.cargo.publish]
 trusted_publishing = true
 
 [ecosystems.deno.publish]
 trusted_publishing = true
+
+[ecosystems.deno.publish.attestations]
+require_registry_provenance = true
 
 [ecosystems.dart.publish]
 trusted_publishing = true
@@ -93,6 +102,53 @@ monochange resolves the GitHub trust context from:
 - otherwise GitHub Actions runtime values such as `GITHUB_REPOSITORY`, `GITHUB_WORKFLOW_REF`, and `GITHUB_JOB`
 
 If your workflow filename or environment cannot be inferred reliably, set them explicitly in `monochange.toml`.
+
+## Attestation and provenance policy
+
+Trusted publishing and attestations answer different questions:
+
+- **trusted publishing** decides which CI/OIDC identity may publish a package
+- **registry-native package provenance** records where a published package came from in registries that support it, such as npm provenance, JSR provenance, and PyPI PEP 740 attestations
+- **GitHub release artifact attestations** cover release assets uploaded to GitHub Releases and are separate from package-registry provenance
+
+Trusted publishing does not automatically require registry provenance. Enable provenance explicitly for registries where you want monochange to enforce it:
+
+```toml
+[ecosystems.npm.publish]
+trusted_publishing = true
+
+[ecosystems.npm.publish.attestations]
+require_registry_provenance = true
+```
+
+Packages inherit `publish.attestations` from their ecosystem publish settings. Package-level settings can override or opt out:
+
+```toml
+[package.legacy.publish.attestations]
+require_registry_provenance = false
+```
+
+When `publish.attestations.require_registry_provenance = true`, built-in release publishing fails before invoking the registry command unless all of these are true:
+
+1. `publish.trusted_publishing = true` is effective for the package.
+2. The current environment exposes a verifiable CI/OIDC identity.
+3. The provider/registry capability matrix says registry-native provenance is available for that identity.
+
+Today this is enforceable for npm trusted publishing and JSR publishing from supported OIDC contexts. The capability matrix records PyPI PEP 740 attestations as registry-native provenance, but monochange rejects `require_registry_provenance` for PyPI until the built-in Python publisher exposes a publish command that can require uploading those attestations. It also rejects `crates.io`, `pub.dev`, Go proxy publication, and custom registries because those flows do not expose registry-native package provenance that monochange can require without creating false assurance.
+
+For GitHub release assets, keep the policy under `[source.releases.attestations]`:
+
+```toml
+[source]
+provider = "github"
+owner = "ifiokjr"
+repo = "monochange"
+
+[source.releases.attestations]
+require_github_artifact_attestations = true
+```
+
+This setting is accepted only for the GitHub source provider. It records that release assets are expected to be covered by GitHub Artifact Attestations; the workflow that builds/uploads assets must still grant `attestations: write` and run the GitHub attestation action for the uploaded subjects.
 
 ## GitHub Actions baseline
 

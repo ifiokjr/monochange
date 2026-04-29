@@ -177,6 +177,7 @@ pub(crate) fn build_package_publication_targets(
 				version: version.to_string(),
 				mode: package_definition.publish.mode,
 				trusted_publishing: package_definition.publish.trusted_publishing.clone(),
+				attestations: package_definition.publish.attestations.clone(),
 			})
 		})
 		.collect::<Vec<_>>();
@@ -1977,6 +1978,7 @@ mod tests {
 					version: "1.2.0".to_string(),
 					mode: PublishMode::Builtin,
 					trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+					attestations: monochange_core::PublishAttestationSettings::default(),
 				},
 				PackagePublicationTarget {
 					package: "web".to_string(),
@@ -1985,6 +1987,7 @@ mod tests {
 					version: "2.0.1".to_string(),
 					mode: PublishMode::External,
 					trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+					attestations: monochange_core::PublishAttestationSettings::default(),
 				},
 			]
 		);
@@ -2024,6 +2027,7 @@ mod tests {
 				version: "1.2.3".to_string(),
 				mode: PublishMode::Builtin,
 				trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
+				attestations: monochange_core::PublishAttestationSettings::default(),
 			}],
 			dry_run: false,
 		};

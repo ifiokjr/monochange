@@ -2967,6 +2967,116 @@ trusted_publishing = false
 }
 
 #[test]
+fn load_workspace_configuration_inherits_publish_attestation_policy() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("packages/web"))
+		.unwrap_or_else(|error| panic!("create web package: {error}"));
+	std::fs::create_dir_all(root.join("packages/legacy"))
+		.unwrap_or_else(|error| panic!("create legacy package: {error}"));
+	std::fs::write(
+		root.join("packages/web/package.json"),
+		r#"{ "name": "web", "version": "1.0.0" }"#,
+	)
+	.unwrap_or_else(|error| panic!("write web manifest: {error}"));
+	std::fs::write(
+		root.join("packages/legacy/package.json"),
+		r#"{ "name": "legacy", "version": "1.0.0" }"#,
+	)
+	.unwrap_or_else(|error| panic!("write legacy manifest: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[ecosystems.npm.publish.attestations]
+require_registry_provenance = true
+
+[package.web]
+path = "packages/web"
+type = "npm"
+
+[package.legacy]
+path = "packages/legacy"
+type = "npm"
+
+[package.legacy.publish.attestations]
+require_registry_provenance = false
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let web = configuration
+		.package_by_id("web")
+		.unwrap_or_else(|| panic!("expected web package"));
+	let legacy = configuration
+		.package_by_id("legacy")
+		.unwrap_or_else(|| panic!("expected legacy package"));
+
+	assert!(web.publish.attestations.require_registry_provenance);
+	assert!(!legacy.publish.attestations.require_registry_provenance);
+	assert!(web.publish.enabled);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_github_release_attestations_for_other_sources() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[source]
+provider = "gitlab"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases.attestations]
+require_github_artifact_attestations = true
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let error = load_workspace_configuration(root)
+		.expect_err("GitHub release attestations should reject GitLab source");
+
+	assert!(error.to_string().contains(
+		"[source.releases.attestations].require_github_artifact_attestations requires [source].provider = \"github\""
+	));
+}
+
+#[test]
+fn load_workspace_configuration_parses_release_attestation_policy() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases.attestations]
+require_github_artifact_attestations = true
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let source = configuration
+		.source
+		.unwrap_or_else(|| panic!("expected source config"));
+
+	assert!(
+		source
+			.releases
+			.attestations
+			.require_github_artifact_attestations
+	);
+}
+
+#[test]
 fn load_workspace_configuration_merges_trusted_publishing_details() {
 	let root = fixture_path("config/publish-trusted-publishing-overrides");
 	let configuration = load_workspace_configuration(&root)
