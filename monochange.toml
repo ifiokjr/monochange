@@ -415,7 +415,7 @@ versioned_files = [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.p
 changelog = { path = "changelog.md", format = "monochange", include = ["monochange"] }
 
 # =============================================================================
-# [changesets.verify] — changeset verification settings
+# [changesets.affected] — changeset verification settings
 # =============================================================================
 #
 # Controls the `AffectedPackages` CLI step which checks whether pull requests
@@ -423,7 +423,7 @@ changelog = { path = "changelog.md", format = "monochange", include = ["monochan
 #
 # This section works independently of any source provider.
 
-[changesets.verify]
+[changesets.affected]
 # Whether changeset verification is enabled. When false, the AffectedPackages
 # step will refuse to run.
 # Default: true
@@ -438,12 +438,27 @@ required = true
 # PR matches an entry here, the verify step returns "skipped" instead of
 # evaluating coverage.
 # Default: []
-skip_labels = ["no-changeset-required"]
+skip_labels = ["no-changeset-required", "release"]
 
 # Whether to render a failure comment body in the evaluation output for
 # CI integrations to post back to the pull request.
 # Default: true
 comment_on_failure = true
+
+# Additional non-package root-level paths that should also trigger changeset
+# requirements when changed. Package directories are included automatically.
+changed_paths = ["Cargo.toml", "Cargo.lock", "codecov.yml"]
+
+# Files that should not trigger changeset requirements.
+ignored_paths = [
+	"**/tests/**",
+	"**/__tests.rs",
+	"**/snapshots/**",
+	"fixtures/tests/**",
+	"crates/*/changelog.md",
+	"changelog.md",
+	"packages/*/changelog.md",
+]
 
 # =============================================================================
 # [lints] — manifest lint configuration
@@ -621,45 +636,6 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 verified_commits = true
-
-# [source.bot.changesets] — changeset policy for the AffectedPackages / `mc affected` step
-#
-# By default, every configured package path is automatically included: any file
-# change within a package's configured `path` directory triggers a changeset
-# requirement for that package. You do NOT need to list package directories here.
-#
-# `changed_paths` below adds ADDITIONAL non-package root-level paths that should
-# also trigger changeset requirements when changed. For example, workspace-level
-# Cargo.toml or Cargo.lock changes affect all packages.
-#
-# `ignored_paths` filters out files that should NOT trigger changeset
-# requirements (e.g. test files, snapshots, fixture workspaces).
-#
-# Per-package `ignored_paths` and `additional_paths` in [package.<id>] tables
-# can further customize which files matter on a package-by-package basis.
-#
-# Fields:
-#   enabled          — enable changeset policy (default: false)
-#   required         — treat missing changesets as errors (default: true)
-#   skip_labels      — PR labels that skip enforcement (default: [])
-#   comment_on_failure — render a failure comment for CI (default: true)
-#   changed_paths    — additional non-package paths that trigger requirements
-#   ignored_paths    — glob patterns to exclude from all package matching
-[source.bot.changesets]
-enabled = true
-required = true
-skip_labels = ["no-changeset-required", "release"]
-comment_on_failure = true
-changed_paths = ["Cargo.toml", "Cargo.lock", "codecov.yml"]
-ignored_paths = [
-	"**/tests/**",
-	"**/__tests.rs",
-	"**/snapshots/**",
-	"fixtures/tests/**",
-	"crates/*/changelog.md",
-	"changelog.md",
-	"packages/*/changelog.md",
-]
 
 # =============================================================================
 # [cli.*] — user-defined CLI commands

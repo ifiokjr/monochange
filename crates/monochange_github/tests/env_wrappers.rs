@@ -4,7 +4,6 @@ use httpmock::Method::GET;
 use httpmock::Method::POST;
 use httpmock::MockServer;
 use monochange_core::CommitMessage;
-use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseSettings;
 use monochange_core::ReleaseOwnerKind;
@@ -151,7 +150,6 @@ fn sample_github_source() -> SourceConfiguration {
 		api_url: None,
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	}
 }
 

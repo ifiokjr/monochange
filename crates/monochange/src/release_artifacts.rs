@@ -1459,7 +1459,6 @@ mod tests {
 	use monochange_core::GroupChangelogInclude;
 	use monochange_core::PackageDefinition;
 	use monochange_core::PackageType;
-	use monochange_core::ProviderBotSettings;
 	use monochange_core::ProviderMergeRequestSettings;
 	use monochange_core::ProviderReleaseNotesSource;
 	use monochange_core::ProviderReleaseSettings;
@@ -1519,7 +1518,6 @@ mod tests {
 				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
-			bot: ProviderBotSettings::default(),
 		}
 	}
 

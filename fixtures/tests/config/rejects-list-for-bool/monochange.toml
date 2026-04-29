@@ -4,7 +4,7 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 
-[changesets.verify]
+[changesets.affected]
 enabled = true
 
 [cli.pr-check]

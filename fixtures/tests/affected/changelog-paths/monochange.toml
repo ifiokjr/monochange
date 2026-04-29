@@ -5,7 +5,7 @@ package_type = "cargo"
 path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
 
-[changesets.verify]
+[changesets.affected]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]

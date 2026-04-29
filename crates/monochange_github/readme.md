@@ -38,7 +38,6 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 ## Example
 
 ```rust
-use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseSettings;
 use monochange_core::SourceConfiguration;
@@ -90,7 +89,6 @@ let github = SourceConfiguration {
     api_url: None,
     releases: ProviderReleaseSettings::default(),
     pull_requests: ProviderMergeRequestSettings::default(),
-    bot: ProviderBotSettings::default(),
 };
 
 let requests = build_release_requests(&github, &manifest);

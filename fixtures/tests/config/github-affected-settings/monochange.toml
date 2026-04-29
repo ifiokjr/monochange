@@ -9,7 +9,7 @@ provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[source.bot.changesets]
+[changesets.affected]
 enabled = true
 comment_on_failure = true
 skip_labels = ["no-changeset-required"]

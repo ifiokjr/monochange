@@ -558,7 +558,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			tips: &[
 				"Prefer package ids in .changeset files.",
 				"Group-owned changesets cover all members of that group.",
-				"Ignored paths and skip labels are configured in [changesets.verify].",
+				"Ignored paths and skip labels are configured in [changesets.affected].",
 			],
 			see_also: &["change", "check"],
 		},

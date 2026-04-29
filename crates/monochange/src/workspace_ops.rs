@@ -2012,7 +2012,6 @@ mod workspace_ops_tests {
 	use monochange_core::HostingProviderKind;
 	use monochange_core::PackageDefinition;
 	use monochange_core::PreparedChangeset;
-	use monochange_core::ProviderBotSettings;
 	use monochange_core::ProviderMergeRequestSettings;
 	use monochange_core::ProviderReleaseSettings;
 	use monochange_core::ShellConfig;
@@ -2100,7 +2099,6 @@ mod workspace_ops_tests {
 			repo: "monochange".to_string(),
 			releases: ProviderReleaseSettings::default(),
 			pull_requests: ProviderMergeRequestSettings::default(),
-			bot: ProviderBotSettings::default(),
 		}
 	}
 
@@ -3004,7 +3002,7 @@ path = "packages/web"
 		run_lockfile_command_in_place(
 			root,
 			&LockfileCommandExecution {
-				command: success_script.display().to_string(),
+				command: format!("sh {}", success_script.display()),
 				cwd: root.to_path_buf(),
 				shell: ShellConfig::None,
 			},
@@ -3020,7 +3018,7 @@ path = "packages/web"
 			root,
 			temp_root.path(),
 			&LockfileCommandExecution {
-				command: remapped_script.display().to_string(),
+				command: format!("sh {}", remapped_script.display()),
 				cwd: root.to_path_buf(),
 				shell: ShellConfig::Default,
 			},

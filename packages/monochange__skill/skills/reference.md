@@ -571,7 +571,7 @@ include = ["sdk-cli"]
 ### Changeset verification
 
 ```toml
-[changesets.verify]
+[changesets.affected]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
