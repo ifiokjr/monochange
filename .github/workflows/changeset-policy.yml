@@ -55,7 +55,7 @@ jobs:
         uses: tj-actions/changed-files@v46
 
       - name: run changeset policy
-        uses: monochange/actions/changeset-policy@v0.5.1
+        uses: monochange/actions/changeset-policy@v0.5.2
         env:
           PATH: ${{ runner.temp }}/monochange-bin:/home/runner/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         with:

@@ -328,7 +328,7 @@ jobs:
       pull-requests: read
     steps:
       - name: block direct merge of release branches
-        uses: monochange/actions/fail-when@v0.5.1
+        uses: monochange/actions/fail-when@v0.5.2
         with:
           should-fail: ${{ startsWith(github.head_ref, 'monochange/release/') }}
           reason: Release branches must be merged via the /merge comment workflow.
