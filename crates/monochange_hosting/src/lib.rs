@@ -757,7 +757,6 @@ mod tests {
 
 	#[test]
 	fn release_body_returns_none_for_github_generated() {
-		use monochange_core::ProviderBotSettings;
 		use monochange_core::ProviderMergeRequestSettings;
 		use monochange_core::ProviderReleaseNotesSource;
 		use monochange_core::ProviderReleaseSettings;
@@ -777,7 +776,6 @@ mod tests {
 				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
-			bot: ProviderBotSettings::default(),
 		};
 		let manifest = sample_manifest();
 		let target = minimal_target("core");
@@ -787,7 +785,6 @@ mod tests {
 	#[test]
 	fn release_body_returns_rendered_changelog_for_monochange_source() {
 		use monochange_core::ChangelogFormat;
-		use monochange_core::ProviderBotSettings;
 		use monochange_core::ProviderMergeRequestSettings;
 		use monochange_core::ProviderReleaseNotesSource;
 		use monochange_core::ProviderReleaseSettings;
@@ -810,7 +807,6 @@ mod tests {
 				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
-			bot: ProviderBotSettings::default(),
 		};
 		let mut manifest = sample_manifest();
 		let target = minimal_target("core");
@@ -839,7 +835,6 @@ mod tests {
 
 	#[test]
 	fn release_body_falls_back_to_minimal_when_no_changelog() {
-		use monochange_core::ProviderBotSettings;
 		use monochange_core::ProviderMergeRequestSettings;
 		use monochange_core::ProviderReleaseNotesSource;
 		use monochange_core::ProviderReleaseSettings;
@@ -859,7 +854,6 @@ mod tests {
 				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
-			bot: ProviderBotSettings::default(),
 		};
 		let manifest = sample_manifest();
 		let target = minimal_target("core");
@@ -870,7 +864,6 @@ mod tests {
 
 	#[test]
 	fn release_body_falls_back_to_minimal_when_only_non_matching_changelog_exists() {
-		use monochange_core::ProviderBotSettings;
 		use monochange_core::ProviderMergeRequestSettings;
 		use monochange_core::ProviderReleaseNotesSource;
 		use monochange_core::ProviderReleaseSettings;
@@ -890,7 +883,6 @@ mod tests {
 				..ProviderReleaseSettings::default()
 			},
 			pull_requests: ProviderMergeRequestSettings::default(),
-			bot: ProviderBotSettings::default(),
 		};
 		let mut manifest = sample_manifest();
 		let target = minimal_target("core");

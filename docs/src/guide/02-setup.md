@@ -259,7 +259,7 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[source.bot.changesets]
+[changesets.affected]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]

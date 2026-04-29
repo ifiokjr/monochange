@@ -3,7 +3,7 @@ parent_bump = "patch"
 package_type = "cargo"
 changelog = false
 
-[changesets.verify]
+[changesets.affected]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]

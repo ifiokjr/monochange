@@ -2660,7 +2660,6 @@ mod tests {
 			api_url: None,
 			releases: monochange_core::ProviderReleaseSettings::default(),
 			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings::default(),
 		}
 	}
 

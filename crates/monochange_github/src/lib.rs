@@ -29,7 +29,6 @@
 //! ## Example
 //!
 //! ```rust
-//! use monochange_core::ProviderBotSettings;
 //! use monochange_core::ProviderMergeRequestSettings;
 //! use monochange_core::ProviderReleaseSettings;
 //! use monochange_core::SourceConfiguration;
@@ -81,7 +80,6 @@
 //!     api_url: None,
 //!     releases: ProviderReleaseSettings::default(),
 //!     pull_requests: ProviderMergeRequestSettings::default(),
-//!     bot: ProviderBotSettings::default(),
 //! };
 //!
 //! let requests = build_release_requests(&github, &manifest);

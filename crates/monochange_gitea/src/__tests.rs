@@ -17,7 +17,6 @@ use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
-use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ProviderReleaseSettings;
@@ -951,7 +950,6 @@ fn sample_source(api_url: Option<String>, host: Option<String>) -> SourceConfigu
 		api_url,
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	}
 }
 
