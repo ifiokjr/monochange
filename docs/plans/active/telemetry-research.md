@@ -159,7 +159,7 @@ Start with a **small internal telemetry abstraction** and defer vendor lock-in.
 
 Recommended first implementation shape:
 
-1. Add a dedicated telemetry crate, `crates/monochange_telemtry`, and import it from the main `monochange` crate.
+1. Add a dedicated telemetry crate, `crates/monochange_telemetry`, and import it from the main `monochange` crate.
 2. Define a `TelemetrySink` trait with a no-op implementation as the default.
 3. Define documented event structs/enums for command, step, discovery, release, and publish events.
 4. Gate all collection behind explicit opt-in configuration and `MC_TELEMETRY`.

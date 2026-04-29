@@ -1,7 +1,7 @@
 ---
 "@monochange/cli": patch
 "monochange": patch
-"monochange_telemtry": patch
+"monochange_telemetry": patch
 ---
 
 # Add local-only telemetry events

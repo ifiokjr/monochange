@@ -31,10 +31,10 @@ use monochange_core::SourceChangeRequestOutcome;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceReleaseOutcome;
 use monochange_core::SourceReleaseRequest;
-use monochange_telemtry::CommandTelemetry;
-use monochange_telemtry::StepTelemetry;
-use monochange_telemtry::TelemetryOutcome;
-use monochange_telemtry::TelemetrySink;
+use monochange_telemetry::CommandTelemetry;
+use monochange_telemetry::StepTelemetry;
+use monochange_telemetry::TelemetryOutcome;
+use monochange_telemetry::TelemetrySink;
 use serde::Serialize;
 
 use crate::cli::command_supports_release_diff_preview;
