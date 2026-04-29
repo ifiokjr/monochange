@@ -15,11 +15,11 @@ concurrency:
 
 jobs:
   check:
-    if: ${{ !startsWith(github.head_ref, 'monochange/release/') }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write
       pull-requests: read
     steps:
       - name: checkout repository
@@ -30,29 +30,63 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: expose monochange on PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin_dir="$RUNNER_TEMP/monochange-bin"
+          devenv_bin="$(command -v devenv)"
+          mkdir -p "$bin_dir"
+          cat > "$bin_dir/mc" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [ "\${1:-}" = "--version" ]; then
+            echo "mc local"
+            exit 0
+          fi
+          if [ "\${1:-}" = "affected" ]; then
+            shift
+            translated=("step:affected-packages")
+            while [ "\$#" -gt 0 ]; do
+              case "\$1" in
+                --paths)
+                  shift
+                  for path in \$1; do
+                    translated+=(--changed-paths "\$path")
+                  done
+                  ;;
+                --labels)
+                  shift
+                  IFS=',' read -ra labels <<< "\$1"
+                  for label in "\${labels[@]}"; do
+                    if [ -n "\$label" ]; then
+                      translated+=(--label "\$label")
+                    fi
+                  done
+                  ;;
+                *)
+                  translated+=("\$1")
+                  ;;
+              esac
+              shift || true
+            done
+            exec "$devenv_bin" shell cargo run --quiet --release --package monochange --bin mc -- "\${translated[@]}"
+          fi
+          exec "$devenv_bin" shell cargo run --quiet --release --package monochange --bin mc -- "\$@"
+          EOF
+          chmod +x "$bin_dir/mc"
+          "$bin_dir/mc" --version
+          echo "$bin_dir" >> "$GITHUB_PATH"
+
       - name: collect changed files
         id: changed
         uses: tj-actions/changed-files@v46
 
       - name: run changeset policy
+        uses: monochange/actions/changeset-policy@v0.5.2
         env:
-          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
-          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(step:affected-packages --format json --verify)
-
-          for path in $CHANGED_FILES; do
-            args+=(--changed-paths "$path")
-          done
-
-          for label in "${labels[@]}"; do
-            args+=(--label "$label")
-          done
-
-          devenv shell -- monochange "${args[@]}" | tee policy.raw
-          awk 'BEGIN { capture = 0 } /^\{/ { capture = 1 } capture { print }' policy.raw > policy.json
-          jq -e '.status != "failed"' policy.json >/dev/null
+          PATH: ${{ runner.temp }}/monochange-bin:/home/runner/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        with:
+          setup-monochange: "false"
+          changed-paths: ${{ steps.changed.outputs.all_changed_files }}
+          labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
