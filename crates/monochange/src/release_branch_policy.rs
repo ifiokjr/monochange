@@ -170,7 +170,6 @@ fn branch_matches(patterns: &[Pattern], ref_name: &str, display_name: &str) -> b
 mod tests {
 	use std::process::Command;
 
-	use monochange_core::ProviderBotSettings;
 	use monochange_core::ProviderMergeRequestSettings;
 	use monochange_core::ProviderReleaseSettings;
 	use monochange_core::SourceProvider;
@@ -428,7 +427,6 @@ mod tests {
 			api_url: None,
 			releases: ProviderReleaseSettings::default(),
 			pull_requests: ProviderMergeRequestSettings::default(),
-			bot: ProviderBotSettings::default(),
 		}
 	}
 

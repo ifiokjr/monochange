@@ -183,7 +183,7 @@ provider = "github"
 owner = "ifiokjr"
 repo = "monochange"
 
-[source.bot.changesets]
+[changesets.affected]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]

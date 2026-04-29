@@ -455,18 +455,18 @@ branches = []
 }
 
 #[test]
-fn load_workspace_configuration_parses_github_changeset_bot_settings() {
-	let root = fixture_path("config/github-bot-settings");
+fn load_workspace_configuration_parses_github_affected_settings() {
+	let root = fixture_path("config/github-affected-settings");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let source = configuration
 		.source
 		.unwrap_or_else(|| panic!("expected source config"));
 	assert_eq!(source.provider, SourceProvider::GitHub);
-	let bot = &source.bot.changesets;
-	assert!(bot.enabled);
-	assert!(bot.comment_on_failure);
-	assert_eq!(bot.skip_labels, vec!["no-changeset-required"]);
+	let affected = &configuration.changesets.affected;
+	assert!(affected.enabled);
+	assert!(affected.comment_on_failure);
+	assert_eq!(affected.skip_labels, vec!["no-changeset-required"]);
 }
 
 #[test]
@@ -3158,15 +3158,15 @@ fn load_workspace_configuration_accepts_comment_released_issues_for_github() {
 }
 
 #[test]
-fn load_workspace_configuration_rejects_enforce_changeset_policy_without_github_bot_config() {
-	let root = fixture_path("config/rejects-enforce-no-bot");
+fn load_workspace_configuration_rejects_affected_packages_when_changeset_verification_disabled() {
+	let root = fixture_path("config/rejects-enforce-no-affected");
 	let error = load_workspace_configuration(&root)
 		.err()
 		.unwrap_or_else(|| panic!("expected verification CLI command config error"));
 	assert!(
 		error
 			.to_string()
-			.contains("uses `AffectedPackages` but `[changesets.verify].enabled` is false")
+			.contains("uses `AffectedPackages` but `[changesets.affected].enabled` is false")
 	);
 }
 
@@ -3860,7 +3860,6 @@ fn sample_source_configuration(provider: SourceProvider) -> monochange_core::Sou
 			enabled: true,
 			..Default::default()
 		},
-		bot: monochange_core::ProviderBotSettings::default(),
 	}
 }
 
@@ -4281,7 +4280,6 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 			repo: "monochange".to_string(),
 			releases: monochange_core::ProviderReleaseSettings::default(),
 			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings::default(),
 		}))
 		.err()
 		.unwrap_or_else(|| panic!("expected source validation error"));
@@ -4293,7 +4291,7 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 
 	let changeset_error = crate::validate_changesets_configuration(
 		&monochange_core::ChangesetSettings {
-			verify: monochange_core::ChangesetVerificationSettings {
+			affected: monochange_core::ChangesetAffectedSettings {
 				skip_labels: vec![String::new()],
 				..Default::default()
 			},
@@ -4305,35 +4303,24 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 	assert!(
 		changeset_error
 			.to_string()
-			.contains("[changesets.verify].skip_labels must not include empty values")
+			.contains("[changesets.affected].skip_labels must not include empty values")
 	);
 
-	let source_skip_label_error =
-		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: SourceProvider::GitHub,
-			host: None,
-			api_url: None,
-			owner: "ifiokjr".to_string(),
-			repo: "monochange".to_string(),
-			releases: monochange_core::ProviderReleaseSettings::default(),
-			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings {
-				changesets: monochange_core::ProviderChangesetBotSettings {
-					enabled: true,
-					required: true,
-					skip_labels: vec![String::new()],
-					comment_on_failure: true,
-					changed_paths: Vec::new(),
-					ignored_paths: Vec::new(),
-				},
+	let affected_empty_path_error = crate::validate_changesets_configuration(
+		&monochange_core::ChangesetSettings {
+			affected: monochange_core::ChangesetAffectedSettings {
+				changed_paths: vec![" ".to_string()],
+				..Default::default()
 			},
-		}))
-		.err()
-		.unwrap_or_else(|| panic!("expected source skip label validation error"));
+		},
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected affected path validation error"));
 	assert!(
-		source_skip_label_error
+		affected_empty_path_error
 			.to_string()
-			.contains("[source.bot.changesets].skip_labels must not include empty values")
+			.contains("[changesets.affected].changed_paths must not include empty values")
 	);
 
 	let source_repo_error =
@@ -4345,7 +4332,6 @@ fn validate_source_and_changeset_settings_reject_empty_values() {
 			repo: " ".to_string(),
 			releases: monochange_core::ProviderReleaseSettings::default(),
 			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings::default(),
 		}))
 		.err()
 		.unwrap_or_else(|| panic!("expected source repo validation error"));
@@ -4781,7 +4767,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 			}],
 		)],
 		&monochange_core::ChangesetSettings {
-			verify: monochange_core::ChangesetVerificationSettings {
+			affected: monochange_core::ChangesetAffectedSettings {
 				enabled: false,
 				..Default::default()
 			},
@@ -4802,12 +4788,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 				inputs: BTreeMap::new(),
 			}],
 		)],
-		&monochange_core::ChangesetSettings {
-			verify: monochange_core::ChangesetVerificationSettings {
-				enabled: true,
-				..Default::default()
-			},
-		},
+		&monochange_core::ChangesetSettings::default(),
 		Some(&sample_source_configuration(SourceProvider::GitHub)),
 	)
 	.err()
@@ -4832,12 +4813,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 	];
 	let invalid_label = crate::validate_cli_runtime_requirements(
 		&[command],
-		&monochange_core::ChangesetSettings {
-			verify: monochange_core::ChangesetVerificationSettings {
-				enabled: true,
-				..Default::default()
-			},
-		},
+		&monochange_core::ChangesetSettings::default(),
 		Some(&sample_source_configuration(SourceProvider::GitHub)),
 	)
 	.err()
@@ -4888,32 +4864,21 @@ fn validate_package_and_source_settings_cover_duplicate_and_pattern_errors() {
 			.contains("`version_format = \"primary\"` is already used by `core`")
 	);
 
-	let source_error =
-		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: SourceProvider::GitHub,
-			owner: "ifiokjr".to_string(),
-			repo: "monochange".to_string(),
-			host: None,
-			api_url: None,
-			releases: monochange_core::ProviderReleaseSettings::default(),
-			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings {
-				changesets: monochange_core::ProviderChangesetBotSettings {
-					enabled: true,
-					required: true,
-					skip_labels: vec!["skip".to_string()],
-					comment_on_failure: true,
-					changed_paths: vec!["[".to_string()],
-					ignored_paths: Vec::new(),
-				},
+	let source_error = crate::validate_changesets_configuration(
+		&monochange_core::ChangesetSettings {
+			affected: monochange_core::ChangesetAffectedSettings {
+				changed_paths: vec!["[".to_string()],
+				..Default::default()
 			},
-		}))
-		.err()
-		.unwrap_or_else(|| panic!("expected invalid source glob error"));
+		},
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid source glob error"));
 	assert!(
 		source_error
 			.to_string()
-			.contains("[source.bot.changesets].changed_paths contains invalid glob pattern")
+			.contains("[changesets.affected].changed_paths contains invalid glob pattern")
 	);
 
 	let package_pattern_error = crate::validate_changesets_configuration(
@@ -5532,7 +5497,6 @@ fn validate_github_source_and_api_configuration_cover_remaining_paths() {
 				labels: vec![" ".to_string()],
 				..Default::default()
 			},
-			bot: monochange_core::ProviderBotSettings::default(),
 		}))
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid github labels error"));
@@ -5540,30 +5504,6 @@ fn validate_github_source_and_api_configuration_cover_remaining_paths() {
 		github_error
 			.to_string()
 			.contains("[source.pull_requests].labels must not include empty values")
-	);
-
-	let github_skip_label_error =
-		crate::validate_source_configuration(Some(&monochange_core::SourceConfiguration {
-			provider: SourceProvider::GitHub,
-			host: None,
-			api_url: None,
-			owner: "ifiokjr".to_string(),
-			repo: "monochange".to_string(),
-			releases: monochange_core::ProviderReleaseSettings::default(),
-			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings {
-				changesets: monochange_core::ProviderChangesetBotSettings {
-					skip_labels: vec![" ".to_string()],
-					..Default::default()
-				},
-			},
-		}))
-		.err()
-		.unwrap_or_else(|| panic!("expected invalid github skip label error"));
-	assert!(
-		github_skip_label_error
-			.to_string()
-			.contains("[source.bot.changesets].skip_labels must not include empty values")
 	);
 
 	let source_api_error =
@@ -5575,7 +5515,6 @@ fn validate_github_source_and_api_configuration_cover_remaining_paths() {
 			repo: "monochange".to_string(),
 			releases: monochange_core::ProviderReleaseSettings::default(),
 			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings::default(),
 		}))
 		.err()
 		.unwrap_or_else(|| panic!("expected insecure api_url error"));

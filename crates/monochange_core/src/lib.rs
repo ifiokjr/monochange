@@ -3354,8 +3354,8 @@ impl Default for ProviderMergeRequestSettings {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ProviderChangesetBotSettings {
-	#[serde(default)]
+pub struct ChangesetAffectedSettings {
+	#[serde(default = "default_true")]
 	pub enabled: bool,
 	#[serde(default = "default_true")]
 	pub required: bool,
@@ -3369,10 +3369,10 @@ pub struct ProviderChangesetBotSettings {
 	pub ignored_paths: Vec<String>,
 }
 
-impl Default for ProviderChangesetBotSettings {
+impl Default for ChangesetAffectedSettings {
 	fn default() -> Self {
 		Self {
-			enabled: false,
+			enabled: true,
 			required: true,
 			skip_labels: Vec::new(),
 			comment_on_failure: true,
@@ -3383,39 +3383,9 @@ impl Default for ProviderChangesetBotSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
-pub struct ProviderBotSettings {
-	#[serde(default)]
-	pub changesets: ProviderChangesetBotSettings,
-}
-
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ChangesetVerificationSettings {
-	#[serde(default = "default_true")]
-	pub enabled: bool,
-	#[serde(default = "default_true")]
-	pub required: bool,
-	#[serde(default)]
-	pub skip_labels: Vec<String>,
-	#[serde(default = "default_true")]
-	pub comment_on_failure: bool,
-}
-
-impl Default for ChangesetVerificationSettings {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			required: true,
-			skip_labels: Vec::new(),
-			comment_on_failure: true,
-		}
-	}
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct ChangesetSettings {
 	#[serde(default)]
-	pub verify: ChangesetVerificationSettings,
+	pub affected: ChangesetAffectedSettings,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -3536,8 +3506,6 @@ pub struct SourceConfiguration {
 	pub releases: ProviderReleaseSettings,
 	#[serde(default)]
 	pub pull_requests: ProviderMergeRequestSettings,
-	#[serde(default)]
-	pub bot: ProviderBotSettings,
 }
 
 #[allow(clippy::struct_excessive_bools)]

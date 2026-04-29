@@ -2237,7 +2237,6 @@ pub(crate) fn inferred_retarget_source_configuration(
 		api_url: None,
 		releases: monochange_core::ProviderReleaseSettings::default(),
 		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-		bot: monochange_core::ProviderBotSettings::default(),
 	})
 }
 
@@ -3553,7 +3552,6 @@ mod tests {
 			api_url: None,
 			releases: monochange_core::ProviderReleaseSettings::default(),
 			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
-			bot: monochange_core::ProviderBotSettings::default(),
 		}
 	}
 
@@ -3947,7 +3945,7 @@ mod tests {
 			r#"[defaults]
 package_type = "cargo"
 
-[changesets.verify]
+[changesets.affected]
 enabled = true
 required = true
 

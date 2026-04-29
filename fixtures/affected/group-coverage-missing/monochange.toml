@@ -1,7 +1,7 @@
 [defaults]
 package_type = "cargo"
 
-[changesets.verify]
+[changesets.affected]
 enabled = true
 required = true
 

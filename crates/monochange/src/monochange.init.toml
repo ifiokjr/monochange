@@ -679,34 +679,10 @@ auto_merge = false
 # labels = ["release", "automated"]
 # auto_merge = false
 
-# [source.bot.changesets] — changeset policy for provider-aware automation
-#
-# These settings feed the AffectedPackages step when it needs to know which
-# paths matter for a pull request on the configured source provider.
-#
-# For skip_labels, prefer [changesets.verify].skip_labels instead.
-#
-# Fields:
-#   enabled            — enable provider-aware changeset policy (default: false)
-#   required           — treat missing changesets as errors (default: true)
-#   skip_labels        — PR labels that skip enforcement (default: [])
-#   comment_on_failure — render a failure comment for CI (default: true)
-#   changed_paths      — glob patterns for paths that require changeset coverage;
-#                        only files matching at least one pattern trigger verification
-#   ignored_paths      — glob patterns for paths to exclude from verification even
-#                        when they match changed_paths
-#
-# [source.bot.changesets]
-# enabled = false
-# required = true
-# skip_labels = []
-# comment_on_failure = true
-# changed_paths = []
-# ignored_paths = []
 {% endif %}
 
 # =============================================================================
-# [changesets.verify] — changeset verification settings
+# [changesets.affected] — changeset verification settings
 # =============================================================================
 #
 # Controls the `AffectedPackages` CLI step which checks whether pull requests
@@ -714,7 +690,7 @@ auto_merge = false
 #
 # This section works independently of any source provider.
 
-[changesets.verify]
+[changesets.affected]
 # Whether changeset verification is enabled. When false, the AffectedPackages
 # step will refuse to run.
 # Default: true
@@ -735,6 +711,15 @@ skip_labels = []
 # CI integrations to post back to the pull request.
 # Default: true
 comment_on_failure = true
+
+# Additional non-package root-level paths that should also trigger changeset
+# requirements when changed. Package directories are included automatically.
+# Default: []
+changed_paths = []
+
+# Files that should not trigger changeset requirements.
+# Default: []
+ignored_paths = []
 
 # =============================================================================
 # [cli.*] — user-defined CLI commands
