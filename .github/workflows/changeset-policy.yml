@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   check:
+    if: ${{ !startsWith(github.head_ref, 'monochange/release/') }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:

@@ -321,13 +321,19 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   release-pr-manual-merge-blocker:
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'monochange/release/')
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: block direct merge of release branches
-        run: |
-          echo "::error::Release branches must be merged via the /merge comment workflow."
-          exit 1
+        uses: monochange/actions/fail-when@v0.4.0
+        with:
+          should-fail: ${{ startsWith(github.head_ref, 'monochange/release/') }}
+          reason: Release branches must be merged via the /merge comment workflow.
+          fail-comment: |
+            Release branches must be merged via the `/merge` comment workflow.
 
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
