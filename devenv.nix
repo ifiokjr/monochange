@@ -184,6 +184,9 @@ in
     "test:cargo" = {
       exec = ''
         set -euo pipefail
+        if [ -n "''${CI:-}" ]; then
+          export CARGO_BUILD_JOBS="''${CARGO_BUILD_JOBS:-2}"
+        fi
         cargo bin cargo-nextest run --workspace --all-features --no-tests pass
       '';
       description = "Run cargo tests with nextest.";
@@ -192,6 +195,9 @@ in
     "test:cargo:expensive" = {
       exec = ''
         set -euo pipefail
+        if [ -n "''${CI:-}" ]; then
+          export CARGO_BUILD_JOBS="''${CARGO_BUILD_JOBS:-2}"
+        fi
         MONOCHANGE_EXPENSIVE_TESTS=1 cargo bin cargo-nextest run --workspace --all-features --no-tests pass
       '';
       description = "Run cargo tests with the CI-only large-fixture cases enabled.";
