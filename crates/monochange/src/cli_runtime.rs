@@ -609,6 +609,14 @@ pub(crate) fn execute_cli_command_with_options(
 		let mut step_phase_timings = Vec::new();
 		let step_result: MonochangeResult<()> = (|| {
 			match step {
+				CliStepDefinition::Config { .. } => {
+					output = if cli_command.name == "step:config" {
+						Some(render_config_step_json(root, configuration))
+					} else {
+						None
+					};
+					Ok(())
+				}
 				CliStepDefinition::Validate { .. } => {
 					let (warnings, mut validation_errors) =
 						lint::collect_workspace_validation_issues(root);
@@ -1282,6 +1290,9 @@ fn step_shows_progress(
 	step: &CliStepDefinition,
 	step_inputs: &BTreeMap<String, Vec<String>>,
 ) -> bool {
+	if matches!(step, CliStepDefinition::Config { .. }) {
+		return false;
+	}
 	if matches!(step, CliStepDefinition::CreateChangeFile { .. })
 		&& step_inputs
 			.get("interactive")
@@ -1663,6 +1674,31 @@ pub(crate) fn build_cli_template_context(
 	variables: Option<&BTreeMap<String, CommandVariable>>,
 ) -> serde_json::Map<String, serde_json::Value> {
 	let mut template_context = serde_json::Map::new();
+
+	let project_root = context
+		.root
+		.canonicalize()
+		.unwrap_or_else(|_| context.root.clone())
+		.display()
+		.to_string();
+	template_context.insert(
+		"project_root".to_string(),
+		serde_json::Value::String(project_root),
+	);
+	template_context.insert(
+		"config_path".to_string(),
+		serde_json::Value::String(
+			monochange_config::config_path(&context.root)
+				.display()
+				.to_string(),
+		),
+	);
+	if let Ok(configuration) = load_workspace_configuration(&context.root) {
+		template_context.insert(
+			"config".to_string(),
+			serde_json::to_value(configuration).unwrap_or(serde_json::Value::Null),
+		);
+	}
 
 	// Core release variables
 	template_context.insert(
@@ -4877,6 +4913,40 @@ path = "crates/core"
 	}
 
 	#[test]
+	fn configured_config_step_uses_generic_completion_without_config_json() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let configuration = sample_configuration(tempdir.path());
+		let cli_command = CliCommandDefinition {
+			name: "configured-config".to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: vec![CliStepDefinition::Config {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			}],
+		};
+
+		let output = execute_cli_command_with_options(
+			tempdir.path(),
+			&configuration,
+			&cli_command,
+			ExecuteCliCommandOptions {
+				dry_run: true,
+				quiet: true,
+				show_diff: false,
+				inputs: BTreeMap::new(),
+				prepared_release_path: None,
+				progress_format: ProgressFormat::Auto,
+			},
+		)
+		.unwrap_or_else(|error| panic!("config command: {error}"));
+
+		assert_eq!(output, "command `configured-config` completed (dry-run)");
+		assert!(!output.contains("projectRoot"));
+	}
+
+	#[test]
 	fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
 		let _guard = TEST_ENV_LOCK
 			.lock()
@@ -4918,13 +4988,25 @@ path = "crates/core"
 		);
 
 		let events = read_telemetry_events(&telemetry_path);
-		assert_eq!(events.len(), 2);
-		assert_eq!(events[0]["body"]["string_value"], "command_step");
-		assert_eq!(events[0]["attributes"]["outcome"], "error");
-		assert_eq!(events[0]["attributes"]["error_kind"], "config_error");
-		assert_eq!(events[1]["body"]["string_value"], "command_run");
-		assert_eq!(events[1]["attributes"]["outcome"], "error");
-		assert_eq!(events[1]["attributes"]["error_kind"], "config_error");
+		let step_event = events
+			.iter()
+			.find(|event| {
+				event["body"]["string_value"] == "command_step"
+					&& event["attributes"]["outcome"] == "error"
+			})
+			.unwrap_or_else(|| panic!("expected command_step event: {events:#?}"));
+		let run_event = events
+			.iter()
+			.find(|event| {
+				event["body"]["string_value"] == "command_run"
+					&& event["attributes"]["outcome"] == "error"
+			})
+			.unwrap_or_else(|| panic!("expected command_run event: {events:#?}"));
+
+		assert_eq!(step_event["attributes"]["outcome"], "error");
+		assert_eq!(step_event["attributes"]["error_kind"], "config_error");
+		assert_eq!(run_event["attributes"]["outcome"], "error");
+		assert_eq!(run_event["attributes"]["error_kind"], "config_error");
 	}
 
 	#[test]
@@ -4966,13 +5048,25 @@ path = "crates/core"
 		);
 
 		let events = read_telemetry_events(&telemetry_path);
-		assert_eq!(events.len(), 2);
-		assert_eq!(events[0]["body"]["string_value"], "command_step");
-		assert_eq!(events[0]["attributes"]["outcome"], "error");
-		assert_eq!(events[0]["attributes"]["error_kind"], "config_error");
-		assert_eq!(events[1]["body"]["string_value"], "command_run");
-		assert_eq!(events[1]["attributes"]["outcome"], "error");
-		assert_eq!(events[1]["attributes"]["error_kind"], "config_error");
+		let step_event = events
+			.iter()
+			.find(|event| {
+				event["body"]["string_value"] == "command_step"
+					&& event["attributes"]["outcome"] == "error"
+			})
+			.unwrap_or_else(|| panic!("expected command_step event: {events:#?}"));
+		let run_event = events
+			.iter()
+			.find(|event| {
+				event["body"]["string_value"] == "command_run"
+					&& event["attributes"]["outcome"] == "error"
+			})
+			.unwrap_or_else(|| panic!("expected command_run event: {events:#?}"));
+
+		assert_eq!(step_event["attributes"]["outcome"], "error");
+		assert_eq!(step_event["attributes"]["error_kind"], "config_error");
+		assert_eq!(run_event["attributes"]["outcome"], "error");
+		assert_eq!(run_event["attributes"]["error_kind"], "config_error");
 	}
 
 	#[test]

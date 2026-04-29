@@ -30,6 +30,7 @@ Commands:
   mcp                            Start the monochange MCP (Model Context Protocol) server over stdin/stdout
   check                          Validate configuration, changesets, and run manifest lint rules
   help                           Show detailed help for a command
+  step:config                    Run the `step:config` command
   step:validate                  Run the `step:validate` command
   step:discover                  Run the `step:discover` command
   step:display-versions          Run the `step:display-versions` command

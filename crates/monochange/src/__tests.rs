@@ -2426,6 +2426,94 @@ fn command_versions_reports_planned_versions_without_mutating_files() {
 }
 
 #[test]
+fn command_config_reports_resolved_configuration_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+
+	let output = run_cli(
+		tempdir.path(),
+		[OsString::from("mc"), OsString::from("step:config")],
+	)
+	.unwrap_or_else(|error| panic!("config output: {error}"));
+	let parsed: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("config json: {error}"));
+
+	let project_root = tempdir
+		.path()
+		.canonicalize()
+		.unwrap_or_else(|error| panic!("canonical root: {error}"))
+		.display()
+		.to_string();
+	let config_path = tempdir.path().join("monochange.toml").display().to_string();
+
+	assert_eq!(parsed["projectRoot"], serde_json::json!(project_root));
+	assert_eq!(parsed["configPath"], serde_json::json!(config_path));
+	assert_eq!(
+		parsed["config"]["packages"][0]["id"],
+		serde_json::json!("app")
+	);
+}
+
+#[test]
+fn render_config_step_json_falls_back_to_uncanonicalized_root() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("config: {error}"));
+	let missing_root = tempdir.path().join("missing-root");
+
+	let output = crate::render_config_step_json(&missing_root, &configuration);
+	let parsed: serde_json::Value =
+		serde_json::from_str(&output).unwrap_or_else(|error| panic!("config json: {error}"));
+
+	assert_eq!(
+		parsed["projectRoot"],
+		serde_json::json!(missing_root.display().to_string())
+	);
+	assert_eq!(
+		parsed["configPath"],
+		serde_json::json!(missing_root.join("monochange.toml").display().to_string())
+	);
+}
+
+#[test]
+fn template_context_exposes_resolved_config_by_default() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	let mut context = cli_context_for_when_evaluation_tests();
+	context.root = tempdir.path().to_path_buf();
+
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	let project_root = tempdir
+		.path()
+		.canonicalize()
+		.unwrap_or_else(|error| panic!("canonical root: {error}"))
+		.display()
+		.to_string();
+	let config_path = tempdir.path().join("monochange.toml").display().to_string();
+
+	assert_eq!(
+		template_context
+			.get("config")
+			.and_then(|value| value.pointer("/packages/0/id"))
+			.and_then(serde_json::Value::as_str),
+		Some("app")
+	);
+	assert_eq!(
+		template_context
+			.get("project_root")
+			.and_then(serde_json::Value::as_str),
+		Some(project_root.as_str())
+	);
+	assert_eq!(
+		template_context
+			.get("config_path")
+			.and_then(serde_json::Value::as_str),
+		Some(config_path.as_str())
+	);
+}
+
+#[test]
 fn render_interactive_changeset_markdown_uses_natural_summary_heading() {
 	let root = fixture_path("changeset-target-metadata/render-workspace");
 	let configuration =
@@ -10731,6 +10819,15 @@ fn detect_output_format_from_env_args_parses_format_equals() {
 	assert_eq!(
 		crate::detect_output_format_from_env_args(args.into_iter()),
 		crate::OutputFormat::Markdown
+	);
+}
+
+#[test]
+fn detect_output_format_from_env_args_treats_config_step_as_json() {
+	let args: Vec<String> = vec!["monochange".to_string(), "step:config".to_string()];
+	assert_eq!(
+		crate::detect_output_format_from_env_args(args.into_iter()),
+		crate::OutputFormat::Json
 	);
 }
 

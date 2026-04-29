@@ -262,6 +262,26 @@ pub(crate) use workspace_ops::render_interactive_changeset_markdown;
 #[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
+pub(crate) fn render_config_step_json(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+) -> String {
+	let project_root = root
+		.canonicalize()
+		.unwrap_or_else(|_| root.to_path_buf())
+		.display()
+		.to_string();
+	let config_path = monochange_config::config_path(root).display().to_string();
+	let output = serde_json::json!({
+		"projectRoot": project_root,
+		"configPath": config_path,
+		"config": configuration,
+	});
+
+	serde_json::to_string_pretty(&output)
+		.unwrap_or_else(|error| panic!("serializing a serde_json::Value failed: {error}"))
+}
+
 pub(crate) fn synthetic_step_command_definition(
 	cli_command_name: &str,
 ) -> MonochangeResult<CliCommandDefinition> {
@@ -667,6 +687,9 @@ pub(crate) fn detect_output_format_from_env_args(
 ) -> OutputFormat {
 	let args: Vec<String> = args.collect();
 	for (i, arg) in args.iter().enumerate() {
+		if arg == "step:config" {
+			return OutputFormat::Json;
+		}
 		if arg == "--format"
 			&& let Some(value) = args.get(i + 1)
 		{

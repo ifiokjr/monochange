@@ -1785,6 +1785,15 @@ impl<'de> Deserialize<'de> for ShellConfig {
 #[serde(tag = "type", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum CliStepDefinition {
+	/// Expose the resolved `monochange` configuration and workspace root.
+	Config {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	/// Validate `monochange` configuration and changesets, and run lint rules
 	/// on package manifests.
 	Validate {
@@ -1983,7 +1992,8 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn inputs(&self) -> &BTreeMap<String, CliStepInputValue> {
 		match self {
-			Self::Validate { inputs, .. }
+			Self::Config { inputs, .. }
+			| Self::Validate { inputs, .. }
 			| Self::Discover { inputs, .. }
 			| Self::DisplayVersions { inputs, .. }
 			| Self::CreateChangeFile { inputs, .. }
@@ -2007,7 +2017,8 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn name(&self) -> Option<&str> {
 		match self {
-			Self::Validate { name, .. }
+			Self::Config { name, .. }
+			| Self::Validate { name, .. }
 			| Self::Discover { name, .. }
 			| Self::DisplayVersions { name, .. }
 			| Self::CreateChangeFile { name, .. }
@@ -2037,7 +2048,8 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn when(&self) -> Option<&str> {
 		match self {
-			Self::Validate { when, .. }
+			Self::Config { when, .. }
+			| Self::Validate { when, .. }
 			| Self::Discover { when, .. }
 			| Self::DisplayVersions { when, .. }
 			| Self::CreateChangeFile { when, .. }
@@ -2072,6 +2084,7 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn kind_name(&self) -> &'static str {
 		match self {
+			Self::Config { .. } => "Config",
 			Self::Validate { .. } => "Validate",
 			Self::Discover { .. } => "Discover",
 			Self::DisplayVersions { .. } => "DisplayVersions",
@@ -2100,6 +2113,7 @@ impl CliStepDefinition {
 	#[must_use]
 	pub fn valid_input_names(&self) -> Option<&'static [&'static str]> {
 		match self {
+			Self::Config { .. } => Some(&[]),
 			Self::Validate { .. } => Some(&["fix"]),
 			Self::CommitRelease { .. } => Some(&["no_verify"]),
 			Self::VerifyReleaseBranch { .. } => Some(&["from"]),
@@ -2200,7 +2214,7 @@ impl CliStepDefinition {
 					_ => None,
 				}
 			}
-			Self::Command { .. } => None,
+			Self::Config { .. } | Self::Command { .. } => None,
 			Self::Discover { .. } | Self::DisplayVersions { .. } | Self::PrepareRelease { .. } => {
 				matches!(name, "format").then_some(CliInputKind::Choice)
 			}
@@ -3832,6 +3846,11 @@ pub fn default_cli_commands() -> Vec<CliCommandDefinition> {
 #[must_use]
 pub fn all_step_variants() -> Vec<CliStepDefinition> {
 	vec![
+		CliStepDefinition::Config {
+			name: None,
+			when: None,
+			inputs: BTreeMap::new(),
+		},
 		CliStepDefinition::Validate {
 			name: None,
 			when: None,
