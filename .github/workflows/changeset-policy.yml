@@ -40,6 +40,10 @@ jobs:
           cat > "$bin_dir/mc" <<EOF
           #!/usr/bin/env bash
           set -euo pipefail
+          if [ "\${1:-}" = "--version" ]; then
+            echo "mc local"
+            exit 0
+          fi
           exec "$devenv_bin" shell cargo run --quiet --release --package monochange --bin mc -- "\$@"
           EOF
           chmod +x "$bin_dir/mc"
