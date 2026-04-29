@@ -35,6 +35,130 @@ For complete feature details, architecture overview, and usage examples, see the
 
 > _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/monochange/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
 
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-29)
+
+### Changed
+
+#### Configure changeset lint rules
+
+Add configurable changeset lint rules under `[lints.rules]` for summaries, section headings, bump-specific requirements, and changelog-type-specific requirements.
+
+Rules can target built-in or custom changeset types with dynamic ids like `changesets/types/breaking` and `changesets/types/unicorns`, while unknown type ids are rejected during configuration loading.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #326](https://github.com/monochange/monochange/pull/326) _Introduced in:_ [`285fd69`](https://github.com/monochange/monochange/commit/285fd697b99502e9d95716413c533251307f0010) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Document supported ecosystem capabilities
+
+The documentation now includes a dedicated ecosystem guide that compares Cargo, npm-family, Deno, Dart / Flutter, and Python support across discovery, manifest updates, lockfile handling, and built-in registry publishing. Python is documented as a supported release-planning ecosystem with uv workspace discovery, Poetry and PEP 621 `pyproject.toml` parsing, Python dependency normalization, manifest version rewrites, internal dependency rewrites, and inferred `uv lock` / `poetry lock --no-update` lockfile commands.
+
+The guide also clarifies ecosystem publishing boundaries, including canonical public registry support and the external-mode escape hatch for private registries or custom publication flows.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #307](https://github.com/monochange/monochange/pull/307) _Introduced in:_ [`11c628c`](https://github.com/monochange/monochange/commit/11c628cd2afb7c9509c31a8cfc043be63a9f2a75) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add Go ecosystem support
+
+monochange now discovers and manages Go modules from `go.mod` files in single-module and multi-module repositories.
+
+**Configuration:**
+
+```toml
+[defaults]
+package_type = "go"
+
+[package.api]
+path = "api"
+
+[package.shared]
+path = "shared"
+
+[ecosystems.go]
+enabled = true
+```
+
+**What it discovers:**
+
+- Go modules by scanning for `go.mod` files
+- Multi-module monorepos with separate modules in subdirectories
+- Module paths, including major version suffixes (`/v2`, `/v3`)
+- Cross-module `require` directives as dependency edges
+- Indirect dependencies marked as development dependencies
+
+**Version management:**
+
+- Go versions come from git tags, not manifest files — the adapter reports `None` for `current_version` and stores the module path as metadata for tag resolution
+- Updates `require` directives in `go.mod` when cross-module dependencies change
+- Preserves `replace`, `exclude`, `retract` directives and comments
+- Adds `v` prefix to version strings automatically when missing
+
+**Lockfile commands:**
+
+- Infers `go mod tidy` for all Go modules (updates both `go.mod` and `go.sum`)
+- Configurable via `[ecosystems.go].lockfile_commands`
+
+**Key design decisions:**
+
+- Module names are derived from the last non-version segment of the module path (`github.com/org/repo/api/v2` → `api`)
+- The full module path and relative directory path are stored as metadata for downstream tag resolution
+- Parse errors during discovery are treated as warnings, not hard errors
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #156](https://github.com/monochange/monochange/pull/156) _Introduced in:_ [`519f841`](https://github.com/monochange/monochange/commit/519f841929c6a06d5b3a578b206982d2d6cc1548) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#133](https://github.com/monochange/monochange/issues/133)
+
+#### Update repository URLs
+
+Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add the publish bootstrap command
+
+Add `mc publish-bootstrap --from <ref>` for release-record-scoped first-time package setup.
+
+The command uses the release record to choose package ids, runs placeholder publishing for that release package set, supports `--dry-run`, and can write a JSON bootstrap result artifact with `--output <path>`. Documentation now recommends rerunning `mc publish-readiness` after bootstrap before planning or publishing packages.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #318](https://github.com/monochange/monochange/pull/318) _Introduced in:_ [`cadb6fc`](https://github.com/monochange/monochange/commit/cadb6fccaac2ff9107db8b03bf6156762bc5a9b2) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add readiness-backed publish planning
+
+`mc publish-plan` now accepts `--readiness <path>` for normal package publish planning. The plan validates that the `mc publish-readiness` artifact matches the current release record and covers the selected package set, then limits rate-limit batches to package ids that are ready in both the artifact and a fresh local readiness check.
+
+Placeholder publish planning continues to reject readiness artifacts and should be run with `mc publish-plan --mode placeholder`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #305](https://github.com/monochange/monochange/pull/305) _Introduced in:_ [`e80c2b8`](https://github.com/monochange/monochange/commit/e80c2b8f1fd1df155e4aa05df8977f245f89bbc5) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add Cargo publish-readiness guards
+
+Built-in crates.io publishing now fails readiness before registry mutation when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`.
+
+Workspace-inherited Cargo metadata is accepted, and already-published package versions remain non-blocking when the saved readiness artifact still matches current readiness.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #303](https://github.com/monochange/monochange/pull/303) _Introduced in:_ [`0527e2c`](https://github.com/monochange/monochange/commit/0527e2c253d37ee283b9116e83db2a23b03b42b8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Require publish readiness artifacts
+
+Require real `mc publish` package-registry runs to pass a readiness artifact generated by `mc publish-readiness`.
+
+`mc publish-readiness` JSON artifacts now include schema metadata, release-record commit metadata, and a deterministic package-set fingerprint. `PublishPackages` validates the artifact before registry mutation and rejects missing, blocked, stale, malformed, duplicate, or package-mismatched readiness artifacts while leaving `--dry-run` publish previews artifact-free.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #301](https://github.com/monochange/monochange/pull/301) _Introduced in:_ [`97337aa`](https://github.com/monochange/monochange/commit/97337aad65e1f9dfc4d97fd381592b3bd57bc30a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Harden publish readiness artifact freshness
+
+Adds a publish input fingerprint to `mc publish-readiness` artifacts. `mc publish` and readiness-backed `mc publish-plan` now reject artifacts when workspace config, package manifests, lockfiles, or registry/tooling inputs changed after the artifact was written.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #324](https://github.com/monochange/monochange/pull/324) _Introduced in:_ [`69f221d`](https://github.com/monochange/monochange/commit/69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add publish resume support
+
+Add package publish result artifacts plus `mc publish --resume <path>` for retrying incomplete registry publishing after partial failures.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #323](https://github.com/monochange/monochange/pull/323) _Introduced in:_ [`8bca357`](https://github.com/monochange/monochange/commit/8bca35730a78f61c22dc71e473bc67a77210c4c6) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Document the generated CLI process
+
+Document the new CLI process where `mc init` generates editable workflow commands in `monochange.toml` and every built-in step is available directly through immutable `mc step:*` commands. The docs now clarify reserved command names such as `validate` and recommend `mc step:affected-packages --verify` for direct changeset-policy checks.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #291](https://github.com/monochange/monochange/pull/291) _Introduced in:_ [`74ac16a`](https://github.com/monochange/monochange/commit/74ac16af949ab07644c9b583774a00da2d95a7be) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added
