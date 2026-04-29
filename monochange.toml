@@ -406,9 +406,7 @@ packages = [
 tag = true
 release = true
 version_format = "primary"
-versioned_files = [
-	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] },
-]
+versioned_files = [{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] }]
 # Optional: filter member-targeted notes in the group changelog.
 # Omit `include` (or set it to "all") to keep current behavior.
 # Use "group-only" to show only direct group-targeted changesets.
@@ -482,7 +480,7 @@ comment_on_failure = true
 #
 [lints]
 use = ["cargo/recommended", "npm/recommended"]
-exclude = ["examples/**"]
+exclude = ["examples/**", "fixtures/**"]
 
 [lints.rules]
 "cargo/dependency-field-order" = "error"
@@ -652,11 +650,7 @@ enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
 comment_on_failure = true
-changed_paths = [
-	"Cargo.toml",
-	"Cargo.lock",
-	"codecov.yml",
-]
+changed_paths = ["Cargo.toml", "Cargo.lock", "codecov.yml"]
 ignored_paths = [
 	"**/tests/**",
 	"**/__tests.rs",

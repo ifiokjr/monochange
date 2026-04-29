@@ -372,16 +372,16 @@ Agents are now instructed to:
 # Separate unrelated features
 
 ---
-core: minor
----
+
+## core: minor
 
 #### add file diff preview
 
 ...
 
 ---
-core: minor
----
+
+## core: minor
 
 #### add changelog format detection
 

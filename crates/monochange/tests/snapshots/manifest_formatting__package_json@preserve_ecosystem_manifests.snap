@@ -4,15 +4,17 @@ assertion_line: 74
 expression: package_json
 ---
 {
-    "name": "web",
-    "version": "1.1.0",
-    "dependencies": { "shared": "^1.0.0" },
-    "metadata": {
-        "bin": {
-            "monochange": {
-                "version": "1.1.0"
-            }
-        }
-    },
-    "private": false
+  "name": "web",
+  "version": "1.1.0",
+  "private": false,
+  "dependencies": {
+    "shared": "^1.0.0"
+  },
+  "metadata": {
+    "bin": {
+      "monochange": {
+        "version": "1.1.0"
+      }
+    }
+  }
 }

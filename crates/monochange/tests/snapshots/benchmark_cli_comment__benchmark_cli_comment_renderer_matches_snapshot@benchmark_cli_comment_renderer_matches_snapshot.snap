@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/benchmark_cli_comment.rs
+assertion_line: 48
 expression: rendered
 ---
 ## Binary Benchmark: main vs PR
@@ -15,75 +16,75 @@ Commands:
 <details>
 <summary><strong>Baseline fixture</strong> — 20 packages, 50 changesets, 50 commits &nbsp; 🔴 validate 🟢 discover 🔴 dry-run 🔴 release</summary>
 
-| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
-|:---|---:|---:|---:|---:|
-| `main · mc validate` | 120.0 ± 6.0 | 113.0 | 129.0 | 1.00 |
-| `pr · mc validate` | 126.0 ± 4.0 | 121.0 | 131.0 | 1.05 ± 0.06 |
-| `main · mc discover --format json` | 88.0 ± 3.0 | 84.0 | 92.0 | 1.00 |
-| `pr · mc discover --format json` | 85.0 ± 2.0 | 82.0 | 88.0 | 0.97 ± 0.04 |
-| `main · mc release --dry-run` | 240.0 ± 8.0 | 229.0 | 251.0 | 1.00 |
-| `pr · mc release --dry-run` | 255.0 ± 10.0 | 242.0 | 269.0 | 1.06 ± 0.06 |
-| `main · mc release` | 315.0 ± 9.0 | 302.0 | 329.0 | 1.00 |
-| `pr · mc release` | 334.0 ± 11.0 | 319.0 | 348.0 | 1.06 ± 0.05 |
+| Command                            |    Mean [ms] | Min [ms] | Max [ms] |    Relative |
+| :--------------------------------- | -----------: | -------: | -------: | ----------: |
+| `main · mc validate`               |  120.0 ± 6.0 |    113.0 |    129.0 |        1.00 |
+| `pr · mc validate`                 |  126.0 ± 4.0 |    121.0 |    131.0 | 1.05 ± 0.06 |
+| `main · mc discover --format json` |   88.0 ± 3.0 |     84.0 |     92.0 |        1.00 |
+| `pr · mc discover --format json`   |   85.0 ± 2.0 |     82.0 |     88.0 | 0.97 ± 0.04 |
+| `main · mc release --dry-run`      |  240.0 ± 8.0 |    229.0 |    251.0 |        1.00 |
+| `pr · mc release --dry-run`        | 255.0 ± 10.0 |    242.0 |    269.0 | 1.06 ± 0.06 |
+| `main · mc release`                |  315.0 ± 9.0 |    302.0 |    329.0 |        1.00 |
+| `pr · mc release`                  | 334.0 ± 11.0 |    319.0 |    348.0 | 1.06 ± 0.05 |
 
 #### Phase timings
 
 ##### `mc release --dry-run`
 
-| Phase | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status |
-|:---|---:|---:|---:|---:|:---|
-| `prepare release total` | 450 | 238 | 251 | +13 | regressed |
-| `discover release workspace` | 180 | 96 | 101 | +5 | regressed |
-| `parse changeset files` | 120 | 44 | 47 | +3 | regressed |
-| `read changeset files` | 120 | 31 | 33 | +2 | regressed |
-| `build manifest updates` | 80 | 18 | 19 | +1 | regressed |
+| Phase                        | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status    |
+| :--------------------------- | ----------: | --------: | ------: | -------------: | :-------- |
+| `prepare release total`      |         450 |       238 |     251 |            +13 | regressed |
+| `discover release workspace` |         180 |        96 |     101 |             +5 | regressed |
+| `parse changeset files`      |         120 |        44 |      47 |             +3 | regressed |
+| `read changeset files`       |         120 |        31 |      33 |             +2 | regressed |
+| `build manifest updates`     |          80 |        18 |      19 |             +1 | regressed |
 
 ##### `mc release`
 
-| Phase | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status |
-|:---|---:|---:|---:|---:|:---|
-| `prepare release total` | 550 | 312 | 333 | +21 | regressed |
-| `discover release workspace` | 180 | 96 | 102 | +6 | regressed |
-| `parse changeset files` | 120 | 44 | 47 | +3 | regressed |
-| `apply release changes` | 160 | 58 | 63 | +5 | regressed |
-| `build manifest updates` | 80 | 18 | 20 | +2 | regressed |
+| Phase                        | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status    |
+| :--------------------------- | ----------: | --------: | ------: | -------------: | :-------- |
+| `prepare release total`      |         550 |       312 |     333 |            +21 | regressed |
+| `discover release workspace` |         180 |        96 |     102 |             +6 | regressed |
+| `parse changeset files`      |         120 |        44 |      47 |             +3 | regressed |
+| `apply release changes`      |         160 |        58 |      63 |             +5 | regressed |
+| `build manifest updates`     |          80 |        18 |      20 |             +2 | regressed |
 
 </details>
 
 <details>
 <summary><strong>Large history fixture</strong> — 200 packages, 500 changesets, 500 commits &nbsp; 🔴 validate 🟢 discover 🔴 dry-run 🔴 release</summary>
 
-| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
-|:---|---:|---:|---:|---:|
-| `main · mc validate` | 480.0 ± 12.0 | 462.0 | 495.0 | 1.00 |
-| `pr · mc validate` | 502.0 ± 15.0 | 481.0 | 522.0 | 1.05 ± 0.05 |
-| `main · mc discover --format json` | 390.0 ± 14.0 | 371.0 | 409.0 | 1.00 |
-| `pr · mc discover --format json` | 372.0 ± 11.0 | 358.0 | 388.0 | 0.95 ± 0.04 |
-| `main · mc release --dry-run` | 980.0 ± 28.0 | 942.0 | 1018.0 | 1.00 |
-| `pr · mc release --dry-run` | 1045.0 ± 35.0 | 998.0 | 1091.0 | 1.07 ± 0.05 |
-| `main · mc release` | 1185.0 ± 41.0 | 1132.0 | 1243.0 | 1.00 |
-| `pr · mc release` | 1264.0 ± 46.0 | 1208.0 | 1327.0 | 1.07 ± 0.05 |
+| Command                            |     Mean [ms] | Min [ms] | Max [ms] |    Relative |
+| :--------------------------------- | ------------: | -------: | -------: | ----------: |
+| `main · mc validate`               |  480.0 ± 12.0 |    462.0 |    495.0 |        1.00 |
+| `pr · mc validate`                 |  502.0 ± 15.0 |    481.0 |    522.0 | 1.05 ± 0.05 |
+| `main · mc discover --format json` |  390.0 ± 14.0 |    371.0 |    409.0 |        1.00 |
+| `pr · mc discover --format json`   |  372.0 ± 11.0 |    358.0 |    388.0 | 0.95 ± 0.04 |
+| `main · mc release --dry-run`      |  980.0 ± 28.0 |    942.0 |   1018.0 |        1.00 |
+| `pr · mc release --dry-run`        | 1045.0 ± 35.0 |    998.0 |   1091.0 | 1.07 ± 0.05 |
+| `main · mc release`                | 1185.0 ± 41.0 |   1132.0 |   1243.0 |        1.00 |
+| `pr · mc release`                  | 1264.0 ± 46.0 |   1208.0 |   1327.0 | 1.07 ± 0.05 |
 
 #### Phase timings
 
 ##### `mc release --dry-run`
 
-| Phase | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status |
-|:---|---:|---:|---:|---:|:---|
-| `prepare release total` | 1600 | 972 | 1044 | +72 | regressed |
-| `discover release workspace` | 700 | 388 | 412 | +24 | regressed |
-| `parse changeset files` | 320 | 186 | 201 | +15 | regressed |
-| `read changeset files` | 320 | 149 | 160 | +11 | regressed |
-| `build manifest updates` | 180 | 81 | 87 | +6 | regressed |
+| Phase                        | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status    |
+| :--------------------------- | ----------: | --------: | ------: | -------------: | :-------- |
+| `prepare release total`      |        1600 |       972 |    1044 |            +72 | regressed |
+| `discover release workspace` |         700 |       388 |     412 |            +24 | regressed |
+| `parse changeset files`      |         320 |       186 |     201 |            +15 | regressed |
+| `read changeset files`       |         320 |       149 |     160 |            +11 | regressed |
+| `build manifest updates`     |         180 |        81 |      87 |             +6 | regressed |
 
 ##### `mc release`
 
-| Phase | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status |
-|:---|---:|---:|---:|---:|:---|
-| `prepare release total` | 1800 | 1182 | 1261 | +79 | regressed |
-| `discover release workspace` | 700 | 388 | 414 | +26 | regressed |
-| `parse changeset files` | 320 | 186 | 201 | +15 | regressed |
-| `apply release changes` | 260 | 132 | 146 | +14 | regressed |
-| `build manifest updates` | 180 | 81 | 88 | +7 | regressed |
+| Phase                        | Budget [ms] | main [ms] | pr [ms] | Δ pr-main [ms] | Status    |
+| :--------------------------- | ----------: | --------: | ------: | -------------: | :-------- |
+| `prepare release total`      |        1800 |      1182 |    1261 |            +79 | regressed |
+| `discover release workspace` |         700 |       388 |     414 |            +26 | regressed |
+| `parse changeset files`      |         320 |       186 |     201 |            +15 | regressed |
+| `apply release changes`      |         260 |       132 |     146 |            +14 | regressed |
+| `build manifest updates`     |         180 |        81 |      88 |             +7 | regressed |
 
 </details>

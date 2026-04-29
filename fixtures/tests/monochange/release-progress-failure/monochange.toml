@@ -35,7 +35,7 @@ type = "PrepareRelease"
 [cli.progress-failure]
 help_text = "Exercise progress output"
 steps = [
-	{ type = "Validate", name = "skip validate", when = "{{ false }}" },
-	{ type = "Command", name = "stderr only", shell = true, command = "printf 'warn line\n' >&2" },
-	{ type = "Command", name = "fail loud", shell = true, command = "printf 'bad line\n' >&2; exit 3" },
+  { type = "Validate", name = "skip validate", when = "{{ false }}" },
+  { type = "Command", name = "stderr only", shell = true, command = "printf 'warn line\n' >&2" },
+  { type = "Command", name = "fail loud", shell = true, command = "printf 'bad line\n' >&2; exit 3" },
 ]

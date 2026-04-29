@@ -1,15 +1,11 @@
 {
-	"private": true,
 	"name": "@monochange/root",
+	"private": true,
 	"description": "Monorepo root for monochange npm packages",
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/monochange/monochange.git"
-	},
-	"engines": {
-		"node": ">=24.0.0",
-		"pnpm": ">=9"
 	},
 	"scripts": {
 		"check": "tsgo -config tsconfig.json",
@@ -26,5 +22,9 @@
 		"oxlint-tsgolint": "^0.22.0",
 		"tsdown": "^0.21.10",
 		"typescript": "^6.0.3"
+	},
+	"engines": {
+		"node": ">=24.0.0",
+		"pnpm": ">=9"
 	}
 }

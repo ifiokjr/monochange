@@ -33,10 +33,10 @@ release_or_publish:
   script:
     - git fetch --force --tags origin
     - |
-        set -euo pipefail
-        if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-          mc tag-release --from HEAD
-          ./scripts/legacy-release.sh
-        else
-          mc release-pr
-        fi
+      set -euo pipefail
+      if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+        mc tag-release --from HEAD
+        ./scripts/legacy-release.sh
+      else
+        mc release-pr
+      fi

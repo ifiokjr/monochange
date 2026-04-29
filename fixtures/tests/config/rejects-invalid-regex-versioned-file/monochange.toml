@@ -3,6 +3,4 @@ package_type = "cargo"
 
 [package.core]
 path = "crates/core"
-versioned_files = [
-    { path = "README.md", regex = "(" }
-]
+versioned_files = [{ path = "README.md", regex = "(" }]

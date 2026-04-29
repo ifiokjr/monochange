@@ -11,7 +11,9 @@ changelog = true
 path = "crates/app"
 changelog = false
 
-group.sdk
+
+
+group.sdk = 
 packages = ["core", "app"]
 changelog = "changelog.md"
 versioned_files = [{ path = "group.toml", type = "cargo" }]

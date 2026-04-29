@@ -4,5 +4,5 @@ package_type = "cargo"
 [package.core]
 path = "crates/core"
 versioned_files = [
-    { path = "crates/core/README.md", regex = 'download/v(?<version>\d+\.\d+\.\d+)\.tgz' }
+  { path = "crates/core/README.md", regex = 'download/v(?<version>\d+\.\d+\.\d+)\.tgz' },
 ]

@@ -11,4 +11,6 @@ section = "magic"
 bump = "minor"
 
 [lints.rules]
-"changesets/types/unicorns" = { level = "error", required_bump = "minor", required_sections = ["Rainbow"] }
+"changesets/types/unicorns" = { level = "error", required_bump = "minor", required_sections = [
+  "Rainbow",
+] }

@@ -2,34 +2,35 @@
 	"name": "@monochange/cli",
 	"version": "0.2.0",
 	"description": "CLI for cross-ecosystem monorepo release planning with monochange",
+	"keywords": [
+		"changesets",
+		"cli",
+		"mcp",
+		"monochange",
+		"monorepo",
+		"releases"
+	],
+	"homepage": "https://github.com/monochange/monochange",
+	"bugs": {
+		"url": "https://github.com/monochange/monochange/issues"
+	},
 	"license": "Unlicense",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/monochange/monochange.git"
 	},
-	"homepage": "https://github.com/monochange/monochange",
-	"bugs": {
-		"url": "https://github.com/monochange/monochange/issues"
-	},
-	"keywords": [
-		"monochange",
-		"releases",
-		"changesets",
-		"cli",
-		"mcp",
-		"monorepo"
-	],
-	"engines": {
-		"node": ">=18"
-	},
 	"bin": {
-		"monochange": "bin/monochange.js",
-		"mc": "bin/monochange.js"
+		"mc": "bin/monochange.js",
+		"monochange": "bin/monochange.js"
 	},
 	"files": [
 		"bin",
 		"README.md"
 	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
 	"optionalDependencies": {
 		"@monochange/cli-darwin-arm64": "workspace:^",
 		"@monochange/cli-darwin-x64": "workspace:^",
@@ -40,8 +41,7 @@
 		"@monochange/cli-win32-arm64-msvc": "workspace:^",
 		"@monochange/cli-win32-x64-msvc": "workspace:^"
 	},
-	"publishConfig": {
-		"access": "public",
-		"provenance": true
+	"engines": {
+		"node": ">=18"
 	}
 }

@@ -2,15 +2,15 @@
   "name": "@monorepo/app",
   "version": "1.0.0",
   "dependencies": {
-    "@monorepo/core": "^1.0.0",
-    "@monorepo/utils": "^1.0.0",
-    "@monorepo/logger": "^1.0.0",
-    "@monorepo/config": "^1.0.0",
-    "@monorepo/models": "^1.0.0",
-    "@monorepo/http-client": "^1.0.0",
     "@monorepo/cache": "^1.0.0",
+    "@monorepo/config": "^1.0.0",
+    "@monorepo/core": "^1.0.0",
+    "@monorepo/http-client": "^1.0.0",
+    "@monorepo/logger": "^1.0.0",
+    "@monorepo/models": "^1.0.0",
+    "@monorepo/telemetry": "^1.0.0",
     "@monorepo/ui-components": "^1.0.0",
-    "@monorepo/telemetry": "^1.0.0"
+    "@monorepo/utils": "^1.0.0"
   },
   "devDependencies": {
     "@monorepo/utils": "^1.0.0"
