@@ -1,3 +1,116 @@
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-29)
+
+### Added
+
+#### Improve lint and check progress output
+
+Add beautiful interactive progress reporting for `mc check` and `mc lint`.
+
+- Introduced `LintProgressReporter` trait in `monochange_core::lint` with 14 lifecycle hooks from planning through summary.
+- Added `NoopLintProgressReporter` for silent / backward-compatible operation.
+- Updated `Linter::lint_workspace` to emit planning, suite, file, rule, and summary events to the reporter.
+- Created `HumanLintProgressReporter` in `monochange` that writes animated spinners, suite-level progress, fix tracking, and a styled summary to stderr.
+- Enhanced `format_check_report` to list which files were fixed when `--fix` is active.
+- Respects `NO_COLOR` and `MONOCHANGE_NO_PROGRESS` environment variables.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #281](https://github.com/monochange/monochange/pull/281) _Introduced in:_ [`a9eec58`](https://github.com/monochange/monochange/commit/a9eec586e72d0a8704d08b7552523e0bd85ed20d) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+### Changed
+
+#### Add Go ecosystem support
+
+monochange now discovers and manages Go modules from `go.mod` files in single-module and multi-module repositories.
+
+**Configuration:**
+
+```toml
+[defaults]
+package_type = "go"
+
+[package.api]
+path = "api"
+
+[package.shared]
+path = "shared"
+
+[ecosystems.go]
+enabled = true
+```
+
+**What it discovers:**
+
+- Go modules by scanning for `go.mod` files
+- Multi-module monorepos with separate modules in subdirectories
+- Module paths, including major version suffixes (`/v2`, `/v3`)
+- Cross-module `require` directives as dependency edges
+- Indirect dependencies marked as development dependencies
+
+**Version management:**
+
+- Go versions come from git tags, not manifest files — the adapter reports `None` for `current_version` and stores the module path as metadata for tag resolution
+- Updates `require` directives in `go.mod` when cross-module dependencies change
+- Preserves `replace`, `exclude`, `retract` directives and comments
+- Adds `v` prefix to version strings automatically when missing
+
+**Lockfile commands:**
+
+- Infers `go mod tidy` for all Go modules (updates both `go.mod` and `go.sum`)
+- Configurable via `[ecosystems.go].lockfile_commands`
+
+**Key design decisions:**
+
+- Module names are derived from the last non-version segment of the module path (`github.com/org/repo/api/v2` → `api`)
+- The full module path and relative directory path are stored as metadata for downstream tag resolution
+- Parse errors during discovery are treated as warnings, not hard errors
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #156](https://github.com/monochange/monochange/pull/156) _Introduced in:_ [`519f841`](https://github.com/monochange/monochange/commit/519f841929c6a06d5b3a578b206982d2d6cc1548) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#133](https://github.com/monochange/monochange/issues/133)
+
+#### Add Python ecosystem support
+
+monochange now discovers and manages Python packages from uv workspaces, Poetry projects, and standalone `pyproject.toml` files.
+
+**Configuration:**
+
+```toml
+[defaults]
+package_type = "python"
+
+[package.core]
+path = "packages/core"
+
+[ecosystems.python]
+enabled = true
+lockfile_commands = [{ command = "uv lock" }]
+```
+
+**What it discovers:**
+
+- uv workspaces via `[tool.uv.workspace].members` glob patterns
+- Poetry projects via `[tool.poetry]` sections
+- Standalone `pyproject.toml` files with PEP 621 `[project]` metadata
+
+**Version management:**
+
+- Reads and updates `[project].version` in `pyproject.toml`
+- Parses PEP 440 versions and maps to semver (e.g., `1.2` → `1.2.0`)
+- Updates dependency version constraints in `[project].dependencies`
+- Handles `dynamic = ["version"]` gracefully (reports `None` for dynamic versions)
+
+**Lockfile commands:**
+
+- Infers `uv lock` for uv projects (detected by `uv.lock`)
+- Infers `poetry lock --no-update` for Poetry projects (detected by `poetry.lock`)
+- Configurable via `[ecosystems.python].lockfile_commands`
+
+**Dependency extraction:**
+
+- PEP 621 `[project].dependencies` and `[project.optional-dependencies]`
+- Poetry `[tool.poetry.dependencies]` and `[tool.poetry.group.*.dependencies]`
+- PEP 503 name normalization for cross-package dependency matching
+- PEP 508 version specifier parsing with extras support
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #152](https://github.com/monochange/monochange/pull/152) _Introduced in:_ [`81b0882`](https://github.com/monochange/monochange/commit/81b0882525ab51d74b0e8cc2a0114aac0fdb3a7f) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#132](https://github.com/monochange/monochange/issues/132)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Breaking Change
