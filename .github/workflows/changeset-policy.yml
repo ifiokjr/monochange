@@ -15,11 +15,11 @@ concurrency:
 
 jobs:
   check:
-    if: ${{ !startsWith(github.head_ref, 'monochange/release/') }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write
       pull-requests: read
     steps:
       - name: checkout repository
@@ -35,24 +35,8 @@ jobs:
         uses: tj-actions/changed-files@v46
 
       - name: run changeset policy
-        env:
-          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
-          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
-          args=(step:affected-packages --format json --verify)
-
-          for path in $CHANGED_FILES; do
-            args+=(--changed-paths "$path")
-          done
-
-          for label in "${labels[@]}"; do
-            args+=(--label "$label")
-          done
-
-          devenv shell -- monochange "${args[@]}" | tee policy.raw
-          awk 'BEGIN { capture = 0 } /^\{/ { capture = 1 } capture { print }' policy.raw > policy.json
-          jq -e '.status != "failed"' policy.json >/dev/null
+        uses: monochange/actions/changeset-policy@v0.5.0
+        with:
+          setup-monochange: "false"
+          changed-paths: ${{ steps.changed.outputs.all_changed_files }}
+          labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}

@@ -42,7 +42,7 @@ jobs:
     steps:
       - name: fast-forward release PR from workflow dispatch
         if: github.event_name == 'workflow_dispatch'
-        uses: monochange/actions/merge@v0.1.0
+        uses: monochange/actions/merge@v0.5.0
         with:
           github-token: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
           pull-request: ${{ inputs.pull_request }}
@@ -54,7 +54,7 @@ jobs:
 
       - name: fast-forward release PR from /merge comment
         if: github.event_name == 'issue_comment'
-        uses: monochange/actions/merge@v0.1.0
+        uses: monochange/actions/merge@v0.5.0
         with:
           github-token: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
           base-branch: main

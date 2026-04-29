@@ -324,19 +324,18 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       issues: write
+      pull-requests: read
     steps:
       - name: block direct merge of release branches
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          if [[ "$HEAD_REF" == monochange/release/* ]]; then
-            echo "::error::Release branches must be merged via the /merge comment workflow."
-            exit 1
-          fi
+        uses: monochange/actions/fail-when@v0.5.0
+        with:
+          should-fail: ${{ startsWith(github.head_ref, 'monochange/release/') }}
+          reason: Release branches must be merged via the /merge comment workflow.
+          fail-comment: |
+            This check fails intentionally so GitHub's normal merge button cannot be used for release PRs.
 
-          echo "PR branch $HEAD_REF is allowed to use normal merge checks."
+            After every required check is green, comment `/merge` on this PR or run the `release-pr-merge` workflow. That workflow fast-forwards the release branch and preserves monochange's release history invariants.
 
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
