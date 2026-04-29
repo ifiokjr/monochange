@@ -3,7 +3,7 @@
 "monochange": patch
 ---
 
-#### Document ecosystem-level trusted publishing inheritance
+# Document ecosystem-level trusted publishing inheritance
 
 Trusted publishing stays an ecosystem-level publish setting that packages inherit by default:
 

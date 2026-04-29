@@ -2,7 +2,7 @@
 "monochange": patch
 ---
 
-#### Harden publish planning guards
+# Harden publish planning guards
 
 `mc publish-plan`, `mc publish`, and `mc placeholder-publish` now respect the current workspace publishability rules instead of trusting stale release metadata or exact placeholder versions.
 

@@ -8,7 +8,7 @@ monochange_go: minor
 monochange_lint: patch
 ---
 
-#### Add Go ecosystem support
+# Add Go ecosystem support
 
 monochange now discovers and manages Go modules from `go.mod` files in single-module and multi-module repositories.
 

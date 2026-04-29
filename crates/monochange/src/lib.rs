@@ -145,8 +145,6 @@ use monochange_cargo::RustSemverProvider;
 use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
-use monochange_config::validate_versioned_files_content;
-use monochange_config::validate_workspace;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;

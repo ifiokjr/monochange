@@ -1484,21 +1484,21 @@ fn load_changeset_file_lints_configured_summary_requirements() {
 	assert!(summary_rule.bool_option("required", false));
 	let packages = vec![PackageRecord::new(
 		Ecosystem::Cargo,
-		"cargo-core",
+		"core",
 		root.join("crates/core/Cargo.toml"),
 		root.clone(),
 		Some(Version::new(1, 0, 0)),
 		PublishState::Public,
 	)];
 
-	let error = load_changeset_file(&root.join("change.md"), &configuration, &packages)
-		.expect_err("summary lint should reject a body that does not start with a heading");
-	let message = error.to_string();
-
-	assert!(
-		message.contains("changeset body must start with a summary heading"),
-		"unexpected error: {message}"
-	);
+	// Changeset linting now runs through `mc check` rather than during config loading,
+	// so `load_changeset_file` should succeed even when the changeset body violates lint rules.
+	let _file = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| {
+			panic!(
+				"changeset should load successfully; lint errors are reported by `mc check`: {error}"
+			)
+		});
 }
 
 #[test]
@@ -1508,21 +1508,20 @@ fn load_changeset_file_lints_configured_bump_and_type_rules() {
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let packages = vec![PackageRecord::new(
 		Ecosystem::Cargo,
-		"cargo-core",
+		"core",
 		root.join("crates/core/Cargo.toml"),
 		root.clone(),
 		Some(Version::new(1, 0, 0)),
 		PublishState::Public,
 	)];
 
-	let error = load_changeset_file(&root.join("change.md"), &configuration, &packages)
-		.expect_err("type lint should reject a forbidden heading");
-	let message = error.to_string();
-
-	assert!(
-		message.contains("changeset must not use `Breaking` as a heading"),
-		"unexpected error: {message}"
-	);
+	// Changeset linting now runs through `mc check` rather than during config loading.
+	let _file = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| {
+			panic!(
+				"changeset should load successfully; lint errors are reported by `mc check`: {error}"
+			)
+		});
 }
 
 #[test]
@@ -1539,21 +1538,20 @@ fn load_changeset_file_lints_configured_custom_type_rule() {
 	);
 	let packages = vec![PackageRecord::new(
 		Ecosystem::Cargo,
-		"cargo-core",
+		"core",
 		root.join("crates/core/Cargo.toml"),
 		root.clone(),
 		Some(Version::new(1, 0, 0)),
 		PublishState::Public,
 	)];
 
-	let error = load_changeset_file(&root.join("change.md"), &configuration, &packages)
-		.expect_err("custom type lint should reject a missing required section");
-	let message = error.to_string();
-
-	assert!(
-		message.contains("changeset must include a `Rainbow` section"),
-		"unexpected error: {message}"
-	);
+	// Changeset linting now runs through `mc check` rather than during config loading.
+	let _file = load_changeset_file(&root.join("change.md"), &configuration, &packages)
+		.unwrap_or_else(|error| {
+			panic!(
+				"changeset should load successfully; lint errors are reported by `mc check`: {error}"
+			)
+		});
 }
 
 #[test]

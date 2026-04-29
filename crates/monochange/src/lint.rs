@@ -31,6 +31,7 @@ fn lint_suites() -> Vec<Box<dyn LintSuite>> {
 	suites.push(Box::new(monochange_npm::lints::lint_suite()));
 	#[cfg(feature = "dart")]
 	suites.push(Box::new(monochange_dart::lints::lint_suite()));
+	suites.push(Box::new(monochange_config::lints::lint_suite()));
 	suites
 }
 
@@ -39,6 +40,22 @@ fn build_linter(
 	selection: LintSelection,
 ) -> Linter {
 	Linter::new(lint_suites(), configuration.lints.clone()).with_selection(selection)
+}
+
+pub(crate) fn collect_workspace_validation_issues(root: &Path) -> (Vec<String>, Vec<String>) {
+	let mut warnings = Vec::new();
+	let mut errors = Vec::new();
+
+	if let Err(error) = monochange_config::validate_workspace(root) {
+		errors.push(error.render());
+	}
+
+	match monochange_config::validate_versioned_files_content(root) {
+		Ok(mut collected_warnings) => warnings.append(&mut collected_warnings),
+		Err(error) => errors.push(error.render()),
+	}
+
+	(warnings, errors)
 }
 
 pub(crate) fn available_lint_rules() -> Vec<LintRule> {
@@ -92,9 +109,18 @@ pub(crate) fn run_check_command(
 	let configuration = load_workspace_configuration(root)?;
 	let mut output = String::new();
 
-	monochange_config::validate_workspace(root)?;
-	monochange_config::validate_versioned_files_content(root)?;
-	let _ = write!(output, "workspace validation passed for {}", root.display());
+	let (validation_warnings, validation_errors) = collect_workspace_validation_issues(root);
+	for warning in &validation_warnings {
+		let _ = writeln!(output, "warning: {warning}");
+	}
+	if validation_errors.is_empty() {
+		let _ = writeln!(output, "workspace validation passed for {}", root.display());
+	} else {
+		let _ = writeln!(output, "workspace validation failed for {}", root.display());
+		for error in &validation_errors {
+			let _ = writeln!(output, "{error}");
+		}
+	}
 
 	let selection = LintSelection::all()
 		.with_suites(ecosystems.iter().cloned())
@@ -149,6 +175,7 @@ pub(crate) fn run_check_command(
 	}
 
 	let lint_has_errors = report.has_errors();
+	let validation_has_errors = !validation_errors.is_empty();
 	if let Some(r) = reporter {
 		r.summary(
 			report.error_count,
@@ -161,15 +188,16 @@ pub(crate) fn run_check_command(
 
 	match format {
 		OutputFormat::Json => {
+			if validation_has_errors {
+				return Err(MonochangeError::Config(format!("check failed:\n{output}")));
+			}
 			Ok(serde_json::to_string_pretty(&report)
 				.unwrap_or_else(|error| panic!("serializing lint reports should succeed: {error}")))
 		}
 		OutputFormat::Text | OutputFormat::Markdown => {
 			output.push_str(&format_check_report(&report, fix));
-			if lint_has_errors {
-				Err(MonochangeError::Config(
-					"lint errors found during check".to_string(),
-				))
+			if validation_has_errors || lint_has_errors {
+				Err(MonochangeError::Config(format!("check failed:\n{output}")))
 			} else {
 				Ok(output)
 			}
@@ -632,6 +660,101 @@ mod tests {
 		let error = run_check_command(tempdir.path(), true, &[], &[], OutputFormat::Text)
 			.expect_err("expected fix write to fail for readonly manifest");
 		assert!(error.to_string().contains("Failed to write fixed content"));
+	}
+
+	#[test]
+	fn run_check_command_reports_all_validation_errors_before_failing() {
+		let tempdir = tempfile::tempdir()
+			.unwrap_or_else(|error| panic!("expected tempdir to be created: {error}"));
+		let root = tempdir.path();
+		let crate_dir = root.join("crates/core");
+		fs::create_dir_all(&crate_dir)
+			.unwrap_or_else(|error| panic!("expected crate dir to be created: {error}"));
+		fs::create_dir_all(root.join(".changeset"))
+			.unwrap_or_else(|error| panic!("expected changeset dir to be created: {error}"));
+		fs::write(
+			root.join("monochange.toml"),
+			"[package.core]\n\
+			path = \"crates/core\"\n\
+			type = \"cargo\"\n\
+			versioned_files = [\n\
+			  { path = \"missing.toml\", type = \"cargo\" },\n\
+			  { path = \"missing/*.toml\", type = \"cargo\" },\n\
+			]\n",
+		)
+		.unwrap_or_else(|error| panic!("expected config to be written: {error}"));
+		fs::write(
+			crate_dir.join("Cargo.toml"),
+			"[package]\n\
+			name = \"core\"\n\
+			version = \"1.0.0\"\n\
+			edition = \"2021\"\n\
+			description = \"Test core package\"\n\
+			license = \"MIT\"\n\
+			repository = \"https://github.com/monochange/monochange\"\n",
+		)
+		.unwrap_or_else(|error| panic!("expected manifest to be written: {error}"));
+		fs::write(
+			root.join(".changeset/broken.md"),
+			"---\nmissing: patch\n---\n\n# Broken target\n",
+		)
+		.unwrap_or_else(|error| panic!("expected changeset to be written: {error}"));
+
+		let (warnings, errors) = collect_workspace_validation_issues(root);
+		assert!(warnings.is_empty());
+		assert!(
+			errors
+				.iter()
+				.any(|error| error.contains("unknown package or group `missing`"))
+		);
+		assert!(
+			errors
+				.iter()
+				.any(|error| error.contains("versioned file") && error.contains("missing.toml"))
+		);
+
+		let warning_tempdir = tempfile::tempdir()
+			.unwrap_or_else(|error| panic!("expected warning tempdir to be created: {error}"));
+		let warning_root = warning_tempdir.path();
+		let warning_crate_dir = warning_root.join("crates/core");
+		fs::create_dir_all(&warning_crate_dir)
+			.unwrap_or_else(|error| panic!("expected warning crate dir to be created: {error}"));
+		fs::write(
+			warning_root.join("monochange.toml"),
+			"[package.core]\n\
+			path = \"crates/core\"\n\
+			type = \"cargo\"\n\
+			versioned_files = [{ path = \"missing/*.toml\", type = \"cargo\" }]\n",
+		)
+		.unwrap_or_else(|error| panic!("expected warning config to be written: {error}"));
+		fs::write(
+			warning_crate_dir.join("Cargo.toml"),
+			"[package]\n\
+			name = \"core\"\n\
+			version = \"1.0.0\"\n\
+			edition = \"2021\"\n\
+			description = \"Test core package\"\n\
+			license = \"MIT\"\n\
+			repository = \"https://github.com/monochange/monochange\"\n",
+		)
+		.unwrap_or_else(|error| panic!("expected warning manifest to be written: {error}"));
+		let warning_text = run_check_command(warning_root, false, &[], &[], OutputFormat::Text)
+			.unwrap_or_else(|error| panic!("expected warning-only check to pass: {error}"));
+		assert!(warning_text.contains("warning:"));
+		assert!(warning_text.contains("matches no files"));
+
+		let text_error = run_check_command(root, false, &[], &[], OutputFormat::Text)
+			.expect_err("expected text check to fail validation");
+		let text_message = text_error.to_string();
+		assert!(text_message.contains("workspace validation failed"));
+		assert!(text_message.contains("unknown package or group `missing`"));
+		assert!(text_message.contains("missing.toml"));
+
+		let json_error = run_check_command(root, false, &[], &[], OutputFormat::Json)
+			.expect_err("expected json check to fail validation");
+		let json_message = json_error.to_string();
+		assert!(json_message.contains("check failed"));
+		assert!(json_message.contains("workspace validation failed"));
 	}
 
 	#[test]

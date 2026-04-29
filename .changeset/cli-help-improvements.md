@@ -2,7 +2,7 @@
 monochange: minor
 ---
 
-#### Add colored CLI help
+# Add colored CLI help
 
 Add beautiful colored CLI help with detailed examples
 

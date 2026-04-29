@@ -4,7 +4,7 @@ monochange_core: feat
 monochange_lint: feat
 ---
 
-#### Improve lint and check progress output
+# Improve lint and check progress output
 
 Add beautiful interactive progress reporting for `mc check` and `mc lint`.
 

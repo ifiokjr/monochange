@@ -2,7 +2,7 @@
 monochange: patch
 ---
 
-#### Ignore changelog-only updates in affected checks
+# Ignore changelog-only updates in affected checks
 
 Release automation now treats configured changelog targets as release metadata instead of as ordinary package source changes. That means changelog-only updates no longer make `mc affected --verify` fail with an uncovered package error, and newly generated release notes are inserted above older release headings so the latest release stays at the top of each changelog.
 

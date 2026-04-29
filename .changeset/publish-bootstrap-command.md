@@ -4,7 +4,7 @@
 "@monochange/skill": patch
 ---
 
-#### Add the publish bootstrap command
+# Add the publish bootstrap command
 
 Add `mc publish-bootstrap --from <ref>` for release-record-scoped first-time package setup.
 

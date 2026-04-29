@@ -1,3 +1,6 @@
 [package]
 name = "gamma"
+description = "Test package gamma"
+license = "MIT"
+repository = "https://github.com/monochange/monochange"
 version = { workspace = true }

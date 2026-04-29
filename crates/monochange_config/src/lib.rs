@@ -474,7 +474,7 @@ struct RawChangeFile {
 	changes: Vec<RawChangeEntry>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct RawChangeEntry {
 	package: String,
 	#[serde(default)]
@@ -1314,7 +1314,7 @@ struct ChangeTypeLookup {
 
 #[derive(Debug)]
 pub struct ChangesetLoadContext<'a> {
-	configuration: &'a WorkspaceConfiguration,
+	_configuration: &'a WorkspaceConfiguration,
 	package_ids: HashSet<&'a str>,
 	groups_by_id: HashMap<&'a str, &'a GroupDefinition>,
 	package_reference_matches: HashMap<String, Vec<&'a str>>,
@@ -1382,7 +1382,7 @@ pub fn build_changeset_load_context<'a>(
 		);
 	}
 	ChangesetLoadContext {
-		configuration,
+		_configuration: configuration,
 		package_ids,
 		groups_by_id,
 		package_reference_matches,
@@ -1794,9 +1794,6 @@ fn parse_markdown_change_file_with_context(
 		});
 	}
 
-	let lint_settings = changeset_lint_settings_from_rules(&context.configuration.lints.rules)?;
-	lint_markdown_changeset(body, &changes, &lint_settings, changes_path)?;
-
 	Ok(RawChangeFile { changes })
 }
 
@@ -2186,7 +2183,7 @@ fn parse_changeset_frontmatter(
 	})
 }
 
-fn markdown_heading_level(line: &str) -> Option<usize> {
+pub(crate) fn markdown_heading_level(line: &str) -> Option<usize> {
 	let trimmed = line.trim_start();
 	let level = trimmed
 		.chars()
@@ -2433,6 +2430,7 @@ fn lint_bump_option(
 	})
 }
 
+#[allow(dead_code)]
 fn lint_markdown_changeset(
 	body: &str,
 	changes: &[RawChangeEntry],
@@ -2461,6 +2459,7 @@ fn lint_markdown_changeset(
 	Ok(())
 }
 
+#[allow(dead_code)]
 fn lint_markdown_no_section_headings(
 	body: &str,
 	changes: &[RawChangeEntry],
@@ -2481,6 +2480,7 @@ fn lint_markdown_no_section_headings(
 	Ok(())
 }
 
+#[allow(dead_code)]
 fn changeset_type_lint_settings<'settings>(
 	settings: &'settings ChangesetLintSettings,
 	change_type: &str,
@@ -2494,6 +2494,7 @@ fn changeset_type_lint_settings<'settings>(
 	})
 }
 
+#[allow(dead_code)]
 fn lint_markdown_summary(
 	body: &str,
 	settings: &ChangesetLintSettings,
@@ -2565,6 +2566,7 @@ fn lint_markdown_summary(
 	Ok(())
 }
 
+#[allow(dead_code)]
 fn lint_markdown_scope(
 	body: &str,
 	change: &RawChangeEntry,
@@ -2628,14 +2630,14 @@ fn lint_markdown_scope(
 	Ok(())
 }
 
-fn first_non_empty_line(markdown: &str) -> Option<&str> {
+pub(crate) fn first_non_empty_line(markdown: &str) -> Option<&str> {
 	markdown.lines().find_map(|line| {
 		let trimmed = line.trim();
 		(!trimmed.is_empty()).then_some(trimmed)
 	})
 }
 
-fn markdown_heading_text(line: &str) -> Option<String> {
+pub(crate) fn markdown_heading_text(line: &str) -> Option<String> {
 	let level = markdown_heading_level(line)?;
 	let text = line
 		.trim_start()
@@ -2649,20 +2651,20 @@ fn markdown_heading_text(line: &str) -> Option<String> {
 	Some(text)
 }
 
-fn markdown_has_heading(markdown: &str, heading: &str) -> bool {
+pub(crate) fn markdown_has_heading(markdown: &str, heading: &str) -> bool {
 	markdown.lines().any(|line| {
 		markdown_heading_text(line).is_some_and(|text| text.eq_ignore_ascii_case(heading.trim()))
 	})
 }
 
-fn markdown_has_code_block(markdown: &str) -> bool {
+pub(crate) fn markdown_has_code_block(markdown: &str) -> bool {
 	markdown.lines().any(|line| {
 		let trimmed = line.trim_start();
 		trimmed.starts_with("```") || trimmed.starts_with("~~~")
 	})
 }
 
-fn has_conventional_commit_prefix(summary: &str) -> bool {
+pub(crate) fn has_conventional_commit_prefix(summary: &str) -> bool {
 	let Some((prefix, _)) = summary.split_once(':') else {
 		return false;
 	};
@@ -2674,6 +2676,7 @@ fn has_conventional_commit_prefix(summary: &str) -> bool {
 	)
 }
 
+#[allow(dead_code)]
 fn changeset_lint_error(path: &Path, message: impl Into<String>) -> MonochangeError {
 	MonochangeError::Config(format!(
 		"changeset lint failed for {}: {}",
@@ -2891,7 +2894,7 @@ fn parse_markdown_change_target(
 	Ok((bump, version, change_type, caused_by))
 }
 
-fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {
+pub(crate) fn parse_bump_severity(value: &str) -> Option<BumpSeverity> {
 	match value {
 		"none" => Some(BumpSeverity::None),
 		"major" => Some(BumpSeverity::Major),
@@ -4765,11 +4768,21 @@ pub fn validate_workspace(root: &Path) -> MonochangeResult<()> {
 		.map(|entry| entry.path())
 		.filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
 		.collect::<Vec<_>>();
+	let mut errors = Vec::new();
 	for changeset_path in changeset_paths {
-		validate_changeset_targets(&configuration, &changeset_path)?;
+		if let Err(error) = validate_changeset_targets(&configuration, &changeset_path) {
+			errors.push(error.render());
+		}
 	}
 
-	Ok(())
+	if errors.is_empty() {
+		Ok(())
+	} else {
+		Err(MonochangeError::Diagnostic(format!(
+			"changeset target validation failed:\n{}",
+			errors.join("\n\n")
+		)))
+	}
 }
 
 /// Validate that versioned file paths exist on disk, ecosystem-typed files
@@ -4808,19 +4821,29 @@ pub fn validate_versioned_files_content(root: &Path) -> MonochangeResult<Vec<Str
 		}
 	}
 
+	let mut errors = Vec::new();
 	for (owner_kind, owner_id, definitions) in &sources {
 		for definition in *definitions {
-			validate_single_versioned_file_content(
+			if let Err(error) = validate_single_versioned_file_content(
 				root,
 				definition,
 				owner_kind,
 				owner_id,
 				&mut warnings,
-			)?;
+			) {
+				errors.push(error.render());
+			}
 		}
 	}
 
-	Ok(warnings)
+	if errors.is_empty() {
+		Ok(warnings)
+	} else {
+		Err(MonochangeError::Diagnostic(format!(
+			"versioned file validation failed:\n{}",
+			errors.join("\n\n")
+		)))
+	}
 }
 
 fn validate_single_versioned_file_content(
@@ -5035,30 +5058,40 @@ fn validate_changeset_targets(
 		})
 		.collect::<BTreeMap<_, _>>();
 
+	let mut errors = Vec::new();
 	for change in &raw.changes {
 		if !package_ids.contains(change.package.as_str())
 			&& !group_members.contains_key(change.package.as_str())
 		{
-			return Err(changeset_diagnostic(
-				&contents,
-				changeset_path,
-				format!(
-					"changeset `{}` references unknown package or group `{}`",
-					changeset_path.display(),
-					change.package,
-				),
-				vec![changeset_key_label(
+			errors.push(
+				changeset_diagnostic(
 					&contents,
-					&change.package,
-					"unknown package or group",
-				)],
-				Some("declare the package or group id in monochange.toml before referencing it in a changeset".to_string()),
-			));
+					changeset_path,
+					format!(
+						"changeset `{}` references unknown package or group `{}`",
+						changeset_path.display(),
+						change.package,
+					),
+					vec![changeset_key_label(
+						&contents,
+						&change.package,
+						"unknown package or group",
+					)],
+					Some("declare the package or group id in monochange.toml before referencing it in a changeset".to_string()),
+				)
+				.render(),
+			);
 		}
 	}
 
-	Ok(())
+	if errors.is_empty() {
+		Ok(())
+	} else {
+		Err(MonochangeError::Diagnostic(errors.join("\n\n")))
+	}
 }
+
+pub mod lints;
 
 #[cfg(test)]
 #[cfg(test)]

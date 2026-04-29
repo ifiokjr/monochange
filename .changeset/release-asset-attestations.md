@@ -2,7 +2,7 @@
 monochange: patch
 ---
 
-#### Attest GitHub release archives
+# Attest GitHub release archives
 
 monochange's own GitHub release asset workflow now runs from tag or manual dispatch events instead of draft release creation events. This makes the workflow compatible with GitHub immutable releases, where assets should exist before the release is finalized and draft `release.created` events are not a reliable trigger.
 

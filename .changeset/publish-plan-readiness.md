@@ -5,7 +5,7 @@
 "@monochange/skill": patch
 ---
 
-#### Add readiness-backed publish planning
+# Add readiness-backed publish planning
 
 `mc publish-plan` now accepts `--readiness <path>` for normal package publish planning. The plan validates that the `mc publish-readiness` artifact matches the current release record and covers the selected package set, then limits rate-limit batches to package ids that are ready in both the artifact and a fresh local readiness check.
 

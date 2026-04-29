@@ -5,6 +5,6 @@ monochange_config: minor
 monochange_core: minor
 ---
 
-#### Add PyPI publishing support
+# Add PyPI publishing support
 
 Add first-class PyPI publishing support for Python packages, including PyPI as the built-in Python registry, placeholder package generation, `uv build` / `uv publish` command generation, PyPI JSON API publication checks, trusted-publisher setup guidance, and rate-limit planning coverage.

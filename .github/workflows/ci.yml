@@ -328,12 +328,15 @@ jobs:
       issues: write
     steps:
       - name: block direct merge of release branches
-        uses: monochange/actions/fail-when@v0.4.0
-        with:
-          should-fail: ${{ startsWith(github.head_ref, 'monochange/release/') }}
-          reason: Release branches must be merged via the /merge comment workflow.
-          fail-comment: |
-            Release branches must be merged via the `/merge` comment workflow.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$HEAD_REF" == monochange/release/* ]]; then
+            echo "::error::Release branches must be merged via the /merge comment workflow."
+            exit 1
+          fi
+
+          echo "PR branch $HEAD_REF is allowed to use normal merge checks."
 
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'

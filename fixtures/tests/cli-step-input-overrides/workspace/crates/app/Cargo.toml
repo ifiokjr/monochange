@@ -1,5 +1,8 @@
 [package]
 name = "workflow-app"
+description = "Test package app"
+license = "MIT"
+repository = "https://github.com/monochange/monochange"
 version = { workspace = true }
 edition = "2021"
 
