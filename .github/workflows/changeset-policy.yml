@@ -35,13 +35,15 @@ jobs:
         run: |
           set -euo pipefail
           bin_dir="$RUNNER_TEMP/monochange-bin"
+          devenv_bin="$(command -v devenv)"
           mkdir -p "$bin_dir"
-          cat > "$bin_dir/mc" <<'EOF'
+          cat > "$bin_dir/mc" <<EOF
           #!/usr/bin/env bash
           set -euo pipefail
-          exec devenv shell -- cargo run --quiet --release --package monochange --bin mc -- "$@"
+          exec "$devenv_bin" shell cargo run --quiet --release --package monochange --bin mc -- "\$@"
           EOF
           chmod +x "$bin_dir/mc"
+          "$bin_dir/mc" --version
           echo "$bin_dir" >> "$GITHUB_PATH"
 
       - name: collect changed files
