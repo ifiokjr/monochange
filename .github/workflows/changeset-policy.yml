@@ -30,6 +30,20 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: expose monochange on PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin_dir="$RUNNER_TEMP/monochange-bin"
+          mkdir -p "$bin_dir"
+          cat > "$bin_dir/mc" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec devenv shell -- cargo run --quiet --release --package monochange --bin mc -- "$@"
+          EOF
+          chmod +x "$bin_dir/mc"
+          echo "$bin_dir" >> "$GITHUB_PATH"
+
       - name: collect changed files
         id: changed
         uses: tj-actions/changed-files@v46
