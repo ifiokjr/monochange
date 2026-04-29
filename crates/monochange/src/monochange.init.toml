@@ -741,13 +741,14 @@ ignored_paths = []
 #
 # Each [cli.<name>] table becomes a top-level `mc <name>` command.
 #
-# monochange starts from its built-in default command set. If you redefine a
-# built-in command like [cli.release], your definition fully replaces the
-# default for that command. You can delete unchanged built-in command tables
-# from your real monochange.toml and keep only the overrides you care about.
+# Workflow names such as `discover`, `change`, `release`, and `publish` come
+# from these generated tables. You can edit or delete them like any other
+# configuration. The underlying steps are always available directly as
+# immutable `mc step:*` commands.
 #
-# Reserved names that cannot be used include built-in commands such as
-# "analyze", "init", "mcp", "help", and "version"
+# Reserved names that cannot be used include hardcoded commands such as
+# "agent", "agents", "analyze", "check", "fix", "help", "init", "lint",
+# "lsp", "mcp", "skill", "skills", "subagents", "validate", and "version".
 #
 # Fields:
 #   help_text — description shown in `mc --help`
@@ -832,10 +833,6 @@ ignored_paths = []
 # CLI inputs are available as {{ inputs.name }} in command templates.
 {% endraw -%}
 
-[cli.validate]
-help_text = "Validate monochange configuration and changesets"
-steps = [{ name = "validate workspace", type = "Validate" }]
-
 [cli.discover]
 help_text = "Discover packages across supported ecosystems"
 inputs = [
@@ -849,6 +846,7 @@ inputs = [
 	{ name = "package", type = "string_list", required = true },
 	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
 	{ name = "reason", type = "string", required = true },
+	{ name = "version", type = "string" },
 	{ name = "type", type = "string" },
 	{ name = "caused_by", type = "string_list" },
 	{ name = "details", type = "string" },
@@ -933,14 +931,23 @@ steps = [{ name = "retarget release", type = "RetargetRelease" }]
 {% if provider %}
 
 [cli.commit-release]
-help_text = "Prepare a release, commit it, and open or update a release PR"
+help_text = "Prepare a release and create a local release commit"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
 steps = [
 	{ type = "PrepareRelease" },
 	{ type = "CommitRelease" },
-	{ type = "OpenReleaseRequest" },
+]
+
+[cli.release-pr]
+help_text = "Prepare a release and open a release pull request"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+]
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "OpenReleaseRequest", name = "open release PR" },
 ]
 
 [cli.publish-release]

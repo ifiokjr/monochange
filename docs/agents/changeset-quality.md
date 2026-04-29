@@ -25,25 +25,25 @@ For any change that adds, removes, or modifies a CLI command or flag:
 
 The goal is to highlight the differences, not duplicate unchanged context.
 
-Example headline for a renamed flag:
+Example headline for a streamlined invocation:
 
-> #### rename `--changed-path` to `--changed-paths`
+> #### allow one `mc affected --changed-paths` flag to accept several paths
 
 Example body:
 
 > **Before:**
 >
 > ```bash
-> mc verify --changed-path src/lib.rs --changed-path crates/core/src/main.rs
+> mc affected --changed-paths src/lib.rs --changed-paths crates/core/src/main.rs
 > ```
 >
 > **After:**
 >
 > ```bash
-> mc verify --changed-paths src/lib.rs crates/core/src/main.rs
+> mc affected --changed-paths src/lib.rs crates/core/src/main.rs
 > ```
 >
-> `--changed-path` is kept as a hidden alias for one release cycle.
+> Repeated `--changed-paths` flags continue to work for compatibility.
 
 When the invocation is unchanged but the output changes, prefer a structure like this:
 
@@ -71,9 +71,9 @@ When the invocation is unchanged but the output changes, prefer a structure like
 
 When a command is **removed**, explain what users should do instead:
 
-> #### remove `mc deploy` command
+> #### remove legacy deployment workflow command
 >
-> Use your CI platform's native deployment triggers (e.g. a GitHub Actions `workflow_run` event on the release workflow) instead of the `Deploy` workflow step.
+> Use your CI platform's native deployment triggers (e.g. a GitHub Actions `workflow_run` event on the release workflow) instead of the legacy deployment wrapper.
 
 ## Library API changes
 
