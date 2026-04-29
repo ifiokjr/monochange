@@ -44,6 +44,34 @@ jobs:
             echo "mc local"
             exit 0
           fi
+          if [ "\${1:-}" = "affected" ]; then
+            shift
+            translated=("step:affected-packages")
+            while [ "\$#" -gt 0 ]; do
+              case "\$1" in
+                --paths)
+                  shift
+                  for path in \$1; do
+                    translated+=(--changed-paths "\$path")
+                  done
+                  ;;
+                --labels)
+                  shift
+                  IFS=',' read -ra labels <<< "\$1"
+                  for label in "\${labels[@]}"; do
+                    if [ -n "\$label" ]; then
+                      translated+=(--label "\$label")
+                    fi
+                  done
+                  ;;
+                *)
+                  translated+=("\$1")
+                  ;;
+              esac
+              shift || true
+            done
+            exec "$devenv_bin" shell cargo run --quiet --release --package monochange --bin mc -- "\${translated[@]}"
+          fi
           exec "$devenv_bin" shell cargo run --quiet --release --package monochange --bin mc -- "\$@"
           EOF
           chmod +x "$bin_dir/mc"
