@@ -648,7 +648,7 @@ verified_commits = true
 [source.bot.changesets]
 enabled = true
 required = true
-skip_labels = ["no-changeset-required"]
+skip_labels = ["no-changeset-required", "release"]
 comment_on_failure = true
 changed_paths = ["Cargo.toml", "Cargo.lock", "codecov.yml"]
 ignored_paths = [
