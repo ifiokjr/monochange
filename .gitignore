@@ -20,7 +20,7 @@ packages/monochange__cli-win32-x64-msvc/bin/
 packages/monochange__cli-win32-arm64-msvc/bin/
 packages/.tmp/
 .tmp-test-build-packages/
-.tmp-test-publish-packages/
+.tmp-test-populate-packages/
 **/dist/**
 node_modules/
 

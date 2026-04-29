@@ -79,14 +79,6 @@ export function packageMetadata(dir) {
 	return JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
 }
 
-export function packageExists(name, version) {
-	const result = _spawnSync("npm", ["view", `${name}@${version}`, "version", "--json"], {
-		encoding: "utf8",
-		stdio: "pipe",
-	});
-	return result.status === 0;
-}
-
 export function hasBinary(dir) {
 	const binDir = join(dir, "bin");
 	if (!existsSync(binDir)) {
@@ -135,54 +127,35 @@ export function assertTrustedPublishingContext(env = process.env) {
 	}
 }
 
-export function npmPublishEnv(env = process.env) {
-	const publishEnv = { ...env };
-	for (const key of FORBIDDEN_NPM_TOKEN_ENV_KEYS) {
-		delete publishEnv[key];
-	}
-	publishEnv.NPM_CONFIG_PROVENANCE = "true";
-	return publishEnv;
-}
-
-export function publishPackage(dir, options = {}) {
-	const env = options.env ?? process.env;
-	const pkg = packageMetadata(dir);
-	if (hasBinary(dir) === false) {
-		throw new Error(
-			`Cannot publish ${pkg.name}@${pkg.version}: no binary found in ${join(dir, "bin")}. ` +
-				"Run build-packages.mjs first to populate platform binaries.",
-		);
-	}
-
-	assertTrustedPublishingContext(env);
-
-	if (packageExists(pkg.name, pkg.version)) {
-		console.log(`Skipping ${pkg.name}@${pkg.version}; already published.`);
-		return;
-	}
-
-	console.log(`Publishing ${pkg.name}@${pkg.version} with npm trusted publishing...`);
-	run("npm", ["publish", "--access", "public", "--provenance"], {
-		cwd: dir,
-		stdio: "inherit",
-		env: npmPublishEnv(env),
-	});
-}
-
-export function main(argv = process.argv.slice(2), options = {}) {
+export function main(argv = process.argv.slice(2)) {
 	const args = parseArgs(argv);
 	if (!args["packages-dir"]) {
-		throw new Error("usage: publish-packages.mjs --packages-dir <dir>");
+		throw new Error("usage: populate-packages.mjs --packages-dir <dir>");
 	}
 
 	const packagesDir = resolve(args["packages-dir"]);
 
-	const env = options.env ?? process.env;
 	for (const dirName of PLATFORM_PACKAGE_DIRS) {
-		publishPackage(join(packagesDir, dirName), { env });
+		const dir = join(packagesDir, dirName);
+		const pkg = packageMetadata(dir);
+		if (hasBinary(dir) === false) {
+			throw new Error(
+				`Cannot populate ${pkg.name}@${pkg.version}: no binary found in ${join(dir, "bin")}. ` +
+					"Run build-packages.mjs first to populate platform binaries.",
+			);
+		}
+		console.log(`Populated ${pkg.name}@${pkg.version}`);
 	}
 
-	publishPackage(join(packagesDir, CLI_PACKAGE_DIR), { env });
+	const cliDir = join(packagesDir, CLI_PACKAGE_DIR);
+	const cliPkg = packageMetadata(cliDir);
+	if (hasBinary(cliDir) === false) {
+		throw new Error(
+			`Cannot populate ${cliPkg.name}@${cliPkg.version}: no binary found in ${join(cliDir, "bin")}. ` +
+				"Run build-packages.mjs first to populate platform binaries.",
+		);
+	}
+	console.log(`Populated ${cliPkg.name}@${cliPkg.version}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {

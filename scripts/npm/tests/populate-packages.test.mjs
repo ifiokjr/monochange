@@ -7,19 +7,16 @@ import {
 	_setSpawnSync,
 	CLI_PACKAGE_DIR,
 	hasBinary,
-	main as publishMain,
-	npmPublishEnv,
-	packageExists,
+	main as populateMain,
 	packageMetadata,
 	parseArgs,
 	PLATFORM_PACKAGE_DIRS,
-	publishPackage,
 	run,
 	assertTrustedPublishingContext,
-} from "../publish-packages.mjs";
+} from "../populate-packages.mjs";
 
 function makeSandbox() {
-	const base = join(process.cwd(), ".tmp-test-publish-packages");
+	const base = join(process.cwd(), ".tmp-test-populate-packages");
 	const sandbox = join(base, `test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 	mkdirSync(sandbox, { recursive: true });
 	return sandbox;
@@ -109,18 +106,6 @@ describe("packageMetadata", () => {
 	});
 });
 
-describe("packageExists", () => {
-	test("returns true when npm view succeeds", () => {
-		_setSpawnSync(() => ({ status: 0, stdout: '"1.0.0"' }));
-		assert.equal(packageExists("@monochange/test", "1.0.0"), true);
-	});
-
-	test("returns false when npm view fails", () => {
-		_setSpawnSync(() => ({ status: 1, stderr: "not found" }));
-		assert.equal(packageExists("@monochange/test", "99.0.0"), false);
-	});
-});
-
 describe("hasBinary", () => {
 	test("returns false when bin directory does not exist", () => {
 		const sandbox = makeSandbox();
@@ -189,101 +174,15 @@ describe("trusted publishing context", () => {
 			message: /Cannot publish npm packages without the trusted-publishing GitHub Actions context/,
 		});
 	});
-
-	test("removes npm token variables from publish environment", () => {
-		const env = npmPublishEnv(
-			trustedPublishingEnv({ NODE_AUTH_TOKEN: "secret", NPM_TOKEN: "secret" }),
-		);
-		assert.equal(env.NODE_AUTH_TOKEN, undefined);
-		assert.equal(env.NPM_TOKEN, undefined);
-		assert.equal(env.NPM_CONFIG_PROVENANCE, "true");
-	});
-});
-
-describe("publishPackage", () => {
-	test("throws when no binary is present", () => {
-		const sandbox = makeSandbox();
-		writeFileSync(
-			join(sandbox, "package.json"),
-			JSON.stringify({
-				name: "@monochange/cli-darwin-arm64",
-				version: "1.0.0",
-			}),
-		);
-		assert.throws(() => publishPackage(sandbox), { message: /no binary found/ });
-	});
-
-	test("error message includes package name and version", () => {
-		const sandbox = makeSandbox();
-		writeFileSync(
-			join(sandbox, "package.json"),
-			JSON.stringify({
-				name: "@monochange/cli-darwin-arm64",
-				version: "3.2.1",
-			}),
-		);
-		try {
-			publishPackage(sandbox);
-			assert.unreachable("should have thrown");
-		} catch (err) {
-			assert.match(err.message, /@monochange\/cli-darwin-arm64@3\.2\.1/);
-			assert.match(err.message, /build-packages\.mjs/);
-		}
-	});
-
-	test("skips publishing when package already exists on npm", () => {
-		const sandbox = makeSandbox();
-		mkdirSync(join(sandbox, "bin"));
-		writeFileSync(join(sandbox, "bin", "monochange"), "");
-		writeFileSync(
-			join(sandbox, "package.json"),
-			JSON.stringify({
-				name: "@monochange/cli-darwin-arm64",
-				version: "1.0.0",
-			}),
-		);
-		_setSpawnSync(() => ({ status: 0, stdout: '"1.0.0"' }));
-		publishPackage(sandbox, { env: trustedPublishingEnv() });
-	});
-
-	test("publishes when binary present and package not on npm", () => {
-		const sandbox = makeSandbox();
-		mkdirSync(join(sandbox, "bin"));
-		writeFileSync(join(sandbox, "bin", "monochange"), "");
-		writeFileSync(
-			join(sandbox, "package.json"),
-			JSON.stringify({
-				name: "@monochange/cli-darwin-arm64",
-				version: "1.0.0",
-			}),
-		);
-		let publishCalled = false;
-		let publishOptions;
-		_setSpawnSync((cmd, args, options) => {
-			if (args[0] === "view") {
-				return { status: 1, stderr: "not found" };
-			}
-			if (args[0] === "publish") {
-				publishCalled = true;
-				publishOptions = options;
-				return { status: 0, stdout: "" };
-			}
-			return { status: 0, stdout: "" };
-		});
-		publishPackage(sandbox, { env: trustedPublishingEnv() });
-		assert.equal(publishCalled, true);
-		assert.equal(publishOptions.env.NPM_CONFIG_PROVENANCE, "true");
-	});
 });
 
 describe("main", () => {
 	test("throws when --packages-dir is missing", () => {
-		assert.throws(() => publishMain([]), { message: /usage:/ });
+		assert.throws(() => populateMain([]), { message: /usage:/ });
 	});
 
-	test("publishes all platform packages then the cli package", () => {
+	test("populates all platform packages then the cli package", () => {
 		const sandbox = makeSandbox();
-		const publishedOrder = [];
 
 		for (const dirName of [...PLATFORM_PACKAGE_DIRS, CLI_PACKAGE_DIR]) {
 			const pkgDir = join(sandbox, dirName);
@@ -299,20 +198,7 @@ describe("main", () => {
 			);
 		}
 
-		_setSpawnSync((cmd, args) => {
-			if (args[0] === "view") {
-				return { status: 1, stderr: "not found" };
-			}
-			if (args[0] === "publish") {
-				publishedOrder.push(args[0]);
-				return { status: 0, stdout: "" };
-			}
-			return { status: 0, stdout: "" };
-		});
-
-		publishMain(["--packages-dir", sandbox], { env: trustedPublishingEnv() });
-
-		assert.equal(publishedOrder.length, PLATFORM_PACKAGE_DIRS.length + 1);
+		populateMain(["--packages-dir", sandbox]);
 	});
 });
 

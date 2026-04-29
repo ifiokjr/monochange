@@ -71,11 +71,7 @@ jobs:
           node scripts/npm/build-packages.mjs \
             --release-tag "$RELEASE_TAG" \
             --assets-dir "$RUNNER_TEMP/release-assets"
-        shell: devenv shell -- bash -e {0}
-
-      - name: publish cli npm packages
-        run: |
-          node scripts/npm/publish-packages.mjs \
+          node scripts/npm/populate-packages.mjs \
             --packages-dir packages
         shell: devenv shell -- bash -e {0}
 
