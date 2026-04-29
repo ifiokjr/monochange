@@ -73,12 +73,6 @@ jobs:
             --assets-dir "$RUNNER_TEMP/release-assets"
         shell: devenv shell -- bash -e {0}
 
-      - name: publish cli npm packages
-        run: |
-          node scripts/npm/publish-packages.mjs \
-            --packages-dir packages
-        shell: devenv shell -- bash -e {0}
-
       - name: plan publish batches
         id: publish_plan
         env:

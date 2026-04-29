@@ -341,7 +341,6 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
     timeout-minutes: 20
     runs-on: ubuntu-latest
-    environment: publisher
     permissions:
       contents: write
       pull-requests: write
@@ -431,20 +430,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mc publish-release --from-ref="HEAD" --draft --format json | tee /tmp/publish-release.json
-        shell: devenv shell -- bash -e {0}
-
-      - name: upload release assets to drafts
-        if: steps.tag_release.outputs.is_release_commit == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          tag="$(mc release-record --from HEAD --format json --jq '.record.releaseTargets[] | select(.id == "main" and .kind == "group" and .release == true) | .tagName')"
-          gh workflow run release.yml \
-            --repo "${{ github.repository }}" \
-            --ref "main" \
-            -f "tag=${tag}"
         shell: devenv shell -- bash -e {0}
 
       - name: comment on released issues

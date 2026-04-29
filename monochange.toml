@@ -300,6 +300,9 @@ path = "crates/monochange_linting"
 
 [package.monochange_lint_testing]
 path = "crates/monochange_lint_testing"
+tag = false
+release = false
+changelog = false
 
 [package."@monochange/skill"]
 path = "packages/monochange__skill"
