@@ -490,6 +490,9 @@ generate_fixture() {
 				echo "name = \"pkg-${i}\""
 				echo 'version = "1.0.0"'
 				echo 'edition = "2021"'
+				echo "description = \"Benchmark fixture package ${i}\""
+				echo 'license = "MIT"'
+				echo 'repository = "https://github.com/monochange/monochange"'
 			} >"$root/crates/pkg-${i}/Cargo.toml"
 		done
 		echo '[ecosystems.cargo]'
@@ -518,6 +521,8 @@ generate_fixture() {
 pkg-${package_index}: patch
 ---
 
+# Fix issue ${commit_index}
+
 Fix issue #${commit_index}.
 EOF
 		fi
@@ -534,6 +539,8 @@ EOF
 ---
 pkg-${package_index}: patch
 ---
+
+# Fix issue ${changeset_index}
 
 Fix issue #${changeset_index}.
 EOF
