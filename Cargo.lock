@@ -2062,7 +2062,7 @@ dependencies = [
  "monochange_npm",
  "monochange_python",
  "monochange_semver",
- "monochange_telemtry",
+ "monochange_telemetry",
  "monochange_test_helpers",
  "portable-pty",
  "rayon",
@@ -2440,7 +2440,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "monochange_telemtry"
+name = "monochange_telemetry"
 version = "0.2.0"
 dependencies = [
  "monochange_core",

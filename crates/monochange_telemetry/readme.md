@@ -1,18 +1,18 @@
-# `monochange_telemtry`
+# `monochange_telemetry`
 
 <br />
 
-<!-- {=crateReadmeBadgeRow:"monochange_telemtry"} -->
+<!-- {=crateReadmeBadgeRow:"monochange_telemetry"} -->
 
-[![Crates.io](https://img.shields.io/badge/crates.io-monochange**telemtry-orange?logo=rust)](https://crates.io/crates/monochange_telemtry) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange**telemtry-1f425f?logo=docs.rs)](https://docs.rs/monochange_telemtry/) [![CI](https://github.com/monochange/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/monochange/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/monochange/monochange/branch/main/graph/badge.svg?flag=monochange_telemtry)](https://codecov.io/gh/monochange/monochange?flag=monochange_telemtry) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
+[![Crates.io](https://img.shields.io/badge/crates.io-monochange**telemetry-orange?logo=rust)](https://crates.io/crates/monochange_telemetry) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange**telemetry-1f425f?logo=docs.rs)](https://docs.rs/monochange_telemetry/) [![CI](https://github.com/monochange/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/monochange/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/monochange/monochange/branch/main/graph/badge.svg?flag=monochange_telemetry)](https://codecov.io/gh/monochange/monochange?flag=monochange_telemetry) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
 
 <!-- {/crateReadmeBadgeRow} -->
 
 <br />
 
-<!-- {=monochangeTelemtryCrateDocs} -->
+<!-- {=monochangeTelemetryCrateDocs} -->
 
-`monochange_telemtry` provides local-only telemetry primitives for the `monochange` CLI.
+`monochange_telemetry` provides local-only telemetry primitives for the `monochange` CLI.
 
 Reach for this crate when you need the reusable event sink, event payloads, and privacy-preserving error classification that power opt-in local JSONL telemetry. The crate intentionally keeps transport simple: it appends OpenTelemetry-style JSON Lines records to a local file and does not send telemetry over the network.
 
@@ -43,9 +43,9 @@ The crate only accepts low-cardinality command metadata, booleans, counts, durat
 ## Example
 
 ```rust
-use monochange_telemtry::CommandTelemetry;
-use monochange_telemtry::TelemetryOutcome;
-use monochange_telemtry::TelemetrySink;
+use monochange_telemetry::CommandTelemetry;
+use monochange_telemetry::TelemetryOutcome;
+use monochange_telemetry::TelemetrySink;
 use std::time::Duration;
 
 let sink = TelemetrySink::Disabled;
@@ -61,4 +61,4 @@ sink.capture_command(CommandTelemetry {
 });
 ```
 
-<!-- {/monochangeTelemtryCrateDocs} -->
+<!-- {/monochangeTelemetryCrateDocs} -->

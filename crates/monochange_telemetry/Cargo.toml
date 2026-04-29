@@ -1,9 +1,9 @@
 [package]
-name = "monochange_telemtry"
+name = "monochange_telemetry"
 version = { workspace = true }
 authors = { workspace = true }
 categories = { workspace = true }
-documentation = "https://docs.rs/monochange_telemtry"
+documentation = "https://docs.rs/monochange_telemetry"
 edition = { workspace = true }
 homepage = { workspace = true }
 include = ["src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "readme.md"]

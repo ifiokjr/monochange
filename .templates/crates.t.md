@@ -682,9 +682,9 @@ Reach for this crate when you are writing integration or fixture-heavy tests tha
 
 <!-- {/monochangeTestHelpersCrateDocs} -->
 
-<!-- {@monochangeTelemtryCrateDocs} -->
+<!-- {@monochangeTelemetryCrateDocs} -->
 
-`monochange_telemtry` provides local-only telemetry primitives for the `monochange` CLI.
+`monochange_telemetry` provides local-only telemetry primitives for the `monochange` CLI.
 
 Reach for this crate when you need the reusable event sink, event payloads, and privacy-preserving error classification that power opt-in local JSONL telemetry. The crate intentionally keeps transport simple: it appends OpenTelemetry-style JSON Lines records to a local file and does not send telemetry over the network.
 
@@ -715,9 +715,9 @@ The crate only accepts low-cardinality command metadata, booleans, counts, durat
 ## Example
 
 ```rust
-use monochange_telemtry::CommandTelemetry;
-use monochange_telemtry::TelemetryOutcome;
-use monochange_telemtry::TelemetrySink;
+use monochange_telemetry::CommandTelemetry;
+use monochange_telemetry::TelemetryOutcome;
+use monochange_telemetry::TelemetrySink;
 use std::time::Duration;
 
 let sink = TelemetrySink::Disabled;
@@ -733,4 +733,4 @@ sink.capture_command(CommandTelemetry {
 });
 ```
 
-<!-- {/monochangeTelemtryCrateDocs} -->
+<!-- {/monochangeTelemetryCrateDocs} -->
