@@ -131,10 +131,23 @@ pub(crate) fn build_changelog_updates(
 			&changes,
 		);
 		let rendered = render_release_notes(changelog_target.format, &document);
+		let initial_header = render_package_initial_changelog_header(
+			context,
+			changelog_target,
+			&package_id,
+			package,
+			group_definition,
+			planned_version,
+		);
+		let next_changelog = append_changelog_section(
+			&changelog_target.path,
+			&rendered,
+			Some(initial_header.as_str()),
+		)?;
 		updates.push(ChangelogUpdate {
 			file: FileUpdate {
 				path: changelog_target.path.clone(),
-				content: append_changelog_section(&changelog_target.path, &rendered)?.into_bytes(),
+				content: next_changelog.into_bytes(),
 			},
 			owner_id: package_id,
 			owner_kind: ReleaseOwnerKind::Package,
@@ -193,10 +206,23 @@ pub(crate) fn build_changelog_updates(
 			&changes,
 		);
 		let rendered = render_release_notes(changelog_target.format, &document);
+		let initial_header = render_group_initial_changelog_header(
+			context,
+			changelog_target,
+			planned_group,
+			group_definition,
+			planned_version,
+			&member_ids,
+		);
+		let next_changelog = append_changelog_section(
+			&changelog_target.path,
+			&rendered,
+			Some(initial_header.as_str()),
+		)?;
 		updates.push(ChangelogUpdate {
 			file: FileUpdate {
 				path: changelog_target.path.clone(),
-				content: append_changelog_section(&changelog_target.path, &rendered)?.into_bytes(),
+				content: next_changelog.into_bytes(),
 			},
 			owner_id: planned_group.group_id.clone(),
 			owner_kind: ReleaseOwnerKind::Group,
@@ -209,7 +235,120 @@ pub(crate) fn build_changelog_updates(
 	Ok(dedup_changelog_updates(updates))
 }
 
-fn append_changelog_section(path: &Path, section: &str) -> MonochangeResult<String> {
+fn default_initial_changelog_header(format: ChangelogFormat) -> &'static str {
+	if format == ChangelogFormat::KeepAChangelog {
+		return monochange_core::DEFAULT_INITIAL_CHANGELOG_HEADER_KEEP_A_CHANGELOG;
+	}
+
+	monochange_core::DEFAULT_INITIAL_CHANGELOG_HEADER_MONOCHANGE
+}
+
+fn render_package_initial_changelog_header(
+	context: ChangelogBuildContext<'_>,
+	changelog_target: &ChangelogTarget,
+	owner_id: &str,
+	package: &PackageRecord,
+	group_definition: Option<&monochange_core::GroupDefinition>,
+	planned_version: &semver::Version,
+) -> String {
+	let mut metadata = initial_changelog_header_metadata(context, changelog_target);
+	let package_dir = package
+		.manifest_path
+		.parent()
+		.unwrap_or(package.manifest_path.as_path());
+	let package_path = monochange_core::normalize_path(package_dir)
+		.strip_prefix(monochange_core::normalize_path(context.root))
+		.map_or_else(|_| package_dir.to_path_buf(), Path::to_path_buf);
+	metadata.insert("package", package.name.clone());
+	metadata.insert("package_id", owner_id.to_string());
+	metadata.insert("package_name", package.name.clone());
+	metadata.insert("package_path", package_path.to_string_lossy().to_string());
+	metadata.insert("release_owner", owner_id.to_string());
+	metadata.insert("release_owner_kind", "package".to_string());
+	metadata.insert("version", planned_version.to_string());
+	metadata.insert("new_version", planned_version.to_string());
+	metadata.insert(
+		"current_version",
+		package
+			.current_version
+			.as_ref()
+			.map(ToString::to_string)
+			.unwrap_or_default(),
+	);
+	if let Some(group) = group_definition {
+		metadata.insert("group", group.id.clone());
+		metadata.insert("group_id", group.id.clone());
+		metadata.insert("group_name", group.id.clone());
+	}
+	render_initial_changelog_header(changelog_target, &metadata)
+}
+
+fn render_group_initial_changelog_header(
+	context: ChangelogBuildContext<'_>,
+	changelog_target: &ChangelogTarget,
+	planned_group: &monochange_core::PlannedVersionGroup,
+	group_definition: Option<&monochange_core::GroupDefinition>,
+	planned_version: &semver::Version,
+	member_ids: &[String],
+) -> String {
+	let mut metadata = initial_changelog_header_metadata(context, changelog_target);
+	let group_id =
+		group_definition.map_or_else(|| planned_group.group_id.clone(), |group| group.id.clone());
+	metadata.insert("group", group_id.clone());
+	metadata.insert("group_id", group_id.clone());
+	metadata.insert("group_name", group_id.clone());
+	metadata.insert("member_count", member_ids.len().to_string());
+	metadata.insert("members", member_ids.join(", "));
+	metadata.insert("release_owner", group_id);
+	metadata.insert("release_owner_kind", "group".to_string());
+	metadata.insert("version", planned_version.to_string());
+	metadata.insert("new_version", planned_version.to_string());
+	render_initial_changelog_header(changelog_target, &metadata)
+}
+
+fn initial_changelog_header_metadata(
+	context: ChangelogBuildContext<'_>,
+	changelog_target: &ChangelogTarget,
+) -> BTreeMap<&'static str, String> {
+	let config_path = context.configuration.root_path.join("monochange.toml");
+	let changelog_path = root_relative(context.root, &changelog_target.path);
+	let workspace_root = monochange_core::normalize_path(context.root);
+	let mut metadata = BTreeMap::new();
+	metadata.insert("monochange_version", env!("CARGO_PKG_VERSION").to_string());
+	metadata.insert("config_path", config_path.to_string_lossy().to_string());
+	metadata.insert(
+		"monochange_config_path",
+		config_path.to_string_lossy().to_string(),
+	);
+	metadata.insert(
+		"workspace_root",
+		workspace_root.to_string_lossy().to_string(),
+	);
+	metadata.insert(
+		"changelog_path",
+		changelog_path.to_string_lossy().to_string(),
+	);
+	metadata.insert("changelog_format", format!("{:?}", changelog_target.format));
+	metadata
+}
+
+fn render_initial_changelog_header(
+	changelog_target: &ChangelogTarget,
+	metadata: &BTreeMap<&'static str, String>,
+) -> String {
+	let template = changelog_target
+		.initial_header
+		.as_deref()
+		.filter(|header| !header.trim().is_empty())
+		.unwrap_or_else(|| default_initial_changelog_header(changelog_target.format));
+	render_message_template(template, metadata)
+}
+
+fn append_changelog_section(
+	path: &Path,
+	section: &str,
+	initial_header: Option<&str>,
+) -> MonochangeResult<String> {
 	let current = if path.exists() {
 		fs::read_to_string(path).map_err(|error| {
 			MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
@@ -220,7 +359,13 @@ fn append_changelog_section(path: &Path, section: &str) -> MonochangeResult<Stri
 
 	let current = current.trim_end();
 	if current.is_empty() {
-		return Ok(format!("{section}\n"));
+		let Some(initial_header) = initial_header
+			.map(str::trim)
+			.filter(|header| !header.is_empty())
+		else {
+			return Ok(format!("{section}\n"));
+		};
+		return Ok(format!("{initial_header}\n\n{section}\n"));
 	}
 
 	let Some(offset) = current
@@ -1262,6 +1407,7 @@ mod tests {
 			changelog: Some(ChangelogTarget {
 				path: PathBuf::from(format!("packages/{config_id}/CHANGELOG.md")),
 				format: ChangelogFormat::Monochange,
+				initial_header: None,
 			}),
 			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
@@ -1285,6 +1431,7 @@ mod tests {
 			changelog: Some(ChangelogTarget {
 				path: PathBuf::from("groups/sdk/CHANGELOG.md"),
 				format: ChangelogFormat::Monochange,
+				initial_header: None,
 			}),
 			changelog_include: include,
 			excluded_changelog_types: Vec::new(),
@@ -1354,18 +1501,205 @@ mod tests {
 	}
 
 	#[test]
+	fn initial_changelog_header_renders_custom_template_and_format_default() {
+		let mut metadata = BTreeMap::new();
+		metadata.insert("package_name", "workflow-core".to_string());
+		metadata.insert("monochange_version", "1.2.3".to_string());
+
+		let custom = ChangelogTarget {
+			path: PathBuf::from("CHANGELOG.md"),
+			format: ChangelogFormat::Monochange,
+			initial_header: Some(
+				"# {{ package_name }}\n\nGenerated by {{ monochange_version }}".to_string(),
+			),
+		};
+		assert_eq!(
+			render_initial_changelog_header(&custom, &metadata),
+			"# workflow-core\n\nGenerated by 1.2.3"
+		);
+
+		let format_default = ChangelogTarget {
+			path: PathBuf::from("CHANGELOG.md"),
+			format: ChangelogFormat::KeepAChangelog,
+			initial_header: None,
+		};
+		assert!(
+			render_initial_changelog_header(&format_default, &metadata)
+				.contains("Keep a Changelog")
+		);
+	}
+
+	#[test]
+	fn build_changelog_updates_writes_package_and_group_initial_headers() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let package_a = sample_package_record(root, "pkg-a", "pkg-a");
+		let package_b = sample_package_record(root, "pkg-b", "pkg-b");
+		let package_a_id = package_a.id.clone();
+		let other_package_id = package_b.id.clone();
+		let packages = vec![package_a, package_b];
+
+		let mut configuration = empty_configuration(root);
+		configuration.packages = vec![
+			sample_package_definition("pkg-a"),
+			sample_package_definition("pkg-b"),
+		];
+		configuration.groups = vec![sample_group_definition(GroupChangelogInclude::All)];
+
+		let plan = ReleasePlan {
+			workspace_root: root.to_path_buf(),
+			decisions: vec![sample_decision(&package_a_id, None)],
+			groups: vec![sample_group(vec![package_a_id.clone(), other_package_id])],
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+		let package_changelog_path = root.join("packages/pkg-a/CHANGELOG.md");
+		let group_changelog_path = root.join("groups/sdk/CHANGELOG.md");
+		let changelog_targets = (
+			BTreeMap::from([(
+				package_a_id,
+				ChangelogTarget {
+					path: package_changelog_path.clone(),
+					format: ChangelogFormat::Monochange,
+					initial_header: Some("# {{ package_name }} changelog".to_string()),
+				},
+			)]),
+			BTreeMap::from([(
+				"sdk".to_string(),
+				ChangelogTarget {
+					path: group_changelog_path.clone(),
+					format: ChangelogFormat::Monochange,
+					initial_header: Some("# {{ group_name }} changelog".to_string()),
+				},
+			)]),
+		);
+
+		let updates = build_changelog_updates(ChangelogBuildContext {
+			root,
+			configuration: &configuration,
+			packages: &packages,
+			plan: &plan,
+			change_signals: &[],
+			changesets: &[],
+			changelog_targets: &changelog_targets,
+			release_targets: &[],
+		})
+		.unwrap_or_else(|error| panic!("build changelog updates: {error}"));
+
+		let package_update = updates
+			.iter()
+			.find(|update| update.file.path == package_changelog_path)
+			.unwrap_or_else(|| panic!("missing package changelog update"));
+		assert!(
+			String::from_utf8_lossy(&package_update.file.content).starts_with("# pkg-a changelog")
+		);
+
+		let group_update = updates
+			.iter()
+			.find(|update| update.file.path == group_changelog_path)
+			.unwrap_or_else(|| panic!("missing group changelog update"));
+		assert!(String::from_utf8_lossy(&group_update.file.content).starts_with("# sdk changelog"));
+	}
+
+	#[test]
+	fn build_changelog_updates_reports_package_and_group_append_errors() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		let package_a = sample_package_record(root, "pkg-a", "pkg-a");
+		let package_a_id = package_a.id.clone();
+		let packages = vec![package_a];
+
+		let mut configuration = empty_configuration(root);
+		configuration.packages = vec![sample_package_definition("pkg-a")];
+		configuration.groups = vec![sample_group_definition(GroupChangelogInclude::All)];
+
+		let bad_changelog_path = root.join("invalid-utf8-changelog.md");
+		fs::write(&bad_changelog_path, [0xff])
+			.unwrap_or_else(|error| panic!("write invalid changelog file: {error}"));
+
+		let package_plan = ReleasePlan {
+			workspace_root: root.to_path_buf(),
+			decisions: vec![sample_decision(&package_a_id, None)],
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+		let package_error = build_changelog_updates(ChangelogBuildContext {
+			root,
+			configuration: &configuration,
+			packages: &packages,
+			plan: &package_plan,
+			change_signals: &[],
+			changesets: &[],
+			changelog_targets: &(
+				BTreeMap::from([(
+					package_a_id.clone(),
+					ChangelogTarget {
+						path: bad_changelog_path.clone(),
+						format: ChangelogFormat::Monochange,
+						initial_header: None,
+					},
+				)]),
+				BTreeMap::new(),
+			),
+			release_targets: &[],
+		});
+		assert!(package_error.is_err());
+
+		let group_plan = ReleasePlan {
+			workspace_root: root.to_path_buf(),
+			decisions: vec![sample_decision(&package_a_id, Some("sdk"))],
+			groups: vec![sample_group(vec![package_a_id.clone()])],
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+		let group_error = build_changelog_updates(ChangelogBuildContext {
+			root,
+			configuration: &configuration,
+			packages: &packages,
+			plan: &group_plan,
+			change_signals: &[],
+			changesets: &[],
+			changelog_targets: &(
+				BTreeMap::new(),
+				BTreeMap::from([(
+					"sdk".to_string(),
+					ChangelogTarget {
+						path: bad_changelog_path,
+						format: ChangelogFormat::Monochange,
+						initial_header: None,
+					},
+				)]),
+			),
+			release_targets: &[],
+		});
+		assert!(group_error.is_err());
+	}
+
+	#[test]
 	fn changelog_file_helpers_append_and_deduplicate_updates() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let changelog_path = tempdir.path().join("CHANGELOG.md");
 
-		let first = append_changelog_section(&changelog_path, "## 1.0.0\n- initial")
-			.unwrap_or_else(|error| panic!("append first changelog section: {error}"));
-		assert_eq!(first, "## 1.0.0\n- initial\n");
+		let first =
+			append_changelog_section(&changelog_path, "## 1.0.0\n- initial", Some("# Changelog"))
+				.unwrap_or_else(|error| panic!("append first changelog section: {error}"));
+		assert_eq!(first, "# Changelog\n\n## 1.0.0\n- initial\n");
+
+		let without_header_path = tempdir.path().join("without-header.md");
+		let without_header =
+			append_changelog_section(&without_header_path, "## 1.0.0\n- initial", None)
+				.unwrap_or_else(|error| panic!("append changelog section without header: {error}"));
+		assert_eq!(without_header, "## 1.0.0\n- initial\n");
 
 		fs::write(&changelog_path, "# Changelog\n\n## 0.9.0\n- older\n")
 			.unwrap_or_else(|error| panic!("write existing changelog: {error}"));
-		let appended = append_changelog_section(&changelog_path, "## 1.0.0\n- latest")
-			.unwrap_or_else(|error| panic!("append second changelog section: {error}"));
+		let appended =
+			append_changelog_section(&changelog_path, "## 1.0.0\n- latest", Some("# Ignored"))
+				.unwrap_or_else(|error| panic!("append second changelog section: {error}"));
 		assert_eq!(
 			appended,
 			"# Changelog\n\n## 1.0.0\n- latest\n\n## 0.9.0\n- older\n"

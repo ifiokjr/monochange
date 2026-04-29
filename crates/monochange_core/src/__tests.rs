@@ -1751,6 +1751,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				changelog: Some(ChangelogTarget {
 					path: PathBuf::from("crates/monochange/changelog.md"),
 					format: ChangelogFormat::Monochange,
+					initial_header: None,
 				}),
 				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
@@ -1772,6 +1773,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 				changelog: Some(ChangelogTarget {
 					path: PathBuf::from("crates/monochange_core/changelog.md"),
 					format: ChangelogFormat::Monochange,
+					initial_header: None,
 				}),
 				excluded_changelog_types: Vec::new(),
 				empty_update_message: None,
@@ -1811,6 +1813,7 @@ fn sample_workspace_configuration() -> WorkspaceConfiguration {
 			changelog: Some(ChangelogTarget {
 				path: PathBuf::from("changelog.md"),
 				format: ChangelogFormat::Monochange,
+				initial_header: None,
 			}),
 			changelog_include: GroupChangelogInclude::All,
 			excluded_changelog_types: Vec::new(),

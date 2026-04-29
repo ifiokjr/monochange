@@ -50,15 +50,28 @@ package_type = "cargo"
 #   false                 → disable changelogs by default
 #   "{{ path }}/changelog.md" → pattern where {{ path }} is replaced with each package path
 #
-# As a table, you can set both path and format:
+# As a table, you can set path, format, and the initial header used when
+# monochange creates a changelog from empty content:
 #   [defaults.changelog]
 #   path = "{{ path }}/changelog.md"
 #   format = "keep_a_changelog"
+#   initial_header = """
+#   # Changelog
+#
+#   All notable changes to this project will be documented in this file.
+#   """
 #
 # Supported formats: "monochange" (default), "keep_a_changelog"
 [defaults.changelog]
 path = "{{ path }}/changelog.md"
 format = "keep_a_changelog"
+initial_header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+This changelog is managed by [monochange](https://github.com/monochange/monochange).
+"""
 
 # Whether conflicting explicit versions from multiple changesets should fail
 # validation/planning instead of warning and using the highest semver version.

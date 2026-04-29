@@ -42,6 +42,8 @@
 		".devenv/**",
 		".tmp-node/**",
 		"**/fixtures",
+		"**/fixtures/**",
+		"fixtures/**",
 		"**/snapshots",
 		"**/target",
 		"**/node_modules",

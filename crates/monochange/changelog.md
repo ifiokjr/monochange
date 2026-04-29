@@ -1,6 +1,8 @@
 # Changelog
 
-All notable changes to `monochange` will be documented in this file.
+All notable changes to this project will be documented in this file.
+
+This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 

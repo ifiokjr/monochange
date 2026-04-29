@@ -1,3 +1,9 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+This changelog is managed by [monochange](https://github.com/monochange/monochange).
+
 ## @monochange/skill [0.1.0](https://github.com/monochange/monochange/releases/tag/@monochange/skill/v0.1.0) (2026-04-13)
 
 ### Breaking changes

@@ -4,6 +4,7 @@ package_type = "cargo"
 [defaults.changelog]
 path = "{{ path }}/CHANGELOG.md"
 format = "keep_a_changelog"
+initial_header = "Default {{ release_owner }} changelog"
 
 [package.core]
 path = "crates/core"
@@ -14,6 +15,7 @@ path = "crates/app"
 [package.app.changelog]
 path = "docs/app-release-notes.md"
 format = "monochange"
+initial_header = "App {{ package_name }} changelog"
 
 [group.sdk]
 packages = ["core", "app"]
