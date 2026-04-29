@@ -32,9 +32,15 @@ use urlencoding::encode;
 use crate::PreparedRelease;
 use crate::discover_release_record;
 use crate::discover_workspace;
+use crate::trust_capabilities::TrustedPublishingIdentity;
+use crate::trust_capabilities::detect_trusted_publishing_identity;
+use crate::trust_capabilities::provider_registry_trust_capability;
+use crate::trust_capabilities::trusted_publishing_capability_message;
 use crate::trust_capabilities::trusted_publishing_capability_message_for_builtin;
 
 const PLACEHOLDER_VERSION: &str = "0.0.0";
+const GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN: &str = "ACTIONS_ID_TOKEN_REQUEST_TOKEN";
+const GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL: &str = "ACTIONS_ID_TOKEN_REQUEST_URL";
 #[cfg(test)]
 const NPM_TRUST_DOCS_URL: &str = "https://docs.npmjs.com/cli/v11/commands/npm-trust";
 #[cfg(test)]
@@ -1026,35 +1032,168 @@ fn enforce_release_trust_prerequisites(
 		return Ok(());
 	}
 
+	let registry = PublishRegistry::Builtin(request.registry);
+	let identity = detect_trusted_publishing_identity(env_map);
+	let capability_message = trusted_publishing_capability_message(&registry, &identity);
+
+	if !identity.is_verifiable_by_env() {
+		return Err(MonochangeError::Config(format!(
+			"`{}` requires trusted publishing from a verifiable CI/OIDC identity before built-in release publishing can continue; local/manual publishing is not allowed when `publish.trusted_publishing = true`. {capability_message} Run `mc publish` from the configured CI workflow or set `publish.trusted_publishing = false` to opt out.",
+			request.package_id,
+		)));
+	}
+
+	let capability = provider_registry_trust_capability(&registry, identity.provider());
+	if !capability.trusted_publishing || !capability.ci_identity_verifiable {
+		return Err(MonochangeError::Config(format!(
+			"`{}` cannot enforce trusted publishing for {} from {}. {capability_message} Set `publish.trusted_publishing = false` to opt out for unsupported registries/providers.",
+			request.package_id,
+			request.registry,
+			identity.provider().label(),
+		)));
+	}
+
 	if request.registry == RegistryKind::Npm {
-		resolve_github_trust_context(root, source, &request.trusted_publishing, env_map)
-			.map(|_| ())
-			.map_err(|error| {
-				let capability_message =
-					trusted_publishing_capability_message_for_builtin(request.registry, env_map);
-				MonochangeError::Config(format!("{error}. {capability_message}"))
-			})
-	} else {
-		let setup_url = manual_setup_url(request);
-		match resolve_github_trust_context(root, source, &request.trusted_publishing, env_map) {
-			Ok(context) => {
-				Err(MonochangeError::Config(format!(
-					"`{}` requires manual trusted publishing setup before built-in release publishing can continue: {}. Register {} there, then rerun `mc publish`.",
-					request.package_id,
-					setup_url,
-					format_manual_trust_context(&context),
-				)))
-			}
-			Err(error) => {
-				let capability_message =
-					trusted_publishing_capability_message_for_builtin(request.registry, env_map);
-				Err(MonochangeError::Config(format!(
-					"`{}` requires trusted-publishing preflight configuration before built-in release publishing can continue: {}. {capability_message} Finish the GitHub context configuration first, then complete registry setup at {} and rerun `mc publish`.",
-					request.package_id, error, setup_url,
-				)))
-			}
+		reject_npm_token_environment(request, env_map)?;
+	}
+
+	let TrustedPublishingIdentity::GitHubActions {
+		repository,
+		workflow,
+		environment,
+		..
+	} = identity
+	else {
+		return Ok(());
+	};
+
+	let expected = resolve_github_trust_context(root, source, &request.trusted_publishing, env_map)
+		.map_err(|error| MonochangeError::Config(format!("{error}. {capability_message}")))?;
+	verify_github_trust_context(
+		request,
+		root,
+		env_map,
+		&expected,
+		repository.as_deref(),
+		workflow.as_deref(),
+		environment.as_deref(),
+	)
+}
+
+fn reject_npm_token_environment(
+	request: &PublishRequest,
+	env_map: &BTreeMap<String, String>,
+) -> MonochangeResult<()> {
+	let token_keys = forbidden_npm_token_env_keys(env_map);
+	if token_keys.is_empty() {
+		return Ok(());
+	}
+
+	Err(MonochangeError::Config(format!(
+		"`{}` requires npm trusted publishing, but long-lived npm token environment variables are present: {}. Remove token-based npm credentials and publish from the configured CI/OIDC workflow, or set `publish.trusted_publishing = false` to opt out.",
+		request.package_id,
+		token_keys.join(", "),
+	)))
+}
+
+fn forbidden_npm_token_env_keys(env_map: &BTreeMap<String, String>) -> Vec<String> {
+	env_map
+		.keys()
+		.filter(|key| is_forbidden_npm_token_env_key(key))
+		.cloned()
+		.collect()
+}
+
+fn is_forbidden_npm_token_env_key(key: &str) -> bool {
+	let lowercase_key = key.to_ascii_lowercase();
+	matches!(
+		key,
+		"NPM_TOKEN" | "NODE_AUTH_TOKEN" | "NPM_CONFIG__AUTH_TOKEN" | "npm_config__authToken"
+	) || (lowercase_key.starts_with("npm_config_")
+		&& lowercase_key.contains("auth")
+		&& lowercase_key.contains("token"))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn verify_github_trust_context(
+	request: &PublishRequest,
+	root: &Path,
+	env_map: &BTreeMap<String, String>,
+	expected: &GitHubTrustContext,
+	actual_repository: Option<&str>,
+	actual_workflow: Option<&str>,
+	actual_environment: Option<&str>,
+) -> MonochangeResult<()> {
+	let actual_repository = actual_repository.ok_or_else(|| {
+		trusted_publishing_identity_error(
+			request,
+			"GitHub Actions did not expose `GITHUB_REPOSITORY`".to_string(),
+		)
+	})?;
+	if actual_repository != expected.repository {
+		return Err(trusted_publishing_identity_error(
+			request,
+			format!(
+				"expected GitHub repository `{}`, but detected `{actual_repository}`",
+				expected.repository
+			),
+		));
+	}
+
+	let actual_workflow = actual_workflow.ok_or_else(|| {
+		trusted_publishing_identity_error(
+			request,
+			"GitHub Actions did not expose `GITHUB_WORKFLOW_REF` with a workflow filename"
+				.to_string(),
+		)
+	})?;
+	if actual_workflow != expected.workflow {
+		return Err(trusted_publishing_identity_error(
+			request,
+			format!(
+				"expected GitHub workflow `{}`, but detected `{actual_workflow}`",
+				expected.workflow
+			),
+		));
+	}
+
+	if let Some(expected_environment) = expected.environment.as_deref() {
+		let resolved_environment = actual_environment
+			.map(ToString::to_string)
+			.or_else(|| resolve_github_job_environment(root, actual_workflow, env_map));
+		if resolved_environment.as_deref() != Some(expected_environment) {
+			return Err(trusted_publishing_identity_error(
+				request,
+				format!(
+					"expected GitHub environment `{expected_environment}`, but detected `{}`",
+					resolved_environment.as_deref().unwrap_or("none")
+				),
+			));
 		}
 	}
+
+	if !env_map.contains_key(GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL)
+		|| !env_map.contains_key(GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN)
+	{
+		return Err(trusted_publishing_identity_error(
+			request,
+			format!(
+				"GitHub Actions did not expose `{GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL}` and `{GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN}`; grant `id-token: write` to the publish job"
+			),
+		));
+	}
+
+	Ok(())
+}
+
+fn trusted_publishing_identity_error(
+	request: &PublishRequest,
+	reason: impl std::fmt::Display,
+) -> MonochangeError {
+	MonochangeError::Config(format!(
+		"`{}` requires trusted publishing from the configured GitHub Actions OIDC identity, but the current context does not match: {reason}. Run `mc publish` from the configured CI workflow or set `publish.trusted_publishing = false` to opt out.",
+		request.package_id,
+	))
 }
 
 fn trust_outcome_for_skip(
@@ -4441,6 +4580,10 @@ jobs:
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
 			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
@@ -4493,6 +4636,10 @@ jobs:
 	fn trust_outcome_for_skip_uses_manual_action_for_non_npm_packages() {
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
+			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
@@ -4567,6 +4714,10 @@ jobs:
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
 			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
@@ -4622,7 +4773,7 @@ jobs:
 		.expect_err("missing GitHub context should block trusted npm release publishing");
 
 		let message = error.to_string();
-		assert!(message.contains("trusted publishing could not determine the GitHub workflow"));
+		assert!(message.contains("local/manual publishing is not allowed"));
 		assert!(message.contains("No supported CI provider identity was detected"));
 		assert!(message.contains("supported providers: GitHub Actions, GitLab CI/CD"));
 	}
@@ -4701,6 +4852,10 @@ jobs:
 		.expect("write workflow:");
 		let env_map = BTreeMap::from([
 			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
@@ -4749,6 +4904,10 @@ jobs:
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
 			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
@@ -4782,6 +4941,10 @@ jobs:
 		let request = trusted_request(RegistryKind::Npm);
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
+			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
@@ -4818,6 +4981,10 @@ jobs:
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
 			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
@@ -4853,14 +5020,26 @@ jobs:
 	}
 
 	#[test]
-	fn enforce_release_trust_prerequisites_accepts_npm_and_rejects_manual_registries() {
+	fn enforce_release_trust_prerequisites_accepts_configured_github_oidc_contexts() {
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
+			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
 			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL.to_string(),
+				"https://token.actions.githubusercontent.com".to_string(),
+			),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN.to_string(),
+				"request-token".to_string(),
+			),
 		]);
 
 		enforce_release_trust_prerequisites(
@@ -4871,21 +5050,13 @@ jobs:
 		)
 		.expect("expected npm trust prereq success:");
 
-		let manual_error = enforce_release_trust_prerequisites(
+		enforce_release_trust_prerequisites(
 			&trusted_request(RegistryKind::CratesIo),
 			Some(&sample_source()),
 			root.path(),
 			&env_map,
 		)
-		.expect_err("expected manual trust error");
-		assert!(
-			manual_error
-				.to_string()
-				.contains("manual trusted publishing setup")
-		);
-		assert!(manual_error.to_string().contains(
-			"repository `monochange/monochange`, workflow `publish.yml`, environment `publisher`"
-		));
+		.expect("expected crates.io trust prereq success:");
 
 		enforce_release_trust_prerequisites(
 			&sample_request(RegistryKind::Npm),
@@ -4895,26 +5066,233 @@ jobs:
 		)
 		.expect("expected disabled trust success:");
 
-		let mut missing_workflow_request = trusted_request(RegistryKind::PubDev);
-		missing_workflow_request.trusted_publishing.repository =
-			Some("monochange/monochange".to_string());
-		let missing_context_error = enforce_release_trust_prerequisites(
-			&missing_workflow_request,
-			None,
+		let mut mismatched_workflow_request = trusted_request(RegistryKind::PubDev);
+		mismatched_workflow_request.trusted_publishing.workflow = Some("release.yml".to_string());
+		let mismatched_context_error = enforce_release_trust_prerequisites(
+			&mismatched_workflow_request,
+			Some(&sample_source()),
+			root.path(),
+			&env_map,
+		)
+		.expect_err("expected mismatched context error");
+		assert!(
+			mismatched_context_error
+				.to_string()
+				.contains("expected GitHub workflow `release.yml`, but detected `publish.yml`")
+		);
+	}
+
+	#[test]
+	fn enforce_release_trust_prerequisites_rejects_long_lived_npm_tokens() {
+		let root = workflow_root();
+		let env_map = BTreeMap::from([
+			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
+				"GITHUB_WORKFLOW_REF".to_string(),
+				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+			),
+			("GITHUB_JOB".to_string(), "release".to_string()),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL.to_string(),
+				"https://token.actions.githubusercontent.com".to_string(),
+			),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN.to_string(),
+				"request-token".to_string(),
+			),
+			("NPM_TOKEN".to_string(), "secret-token".to_string()),
+		]);
+
+		let error = enforce_release_trust_prerequisites(
+			&trusted_request(RegistryKind::Npm),
+			Some(&sample_source()),
+			root.path(),
+			&env_map,
+		)
+		.expect_err("long-lived npm tokens should be rejected");
+		let message = error.to_string();
+		assert!(message.contains("long-lived npm token environment variables"));
+		assert!(message.contains("NPM_TOKEN"));
+	}
+
+	#[test]
+	fn enforce_release_trust_prerequisites_rejects_unsupported_provider_registry_pairs() {
+		let root = workflow_root();
+		let circle_env = BTreeMap::from([
+			("CIRCLECI".to_string(), "true".to_string()),
+			(
+				"CIRCLE_PROJECT_USERNAME".to_string(),
+				"monochange".to_string(),
+			),
+			(
+				"CIRCLE_PROJECT_REPONAME".to_string(),
+				"monochange".to_string(),
+			),
+			("CIRCLE_WORKFLOW_ID".to_string(), "workflow".to_string()),
+		]);
+		let error = enforce_release_trust_prerequisites(
+			&trusted_request(RegistryKind::Npm),
+			Some(&sample_source()),
+			root.path(),
+			&circle_env,
+		)
+		.expect_err("CircleCI npm trusted publishing should be rejected");
+		let message = error.to_string();
+		assert!(message.contains("cannot enforce trusted publishing"));
+		assert!(message.contains("CircleCI"));
+
+		let gitlab_env = BTreeMap::from([
+			("GITLAB_CI".to_string(), "true".to_string()),
+			(
+				"CI_PROJECT_PATH".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			("CI_JOB_ID".to_string(), "42".to_string()),
+		]);
+		enforce_release_trust_prerequisites(
+			&trusted_request(RegistryKind::Npm),
+			Some(&sample_source()),
+			root.path(),
+			&gitlab_env,
+		)
+		.expect("supported non-GitHub trusted publishing identities should pass capability checks");
+	}
+
+	#[test]
+	fn forbidden_npm_token_env_keys_detects_config_auth_tokens() {
+		let env_map = BTreeMap::from([
+			(
+				"npm_config_registry_auth_token".to_string(),
+				"secret".to_string(),
+			),
+			("NPM_CONFIG_USERCONFIG".to_string(), ".npmrc".to_string()),
+		]);
+		assert_eq!(
+			forbidden_npm_token_env_keys(&env_map),
+			vec!["npm_config_registry_auth_token".to_string()]
+		);
+	}
+
+	#[test]
+	fn verify_github_trust_context_reports_identity_mismatches() {
+		let root = workflow_root();
+		let request = trusted_request(RegistryKind::Npm);
+		let expected = GitHubTrustContext {
+			repository: "monochange/monochange".to_string(),
+			workflow: "publish.yml".to_string(),
+			environment: Some("publisher".to_string()),
+		};
+
+		let missing_repository = verify_github_trust_context(
+			&request,
 			root.path(),
 			&BTreeMap::new(),
+			&expected,
+			None,
+			Some("publish.yml"),
+			Some("publisher"),
 		)
-		.expect_err("expected missing context error");
+		.expect_err("missing GitHub repository should fail");
 		assert!(
-			missing_context_error
+			missing_repository
 				.to_string()
-				.contains("trusted-publishing preflight configuration")
+				.contains("GitHub Actions did not expose `GITHUB_REPOSITORY`")
 		);
+
+		let repository_mismatch = verify_github_trust_context(
+			&request,
+			root.path(),
+			&BTreeMap::new(),
+			&expected,
+			Some("other/repo"),
+			Some("publish.yml"),
+			Some("publisher"),
+		)
+		.expect_err("mismatched GitHub repository should fail");
+		assert!(repository_mismatch.to_string().contains(
+			"expected GitHub repository `monochange/monochange`, but detected `other/repo`"
+		));
+
+		let missing_workflow = verify_github_trust_context(
+			&request,
+			root.path(),
+			&BTreeMap::new(),
+			&expected,
+			Some("monochange/monochange"),
+			None,
+			Some("publisher"),
+		)
+		.expect_err("missing GitHub workflow should fail");
 		assert!(
-			missing_context_error
+			missing_workflow
 				.to_string()
-				.contains("set `publish.trusted_publishing.workflow`")
+				.contains("GitHub Actions did not expose `GITHUB_WORKFLOW_REF`")
 		);
+
+		let environment_mismatch = verify_github_trust_context(
+			&request,
+			root.path(),
+			&BTreeMap::new(),
+			&expected,
+			Some("monochange/monochange"),
+			Some("publish.yml"),
+			None,
+		)
+		.expect_err("missing GitHub environment should fail");
+		assert!(
+			environment_mismatch
+				.to_string()
+				.contains("expected GitHub environment `publisher`, but detected `none`")
+		);
+
+		let missing_oidc = verify_github_trust_context(
+			&request,
+			root.path(),
+			&BTreeMap::new(),
+			&GitHubTrustContext {
+				environment: None,
+				..expected
+			},
+			Some("monochange/monochange"),
+			Some("publish.yml"),
+			None,
+		)
+		.expect_err("missing GitHub OIDC token request variables should fail");
+		assert!(missing_oidc.to_string().contains("grant `id-token: write`"));
+	}
+
+	#[test]
+	fn execute_publish_requests_blocks_trusted_publish_before_external_command() {
+		let server = MockServer::start();
+		server.mock(|when, then| {
+			when.method(GET).path("/pkg");
+			then.status(404);
+		});
+		let client = Client::builder().build().expect("http client:");
+		let endpoints = sample_endpoints(&server.base_url());
+		let mut executor = FakeExecutor::new(Vec::new());
+		let error = execute_publish_requests(
+			Path::new("."),
+			Some(&sample_source()),
+			PackagePublishRunMode::Release,
+			false,
+			&[trusted_request(RegistryKind::Npm)],
+			&client,
+			&endpoints,
+			&BTreeMap::new(),
+			&mut executor,
+		)
+		.expect_err("trusted publishing should block local release publish");
+
+		assert!(
+			error
+				.to_string()
+				.contains("local/manual publishing is not allowed")
+		);
+		assert!(executor.commands.is_empty());
 	}
 
 	#[test]
@@ -5383,10 +5761,22 @@ version = "1.2.3"
 		let root = workflow_root();
 		let env_map = BTreeMap::from([
 			(
+				"GITHUB_REPOSITORY".to_string(),
+				"monochange/monochange".to_string(),
+			),
+			(
 				"GITHUB_WORKFLOW_REF".to_string(),
 				"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
 			),
 			("GITHUB_JOB".to_string(), "release".to_string()),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL.to_string(),
+				"https://token.actions.githubusercontent.com".to_string(),
+			),
+			(
+				GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN.to_string(),
+				"request-token".to_string(),
+			),
 		]);
 		let mut executor = FakeExecutor::new(vec![
 			CommandOutput {

@@ -114,6 +114,8 @@ jobs:
 
 Use the same environment name in GitHub Actions and in the registry configuration.
 
+When `publish.trusted_publishing = true`, release publishing is a mandatory CI/OIDC flow. Built-in publish commands reject local/manual execution before invoking registry CLIs, require the configured GitHub repository/workflow/environment to match the current job, require `id-token: write`, and refuse long-lived npm token environment variables such as `NPM_TOKEN` or `NODE_AUTH_TOKEN`. Use `publish.trusted_publishing = false` only for packages that intentionally opt out.
+
 ## Recommended rollout
 
 Use this sequence when adopting trusted publishing for an existing workspace:

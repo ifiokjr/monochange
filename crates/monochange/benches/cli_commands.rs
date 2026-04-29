@@ -589,7 +589,9 @@ fn bench_release_pr(c: &mut Criterion) {
 					when.method(POST).path("/graphql");
 					then.status(200)
 						.header("content-type", "application/json")
-						.body("{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":7}}}");
+						.body(
+							"{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":7}},\"data\":{\"enablePullRequestAutoMerge\":{\"pullRequest\":{\"number\":7}}}}",
+						);
 				});
 				(tempdir, server)
 			},
