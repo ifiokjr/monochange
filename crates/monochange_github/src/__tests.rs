@@ -22,7 +22,6 @@ use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
-use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ProviderReleaseSettings;
@@ -86,7 +85,6 @@ fn comment_released_issues_with_client_closes_skipped_existing_issues_when_plan_
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let plans = vec![GitHubIssueCommentPlan {
 		repository: "ifiokjr/monochange".to_string(),
@@ -123,7 +121,6 @@ fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -159,7 +156,6 @@ fn build_release_requests_can_defer_to_github_generated_notes() {
 			..ProviderReleaseSettings::default()
 		},
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -198,7 +194,6 @@ fn github_url_helpers_use_source_configuration_coordinates() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 
 	temp_env::with_var("GITHUB_SERVER_URL", Some("https://example.com"), || {
@@ -227,7 +222,6 @@ fn validate_source_configuration_rejects_conflicting_release_note_modes() {
 			..ProviderReleaseSettings::default()
 		},
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected validation error"));
@@ -270,7 +264,6 @@ fn comment_released_issues_with_client_closes_issues_when_plan_close_is_true() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let _manifest = ReleaseManifest {
 		command: "release".to_string(),
@@ -344,7 +337,6 @@ fn comment_released_issues_public_api_uses_source_configuration() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let mut manifest = sample_manifest();
 	manifest.changesets = vec![PreparedChangeset {
@@ -415,7 +407,6 @@ fn github_hosted_source_adapter_comments_released_issues() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let mut manifest = sample_manifest();
 	manifest.changesets = vec![PreparedChangeset {
@@ -471,7 +462,6 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let manifest = ReleaseManifest {
 		command: "release".to_string(),
@@ -545,7 +535,6 @@ fn build_release_pull_request_request_renders_branch_and_body() {
 			auto_merge: true,
 			..ProviderMergeRequestSettings::default()
 		},
-		bot: ProviderBotSettings::default(),
 	};
 	let manifest = sample_manifest();
 
@@ -654,7 +643,6 @@ fn sync_retargeted_releases_plans_updates_in_dry_run_mode() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -710,7 +698,6 @@ fn sync_retargeted_releases_updates_existing_release_target_commitish() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -762,7 +749,6 @@ fn sync_retargeted_releases_reports_already_aligned_release() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -807,7 +793,6 @@ fn sync_retargeted_releases_errors_when_release_lookup_is_missing() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -862,7 +847,6 @@ fn sync_retargeted_releases_public_api_uses_source_configuration_and_env() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let updates = vec![RetargetTagResult {
 		tag_name: "v1.2.3".to_string(),
@@ -1843,7 +1827,6 @@ fn enrich_changeset_context_resolves_pull_requests_and_related_issues() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let mut changesets = vec![PreparedChangeset {
 		path: PathBuf::from(".changeset/feature.md"),
@@ -1953,7 +1936,6 @@ fn enrich_changeset_context_public_api_uses_source_configuration() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let mut changesets = vec![PreparedChangeset {
 		path: PathBuf::from(".changeset/feature.md"),
@@ -2022,7 +2004,6 @@ fn enrich_changeset_context_falls_back_to_commit_annotations_when_batch_lookup_f
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let mut changesets = vec![PreparedChangeset {
 		path: PathBuf::from(".changeset/feature.md"),
@@ -2109,7 +2090,6 @@ fn batch_review_request_lookup_reports_missing_repository_payload_and_parses_bod
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	github_runtime()
 		.unwrap_or_else(|error| panic!("runtime: {error}"))
@@ -2227,7 +2207,6 @@ fn comment_released_issues_skips_existing_markers_and_posts_missing_comments() {
 		repo: "monochange".to_string(),
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	};
 	let mut manifest = sample_manifest();
 	manifest.changesets = vec![PreparedChangeset {
@@ -2346,7 +2325,6 @@ fn sample_source(api_url: Option<String>) -> SourceConfiguration {
 		api_url,
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	}
 }
 

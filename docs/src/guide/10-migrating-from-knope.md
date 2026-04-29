@@ -383,11 +383,11 @@ knope uses `scopes` to filter conventional commits to specific packages. Since m
 enabled = true
 ```
 
-In monochange, release automation is configured through `[source.bot.changesets]`:
+In monochange, release automation is configured through `[changesets.affected]`:
 
 ```toml
 # monochange.toml
-[source.bot.changesets]
+[changesets.affected]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]

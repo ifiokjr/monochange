@@ -31,7 +31,7 @@
 //! - load `monochange.toml`
 //! - validate version groups and CLI commands
 //! - resolve package references against discovered packages
-//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, source-provider config, changeset-bot policy config, and command release/manifest/policy steps
+//! - parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, source-provider config, affected-package policy config, and command release/manifest/policy steps
 //!
 //! ## Example
 //!
@@ -110,7 +110,6 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
-use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseSettings;
 use monochange_core::PublishAttestationSettings;
@@ -464,8 +463,6 @@ struct RawSourceConfiguration {
 	releases: ProviderReleaseSettings,
 	#[serde(default)]
 	pull_requests: ProviderMergeRequestSettings,
-	#[serde(default)]
-	bot: ProviderBotSettings,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -1176,7 +1173,6 @@ fn resolve_source_configuration(
 			api_url: source.api_url,
 			releases: source.releases,
 			pull_requests: source.pull_requests,
-			bot: source.bot,
 		}
 	})
 }
@@ -3123,7 +3119,7 @@ fn validate_affected_packages_step_enabled(
 	}
 
 	Err(MonochangeError::Config(format!(
-		"CLI command `{}` uses `AffectedPackages` but `[changesets.verify].enabled` is false",
+		"CLI command `{}` uses `AffectedPackages` but `[changesets.affected].enabled` is false",
 		cli_command.name
 	)))
 }
@@ -3581,40 +3577,6 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 			"[source.pull_requests].labels must not include empty values".to_string(),
 		));
 	}
-	if source
-		.bot
-		.changesets
-		.skip_labels
-		.iter()
-		.any(|label| label.trim().is_empty())
-	{
-		return Err(MonochangeError::Config(
-			"[source.bot.changesets].skip_labels must not include empty values".to_string(),
-		));
-	}
-	for (field, patterns) in [
-		(
-			"[source.bot.changesets].changed_paths",
-			&source.bot.changesets.changed_paths,
-		),
-		(
-			"[source.bot.changesets].ignored_paths",
-			&source.bot.changesets.ignored_paths,
-		),
-	] {
-		for pattern in patterns {
-			if pattern.trim().is_empty() {
-				return Err(MonochangeError::Config(format!(
-					"{field} must not include empty values"
-				)));
-			}
-			Pattern::new(pattern).map_err(|error| {
-				MonochangeError::Config(format!(
-					"{field} contains invalid glob pattern `{pattern}`: {error}"
-				))
-			})?;
-		}
-	}
 	if let Some(api_url) = &source.api_url {
 		validate_api_url_host(api_url, source.provider)?;
 	}
@@ -3662,14 +3624,37 @@ fn validate_changesets_configuration(
 	packages: &[PackageDefinition],
 ) -> MonochangeResult<()> {
 	if changesets
-		.verify
+		.affected
 		.skip_labels
 		.iter()
 		.any(|label| label.trim().is_empty())
 	{
 		return Err(MonochangeError::Config(
-			"[changesets.verify].skip_labels must not include empty values".to_string(),
+			"[changesets.affected].skip_labels must not include empty values".to_string(),
 		));
+	}
+	for (field, patterns) in [
+		(
+			"[changesets.affected].changed_paths",
+			&changesets.affected.changed_paths,
+		),
+		(
+			"[changesets.affected].ignored_paths",
+			&changesets.affected.ignored_paths,
+		),
+	] {
+		for pattern in patterns {
+			if pattern.trim().is_empty() {
+				return Err(MonochangeError::Config(format!(
+					"{field} must not include empty values"
+				)));
+			}
+			Pattern::new(pattern).map_err(|error| {
+				MonochangeError::Config(format!(
+					"{field} contains invalid glob pattern `{pattern}`: {error}"
+				))
+			})?;
+		}
 	}
 	for package in packages {
 		for (field, patterns) in [
@@ -4029,7 +4014,7 @@ fn validate_cli_runtime_requirements(
 		for step in &cli_command.steps {
 			validate_step_input_overrides(cli_command, step)?;
 			if let CliStepDefinition::AffectedPackages { inputs, .. } = step {
-				validate_affected_packages_step_enabled(cli_command, changesets.verify.enabled)?;
+				validate_affected_packages_step_enabled(cli_command, changesets.affected.enabled)?;
 
 				let has_changed_paths = inputs.contains_key("changed_paths")
 					|| cli_command_input(cli_command, "changed_paths")

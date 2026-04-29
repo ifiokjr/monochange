@@ -14,8 +14,8 @@ use crate::ChangelogFormat;
 use crate::ChangelogSectionDef;
 use crate::ChangelogSettings;
 use crate::ChangelogTarget;
+use crate::ChangesetAffectedSettings;
 use crate::ChangesetPolicyStatus;
-use crate::ChangesetVerificationSettings;
 use crate::CliInputKind;
 use crate::CliStepDefinition;
 use crate::DependencyKind;
@@ -33,7 +33,6 @@ use crate::PackageDefinition;
 use crate::PackageDependency;
 use crate::PackageRecord;
 use crate::PackageType;
-use crate::ProviderBotSettings;
 use crate::ProviderMergeRequestSettings;
 use crate::ProviderReleaseSettings;
 use crate::PublishMode;
@@ -153,7 +152,6 @@ fn test_source_configuration(provider: SourceProvider) -> SourceConfiguration {
 		api_url: None,
 		releases: ProviderReleaseSettings::default(),
 		pull_requests: ProviderMergeRequestSettings::default(),
-		bot: ProviderBotSettings::default(),
 	}
 }
 
@@ -871,7 +869,7 @@ fn changeset_policy_status_renders_stable_strings() {
 
 #[test]
 fn changeset_verification_settings_default_to_enabled_enforcement() {
-	let settings = ChangesetVerificationSettings::default();
+	let settings = ChangesetAffectedSettings::default();
 	assert!(settings.enabled);
 	assert!(settings.required);
 	assert!(settings.comment_on_failure);

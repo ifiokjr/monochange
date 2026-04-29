@@ -7,11 +7,13 @@ use glob::Pattern;
 use monochange_config::load_change_signals;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
+use monochange_core::ChangesetAffectedSettings;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
-use monochange_core::ChangesetVerificationSettings;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::SourceConfiguration;
+use monochange_core::git::git_current_branch;
 
 use crate::discover_workspace;
 
@@ -28,11 +30,11 @@ pub fn affected_packages(
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
 	// Load and validate configuration
 	let configuration = load_workspace_configuration(root)?;
-	let verify = &configuration.changesets.verify;
+	let verify = &configuration.changesets.affected;
 
 	if !verify.enabled {
 		return Err(MonochangeError::Config(
-			"changeset verification requires `[changesets.verify].enabled = true`".to_string(),
+			"changeset verification requires `[changesets.affected].enabled = true`".to_string(),
 		));
 	}
 
@@ -49,6 +51,17 @@ pub fn affected_packages(
 		.map(|path| normalize_changed_path(path))
 		.filter(|path| !path.is_empty())
 		.collect::<Vec<_>>();
+
+	if let Some((current_branch, branch_prefix)) =
+		current_branch_matches_pull_request_branch_prefix(root, configuration.source.as_ref())
+	{
+		return Ok(skipped_pull_request_branch_evaluation(
+			labels,
+			changed_paths,
+			&current_branch,
+			&branch_prefix,
+		));
+	}
 
 	// Identify skip labels and changeset paths
 	let matched_skip_labels = labels
@@ -85,12 +98,28 @@ pub fn affected_packages(
 		.iter()
 		.filter(|path| !is_changeset_markdown_path(path))
 	{
+		if path_matches_any_global_pattern(path, &verify.ignored_paths) {
+			ignored_paths.push(path.clone());
+			continue;
+		}
+
 		if path_matches_any_configured_changelog(
 			path,
 			&configuration.packages,
 			&configuration.groups,
 		) {
 			ignored_paths.push(path.clone());
+			continue;
+		}
+
+		if path_matches_any_global_pattern(path, &verify.changed_paths) {
+			matched_paths.push(path.clone());
+			affected_package_ids.extend(
+				configuration
+					.packages
+					.iter()
+					.map(|package| package.id.clone()),
+			);
 			continue;
 		}
 
@@ -218,6 +247,49 @@ pub fn affected_packages(
 	Ok(evaluation)
 }
 
+fn current_branch_matches_pull_request_branch_prefix(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+) -> Option<(String, String)> {
+	let source = source?;
+	let branch_prefix = source.pull_requests.branch_prefix.trim();
+	if branch_prefix.is_empty() {
+		return None;
+	}
+
+	let current_branch = git_current_branch(root).ok()?;
+	current_branch
+		.starts_with(branch_prefix)
+		.then(|| (current_branch, branch_prefix.to_string()))
+}
+
+fn skipped_pull_request_branch_evaluation(
+	labels: Vec<String>,
+	changed_paths: Vec<String>,
+	current_branch: &str,
+	branch_prefix: &str,
+) -> ChangesetPolicyEvaluation {
+	ChangesetPolicyEvaluation {
+		status: ChangesetPolicyStatus::Skipped,
+		required: false,
+		enforce: false,
+		summary: format!(
+			"changeset verification skipped because current branch `{current_branch}` starts with release pull request branch prefix `{branch_prefix}`"
+		),
+		comment: None,
+		labels,
+		matched_skip_labels: Vec::new(),
+		changed_paths,
+		matched_paths: Vec::new(),
+		ignored_paths: Vec::new(),
+		changeset_paths: Vec::new(),
+		affected_package_ids: Vec::new(),
+		covered_package_ids: Vec::new(),
+		uncovered_package_ids: Vec::new(),
+		errors: Vec::new(),
+	}
+}
+
 /// Backwards-compatible alias for [`affected_packages`].
 pub fn verify_changesets(
 	root: &Path,
@@ -296,6 +368,14 @@ pub(crate) fn is_changeset_markdown_path(path: &str) -> bool {
 			.is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
 }
 
+fn path_matches_any_global_pattern(path: &str, patterns: &[String]) -> bool {
+	patterns.iter().any(|pattern| {
+		Pattern::new(pattern)
+			.ok()
+			.is_some_and(|compiled| compiled.matches(path))
+	})
+}
+
 fn path_touches_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
 	if matches_any_package_pattern(path, package, &package.additional_paths) {
 		return true;
@@ -369,7 +449,7 @@ fn clear_git_env(command: &mut ProcessCommand) {
 }
 
 fn render_changeset_verification_comment(
-	verify: &ChangesetVerificationSettings,
+	verify: &ChangesetAffectedSettings,
 	evaluation: &ChangesetPolicyEvaluation,
 ) -> String {
 	let mut lines = vec![
@@ -435,6 +515,7 @@ mod tests {
 
 	use monochange_core::PackageDefinition;
 	use monochange_core::PackageType;
+	use monochange_core::SourceProvider as ProviderKind;
 	use monochange_core::VersionFormat;
 
 	use super::*;
@@ -511,7 +592,7 @@ mod tests {
 		.unwrap_or_else(|error| panic!("write lib.rs: {error}"));
 		fs::write(
 			tempdir.path().join("monochange.toml"),
-			"[defaults]\npackage_type = \"cargo\"\n\n[changesets.verify]\nenabled = false\nrequired = true\ncomment_on_failure = true\n\n[package.core]\npath = \"crates/core\"\n",
+			"[defaults]\npackage_type = \"cargo\"\n\n[changesets.affected]\nenabled = false\nrequired = true\ncomment_on_failure = true\n\n[package.core]\npath = \"crates/core\"\n",
 		)
 		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
@@ -525,7 +606,142 @@ mod tests {
 		assert!(matches!(error, MonochangeError::Config(_)));
 		assert_eq!(
 			error.to_string(),
-			"config error: changeset verification requires `[changesets.verify].enabled = true`"
+			"config error: changeset verification requires `[changesets.affected].enabled = true`"
+		);
+	}
+
+	#[test]
+	fn affected_packages_skips_release_pull_request_branches() {
+		let fixture = setup_fixture("monochange/changeset-policy-base");
+		let config_path = fixture.path().join("monochange.toml");
+		let mut config = fs::read_to_string(&config_path)
+			.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
+		config.push_str(
+			"\n[source]\nprovider = \"github\"\nowner = \"monochange\"\nrepo = \"monochange\"\n\n[source.pull_requests]\nbranch_prefix = \"monochange/release\"\n",
+		);
+		fs::write(&config_path, config)
+			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+		git(fixture.path(), &["init", "-b", "main"]);
+		git(fixture.path(), &["config", "user.name", "monochange"]);
+		git(
+			fixture.path(),
+			&["config", "user.email", "monochange@example.com"],
+		);
+		git(fixture.path(), &["add", "."]);
+		git(fixture.path(), &["commit", "-m", "initial"]);
+		git(
+			fixture.path(),
+			&["checkout", "-b", "monochange/release/affected"],
+		);
+
+		let evaluation = affected_packages(
+			fixture.path(),
+			&["crates/core/src/lib.rs".to_string()],
+			&Vec::new(),
+		)
+		.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
+
+		assert_eq!(evaluation.status, ChangesetPolicyStatus::Skipped);
+		assert!(!evaluation.required);
+		assert!(evaluation.affected_package_ids.is_empty());
+		assert_eq!(
+			evaluation.changed_paths,
+			vec!["crates/core/src/lib.rs".to_string()]
+		);
+		assert!(
+			evaluation
+				.summary
+				.contains("current branch `monochange/release/affected` starts")
+		);
+	}
+
+	#[test]
+	fn affected_packages_uses_global_affected_path_filters() {
+		let fixture = setup_fixture("monochange/changeset-policy-base");
+		let config_path = fixture.path().join("monochange.toml");
+		let mut config = fs::read_to_string(&config_path)
+			.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
+		config = config.replace(
+			"comment_on_failure = true",
+			"comment_on_failure = true\nchanged_paths = [\"infra/**\"]\nignored_paths = [\"docs/**\"]",
+		);
+		config = config.replace(
+			"path = \"crates/core\"\nignored_paths",
+			"path = \"crates/core\"\nchangelog = \"crates/core/CHANGELOG.md\"\nignored_paths",
+		);
+		fs::write(&config_path, config)
+			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+		let evaluation = affected_packages(
+			fixture.path(),
+			&[
+				"docs/readme.md".to_string(),
+				"crates/core/CHANGELOG.md".to_string(),
+				"infra/config.yml".to_string(),
+			],
+			&Vec::new(),
+		)
+		.unwrap_or_else(|error| panic!("affected packages for global paths: {error}"));
+
+		assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);
+		assert_eq!(
+			evaluation.ignored_paths,
+			vec![
+				"docs/readme.md".to_string(),
+				"crates/core/CHANGELOG.md".to_string()
+			]
+		);
+		assert_eq!(
+			evaluation.matched_paths,
+			vec!["infra/config.yml".to_string()]
+		);
+		assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
+	}
+
+	#[test]
+	fn current_branch_prefix_matching_requires_non_empty_prefix() {
+		let repo = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		git(repo.path(), &["init", "-b", "main"]);
+		git(repo.path(), &["config", "user.name", "monochange"]);
+		git(
+			repo.path(),
+			&["config", "user.email", "monochange@example.com"],
+		);
+		fs::write(repo.path().join("tracked.txt"), "initial\n")
+			.unwrap_or_else(|error| panic!("write tracked file: {error}"));
+		git(repo.path(), &["add", "tracked.txt"]);
+		git(repo.path(), &["commit", "-m", "initial"]);
+
+		let mut source = SourceConfiguration {
+			provider: ProviderKind::default(),
+			owner: "monochange".to_string(),
+			repo: "monochange".to_string(),
+			host: None,
+			api_url: None,
+			releases: monochange_core::ProviderReleaseSettings::default(),
+			pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+		};
+
+		source.pull_requests.branch_prefix = "   ".to_string();
+		assert_eq!(
+			current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)),
+			None
+		);
+
+		source.pull_requests.branch_prefix = "monochange/release/".to_string();
+		assert_eq!(
+			current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)),
+			None
+		);
+
+		git(repo.path(), &["checkout", "-b", "monochange/release/core"]);
+		assert_eq!(
+			current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)),
+			Some((
+				"monochange/release/core".to_string(),
+				"monochange/release/".to_string()
+			))
 		);
 	}
 
@@ -659,11 +875,13 @@ mod tests {
 			&package.ignored_paths
 		));
 
-		let verify = ChangesetVerificationSettings {
+		let verify = ChangesetAffectedSettings {
 			enabled: true,
 			required: true,
 			comment_on_failure: true,
 			skip_labels: vec!["release-notes-not-needed".to_string()],
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
 		};
 		let evaluation = ChangesetPolicyEvaluation {
 			status: ChangesetPolicyStatus::Failed,
@@ -710,11 +928,13 @@ mod tests {
 
 	#[test]
 	fn render_comment_includes_related_skip_guidance() {
-		let verify = ChangesetVerificationSettings {
+		let verify = ChangesetAffectedSettings {
 			enabled: true,
 			required: false,
 			comment_on_failure: true,
 			skip_labels: vec!["docs-only".to_string()],
+			changed_paths: Vec::new(),
+			ignored_paths: Vec::new(),
 		};
 		let evaluation = ChangesetPolicyEvaluation {
 			status: ChangesetPolicyStatus::Failed,
@@ -756,6 +976,14 @@ mod tests {
 		assert!(!matches_any_package_pattern(
 			"crates/core/src/lib.rs",
 			&package,
+			&["[".to_string()]
+		));
+		assert!(path_matches_any_global_pattern(
+			"docs/readme.md",
+			&["docs/**".to_string()]
+		));
+		assert!(!path_matches_any_global_pattern(
+			"docs/readme.md",
 			&["[".to_string()]
 		));
 		assert!(!path_touches_package("docs/readme.md", &package));

@@ -590,7 +590,7 @@ title = "chore(release): prepare release"
 labels = ["release", "automated"]
 auto_merge = false
 
-[source.bot.changesets]
+[changesets.affected]
 enabled = true
 required = true
 skip_labels = ["no-changeset-required"]
@@ -721,10 +721,10 @@ Current implementation notes:
 - `defaults.include_private` is parsed, but discovery behavior is still centered on the supported fixture-driven CLI commands documented here
 - `[ecosystems.*].enabled/roots/exclude` are parsed, but discovery still scans all supported ecosystems regardless of those settings today
 - `defaults.strict_version_conflicts` controls whether conflicting explicit `version` entries across changesets warn-and-pick-highest (default) or fail planning outright
-- source automation expects `[source]` with provider release settings and release branch policy under `[source.releases]`, pull request settings under `[source.pull_requests]`, and bot settings under `[source.bot.changesets]`; GitHub remains the default provider
+- source automation expects `[source]` with provider release settings and release branch policy under `[source.releases]`, pull request settings under `[source.pull_requests]`, and affected-package policy settings under `[changesets.affected]`; GitHub remains the default provider
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
-- changeset policy commands currently apply only to the GitHub provider and expect `[source.bot.changesets]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
+- changeset policy commands currently apply only to the GitHub provider and expect `[changesets.affected]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
 - supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`, and `Command`
 - see the [CLI step reference](../reference/cli-steps/00-index.md) for detailed per-step guidance, prerequisites, and composition examples
 

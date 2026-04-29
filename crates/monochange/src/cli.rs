@@ -848,7 +848,7 @@ Commit notes:
 Verification reminders:
   - Prefer package ids in .changeset files.
   - Group-owned changesets cover all members of that group.
-  - Ignored paths and skip labels are controlled from [changesets.verify].",
+  - Ignored paths and skip labels are controlled from [changesets.affected].",
 			)
 		}
 		"diagnostics" => {

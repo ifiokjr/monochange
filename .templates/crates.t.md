@@ -198,7 +198,7 @@ Reach for this crate when you need to load `monochange.toml`, resolve package re
 - load `monochange.toml`
 - validate version groups and CLI commands
 - resolve package references against discovered packages
-- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, source-provider config, changeset-bot policy config, and command release/manifest/policy steps
+- parse change-input files, evidence, release-note `type` / `details` fields, changelog paths, changelog format overrides, source-provider config, affected-package policy config, and command release/manifest/policy steps
 
 ## Example
 
@@ -302,7 +302,6 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 ## Example
 
 ```rust
-use monochange_core::ProviderBotSettings;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseSettings;
 use monochange_core::SourceConfiguration;
@@ -354,7 +353,6 @@ let github = SourceConfiguration {
     api_url: None,
     releases: ProviderReleaseSettings::default(),
     pull_requests: ProviderMergeRequestSettings::default(),
-    bot: ProviderBotSettings::default(),
 };
 
 let requests = build_release_requests(&github, &manifest);
