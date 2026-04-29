@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 89
 info:
   program: mc
   args:
@@ -14,11 +15,4 @@ exit_code: 0
 workspace validation passed for .
 
 ----- stderr -----
-lint: 3 errors, 0 warnings
-
-[ROOT]/crates/core/Cargo.toml:
-  ✗ missing required package field `description` at 1:1
-  ✗ missing required package field `license` at 1:1
-  ✗ missing required package field `repository` at 1:1
-
-No auto-fixable issues found.
+lint: no issues found

@@ -5,7 +5,7 @@ monochange_core: feat
 "@monochange/skill": patch
 ---
 
-#### Configure changeset lint rules
+# Configure changeset lint rules
 
 Add configurable changeset lint rules under `[lints.rules]` for summaries, section headings, bump-specific requirements, and changelog-type-specific requirements.
 

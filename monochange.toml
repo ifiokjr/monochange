@@ -496,7 +496,7 @@ exclude = ["examples/**", "fixtures/**"]
 "npm/unlisted-package-private" = "warning"
 "changesets/duplicate" = "error"
 "changesets/no_section_headings" = "error"
-"changesets/summary" = { level = "error", required = true, heading_level = 4, min_length = 8, max_length = 90, forbid_trailing_period = true, forbid_conventional_commit_prefix = true }
+"changesets/summary" = { level = "error", required = true, heading_level = 1, min_length = 8, max_length = 90, forbid_trailing_period = true, forbid_conventional_commit_prefix = true }
 "changesets/bump/major" = { level = "error", min_body_chars = 120, require_code_block = true }
 "changesets/types/breaking" = { level = "error", required_bump = "major", forbidden_headings = ["Breaking", "Breaking change", "Breaking changes"] }
 "changesets/types/major" = { level = "error", required_bump = "major", forbidden_headings = ["Major", "Breaking", "Breaking change", "Breaking changes"] }

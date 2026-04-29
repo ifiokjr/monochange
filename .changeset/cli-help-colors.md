@@ -2,7 +2,7 @@
 "monochange": patch
 ---
 
-#### Fix CLI help colors
+# Fix CLI help colors
 
 Fix `--help` (`-h`) color output and unify CLI color palette.
 

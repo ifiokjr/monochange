@@ -4,7 +4,7 @@
 "monochange_telemtry": patch
 ---
 
-#### Add local-only telemetry events
+# Add local-only telemetry events
 
 Users can now opt in to local-only telemetry for CLI support and debugging without sending data over the network. By default, nothing is recorded. Setting `MC_TELEMETRY=local` writes OpenTelemetry-style JSON Lines events to the user state directory, while `MC_TELEMETRY_FILE=/path/to/telemetry.jsonl` writes to a chosen file.
 

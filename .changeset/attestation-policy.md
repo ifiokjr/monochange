@@ -4,7 +4,7 @@
 "monochange": patch
 ---
 
-#### add attestation policy configuration
+# add attestation policy configuration
 
 Add first-class package and release attestation policy settings. Package publish settings now support `publish.attestations.require_registry_provenance`, inherited from ecosystem publish settings and overridable per package.
 

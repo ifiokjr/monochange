@@ -610,9 +610,12 @@ pub(crate) fn execute_cli_command_with_options(
 		let step_result: MonochangeResult<()> = (|| {
 			match step {
 				CliStepDefinition::Validate { .. } => {
-					validate_workspace(root)?;
-					validate_cargo_workspace_version_groups(root)?;
-					let warnings = validate_versioned_files_content(root)?;
+					let (warnings, mut validation_errors) =
+						lint::collect_workspace_validation_issues(root);
+					#[cfg(feature = "cargo")]
+					if let Err(error) = validate_cargo_workspace_version_groups(root) {
+						validation_errors.push(error.render());
+					}
 					if !context.quiet {
 						for warning in &warnings {
 							eprintln!("warning: {warning}");
@@ -622,9 +625,20 @@ pub(crate) fn execute_cli_command_with_options(
 						.get("fix")
 						.and_then(|values| values.first())
 						.is_some_and(|value| value == "true");
-					let (lint_output, _lint_has_errors) = lint::run_lint_step(root, fix)?;
+					let (lint_output, lint_has_errors) = lint::run_lint_step(root, fix)?;
 					if !context.quiet && !lint_output.is_empty() {
 						eprintln!("{lint_output}");
+					}
+					if !validation_errors.is_empty() || lint_has_errors {
+						let mut message = String::from("workspace validation failed");
+						for error in validation_errors {
+							message.push('\n');
+							message.push_str(&error);
+						}
+						if lint_has_errors {
+							message.push_str("\nlint errors found during validation");
+						}
+						return Err(MonochangeError::Config(message));
 					}
 					output = Some(format!(
 						"workspace validation passed for {}",

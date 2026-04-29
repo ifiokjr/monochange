@@ -9,7 +9,7 @@
 "@monochange/cli": patch
 ---
 
-#### Add release branch policy enforcement
+# Add release branch policy enforcement
 
 monochange can now enforce that release tags and registry publishing only run from commits that are reachable from configured release branches. This moves release-branch safety from ad hoc CI shell checks into reusable CLI behavior that works in detached CI checkouts.
 

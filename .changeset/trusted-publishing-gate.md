@@ -2,7 +2,7 @@
 "monochange": patch
 ---
 
-#### enforce trusted publishing before registry publish commands
+# enforce trusted publishing before registry publish commands
 
 Packages with effective `publish.trusted_publishing = true` now fail before monochange invokes a built-in registry publish command unless the current environment exposes a verifiable CI/OIDC identity.
 

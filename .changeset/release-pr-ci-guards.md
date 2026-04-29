@@ -2,7 +2,7 @@
 monochange: patch
 ---
 
-#### Tighten release PR CI guards
+# Tighten release PR CI guards
 
 The built-in GitHub Actions release automation now treats a commit as a release commit only when `HEAD` itself matches the stored release record. That prevents ordinary commits from skipping `publish:check` just because an older release record exists somewhere in history.
 

@@ -1,3 +1,6 @@
 [package]
 name = "beta"
+description = "Test package beta"
+license = "MIT"
+repository = "https://github.com/monochange/monochange"
 version = { workspace = true }

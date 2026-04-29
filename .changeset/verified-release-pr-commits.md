@@ -5,7 +5,7 @@ monochange_github: patch
 "@monochange/cli": patch
 ---
 
-#### Prefer verified GitHub release PR commits
+# Prefer verified GitHub release PR commits
 
 When `[source.pull_requests].verified_commits = true`, `mc release-pr` publishes a GitHub release pull request from GitHub Actions by asking the GitHub provider to recreate the release branch commit through the Git Database API and only moves the branch when GitHub marks the replacement commit as verified.
 

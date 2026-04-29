@@ -4768,11 +4768,21 @@ pub fn validate_workspace(root: &Path) -> MonochangeResult<()> {
 		.map(|entry| entry.path())
 		.filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
 		.collect::<Vec<_>>();
+	let mut errors = Vec::new();
 	for changeset_path in changeset_paths {
-		validate_changeset_targets(&configuration, &changeset_path)?;
+		if let Err(error) = validate_changeset_targets(&configuration, &changeset_path) {
+			errors.push(error.render());
+		}
 	}
 
-	Ok(())
+	if errors.is_empty() {
+		Ok(())
+	} else {
+		Err(MonochangeError::Diagnostic(format!(
+			"changeset target validation failed:\n{}",
+			errors.join("\n\n")
+		)))
+	}
 }
 
 /// Validate that versioned file paths exist on disk, ecosystem-typed files
@@ -4811,19 +4821,29 @@ pub fn validate_versioned_files_content(root: &Path) -> MonochangeResult<Vec<Str
 		}
 	}
 
+	let mut errors = Vec::new();
 	for (owner_kind, owner_id, definitions) in &sources {
 		for definition in *definitions {
-			validate_single_versioned_file_content(
+			if let Err(error) = validate_single_versioned_file_content(
 				root,
 				definition,
 				owner_kind,
 				owner_id,
 				&mut warnings,
-			)?;
+			) {
+				errors.push(error.render());
+			}
 		}
 	}
 
-	Ok(warnings)
+	if errors.is_empty() {
+		Ok(warnings)
+	} else {
+		Err(MonochangeError::Diagnostic(format!(
+			"versioned file validation failed:\n{}",
+			errors.join("\n\n")
+		)))
+	}
 }
 
 fn validate_single_versioned_file_content(
@@ -5038,29 +5058,37 @@ fn validate_changeset_targets(
 		})
 		.collect::<BTreeMap<_, _>>();
 
+	let mut errors = Vec::new();
 	for change in &raw.changes {
 		if !package_ids.contains(change.package.as_str())
 			&& !group_members.contains_key(change.package.as_str())
 		{
-			return Err(changeset_diagnostic(
-				&contents,
-				changeset_path,
-				format!(
-					"changeset `{}` references unknown package or group `{}`",
-					changeset_path.display(),
-					change.package,
-				),
-				vec![changeset_key_label(
+			errors.push(
+				changeset_diagnostic(
 					&contents,
-					&change.package,
-					"unknown package or group",
-				)],
-				Some("declare the package or group id in monochange.toml before referencing it in a changeset".to_string()),
-			));
+					changeset_path,
+					format!(
+						"changeset `{}` references unknown package or group `{}`",
+						changeset_path.display(),
+						change.package,
+					),
+					vec![changeset_key_label(
+						&contents,
+						&change.package,
+						"unknown package or group",
+					)],
+					Some("declare the package or group id in monochange.toml before referencing it in a changeset".to_string()),
+				)
+				.render(),
+			);
 		}
 	}
 
-	Ok(())
+	if errors.is_empty() {
+		Ok(())
+	} else {
+		Err(MonochangeError::Diagnostic(errors.join("\n\n")))
+	}
 }
 
 pub mod lints;

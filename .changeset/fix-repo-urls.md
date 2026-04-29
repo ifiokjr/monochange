@@ -25,6 +25,6 @@ monochange_npm: patch
 monochange_semver: patch
 ---
 
-#### Update repository URLs
+# Update repository URLs
 
 Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
