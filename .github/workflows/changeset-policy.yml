@@ -56,6 +56,8 @@ jobs:
 
       - name: run changeset policy
         uses: monochange/actions/changeset-policy@v0.5.1
+        env:
+          PATH: ${{ runner.temp }}/monochange-bin:/home/runner/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         with:
           setup-monochange: "false"
           changed-paths: ${{ steps.changed.outputs.all_changed_files }}
