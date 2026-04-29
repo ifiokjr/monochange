@@ -61,6 +61,7 @@ Direct `SourceProvider` and `EcosystemType` branching is intentionally concentra
 
 These files are the current reviewed exceptions inside the orchestration/config layers:
 
+- `crates/monochange/src/cli_runtime.rs`
 - `crates/monochange/src/hosted_sources.rs`
 - `crates/monochange/src/release_artifacts.rs`
 - `crates/monochange/src/release_branch_policy.rs`

@@ -732,6 +732,7 @@ help_text = "Prepare a pull request release from discovered change files. It sho
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
 	{ name = "no_verify", type = "boolean", default = true },
+	{ name = "labels", type = "string" },
 ]
 steps = [
 	{ type = "PrepareRelease", name = "plan release" },
@@ -740,7 +741,7 @@ steps = [
 	{ type = "Command", name = "format changed files", command = "dprint fmt {{ changed_files }}" },
 	{ type = "Command", name = "refresh shared markdown", command = "mdt update" },
 	{ type = "CommitRelease", name = "create release commit", inputs = { no_verify = "{{ inputs.no_verify }}" } },
-	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}", labels = "{{ inputs.labels }}" } },
 ]
 
 [cli.publish-release]

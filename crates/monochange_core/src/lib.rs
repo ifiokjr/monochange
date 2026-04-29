@@ -2110,7 +2110,7 @@ impl CliStepDefinition {
 				Some(&["format", "from-ref", "auto-close-issues"])
 			}
 			Self::PublishRelease { .. } => Some(&["format", "from-ref", "draft"]),
-			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
+			Self::OpenReleaseRequest { .. } => Some(&["format", "labels", "no_verify"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package"]),
 			Self::PublishPackages { .. } => {
 				Some(&["format", "output", "package", "readiness", "resume"])
@@ -2223,6 +2223,7 @@ impl CliStepDefinition {
 			Self::OpenReleaseRequest { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
+					"labels" => Some(CliInputKind::String),
 					"no_verify" => Some(CliInputKind::Boolean),
 					_ => None,
 				}

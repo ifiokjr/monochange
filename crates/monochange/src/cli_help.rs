@@ -498,15 +498,24 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 					"<FORMAT>",
 					"markdown, text, json (default: markdown)",
 				),
+				(
+					"--labels",
+					"<LABELS>",
+					"Comma-separated labels to add to the release PR",
+				),
 			],
 			examples: &[
 				("Preview the PR:", "mc release-pr --dry-run"),
 				("Preview with markdown diff:", "mc release-pr --dry-run"),
 				("Create the PR:", "mc release-pr"),
+				(
+					"Create with extra labels:",
+					"mc release-pr --labels no-changeset-required",
+				),
 			],
 			tips: &[
 				"Requires [source] configuration with provider, owner, and repo.",
-				"Labels and auto-merge settings come from [source.pull_requests].",
+				"Labels and auto-merge settings come from [source.pull_requests] and --labels.",
 			],
 			see_also: &["commit-release", "release"],
 		},

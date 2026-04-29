@@ -6,6 +6,7 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const monitoredRoots = ["crates/monochange/src", "crates/monochange_config/src"];
 const allowlist = new Set([
+	"crates/monochange/src/cli_runtime.rs",
 	"crates/monochange/src/hosted_sources.rs",
 	"crates/monochange/src/release_artifacts.rs",
 	"crates/monochange/src/release_branch_policy.rs",

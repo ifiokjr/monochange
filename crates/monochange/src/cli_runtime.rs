@@ -427,6 +427,32 @@ fn build_release_request_result_for_source(
 	result
 }
 
+fn apply_release_request_label_inputs(
+	request: &mut SourceChangeRequest,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) {
+	for label in parse_comma_separated_step_input(step_inputs, "labels") {
+		if !request.labels.iter().any(|existing| existing == &label) {
+			request.labels.push(label);
+		}
+	}
+}
+
+fn parse_comma_separated_step_input(
+	step_inputs: &BTreeMap<String, Vec<String>>,
+	name: &str,
+) -> Vec<String> {
+	step_inputs
+		.get(name)
+		.into_iter()
+		.flat_map(|values| values.iter())
+		.flat_map(|value| value.split(','))
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
+		.map(ToString::to_string)
+		.collect()
+}
+
 pub(crate) fn build_issue_comment_results(
 	dry_run: bool,
 	plans: &[HostedIssueCommentPlan],
@@ -871,7 +897,8 @@ pub(crate) fn execute_cli_command_with_options(
 						prepared_release,
 						&context.command_logs,
 					);
-					let request = build_source_change_request(&source, &manifest);
+					let mut request = build_source_change_request(&source, &manifest);
+					apply_release_request_label_inputs(&mut request, &step_inputs);
 					let tracked_paths = tracked_release_pull_request_paths(&context, &manifest);
 					let dry_run = context.dry_run;
 					let no_verify =
@@ -3503,6 +3530,7 @@ mod tests {
 	use monochange_core::ChangesetPolicyStatus;
 	use monochange_core::CliCommandDefinition;
 	use monochange_core::CliStepDefinition;
+	use monochange_core::CommitMessage;
 	use monochange_core::ReleaseOwnerKind;
 	use monochange_core::ReleasePlan;
 	use monochange_core::ShellConfig;
@@ -3513,6 +3541,45 @@ mod tests {
 
 	use super::*;
 	use crate::TEST_ENV_LOCK;
+
+	#[test]
+	fn release_request_label_inputs_append_comma_separated_unique_labels() {
+		let mut request = SourceChangeRequest {
+			provider: SourceProvider::default(),
+			repository: "monochange/monochange".to_string(),
+			owner: "monochange".to_string(),
+			repo: "monochange".to_string(),
+			base_branch: "main".to_string(),
+			head_branch: "monochange/release/main".to_string(),
+			title: "chore(release): prepare release".to_string(),
+			body: "Release".to_string(),
+			labels: vec!["release".to_string(), "automated".to_string()],
+			auto_merge: false,
+			commit_message: CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+		};
+		let step_inputs = BTreeMap::from([(
+			"labels".to_string(),
+			vec![
+				" no-changeset-required, release ".to_string(),
+				"security".to_string(),
+			],
+		)]);
+
+		apply_release_request_label_inputs(&mut request, &step_inputs);
+
+		assert_eq!(
+			request.labels,
+			vec![
+				"release".to_string(),
+				"automated".to_string(),
+				"no-changeset-required".to_string(),
+				"security".to_string(),
+			]
+		);
+	}
 
 	fn cli_context() -> CliContext {
 		CliContext {
