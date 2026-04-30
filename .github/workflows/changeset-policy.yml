@@ -36,10 +36,21 @@ jobs:
         uses: tj-actions/changed-files@v46
 
       - name: run changeset policy
-        uses: monochange/actions/changeset-policy@v0.5.2
         env:
-          PATH: ${{ runner.temp }}/monochange-bin:/home/runner/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-        with:
-          setup-monochange: "mc"
-          changed-paths: ${{ steps.changed.outputs.all_changed_files }}
-          labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
+          args=(step:affected-packages --format json --verify)
+
+          for path in $CHANGED_FILES; do
+            args+=(--changed-paths "$path")
+          done
+
+          for label in "${labels[@]}"; do
+            args+=(--label "$label")
+          done
+
+          mc "${args[@]}"

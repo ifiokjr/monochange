@@ -23,7 +23,7 @@ default = "text"
 name = "changed_paths"
 type = "string_list"
 [[cli.affected.inputs]]
-name = "since"
+name = "from"
 type = "string"
 [[cli.affected.inputs]]
 name = "verify"

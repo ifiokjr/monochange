@@ -3186,7 +3186,7 @@ fn load_workspace_configuration_rejects_affected_packages_without_path_inputs() 
 	assert!(
 		error
 			.to_string()
-			.contains("declares neither a `changed_paths` nor a `since` input")
+			.contains("declares neither a `changed_paths` nor a `from` input")
 	);
 }
 
@@ -3204,8 +3204,8 @@ fn load_workspace_configuration_accepts_affected_packages_step_input_overrides()
 }
 
 #[test]
-fn load_workspace_configuration_accepts_affected_packages_with_since_in_step_override() {
-	let root = fixture_path("config/affected-step-since");
+fn load_workspace_configuration_accepts_affected_packages_with_from_in_step_override() {
+	let root = fixture_path("config/affected-step-from");
 	let configuration = load_workspace_configuration(&root)
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	assert!(
@@ -3226,7 +3226,7 @@ fn load_workspace_configuration_rejects_affected_packages_when_step_override_pro
 	assert!(
 		error
 			.to_string()
-			.contains("declares neither a `changed_paths` nor a `since` input")
+			.contains("declares neither a `changed_paths` nor a `from` input")
 	);
 }
 
@@ -4805,7 +4805,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 	assert!(
 		missing_selector
 			.to_string()
-			.contains("declares neither a `changed_paths` nor a `since` input")
+			.contains("declares neither a `changed_paths` nor a `from` input")
 	);
 
 	let mut command = cli_command(

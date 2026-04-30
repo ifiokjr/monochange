@@ -3325,17 +3325,17 @@ fn execute_affected_packages_step(
 	step_inputs: &BTreeMap<String, Vec<String>>,
 	quiet: bool,
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
-	let since = step_inputs
-		.get("since")
+	let from_ref = step_inputs
+		.get("from")
 		.and_then(|values| values.first().cloned());
 	let explicit_paths = step_inputs
 		.get("changed_paths")
 		.cloned()
 		.unwrap_or_default();
-	let changed_paths = match &since {
+	let changed_paths = match &from_ref {
 		Some(rev) => {
 			if !quiet && !explicit_paths.is_empty() {
-				eprintln!("warning: --since takes priority; --changed-paths was ignored");
+				eprintln!("warning: --from takes priority; --changed-paths was ignored");
 			}
 
 			compute_changed_paths_since(root, rev)?
@@ -3971,7 +3971,7 @@ mod tests {
 	}
 
 	#[test]
-	fn execute_affected_packages_step_supports_since_git_input() {
+	fn execute_affected_packages_step_supports_from_git_input() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path();
 		fs::create_dir_all(root.join("crates/core/src"))
@@ -4020,7 +4020,7 @@ path = "crates/core"
 
 		let evaluation = execute_affected_packages_step(
 			root,
-			&BTreeMap::from([("since".to_string(), vec!["HEAD".to_string()])]),
+			&BTreeMap::from([("from".to_string(), vec!["HEAD".to_string()])]),
 			true,
 		)
 		.unwrap_or_else(|error| panic!("execute affected packages step: {error}"));

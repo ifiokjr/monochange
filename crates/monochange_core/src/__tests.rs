@@ -1204,7 +1204,7 @@ fn valid_input_names_returns_expected_names_for_affected_packages() {
 	let names = step.valid_input_names().unwrap();
 	assert!(names.contains(&"format"));
 	assert!(names.contains(&"changed_paths"));
-	assert!(names.contains(&"since"));
+	assert!(names.contains(&"from"));
 	assert!(names.contains(&"verify"));
 	assert!(names.contains(&"label"));
 }
@@ -1304,10 +1304,7 @@ fn expected_input_kind_returns_correct_types_for_affected_packages() {
 		step.expected_input_kind("changed_paths"),
 		Some(CliInputKind::StringList)
 	);
-	assert_eq!(
-		step.expected_input_kind("since"),
-		Some(CliInputKind::String)
-	);
+	assert_eq!(step.expected_input_kind("from"), Some(CliInputKind::String));
 	assert_eq!(
 		step.expected_input_kind("verify"),
 		Some(CliInputKind::Boolean)
