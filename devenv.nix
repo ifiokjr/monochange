@@ -15,10 +15,8 @@ in
     [
       cargo-binstall
       cargo-run-bin
-      cacert
       custom.mdt
       custom.pnpm
-      deno
       dprint
       gitleaks
       hyperfine
