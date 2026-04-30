@@ -101,6 +101,7 @@ jobs:
 
           echo "Publish plan:"
           echo "$report" | jq '.publishRateLimits'
+        shell: devenv shell -- bash -e {0}
 
   publish:
     needs: plan
