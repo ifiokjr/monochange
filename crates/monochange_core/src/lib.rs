@@ -3050,6 +3050,8 @@ pub struct ReleaseRecord {
 	#[serde(default)]
 	pub changesets: Vec<PreparedChangeset>,
 	#[serde(default)]
+	pub changelogs: Vec<ReleaseManifestChangelog>,
+	#[serde(default)]
 	pub provider: Option<ReleaseRecordProvider>,
 }
 

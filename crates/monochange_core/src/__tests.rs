@@ -2123,6 +2123,7 @@ fn sample_release_record() -> ReleaseRecord {
 		updated_changelogs: vec![PathBuf::from("crates/monochange/CHANGELOG.md")],
 		deleted_changesets: vec![PathBuf::from(".changeset/032-step-outputs.md")],
 		changesets: Vec::new(),
+		changelogs: Vec::new(),
 		provider: Some(ReleaseRecordProvider {
 			kind: SourceProvider::GitHub,
 			owner: "ifiokjr".to_string(),
