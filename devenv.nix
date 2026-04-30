@@ -58,15 +58,6 @@ in
         entry = "${pkgs.dprint}/bin/dprint check --allow-no-files";
         stages = [ "pre-commit" ];
       };
-      "secrets:push" = {
-        enable = true;
-        verbose = true;
-        pass_filenames = false;
-        name = "secrets";
-        description = "Scan repository history for leaked secrets with gitleaks before push.";
-        entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
-        stages = [ "pre-push" ];
-      };
       "lint:test" = {
         enable = true;
         verbose = true;
@@ -299,10 +290,12 @@ in
     };
     "lint:test" = {
       exec = ''
-        set -euo pipefail
+        set -e
         while IFS= read -r name; do
           unset "$name"
         done < <(git rev-parse --local-env-vars)
+
+        gitleaks detect --verbose --redact
         lint:all;
         test:all;
       '';
