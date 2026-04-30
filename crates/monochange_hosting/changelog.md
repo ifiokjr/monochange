@@ -4,6 +4,310 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-30)
+
+### Testing
+
+#### Add mutation regression coverage
+
+Add cargo-mutants regression coverage for `monochange_analysis`, `monochange_config`, `monochange_core`, and `monochange_hosting`.
+
+- `monochange_analysis`: add tests for `latest_workspace_release_tag` to ignore namespaced tags, `snapshot_files_from_working_tree` and `read_text_file_from_git_object` for medium/exact-size files, `detect_raw_pr_environment` to reject non-PR events across CI providers, `default_branch_name` with origin HEAD symbolic ref, `get_merge_base` returning actual merge base, and `ChangeFrame::changed_files` distinguishing working directory from staged-only.
+- `monochange_config`: add fixture-backed tests and proptests for ecosystem versioned-file inheritance, explicit group bump inference, and changelog validation defaults to close mutation gaps in release-planning configuration loading.
+- `monochange_core`: add fixture-backed tests for discovery filtering around parent `.git` directories outside the workspace root and block-comment stripping edge cases in JSON helper logic.
+- `monochange_hosting`: add HTTP-mock tests for error paths in `get_json`, `get_optional_json`, `post_json`, `put_json`, and `patch_json` to kill mutants on status-code checks. Update `Cargo.toml` to include `src/*.rs` in the distribution manifest so `__tests.rs` builds correctly with `httpmock` as a dev-dependency.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #277](https://github.com/monochange/monochange/pull/277) _Introduced in:_ [`4c411d9`](https://github.com/monochange/monochange/commit/4c411d9efe84aaefbe2231ac16e4065249fc2a06) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add changelog section thresholds
+
+`monochange` changelog rendering can now hide or collapse sections based on each section's configured priority. This lets you keep high-signal sections expanded while moving low-priority notes into collapsible markdown blocks or omitting them entirely.
+
+Add the new workspace setting under `[changelog.section_thresholds]`:
+
+```toml
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+With that configuration:
+
+- sections with `priority < 50` stay fully expanded
+- sections with `priority >= 50` render inside markdown `<details>` blocks
+- sections with `priority > 100` are omitted from the rendered changelog
+
+**Before:** every configured `changelog.sections` entry rendered normally once it had entries.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+### Other
+
+- internal cleanup note
+```
+
+**After:** lower-priority sections can collapse automatically.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+<details>
+<summary><strong>Other</strong></summary>
+
+- internal cleanup note
+
+</details>
+```
+
+This release also updates the generated init config and workspace config annotations so the new thresholds are documented where `monochange.toml` is authored.
+
+> **Breaking change for Rust library consumers** — `monochange_core::ReleaseNotesSection` and `monochange_core::ChangelogSettings` now carry the new changelog-threshold metadata, so manual struct literals must include the added fields.
+
+**Before (`monochange_core`):**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    types,
+}
+```
+
+**After:**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    collapsed: true,
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    section_thresholds,
+    types,
+}
+```
+
+> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`4426b99`](https://github.com/monochange/monochange/commit/4426b9916791ceff82957f61837be1e681988c9a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+### Changed
+
+#### Update repository URLs
+
+Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add release branch policy enforcement
+
+monochange can now enforce that release tags and registry publishing only run from commits that are reachable from configured release branches. This moves release-branch safety from ad hoc CI shell checks into reusable CLI behavior that works in detached CI checkouts.
+
+**Before (`monochange.toml`):**
+
+```toml
+[source]
+provider = "github"
+owner = "acme"
+repo = "widgets"
+```
+
+Release workflows had to add their own branch guard scripts before running commands such as `mc tag-release` or `mc publish`.
+
+**After (`monochange.toml`):**
+
+```toml
+[source]
+provider = "github"
+owner = "acme"
+repo = "widgets"
+
+[source.releases]
+branches = ["main", "release/*"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
+```
+
+`mc tag-release`, `PublishRelease`, and `PublishPackages` now reject release refs that are not reachable from one of the configured release branch patterns. `CommitRelease` remains usable on release-preparation branches by default, but projects can opt into the same guard with `enforce_for_commit = true`.
+
+**Before (manual CI guard):**
+
+```bash
+git fetch origin main
+# custom shell checks here
+mc tag-release --from v1.2.0 --push
+```
+
+**After (CLI-native guard):**
+
+```bash
+mc step:verify-release-branch --from v1.2.0
+mc tag-release --from v1.2.0 --push
+```
+
+The explicit `step:verify-release-branch` command is available for pipelines that want an early, named verification step, while mutation commands still enforce the policy internally when the relevant `enforce_for_*` setting is enabled.
+
+**Before (`monochange_core::ProviderReleaseSettings`):**
+
+```rust
+ProviderReleaseSettings {
+    enabled,
+    draft,
+    prerelease,
+    generate_notes,
+    source,
+}
+```
+
+**After:**
+
+```rust
+ProviderReleaseSettings {
+    enabled,
+    draft,
+    prerelease,
+    generate_notes,
+    source,
+    branches,
+    enforce_for_tags,
+    enforce_for_publish,
+    enforce_for_commit,
+}
+```
+
+Callers constructing `ProviderReleaseSettings` directly should include the release branch policy fields or use `ProviderReleaseSettings::default()` to keep the default `main` branch policy.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #321](https://github.com/monochange/monochange/pull/321) _Introduced in:_ [`e888554`](https://github.com/monochange/monochange/commit/e888554ca981816b80f5135086e8b226ee8f0a20) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#310](https://github.com/monochange/monochange/issues/310)
+
+#### Commit release PR messages from a file
+
+Commit generated release pull request messages from a temporary file and include detailed commit diagnostics when git cannot create the release commit.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #328](https://github.com/monochange/monochange/pull/328) _Introduced in:_ [`7c4f80a`](https://github.com/monochange/monochange/commit/7c4f80a217cf16716221d701ef3fe52c1ea65443) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add no-verify support to release automation
+
+> **Breaking change** — library consumers that construct `monochange_core::CliStepDefinition::CommitRelease` or `OpenReleaseRequest`, or that call the exported git/provider release helpers directly, must now handle the new `no_verify` field/argument.
+
+Release automation can now bypass local git hooks when creating the generated release commit and when pushing the release request branch. This is useful for CI-driven `mc release-pr` flows where repository hooks depend on tools that are not available in the runner environment.
+
+**Before (`monochange.toml`):**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit" },
+	{ type = "OpenReleaseRequest", name = "create the pr" },
+]
+```
+
+**After:**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+	{ name = "no_verify", type = "boolean", default = true },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+]
+```
+
+That keeps the `mc release-pr` invocation the same while making hook bypass explicit in config:
+
+```bash
+mc release-pr
+```
+
+For crate consumers, the step and git helper APIs now carry the same flag through the full release-request pipeline.
+
+**Before (`monochange_core` / hosting adapters):**
+
+```rust
+// before
+CliStepDefinition::CommitRelease { name, when, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, inputs }
+
+git_commit_paths_command(root, &message)
+git_push_branch_command(root, branch)
+```
+
+**After:**
+
+```rust
+// after
+CliStepDefinition::CommitRelease { name, when, no_verify, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, no_verify, inputs }
+
+git_commit_paths_command(root, &message, no_verify)
+git_push_branch_command(root, branch, no_verify)
+```
+
+Provider-facing release helpers in `monochange_hosting`, `monochange_github`, `monochange_gitlab`, and `monochange_gitea` now forward that flag so a single `no_verify` choice applies consistently to commit creation and branch push operations.
+
+> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Consolidate affected-package configuration
+
+> **Breaking change** — affected-package policy now lives in `[changesets.affected]`. Configurations using the previous `[changesets.verify]` section must rename it, and configurations using the hosted-source affected-package policy section (`[source.bot.changesets]` in older configs, or `[source.affected]` in prerelease configs) must move `enabled`, `required`, `skip_labels`, `comment_on_failure`, `changed_paths`, and `ignored_paths` into `[changesets.affected]`.
+
+Move affected-package policy settings into the changesets configuration:
+
+```toml
+[changesets.affected]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["Cargo.toml", "Cargo.lock"]
+ignored_paths = ["**/tests/**"]
+```
+
+The Rust configuration model now exposes `ChangesetSettings::affected` with `ChangesetAffectedSettings`; the previous `ChangesetSettings::verify`, `SourceConfiguration::bot`, `SourceConfiguration::affected`, `ProviderChangesetBotSettings`, `ProviderAffectedSettings`, and `ProviderBotSettings` types or fields have been removed.
+
+The `mc affected` policy command now reports `skipped` when it runs on a generated release pull request branch whose name starts with `source.pull_requests.branch_prefix`, allowing CI to ignore those branches.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #340](https://github.com/monochange/monochange/pull/340) _Introduced in:_ [`d5d8856`](https://github.com/monochange/monochange/commit/d5d8856b1522cd4ad70eeb06abd4d33ad7f0c9b6)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Added

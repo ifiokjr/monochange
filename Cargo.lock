@@ -2034,7 +2034,7 @@ dependencies = [
 
 [[package]]
 name = "monochange"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anstyle",
  "chrono",
@@ -2091,7 +2091,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_analysis"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "insta",
  "monochange_cargo",
@@ -2112,7 +2112,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_book"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "doc-comment",
  "monochange",
@@ -2130,7 +2130,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_cargo"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "glob",
  "insta",
@@ -2157,7 +2157,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_config"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "doc-comment",
  "glob",
@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ignore",
  "insta",
@@ -2209,7 +2209,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_dart"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "glob",
  "insta",
@@ -2229,7 +2229,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_deno"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "glob",
  "insta",
@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_ecmascript"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "monochange_core",
  "oxc_allocator",
@@ -2258,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitea"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2277,7 +2277,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_github"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2298,7 +2298,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitlab"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2317,7 +2317,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_go"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "glob",
  "insta",
@@ -2334,7 +2334,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_graph"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2348,7 +2348,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_hosting"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "httpmock",
  "monochange_core",
@@ -2358,7 +2358,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_lint"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "glob",
  "ignore",
@@ -2371,7 +2371,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_lint_testing"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "monochange_core",
  "monochange_lint",
@@ -2380,14 +2380,14 @@ dependencies = [
 
 [[package]]
 name = "monochange_linting"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "monochange_core",
 ]
 
 [[package]]
 name = "monochange_npm"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "glob",
  "insta",
@@ -2410,7 +2410,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_python"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "glob",
  "insta",
@@ -2429,7 +2429,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_semver"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2441,7 +2441,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_telemetry"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "monochange_core",
  "reqwest",
@@ -2454,7 +2454,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_test_helpers"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "insta",
  "monochange_core",

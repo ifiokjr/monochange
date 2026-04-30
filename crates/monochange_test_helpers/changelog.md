@@ -79,3 +79,9 @@ Add `monochange_core::lint` module with the foundational types for the linting s
 Also adds `lints` field to `EcosystemSettings` for per-ecosystem lint configuration and `Lint` variant to `CliStepDefinition` with `format`, `fix`, and `ecosystem` inputs.
 
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/ifiokjr/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/ifiokjr/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/ifiokjr/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+
+## monochange_test_helpers [0.0.3](https://github.com/monochange/monochange/releases/tag/monochange_test_helpers/v0.0.3) (2026-04-30)
+
+### Changed
+
+- No package-specific changes were recorded; `monochange_test_helpers` was updated to 0.0.3.

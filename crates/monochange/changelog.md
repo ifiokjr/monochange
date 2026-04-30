@@ -4,6 +4,888 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-30)
+
+### Added
+
+#### Improve lint and check progress output
+
+Add beautiful interactive progress reporting for `mc check` and `mc lint`.
+
+- Introduced `LintProgressReporter` trait in `monochange_core::lint` with 14 lifecycle hooks from planning through summary.
+- Added `NoopLintProgressReporter` for silent / backward-compatible operation.
+- Updated `Linter::lint_workspace` to emit planning, suite, file, rule, and summary events to the reporter.
+- Created `HumanLintProgressReporter` in `monochange` that writes animated spinners, suite-level progress, fix tracking, and a styled summary to stderr.
+- Enhanced `format_check_report` to list which files were fixed when `--fix` is active.
+- Respects `NO_COLOR` and `MONOCHANGE_NO_PROGRESS` environment variables.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #281](https://github.com/monochange/monochange/pull/281) _Introduced in:_ [`a9eec58`](https://github.com/monochange/monochange/commit/a9eec586e72d0a8704d08b7552523e0bd85ed20d) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Configure changeset lint rules
+
+Add configurable changeset lint rules under `[lints.rules]` for summaries, section headings, bump-specific requirements, and changelog-type-specific requirements.
+
+Rules can target built-in or custom changeset types with dynamic ids like `changesets/types/breaking` and `changesets/types/unicorns`, while unknown type ids are rejected during configuration loading.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #326](https://github.com/monochange/monochange/pull/326) _Introduced in:_ [`285fd69`](https://github.com/monochange/monochange/commit/285fd697b99502e9d95716413c533251307f0010) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+### Changed
+
+#### add attestation policy configuration
+
+Add first-class package and release attestation policy settings. Package publish settings now support `publish.attestations.require_registry_provenance`, inherited from ecosystem publish settings and overridable per package.
+
+When registry provenance is required, built-in release publishing fails before invoking registry commands unless trusted publishing is enabled, the current CI/OIDC identity is verifiable, the provider/registry capability matrix reports registry-native provenance support, and the built-in publisher can require that provenance. npm release publishes add `--provenance` only when this policy is enabled.
+
+GitHub release asset attestation intent is modeled under `[source.releases.attestations]` with `require_github_artifact_attestations`, which is accepted only for GitHub sources.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #339](https://github.com/monochange/monochange/pull/339) _Introduced in:_ [`2849f7b`](https://github.com/monochange/monochange/commit/2849f7b771c24b2e3459450661d24c7f36c91a9c) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#315](https://github.com/monochange/monochange/issues/315)
+
+#### Add cargo-binstall metadata
+
+Add cargo-binstall metadata so `cargo binstall monochange` can resolve the GitHub release archive layout.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #293](https://github.com/monochange/monochange/pull/293) _Introduced in:_ [`497f8c0`](https://github.com/monochange/monochange/commit/497f8c010a534fcac6e3ed26bb21c220c54e7a5e) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add initial changelog headers
+
+Changelog targets now support `initial_header` in `[defaults.changelog]`, `[package.<id>.changelog]`, and `[group.<id>.changelog]`. monochange renders the header only when creating a changelog from empty content, preserving existing preambles on later releases.
+
+When no custom header is configured, the selected changelog format provides a built-in default header.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #344](https://github.com/monochange/monochange/pull/344) _Introduced in:_ [`ad6c84b`](https://github.com/monochange/monochange/commit/ad6c84b8de13a5849b262a4db2e2ac87710944f2)
+
+#### Add changelog section thresholds
+
+`monochange` changelog rendering can now hide or collapse sections based on each section's configured priority. This lets you keep high-signal sections expanded while moving low-priority notes into collapsible markdown blocks or omitting them entirely.
+
+Add the new workspace setting under `[changelog.section_thresholds]`:
+
+```toml
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+With that configuration:
+
+- sections with `priority < 50` stay fully expanded
+- sections with `priority >= 50` render inside markdown `<details>` blocks
+- sections with `priority > 100` are omitted from the rendered changelog
+
+**Before:** every configured `changelog.sections` entry rendered normally once it had entries.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+### Other
+
+- internal cleanup note
+```
+
+**After:** lower-priority sections can collapse automatically.
+
+```toml
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Other", priority = 50 }
+
+[changelog.section_thresholds]
+collapse = 50
+ignored = 100
+```
+
+```md
+## 1.2.3
+
+### Added
+
+- ship a new release workflow
+
+<details>
+<summary><strong>Other</strong></summary>
+
+- internal cleanup note
+
+</details>
+```
+
+This release also updates the generated init config and workspace config annotations so the new thresholds are documented where `monochange.toml` is authored.
+
+> **Breaking change for Rust library consumers** — `monochange_core::ReleaseNotesSection` and `monochange_core::ChangelogSettings` now carry the new changelog-threshold metadata, so manual struct literals must include the added fields.
+
+**Before (`monochange_core`):**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    types,
+}
+```
+
+**After:**
+
+```rust
+ReleaseNotesSection {
+    title: "Documentation".to_string(),
+    collapsed: true,
+    entries: vec!["- update migration guide".to_string()],
+}
+
+ChangelogSettings {
+    templates,
+    sections,
+    section_thresholds,
+    types,
+}
+```
+
+> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`4426b99`](https://github.com/monochange/monochange/commit/4426b9916791ceff82957f61837be1e681988c9a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Refactor changeset linting into LintSuite architecture
+
+Move changeset linting out of workspace config loading and into the `LintSuite`/`LintRuleRunner` framework alongside cargo, npm, and dart linting. This ensures `mc check` and `mc validate` surface changeset lint errors consistently.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add post-merge release automation
+
+- Add `release-pr-manual-merge-blocker` job to CI that fails on PRs from `monochange/release/*` branches, forcing the `/merge` slash-command workflow
+- Protect the `release-pr` job with `environment: publisher` so branch-protection rules apply
+- Introduce a `release-post-merge` job that runs `PublishRelease` and `CommentReleasedIssues` steps after a release PR merges
+- Add `from-ref` support to `PublishRelease` and `CommentReleasedIssues` for discovering the release record from the merge commit when `prepared_release` context is unavailable
+- Add `auto-close-issues` flag to `CommentReleasedIssues` that closes released issues not already closed by a PR reference
+- Store `changesets` in `ReleaseRecord` so post-merge steps can resolve related issues without access to the deleted changeset files
+- Update `plan_released_issue_comments` to include all issue relationships and set `close` state appropriately
+- Update `comment_released_issues_with_client` to PATCH issue state to `"closed"` when `plan.close` is `true`
+- Add dedicated composite actions: `publish-release` and `comment-released-issues`
+- Add `publish-release` and `comment-released-issues` CLI step definitions to `monochange.init.toml`
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #282](https://github.com/monochange/monochange/pull/282) _Introduced in:_ [`014491d`](https://github.com/monochange/monochange/commit/014491ddb0de1a562bd0ca6552bba9646baf7f42) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Fix CLI help colors
+
+Fix `--help` (`-h`) color output and unify CLI color palette.
+
+- `mc --help` now emits ANSI colors in terminal emulators, matching `mc help <command>` behavior
+- Extract shared `cli_theme` module so clap built-in help and custom `mc help` renderer use identical colors:
+  - bright cyan for headers and accents
+  - bright white for usage
+  - bright yellow for flags and literals
+  - bright magenta for placeholders
+  - bright green for valid/code snippets
+  - bright red for errors
+  - bright black (gray) for muted text
+- Explicitly opt in to `ColorChoice::Auto` on the `Command` builder
+- Preserve plain text output in test and CI modes so existing snapshots stay stable
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #267](https://github.com/monochange/monochange/pull/267) _Introduced in:_ [`370d5a1`](https://github.com/monochange/monochange/commit/370d5a1d4655c14cf4340cec7886ddc8aa7bbd51) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Group CLI help commands consistently
+
+Make `mc -h`, `mc --help`, and `mc help` render the same command overview so users see consistent help no matter which entry point they use.
+
+The overview now separates built-in commands, generated `step:*` commands, and user-defined `monochange.toml` commands. Generated step commands are always listed, and detailed command help includes richer descriptions for step commands such as `step:publish-release`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #348](https://github.com/monochange/monochange/pull/348) _Introduced in:_ [`33e82e4`](https://github.com/monochange/monochange/commit/33e82e4df24e7c0a36af70f7a397bbadbf5ff9dd)
+
+#### Add colored CLI help
+
+Add beautiful colored CLI help with detailed examples
+
+The `mc help <command>` subcommand now renders detailed, formatted help with bordered headers, colored sections, multiple examples per command, tips, and cross-references. Running `mc help` shows an overview listing all commands. The standard `--help` flags also use ANSI colors via an anstyle theme. All colors respect NO_COLOR and TTY detection.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #265](https://github.com/monochange/monochange/pull/265) _Introduced in:_ [`8890d77`](https://github.com/monochange/monochange/commit/8890d77e8d54f81f8807588192441a3cd46bfbb8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Expose resolved configuration in CLI templates
+
+Configured CLI workflows can now reference the resolved workspace configuration and paths without adding a dedicated setup step. Templates receive `config`, `project_root`, and `config_path` by default, so later steps can read values such as `{{ config.packages.0.id }}` while regular workflow execution stays quiet unless a step intentionally emits output.
+
+The new built-in config step also makes the generated command available for CI and debugging:
+
+```bash
+mc step:config
+```
+
+It prints JSON containing the canonical project root, the `monochange.toml` path, and the resolved configuration:
+
+```json
+{
+	"projectRoot": "/workspace/repo",
+	"configPath": "/workspace/repo/monochange.toml",
+	"config": {
+		"packages": []
+	}
+}
+```
+
+This gives scripts and GitHub Actions a stable command for inspecting the exact configuration that `monochange` loaded while preserving the no-output default for configured workflow steps.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #343](https://github.com/monochange/monochange/pull/343) _Introduced in:_ [`fc627b3`](https://github.com/monochange/monochange/commit/fc627b38392bc32dc9402a64a5bcc95572a94c3c)
+
+#### Document ecosystem-level trusted publishing inheritance
+
+Trusted publishing stays an ecosystem-level publish setting that packages inherit by default:
+
+```toml
+[ecosystems.npm.publish]
+trusted_publishing = true
+
+[package.legacy.publish]
+trusted_publishing = false
+```
+
+Use `[ecosystems.<name>.publish.trusted_publishing]` for shared repository, workflow, and environment metadata. Package-level publish settings override the ecosystem defaults for package-specific workflows or opt-outs.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #336](https://github.com/monochange/monochange/pull/336) _Introduced in:_ [`263a8d0`](https://github.com/monochange/monochange/commit/263a8d0bc0f61029392cbf45733d0a2fb24b8773) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Sync documented workflow commands with generated config
+
+Fix the generated `mc init` configuration so it no longer defines the reserved `[cli.validate]` command, restores the documented provider `release-pr` workflow command, and syncs the repository workflow examples with the config-defined commands documented in the README and guides.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #345](https://github.com/monochange/monochange/pull/345) _Introduced in:_ [`13e594b`](https://github.com/monochange/monochange/commit/13e594b62c751b3d6f2779446314d6d283c7e35b)
+
+#### Document supported ecosystem capabilities
+
+The documentation now includes a dedicated ecosystem guide that compares Cargo, npm-family, Deno, Dart / Flutter, and Python support across discovery, manifest updates, lockfile handling, and built-in registry publishing. Python is documented as a supported release-planning ecosystem with uv workspace discovery, Poetry and PEP 621 `pyproject.toml` parsing, Python dependency normalization, manifest version rewrites, internal dependency rewrites, and inferred `uv lock` / `poetry lock --no-update` lockfile commands.
+
+The guide also clarifies ecosystem publishing boundaries, including canonical public registry support and the external-mode escape hatch for private registries or custom publication flows.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #307](https://github.com/monochange/monochange/pull/307) _Introduced in:_ [`11c628c`](https://github.com/monochange/monochange/commit/11c628cd2afb7c9509c31a8cfc043be63a9f2a75) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add Go ecosystem support
+
+monochange now discovers and manages Go modules from `go.mod` files in single-module and multi-module repositories.
+
+**Configuration:**
+
+```toml
+[defaults]
+package_type = "go"
+
+[package.api]
+path = "api"
+
+[package.shared]
+path = "shared"
+
+[ecosystems.go]
+enabled = true
+```
+
+**What it discovers:**
+
+- Go modules by scanning for `go.mod` files
+- Multi-module monorepos with separate modules in subdirectories
+- Module paths, including major version suffixes (`/v2`, `/v3`)
+- Cross-module `require` directives as dependency edges
+- Indirect dependencies marked as development dependencies
+
+**Version management:**
+
+- Go versions come from git tags, not manifest files — the adapter reports `None` for `current_version` and stores the module path as metadata for tag resolution
+- Updates `require` directives in `go.mod` when cross-module dependencies change
+- Preserves `replace`, `exclude`, `retract` directives and comments
+- Adds `v` prefix to version strings automatically when missing
+
+**Lockfile commands:**
+
+- Infers `go mod tidy` for all Go modules (updates both `go.mod` and `go.sum`)
+- Configurable via `[ecosystems.go].lockfile_commands`
+
+**Key design decisions:**
+
+- Module names are derived from the last non-version segment of the module path (`github.com/org/repo/api/v2` → `api`)
+- The full module path and relative directory path are stored as metadata for downstream tag resolution
+- Parse errors during discovery are treated as warnings, not hard errors
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #156](https://github.com/monochange/monochange/pull/156) _Introduced in:_ [`519f841`](https://github.com/monochange/monochange/commit/519f841929c6a06d5b3a578b206982d2d6cc1548) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#133](https://github.com/monochange/monochange/issues/133)
+
+#### Add Python ecosystem support
+
+monochange now discovers and manages Python packages from uv workspaces, Poetry projects, and standalone `pyproject.toml` files.
+
+**Configuration:**
+
+```toml
+[defaults]
+package_type = "python"
+
+[package.core]
+path = "packages/core"
+
+[ecosystems.python]
+enabled = true
+lockfile_commands = [{ command = "uv lock" }]
+```
+
+**What it discovers:**
+
+- uv workspaces via `[tool.uv.workspace].members` glob patterns
+- Poetry projects via `[tool.poetry]` sections
+- Standalone `pyproject.toml` files with PEP 621 `[project]` metadata
+
+**Version management:**
+
+- Reads and updates `[project].version` in `pyproject.toml`
+- Parses PEP 440 versions and maps to semver (e.g., `1.2` → `1.2.0`)
+- Updates dependency version constraints in `[project].dependencies`
+- Handles `dynamic = ["version"]` gracefully (reports `None` for dynamic versions)
+
+**Lockfile commands:**
+
+- Infers `uv lock` for uv projects (detected by `uv.lock`)
+- Infers `poetry lock --no-update` for Poetry projects (detected by `poetry.lock`)
+- Configurable via `[ecosystems.python].lockfile_commands`
+
+**Dependency extraction:**
+
+- PEP 621 `[project].dependencies` and `[project.optional-dependencies]`
+- Poetry `[tool.poetry.dependencies]` and `[tool.poetry.group.*.dependencies]`
+- PEP 503 name normalization for cross-package dependency matching
+- PEP 508 version specifier parsing with extras support
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #152](https://github.com/monochange/monochange/pull/152) _Introduced in:_ [`81b0882`](https://github.com/monochange/monochange/commit/81b0882525ab51d74b0e8cc2a0114aac0fdb3a7f) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#132](https://github.com/monochange/monochange/issues/132)
+
+#### Add PyPI publishing support
+
+Add first-class PyPI publishing support for Python packages, including PyPI as the built-in Python registry, placeholder package generation, `uv build` / `uv publish` command generation, PyPI JSON API publication checks, trusted-publisher setup guidance, and rate-limit planning coverage.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #322](https://github.com/monochange/monochange/pull/322) _Introduced in:_ [`afe5959`](https://github.com/monochange/monochange/commit/afe595944146c3ec4c9798098c92c031d4279e6a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Fix binary benchmark changeset fixtures
+
+Update generated binary benchmark changesets to include summary headings so the PR benchmark fixtures pass changeset validation.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Handle large release commit messages reliably
+
+Release commit creation now streams the generated commit message through standard input instead of passing the full release record as a command-line argument. This avoids operating-system argument length limits for large release records.
+
+Git command spawning now reuses a stable path that contains `git`, and benchmark fixture git commands now use monochange's sanitized git command helper with automatic garbage collection disabled for deterministic synthetic history setup in CI.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #320](https://github.com/monochange/monochange/pull/320) _Introduced in:_ [`f41f985`](https://github.com/monochange/monochange/commit/f41f985288e1440b3b64c2fa9c1cda987925ef8a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Fix release merge blocker workflow
+
+Replace the release PR merge blocker action with an inline shell guard so normal pull requests are not blocked by missing action dependencies.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Update repository URLs
+
+Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Default CLI output to markdown
+
+Default output format to markdown with termimad terminal rendering.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #263](https://github.com/monochange/monochange/pull/263) _Introduced in:_ [`020df1f`](https://github.com/monochange/monochange/commit/020df1f2d1bec0d8470fe1f4e734ee31e3e167bf) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Publish GitHub releases through drafts
+
+- Add a boolean `draft` input to the built-in `PublishRelease` step so CLI commands can create hosted releases as drafts while preserving `[source.releases].draft` defaults.
+- Update release automation to create draft GitHub releases, run the asset upload workflow against those drafts, then publish the drafts after assets are attached.
+- Add a global `--jq` filter for JSON-producing commands so automation can extract release tags and other fields directly from `--format json` output.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #325](https://github.com/monochange/monochange/pull/325) _Introduced in:_ [`bee06fe`](https://github.com/monochange/monochange/commit/bee06fed90e50cda3de695b973f415dd162eec29) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add local-only telemetry events
+
+Users can now opt in to local-only telemetry for CLI support and debugging without sending data over the network. By default, nothing is recorded. Setting `MC_TELEMETRY=local` writes OpenTelemetry-style JSON Lines events to the user state directory, while `MC_TELEMETRY_FILE=/path/to/telemetry.jsonl` writes to a chosen file.
+
+Command:
+
+```bash
+MC_TELEMETRY=local mc validate
+MC_TELEMETRY_FILE=/tmp/mc-telemetry.jsonl mc validate
+```
+
+The recorded events are limited to low-cardinality command and step metadata such as command name, step kind, duration, outcome, and sanitized error category. The local sink does not record package names, repository paths, repository URLs, branch names, tags, commit hashes, command strings, raw error messages, or release-note text.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #302](https://github.com/monochange/monochange/pull/302) _Introduced in:_ [`72a126c`](https://github.com/monochange/monochange/commit/72a126cf0789ffbf1c8866f043f307c9f570b088) _Last updated in:_ [`46abfea`](https://github.com/monochange/monochange/commit/46abfea87db6ffed185a0739f5e15c46532192d6) _Related issues:_ [#295](https://github.com/monochange/monochange/issues/295), [#296](https://github.com/monochange/monochange/issues/296), [#297](https://github.com/monochange/monochange/issues/297), [#298](https://github.com/monochange/monochange/issues/298), [#299](https://github.com/monochange/monochange/issues/299), [#300](https://github.com/monochange/monochange/issues/300)
+
+#### Improve migration tools
+
+Add `mc migrate audit` to report legacy release tooling, changelog providers, and CI migration signals before moving a repository to monochange.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #332](https://github.com/monochange/monochange/pull/332) _Introduced in:_ [`3f4c89b`](https://github.com/monochange/monochange/commit/3f4c89bd3813317f6a962c38116c74fb0f83e486) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Related issues:_ [#319](https://github.com/monochange/monochange/issues/319)
+
+#### Publish CLI npm packages with trusted publishing
+
+monochange's own CLI npm package workflow now publishes without `NODE_AUTH_TOKEN` or `NPM_TOKEN`. The publish job keeps the protected `publisher` environment and `id-token: write` permission so npm can use GitHub OIDC trusted publishing and produce provenance for the CLI packages.
+
+**Before:**
+
+```yaml
+- name: publish cli npm packages
+  env:
+    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  run: node scripts/npm/publish-packages.mjs --packages-dir packages
+```
+
+**After:**
+
+```yaml
+- name: publish cli npm packages
+  run: node scripts/npm/publish-packages.mjs --packages-dir packages
+```
+
+The publish script rejects long-lived npm token environment variables and verifies it is running from `monochange/monochange`'s `publish.yml` workflow with GitHub Actions OIDC context before invoking `npm publish --provenance`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #330](https://github.com/monochange/monochange/pull/330) _Introduced in:_ [`7b3ebab`](https://github.com/monochange/monochange/commit/7b3ebab32b002e8a48595553685d6aaf72434d61) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#309](https://github.com/monochange/monochange/issues/309)
+
+#### Add provider trust context detection
+
+The capability model distinguishes trusted-publishing support, CI identity detection, registry-side setup verification, setup automation, and registry-native provenance so future enforcement can avoid overstating unsupported provider or registry combinations.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #331](https://github.com/monochange/monochange/pull/331) _Introduced in:_ [`a9c24e5`](https://github.com/monochange/monochange/commit/a9c24e55bd72678f2a67af8fa470387afe722603) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#313](https://github.com/monochange/monochange/issues/313)
+
+#### Add the publish bootstrap command
+
+Add `mc publish-bootstrap --from <ref>` for release-record-scoped first-time package setup.
+
+The command uses the release record to choose package ids, runs placeholder publishing for that release package set, supports `--dry-run`, and can write a JSON bootstrap result artifact with `--output <path>`. Documentation now recommends rerunning `mc publish-readiness` after bootstrap before planning or publishing packages.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #318](https://github.com/monochange/monochange/pull/318) _Introduced in:_ [`cadb6fc`](https://github.com/monochange/monochange/commit/cadb6fccaac2ff9107db8b03bf6156762bc5a9b2) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add readiness-backed publish planning
+
+`mc publish-plan` now accepts `--readiness <path>` for normal package publish planning. The plan validates that the `mc publish-readiness` artifact matches the current release record and covers the selected package set, then limits rate-limit batches to package ids that are ready in both the artifact and a fresh local readiness check.
+
+Placeholder publish planning continues to reject readiness artifacts and should be run with `mc publish-plan --mode placeholder`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #305](https://github.com/monochange/monochange/pull/305) _Introduced in:_ [`e80c2b8`](https://github.com/monochange/monochange/commit/e80c2b8f1fd1df155e4aa05df8977f245f89bbc5) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Harden publish planning guards
+
+`mc publish-plan`, `mc publish`, and `mc placeholder-publish` now respect the current workspace publishability rules instead of trusting stale release metadata or exact placeholder versions.
+
+For `mc publish-plan --format json`, cargo batches previously included crates with `publish = false`, and release-record entries could keep npm or other ecosystem packages in the plan even after publishing was disabled.
+
+Now publish batches skip packages that are currently private or excluded in discovery, and they also skip packages whose effective publish settings are disabled in the workspace configuration.
+
+For `mc placeholder-publish --dry-run --format json`, placeholder bootstrap checks previously only looked for the exact `0.0.0` version, so a package that already had `1.0.0` on the registry could still be treated as needing a placeholder release.
+
+Now placeholder planning skips any package that already has **any** version on its registry, and npm `setupUrl` values now point at:
+
+```text
+https://www.npmjs.com/package/<package>/access
+```
+
+`mc publish-plan` also falls back to the crates.io sparse index when the crates.io API denies package lookups, which keeps rate-limit planning working in CI environments that return `403 Forbidden` from the API endpoint.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #264](https://github.com/monochange/monochange/pull/264) _Introduced in:_ [`e542f69`](https://github.com/monochange/monochange/commit/e542f694e15fe91a778c3a66dae66358fe0053b6) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add Cargo publish-readiness guards
+
+Built-in crates.io publishing now fails readiness before registry mutation when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`.
+
+Workspace-inherited Cargo metadata is accepted, and already-published package versions remain non-blocking when the saved readiness artifact still matches current readiness.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #303](https://github.com/monochange/monochange/pull/303) _Introduced in:_ [`0527e2c`](https://github.com/monochange/monochange/commit/0527e2c253d37ee283b9116e83db2a23b03b42b8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add initial publish readiness command
+
+Adds `mc publish-readiness` as a non-mutating preflight command for package registry publishing. The command reads a release record from `--from`, dry-runs registry publish checks for the selected package set, reports ready/already-published/unsupported package states, and can write a JSON readiness artifact with `--output`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #292](https://github.com/monochange/monochange/pull/292) _Introduced in:_ [`63cbbe7`](https://github.com/monochange/monochange/commit/63cbbe7c06b03c0f1ed215a4fc61e0a74b50e1c4) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Require publish readiness artifacts
+
+Require real `mc publish` package-registry runs to pass a readiness artifact generated by `mc publish-readiness`.
+
+`mc publish-readiness` JSON artifacts now include schema metadata, release-record commit metadata, and a deterministic package-set fingerprint. `PublishPackages` validates the artifact before registry mutation and rejects missing, blocked, stale, malformed, duplicate, or package-mismatched readiness artifacts while leaving `--dry-run` publish previews artifact-free.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #301](https://github.com/monochange/monochange/pull/301) _Introduced in:_ [`97337aa`](https://github.com/monochange/monochange/commit/97337aad65e1f9dfc4d97fd381592b3bd57bc30a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Harden publish readiness artifact freshness
+
+Adds a publish input fingerprint to `mc publish-readiness` artifacts. `mc publish` and readiness-backed `mc publish-plan` now reject artifacts when workspace config, package manifests, lockfiles, or registry/tooling inputs changed after the artifact was written.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #324](https://github.com/monochange/monochange/pull/324) _Introduced in:_ [`69f221d`](https://github.com/monochange/monochange/commit/69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add publish resume support
+
+Add package publish result artifacts plus `mc publish --resume <path>` for retrying incomplete registry publishing after partial failures.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #323](https://github.com/monochange/monochange/pull/323) _Introduced in:_ [`8bca357`](https://github.com/monochange/monochange/commit/8bca35730a78f61c22dc71e473bc67a77210c4c6) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Attest GitHub release archives
+
+monochange's own GitHub release asset workflow now runs from tag or manual dispatch events instead of draft release creation events. This makes the workflow compatible with GitHub immutable releases, where assets should exist before the release is finalized and draft `release.created` events are not a reliable trigger.
+
+**Before:**
+
+```yaml
+on:
+  release:
+    types: [created]
+```
+
+The workflow uploaded CLI archives and checksum files, but did not create first-class GitHub artifact attestations for the uploaded `.tar.gz` and `.zip` archives.
+
+**After:**
+
+```yaml
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+```
+
+The release asset job now requests the minimum attestation permissions, downloads each uploaded archive back from the release, creates GitHub build-provenance attestations for those archive subjects, and verifies the attestations before triggering downstream package publishing.
+
+Users can verify a published archive with:
+
+```bash
+gh attestation verify monochange-x86_64-unknown-linux-gnu-v1.2.3.tar.gz \
+  --repo monochange/monochange
+```
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #329](https://github.com/monochange/monochange/pull/329) _Introduced in:_ [`ebc26a2`](https://github.com/monochange/monochange/commit/ebc26a2b23eef84660d079fdb1d8d5ad68d3f20c) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#308](https://github.com/monochange/monochange/issues/308)
+
+#### Add release branch policy enforcement
+
+monochange can now enforce that release tags and registry publishing only run from commits that are reachable from configured release branches. This moves release-branch safety from ad hoc CI shell checks into reusable CLI behavior that works in detached CI checkouts.
+
+**Before (`monochange.toml`):**
+
+```toml
+[source]
+provider = "github"
+owner = "acme"
+repo = "widgets"
+```
+
+Release workflows had to add their own branch guard scripts before running commands such as `mc tag-release` or `mc publish`.
+
+**After (`monochange.toml`):**
+
+```toml
+[source]
+provider = "github"
+owner = "acme"
+repo = "widgets"
+
+[source.releases]
+branches = ["main", "release/*"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
+```
+
+`mc tag-release`, `PublishRelease`, and `PublishPackages` now reject release refs that are not reachable from one of the configured release branch patterns. `CommitRelease` remains usable on release-preparation branches by default, but projects can opt into the same guard with `enforce_for_commit = true`.
+
+**Before (manual CI guard):**
+
+```bash
+git fetch origin main
+# custom shell checks here
+mc tag-release --from v1.2.0 --push
+```
+
+**After (CLI-native guard):**
+
+```bash
+mc step:verify-release-branch --from v1.2.0
+mc tag-release --from v1.2.0 --push
+```
+
+The explicit `step:verify-release-branch` command is available for pipelines that want an early, named verification step, while mutation commands still enforce the policy internally when the relevant `enforce_for_*` setting is enabled.
+
+**Before (`monochange_core::ProviderReleaseSettings`):**
+
+```rust
+ProviderReleaseSettings {
+    enabled,
+    draft,
+    prerelease,
+    generate_notes,
+    source,
+}
+```
+
+**After:**
+
+```rust
+ProviderReleaseSettings {
+    enabled,
+    draft,
+    prerelease,
+    generate_notes,
+    source,
+    branches,
+    enforce_for_tags,
+    enforce_for_publish,
+    enforce_for_commit,
+}
+```
+
+Callers constructing `ProviderReleaseSettings` directly should include the release branch policy fields or use `ProviderReleaseSettings::default()` to keep the default `main` branch policy.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #321](https://github.com/monochange/monochange/pull/321) _Introduced in:_ [`e888554`](https://github.com/monochange/monochange/commit/e888554ca981816b80f5135086e8b226ee8f0a20) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#310](https://github.com/monochange/monochange/issues/310)
+
+#### Ignore changelog-only updates in affected checks
+
+Release automation now treats configured changelog targets as release metadata instead of as ordinary package source changes. That means changelog-only updates no longer make `mc affected --verify` fail with an uncovered package error, and newly generated release notes are inserted above older release headings so the latest release stays at the top of each changelog.
+
+Configured changelog targets are unchanged:
+
+```toml
+[package.core.changelog]
+path = "crates/core/changelog.md"
+```
+
+Command used by CI and local verification:
+
+```bash
+mc affected --format json --verify --changed-paths crates/core/changelog.md
+```
+
+**Before (output):**
+
+```json
+{
+	"status": "failed",
+	"affectedPackageIds": ["core"],
+	"matchedPaths": ["crates/core/changelog.md"],
+	"uncoveredPackageIds": ["core"]
+}
+```
+
+**After (output):**
+
+```json
+{
+	"status": "not_required",
+	"affectedPackageIds": [],
+	"ignoredPaths": ["crates/core/changelog.md"],
+	"matchedPaths": [],
+	"uncoveredPackageIds": []
+}
+```
+
+Generated changelog sections also stay in reverse-chronological order:
+
+```md
+# Changelog
+
+## [0.3.0] - 2026-04-23
+
+- latest release notes
+
+## [0.2.0] - 2026-03-01
+
+- previous release notes
+```
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #278](https://github.com/monochange/monochange/pull/278) _Introduced in:_ [`61a0593`](https://github.com/monochange/monochange/commit/61a0593264c153d6174beb4124812f5055a194dc) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Tighten release PR CI guards
+
+The built-in GitHub Actions release automation now treats a commit as a release commit only when `HEAD` itself matches the stored release record. That prevents ordinary commits from skipping `publish:check` just because an older release record exists somewhere in history.
+
+Command used by the workflow:
+
+```bash
+mc release-record --from HEAD --format json
+```
+
+**Before (workflow behavior):**
+
+```yaml
+if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+else
+echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+fi
+```
+
+Any reachable release record could make CI behave as if the current commit was the release commit.
+
+**After:**
+
+```yaml
+resolved_commit="$(jq -r '.resolvedCommit' /tmp/release-record.json)"
+record_commit="$(jq -r '.recordCommit' /tmp/release-record.json)"
+
+if [ "$resolved_commit" = "$record_commit" ]; then
+echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+else
+echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+fi
+```
+
+With that guard in place:
+
+- `publish:check` is skipped only for the actual release commit at `HEAD`
+- the generated `release.yml` template uses the same detection logic
+- the `release-pr` job now runs only on pushes to `main`
+- the workflow passes `GH_TOKEN` to `mc release-pr` so the built-in GitHub provider can authenticate without extra wrapper scripting
+
+> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Commit release PR messages from a file
+
+Commit generated release pull request messages from a temporary file and include detailed commit diagnostics when git cannot create the release commit.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #328](https://github.com/monochange/monochange/pull/328) _Introduced in:_ [`7c4f80a`](https://github.com/monochange/monochange/commit/7c4f80a217cf16716221d701ef3fe52c1ea65443) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Add no-verify support to release automation
+
+> **Breaking change** — library consumers that construct `monochange_core::CliStepDefinition::CommitRelease` or `OpenReleaseRequest`, or that call the exported git/provider release helpers directly, must now handle the new `no_verify` field/argument.
+
+Release automation can now bypass local git hooks when creating the generated release commit and when pushing the release request branch. This is useful for CI-driven `mc release-pr` flows where repository hooks depend on tools that are not available in the runner environment.
+
+**Before (`monochange.toml`):**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit" },
+	{ type = "OpenReleaseRequest", name = "create the pr" },
+]
+```
+
+**After:**
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+	{ name = "no_verify", type = "boolean", default = true },
+]
+steps = [
+	{ type = "CommitRelease", name = "create release commit", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "OpenReleaseRequest", name = "create the pr", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+]
+```
+
+That keeps the `mc release-pr` invocation the same while making hook bypass explicit in config:
+
+```bash
+mc release-pr
+```
+
+For crate consumers, the step and git helper APIs now carry the same flag through the full release-request pipeline.
+
+**Before (`monochange_core` / hosting adapters):**
+
+```rust
+// before
+CliStepDefinition::CommitRelease { name, when, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, inputs }
+
+git_commit_paths_command(root, &message)
+git_push_branch_command(root, branch)
+```
+
+**After:**
+
+```rust
+// after
+CliStepDefinition::CommitRelease { name, when, no_verify, inputs }
+CliStepDefinition::OpenReleaseRequest { name, when, no_verify, inputs }
+
+git_commit_paths_command(root, &message, no_verify)
+git_push_branch_command(root, branch, no_verify)
+```
+
+Provider-facing release helpers in `monochange_hosting`, `monochange_github`, `monochange_gitlab`, and `monochange_gitea` now forward that flag so a single `no_verify` choice applies consistently to commit creation and branch push operations.
+
+> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Consolidate affected-package configuration
+
+> **Breaking change** — affected-package policy now lives in `[changesets.affected]`. Configurations using the previous `[changesets.verify]` section must rename it, and configurations using the hosted-source affected-package policy section (`[source.bot.changesets]` in older configs, or `[source.affected]` in prerelease configs) must move `enabled`, `required`, `skip_labels`, `comment_on_failure`, `changed_paths`, and `ignored_paths` into `[changesets.affected]`.
+
+Move affected-package policy settings into the changesets configuration:
+
+```toml
+[changesets.affected]
+enabled = true
+required = true
+skip_labels = ["no-changeset-required"]
+comment_on_failure = true
+changed_paths = ["Cargo.toml", "Cargo.lock"]
+ignored_paths = ["**/tests/**"]
+```
+
+The Rust configuration model now exposes `ChangesetSettings::affected` with `ChangesetAffectedSettings`; the previous `ChangesetSettings::verify`, `SourceConfiguration::bot`, `SourceConfiguration::affected`, `ProviderChangesetBotSettings`, `ProviderAffectedSettings`, and `ProviderBotSettings` types or fields have been removed.
+
+The `mc affected` policy command now reports `skipped` when it runs on a generated release pull request branch whose name starts with `source.pull_requests.branch_prefix`, allowing CI to ignore those branches.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #340](https://github.com/monochange/monochange/pull/340) _Introduced in:_ [`d5d8856`](https://github.com/monochange/monochange/commit/d5d8856b1522cd4ad70eeb06abd4d33ad7f0c9b6)
+
+#### Expose built-in CLI steps as commands
+
+Expose built-in CLI steps as immutable `step:*` commands and move default workflows into generated config.
+
+Rename the `AffectedPackages` revision input from `since` to `from`, so the generated command now accepts `mc step:affected-packages --from <ref>`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #290](https://github.com/monochange/monochange/pull/290) _Introduced in:_ [`ec09ba2`](https://github.com/monochange/monochange/commit/ec09ba234cdc81fb5468292651a7c7968ffe7677) _Last updated in:_ [`72fca4d`](https://github.com/monochange/monochange/commit/72fca4d87f53053dd103e577f871581031a5088d)
+
+#### enforce trusted publishing before registry publish commands
+
+Packages with effective `publish.trusted_publishing = true` now fail before monochange invokes a built-in registry publish command unless the current environment exposes a verifiable CI/OIDC identity.
+
+For GitHub Actions trusted publishing, monochange verifies the configured repository, workflow, optional environment, and `id-token: write` OIDC request variables. npm packages also reject long-lived token variables such as `NPM_TOKEN` and `NODE_AUTH_TOKEN` so trusted publishing cannot silently fall back to token-based publishing.
+
+Use the same package configuration as before:
+
+```toml
+[ecosystems.npm.publish]
+trusted_publishing = true
+
+[ecosystems.npm.publish.trusted_publishing]
+workflow = "publish.yml"
+environment = "publisher"
+```
+
+Run release publishing from the configured CI workflow, or set `publish.trusted_publishing = false` on an individual package when that package intentionally uses a manual publishing path.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #338](https://github.com/monochange/monochange/pull/338) _Introduced in:_ [`71dc3d0`](https://github.com/monochange/monochange/commit/71dc3d0632403a3a79f07fc58c1e656788a75cbd) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#312](https://github.com/monochange/monochange/issues/312)
+
+#### Document the generated CLI process
+
+Document the new CLI process where `mc init` generates editable workflow commands in `monochange.toml` and every built-in step is available directly through immutable `mc step:*` commands. The docs now clarify reserved command names such as `validate` and recommend `mc step:affected-packages --verify` for direct changeset-policy checks.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #291](https://github.com/monochange/monochange/pull/291) _Introduced in:_ [`74ac16a`](https://github.com/monochange/monochange/commit/74ac16af949ab07644c9b583774a00da2d95a7be) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
+#### Prefer verified GitHub release PR commits
+
+When `[source.pull_requests].verified_commits = true`, `mc release-pr` publishes a GitHub release pull request from GitHub Actions by asking the GitHub provider to recreate the release branch commit through the Git Database API and only moves the branch when GitHub marks the replacement commit as verified.
+
+The setting defaults to `false`. If the API commit cannot be created, is not verified, or the branch changes before the replacement lands, monochange leaves the normal pushed git commit in place and continues with the release PR flow.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #306](https://github.com/monochange/monochange/pull/306) _Introduced in:_ [`f93547d`](https://github.com/monochange/monochange/commit/f93547d919cf5bcbffe61beb675fa053307520c8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
 ### Breaking Change
