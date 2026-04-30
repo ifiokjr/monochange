@@ -1032,24 +1032,28 @@ pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> Rele
 			.collect(),
 		released_packages: record.released_packages.clone(),
 		changed_files: record.changed_files.clone(),
-		changelogs: record
-			.updated_changelogs
-			.iter()
-			.map(|path| {
-				ReleaseManifestChangelog {
-					owner_id: String::new(),
-					owner_kind: ReleaseOwnerKind::Group,
-					path: path.clone(),
-					format: ChangelogFormat::default(),
-					notes: ReleaseNotesDocument {
-						title: String::new(),
-						summary: Vec::new(),
-						sections: Vec::new(),
-					},
-					rendered: String::new(),
-				}
-			})
-			.collect(),
+		changelogs: if record.changelogs.is_empty() {
+			record
+				.updated_changelogs
+				.iter()
+				.map(|path| {
+					ReleaseManifestChangelog {
+						owner_id: String::new(),
+						owner_kind: ReleaseOwnerKind::Group,
+						path: path.clone(),
+						format: ChangelogFormat::default(),
+						notes: ReleaseNotesDocument {
+							title: String::new(),
+							summary: Vec::new(),
+							sections: Vec::new(),
+						},
+						rendered: String::new(),
+					}
+				})
+				.collect()
+		} else {
+			record.changelogs.clone()
+		},
 		package_publications: record.package_publications.clone(),
 		changesets: record.changesets.clone(),
 		deleted_changesets: record.deleted_changesets.clone(),
@@ -1101,6 +1105,7 @@ pub(crate) fn build_release_record(
 			.iter()
 			.map(|changelog| changelog.path.clone())
 			.collect(),
+		changelogs: manifest.changelogs.clone(),
 		deleted_changesets: manifest.deleted_changesets.clone(),
 		changesets: manifest.changesets.clone(),
 		provider: source.map(|source| {
