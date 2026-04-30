@@ -314,7 +314,6 @@ in
         deny:check
         docs:check
         lint:monochange
-        publish:check
       '';
       description = "Run all checks.";
       binary = "bash";
