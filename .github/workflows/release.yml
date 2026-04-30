@@ -94,62 +94,55 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           checksum: sha256,sha512
 
-      - name: download uploaded archives for attestation
+  attest_assets:
+    if: >-
+      github.repository_owner == 'monochange' &&
+      startsWith(inputs.tag || github.ref_name, 'v')
+    needs: upload_assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: download all release archives for attestation
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -euo pipefail
 
-          asset_dir="$RUNNER_TEMP/release-asset-attestations/$RELEASE_TARGET"
+          asset_dir="$RUNNER_TEMP/release-asset-attestations"
           mkdir -p "$asset_dir"
 
-          downloaded=0
-          for asset in \
-            "monochange-${RELEASE_TARGET}-${RELEASE_TAG}.tar.gz" \
-            "monochange-${RELEASE_TARGET}-${RELEASE_TAG}.zip"; do
-            if gh release view "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json assets \
-              --jq '.assets[].name' | grep -Fx "$asset" >/dev/null; then
-              gh release download "$RELEASE_TAG" \
-                --repo "$GITHUB_REPOSITORY" \
-                --pattern "$asset" \
-                --dir "$asset_dir"
-              downloaded=$((downloaded + 1))
-            fi
-          done
-
-          if [ "$downloaded" -eq 0 ]; then
-            echo "No release archives found for $RELEASE_TARGET and $RELEASE_TAG" >&2
-            gh release view "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json assets \
-              --jq '.assets[].name' >&2
-            exit 1
-          fi
+          echo "Downloading all release assets for attestation..."
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'monochange-*' \
+            --dir "$asset_dir"
 
           echo "Downloaded release archives for attestation:"
           for archive in "$asset_dir"/*; do
             echo "$archive"
-            shasum -a 256 "$archive"
+            sha256sum "$archive"
           done
 
-      - name: attest release archives
+      - name: attest all release archives
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: ${{ runner.temp }}/release-asset-attestations/${{ matrix.target }}/*
+          subject-path: ${{ runner.temp }}/release-asset-attestations/*
 
-      - name: verify release archive attestations
+      - name: verify all release archive attestations
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -euo pipefail
 
-          for archive in "$RUNNER_TEMP/release-asset-attestations/$RELEASE_TARGET"/*; do
+          for archive in "$RUNNER_TEMP/release-asset-attestations"/*; do
             echo "::group::Verify attestation for $(basename "$archive")"
             verified=false
             for attempt in 1 2 3 4 5; do
@@ -170,7 +163,7 @@ jobs:
           done
 
   publish_draft:
-    needs: upload_assets
+    needs: attest_assets
     environment: publisher
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
