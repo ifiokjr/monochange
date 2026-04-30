@@ -396,6 +396,7 @@ jobs:
     permissions:
       actions: write
       contents: write
+      issues: write
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -438,3 +439,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mc comment-released-issues --from-ref="HEAD" --auto-close-issues
         shell: devenv shell -- bash -e {0}
+
+      - name: trigger release workflow
+        if: steps.tag_release.outputs.is_release_commit == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="$(jq -r '.groupVersion.tag // empty' /tmp/tag-report.json)"
+          if [ -z "$tag" ]; then
+            echo "No tag found in tag-report.json, skipping release trigger"
+            exit 0
+          fi
+          echo "Triggering release workflow for tag $tag"
+          gh workflow run release.yml \
+            --repo "${{ github.repository }}" \
+            -f "tag=$tag"
