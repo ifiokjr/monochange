@@ -16,30 +16,36 @@ exit_code: 0
 error: Unknown command `nonexistent`
 
   Run mc help to see available commands.
-  init                 Generate monochange.toml with detected packages
-  populate             Add missing built-in CLI commands to monochange.toml
-  skill                Install the monochange skill bundle for AI agents
-  subagents            Generate repo-local monochange subagents and agent guidance
-  analyze              Analyze semantic changes for a package
-  change               Create a change file for one or more packages
-  release              Prepare a release from discovered change files
-  versions             Display planned versions without modifying files
-  commit-release       Create a local release commit with an embedded release record
-  release-pr           Open or update a hosted release pull request
-  affected             Evaluate affected packages and changeset coverage
-  diagnostics          Inspect parsed changeset data, provenance, and metadata
-  repair-release       Repair a recent release by retargeting its tag set
-  tag-release          Create and push release tags from an embedded release record
-  release-record       Inspect the monochange release record for a tag or commit
-  check                Validate configuration, changesets, and run manifest lint rules
-  lint                 Inspect and scaffold manifest lint rules
-  mcp                  Start the monochange MCP server over stdin/stdout
-  validate             Validate monochange configuration and changesets
-  discover             Discover packages across supported ecosystems
-  publish-readiness    Check package registry publishing readiness without publishing packages
-  publish-bootstrap    Publish first-time placeholder package versions for a release record
-  placeholder-publish  Publish placeholder versions for missing registry packages
-  publish-packages     Publish package versions from release state
+  init                           Generate monochange.toml with detected packages
+  populate                       Add missing built-in CLI commands to monochange.toml
+  skill                          Install the monochange skill bundle for AI agents
+  subagents                      Generate repo-local monochange subagents and agent guidance
+  analyze                        Analyze semantic changes for a package
+  tag-release                    Create and push release tags from an embedded release record
+  release-record                 Inspect the monochange release record for a tag or commit
+  check                          Validate configuration, changesets, and run manifest lint rules
+  lint                           Inspect and scaffold manifest lint rules
+  mcp                            Start the monochange MCP server over stdin/stdout
+  validate                       Validate monochange configuration and changesets
+  publish-readiness              Check package registry publishing readiness without publishing packages
+  publish-bootstrap              Publish first-time placeholder package versions for a release record
+  step:config                    Render resolved monochange configuration and workspace metadata
+  step:validate                  Validate configuration, package manifests, and changesets
+  step:discover                  Discover packages across supported ecosystems
+  step:display-versions          Preview planned versions without modifying files
+  step:create-change-file        Create a structured changeset file
+  step:prepare-release           Plan version bumps, changelogs, and release artifacts
+  step:commit-release            Create a release commit with an embedded release record
+  step:verify-release-branch     Verify that a release branch still targets a valid base
+  step:publish-release           Create or update hosted source-provider releases
+  step:placeholder-publish       Publish missing first-time placeholder package versions
+  step:publish-packages          Publish package versions from a publish plan
+  step:plan-publish-rate-limits  Plan package publish batches around registry rate limits
+  step:open-release-request      Open or update a hosted release pull request
+  step:comment-released-issues   Comment on issues referenced by released changesets
+  step:affected-packages         Evaluate affected packages and changeset coverage
+  step:diagnose-changesets       Inspect changeset provenance and metadata
+  step:retarget-release          Repair release tags by retargeting a release
 
 
 ----- stderr -----

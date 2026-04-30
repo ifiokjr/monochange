@@ -9,6 +9,11 @@
 
 use std::io::IsTerminal;
 
+use monochange_core::CliCommandDefinition;
+use monochange_core::CliInputDefinition;
+use monochange_core::CliInputKind;
+use monochange_core::CliStepDefinition;
+
 // ---------------------------------------------------------------------------
 // Color theme
 // ---------------------------------------------------------------------------
@@ -127,6 +132,74 @@ fn example_block(description: &str, command: &str) -> String {
 // ---------------------------------------------------------------------------
 // Per-command detailed help content
 // ---------------------------------------------------------------------------
+
+const BUILTIN_COMMAND_NAMES: &[&str] = &[
+	"init",
+	"populate",
+	"skill",
+	"subagents",
+	"analyze",
+	"migrate",
+	"release-record",
+	"publish-readiness",
+	"publish-bootstrap",
+	"tag-release",
+	"lint",
+	"mcp",
+	"check",
+	"validate",
+	"help",
+];
+
+#[derive(Clone)]
+struct OwnedCommandHelp {
+	name: String,
+	summary: String,
+	description: String,
+	usage: String,
+	options: Vec<(String, String, String)>,
+	examples: Vec<(String, String)>,
+	tips: Vec<String>,
+	see_also: Vec<String>,
+}
+
+impl From<&CommandHelp> for OwnedCommandHelp {
+	fn from(help: &CommandHelp) -> Self {
+		Self {
+			name: help.name.to_string(),
+			summary: help.summary.to_string(),
+			description: help.description.to_string(),
+			usage: help.usage.to_string(),
+			options: help
+				.options
+				.iter()
+				.map(|(flag, type_name, desc)| {
+					(
+						(*flag).to_string(),
+						(*type_name).to_string(),
+						(*desc).to_string(),
+					)
+				})
+				.collect(),
+			examples: help
+				.examples
+				.iter()
+				.map(|(description, command)| ((*description).to_string(), (*command).to_string()))
+				.collect(),
+			tips: help.tips.iter().map(|tip| (*tip).to_string()).collect(),
+			see_also: help
+				.see_also
+				.iter()
+				.map(|command| (*command).to_string())
+				.collect(),
+		}
+	}
+}
+
+struct CommandListItem {
+	name: String,
+	summary: String,
+}
 
 struct CommandHelp {
 	name: &'static str,
@@ -1001,20 +1074,56 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 // ---------------------------------------------------------------------------
 
 /// Render beautiful, detailed help for the named command.
+#[allow(dead_code)]
 pub fn render_command_help(bin_name: &str, command_name: &str) -> String {
-	let helps = builtin_command_helps();
-	let Some(help) = helps.iter().find(|h| h.name == command_name) else {
-		return render_unknown_command_help(bin_name, command_name, &helps);
-	};
-	render_single_command_help(bin_name, help)
+	render_command_help_with_cli(bin_name, command_name, &[])
+}
+
+/// Render beautiful, detailed help for the named command with config-defined commands.
+pub fn render_command_help_with_cli(
+	bin_name: &str,
+	command_name: &str,
+	cli: &[CliCommandDefinition],
+) -> String {
+	let builtin_helps = builtin_command_helps();
+	if let Some(help) = builtin_helps
+		.iter()
+		.find(|help| help.name == command_name && BUILTIN_COMMAND_NAMES.contains(&help.name))
+	{
+		return render_single_command_help(bin_name, help);
+	}
+
+	if command_name.starts_with("step:")
+		&& let Some(help) = step_command_help(command_name)
+	{
+		return render_owned_command_help(bin_name, &help);
+	}
+
+	if let Some(cli_command) = cli.iter().find(|command| command.name == command_name) {
+		if let Some(help) = builtin_helps.iter().find(|help| help.name == command_name) {
+			return render_single_command_help(bin_name, help);
+		}
+		return render_owned_command_help(bin_name, &configured_command_help(cli_command));
+	}
+
+	if let Some(help) = builtin_helps.iter().find(|help| help.name == command_name) {
+		return render_single_command_help(bin_name, help);
+	}
+
+	render_unknown_command_help(bin_name, command_name, &available_command_items(cli))
 }
 
 /// Render top-level help listing all commands.
+#[allow(dead_code)]
 pub fn render_overview_help(bin_name: &str) -> String {
-	let helps = builtin_command_helps();
+	render_overview_help_with_cli(bin_name, &[])
+}
+
+/// Render top-level help listing all built-in, step, and config-defined commands.
+pub fn render_overview_help_with_cli(bin_name: &str, cli: &[CliCommandDefinition]) -> String {
+	let builtin_helps = builtin_command_helps();
 	let mut out = String::new();
 
-	// Header
 	out.push_str(&bordered_header(
 		bin_name,
 		"monochange — versioning & releases for your monorepo",
@@ -1022,31 +1131,44 @@ pub fn render_overview_help(bin_name: &str) -> String {
 	));
 	out.push_str("\n\n");
 
-	// Description
 	out.push_str(&section_heading("Description"));
 	out.push_str("\n\n");
 	out.push_str(&paint(
 		"monochange discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter, \
 		then coordinates version bumps, changelogs, and release automation from a single \
 		monochange.toml config.\n\n\
-		Run `mc help <command>` for detailed examples and usage tips for any command.",
+		Run `mc help <command>` or `mc <command> -h` for detailed examples and usage tips.",
 		muted(),
 	));
 	out.push_str("\n\n");
 
-	// Commands listing
-	out.push_str(&section_heading("Commands"));
+	out.push_str(&section_heading("Usage"));
 	out.push_str("\n\n");
+	out.push_str(&format!(
+		"  {}\n\n",
+		paint(&format!("Usage: {bin_name} [OPTIONS] <COMMAND>"), accent())
+	));
 
-	let name_width = helps.iter().map(|h| h.name.len()).max().unwrap_or(20);
-	for help in &helps {
-		let padded = format!("{:width$}", help.name, width = name_width);
-		out.push_str(&format!(
-			"  {}  {}\n",
-			paint(&padded, flag_style()),
-			paint(help.summary, muted()),
-		));
-	}
+	render_command_section(
+		&mut out,
+		"Built-in Commands",
+		builtin_helps
+			.iter()
+			.filter(|help| BUILTIN_COMMAND_NAMES.contains(&help.name))
+			.map(|help| {
+				CommandListItem {
+					name: help.name.to_string(),
+					summary: help.summary.to_string(),
+				}
+			})
+			.collect(),
+	);
+	render_command_section(&mut out, "Step Commands", step_command_items());
+	render_command_section(
+		&mut out,
+		"User-defined Commands",
+		configured_command_items(cli),
+	);
 
 	out.push_str("\n");
 	out.push_str(&section_heading("Global Flags"));
@@ -1064,7 +1186,7 @@ pub fn render_overview_help(bin_name: &str) -> String {
 	out.push_str(&format!(
 		"  {}\n",
 		paint(
-			"Use `mc help <command>` for detailed command help.",
+			"Use `mc help <command>` or `mc <command> -h` for detailed command help.",
 			accent()
 		),
 	));
@@ -1072,13 +1194,361 @@ pub fn render_overview_help(bin_name: &str) -> String {
 	out
 }
 
+fn render_command_section(out: &mut String, title: &str, items: Vec<CommandListItem>) {
+	if items.is_empty() {
+		return;
+	}
+
+	out.push_str(&section_heading(title));
+	out.push_str("\n\n");
+	let name_width = items.iter().map(|item| item.name.len()).max().unwrap_or(20);
+	for item in items {
+		let padded = format!("{:width$}", item.name, width = name_width);
+		out.push_str(&format!(
+			"  {}  {}\n",
+			paint(&padded, flag_style()),
+			paint(&item.summary, muted()),
+		));
+	}
+	out.push_str("\n");
+}
+
+fn configured_command_items(cli: &[CliCommandDefinition]) -> Vec<CommandListItem> {
+	cli.iter()
+		.filter(|command| !command.name.starts_with("step:"))
+		.filter(|command| !BUILTIN_COMMAND_NAMES.contains(&command.name.as_str()))
+		.map(|command| {
+			CommandListItem {
+				name: command.name.clone(),
+				summary: command_summary(command),
+			}
+		})
+		.collect()
+}
+
+fn available_command_items(cli: &[CliCommandDefinition]) -> Vec<CommandListItem> {
+	let mut items = builtin_command_helps()
+		.iter()
+		.filter(|help| BUILTIN_COMMAND_NAMES.contains(&help.name))
+		.map(|help| {
+			CommandListItem {
+				name: help.name.to_string(),
+				summary: help.summary.to_string(),
+			}
+		})
+		.collect::<Vec<_>>();
+	items.extend(step_command_items());
+	items.extend(configured_command_items(cli));
+	items
+}
+
+fn step_command_items() -> Vec<CommandListItem> {
+	monochange_core::all_step_variants()
+		.into_iter()
+		.map(|step| {
+			let name = format!("step:{}", step.step_kebab_name());
+			let summary = step_summary(&step);
+			CommandListItem { name, summary }
+		})
+		.collect()
+}
+
+fn command_summary(command: &CliCommandDefinition) -> String {
+	command.help_text.clone().unwrap_or_else(|| {
+		let steps = command
+			.steps
+			.iter()
+			.map(CliStepDefinition::kind_name)
+			.collect::<Vec<_>>()
+			.join(" → ");
+		if steps.is_empty() {
+			"Run a monochange workflow command from monochange.toml".to_string()
+		} else {
+			format!("Run configured workflow steps: {steps}")
+		}
+	})
+}
+
+fn configured_command_help(command: &CliCommandDefinition) -> OwnedCommandHelp {
+	let summary = command_summary(command);
+	let step_names = command
+		.steps
+		.iter()
+		.map(|step| format!("{} ({})", step.display_name(), step.kind_name()))
+		.collect::<Vec<_>>();
+	let description = if step_names.is_empty() {
+		"This user-defined command is loaded from `[cli.*]` in monochange.toml. \
+		Edit that table to change its inputs, help text, or execution steps."
+			.to_string()
+	} else {
+		format!(
+			"This user-defined command is loaded from `[cli.{}]` in monochange.toml. \
+			It executes these workflow steps in order:\n\n{}\n\n\
+			Edit monochange.toml to change its inputs, help text, or execution steps.",
+			command.name,
+			step_names
+				.iter()
+				.map(|step| format!("- {step}"))
+				.collect::<Vec<_>>()
+				.join("\n")
+		)
+	};
+
+	OwnedCommandHelp {
+		name: command.name.clone(),
+		summary,
+		description,
+		usage: command_usage(&command.name, &command.inputs),
+		options: input_options(&command.inputs),
+		examples: vec![
+			(
+				"Run this configured workflow:".to_string(),
+				format!("mc {}", command.name),
+			),
+			(
+				"Show help for this workflow:".to_string(),
+				format!("mc help {}", command.name),
+			),
+		],
+		tips: vec![
+			"User-defined commands come from monochange.toml, not from the binary.".to_string(),
+			"Use `mc step:*` commands when you need an immutable built-in step directly."
+				.to_string(),
+		],
+		see_also: command
+			.steps
+			.iter()
+			.map(|step| format!("step:{}", step.step_kebab_name()))
+			.collect(),
+	}
+}
+
+fn step_command_help(command_name: &str) -> Option<OwnedCommandHelp> {
+	let kebab = command_name.strip_prefix("step:")?;
+	let step = monochange_core::all_step_variants()
+		.into_iter()
+		.find(|step| step.step_kebab_name() == kebab)?;
+	let details = step_details(kebab);
+	Some(OwnedCommandHelp {
+		name: command_name.to_string(),
+		summary: step_summary(&step),
+		description: details.description.to_string(),
+		usage: command_usage(command_name, &step.step_inputs_schema()),
+		options: input_options(&step.step_inputs_schema()),
+		examples: details
+			.examples
+			.iter()
+			.map(|(description, command)| ((*description).to_string(), (*command).to_string()))
+			.collect(),
+		tips: details.tips.iter().map(|tip| (*tip).to_string()).collect(),
+		see_also: details
+			.see_also
+			.iter()
+			.map(|command| (*command).to_string())
+			.collect(),
+	})
+}
+
+fn command_usage(command_name: &str, inputs: &[CliInputDefinition]) -> String {
+	if inputs.is_empty() {
+		format!("mc {command_name}")
+	} else {
+		format!("mc {command_name} [OPTIONS]")
+	}
+}
+
+fn input_options(inputs: &[CliInputDefinition]) -> Vec<(String, String, String)> {
+	inputs
+		.iter()
+		.map(|input| {
+			let flag = format!("--{}", input.name.replace('_', "-"));
+			let type_name = input_type_name(input);
+			let description = input
+				.help_text
+				.clone()
+				.unwrap_or_else(|| input_description(input));
+			(flag, type_name, description)
+		})
+		.collect()
+}
+
+fn input_type_name(input: &CliInputDefinition) -> String {
+	match input.kind {
+		CliInputKind::Boolean => String::new(),
+		CliInputKind::Path => "<PATH>".to_string(),
+		CliInputKind::Choice | CliInputKind::String | CliInputKind::StringList => {
+			"<VALUE>".to_string()
+		}
+	}
+}
+
+fn input_description(input: &CliInputDefinition) -> String {
+	let mut description = match input.name.as_str() {
+		"format" => "Output format".to_string(),
+		"package" => "Limit the command to one or more package ids".to_string(),
+		"from" | "from-ref" => "Release tag, branch, or commit to inspect".to_string(),
+		"target" => "Target commit for the operation".to_string(),
+		"force" => "Allow an otherwise unsafe operation".to_string(),
+		"verify" => "Fail when policy requirements are not satisfied".to_string(),
+		"changed_paths" => "Changed paths to evaluate".to_string(),
+		"label" => "Pull request label influencing policy evaluation".to_string(),
+		"since" => "Git base ref used for comparison".to_string(),
+		"draft" => "Create provider releases as drafts when supported".to_string(),
+		"output" => "Path for the generated artifact".to_string(),
+		"readiness" => "Path to a publish-readiness artifact".to_string(),
+		"resume" => "Path to an existing publish result artifact to resume".to_string(),
+		"mode" => "Rate-limit planning mode".to_string(),
+		"ci" => "CI provider context used for trust metadata".to_string(),
+		"interactive" => "Prompt interactively when supported".to_string(),
+		"bump" => "Requested semver bump".to_string(),
+		"version" => "Explicit version to request".to_string(),
+		"reason" => "Human-readable reason for the change".to_string(),
+		"type" => "Change category".to_string(),
+		"details" => "Additional markdown body for the changeset".to_string(),
+		"changeset" => "Changeset file to inspect".to_string(),
+		"fix" => "Apply safe automatic fixes while validating".to_string(),
+		"no_verify" => "Skip verification where the workflow explicitly allows it".to_string(),
+		"auto-close-issues" => "Close linked issues after commenting when supported".to_string(),
+		_ => format!("Value for `{}`", input.name.replace('_', "-")),
+	};
+	if !input.choices.is_empty() {
+		description.push_str(&format!(" ({})", input.choices.join(", ")));
+	}
+	description
+}
+
+struct StepDetails {
+	description: &'static str,
+	examples: &'static [(&'static str, &'static str)],
+	tips: &'static [&'static str],
+	see_also: &'static [&'static str],
+}
+
+fn step_summary(step: &CliStepDefinition) -> String {
+	step_summary_for_kind(step.kind_name())
+}
+
+fn step_summary_for_kind(kind_name: &str) -> String {
+	match kind_name {
+		"Config" => "Render resolved monochange configuration and workspace metadata".to_string(),
+		"Validate" => "Validate configuration, package manifests, and changesets".to_string(),
+		"Discover" => "Discover packages across supported ecosystems".to_string(),
+		"DisplayVersions" => "Preview planned versions without modifying files".to_string(),
+		"CreateChangeFile" => "Create a structured changeset file".to_string(),
+		"AffectedPackages" => "Evaluate affected packages and changeset coverage".to_string(),
+		"DiagnoseChangesets" => "Inspect changeset provenance and metadata".to_string(),
+		"RetargetRelease" => "Repair release tags by retargeting a release".to_string(),
+		"PrepareRelease" => "Plan version bumps, changelogs, and release artifacts".to_string(),
+		"CommitRelease" => "Create a release commit with an embedded release record".to_string(),
+		"VerifyReleaseBranch" => {
+			"Verify that a release branch still targets a valid base".to_string()
+		}
+		"PlanPublishRateLimits" => {
+			"Plan package publish batches around registry rate limits".to_string()
+		}
+		"PublishRelease" => "Create or update hosted source-provider releases".to_string(),
+		"OpenReleaseRequest" => "Open or update a hosted release pull request".to_string(),
+		"CommentReleasedIssues" => {
+			"Comment on issues referenced by released changesets".to_string()
+		}
+		"PlaceholderPublish" => {
+			"Publish missing first-time placeholder package versions".to_string()
+		}
+		"PublishPackages" => "Publish package versions from a publish plan".to_string(),
+		"Command" => "Run an arbitrary configured shell command step".to_string(),
+		kind_name => format!("Run the built-in {kind_name} step"),
+	}
+}
+
+fn step_details(kebab: &str) -> StepDetails {
+	match kebab {
+		"publish-release" => {
+			StepDetails {
+				description: "PublishRelease converts a prepared release into hosted provider release operations.\n\nFor example, with a configured source provider it can create or update the outward release objects that correspond to monochange's prepared release targets. It does not publish package artifacts to registries; package publishing lives in `mc publish-readiness`, `mc publish --readiness <path>`, and `mc placeholder-publish`.\n\nUse it when you want monochange to handle provider-aware publication rather than stitching together release API calls manually. It needs a previous PrepareRelease step in the same workflow and `[source]` configuration.",
+				examples: &[
+					(
+						"Preview provider release payloads:",
+						"mc step:publish-release --format json --from-ref HEAD",
+					),
+					(
+						"Compose it after PrepareRelease in monochange.toml:",
+						"[[cli.publish-release.steps]]\ntype = \"PrepareRelease\"\n\n[[cli.publish-release.steps]]\ntype = \"PublishRelease\"",
+					),
+				],
+				tips: &[
+					"PublishRelease handles hosted/source-provider releases such as GitHub releases, not package registries.",
+					"Use `mc publish-readiness --from HEAD --output <path>` followed by `mc publish --readiness <path>` for crates.io, npm, JSR, or pub.dev packages.",
+					"Dry-run output stays aligned with the prepared release state and release target model.",
+				],
+				see_also: &["step:prepare-release", "publish-readiness", "publish"],
+			}
+		}
+		"prepare-release" => {
+			StepDetails {
+				description: "PrepareRelease reads pending changesets, computes version bumps, updates manifests and changelogs, and refreshes the cached release manifest used by later stateful steps.",
+				examples: &[(
+					"Preview release planning:",
+					"mc step:prepare-release --format json",
+				)],
+				tips: &[
+					"Use this before CommitRelease, PublishRelease, OpenReleaseRequest, or CommentReleasedIssues in one workflow.",
+				],
+				see_also: &[
+					"step:commit-release",
+					"step:publish-release",
+					"step:open-release-request",
+				],
+			}
+		}
+		"affected-packages" => {
+			StepDetails {
+				description: "AffectedPackages compares changed paths with workspace package ownership and changeset coverage. In CI it can enforce that pull requests touching published packages include appropriate changesets.",
+				examples: &[(
+					"Verify changed files in CI:",
+					"mc step:affected-packages --format json --verify --changed-paths crates/monochange/src/lib.rs",
+				)],
+				tips: &[
+					"Pass each changed file with `--changed-paths` when your CI provider already computed the diff.",
+				],
+				see_also: &["change", "check"],
+			}
+		}
+		"create-change-file" => {
+			StepDetails {
+				description: "CreateChangeFile writes a structured markdown changeset under .changeset/ for one or more package targets, requested bumps, and release-note content.",
+				examples: &[(
+					"Create a patch changeset:",
+					"mc step:create-change-file --package monochange --bump patch --reason \"improve CLI help\"",
+				)],
+				tips: &["Use package ids rather than legacy manifest paths whenever possible."],
+				see_also: &["change", "step:affected-packages"],
+			}
+		}
+		_ => {
+			StepDetails {
+				description: "This immutable `step:*` command runs one built-in monochange workflow step directly. Step commands are generated by the binary, derive flags from the step schema, and do not require a `[cli.*]` entry in monochange.toml.\n\nUse direct step commands for CI jobs, debugging, or one-off automation; use user-defined commands from monochange.toml when you want to chain multiple steps or expose repository-specific inputs.",
+				examples: &[("Run the step directly:", "mc step:discover --format json")],
+				tips: &[
+					"All CLI steps support an optional `when = \"...\"` condition when composed inside monochange.toml.",
+					"The `Command` step is intentionally not exposed as a direct step command because it needs repository configuration.",
+				],
+				see_also: &["help"],
+			}
+		}
+	}
+}
+
 fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
+	render_owned_command_help(bin_name, &OwnedCommandHelp::from(help))
+}
+
+fn render_owned_command_help(bin_name: &str, help: &OwnedCommandHelp) -> String {
 	let mut out = String::new();
 
 	// Bordered header
 	out.push_str(&bordered_header(
 		&format!("{} {}", bin_name, help.name),
-		help.summary,
+		&help.summary,
 		60,
 	));
 	out.push_str("\n\n");
@@ -1098,7 +1568,7 @@ fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
 	// Usage
 	out.push_str(&section_heading("Usage"));
 	out.push_str("\n\n");
-	out.push_str(&format!("  {}\n\n", paint(help.usage, accent())));
+	out.push_str(&format!("  {}\n\n", paint(&help.usage, accent())));
 
 	// Options
 	if !help.options.is_empty() {
@@ -1110,7 +1580,7 @@ fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
 			.map(|(f, t, _)| format!("{f} {t}").len())
 			.max()
 			.unwrap_or(20);
-		for (flag, type_name, desc) in help.options {
+		for (flag, type_name, desc) in &help.options {
 			let flag_part = paint(flag, flag_style());
 			let type_part = if type_name.is_empty() {
 				String::new()
@@ -1132,7 +1602,7 @@ fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
 	if !help.examples.is_empty() {
 		out.push_str(&section_heading("Examples"));
 		out.push_str("\n\n");
-		for (desc, cmd) in help.examples {
+		for (desc, cmd) in &help.examples {
 			out.push_str(&example_block(desc, cmd));
 			out.push_str("\n\n");
 		}
@@ -1142,7 +1612,7 @@ fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
 	if !help.tips.is_empty() {
 		out.push_str(&section_heading("Tips"));
 		out.push_str("\n\n");
-		for tip in help.tips {
+		for tip in &help.tips {
 			out.push_str(&format!(
 				"  {} {}\n",
 				paint("•", accent()),
@@ -1170,7 +1640,7 @@ fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
 fn render_unknown_command_help(
 	bin_name: &str,
 	command_name: &str,
-	helps: &[CommandHelp],
+	helps: &[CommandListItem],
 ) -> String {
 	let mut out = String::new();
 	out.push_str(&format!(
@@ -1192,7 +1662,7 @@ fn render_unknown_command_help(
 		out.push_str(&format!(
 			"  {}  {}\n",
 			paint(&padded, flag_style()),
-			paint(help.summary, muted()),
+			paint(&help.summary, muted()),
 		));
 	}
 
@@ -1300,7 +1770,16 @@ mod tests {
 
 	#[test]
 	fn render_unknown_command_help_skips_matched_name() {
-		let helps = builtin_command_helps();
+		let helps = vec![
+			CommandListItem {
+				name: "change".to_string(),
+				summary: "Create a change file".to_string(),
+			},
+			CommandListItem {
+				name: "release".to_string(),
+				summary: "Prepare a release".to_string(),
+			},
+		];
 		let out = render_unknown_command_help("mc", "change", &helps);
 		// Should contain error and suggestion text
 		assert!(out.contains("Unknown command"));
@@ -1369,6 +1848,259 @@ mod tests {
 		assert!(out.contains("help"));
 		// Should have global flags section
 		assert!(out.contains("Global Flags"));
+	}
+
+	#[test]
+	fn render_overview_help_with_cli_lists_user_defined_commands() {
+		let cli = vec![CliCommandDefinition {
+			name: "ship-it".to_string(),
+			help_text: Some("Ship the workspace".to_string()),
+			inputs: vec![],
+			steps: vec![],
+		}];
+		let out = render_overview_help_with_cli("mc", &cli);
+
+		assert!(out.contains("Built-in Commands"));
+		assert!(out.contains("Step Commands"));
+		assert!(out.contains("User-defined Commands"));
+		assert!(out.contains("ship-it"));
+		assert!(out.contains("Ship the workspace"));
+	}
+
+	#[test]
+	fn render_command_help_for_publish_release_step_is_detailed() {
+		let out = render_command_help("mc", "step:publish-release");
+
+		assert!(out.contains("hosted provider release operations"));
+		assert!(out.contains("does not publish package artifacts"));
+		assert!(out.contains("publish-readiness"));
+	}
+
+	#[test]
+	fn render_command_help_for_other_step_commands_uses_specific_and_generic_details() {
+		let prepare = render_command_help("mc", "step:prepare-release");
+		assert!(prepare.contains("PrepareRelease reads pending changesets"));
+		assert!(prepare.contains("step:commit-release"));
+
+		let affected = render_command_help("mc", "step:affected-packages");
+		assert!(affected.contains("compares changed paths"));
+		assert!(affected.contains("--changed-paths"));
+
+		let create = render_command_help("mc", "step:create-change-file");
+		assert!(create.contains("writes a structured markdown changeset"));
+		assert!(create.contains("--reason"));
+
+		let discover = render_command_help("mc", "step:discover");
+		assert!(discover.contains("runs one built-in monochange workflow step directly"));
+		assert!(discover.contains("step commands for CI jobs"));
+	}
+
+	#[test]
+	fn render_command_help_with_cli_documents_user_defined_commands() {
+		let discover_step = monochange_core::all_step_variants()
+			.into_iter()
+			.find(|step| step.step_kebab_name() == "discover")
+			.expect("discover step");
+		let cli = vec![CliCommandDefinition {
+			name: "ship-it".to_string(),
+			help_text: None,
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: None,
+					required: false,
+					default: Some("json".to_string()),
+					choices: vec!["json".to_string(), "text".to_string()],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "output".to_string(),
+					kind: CliInputKind::Path,
+					help_text: None,
+					required: false,
+					default: None,
+					choices: vec![],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "verify".to_string(),
+					kind: CliInputKind::Boolean,
+					help_text: Some("Require verification".to_string()),
+					required: false,
+					default: None,
+					choices: vec![],
+					short: None,
+				},
+			],
+			steps: vec![discover_step],
+		}];
+		let out = render_command_help_with_cli("mc", "ship-it", &cli);
+
+		assert!(out.contains("Run configured workflow steps: Discover"));
+		assert!(out.contains("loaded from `[cli.ship-it]`"));
+		assert!(out.contains("Discover (Discover)"));
+		assert!(out.contains("--format"));
+		assert!(out.contains("json, text"));
+		assert!(out.contains("--output"));
+		assert!(out.contains("<PATH>"));
+		assert!(out.contains("Require verification"));
+		assert!(out.contains("User-defined commands come from monochange.toml"));
+		assert!(out.contains("step:discover"));
+	}
+
+	#[test]
+	fn render_command_help_with_cli_uses_rich_help_for_configured_legacy_commands() {
+		let cli = vec![CliCommandDefinition {
+			name: "release".to_string(),
+			help_text: Some("Configured release workflow".to_string()),
+			inputs: vec![],
+			steps: vec![],
+		}];
+		let out = render_command_help_with_cli("mc", "release", &cli);
+
+		assert!(out.contains("Prepare a release from discovered change files"));
+		assert!(out.contains("mc release --dry-run"));
+	}
+
+	#[test]
+	fn render_command_help_with_cli_documents_empty_user_defined_commands() {
+		let cli = vec![CliCommandDefinition {
+			name: "noop".to_string(),
+			help_text: None,
+			inputs: vec![],
+			steps: vec![],
+		}];
+		let out = render_command_help_with_cli("mc", "noop", &cli);
+
+		assert!(out.contains("Run a monochange workflow command from monochange.toml"));
+		assert!(out.contains("This user-defined command is loaded from `[cli.*]`"));
+		assert!(out.contains("mc noop"));
+	}
+
+	#[test]
+	fn available_command_items_include_builtins_steps_and_configured_commands() {
+		let cli = vec![
+			CliCommandDefinition {
+				name: "init".to_string(),
+				help_text: Some("Override built-in init".to_string()),
+				inputs: vec![],
+				steps: vec![],
+			},
+			CliCommandDefinition {
+				name: "step:discover".to_string(),
+				help_text: Some("Override step".to_string()),
+				inputs: vec![],
+				steps: vec![],
+			},
+			CliCommandDefinition {
+				name: "custom".to_string(),
+				help_text: Some("Custom workflow".to_string()),
+				inputs: vec![],
+				steps: vec![],
+			},
+		];
+		let items = available_command_items(&cli);
+
+		assert!(items.iter().any(|item| item.name == "init"));
+		assert!(items.iter().any(|item| item.name == "step:discover"));
+		assert!(items.iter().any(|item| item.name == "custom"));
+		assert!(
+			!configured_command_items(&cli)
+				.iter()
+				.any(|item| item.name == "init" || item.name == "step:discover")
+		);
+	}
+
+	#[test]
+	fn input_options_document_common_input_names() {
+		let names = [
+			"package",
+			"from",
+			"from-ref",
+			"target",
+			"force",
+			"changed_paths",
+			"label",
+			"since",
+			"draft",
+			"readiness",
+			"resume",
+			"mode",
+			"ci",
+			"interactive",
+			"bump",
+			"version",
+			"reason",
+			"type",
+			"details",
+			"changeset",
+			"fix",
+			"no_verify",
+			"auto-close-issues",
+			"custom_value",
+		];
+		let inputs = names
+			.iter()
+			.map(|name| {
+				CliInputDefinition {
+					name: (*name).to_string(),
+					kind: if *name == "changed_paths" {
+						CliInputKind::StringList
+					} else {
+						CliInputKind::String
+					},
+					help_text: None,
+					required: false,
+					default: None,
+					choices: vec![],
+					short: None,
+				}
+			})
+			.collect::<Vec<_>>();
+		let options = input_options(&inputs);
+		let joined = options
+			.iter()
+			.map(|(flag, type_name, description)| format!("{flag} {type_name} {description}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+
+		assert!(joined.contains("Limit the command to one or more package ids"));
+		assert!(joined.contains("Release tag, branch, or commit to inspect"));
+		assert!(joined.contains("Allow an otherwise unsafe operation"));
+		assert!(joined.contains("Changed paths to evaluate"));
+		assert!(joined.contains("Close linked issues after commenting"));
+		assert!(joined.contains("Value for `custom-value`"));
+	}
+
+	#[test]
+	fn step_summary_for_kind_covers_command_and_fallback_labels() {
+		assert_eq!(
+			step_summary_for_kind("Command"),
+			"Run an arbitrary configured shell command step"
+		);
+		assert_eq!(
+			step_summary_for_kind("FutureStep"),
+			"Run the built-in FutureStep step"
+		);
+	}
+
+	#[test]
+	fn step_command_items_cover_all_generated_step_summaries() {
+		let items = step_command_items();
+		let joined = items
+			.iter()
+			.map(|item| format!("{} {}", item.name, item.summary))
+			.collect::<Vec<_>>()
+			.join("\n");
+
+		assert!(joined.contains("step:config"));
+		assert!(joined.contains("Render resolved monochange configuration"));
+		assert!(joined.contains("step:validate"));
+		assert!(joined.contains("step:display-versions"));
+		assert!(joined.contains("step:plan-publish-rate-limits"));
+		assert!(joined.contains("step:retarget-release"));
+		assert!(joined.contains("Publish package versions from a publish plan"));
 	}
 
 	#[test]

@@ -710,6 +710,11 @@ fn quiet_from_os_arg(arg: &OsString) -> bool {
 	matches!(arg.to_str(), Some("--quiet" | "-q"))
 }
 
+fn is_root_help_request(args: &[OsString]) -> bool {
+	let mut positional = args.iter().skip(1).filter_map(|arg| arg.to_str());
+	matches!(positional.next(), None | Some("-h" | "--help")) && positional.next().is_none()
+}
+
 fn extract_quiet_from_args<I>(args: I) -> bool
 where
 	I: IntoIterator<Item = OsString>,
@@ -777,6 +782,7 @@ where
 	let configuration = load_workspace_configuration(root);
 	let cli = cli_commands_from_config(&configuration);
 	let quiet = extract_quiet_from_args(args.iter().cloned());
+	let root_help_requested = is_root_help_request(&args);
 	let matches = match build_command_with_cli(bin_name, &cli).try_get_matches_from(args) {
 		Ok(matches) => matches,
 		Err(error)
@@ -785,6 +791,10 @@ where
 				ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
 			) =>
 		{
+			if root_help_requested && matches!(error.kind(), ErrorKind::DisplayHelp) {
+				return Ok(cli_help::render_overview_help_with_cli(bin_name, &cli));
+			}
+
 			return Ok(format_clap_error(
 				&error,
 				!cfg!(test) && std::io::stdout().is_terminal(),
@@ -800,9 +810,9 @@ where
 				.get_one::<String>("command")
 				.map_or("", String::as_str);
 			let output = if command_name.is_empty() {
-				cli_help::render_overview_help(bin_name)
+				cli_help::render_overview_help_with_cli(bin_name, &cli)
 			} else {
-				cli_help::render_command_help(bin_name, command_name)
+				cli_help::render_command_help_with_cli(bin_name, command_name, &cli)
 			};
 			Ok(output)
 		}

@@ -10,6 +10,7 @@ use monochange_config::load_workspace_configuration;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
+use monochange_core::CliStepDefinition;
 use monochange_core::default_cli_commands;
 
 /// Build the top-level Clap command for the `monochange` binary.
@@ -147,6 +148,7 @@ pub(crate) fn build_command_with_cli(
 			.disable_help_subcommand(true)
 			.subcommand_required(true)
 			.arg_required_else_help(true)
+			.subcommand_help_heading("Built-in Commands")
 			.arg(
 				Arg::new("log-level")
 					.long("log-level")
@@ -225,18 +227,21 @@ When provided, the generated config includes:\n\
 			.subcommand(build_validate_subcommand())
 			.subcommand(build_help_subcommand());
 
-	for cli_command in cli {
-		command = command.subcommand(build_cli_command_subcommand(cli_command));
-	}
+	command = command.next_help_heading("Step Commands");
 	for step in monochange_core::all_step_variants() {
 		let kebab = step.step_kebab_name();
 		let synthetic = CliCommandDefinition {
 			name: format!("step:{kebab}"),
-			help_text: step.name().map(ToString::to_string),
+			help_text: Some(step_command_summary(&step)),
 			inputs: step.step_inputs_schema(),
 			steps: vec![step],
 		};
 		command = command.subcommand(build_cli_command_subcommand(&synthetic));
+	}
+
+	command = command.next_help_heading("User-defined Commands");
+	for cli_command in cli {
+		command = command.subcommand(build_cli_command_subcommand(cli_command));
 	}
 
 	command
@@ -732,12 +737,22 @@ pub(crate) fn build_help_subcommand() -> Command {
 }
 
 pub(crate) fn command_supports_release_diff_preview(cli_command: &CliCommandDefinition) -> bool {
-	cli_command.steps.iter().any(|step| {
-		matches!(
-			step,
-			monochange_core::CliStepDefinition::PrepareRelease { .. }
-		)
-	})
+	cli_command
+		.steps
+		.iter()
+		.any(|step| matches!(step, CliStepDefinition::PrepareRelease { .. }))
+}
+
+fn step_command_summary(step: &CliStepDefinition) -> String {
+	match step.step_kebab_name().as_str() {
+		"affected-packages" => "Compute affected packages from a prepared release plan".to_string(),
+		"create-change-file" => "Create a changeset file for one or more packages".to_string(),
+		"prepare-release" => "Plan version bumps, changelogs, and release artifacts".to_string(),
+		"publish-release" => {
+			"Publish provider release objects from a prepared release artifact".to_string()
+		}
+		kebab => format!("Run the built-in {kebab} release workflow step"),
+	}
 }
 
 pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -> Command {
@@ -784,6 +799,57 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 
 pub(crate) fn cli_command_after_help(cli_command: &CliCommandDefinition) -> Option<&'static str> {
 	match cli_command.name.as_str() {
+		"step:publish-release" => {
+			Some(
+				r"What this step does:
+  - Reads a prepared release artifact produced by prepare-release.
+  - Creates or updates source-control provider release objects, such as GitHub, GitLab, or Gitea releases.
+  - Uploads provider release notes and asset metadata according to the configured source provider.
+
+What this step does not do:
+  - It does not publish package artifacts to registries such as npm, crates.io, pub.dev, or PyPI.
+  - Registry publication is handled by the publish planning and publish commands.
+
+Typical release flow:
+  mc step:prepare-release --output prepared-release.json
+  mc step:publish-release --prepared-release prepared-release.json
+
+Related commands:
+  mc help step:prepare-release
+  mc help publish-readiness
+  mc help publish",
+			)
+		}
+		"step:prepare-release" => {
+			Some(
+				r"What this step does:
+  - Reads pending changesets and workspace package metadata.
+  - Calculates version bumps, changelog entries, and release artifacts.
+  - Writes a prepared release artifact that later steps can consume.
+
+Typical release flow:
+  mc step:prepare-release --output prepared-release.json
+  mc step:publish-release --prepared-release prepared-release.json",
+			)
+		}
+		"step:affected-packages" => {
+			Some(
+				r"What this step does:
+  - Computes packages affected by a change or release plan.
+  - Includes direct changes, grouped packages, and dependent packages according to monochange propagation rules.
+
+Use this command when debugging release scope before preparing or publishing a release.",
+			)
+		}
+		"step:create-change-file" => {
+			Some(
+				r"What this step does:
+  - Creates a changeset file for one or more packages.
+  - Records bump intent, reason text, and dependency-caused relationships.
+
+Prefer configured package ids in change files whenever a leaf package changed.",
+			)
+		}
 		"change" => {
 			Some(
 				r#"Examples:
