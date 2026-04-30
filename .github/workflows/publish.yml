@@ -76,12 +76,22 @@ jobs:
             --packages-dir packages
         shell: devenv shell -- bash -e {0}
 
+      - name: check publish readiness
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+        run: |
+          mc publish-readiness \
+            --from HEAD \
+            --output "$RUNNER_TEMP/publish-readiness.json" \
+            --format json
+        shell: devenv shell -- bash -e {0}
+
       - name: plan publish batches
         id: publish_plan
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          report="$(mc publish-plan --format json)"
+          report="$(mc publish-plan --readiness "$RUNNER_TEMP/publish-readiness.json" --format json)"
           echo "report<<EOF" >> "$GITHUB_OUTPUT"
           echo "$report" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -136,6 +146,42 @@ jobs:
         uses: rust-lang/crates-io-auth-action@v1
         id: crates-oidc
 
+      - name: download release assets
+        if: matrix.registry == 'npm' && startsWith( needs.plan.outputs.tag , 'v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-assets"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "monochange-*-${RELEASE_TAG}.tar.gz" \
+            --pattern "monochange-*-${RELEASE_TAG}.zip" \
+            --dir "$RUNNER_TEMP/release-assets"
+
+      - name: populate cli npm packages with release binaries
+        if: matrix.registry == 'npm'
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          node scripts/npm/build-packages.mjs \
+            --release-tag "$RELEASE_TAG" \
+            --assets-dir "$RUNNER_TEMP/release-assets"
+          node scripts/npm/populate-packages.mjs \
+            --packages-dir packages
+        shell: devenv shell -- bash -e {0}
+
+      - name: check publish readiness for batch
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+        run: |
+          mc publish-readiness \
+            --from HEAD \
+            ${{ matrix.packages }} \
+            --output "$RUNNER_TEMP/publish-readiness.json" \
+            --format json
+        shell: devenv shell -- bash -e {0}
+
       - name: wait for rate-limit window
         if: matrix.wait_seconds > 0
         run: |
@@ -145,5 +191,9 @@ jobs:
       - name: publish batch ${{ matrix.batch }} of ${{ matrix.total_batches }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
-        run: mc publish ${{ matrix.packages }} --format json
+        run: |
+          mc publish ${{ matrix.packages }} \
+            --readiness "$RUNNER_TEMP/publish-readiness.json" \
+            --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
+            --format json
         shell: devenv shell -- bash -e {0}
