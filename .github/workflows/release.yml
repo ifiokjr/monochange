@@ -103,7 +103,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       attestations: write
-      contents: read
+      contents: write
       id-token: write
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
@@ -119,16 +119,10 @@ jobs:
           mkdir -p "$asset_dir"
 
           echo "Downloading all release assets for attestation..."
-          for attempt in 1 2 3 4 5; do
-            if gh release download "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --pattern 'monochange-*' \
-              --dir "$asset_dir" 2>/dev/null; then
-              break
-            fi
-            echo "Release $RELEASE_TAG not yet available (attempt $attempt/5), retrying in 10s..."
-            sleep 10
-          done
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'monochange-*' \
+            --dir "$asset_dir"
 
           # Verify we actually got files
           shopt -s nullglob
