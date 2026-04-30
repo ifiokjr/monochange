@@ -1425,7 +1425,11 @@ struct StepDetails {
 }
 
 fn step_summary(step: &CliStepDefinition) -> String {
-	match step.kind_name() {
+	step_summary_for_kind(step.kind_name())
+}
+
+fn step_summary_for_kind(kind_name: &str) -> String {
+	match kind_name {
 		"Config" => "Render resolved monochange configuration and workspace metadata".to_string(),
 		"Validate" => "Validate configuration, package manifests, and changesets".to_string(),
 		"Discover" => "Discover packages across supported ecosystems".to_string(),
@@ -1452,7 +1456,7 @@ fn step_summary(step: &CliStepDefinition) -> String {
 		}
 		"PublishPackages" => "Publish package versions from a publish plan".to_string(),
 		"Command" => "Run an arbitrary configured shell command step".to_string(),
-		name => format!("Run the built-in {name} step"),
+		kind_name => format!("Run the built-in {kind_name} step"),
 	}
 }
 
@@ -1946,6 +1950,20 @@ mod tests {
 	}
 
 	#[test]
+	fn render_command_help_with_cli_uses_rich_help_for_configured_legacy_commands() {
+		let cli = vec![CliCommandDefinition {
+			name: "release".to_string(),
+			help_text: Some("Configured release workflow".to_string()),
+			inputs: vec![],
+			steps: vec![],
+		}];
+		let out = render_command_help_with_cli("mc", "release", &cli);
+
+		assert!(out.contains("Prepare a release from discovered change files"));
+		assert!(out.contains("mc release --dry-run"));
+	}
+
+	#[test]
 	fn render_command_help_with_cli_documents_empty_user_defined_commands() {
 		let cli = vec![CliCommandDefinition {
 			name: "noop".to_string(),
@@ -2053,6 +2071,18 @@ mod tests {
 		assert!(joined.contains("Changed paths to evaluate"));
 		assert!(joined.contains("Close linked issues after commenting"));
 		assert!(joined.contains("Value for `custom-value`"));
+	}
+
+	#[test]
+	fn step_summary_for_kind_covers_command_and_fallback_labels() {
+		assert_eq!(
+			step_summary_for_kind("Command"),
+			"Run an arbitrary configured shell command step"
+		);
+		assert_eq!(
+			step_summary_for_kind("FutureStep"),
+			"Run the built-in FutureStep step"
+		);
 	}
 
 	#[test]
