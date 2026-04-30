@@ -1555,7 +1555,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 	// Building unified diffs for large lockfiles can dominate wall time, so skip
 	// that work here unless a caller explicitly asks for the richer execution
 	// report via `prepare_release_execution`.
-	prepare_release_execution_with_file_diffs(root, dry_run, false)
+	prepare_release_execution_with_file_diffs(root, dry_run, false, false)
 		.map(|execution| execution.prepared_release)
 }
 
@@ -1565,7 +1565,7 @@ pub(crate) fn prepare_release_execution(
 	root: &Path,
 	dry_run: bool,
 ) -> MonochangeResult<PreparedReleaseExecution> {
-	prepare_release_execution_with_file_diffs(root, dry_run, true)
+	prepare_release_execution_with_file_diffs(root, dry_run, true, false)
 }
 
 #[tracing::instrument(skip_all, fields(dry_run, build_file_diffs))]
@@ -1573,6 +1573,7 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 	root: &Path,
 	dry_run: bool,
 	build_file_diffs: bool,
+	allow_empty_changesets: bool,
 ) -> MonochangeResult<PreparedReleaseExecution> {
 	let mut phase_timings = Vec::new();
 	let configuration =
@@ -1585,9 +1586,38 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		})?;
 	let changeset_paths =
 		measure_prepare_phase(&mut phase_timings, "discover changeset paths", || {
-			discover_changeset_paths(root)
+			discover_changeset_paths(root, allow_empty_changesets)
 		})?;
 	tracing::debug!(count = changeset_paths.len(), "discovered changesets");
+
+	if changeset_paths.is_empty() && allow_empty_changesets {
+		return Ok(PreparedReleaseExecution {
+			prepared_release: PreparedRelease {
+				plan: ReleasePlan {
+					workspace_root: root.to_path_buf(),
+					decisions: Vec::new(),
+					groups: Vec::new(),
+					warnings: Vec::new(),
+					unresolved_items: Vec::new(),
+					compatibility_evidence: Vec::new(),
+				},
+				changeset_paths,
+				changesets: Vec::new(),
+				released_packages: Vec::new(),
+				package_publications: Vec::new(),
+				version: None,
+				group_version: None,
+				release_targets: Vec::new(),
+				changed_files: Vec::new(),
+				changelogs: Vec::new(),
+				updated_changelogs: Vec::new(),
+				deleted_changesets: Vec::new(),
+				dry_run,
+			},
+			file_diffs: Vec::new(),
+			phase_timings,
+		});
+	}
 
 	// Build the shared changeset lookup context once.
 	//
@@ -3168,8 +3198,9 @@ cwd = "."
 		fs::write(&config_path, config)
 			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
-		let prepared = prepare_release_execution_with_file_diffs(fixture.path(), false, false)
-			.unwrap_or_else(|error| panic!("prepare release: {error}"));
+		let prepared =
+			prepare_release_execution_with_file_diffs(fixture.path(), false, false, false)
+				.unwrap_or_else(|error| panic!("prepare release: {error}"));
 
 		assert!(
 			prepared
@@ -3206,8 +3237,9 @@ repo = "monochange"
 		fs::write(&config_path, config)
 			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
-		let prepared = prepare_release_execution_with_file_diffs(fixture.path(), true, false)
-			.unwrap_or_else(|error| panic!("prepare release: {error}"));
+		let prepared =
+			prepare_release_execution_with_file_diffs(fixture.path(), true, false, false)
+				.unwrap_or_else(|error| panic!("prepare release: {error}"));
 
 		assert!(
 			prepared
@@ -3238,8 +3270,9 @@ repo = "monochange"
 		fs::write(&config_path, config)
 			.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
-		let prepared = prepare_release_execution_with_file_diffs(fixture.path(), false, false)
-			.unwrap_or_else(|error| panic!("prepare release: {error}"));
+		let prepared =
+			prepare_release_execution_with_file_diffs(fixture.path(), false, false, false)
+				.unwrap_or_else(|error| panic!("prepare release: {error}"));
 
 		assert!(
 			prepared

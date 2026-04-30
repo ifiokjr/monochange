@@ -10,7 +10,7 @@ pub(crate) fn diagnose_changesets(
 	let discovery = discover_workspace(root)?;
 
 	let changeset_paths = if requested.is_empty() {
-		discover_changeset_paths(root)?
+		discover_changeset_paths(root, false)?
 			.into_iter()
 			.map(|path| root.join(path))
 			.collect::<Vec<_>>()
@@ -203,10 +203,16 @@ fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetCont
 }
 
 #[must_use = "the discovery result must be checked"]
-pub(crate) fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
+pub(crate) fn discover_changeset_paths(
+	root: &Path,
+	allow_empty: bool,
+) -> MonochangeResult<Vec<PathBuf>> {
 	let changeset_dir = root.join(CHANGESET_DIR);
 
 	if !changeset_dir.exists() {
+		if allow_empty {
+			return Ok(Vec::new());
+		}
 		return Err(MonochangeError::Config(format!(
 			"no markdown changesets found under {CHANGESET_DIR}"
 		)));
@@ -226,7 +232,7 @@ pub(crate) fn discover_changeset_paths(root: &Path) -> MonochangeResult<Vec<Path
 
 	changeset_paths.sort();
 
-	if changeset_paths.is_empty() {
+	if changeset_paths.is_empty() && !allow_empty {
 		return Err(MonochangeError::Config(format!(
 			"no markdown changesets found under {CHANGESET_DIR}"
 		)));
@@ -371,7 +377,7 @@ mod diagnostics_tests {
 		assert_eq!(absolute, tempdir.path().join(".changeset/feature.md"));
 
 		let missing_dir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		let missing_error = discover_changeset_paths(missing_dir.path())
+		let missing_error = discover_changeset_paths(missing_dir.path(), false)
 			.err()
 			.unwrap_or_else(|| panic!("expected missing changeset directory error"));
 		assert!(
@@ -383,7 +389,7 @@ mod diagnostics_tests {
 		let empty_dir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		fs::create_dir_all(empty_dir.path().join(".changeset"))
 			.unwrap_or_else(|error| panic!("create empty changeset dir: {error}"));
-		let empty_error = discover_changeset_paths(empty_dir.path())
+		let empty_error = discover_changeset_paths(empty_dir.path(), false)
 			.err()
 			.unwrap_or_else(|| panic!("expected empty changeset directory error"));
 		assert!(
@@ -395,7 +401,7 @@ mod diagnostics_tests {
 		let blocked_dir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		fs::write(blocked_dir.path().join(".changeset"), "not a directory\n")
 			.unwrap_or_else(|error| panic!("write blocking .changeset file: {error}"));
-		let blocked_error = discover_changeset_paths(blocked_dir.path())
+		let blocked_error = discover_changeset_paths(blocked_dir.path(), false)
 			.err()
 			.unwrap_or_else(|| panic!("expected read_dir error for file-backed .changeset path"));
 		assert!(blocked_error.to_string().contains("failed to read"));
