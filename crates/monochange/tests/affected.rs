@@ -171,7 +171,7 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 
 	copy_directory(&fixture_path("affected/since-changed-source"), root);
 
-	let json = run_affected_json(root, &["--since", "HEAD"]);
+	let json = run_affected_json(root, &["--from", "HEAD"]);
 	assert_json_snapshot!(json);
 }
 
@@ -192,7 +192,7 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 
 	copy_directory(&fixture_path("affected/since-changed-with-changeset"), root);
 
-	let json = run_affected_json(root, &["--since", "HEAD"]);
+	let json = run_affected_json(root, &["--from", "HEAD"]);
 	assert_json_snapshot!(json);
 }
 
@@ -210,7 +210,7 @@ fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	let output = run_affected_raw(
 		root,
 		&[
-			"--since",
+			"--from",
 			"HEAD",
 			"--changed-paths",
 			"crates/core/src/lib.rs",
@@ -218,7 +218,7 @@ fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	);
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
-		stderr.contains("--since takes priority") || stderr.contains("--changed-paths was ignored"),
+		stderr.contains("--from takes priority") || stderr.contains("--changed-paths was ignored"),
 		"should warn when both flags are provided: stderr={stderr}"
 	);
 }

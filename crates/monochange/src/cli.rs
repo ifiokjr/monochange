@@ -908,8 +908,8 @@ Commit notes:
 		"affected" => {
 			Some(
 				r"Examples:
-  mc affected --changed-paths crates/core/src/lib.rs --format json
-  mc affected --since origin/main --verify
+  mc step:affected-packages --changed-paths crates/core/src/lib.rs --format json
+  mc step:affected-packages --from origin/main --verify
 
 Verification reminders:
   - Prefer package ids in .changeset files.

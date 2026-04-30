@@ -750,15 +750,6 @@ inputs = [
 ]
 steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]
 
-[cli.affected]
-help_text = "Evaluate pull-request changeset policy"
-inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
-	{ name = "changed_paths", type = "string_list", required = true },
-	{ name = "label", type = "string_list" },
-]
-steps = [{ name = "evaluate affected packages", type = "AffectedPackages" }]
-
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"
 inputs = [

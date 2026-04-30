@@ -349,6 +349,82 @@ fn synthetic_step_command_definition_rejects_unknown_steps() {
 	);
 }
 
+fn expected_builtin_step_command_names() -> Vec<&'static str> {
+	vec![
+		"step:config",
+		"step:validate",
+		"step:discover",
+		"step:display-versions",
+		"step:create-change-file",
+		"step:prepare-release",
+		"step:commit-release",
+		"step:verify-release-branch",
+		"step:publish-release",
+		"step:placeholder-publish",
+		"step:publish-packages",
+		"step:plan-publish-rate-limits",
+		"step:open-release-request",
+		"step:comment-released-issues",
+		"step:affected-packages",
+		"step:diagnose-changesets",
+		"step:retarget-release",
+	]
+}
+
+#[test]
+fn synthetic_step_command_definitions_cover_all_builtin_steps_except_command() {
+	let step_command_names = monochange_core::all_step_variants()
+		.into_iter()
+		.map(|step| format!("step:{}", step.step_kebab_name()))
+		.collect::<Vec<_>>();
+	let expected = expected_builtin_step_command_names();
+
+	assert_eq!(step_command_names, expected);
+	assert!(
+		step_command_names
+			.iter()
+			.any(|name| name == "step:affected-packages")
+	);
+	assert!(!step_command_names.iter().any(|name| name == "step:command"));
+
+	for command_name in &step_command_names {
+		let synthetic = crate::synthetic_step_command_definition(command_name)
+			.unwrap_or_else(|error| panic!("synthetic step command {command_name}: {error}"));
+		assert_eq!(synthetic.name, *command_name);
+		assert_eq!(synthetic.steps.len(), 1);
+		assert_eq!(
+			synthetic
+				.steps
+				.first()
+				.unwrap_or_else(|| panic!("expected step for {command_name}"))
+				.step_kebab_name(),
+			command_name.trim_start_matches("step:")
+		);
+	}
+
+	let command_error = crate::synthetic_step_command_definition("step:command")
+		.err()
+		.unwrap_or_else(|| panic!("expected Command step to stay synthetic-command-only"));
+	assert_eq!(
+		command_error.to_string(),
+		"config error: unknown step command: step:command"
+	);
+}
+
+#[test]
+fn generated_step_commands_cover_all_builtin_steps_except_command() {
+	let command = crate::cli::build_command_with_cli("mc", &[]);
+	let expected = expected_builtin_step_command_names();
+
+	for command_name in expected {
+		assert!(
+			command.find_subcommand(command_name).is_some(),
+			"expected generated {command_name} command"
+		);
+	}
+	assert!(command.find_subcommand("step:command").is_none());
+}
+
 #[test]
 fn cli_parses_discover_command() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");

@@ -598,7 +598,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 					"File paths changed in the PR (repeatable)",
 				),
 				(
-					"--since",
+					"--from",
 					"<REF>",
 					"Git ref to diff against (e.g. origin/main)",
 				),
@@ -621,11 +621,11 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				),
 				(
 					"Compare against a branch:",
-					"mc affected --since origin/main --verify",
+					"mc affected --from origin/main --verify",
 				),
 				(
 					"In CI with labels:",
-					"mc affected --since origin/main --label skip-changeset",
+					"mc affected --from origin/main --label skip-changeset",
 				),
 			],
 			tips: &[
@@ -1386,13 +1386,12 @@ fn input_description(input: &CliInputDefinition) -> String {
 	let mut description = match input.name.as_str() {
 		"format" => "Output format".to_string(),
 		"package" => "Limit the command to one or more package ids".to_string(),
-		"from" | "from-ref" => "Release tag, branch, or commit to inspect".to_string(),
+		"from" | "from-ref" => "Git ref, branch, tag, or commit used as input".to_string(),
 		"target" => "Target commit for the operation".to_string(),
 		"force" => "Allow an otherwise unsafe operation".to_string(),
 		"verify" => "Fail when policy requirements are not satisfied".to_string(),
 		"changed_paths" => "Changed paths to evaluate".to_string(),
 		"label" => "Pull request label influencing policy evaluation".to_string(),
-		"since" => "Git base ref used for comparison".to_string(),
 		"draft" => "Create provider releases as drafts when supported".to_string(),
 		"output" => "Path for the generated artifact".to_string(),
 		"readiness" => "Path to a publish-readiness artifact".to_string(),
@@ -2022,7 +2021,7 @@ mod tests {
 			"force",
 			"changed_paths",
 			"label",
-			"since",
+			"from",
 			"draft",
 			"readiness",
 			"resume",
@@ -2066,7 +2065,7 @@ mod tests {
 			.join("\n");
 
 		assert!(joined.contains("Limit the command to one or more package ids"));
-		assert!(joined.contains("Release tag, branch, or commit to inspect"));
+		assert!(joined.contains("Git ref, branch, tag, or commit used as input"));
 		assert!(joined.contains("Allow an otherwise unsafe operation"));
 		assert!(joined.contains("Changed paths to evaluate"));
 		assert!(joined.contains("Close linked issues after commenting"));

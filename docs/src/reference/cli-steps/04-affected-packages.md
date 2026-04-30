@@ -25,7 +25,7 @@ It is the best fit for:
 
 - `format` — `text` or `json`
 - `changed_paths` — explicit changed paths
-- `since` — revision to diff against; takes priority over `changed_paths`
+- `from` — revision to diff against; takes priority over `changed_paths`
 - `verify` — whether to enforce non-zero failure on uncovered packages
 - `label` — skip labels supplied from CI
 
@@ -114,6 +114,6 @@ Because it reuses monochange's own understanding of package paths, groups, ignor
 
 ## Common mistakes
 
-- providing both `since` and `changed_paths` and forgetting `since` wins
+- providing both `from` and `changed_paths` and forgetting `from` wins
 - assuming this step prepares release state
 - treating verification results as equivalent to a release plan
