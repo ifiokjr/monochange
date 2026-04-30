@@ -1873,6 +1873,207 @@ mod tests {
 	}
 
 	#[test]
+	fn render_command_help_for_other_step_commands_uses_specific_and_generic_details() {
+		let prepare = render_command_help("mc", "step:prepare-release");
+		assert!(prepare.contains("PrepareRelease reads pending changesets"));
+		assert!(prepare.contains("step:commit-release"));
+
+		let affected = render_command_help("mc", "step:affected-packages");
+		assert!(affected.contains("compares changed paths"));
+		assert!(affected.contains("--changed-paths"));
+
+		let create = render_command_help("mc", "step:create-change-file");
+		assert!(create.contains("writes a structured markdown changeset"));
+		assert!(create.contains("--reason"));
+
+		let discover = render_command_help("mc", "step:discover");
+		assert!(discover.contains("runs one built-in monochange workflow step directly"));
+		assert!(discover.contains("step commands for CI jobs"));
+	}
+
+	#[test]
+	fn render_command_help_with_cli_documents_user_defined_commands() {
+		let discover_step = monochange_core::all_step_variants()
+			.into_iter()
+			.find(|step| step.step_kebab_name() == "discover")
+			.expect("discover step");
+		let cli = vec![CliCommandDefinition {
+			name: "ship-it".to_string(),
+			help_text: None,
+			inputs: vec![
+				CliInputDefinition {
+					name: "format".to_string(),
+					kind: CliInputKind::Choice,
+					help_text: None,
+					required: false,
+					default: Some("json".to_string()),
+					choices: vec!["json".to_string(), "text".to_string()],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "output".to_string(),
+					kind: CliInputKind::Path,
+					help_text: None,
+					required: false,
+					default: None,
+					choices: vec![],
+					short: None,
+				},
+				CliInputDefinition {
+					name: "verify".to_string(),
+					kind: CliInputKind::Boolean,
+					help_text: Some("Require verification".to_string()),
+					required: false,
+					default: None,
+					choices: vec![],
+					short: None,
+				},
+			],
+			steps: vec![discover_step],
+		}];
+		let out = render_command_help_with_cli("mc", "ship-it", &cli);
+
+		assert!(out.contains("Run configured workflow steps: Discover"));
+		assert!(out.contains("loaded from `[cli.ship-it]`"));
+		assert!(out.contains("Discover (Discover)"));
+		assert!(out.contains("--format"));
+		assert!(out.contains("json, text"));
+		assert!(out.contains("--output"));
+		assert!(out.contains("<PATH>"));
+		assert!(out.contains("Require verification"));
+		assert!(out.contains("User-defined commands come from monochange.toml"));
+		assert!(out.contains("step:discover"));
+	}
+
+	#[test]
+	fn render_command_help_with_cli_documents_empty_user_defined_commands() {
+		let cli = vec![CliCommandDefinition {
+			name: "noop".to_string(),
+			help_text: None,
+			inputs: vec![],
+			steps: vec![],
+		}];
+		let out = render_command_help_with_cli("mc", "noop", &cli);
+
+		assert!(out.contains("Run a monochange workflow command from monochange.toml"));
+		assert!(out.contains("This user-defined command is loaded from `[cli.*]`"));
+		assert!(out.contains("mc noop"));
+	}
+
+	#[test]
+	fn available_command_items_include_builtins_steps_and_configured_commands() {
+		let cli = vec![
+			CliCommandDefinition {
+				name: "init".to_string(),
+				help_text: Some("Override built-in init".to_string()),
+				inputs: vec![],
+				steps: vec![],
+			},
+			CliCommandDefinition {
+				name: "step:discover".to_string(),
+				help_text: Some("Override step".to_string()),
+				inputs: vec![],
+				steps: vec![],
+			},
+			CliCommandDefinition {
+				name: "custom".to_string(),
+				help_text: Some("Custom workflow".to_string()),
+				inputs: vec![],
+				steps: vec![],
+			},
+		];
+		let items = available_command_items(&cli);
+
+		assert!(items.iter().any(|item| item.name == "init"));
+		assert!(items.iter().any(|item| item.name == "step:discover"));
+		assert!(items.iter().any(|item| item.name == "custom"));
+		assert!(
+			!configured_command_items(&cli)
+				.iter()
+				.any(|item| item.name == "init" || item.name == "step:discover")
+		);
+	}
+
+	#[test]
+	fn input_options_document_common_input_names() {
+		let names = [
+			"package",
+			"from",
+			"from-ref",
+			"target",
+			"force",
+			"changed_paths",
+			"label",
+			"since",
+			"draft",
+			"readiness",
+			"resume",
+			"mode",
+			"ci",
+			"interactive",
+			"bump",
+			"version",
+			"reason",
+			"type",
+			"details",
+			"changeset",
+			"fix",
+			"no_verify",
+			"auto-close-issues",
+			"custom_value",
+		];
+		let inputs = names
+			.iter()
+			.map(|name| {
+				CliInputDefinition {
+					name: (*name).to_string(),
+					kind: if *name == "changed_paths" {
+						CliInputKind::StringList
+					} else {
+						CliInputKind::String
+					},
+					help_text: None,
+					required: false,
+					default: None,
+					choices: vec![],
+					short: None,
+				}
+			})
+			.collect::<Vec<_>>();
+		let options = input_options(&inputs);
+		let joined = options
+			.iter()
+			.map(|(flag, type_name, description)| format!("{flag} {type_name} {description}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+
+		assert!(joined.contains("Limit the command to one or more package ids"));
+		assert!(joined.contains("Release tag, branch, or commit to inspect"));
+		assert!(joined.contains("Allow an otherwise unsafe operation"));
+		assert!(joined.contains("Changed paths to evaluate"));
+		assert!(joined.contains("Close linked issues after commenting"));
+		assert!(joined.contains("Value for `custom-value`"));
+	}
+
+	#[test]
+	fn step_command_items_cover_all_generated_step_summaries() {
+		let items = step_command_items();
+		let joined = items
+			.iter()
+			.map(|item| format!("{} {}", item.name, item.summary))
+			.collect::<Vec<_>>()
+			.join("\n");
+
+		assert!(joined.contains("step:config"));
+		assert!(joined.contains("Render resolved monochange configuration"));
+		assert!(joined.contains("step:validate"));
+		assert!(joined.contains("step:display-versions"));
+		assert!(joined.contains("step:plan-publish-rate-limits"));
+		assert!(joined.contains("step:retarget-release"));
+		assert!(joined.contains("Publish package versions from a publish plan"));
+	}
+
+	#[test]
 	fn render_command_help_for_change() {
 		let out = render_command_help("mc", "change");
 		assert!(out.contains("change"));
