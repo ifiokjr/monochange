@@ -1850,6 +1850,11 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
+		/// When true, do not error when there are no pending changesets.
+		/// Instead, succeed with zero changesets, allowing downstream steps
+		/// to check `number_of_changesets` in their `when` conditions.
+		#[serde(default)]
+		allow_empty_changesets: bool,
 	},
 	/// Create a local release commit with an embedded durable `ReleaseRecord`.
 	///
@@ -3853,6 +3858,7 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
+			allow_empty_changesets: false,
 		},
 		CliStepDefinition::CommitRelease {
 			name: None,

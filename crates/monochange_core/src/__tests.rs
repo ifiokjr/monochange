@@ -940,6 +940,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
+				allow_empty_changesets: false,
 			},
 			"PrepareRelease",
 		),
@@ -1056,11 +1057,13 @@ fn cli_step_display_name_prefers_explicit_name_over_kind() {
 		name: Some("plan release".to_string()),
 		when: None,
 		inputs: BTreeMap::new(),
+		allow_empty_changesets: false,
 	};
 	let unnamed = CliStepDefinition::PrepareRelease {
 		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
+		allow_empty_changesets: false,
 	};
 	assert_eq!(named.display_name(), "plan release");
 	assert_eq!(unnamed.display_name(), "PrepareRelease");
@@ -1090,6 +1093,7 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 			name: Some(expected.to_string()),
 			when: None,
 			inputs: BTreeMap::new(),
+			allow_empty_changesets: false,
 		},
 		CliStepDefinition::CommitRelease {
 			name: Some(expected.to_string()),
@@ -1361,6 +1365,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		name: None,
 		when: None,
 		inputs: BTreeMap::new(),
+		allow_empty_changesets: false,
 	};
 	assert_eq!(
 		prepare.expected_input_kind("format"),

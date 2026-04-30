@@ -512,8 +512,9 @@ mod tests {
 	fn save_artifact(root: &Path, dry_run: bool, explicit_path: &Path) -> WorkspaceConfiguration {
 		let configuration = load_workspace_configuration(root)
 			.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
-		let prepared = crate::prepare_release_execution_with_file_diffs(root, dry_run, false)
-			.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
+		let prepared =
+			crate::prepare_release_execution_with_file_diffs(root, dry_run, false, false)
+				.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 		save_prepared_release_execution(
 			root,
 			&configuration,
@@ -582,7 +583,7 @@ mod tests {
 		let root = tempdir.path();
 		let configuration = load_workspace_configuration(root)
 			.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
-		let prepared = crate::prepare_release_execution_with_file_diffs(root, true, false)
+		let prepared = crate::prepare_release_execution_with_file_diffs(root, true, false, false)
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 		let changed_file = prepared
 			.prepared_release
@@ -664,7 +665,7 @@ mod tests {
 		let artifact_path = explicit_artifact_path(root);
 		let configuration = load_workspace_configuration(root)
 			.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
-		let prepared = crate::prepare_release_execution_with_file_diffs(root, false, true)
+		let prepared = crate::prepare_release_execution_with_file_diffs(root, false, true, false)
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 		save_prepared_release_execution(
 			root,
@@ -838,7 +839,7 @@ mod tests {
 		let default_path = default_prepared_release_cache_path(root);
 		let configuration = load_workspace_configuration(root)
 			.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
-		let prepared = crate::prepare_release_execution_with_file_diffs(root, false, false)
+		let prepared = crate::prepare_release_execution_with_file_diffs(root, false, false, false)
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 		save_prepared_release_execution(
 			root,
@@ -941,7 +942,7 @@ mod tests {
 		let root = tempdir.path();
 		let configuration = load_workspace_configuration(root)
 			.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
-		let prepared = crate::prepare_release_execution_with_file_diffs(root, false, false)
+		let prepared = crate::prepare_release_execution_with_file_diffs(root, false, false, false)
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 
 		let parent_file = root.join("artifact-parent");

@@ -673,7 +673,9 @@ pub(crate) fn execute_cli_command_with_options(
 						false,
 					)? {
 						Some(loaded) => loaded.execution,
-						None => prepare_release_execution_with_file_diffs(root, true, false)?,
+						None => {
+							prepare_release_execution_with_file_diffs(root, true, false, false)?
+						}
 					};
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					let rendered_output = render_display_versions_output(
@@ -691,7 +693,10 @@ pub(crate) fn execute_cli_command_with_options(
 					)?);
 					Ok(())
 				}
-				CliStepDefinition::PrepareRelease { .. } => {
+				CliStepDefinition::PrepareRelease {
+					allow_empty_changesets,
+					..
+				} => {
 					let build_file_diffs = context.show_diff
 						|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
 					let prepared_execution = if let Some(loaded) =
@@ -705,7 +710,12 @@ pub(crate) fn execute_cli_command_with_options(
 						context.command_logs.push(loaded.message);
 						loaded.execution
 					} else {
-						prepare_release_execution_with_file_diffs(root, dry_run, build_file_diffs)?
+						prepare_release_execution_with_file_diffs(
+							root,
+							dry_run,
+							build_file_diffs,
+							*allow_empty_changesets,
+						)?
 					};
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					context.prepared_file_diffs = prepared_execution.file_diffs;
@@ -1750,6 +1760,14 @@ pub(crate) fn build_cli_template_context(
 					.collect(),
 			),
 		);
+		let number_of_changesets = serde_json::Value::Number(serde_json::Number::from(
+			prepared.changeset_paths.len() as u64,
+		));
+		template_context.insert(
+			"number_of_changesets".to_string(),
+			number_of_changesets.clone(),
+		);
+		template_context.insert("changeset_count".to_string(), number_of_changesets);
 	}
 
 	// Structured release.* namespace
@@ -5204,6 +5222,7 @@ path = "crates/core"
 					name: None,
 					when: None,
 					inputs: BTreeMap::new(),
+					allow_empty_changesets: false,
 				},
 				CliStepDefinition::PlanPublishRateLimits {
 					name: None,

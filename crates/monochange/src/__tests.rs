@@ -1388,6 +1388,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
 				)]),
+				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::Command {
 				show_progress: None,
@@ -2480,6 +2481,38 @@ fn command_release_dry_run_discovers_changesets_without_mutating_files() {
 		original_changelog
 	);
 	assert!(tempdir.path().join(".changeset/feature.md").exists());
+}
+
+#[test]
+fn prepare_release_allows_empty_changesets_when_configured() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	seed_release_fixture(tempdir.path(), None, false);
+	fs::remove_dir_all(tempdir.path().join(".changeset"))
+		.unwrap_or_else(|error| panic!("remove changesets: {error}"));
+
+	let strict_error =
+		crate::prepare_release_execution_with_file_diffs(tempdir.path(), true, false, false)
+			.err()
+			.unwrap_or_else(|| panic!("expected missing changeset error"));
+	assert!(
+		strict_error
+			.to_string()
+			.contains("no markdown changesets found under .changeset")
+	);
+
+	let execution =
+		crate::prepare_release_execution_with_file_diffs(tempdir.path(), true, true, true)
+			.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
+
+	assert_eq!(
+		execution.prepared_release.plan.workspace_root,
+		tempdir.path().to_path_buf()
+	);
+	assert!(execution.prepared_release.changeset_paths.is_empty());
+	assert!(execution.prepared_release.changesets.is_empty());
+	assert!(execution.prepared_release.released_packages.is_empty());
+	assert!(execution.prepared_release.changed_files.is_empty());
+	assert!(execution.file_diffs.is_empty());
 }
 
 #[test]
@@ -4210,6 +4243,37 @@ fn should_execute_cli_step_skips_for_zero_value() {
 }
 
 #[test]
+fn should_execute_cli_step_can_gate_on_number_of_changesets() {
+	let mut context = cli_context_for_when_evaluation_tests();
+	let step_inputs = BTreeMap::new();
+	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
+		name: None,
+		when: Some("{{ number_of_changesets > 0 }}".to_string()),
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+
+	context.prepared_release = Some(sample_prepared_release_for_cli_render());
+	assert!(
+		!should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
+
+	let mut prepared = sample_prepared_release_for_cli_render();
+	prepared.changeset_paths = vec![PathBuf::from(".changeset/feature.md")];
+	context.prepared_release = Some(prepared);
+	assert!(
+		should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
+}
+
+#[test]
 fn should_execute_cli_step_trims_and_treats_1_as_true() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec![" 1 ".to_string()])]);
@@ -5120,6 +5184,18 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 			.map(Vec::len),
 		Some(1)
 	);
+	assert_eq!(
+		template_context
+			.get("number_of_changesets")
+			.and_then(serde_json::Value::as_u64),
+		Some(0)
+	);
+	assert_eq!(
+		template_context
+			.get("changeset_count")
+			.and_then(serde_json::Value::as_u64),
+		Some(0)
+	);
 }
 
 #[test]
@@ -5447,6 +5523,7 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
+				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
@@ -5486,6 +5563,7 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
+				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
@@ -5546,6 +5624,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 					name: None,
 					when: None,
 					inputs: BTreeMap::new(),
+					allow_empty_changesets: false,
 				},
 				step,
 			],
@@ -5619,6 +5698,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
+			allow_empty_changesets: false,
 		}],
 	};
 	let render_output = crate::execute_cli_command(
@@ -5643,6 +5723,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
+				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::PublishRelease {
 				name: None,
@@ -5671,6 +5752,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
+				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
@@ -5700,6 +5782,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				name: None,
 				when: None,
 				inputs: BTreeMap::new(),
+				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
@@ -5812,6 +5895,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 						name: None,
 						when: None,
 						inputs: BTreeMap::new(),
+						allow_empty_changesets: false,
 					},
 					monochange_core::CliStepDefinition::PublishPackages {
 						name: None,
@@ -5891,6 +5975,7 @@ fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matc
 						name: None,
 						when: None,
 						inputs: BTreeMap::new(),
+						allow_empty_changesets: false,
 					},
 					monochange_core::CliStepDefinition::PublishPackages {
 						name: None,
@@ -9665,6 +9750,7 @@ fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defau
 			name: None,
 			when: None,
 			inputs: BTreeMap::new(),
+			allow_empty_changesets: false,
 		}],
 	}];
 
