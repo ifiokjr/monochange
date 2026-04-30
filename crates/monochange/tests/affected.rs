@@ -155,7 +155,7 @@ fn affected_with_verify_flag_exits_zero_when_covered() {
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn affected_since_flag_detects_changes_from_git_revision() {
+fn affected_from_flag_detects_changes_from_git_revision() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
@@ -171,12 +171,12 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 
 	copy_directory(&fixture_path("affected/since-changed-source"), root);
 
-	let json = run_affected_json(root, &["--since", "HEAD"]);
+	let json = run_affected_json(root, &["--from", "HEAD"]);
 	assert_json_snapshot!(json);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn affected_since_flag_detects_changeset_added_after_revision() {
+fn affected_from_flag_detects_changeset_added_after_revision() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
@@ -192,12 +192,12 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 
 	copy_directory(&fixture_path("affected/since-changed-with-changeset"), root);
 
-	let json = run_affected_json(root, &["--since", "HEAD"]);
+	let json = run_affected_json(root, &["--from", "HEAD"]);
 	assert_json_snapshot!(json);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn affected_since_takes_priority_over_changed_paths_with_warning() {
+fn affected_rejects_both_from_and_changed_paths() {
 	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
 
@@ -210,7 +210,7 @@ fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	let output = run_affected_raw(
 		root,
 		&[
-			"--since",
+			"--from",
 			"HEAD",
 			"--changed-paths",
 			"crates/core/src/lib.rs",
@@ -218,8 +218,12 @@ fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	);
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
-		stderr.contains("--since takes priority") || stderr.contains("--changed-paths was ignored"),
-		"should warn when both flags are provided: stderr={stderr}"
+		stderr.contains("accepts either `--from <REF>` or `--changed-paths <PATHS>`, but not both"),
+		"should error when both flags are provided: stderr={stderr}"
+	);
+	assert!(
+		!output.status.success(),
+		"should exit with non-zero when both flags are provided"
 	);
 }
 
