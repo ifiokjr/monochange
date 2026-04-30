@@ -598,7 +598,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 					"File paths changed in the PR (repeatable)",
 				),
 				(
-					"--from",
+					"--since",
 					"<REF>",
 					"Git ref to diff against (e.g. origin/main)",
 				),
@@ -621,11 +621,11 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				),
 				(
 					"Compare against a branch:",
-					"mc affected --from origin/main --verify",
+					"mc affected --since origin/main --verify",
 				),
 				(
 					"In CI with labels:",
-					"mc affected --from origin/main --label skip-changeset",
+					"mc affected --since origin/main --label skip-changeset",
 				),
 			],
 			tips: &[

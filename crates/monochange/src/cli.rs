@@ -909,7 +909,7 @@ Commit notes:
 			Some(
 				r"Examples:
   mc affected --changed-paths crates/core/src/lib.rs --format json
-  mc affected --from origin/main --verify
+  mc affected --since origin/main --verify
 
 Verification reminders:
   - Prefer package ids in .changeset files.

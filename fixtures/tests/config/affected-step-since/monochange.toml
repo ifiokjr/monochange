@@ -11,4 +11,4 @@ enabled = true
 
 [[cli.pr-check.steps]]
 type = "AffectedPackages"
-inputs = { from = "origin/main" }
+inputs = { since = "origin/main" }
