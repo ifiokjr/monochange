@@ -42,7 +42,7 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: lint js
-        run: env -u LD_LIBRARY_PATH -u LD_PRELOAD lint:js:syntax
+        run: env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u NIX_LD -u NIX_LD_LIBRARY_PATH pnpm exec oxlint .
         shell: devenv shell -- bash -e {0}
 
       - name: cargo deny
