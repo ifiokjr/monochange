@@ -12,6 +12,22 @@ templates = [
   "- {{ summary }}",
 ]
 
+[changelog.sections.minor]
+heading = "Minor"
+priority = 15
+
+[changelog.sections.patch]
+heading = "Patch"
+priority = 35
+
+[changelog.types.minor]
+bump = "minor"
+section = "minor"
+
+[changelog.types.patch]
+bump = "patch"
+section = "patch"
+
 [package.core]
 path = "crates/core"
 

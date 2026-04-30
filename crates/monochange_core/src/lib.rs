@@ -2397,11 +2397,6 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 		}
 		lines.push(paragraph.clone());
 	}
-	let include_section_headings = document.sections.len() > 1
-		|| document
-			.sections
-			.iter()
-			.any(|section| section.title != "Changed" || section.collapsed);
 	for section in &document.sections {
 		if section.entries.is_empty() {
 			continue;
@@ -2413,10 +2408,8 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 			push_collapsed_release_note_section(&mut lines, section);
 			continue;
 		}
-		if include_section_headings {
-			lines.push(format!("### {}", section.title));
-			lines.push(String::new());
-		}
+		lines.push(format!("### {}", section.title));
+		lines.push(String::new());
 		push_release_note_entries(&mut lines, &section.entries);
 	}
 	lines.join("\n")

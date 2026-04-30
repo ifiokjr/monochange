@@ -12,6 +12,8 @@ priority = 40
 
 [changelog.types.docs]
 section = "documentation"
+bump = "none"
 
 [changelog.types.test]
 section = "testing"
+bump = "patch"

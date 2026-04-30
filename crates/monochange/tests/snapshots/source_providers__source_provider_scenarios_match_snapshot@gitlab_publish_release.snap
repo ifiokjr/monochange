@@ -20,7 +20,7 @@ expression: json
               "entries": [
                 "#### add gitlab fixture coverage"
               ],
-              "title": "Changed"
+              "title": "Minor"
             }
           ],
           "summary": [],
@@ -29,7 +29,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.1.0](https://gitlab.com/group/monochange/-/releases/core/v1.1.0) ([DATE])\n\n#### add gitlab fixture coverage"
+        "rendered": "## core [1.1.0](https://gitlab.com/group/monochange/-/releases/core/v1.1.0) ([DATE])\n\n### Minor\n\n#### add gitlab fixture coverage"
       }
     ],
     "changesets": [
@@ -54,7 +54,7 @@ expression: json
         "targets": [
           {
             "bump": "minor",
-            "changeType": null,
+            "changeType": "minor",
             "evidenceRefs": [],
             "id": "core",
             "kind": "package",
@@ -130,7 +130,7 @@ expression: json
   "releaseRequest": null,
   "releases": [
     {
-      "body": "## core [1.1.0](https://gitlab.com/group/monochange/-/releases/core/v1.1.0) ([DATE])\n\n#### add gitlab fixture coverage",
+      "body": "## core [1.1.0](https://gitlab.com/group/monochange/-/releases/core/v1.1.0) ([DATE])\n\n### Minor\n\n#### add gitlab fixture coverage",
       "draft": false,
       "generateReleaseNotes": false,
       "name": "core 1.1.0 ([DATE])",

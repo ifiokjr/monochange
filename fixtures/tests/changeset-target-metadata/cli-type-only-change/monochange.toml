@@ -10,9 +10,11 @@ heading = "Testing"
 priority = 40
 
 [changelog.types.docs]
+bump = "none"
 section = "documentation"
 
 [changelog.types.test]
+bump = "patch"
 section = "testing"
 
 [package.core]

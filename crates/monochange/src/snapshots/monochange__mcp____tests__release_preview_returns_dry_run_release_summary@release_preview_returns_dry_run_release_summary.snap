@@ -38,7 +38,7 @@ expression: content_text(&result)
         "targets": [
           {
             "bump": "minor",
-            "changeType": null,
+            "changeType": "minor",
             "evidenceRefs": [],
             "id": "core",
             "kind": "package",

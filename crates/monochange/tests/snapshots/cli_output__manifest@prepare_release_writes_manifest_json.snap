@@ -51,7 +51,7 @@ expression: manifest
         ],
         "sections": [
           {
-            "title": "Changed",
+            "title": "Minor",
             "collapsed": false,
             "entries": [
               "> [!NOTE]\n> *core*\n\n#### add feature"
@@ -59,7 +59,7 @@ expression: manifest
           }
         ]
       },
-      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add feature"
+      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
     },
     {
       "ownerId": "core",
@@ -71,7 +71,7 @@ expression: manifest
         "summary": [],
         "sections": [
           {
-            "title": "Changed",
+            "title": "Minor",
             "collapsed": false,
             "entries": [
               "#### add feature"
@@ -79,7 +79,7 @@ expression: manifest
           }
         ]
       },
-      "rendered": "## 1.1.0 ([DATE])\n\n#### add feature"
+      "rendered": "## 1.1.0 ([DATE])\n\n### Minor\n\n#### add feature"
     }
   ],
   "packagePublications": [
@@ -122,7 +122,7 @@ expression: manifest
           "bump": "minor",
           "origin": "direct-change",
           "evidenceRefs": [],
-          "changeType": null
+          "changeType": "minor"
         }
       ],
       "context": {

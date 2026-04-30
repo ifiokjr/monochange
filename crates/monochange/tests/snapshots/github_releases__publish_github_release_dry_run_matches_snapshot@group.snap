@@ -23,7 +23,7 @@ expression: json
               "entries": [
                 "> [!NOTE]\n> *core*\n\n#### add feature"
               ],
-              "title": "Changed"
+              "title": "Minor"
             }
           ],
           "summary": [
@@ -36,7 +36,7 @@ expression: json
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add feature"
+        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
       },
       {
         "format": "monochange",
@@ -47,7 +47,7 @@ expression: json
               "entries": [
                 "#### add feature"
               ],
-              "title": "Changed"
+              "title": "Minor"
             }
           ],
           "summary": [],
@@ -56,7 +56,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\n#### add feature"
+        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\n### Minor\n\n#### add feature"
       }
     ],
     "changesets": [
@@ -81,7 +81,7 @@ expression: json
         "targets": [
           {
             "bump": "minor",
-            "changeType": null,
+            "changeType": "minor",
             "evidenceRefs": [],
             "id": "core",
             "kind": "package",
@@ -196,7 +196,7 @@ expression: json
   "releaseRequest": null,
   "releases": [
     {
-      "body": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add feature",
+      "body": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature",
       "draft": false,
       "generateReleaseNotes": false,
       "name": "1.1.0 ([DATE])",

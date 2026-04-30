@@ -25,7 +25,7 @@ expression: content_text(&result)
               "entries": [
                 "> [!NOTE]\n> *core*\n\n#### add release command"
               ],
-              "title": "Changed"
+              "title": "Minor"
             }
           ],
           "summary": [
@@ -38,7 +38,7 @@ expression: content_text(&result)
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n> [!NOTE]\n> *core*\n\n#### add release command"
+        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add release command"
       },
       {
         "format": "monochange",
@@ -58,7 +58,7 @@ expression: content_text(&result)
         "ownerId": "app",
         "ownerKind": "package",
         "path": "crates/app/changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
+        "rendered": "## 1.1.0 ([DATE])\n\n### Changed\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
       },
       {
         "format": "monochange",
@@ -69,7 +69,7 @@ expression: content_text(&result)
               "entries": [
                 "#### add release command"
               ],
-              "title": "Changed"
+              "title": "Minor"
             }
           ],
           "summary": [],
@@ -78,7 +78,7 @@ expression: content_text(&result)
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\n#### add release command"
+        "rendered": "## 1.1.0 ([DATE])\n\n### Minor\n\n#### add release command"
       }
     ],
     "changesets": [
@@ -103,7 +103,7 @@ expression: content_text(&result)
         "targets": [
           {
             "bump": "minor",
-            "changeType": null,
+            "changeType": "minor",
             "evidenceRefs": [],
             "id": "core",
             "kind": "package",

@@ -1583,14 +1583,35 @@ pub fn load_changeset_contents_with_context(
 		if let Some(group) = context.groups_by_id.get(change.package.as_str()) {
 			let explicit_version = change.version.clone();
 			let caused_by = change.caused_by.clone();
+			let change_type = change.change_type.clone();
+			if let Some(change_type) = change_type.as_deref() {
+				validate_configured_change_type_with_context(
+					context,
+					changes_path,
+					&change.package,
+					change_type,
+				)?;
+			}
+			let type_default_bump = change_type.as_deref().and_then(|change_type| {
+				configured_change_type_default_bump_with_context(
+					context,
+					&change.package,
+					change_type,
+				)
+			});
 			let inferred_bump = match change.bump {
 				Some(bump) => Some(bump),
 				None => {
-					infer_group_bump_from_explicit_version_with_context(
-						group,
-						context,
-						explicit_version.as_ref(),
-					)?
+					match type_default_bump {
+						Some(bump) => Some(bump),
+						None => {
+							infer_group_bump_from_explicit_version_with_context(
+								group,
+								context,
+								explicit_version.as_ref(),
+							)?
+						}
+					}
 				}
 			};
 			targets.push(LoadedChangesetTarget {
@@ -1600,7 +1621,7 @@ pub fn load_changeset_contents_with_context(
 				explicit_version: explicit_version.clone(),
 				origin: "direct-change".to_string(),
 				evidence_refs: Vec::new(),
-				change_type: change.change_type.clone(),
+				change_type: change_type.clone(),
 				caused_by: caused_by.clone(),
 			});
 			for member_id in &group.packages {
@@ -1632,7 +1653,7 @@ pub fn load_changeset_contents_with_context(
 					evidence_refs: Vec::new(),
 					notes: change.reason.clone(),
 					details: change.details.clone(),
-					change_type: change.change_type.clone(),
+					change_type: change_type.clone(),
 					caused_by: caused_by.clone(),
 					source_path: changes_path.to_path_buf(),
 				});
@@ -1641,7 +1662,23 @@ pub fn load_changeset_contents_with_context(
 			let package_id = resolve_package_reference_with_context(&change.package, context)?;
 			let explicit_version = change.version;
 			let caused_by = change.caused_by;
-			let inferred_bump = change.bump.or_else(|| {
+			let change_type = change.change_type;
+			if let Some(change_type) = change_type.as_deref() {
+				validate_configured_change_type_with_context(
+					context,
+					changes_path,
+					&change.package,
+					change_type,
+				)?;
+			}
+			let type_default_bump = change_type.as_deref().and_then(|change_type| {
+				configured_change_type_default_bump_with_context(
+					context,
+					&change.package,
+					change_type,
+				)
+			});
+			let inferred_bump = change.bump.or(type_default_bump).or_else(|| {
 				infer_package_bump_from_explicit_version_with_context(
 					&package_id,
 					context,
@@ -1655,7 +1692,7 @@ pub fn load_changeset_contents_with_context(
 				explicit_version: explicit_version.clone(),
 				origin: "direct-change".to_string(),
 				evidence_refs: Vec::new(),
-				change_type: change.change_type.clone(),
+				change_type: change_type.clone(),
 				caused_by: caused_by.clone(),
 			});
 			if !seen_package_ids.insert(package_id.clone()) {
@@ -1682,7 +1719,7 @@ pub fn load_changeset_contents_with_context(
 				evidence_refs: Vec::new(),
 				notes: change.reason,
 				details: change.details,
-				change_type: change.change_type,
+				change_type,
 				caused_by,
 				source_path: changes_path.to_path_buf(),
 			});
@@ -1843,9 +1880,6 @@ fn parse_markdown_change_target_with_context(
 		.map(str::trim)
 		.filter(|value| !value.is_empty())
 	{
-		if let Some(bump) = parse_bump_severity(token) {
-			return Ok((Some(bump), None, None, Vec::new()));
-		}
 		if let Some(default_bump) =
 			configured_change_type_default_bump_with_context(context, package, token)
 		{
@@ -1859,15 +1893,12 @@ fn parse_markdown_change_target_with_context(
 		if context.package_ids.contains(package) || context.groups_by_id.contains_key(package) {
 			let valid_types = configured_change_types_with_context(context, package);
 			let valid_types_help = if valid_types.is_empty() {
-				String::new()
+				"no configured types are available for this target".to_string()
 			} else {
-				format!(
-					" or one of the configured types: {}",
-					valid_types.join(", ")
-				)
+				format!("valid types: {}", valid_types.join(", "))
 			};
 			return Err(MonochangeError::Config(format!(
-				"failed to parse {}: target `{package}` has invalid scalar value `{token}`; expected one of `none`, `patch`, `minor`, `major`{valid_types_help}`",
+				"failed to parse {}: target `{package}` has invalid scalar change type `{token}`; {valid_types_help}",
 				changes_path.display()
 			)));
 		}
@@ -1876,7 +1907,7 @@ fn parse_markdown_change_target_with_context(
 
 	let Some(mapping) = value.as_mapping() else {
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, `type`, and/or `caused_by`",
+			"failed to parse {}: target `{package}` must map to a configured change type or to a table with `bump`, `version`, `type`, and/or `caused_by`",
 			changes_path.display()
 		)));
 	};
@@ -2725,6 +2756,10 @@ fn configured_change_type_default_bump(
 	target: &str,
 	change_type: &str,
 ) -> Option<BumpSeverity> {
+	let excluded = configured_excluded_types(configuration, target);
+	if excluded.contains(&change_type) {
+		return None;
+	}
 	configured_change_sections(configuration, target)
 		.types
 		.get(change_type)
@@ -2803,9 +2838,6 @@ fn parse_markdown_change_target(
 		.map(str::trim)
 		.filter(|value| !value.is_empty())
 	{
-		if let Some(bump) = parse_bump_severity(token) {
-			return Ok((Some(bump), None, None, Vec::new()));
-		}
 		if let Some(default_bump) =
 			configured_change_type_default_bump(configuration, package, token)
 		{
@@ -2821,15 +2853,12 @@ fn parse_markdown_change_target(
 		{
 			let valid_types = configured_change_types(configuration, package);
 			let valid_types_help = if valid_types.is_empty() {
-				String::new()
+				"no configured types are available for this target".to_string()
 			} else {
-				format!(
-					" or one of the configured types: {}",
-					valid_types.join(", ")
-				)
+				format!("valid types: {}", valid_types.join(", "))
 			};
 			return Err(MonochangeError::Config(format!(
-				"failed to parse {}: target `{package}` has invalid scalar value `{token}`; expected one of `none`, `patch`, `minor`, `major`{valid_types_help}`",
+				"failed to parse {}: target `{package}` has invalid scalar change type `{token}`; {valid_types_help}",
 				changes_path.display()
 			)));
 		}
@@ -2838,7 +2867,7 @@ fn parse_markdown_change_target(
 
 	let Some(mapping) = value.as_mapping() else {
 		return Err(MonochangeError::Config(format!(
-			"failed to parse {}: target `{package}` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, `type`, and/or `caused_by`",
+			"failed to parse {}: target `{package}` must map to a configured change type or to a table with `bump`, `version`, `type`, and/or `caused_by`",
 			changes_path.display()
 		)));
 	};
@@ -3430,8 +3459,23 @@ fn validate_changelog_configuration(
 			"[changelog].section_thresholds.ignored must be greater than or equal to [changelog].section_thresholds.collapse".to_string(),
 		));
 	}
-	// Validate that each type references an existing section
+	let config_document = if changelog.types.is_empty() {
+		None
+	} else {
+		Some(toml::from_str::<toml::Value>(contents).map_err(|error| {
+			MonochangeError::Config(format!("failed to parse monochange.toml: {error}"))
+		})?)
+	};
+	// Validate that each type declares a semantic bump and references an existing section
 	for (type_key, typ) in &changelog.types {
+		if config_document
+			.as_ref()
+			.is_some_and(|document| !raw_changelog_type_has_field(document, type_key, "bump"))
+		{
+			return Err(MonochangeError::Config(format!(
+				"[changelog].types.{type_key} must declare a `bump` default (`none`, `patch`, `minor`, or `major`)"
+			)));
+		}
 		if !changelog.sections.contains_key(&typ.section) {
 			return Err(MonochangeError::Config(format!(
 				"[changelog].types.{type_key} references section `{}` which does not exist in [changelog.sections]",
@@ -3461,6 +3505,15 @@ fn validate_changelog_configuration(
 		}
 	}
 	Ok(())
+}
+
+fn raw_changelog_type_has_field(document: &toml::Value, type_key: &str, field: &str) -> bool {
+	document
+		.get("changelog")
+		.and_then(|changelog| changelog.get("types"))
+		.and_then(|types| types.get(type_key))
+		.and_then(toml::Value::as_table)
+		.is_some_and(|type_config| type_config.contains_key(field))
 }
 
 fn validate_changelog_keys<K, V>(

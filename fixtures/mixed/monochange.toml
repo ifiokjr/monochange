@@ -1,9 +1,17 @@
 [defaults]
 parent_bump = "patch"
 
+[changelog.sections.minor]
+heading = "Minor"
+priority = 30
+
 [changelog.sections.security]
 heading = "Security"
 priority = 40
+
+[changelog.types.minor]
+section = "minor"
+bump = "minor"
 
 [changelog.types.security]
 section = "security"

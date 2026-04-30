@@ -30,7 +30,7 @@ expression: json
       "targets": [
         {
           "bump": "major",
-          "changeType": null,
+          "changeType": "major",
           "evidenceRefs": [],
           "id": "core",
           "kind": "package",

@@ -25,7 +25,7 @@ expression: json
       "targets": [
         {
           "bump": "minor",
-          "changeType": null,
+          "changeType": "minor",
           "evidenceRefs": [],
           "id": "core",
           "kind": "package",
