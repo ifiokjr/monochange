@@ -801,7 +801,7 @@ pub(crate) fn cli_command_after_help(cli_command: &CliCommandDefinition) -> Opti
 	match cli_command.name.as_str() {
 		"step:publish-release" => {
 			Some(
-				r#"What this step does:
+				r"What this step does:
   - Reads a prepared release artifact produced by prepare-release.
   - Creates or updates source-control provider release objects, such as GitHub, GitLab, or Gitea releases.
   - Uploads provider release notes and asset metadata according to the configured source provider.
@@ -817,37 +817,37 @@ Typical release flow:
 Related commands:
   mc help step:prepare-release
   mc help publish-readiness
-  mc help publish"#,
+  mc help publish",
 			)
 		}
 		"step:prepare-release" => {
 			Some(
-				r#"What this step does:
+				r"What this step does:
   - Reads pending changesets and workspace package metadata.
   - Calculates version bumps, changelog entries, and release artifacts.
   - Writes a prepared release artifact that later steps can consume.
 
 Typical release flow:
   mc step:prepare-release --output prepared-release.json
-  mc step:publish-release --prepared-release prepared-release.json"#,
+  mc step:publish-release --prepared-release prepared-release.json",
 			)
 		}
 		"step:affected-packages" => {
 			Some(
-				r#"What this step does:
+				r"What this step does:
   - Computes packages affected by a change or release plan.
   - Includes direct changes, grouped packages, and dependent packages according to monochange propagation rules.
 
-Use this command when debugging release scope before preparing or publishing a release."#,
+Use this command when debugging release scope before preparing or publishing a release.",
 			)
 		}
 		"step:create-change-file" => {
 			Some(
-				r#"What this step does:
+				r"What this step does:
   - Creates a changeset file for one or more packages.
   - Records bump intent, reason text, and dependency-caused relationships.
 
-Prefer configured package ids in change files whenever a leaf package changed."#,
+Prefer configured package ids in change files whenever a leaf package changed.",
 			)
 		}
 		"change" => {

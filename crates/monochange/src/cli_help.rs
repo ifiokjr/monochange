@@ -1093,10 +1093,10 @@ pub fn render_command_help_with_cli(
 		return render_single_command_help(bin_name, help);
 	}
 
-	if command_name.starts_with("step:") {
-		if let Some(help) = step_command_help(command_name) {
-			return render_owned_command_help(bin_name, &help);
-		}
+	if command_name.starts_with("step:")
+		&& let Some(help) = step_command_help(command_name)
+	{
+		return render_owned_command_help(bin_name, &help);
 	}
 
 	if let Some(cli_command) = cli.iter().find(|command| command.name == command_name) {
@@ -1375,9 +1375,10 @@ fn input_options(inputs: &[CliInputDefinition]) -> Vec<(String, String, String)>
 fn input_type_name(input: &CliInputDefinition) -> String {
 	match input.kind {
 		CliInputKind::Boolean => String::new(),
-		CliInputKind::Choice => "<VALUE>".to_string(),
 		CliInputKind::Path => "<PATH>".to_string(),
-		CliInputKind::String | CliInputKind::StringList => "<VALUE>".to_string(),
+		CliInputKind::Choice | CliInputKind::String | CliInputKind::StringList => {
+			"<VALUE>".to_string()
+		}
 	}
 }
 
