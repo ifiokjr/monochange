@@ -15,6 +15,7 @@ in
     [
       cargo-binstall
       cargo-run-bin
+      cacert
       custom.mdt
       custom.pnpm
       dprint
@@ -384,7 +385,7 @@ in
     "lint:js" = {
       exec = ''
         set -euo pipefail
-        env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u NIX_LD -u NIX_LD_LIBRARY_PATH node node_modules/oxlint/bin/oxlint --type-aware .
+        pnpm oxlint --type-aware .
       '';
       description = "Lint all JS/TS files with oxlint (type-aware).";
       binary = "bash";
@@ -392,7 +393,7 @@ in
     "lint:js:syntax" = {
       exec = ''
         set -euo pipefail
-        env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u NIX_LD -u NIX_LD_LIBRARY_PATH node node_modules/oxlint/bin/oxlint .
+        pnpm oxlint .
       '';
       description = "Lint all JS/TS files with oxlint (syntax-only, faster).";
       binary = "bash";
@@ -400,7 +401,7 @@ in
     "lint:js:types" = {
       exec = ''
         set -euo pipefail
-        env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u NIX_LD -u NIX_LD_LIBRARY_PATH node node_modules/@rslint/tsgo/bin/tsgo.cjs -config tsconfig.json
+        pnpm tsgo -config tsconfig.json
       '';
       description = "Type-check all JS/TS files with tsgo.";
       binary = "bash";
@@ -408,7 +409,7 @@ in
     "fix:js" = {
       exec = ''
         set -euo pipefail
-        env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u NIX_LD -u NIX_LD_LIBRARY_PATH node node_modules/oxfmt/bin/oxfmt --write .
+        pnpm oxfmt --write .
       '';
       description = "Format all JS/TS files with oxfmt.";
       binary = "bash";
@@ -416,7 +417,7 @@ in
     "build:js" = {
       exec = ''
         set -euo pipefail
-        env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u NIX_LD -u NIX_LD_LIBRARY_PATH node node_modules/tsdown/dist/run.mjs
+        pnpm tsdown
       '';
       description = "Bundle JS/TS entry points with tsdown.";
       binary = "bash";
