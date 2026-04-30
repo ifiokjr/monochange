@@ -2152,7 +2152,7 @@ impl CliStepDefinition {
 				])
 			}
 			Self::AffectedPackages { .. } => {
-				Some(&["format", "changed_paths", "since", "verify", "label"])
+				Some(&["format", "changed_paths", "from", "verify", "label"])
 			}
 			Self::DiagnoseChangesets { .. } => Some(&["format", "changeset"]),
 			Self::RetargetRelease { .. } => Some(&["from", "target", "force", "sync_provider"]),
@@ -2285,7 +2285,7 @@ impl CliStepDefinition {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					"changed_paths" | "label" => Some(CliInputKind::StringList),
-					"since" => Some(CliInputKind::String),
+					"from" => Some(CliInputKind::String),
 					"verify" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
