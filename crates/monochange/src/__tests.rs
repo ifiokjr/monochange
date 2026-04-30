@@ -433,7 +433,7 @@ fn repair_release_help_describes_retargeting_workflow() {
 	)
 	.unwrap_or_else(|error| panic!("repair-release help: {error}"));
 
-	assert!(output.contains("Run the `step:retarget-release` command"));
+	assert!(output.contains("Run the built-in retarget-release release workflow step"));
 	assert!(output.contains("--from"));
 	assert!(output.contains("--sync-provider"));
 }
@@ -567,7 +567,7 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 		],
 	)
 	.unwrap_or_else(|error| panic!("versions help: {error}"));
-	assert!(versions_help.contains("Run the `step:display-versions` command"));
+	assert!(versions_help.contains("Run the built-in display-versions release workflow step"));
 	assert!(versions_help.contains("--format <FORMAT>"));
 
 	let matches = build_command_for_root("mc", &fixture_root)
@@ -11713,6 +11713,16 @@ fn cli_accepts_log_level_equals_syntax_without_error() {
 	.unwrap_or_else(|error| panic!("log-level equals with help: {error}"));
 
 	assert!(output.contains("Usage: mc"));
+}
+
+#[test]
+fn cli_root_help_matches_help_subcommand_overview() {
+	let root_help = run_with_args("mc", [OsString::from("mc"), OsString::from("--help")])
+		.unwrap_or_else(|error| panic!("root help output: {error}"));
+	let help_subcommand = run_with_args("mc", [OsString::from("mc"), OsString::from("help")])
+		.unwrap_or_else(|error| panic!("help subcommand output: {error}"));
+
+	assert_eq!(root_help, help_subcommand);
 }
 
 #[test]

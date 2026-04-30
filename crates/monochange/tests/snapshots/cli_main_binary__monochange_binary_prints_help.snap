@@ -11,48 +11,63 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Manage versions and releases for your multiplatform, multilanguage monorepo
+╭──────────────────────────────────────────────────────────╮
+│  monochange                                              │
+│  monochange — versioning & releases for your monorepo  │
+╰──────────────────────────────────────────────────────────╯
 
-Usage: monochange [OPTIONS] <COMMAND>
+▸ Description
 
-Commands:
-  init                           Generate monochange.toml with detected packages, groups, and default CLI commands
-  populate                       Add any missing built-in CLI commands to monochange.toml so you can customize them
-  skill                          Install the monochange skill bundle into the current project with the skills CLI
-  subagents                      Generate repo-local monochange subagents and agent guidance files
-  analyze                        Analyze semantic changes for one package across main, head, and optional release baselines
-  migrate                        Audit release automation before migrating to monochange
-  release-record                 Inspect the monochange release record associated with a tag or commit
-  publish-readiness              Check package registry publishing readiness without publishing packages
-  publish-bootstrap              Publish first-time placeholder package versions for a release record
-  tag-release                    Create and push release tags from the monochange release record on a commit
-  lint                           Inspect and scaffold manifest lint rules
-  mcp                            Start the monochange MCP (Model Context Protocol) server over stdin/stdout
-  check                          Validate configuration, changesets, and run manifest lint rules
-  help                           Show detailed help for a command
-  step:config                    Run the `step:config` command
-  step:validate                  Run the `step:validate` command
-  step:discover                  Run the `step:discover` command
-  step:display-versions          Run the `step:display-versions` command
-  step:create-change-file        Run the `step:create-change-file` command
-  step:prepare-release           Run the `step:prepare-release` command
-  step:commit-release            Run the `step:commit-release` command
-  step:verify-release-branch     Run the `step:verify-release-branch` command
-  step:publish-release           Run the `step:publish-release` command
-  step:placeholder-publish       Run the `step:placeholder-publish` command
-  step:publish-packages          Run the `step:publish-packages` command
-  step:plan-publish-rate-limits  Run the `step:plan-publish-rate-limits` command
-  step:open-release-request      Run the `step:open-release-request` command
-  step:comment-released-issues   Run the `step:comment-released-issues` command
-  step:affected-packages         Run the `step:affected-packages` command
-  step:diagnose-changesets       Run the `step:diagnose-changesets` command
-  step:retarget-release          Run the `step:retarget-release` command
+monochange discovers packages across Cargo, npm/pnpm/Bun, Deno, and Dart/Flutter, then coordinates version bumps, changelogs, and release automation from a single monochange.toml config.
 
-Options:
-  -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
-      --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
-      --jq <EXPRESSION>           Filter JSON output with a jq-style expression, such as `.assets[].name`
-  -h, --help                      Print help
+Run `mc help <command>` or `mc <command> -h` for detailed examples and usage tips.
+
+▸ Usage
+
+  Usage: monochange [OPTIONS] <COMMAND>
+
+▸ Built-in Commands
+
+  init               Generate monochange.toml with detected packages
+  populate           Add missing built-in CLI commands to monochange.toml
+  skill              Install the monochange skill bundle for AI agents
+  subagents          Generate repo-local monochange subagents and agent guidance
+  analyze            Analyze semantic changes for a package
+  tag-release        Create and push release tags from an embedded release record
+  release-record     Inspect the monochange release record for a tag or commit
+  check              Validate configuration, changesets, and run manifest lint rules
+  lint               Inspect and scaffold manifest lint rules
+  mcp                Start the monochange MCP server over stdin/stdout
+  validate           Validate monochange configuration and changesets
+  publish-readiness  Check package registry publishing readiness without publishing packages
+  publish-bootstrap  Publish first-time placeholder package versions for a release record
+
+▸ Step Commands
+
+  step:config                    Render resolved monochange configuration and workspace metadata
+  step:validate                  Validate configuration, package manifests, and changesets
+  step:discover                  Discover packages across supported ecosystems
+  step:display-versions          Preview planned versions without modifying files
+  step:create-change-file        Create a structured changeset file
+  step:prepare-release           Plan version bumps, changelogs, and release artifacts
+  step:commit-release            Create a release commit with an embedded release record
+  step:verify-release-branch     Verify that a release branch still targets a valid base
+  step:publish-release           Create or update hosted source-provider releases
+  step:placeholder-publish       Publish missing first-time placeholder package versions
+  step:publish-packages          Publish package versions from a publish plan
+  step:plan-publish-rate-limits  Plan package publish batches around registry rate limits
+  step:open-release-request      Open or update a hosted release pull request
+  step:comment-released-issues   Comment on issues referenced by released changesets
+  step:affected-packages         Evaluate affected packages and changeset coverage
+  step:diagnose-changesets       Inspect changeset provenance and metadata
+  step:retarget-release          Repair release tags by retargeting a release
+
+
+▸ Global Flags
+
+  --quiet     Suppress output, run in dry-run mode
+  --progress-format <FORMAT>  auto, unicode, ascii, json
+  Use `mc help <command>` or `mc <command> -h` for detailed command help.
 
 
 ----- stderr -----
