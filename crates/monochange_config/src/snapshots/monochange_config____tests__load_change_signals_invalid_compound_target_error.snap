@@ -1,5 +1,6 @@
 ---
 source: crates/monochange_config/src/__tests.rs
+assertion_line: 5226
 expression: error.to_string()
 ---
-config error: failed to parse [ROOT]/invalid-change.md: target `core` must map to `none`, `patch`, `minor`, `major`, a configured change type, or to a table with `bump`, `version`, `type`, and/or `caused_by`
+config error: failed to parse [ROOT]/invalid-change.md: target `core` must map to a configured change type or to a table with `bump`, `version`, `type`, and/or `caused_by`

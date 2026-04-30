@@ -7,4 +7,6 @@ expression: app_changelog
 
 ## app 1.0.1 ([DATE])
 
+### Changed
+
 - No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.

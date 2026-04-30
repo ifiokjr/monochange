@@ -2874,7 +2874,7 @@ mod tests {
 	}
 
 	#[test]
-	fn monochange_format_omits_heading_for_single_changed_section() {
+	fn monochange_format_includes_heading_for_single_changed_section() {
 		let settings = ChangelogSettings {
 			templates: vec!["- {{ summary }}".to_string()],
 			..ChangelogSettings::default()
@@ -2894,15 +2894,15 @@ mod tests {
 		let markdown =
 			render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
 
-		// Monochange format omits "### Changed" when it's the only section
-		// (it's a single section with title "Changed" - the default)
+		// Monochange format includes section headings even when the only section is
+		// the default `Changed` bucket.
 		assert!(
-			!markdown.contains("### Changed"),
-			"monochange format should omit ### Changed heading for single default section"
+			markdown.contains("### Changed"),
+			"monochange format should include ### Changed heading for single default section"
 		);
 		assert!(
 			markdown.contains("- fix bug"),
-			"entry should appear even without heading"
+			"entry should appear after heading"
 		);
 	}
 

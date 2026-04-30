@@ -2132,26 +2132,406 @@ fn load_change_signals_accept_group_scalar_type_shorthand_with_default_bump() {
 }
 
 #[test]
-fn load_change_signals_accept_type_only_scalar_shorthand_without_default_bump() {
+fn load_workspace_configuration_rejects_changelog_type_without_default_bump() {
 	let root = fixture_path("config/change-signals-type-only-no-default-bump");
-	let configuration = load_workspace_configuration(&root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
-	let mut packages = vec![PackageRecord::new(
-		Ecosystem::Cargo,
-		"cargo-core",
+	let error = load_workspace_configuration(&root)
+		.err()
+		.unwrap_or_else(|| panic!("expected configuration error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("[changelog].types.docs must declare a `bump` default")
+	);
+}
+
+#[test]
+fn load_change_signals_treats_bump_named_scalar_as_configured_type() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+	std::fs::write(
 		root.join("crates/core/Cargo.toml"),
-		root.clone(),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[changelog.sections.fixes]
+heading = "Fixed"
+priority = 20
+
+[changelog.types.patch]
+section = "fixes"
+bump = "minor"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	std::fs::write(
+		root.join("change.md"),
+		"---\ncore: patch\n---\n\nFix a parser bug.\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.to_path_buf(),
 		Some(Version::new(1, 0, 0)),
 		PublishState::Public,
 	)];
-	apply_version_groups(&mut packages, &configuration)
-		.unwrap_or_else(|error| panic!("version groups: {error}"));
 
 	let signals = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.unwrap_or_else(|error| panic!("change signals: {error}"));
 	let signal = signals.first().unwrap_or_else(|| panic!("expected signal"));
-	assert_eq!(signal.requested_bump, Some(BumpSeverity::None));
-	assert_eq!(signal.change_type.as_deref(), Some("docs"));
+	assert_eq!(signal.requested_bump, Some(BumpSeverity::Minor));
+	assert_eq!(signal.change_type.as_deref(), Some("patch"));
+}
+
+#[test]
+fn load_change_signals_rejects_bump_named_scalar_when_type_is_not_configured() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+	std::fs::write(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[changelog.sections.documentation]
+heading = "Documentation"
+priority = 30
+
+[changelog.sections.testing]
+heading = "Testing"
+priority = 40
+
+[changelog.types.docs]
+section = "documentation"
+bump = "none"
+
+[changelog.types.test]
+section = "testing"
+bump = "patch"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let change_path = root.join("change.md");
+	std::fs::write(&change_path, "---\ncore: patch\n---\n\nPatch change.\n")
+		.unwrap_or_else(|error| panic!("write changeset: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&change_path, &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected parse error"));
+	let rendered = error.to_string();
+	assert!(rendered.contains("invalid scalar change type `patch`"));
+	assert!(rendered.contains("valid types: docs, test"));
+}
+
+#[test]
+fn load_change_signals_allows_object_bump_without_configured_type() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+	std::fs::write(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let change_path = root.join("change.md");
+	std::fs::write(
+		&change_path,
+		"---\ncore:\n  bump: patch\n---\n\nPatch change.\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let signals = load_change_signals(&change_path, &configuration, &packages)
+		.unwrap_or_else(|error| panic!("change signals: {error}"));
+	let signal = signals.first().unwrap_or_else(|| panic!("expected signal"));
+	assert_eq!(signal.requested_bump, Some(BumpSeverity::Patch));
+	assert_eq!(signal.change_type, None);
+}
+
+#[test]
+fn load_change_signals_applies_toml_type_defaults_and_validates_context_types() {
+	let tempdir = setup_fixture("changeset-target-metadata/render-workspace");
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let mut packages = vec![
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"core",
+			tempdir.path().join("crates/core/Cargo.toml"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+		PackageRecord::new(
+			Ecosystem::Cargo,
+			"app",
+			tempdir.path().join("crates/app/Cargo.toml"),
+			tempdir.path().to_path_buf(),
+			Some(Version::new(1, 0, 0)),
+			PublishState::Public,
+		),
+	];
+	apply_version_groups(&mut packages, &configuration)
+		.unwrap_or_else(|error| panic!("version groups: {error}"));
+
+	let type_path = tempdir.path().join("type-only.toml");
+	std::fs::write(
+		&type_path,
+		r#"[[changes]]
+package = "sdk"
+type = "test"
+reason = "Exercise a group TOML type default."
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write type-only.toml: {error}"));
+	let loaded = load_changeset_file(&type_path, &configuration, &packages)
+		.unwrap_or_else(|error| panic!("typed changeset: {error}"));
+	let target = loaded
+		.targets
+		.iter()
+		.find(|target| target.id == "sdk")
+		.unwrap_or_else(|| panic!("expected sdk target"));
+	assert_eq!(target.bump, Some(BumpSeverity::Minor));
+	assert_eq!(target.change_type.as_deref(), Some("test"));
+	assert_eq!(loaded.signals.len(), 2);
+	assert!(loaded.signals.iter().all(|signal| {
+		signal.requested_bump == Some(BumpSeverity::Minor)
+			&& signal.change_type.as_deref() == Some("test")
+	}));
+
+	let version_path = tempdir.path().join("version-only.toml");
+	std::fs::write(
+		&version_path,
+		r#"[[changes]]
+package = "sdk"
+version = "2.0.0"
+reason = "Exercise group version inference."
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write version-only.toml: {error}"));
+	let loaded = load_changeset_file(&version_path, &configuration, &packages)
+		.unwrap_or_else(|error| panic!("versioned changeset: {error}"));
+	let target = loaded
+		.targets
+		.iter()
+		.find(|target| target.id == "sdk")
+		.unwrap_or_else(|| panic!("expected sdk target"));
+	assert_eq!(target.bump, Some(BumpSeverity::Major));
+	assert!(
+		loaded
+			.signals
+			.iter()
+			.all(|signal| signal.requested_bump == Some(BumpSeverity::Major))
+	);
+
+	let packages_without_app = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		tempdir.path().join("crates/core/Cargo.toml"),
+		tempdir.path().to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+	let missing_member_error =
+		load_change_signals(&version_path, &configuration, &packages_without_app)
+			.err()
+			.unwrap_or_else(|| panic!("expected missing group member error"));
+	assert!(
+		missing_member_error
+			.to_string()
+			.contains("change package reference `app` did not match any discovered package")
+	);
+
+	let invalid_group_path = tempdir.path().join("invalid-group-type.toml");
+	std::fs::write(
+		&invalid_group_path,
+		r#"[[changes]]
+package = "sdk"
+type = "nope"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write invalid-group-type.toml: {error}"));
+	let group_error = load_change_signals(&invalid_group_path, &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid group type error"));
+	assert!(
+		group_error
+			.to_string()
+			.contains("target `sdk` has invalid type `nope`")
+	);
+
+	let invalid_package_path = tempdir.path().join("invalid-package-type.toml");
+	std::fs::write(
+		&invalid_package_path,
+		r#"[[changes]]
+package = "core"
+type = "nope"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write invalid-package-type.toml: {error}"));
+	let package_error = load_change_signals(&invalid_package_path, &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid package type error"));
+	assert!(
+		package_error
+			.to_string()
+			.contains("target `core` has invalid type `nope`")
+	);
+}
+
+#[test]
+fn load_change_signals_reports_no_configured_scalar_types() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::fs::create_dir_all(root.join("crates/core"))
+		.unwrap_or_else(|error| panic!("create package dir: {error}"));
+	std::fs::write(
+		root.join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[package.core]
+path = "crates/core"
+type = "cargo"
+
+[changelog.sections.misc]
+heading = "Miscellaneous"
+priority = 90
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let change_path = root.join("change.md");
+	std::fs::write(&change_path, "---\ncore: docs\n---\n\n# docs\n")
+		.unwrap_or_else(|error| panic!("write changeset: {error}"));
+
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+	let packages = vec![PackageRecord::new(
+		Ecosystem::Cargo,
+		"core",
+		root.join("crates/core/Cargo.toml"),
+		root.to_path_buf(),
+		Some(Version::new(1, 0, 0)),
+		PublishState::Public,
+	)];
+
+	let error = load_change_signals(&change_path, &configuration, &packages)
+		.err()
+		.unwrap_or_else(|| panic!("expected scalar type error"));
+	let rendered = error.to_string();
+	assert!(rendered.contains("invalid scalar change type `docs`"));
+	assert!(rendered.contains("no configured types are available for this target"));
+
+	let scalar = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("docs")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let scalar_error = crate::parse_markdown_change_target(
+		&scalar,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected non-context scalar type error"));
+	let rendered = scalar_error.to_string();
+	assert!(rendered.contains("invalid scalar change type `docs`"));
+	assert!(rendered.contains("no configured types are available for this target"));
+}
+
+#[test]
+fn validate_changelog_configuration_reports_invalid_toml_when_types_need_raw_fields() {
+	let mut sections = BTreeMap::new();
+	sections.insert(
+		"testing".to_string(),
+		monochange_core::ChangelogSectionDef {
+			heading: "Testing".to_string(),
+			description: None,
+			priority: 40,
+		},
+	);
+	let mut types = BTreeMap::new();
+	types.insert(
+		"test".to_string(),
+		monochange_core::ChangelogType {
+			bump: BumpSeverity::Patch,
+			section: "testing".to_string(),
+			description: None,
+		},
+	);
+
+	let error = crate::validate_changelog_configuration(
+		"[changelog.types.test\n",
+		&crate::RawChangelogSettings {
+			templates: Vec::new(),
+			sections,
+			section_thresholds: monochange_core::ChangelogSectionThresholds::default(),
+			types,
+		},
+		&[],
+		&[],
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected invalid TOML error"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to parse monochange.toml")
+	);
 }
 
 #[test]
@@ -2172,8 +2552,8 @@ fn load_change_signals_reject_unknown_scalar_type_with_valid_types_help() {
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
 	let rendered = error.to_string();
-	assert!(rendered.contains("invalid scalar value `nope`"));
-	assert!(rendered.contains("configured types: docs, test"));
+	assert!(rendered.contains("invalid scalar change type `nope`"));
+	assert!(rendered.contains("valid types: docs, test"));
 }
 
 #[test]
@@ -2333,6 +2713,23 @@ fn validate_configured_change_type_rejects_package_excluded_type() {
 	.unwrap_or_else(|| panic!("expected invalid type error"));
 	assert!(error.to_string().contains("invalid type `test`"));
 	assert!(error.to_string().contains("valid types: feat, fix"));
+
+	let scalar = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("test")
+		.unwrap_or_else(|error| panic!("yaml parse: {error}"));
+	let scalar_error = crate::parse_markdown_change_target(
+		&scalar,
+		Path::new("change.md"),
+		"core",
+		&configuration,
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected scalar type error"));
+	assert!(
+		scalar_error
+			.to_string()
+			.contains("invalid scalar change type `test`")
+	);
+	assert!(scalar_error.to_string().contains("valid types: feat, fix"));
 }
 
 #[test]
@@ -2390,7 +2787,7 @@ fn parse_markdown_change_target_rejects_non_scalar_non_mapping_values() {
 	assert!(
 		error
 			.to_string()
-			.contains("must map to `none`, `patch`, `minor`, `major`, a configured change type")
+			.contains("must map to a configured change type or to a table")
 	);
 }
 
@@ -2489,7 +2886,11 @@ fn load_change_signals_rejects_invalid_markdown_bumps() {
 	let error = load_change_signals(&root.join("change.md"), &configuration, &packages)
 		.err()
 		.unwrap_or_else(|| panic!("expected parse error"));
-	assert!(error.to_string().contains("invalid scalar value `note`"));
+	assert!(
+		error
+			.to_string()
+			.contains("invalid scalar change type `note`")
+	);
 }
 
 #[test]
@@ -4959,9 +5360,9 @@ fn parse_markdown_change_target_and_validation_helpers_cover_remaining_error_pat
 	assert!(
 		scalar_error
 			.to_string()
-			.contains("invalid scalar value `docs`")
+			.contains("invalid scalar change type `docs`")
 	);
-	assert!(scalar_error.to_string().contains("configured types"));
+	assert!(scalar_error.to_string().contains("valid types"));
 
 	let unknown_keys = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("extra: true")
 		.unwrap_or_else(|error| panic!("yaml parse: {error}"));

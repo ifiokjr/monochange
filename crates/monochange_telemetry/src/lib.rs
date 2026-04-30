@@ -257,9 +257,11 @@ fn write_event(
 		body: EventBody { value: name },
 		attributes,
 	};
+	let mut line = serde_json::to_vec(&event).map_err(std::io::Error::other)?;
+	line.push(b'\n');
+
 	let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-	serde_json::to_writer(&mut file, &event)?;
-	file.write_all(b"\n")?;
+	file.write_all(&line)?;
 	Ok(())
 }
 

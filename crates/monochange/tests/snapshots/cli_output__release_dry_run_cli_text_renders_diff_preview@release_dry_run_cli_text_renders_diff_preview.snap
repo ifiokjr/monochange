@@ -49,7 +49,7 @@ file diffs:
 
 --- a/changelog.md
 +++ b/changelog.md
-@@ -1 +1,14 @@
+@@ -1 +1,16 @@
  # Changelog
 +
 +## 1.1.0 ([DATE])
@@ -60,6 +60,8 @@ file diffs:
 +
 +Synchronized members: app
 +
++### Minor
++
 +> [!NOTE]
 +> *core*
 +
@@ -67,10 +69,12 @@ file diffs:
 
 --- a/crates/core/CHANGELOG.md
 +++ b/crates/core/CHANGELOG.md
-@@ -1 +1,5 @@
+@@ -1 +1,7 @@
  # Changelog
 +
 +## 1.1.0 ([DATE])
++
++### Minor
 +
 +#### add feature
 

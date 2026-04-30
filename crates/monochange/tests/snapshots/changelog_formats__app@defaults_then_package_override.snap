@@ -11,4 +11,6 @@ This changelog is managed by [monochange](https://github.com/monochange/monochan
 
 ## 1.1.0 ([DATE])
 
+### Changed
+
 - No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`.

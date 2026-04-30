@@ -28,7 +28,7 @@ expression: content_text(&result)
         "targets": [
           {
             "bump": "patch",
-            "changeType": null,
+            "changeType": "patch",
             "evidenceRefs": [],
             "id": "core",
             "kind": "package",

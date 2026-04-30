@@ -32,7 +32,7 @@ expression: json
       "targets": [
         {
           "bump": "minor",
-          "changeType": null,
+          "changeType": "minor",
           "evidenceRefs": [],
           "id": "sdk-core",
           "kind": "package",

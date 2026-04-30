@@ -20,7 +20,7 @@ expression: json
               "entries": [
                 "#### add github fixture coverage"
               ],
-              "title": "Changed"
+              "title": "Minor"
             }
           ],
           "summary": [],
@@ -29,7 +29,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n#### add github fixture coverage"
+        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Minor\n\n#### add github fixture coverage"
       }
     ],
     "changesets": [
@@ -54,7 +54,7 @@ expression: json
         "targets": [
           {
             "bump": "minor",
-            "changeType": null,
+            "changeType": "minor",
             "evidenceRefs": [],
             "id": "core",
             "kind": "package",

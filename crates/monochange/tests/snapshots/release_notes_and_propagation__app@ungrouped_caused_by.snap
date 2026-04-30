@@ -7,6 +7,8 @@ expression: app_changelog
 
 ## app 1.0.1 ([DATE])
 
+### Changed
+
 #### update dependency on core
 
 Bumps the app dependency to consume the latest core API.

@@ -29,7 +29,7 @@ expression: "serde_json::to_string_pretty(&eval).unwrap_or_else(|error|\n{ panic
           "targets": [
             {
               "bump": "patch",
-              "changeType": null,
+              "changeType": "patch",
               "evidenceRefs": [],
               "id": "core",
               "kind": "package",
@@ -101,7 +101,7 @@ expression: "serde_json::to_string_pretty(&eval).unwrap_or_else(|error|\n{ panic
           "targets": [
             {
               "bump": "patch",
-              "changeType": null,
+              "changeType": "patch",
               "evidenceRefs": [],
               "id": "core",
               "kind": "package",
