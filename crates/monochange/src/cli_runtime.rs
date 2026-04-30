@@ -941,7 +941,7 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::AffectedPackages { .. } => {
 					let evaluation =
-						execute_affected_packages_step(root, &step_inputs, context.quiet)?;
+						execute_affected_packages_step(root, step, &step_inputs, context.quiet)?;
 					context.changeset_policy_evaluation = Some(evaluation);
 					output = None;
 					Ok(())
@@ -3322,24 +3322,44 @@ fn execute_create_change_file_step(
 
 fn execute_affected_packages_step(
 	root: &Path,
+	step: &CliStepDefinition,
 	step_inputs: &BTreeMap<String, Vec<String>>,
-	quiet: bool,
+	_quiet: bool,
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
-	let since = step_inputs
-		.get("since")
+	let from = step_inputs
+		.get("from")
 		.and_then(|values| values.first().cloned());
+
+	let has_from = step.inputs().contains_key("from")
+		|| step_inputs
+			.get("from")
+			.is_some_and(|values| !values.is_empty());
+	let has_changed_paths = step.inputs().contains_key("changed_paths")
+		|| step_inputs
+			.get("changed_paths")
+			.is_some_and(|values| !values.is_empty());
+
+	match (has_from, has_changed_paths) {
+		(false, false) => {
+			return Err(MonochangeError::Config(
+				"`AffectedPackages` requires either `--from <REF>` or `--changed-paths <PATHS>`"
+					.to_string(),
+			));
+		}
+		(true, true) => {
+			return Err(MonochangeError::Config(
+				"`AffectedPackages` accepts either `--from <REF>` or `--changed-paths <PATHS>`, but not both".to_string(),
+			));
+		}
+		_ => {}
+	}
+
 	let explicit_paths = step_inputs
 		.get("changed_paths")
 		.cloned()
 		.unwrap_or_default();
-	let changed_paths = match &since {
-		Some(rev) => {
-			if !quiet && !explicit_paths.is_empty() {
-				eprintln!("warning: --since takes priority; --changed-paths was ignored");
-			}
-
-			compute_changed_paths_since(root, rev)?
-		}
+	let changed_paths = match &from {
+		Some(rev) => compute_changed_paths_since(root, rev)?,
 		None => explicit_paths,
 	};
 	let labels = step_inputs.get("label").cloned().unwrap_or_default();
@@ -3971,7 +3991,7 @@ mod tests {
 	}
 
 	#[test]
-	fn execute_affected_packages_step_supports_since_git_input() {
+	fn execute_affected_packages_step_supports_from_git_input() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path();
 		fs::create_dir_all(root.join("crates/core/src"))
@@ -4020,7 +4040,12 @@ path = "crates/core"
 
 		let evaluation = execute_affected_packages_step(
 			root,
-			&BTreeMap::from([("since".to_string(), vec!["HEAD".to_string()])]),
+			&CliStepDefinition::AffectedPackages {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			&BTreeMap::from([("from".to_string(), vec!["HEAD".to_string()])]),
 			true,
 		)
 		.unwrap_or_else(|error| panic!("execute affected packages step: {error}"));
@@ -4032,6 +4057,92 @@ path = "crates/core"
 		);
 		assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
 		assert_eq!(evaluation.uncovered_package_ids, vec!["core".to_string()]);
+	}
+
+	#[test]
+	fn execute_affected_packages_step_rejects_neither_from_nor_changed_paths() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("crates/core/src"))
+			.unwrap_or_else(|error| panic!("create workspace directories: {error}"));
+		fs::write(
+			root.join("monochange.toml"),
+			r#"[defaults]
+package_type = "cargo"
+
+[changesets.affected]
+enabled = true
+required = true
+
+[package.core]
+path = "crates/core"
+"#,
+		)
+		.unwrap_or_else(|error| panic!("write monochange config: {error}"));
+
+		let error = execute_affected_packages_step(
+			root,
+			&CliStepDefinition::AffectedPackages {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			&BTreeMap::new(),
+			true,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected error"));
+		assert!(
+			error
+				.to_string()
+				.contains("requires either `--from <REF>` or `--changed-paths <PATHS>`")
+		);
+	}
+
+	#[test]
+	fn execute_affected_packages_step_rejects_both_from_and_changed_paths() {
+		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let root = tempdir.path();
+		fs::create_dir_all(root.join("crates/core/src"))
+			.unwrap_or_else(|error| panic!("create workspace directories: {error}"));
+		fs::write(
+			root.join("monochange.toml"),
+			r#"[defaults]
+package_type = "cargo"
+
+[changesets.affected]
+enabled = true
+required = true
+
+[package.core]
+path = "crates/core"
+"#,
+		)
+		.unwrap_or_else(|error| panic!("write monochange config: {error}"));
+
+		let error = execute_affected_packages_step(
+			root,
+			&CliStepDefinition::AffectedPackages {
+				name: None,
+				when: None,
+				inputs: BTreeMap::new(),
+			},
+			&BTreeMap::from([
+				("from".to_string(), vec!["HEAD".to_string()]),
+				(
+					"changed_paths".to_string(),
+					vec!["crates/core/src/lib.rs".to_string()],
+				),
+			]),
+			true,
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected error"));
+		assert!(
+			error.to_string().contains(
+				"accepts either `--from <REF>` or `--changed-paths <PATHS>`, but not both"
+			)
+		);
 	}
 
 	#[test]

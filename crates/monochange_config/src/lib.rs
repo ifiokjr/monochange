@@ -4051,11 +4051,11 @@ fn validate_cli_runtime_requirements(
 				let has_changed_paths = inputs.contains_key("changed_paths")
 					|| cli_command_input(cli_command, "changed_paths")
 						.is_some_and(|input| matches!(input.kind, CliInputKind::StringList));
-				let has_since = inputs.contains_key("since")
-					|| cli_command_input(cli_command, "since").is_some();
-				if !has_changed_paths && !has_since {
+				let has_from =
+					inputs.contains_key("from") || cli_command_input(cli_command, "from").is_some();
+				if !has_changed_paths && !has_from {
 					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` uses `AffectedPackages` but declares neither a `changed_paths` nor a `since` input and does not override either on the step",
+						"CLI command `{}` uses `AffectedPackages` but declares neither a `changed_paths` nor a `from` input and does not override either on the step",
 						cli_command.name
 					)));
 				}
@@ -4074,13 +4074,7 @@ fn validate_cli_runtime_requirements(
 					inputs.get("changed_paths"),
 					false,
 				)?;
-				validate_step_override_kind(
-					cli_command,
-					step,
-					"since",
-					inputs.get("since"),
-					false,
-				)?;
+				validate_step_override_kind(cli_command, step, "from", inputs.get("from"), false)?;
 				validate_step_override_kind(
 					cli_command,
 					step,
