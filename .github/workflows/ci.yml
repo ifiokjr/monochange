@@ -381,7 +381,7 @@ jobs:
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
-        run: mc release-pr
+        run: mc --log-level=debug release-pr
         shell: devenv shell -- bash -e {0}
 
       - name: skip refresh on merged release commit
