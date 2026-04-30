@@ -1032,25 +1032,27 @@ pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> Rele
 			.collect(),
 		released_packages: record.released_packages.clone(),
 		changed_files: record.changed_files.clone(),
-		changelogs: if !record.changelogs.is_empty() {
-			record.changelogs.clone()
-		} else {
+		changelogs: if record.changelogs.is_empty() {
 			record
 				.updated_changelogs
 				.iter()
-				.map(|path| ReleaseManifestChangelog {
-					owner_id: String::new(),
-					owner_kind: ReleaseOwnerKind::Group,
-					path: path.clone(),
-					format: ChangelogFormat::default(),
-					notes: ReleaseNotesDocument {
-						title: String::new(),
-						summary: Vec::new(),
-						sections: Vec::new(),
-					},
-					rendered: String::new(),
+				.map(|path| {
+					ReleaseManifestChangelog {
+						owner_id: String::new(),
+						owner_kind: ReleaseOwnerKind::Group,
+						path: path.clone(),
+						format: ChangelogFormat::default(),
+						notes: ReleaseNotesDocument {
+							title: String::new(),
+							summary: Vec::new(),
+							sections: Vec::new(),
+						},
+						rendered: String::new(),
+					}
 				})
 				.collect()
+		} else {
+			record.changelogs.clone()
 		},
 		package_publications: record.package_publications.clone(),
 		changesets: record.changesets.clone(),

@@ -12357,6 +12357,56 @@ fn build_release_manifest_from_record_populates_manifest_from_release_record() {
 }
 
 #[test]
+fn build_release_manifest_from_record_preserves_changelog_metadata() {
+	use std::path::PathBuf;
+
+	use monochange_core::ChangelogFormat;
+	use monochange_core::ReleaseManifestChangelog;
+	use monochange_core::ReleaseNotesDocument;
+	use monochange_core::ReleaseNotesSection;
+	use monochange_core::ReleaseOwnerKind;
+	use monochange_core::ReleaseRecord;
+
+	let changelog = ReleaseManifestChangelog {
+		owner_id: "main".to_string(),
+		owner_kind: ReleaseOwnerKind::Group,
+		path: PathBuf::from("changelog.md"),
+		format: ChangelogFormat::Monochange,
+		notes: ReleaseNotesDocument {
+			title: "main 1.0.0".to_string(),
+			summary: vec!["Release target `main`".to_string()],
+			sections: vec![ReleaseNotesSection {
+				title: "Changed".to_string(),
+				collapsed: false,
+				entries: vec!["Preserve release notes".to_string()],
+			}],
+		},
+		rendered: "## main 1.0.0\n\n- Preserve release notes".to_string(),
+	};
+	let record = ReleaseRecord {
+		schema_version: 1,
+		kind: "monochange.releaseRecord".to_string(),
+		created_at: "2024-01-01T00:00:00Z".to_string(),
+		command: "publish-release".to_string(),
+		version: Some("1.0.0".to_string()),
+		group_version: None,
+		release_targets: Vec::new(),
+		released_packages: Vec::new(),
+		changed_files: Vec::new(),
+		package_publications: Vec::new(),
+		updated_changelogs: vec![PathBuf::from("legacy.md")],
+		deleted_changesets: Vec::new(),
+		changesets: Vec::new(),
+		changelogs: vec![changelog.clone()],
+		provider: None,
+	};
+
+	let manifest = crate::release_artifacts::build_release_manifest_from_record(&record);
+
+	assert_eq!(manifest.changelogs, vec![changelog]);
+}
+
+#[test]
 fn build_issue_comment_results_includes_closed_operation() {
 	let issue_comment_plans = vec![monochange_github::GitHubIssueCommentPlan {
 		repository: "ifiokjr/monochange".to_string(),
