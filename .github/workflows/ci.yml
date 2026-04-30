@@ -381,7 +381,15 @@ jobs:
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
-        run: mc --log-level=debug release-pr
+        run: |
+          if ! mc --log-level=debug release-pr 2>&1; then
+            exit_code=$?
+            if [ "$exit_code" -eq 1 ]; then
+              echo "::notice::No changesets to release; skipping release PR refresh."
+            else
+              exit "$exit_code"
+            fi
+          fi
         shell: devenv shell -- bash -e {0}
 
       - name: skip refresh on merged release commit
