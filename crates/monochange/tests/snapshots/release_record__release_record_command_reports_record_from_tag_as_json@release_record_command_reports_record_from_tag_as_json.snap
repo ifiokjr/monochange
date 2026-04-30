@@ -9,6 +9,7 @@ expression: parsed
     "changedFiles": [
       "Cargo.lock"
     ],
+    "changelogs": [],
     "changesets": [],
     "command": "release-pr",
     "createdAt": "[DATETIME]Z",
