@@ -28,6 +28,7 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
+          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: collect changed files
@@ -52,4 +53,4 @@ jobs:
             args+=(--label "$label")
           done
 
-          devenv shell -- mc "${args[@]}"
+          mc "${args[@]}"

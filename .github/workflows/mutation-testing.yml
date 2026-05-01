@@ -55,17 +55,16 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
+          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: install cargo-mutants
         run: cargo install cargo-mutants --locked
-        shell: devenv shell -- bash -e {0}
 
       - name: run mutation testing for ${{ matrix.crate }}
         run: |
           set -euo pipefail
           cargo mutants -p "${{ matrix.crate }}" --no-shuffle --output "mutants-report/${{ matrix.crate }}"
-        shell: devenv shell -- bash -e {0}
         timeout-minutes: 90
 
       - name: upload mutants report
@@ -92,5 +91,4 @@ jobs:
             echo "No mutants report found"
             exit 1
           fi
-        shell: devenv shell -- bash -e {0}
         if: always()

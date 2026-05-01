@@ -46,6 +46,7 @@ jobs:
       - name: setup current monochange cli
         uses: ./.github/actions/devenv
         with:
+          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build current monochange cli and checkout release tag
@@ -84,7 +85,6 @@ jobs:
             --assets-dir "$RUNNER_TEMP/release-assets"
           node scripts/npm/populate-packages.mjs \
             --packages-dir packages
-        shell: devenv shell -- bash -e {0}
 
       - name: check publish readiness
         env:
@@ -94,7 +94,6 @@ jobs:
             --from HEAD \
             --output "$RUNNER_TEMP/publish-readiness.json" \
             --format json
-        shell: devenv shell -- bash -e {0}
 
       - name: plan publish batches
         id: publish_plan
@@ -122,7 +121,6 @@ jobs:
 
           echo "Publish plan:"
           echo "$report" | jq '.publishRateLimits'
-        shell: devenv shell -- bash -e {0}
 
   publish:
     needs: plan
@@ -149,6 +147,7 @@ jobs:
       - name: setup current monochange cli
         uses: ./.github/actions/devenv
         with:
+          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build current monochange cli and checkout release tag
@@ -189,7 +188,6 @@ jobs:
             --assets-dir "$RUNNER_TEMP/release-assets"
           node scripts/npm/populate-packages.mjs \
             --packages-dir packages
-        shell: devenv shell -- bash -e {0}
 
       - name: wait for rate-limit window
         if: matrix.wait_seconds > 0
@@ -204,4 +202,3 @@ jobs:
           "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
             --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
             --format json
-        shell: devenv shell -- bash -e {0}
