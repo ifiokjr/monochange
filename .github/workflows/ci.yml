@@ -388,6 +388,7 @@ jobs:
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+          GITHUB_COMMIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mc --log-level=debug release-pr
         shell: devenv shell -- bash -e {0}
 

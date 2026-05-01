@@ -2784,3 +2784,44 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 		.unwrap_or_else(|error| panic!("update release file: {error}"));
 	(tempdir, repo)
 }
+
+#[test]
+fn github_commit_client_from_env_requires_commit_token_or_github_token() {
+	let source = sample_source(None);
+
+	let result = temp_env::with_vars(
+		[
+			("GITHUB_COMMIT_TOKEN", None::<&str>),
+			("GITHUB_TOKEN", None::<&str>),
+		],
+		|| {
+			let runtime = github_runtime().unwrap_or_else(|error| panic!("runtime: {error}"));
+			runtime.block_on(async { github_commit_client_from_env(&source) })
+		},
+	);
+
+	assert_eq!(
+		result
+			.err()
+			.map(|error| error.to_string()),
+		Some("config error: set `GITHUB_COMMIT_TOKEN` (or `GITHUB_TOKEN`) for GitHub commit verification".to_string())
+	);
+}
+
+#[test]
+fn github_commit_client_from_env_prefers_github_commit_token_over_github_token() {
+	let source = sample_source(None);
+
+	let result = temp_env::with_vars(
+		[
+			("GITHUB_COMMIT_TOKEN", Some("commit-token")),
+			("GITHUB_TOKEN", Some("github-token")),
+		],
+		|| {
+			let runtime = github_runtime().unwrap_or_else(|error| panic!("runtime: {error}"));
+			runtime.block_on(async { github_commit_client_from_env(&source) })
+		},
+	);
+
+	assert!(result.is_ok());
+}
