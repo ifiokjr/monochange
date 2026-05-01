@@ -1,0 +1,17 @@
+{
+  "name": "@monochange/embed",
+  "version": "0.1.0",
+  "description": "Embeddable feedback widget for monochange",
+  "private": true,
+  "type": "module",
+  "main": "dist/widget.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --minify --format=esm --outfile=dist/widget.js",
+    "dev": "esbuild src/index.ts --bundle --format=esm --outfile=dist/widget.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  }
+}

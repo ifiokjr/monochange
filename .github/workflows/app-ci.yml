@@ -1,0 +1,176 @@
+name: "app-ci"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/monochange_app/**"
+  pull_request:
+    paths:
+      - "apps/monochange_app/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/monochange_test
+  JWT_SECRET: ci-test-jwt-secret-key-123
+  GITHUB_CLIENT_ID: ci-test-client-id
+  GITHUB_CLIENT_SECRET: ci-test-client-secret
+
+jobs:
+  unit-tests:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/monochange_app
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: monochange_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: cargo test (unit)
+        run: |
+          secretspec run --profile ci --provider env -- cargo test --workspace --lib
+        shell: devenv shell -- bash -e {0}
+
+      - name: cargo test (integration)
+        run: |
+          secretspec run --profile ci --provider env -- cargo test --workspace --test '*' --lib --bins
+        shell: devenv shell -- bash -e {0}
+
+  check:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/monochange_app
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: cargo check
+        run: cargo check --workspace
+        shell: devenv shell -- bash -e {0}
+
+      - name: cargo leptos build (frontend-only)
+        run: cargo leptos build --frontend-only
+        shell: devenv shell -- bash -e {0}
+
+  e2e:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    needs: [unit-tests, check]
+    defaults:
+      run:
+        working-directory: apps/monochange_app
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: monochange_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: install playwright browsers
+        run: npx playwright install chromium --with-deps
+        shell: devenv shell -- bash -e {0}
+
+      - name: run end-to-end tests
+        run: |
+          secretspec run --profile ci --provider env -- cargo leptos end-to-end
+        shell: devenv shell -- bash -e {0}
+
+  coverage:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    defaults:
+      run:
+        working-directory: apps/monochange_app
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: monochange_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: generate coverage
+        run: |
+          secretspec run --profile ci --provider env -- cargo llvm-cov --workspace --lcov --output-path lcov.info
+        shell: devenv shell -- bash -e {0}
+
+      - name: upload coverage to codecov
+        uses: codecov/codecov-action@v5
+        with:
+          working-directory: apps/monochange_app
+          files: lcov.info
+          flags: monochange_app
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

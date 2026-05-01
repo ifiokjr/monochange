@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="g6" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0c8ee7"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <!-- Connected graph nodes -->
+  <circle cx="120" cy="50" r="18" fill="url(#g6)" opacity="0.2" stroke="url(#g6)" stroke-width="3"/>
+  <circle cx="60" cy="110" r="22" fill="url(#g6)" opacity="0.2" stroke="url(#g6)" stroke-width="3"/>
+  <circle cx="180" cy="110" r="22" fill="url(#g6)" opacity="0.2" stroke="url(#g6)" stroke-width="3"/>
+  <circle cx="80" cy="185" r="16" fill="url(#g6)" opacity="0.2" stroke="url(#g6)" stroke-width="3"/>
+  <circle cx="160" cy="185" r="16" fill="url(#g6)" opacity="0.2" stroke="url(#g6)" stroke-width="3"/>
+  <circle cx="120" cy="145" r="14" fill="url(#g6)" opacity="0.3" stroke="url(#g6)" stroke-width="3"/>
+  <!-- Connections -->
+  <g stroke="url(#g6)" stroke-width="2.5" opacity="0.7">
+    <line x1="120" y1="68" x2="60" y2="92"/>
+    <line x1="120" y1="68" x2="180" y2="92"/>
+    <line x1="60" y1="132" x2="80" y2="167"/>
+    <line x1="180" y1="132" x2="160" y2="167"/>
+    <line x1="80" y1="167" x2="120" y2="159"/>
+    <line x1="160" y1="167" x2="120" y2="159"/>
+    <line x1="120" y1="131" x2="60" y2="110"/>
+    <line x1="120" y1="131" x2="180" y2="110"/>
+  </g>
+  <!-- Center filled dot -->
+  <circle cx="120" cy="145" r="6" fill="url(#g6)"/>
+</svg>
