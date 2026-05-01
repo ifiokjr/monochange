@@ -1,5 +1,5 @@
 ---
-main: fix
+main: none
 ---
 
 # Use the current monochange CLI when publishing release tags
