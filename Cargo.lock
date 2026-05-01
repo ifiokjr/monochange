@@ -2194,7 +2194,6 @@ version = "0.3.0"
 dependencies = [
  "ignore",
  "insta",
- "monochange_test_helpers",
  "proptest",
  "reqwest",
  "rstest",
@@ -2354,6 +2353,15 @@ dependencies = [
  "monochange_core",
  "reqwest",
  "serde",
+]
+
+[[package]]
+name = "monochange_integration_tests"
+version = "0.0.0"
+dependencies = [
+ "monochange_core",
+ "monochange_test_helpers",
+ "tempfile",
 ]
 
 [[package]]

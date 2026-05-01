@@ -159,19 +159,24 @@ trait CommandExecutor {
 
 struct ProcessCommandExecutor;
 
+fn command_requires_clean_system_library_path(program: &str) -> bool {
+	matches!(program, "npm" | "pnpm" | "npx" | "node")
+}
+
 impl CommandExecutor for ProcessCommandExecutor {
 	fn run(&mut self, spec: &CommandSpec) -> MonochangeResult<CommandOutput> {
-		let output = ProcessCommand::new(&spec.program)
-			.args(&spec.args)
-			.current_dir(&spec.cwd)
-			.output()
-			.map_err(|error| {
-				MonochangeError::Io(format!(
-					"failed to run `{}` in {}: {error}",
-					render_command(spec),
-					spec.cwd.display()
-				))
-			})?;
+		let mut command = ProcessCommand::new(&spec.program);
+		command.args(&spec.args).current_dir(&spec.cwd);
+		if command_requires_clean_system_library_path(&spec.program) {
+			command.env_remove("LD_LIBRARY_PATH");
+		}
+		let output = command.output().map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to run `{}` in {}: {error}",
+				render_command(spec),
+				spec.cwd.display()
+			))
+		})?;
 		Ok(CommandOutput {
 			success: output.status.success(),
 			stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
@@ -3309,6 +3314,59 @@ jobs:
 				.to_string()
 				.contains("failed to read placeholder README")
 		);
+	}
+
+	#[test]
+	fn process_command_executor_cleans_library_path_for_javascript_tooling() {
+		let _guard = TEST_ENV_LOCK.lock().expect("test env lock");
+		let root = tempfile::tempdir().expect("tempdir:");
+		let bin = root.path().join("bin");
+		fs::create_dir_all(&bin).expect("create bin dir");
+		let node = bin.join("node");
+		fs::write(
+			&node,
+			"#!/usr/bin/env sh\nif [ -n \"${LD_LIBRARY_PATH:-}\" ]; then exit 42; fi\nprintf clean\n",
+		)
+		.expect("write fake node");
+		let mut permissions = fs::metadata(&node)
+			.expect("fake node metadata")
+			.permissions();
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			permissions.set_mode(0o755);
+			fs::set_permissions(&node, permissions).expect("chmod fake node");
+		}
+
+		let original_path = env::var("PATH").unwrap_or_default();
+		let path = format!("{}:{original_path}", bin.display());
+		with_vars(
+			[
+				("PATH", Some(path.as_str())),
+				("LD_LIBRARY_PATH", Some("/nix/store/lib")),
+			],
+			|| {
+				let mut executor = ProcessCommandExecutor;
+				let output = executor
+					.run(&CommandSpec {
+						program: "node".to_string(),
+						args: Vec::new(),
+						cwd: root.path().to_path_buf(),
+					})
+					.expect("node command");
+				assert!(output.success);
+				assert_eq!(output.stdout, "clean");
+			},
+		);
+	}
+
+	#[test]
+	fn command_requires_clean_system_library_path_matches_javascript_tooling() {
+		assert!(command_requires_clean_system_library_path("node"));
+		assert!(command_requires_clean_system_library_path("npm"));
+		assert!(command_requires_clean_system_library_path("pnpm"));
+		assert!(command_requires_clean_system_library_path("npx"));
+		assert!(!command_requires_clean_system_library_path("cargo"));
 	}
 
 	#[test]

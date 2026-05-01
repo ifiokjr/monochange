@@ -27,7 +27,6 @@ tracing = { workspace = true, default-features = true }
 
 [dev-dependencies]
 insta = { workspace = true, default-features = true }
-monochange_test_helpers = { workspace = true }
 proptest = { workspace = true, default-features = true }
 rstest = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
