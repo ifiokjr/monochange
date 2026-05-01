@@ -159,7 +159,7 @@ readme_file = "docs/web-placeholder.md"
 Use:
 
 - `mc placeholder-publish` to bootstrap missing public packages
-- `mc publish-readiness --from HEAD --output <path>` and `mc publish --readiness <path>` for package-registry publishing
+- `mc publish-readiness --from HEAD --output <path>` and `mc publish` for package-registry publishing
 - `mc publish-release` for hosted/provider releases
 
 Preference rules for trusted publishing:

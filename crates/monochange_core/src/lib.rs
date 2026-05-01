@@ -2138,9 +2138,7 @@ impl CliStepDefinition {
 			Self::PublishRelease { .. } => Some(&["format", "from-ref", "draft"]),
 			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package"]),
-			Self::PublishPackages { .. } => {
-				Some(&["format", "output", "package", "readiness", "resume"])
-			}
+			Self::PublishPackages { .. } => Some(&["format", "output", "package", "resume"]),
 			Self::PlanPublishRateLimits { .. } => {
 				Some(&["format", "mode", "package", "ci", "readiness"])
 			}
@@ -2264,7 +2262,7 @@ impl CliStepDefinition {
 				match name {
 					"format" => Some(CliInputKind::Choice),
 					"package" => Some(CliInputKind::StringList),
-					"output" | "readiness" | "resume" => Some(CliInputKind::Path),
+					"output" | "resume" => Some(CliInputKind::Path),
 					_ => None,
 				}
 			}

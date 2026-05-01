@@ -27,11 +27,11 @@ The report includes:
 - `jsr` — official publish-window metadata
 - `pub.dev` — conservative daily publish planning metadata for CI batching
 
-Use `mc publish-readiness --from HEAD --output <path>`, then `mc publish-plan --readiness <path>`, then `mc publish --readiness <path>` when you want CI to fail early instead of discovering registry throttling mid-release. Rerun `mc publish-readiness` if workspace config, package manifests, lockfiles, or registry/tooling files changed since the artifact was written. The `--readiness` input is only valid for normal publish planning; placeholder planning still uses `mc publish-plan --mode placeholder` without a readiness artifact.
+Use `mc publish-readiness --from HEAD --output <path>`, then `mc publish-plan --readiness <path>`, then `mc publish` when you want CI to fail early instead of discovering registry throttling mid-release. Rerun `mc publish-readiness` if workspace config, package manifests, lockfiles, or registry/tooling files changed since the artifact was written. The `--readiness` input is only valid for normal publish planning; placeholder planning still uses `mc publish-plan --mode placeholder` without a readiness artifact.
 
 ## Filtering and enforcement
 
-Both `mc publish` and `mc placeholder-publish` accept repeated `--package <id>` filters so you can execute one planned batch at a time. For real `mc publish --package <id>` runs, generate the readiness artifact with the same `--package <id>` selection, or pass a broader readiness artifact to `mc publish-plan --readiness <path> --package <id>` so the plan can validate that the artifact covers the selected package subset.
+Both `mc publish` and `mc placeholder-publish` accept repeated `--package <id>` filters so you can execute one planned batch at a time. For planning, generate the readiness artifact with the same `--package <id>` selection, or pass a broader readiness artifact to `mc publish-plan --readiness <path> --package <id>` so the plan can validate that the artifact covers the selected package subset. The later `mc publish --package <id>` run derives work directly from release state and does not consume the readiness artifact.
 
 If you want monochange to block risky built-in publishes instead of only warning, enable:
 
@@ -48,4 +48,4 @@ That setting is inherited by matching packages and causes monochange to stop bef
 
 `mc publish-plan --ci gitlab-ci` renders a GitLab CI matrix snippet.
 
-Both snippets use explicit `mc publish --package ...` invocations for each planned batch so you can wire the batches into manual, scheduled, or follow-up pipelines without relying on long sleeps inside CI. Pair each real batch with `mc publish-readiness --from HEAD --package ... --output <path>` and pass that artifact to `mc publish --readiness <path> --package ...`.
+Both snippets use explicit `mc publish --package ...` invocations for each planned batch so you can wire the batches into manual, scheduled, or follow-up pipelines without relying on long sleeps inside CI. Pair each planned batch with `mc publish-readiness --from HEAD --package ... --output <path>` when you want a preflight report for that subset; publish the batch with `mc publish --package ...`.

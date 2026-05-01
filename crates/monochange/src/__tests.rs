@@ -5926,7 +5926,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 }
 
 #[test]
-fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matching_packages() {
+fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matching_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
 	let root = tempdir.path();
@@ -5984,7 +5984,7 @@ fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matc
 					},
 				],
 			};
-			let publish_error = crate::execute_cli_command(
+			let publish_output = crate::execute_cli_command(
 				root,
 				&configuration,
 				&publish_command,
@@ -5994,42 +5994,20 @@ fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matc
 					("package".to_string(), vec!["missing-package".to_string()]),
 				]),
 			)
-			.expect_err("non-dry-run publish packages should require readiness");
-			assert!(
-				publish_error
-					.to_string()
-					.contains("requires `--readiness <PATH>`")
-			);
+			.unwrap_or_else(|error| {
+				panic!("non-dry-run publish packages without readiness: {error}")
+			});
+			assert!(publish_output.contains("package publishing:"));
+			assert!(publish_output.contains("no packages matched the publishing criteria"));
 
 			let release_tempdir =
 				tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 			let release_root = release_tempdir.path();
-			let release_commit = create_release_record_commit(release_root);
+			create_release_record_commit(release_root);
 			let release_configuration = load_workspace_configuration(release_root)
 				.unwrap_or_else(|error| panic!("release configuration: {error}"));
-			let readiness_path = release_root.join("readiness.json");
 			let publish_result_path = release_root.join("publish-result.json");
-			fs::write(
-				&readiness_path,
-				format!(
-					concat!(
-						"{{\n",
-						"  \"schemaVersion\": 2,\n",
-						"  \"kind\": \"monochange.publishReadiness\",\n",
-						"  \"status\": \"ready\",\n",
-						"  \"from\": \"HEAD\",\n",
-						"  \"resolvedCommit\": \"{}\",\n",
-						"  \"recordCommit\": \"{}\",\n",
-						"  \"packageSetFingerprint\": \"\",\n",
-						"  \"inputFingerprint\": \"fnv1a64:0c546588318b4dae\",\n",
-						"  \"packages\": []\n",
-						"}}"
-					),
-					release_commit, release_commit
-				),
-			)
-			.unwrap_or_else(|error| panic!("write readiness artifact: {error}"));
-			let publish_ready_command = CliCommandDefinition {
+			let publish_release_command = CliCommandDefinition {
 				name: "publish".to_string(),
 				help_text: None,
 				inputs: Vec::new(),
@@ -6042,22 +6020,18 @@ fn execute_cli_command_requires_readiness_for_package_publish_steps_without_matc
 			let publish_output = crate::execute_cli_command(
 				release_root,
 				&release_configuration,
-				&publish_ready_command,
+				&publish_release_command,
 				false,
 				BTreeMap::from([
 					("format".to_string(), vec!["text".to_string()]),
 					("package".to_string(), vec!["missing-package".to_string()]),
-					(
-						"readiness".to_string(),
-						vec![readiness_path.to_string_lossy().to_string()],
-					),
 					(
 						"output".to_string(),
 						vec![publish_result_path.to_string_lossy().to_string()],
 					),
 				]),
 			)
-			.unwrap_or_else(|error| panic!("publish packages with readiness: {error}"));
+			.unwrap_or_else(|error| panic!("publish packages without readiness: {error}"));
 			assert!(publish_output.contains("package publishing:"));
 			assert!(publish_output.contains("no packages matched the publishing criteria"));
 			let publish_result = fs::read_to_string(&publish_result_path)

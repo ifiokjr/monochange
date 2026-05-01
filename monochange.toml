@@ -705,9 +705,7 @@ verified_commits = true
 
 [cli.discover]
 help_text = "Discover packages across supported ecosystems"
-inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
-]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
 steps = [{ name = "discover packages", type = "Discover" }]
 
 [cli.change]
@@ -805,13 +803,8 @@ steps = [
 
 [cli.commit-release]
 help_text = "Prepare a release and create a local release commit"
-inputs = [
-	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
-]
-steps = [
-	{ type = "PrepareRelease" },
-	{ type = "CommitRelease" },
-]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
+steps = [{ type = "PrepareRelease" }, { type = "CommitRelease" }]
 
 [cli.publish-release]
 help_text = "Create provider releases from a durable release record"
@@ -834,7 +827,6 @@ steps = [{ name = "comment on released issues", type = "CommentReleasedIssues" }
 help_text = "Publish packages from this release using built-in publishing workflows"
 inputs = [
 	{ name = "package", type = "string_list" },
-	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; required when publishing for real" },
 	{ name = "resume", type = "path", help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped" },
 	{ name = "output", type = "path", help_text = "Write the package publish result JSON artifact for retry/resume" },
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },

@@ -40,7 +40,7 @@ The reference pages in this section document each built-in step with:
 | `OpenReleaseRequest`    | create or update a hosted release PR/MR                                   | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                  |
 | `PlanPublishRateLimits` | plan package-registry publish work against known rate limits              | no                               | `PublishPackages`, `PlaceholderPublish`                                                     |
 | `PlaceholderPublish`    | publish `0.0.0` placeholder versions for missing registry packages        | no                               | normally before `PublishPackages`                                                           |
-| `PublishPackages`       | publish package versions to registries using built-in ecosystem workflows | readiness artifact for real runs | custom `Command` steps using `publish.*`                                                    |
+| `PublishPackages`       | publish package versions to registries using built-in ecosystem workflows | prepared or HEAD release state   | custom `Command` steps using `publish.*`                                                    |
 | `CommentReleasedIssues` | post release follow-up comments to closed issues                          | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                             |
 | `AffectedPackages`      | evaluate changeset coverage for changed files                             | no                               | CI enforcement, custom failure messaging                                                    |
 | `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata  | no                               | local debugging, CI inspection                                                              |
@@ -450,11 +450,6 @@ default = "text"
 [[cli.publish.inputs]]
 name = "package"
 type = "string_list"
-
-[[cli.publish.inputs]]
-name = "readiness"
-type = "path"
-help_text = "JSON artifact from mc publish-readiness; required when publishing for real"
 
 [[cli.publish.inputs]]
 name = "resume"

@@ -79,7 +79,7 @@ If immutable registry artifacts have already been published, prefer cutting a ne
 Package publishing is separate from provider release publishing:
 
 - `mc publish-readiness --from HEAD --output <path>` checks package registries before mutation
-- `mc publish --readiness <path>` handles package registries such as `crates.io`, `npm`, `jsr`, and `pub.dev`
+- `mc publish` handles package registries such as `crates.io`, `npm`, `jsr`, and `pub.dev`
 - `mc publish-release` handles hosted source-provider releases such as GitHub releases
 
 When `publish.trusted_publishing` is enabled, monochange can derive GitHub trust metadata from the workflow runtime and the configured `[source]` block. npm packages are the only ecosystem with built-in bulk trust automation today:
@@ -254,7 +254,7 @@ type = "AffectedPackages"
 monochange now includes a release workflow modeled around long-running release PR refresh plus post-merge tagging:
 
 - `.github/workflows/release.yml` refreshes the dedicated release PR branch on normal `main` pushes
-- the same workflow detects when `HEAD` is already a merged monochange release commit, runs `mc tag-release --from HEAD`, runs `mc publish-readiness --from HEAD --output <path>`, and then runs `mc publish --readiness <path>`
+- the same workflow detects when `HEAD` is already a merged monochange release commit, runs `mc tag-release --from HEAD`, runs `mc publish-readiness --from HEAD --output <path>`, and then runs `mc publish`
 - tag-triggered or downstream workflows can then build archives, create hosted releases, publish additional assets from the pushed tags, or run a separate `mc publish-release` job when you still want manifest-driven hosted-release publication
 
 That split keeps tag creation on the default branch side of the merge and lets downstream automation consume the exact durable release metadata that monochange stored in git history.
