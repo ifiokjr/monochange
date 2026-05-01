@@ -56,10 +56,27 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - name: checkout
+      - name: checkout current workflow ref
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.checkout_ref && github.ref_name || env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: checkout release asset ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_ref='${{ inputs.checkout_ref && github.ref_name || env.RELEASE_TAG }}'
+          git fetch --force origin "+refs/heads/*:refs/remotes/origin/*"
+          git fetch --tags --force origin "+refs/tags/*:refs/tags/*"
+
+          if git rev-parse --verify --quiet "refs/tags/$release_ref" >/dev/null; then
+            git checkout --detach "refs/tags/$release_ref"
+          elif git rev-parse --verify --quiet "refs/remotes/origin/$release_ref" >/dev/null; then
+            git checkout --detach "refs/remotes/origin/$release_ref"
+          else
+            git fetch --force origin "$release_ref"
+            git checkout --detach FETCH_HEAD
+          fi
 
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -205,6 +222,7 @@ jobs:
         run: |
           gh workflow run publish.yml \
             --repo "${{ github.repository }}" \
+            --ref "${{ github.sha }}" \
             -f "tag=${{ env.RELEASE_TAG }}"
         env:
           GH_TOKEN: ${{ github.token }}

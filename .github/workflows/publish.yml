@@ -37,16 +37,26 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Resolved release tag: $TAG"
 
-      - name: checkout
+      - name: checkout current monochange cli
         uses: actions/checkout@v6
         with:
-          ref: ${{ steps.release_tag.outputs.tag }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: setup
+      - name: setup current monochange cli
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build current monochange cli and checkout release tag
+        run: |
+          cargo build --release --package monochange --bin mc
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp target/release/mc "$RUNNER_TEMP/bin/mc"
+          git fetch --force origin "+refs/heads/*:refs/remotes/origin/*"
+          git fetch --tags --force origin "refs/tags/${{ steps.release_tag.outputs.tag }}:refs/tags/${{ steps.release_tag.outputs.tag }}"
+          git checkout --detach "${{ steps.release_tag.outputs.tag }}"
+        shell: devenv shell -- bash -e {0}
 
       - name: get crates oidc auth token
         uses: rust-lang/crates-io-auth-action@v1
@@ -80,7 +90,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          mc publish-readiness \
+          "$RUNNER_TEMP/bin/mc" publish-readiness \
             --from HEAD \
             --output "$RUNNER_TEMP/publish-readiness.json" \
             --format json
@@ -91,7 +101,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          report="$(mc publish-plan --readiness "$RUNNER_TEMP/publish-readiness.json" --format json)"
+          report="$("$RUNNER_TEMP/bin/mc" publish-plan --readiness "$RUNNER_TEMP/publish-readiness.json" --format json)"
           echo "report<<EOF" >> "$GITHUB_OUTPUT"
           echo "$report" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -130,16 +140,26 @@ jobs:
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     name: publish ${{ matrix.registry }} (${{ matrix.batch }}/${{ matrix.total_batches }})
     steps:
-      - name: checkout
+      - name: checkout current monochange cli
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.plan.outputs.tag }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: setup
+      - name: setup current monochange cli
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build current monochange cli and checkout release tag
+        run: |
+          cargo build --release --package monochange --bin mc
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp target/release/mc "$RUNNER_TEMP/bin/mc"
+          git fetch --force origin "+refs/heads/*:refs/remotes/origin/*"
+          git fetch --tags --force origin "refs/tags/${{ needs.plan.outputs.tag }}:refs/tags/${{ needs.plan.outputs.tag }}"
+          git checkout --detach "${{ needs.plan.outputs.tag }}"
+        shell: devenv shell -- bash -e {0}
 
       - name: get crates oidc auth token
         if: matrix.registry == 'crates_io'
@@ -181,7 +201,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          mc publish ${{ matrix.packages }} \
+          "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
             --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
             --format json
         shell: devenv shell -- bash -e {0}
