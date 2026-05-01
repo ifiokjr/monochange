@@ -70,6 +70,20 @@ fn build_release_requests_uses_gitlab_provider() {
 }
 
 #[test]
+fn build_release_requests_falls_back_to_tag_name_when_rendered_title_is_empty() {
+	let source = sample_source(None);
+	let mut manifest = sample_manifest();
+	manifest.release_targets.first_mut().unwrap().rendered_title = String::new();
+
+	let requests = build_release_requests(&source, &manifest);
+	let request = requests
+		.first()
+		.unwrap_or_else(|| panic!("expected request"));
+
+	assert_eq!(request.name, "v1.2.0");
+}
+
+#[test]
 fn build_release_pull_request_request_uses_gitlab_provider_and_sanitized_branch() {
 	let source = sample_source(None);
 	let manifest = ReleaseManifest {

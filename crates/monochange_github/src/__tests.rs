@@ -519,6 +519,28 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 }
 
 #[test]
+fn build_release_requests_falls_back_to_tag_name_when_rendered_title_is_empty() {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings::default(),
+	};
+	let mut manifest = sample_manifest();
+	manifest.release_targets.first_mut().unwrap().rendered_title = String::new();
+
+	let requests = build_release_requests(&github, &manifest);
+	let request = requests
+		.first()
+		.unwrap_or_else(|| panic!("expected request"));
+
+	assert_eq!(request.name, "v1.2.0");
+}
+
+#[test]
 fn build_release_pull_request_request_renders_branch_and_body() {
 	let github = SourceConfiguration {
 		provider: SourceProvider::GitHub,
