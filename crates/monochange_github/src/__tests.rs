@@ -553,6 +553,10 @@ fn build_release_pull_request_request_renders_branch_and_body() {
 			"body": request.body,
 		})
 	);
+	assert_snapshot!(
+		"build_release_pull_request_request_renders_branch_and_body__body",
+		request.body
+	);
 }
 
 #[test]
@@ -1040,6 +1044,8 @@ fn release_pull_request_commit_verification_uses_github_git_database_api() {
 	let request = sample_pull_request_request();
 	let fallback = "1111111111111111111111111111111111111111";
 	let verified = "2222222222222222222222222222222222222222";
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
 	let original_commit = server.mock(|when, then| {
 		when.method(GET)
 			.path(format!("/repos/ifiokjr/monochange/git/commits/{fallback}"));
@@ -1048,6 +1054,13 @@ fn release_pull_request_commit_verification_uses_github_git_database_api() {
 			.body(format!(
 				r#"{{"sha":"{fallback}","message":"chore(release): prepare release\n\nbody","tree":{{"sha":"tree123"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":false,"reason":"unsigned"}}}}"#
 			));
+	});
+	let parent_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/commits/parent123");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"parent123","message":"parent","tree":{"sha":"tree123"},"parents":[],"verification":{"verified":false}}"#);
 	});
 	let create_commit = server.mock(|when, then| {
 		when.method(POST)
@@ -1087,12 +1100,17 @@ fn release_pull_request_commit_verification_uses_github_git_database_api() {
 		],
 		|| {
 			maybe_replace_release_pull_request_commit_with_verified_github_commit(
-				&source, &request, fallback,
+				&source,
+				&request,
+				fallback,
+				root,
+				&[],
 			)
 		},
 	);
 
 	original_commit.assert();
+	parent_commit.assert();
 	create_commit.assert();
 	get_ref.assert();
 	update_ref.assert();
@@ -1106,6 +1124,8 @@ fn release_pull_request_commit_verification_falls_back_when_github_does_not_veri
 	let request = sample_pull_request_request();
 	let fallback = "1111111111111111111111111111111111111111";
 	let unverified = "2222222222222222222222222222222222222222";
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
 	let original_commit = server.mock(|when, then| {
 		when.method(GET)
 			.path(format!("/repos/ifiokjr/monochange/git/commits/{fallback}"));
@@ -1114,6 +1134,13 @@ fn release_pull_request_commit_verification_falls_back_when_github_does_not_veri
 			.body(format!(
 				r#"{{"sha":"{fallback}","message":"chore(release): prepare release","tree":{{"sha":"tree123"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":false,"reason":"unsigned"}}}}"#
 			));
+	});
+	let parent_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/commits/parent123");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"parent123","message":"parent","tree":{"sha":"tree123"},"parents":[],"verification":{"verified":false}}"#);
 	});
 	let create_commit = server.mock(|when, then| {
 		when.method(POST)
@@ -1133,14 +1160,291 @@ fn release_pull_request_commit_verification_falls_back_when_github_does_not_veri
 		],
 		|| {
 			maybe_replace_release_pull_request_commit_with_verified_github_commit(
-				&source, &request, fallback,
+				&source,
+				&request,
+				fallback,
+				root,
+				&[],
 			)
 		},
 	);
 
 	original_commit.assert();
+	parent_commit.assert();
 	create_commit.assert();
 	assert!(result.is_err_and(|message| message.contains("without verification (unsigned)")));
+}
+#[test]
+fn release_pull_request_commit_verification_creates_blobs_for_varied_file_types() {
+	let server = MockServer::start();
+	let source = sample_source_with_verified_commits(Some(server.base_url()));
+	let request = sample_pull_request_request();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	// Create a directory (should be skipped)
+	std::fs::create_dir(root.join("skipped_dir")).unwrap();
+
+	// Create a regular file
+	std::fs::write(root.join("regular.txt"), "hello").unwrap();
+
+	// Create an executable file
+	let exec_path = root.join("exec.sh");
+	std::fs::write(&exec_path, "#!/bin/bash").unwrap();
+	use std::os::unix::fs::PermissionsExt;
+	let mut perms = std::fs::metadata(&exec_path).unwrap().permissions();
+	perms.set_mode(perms.mode() | 0o111);
+	std::fs::set_permissions(&exec_path, perms).unwrap();
+
+	// Create a symlink
+	std::os::unix::fs::symlink("regular.txt", root.join("link")).unwrap();
+
+	// deleted.txt intentionally does not exist
+
+	let tracked_paths = vec![
+		PathBuf::from("skipped_dir"),
+		PathBuf::from("regular.txt"),
+		PathBuf::from("exec.sh"),
+		PathBuf::from("link"),
+		PathBuf::from("deleted.txt"),
+	];
+
+	let fallback = "1111111111111111111111111111111111111111";
+	let verified = "9999999999999999999999999999999999999999";
+
+	let original_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path(format!("/repos/ifiokjr/monochange/git/commits/{fallback}"));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(
+				r#"{{"sha":"{fallback}","message":"chore(release): prepare release\n\nbody","tree":{{"sha":"original_tree"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":false,"reason":"unsigned"}}}}"#
+			));
+	});
+	let parent_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/commits/parent123");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"parent123","message":"parent","tree":{"sha":"parent_tree"},"parents":[],"verification":{"verified":false}}"#);
+	});
+	let blob_regular = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/blobs")
+			.json_body(json!({"content": "hello", "encoding": "utf-8"}));
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"blob_regular"}"#);
+	});
+	let blob_exec = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/blobs")
+			.json_body(json!({"content": "#!/bin/bash", "encoding": "utf-8"}));
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"blob_exec"}"#);
+	});
+	let blob_symlink = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/blobs")
+			.json_body(json!({"content": "regular.txt", "encoding": "utf-8"}));
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"blob_symlink"}"#);
+	});
+	let create_tree = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/trees");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"new_tree"}"#);
+	});
+	let create_commit = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/commits")
+			.json_body(json!({
+				"message": "chore(release): prepare release\n\nbody",
+				"tree": "new_tree",
+				"parents": ["parent123"],
+			}));
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(format!(
+				r#"{{"sha":"{verified}","message":"chore(release): prepare release\n\nbody","tree":{{"sha":"new_tree"}},"parents":[{{"sha":"parent123"}}],"verification":{{"verified":true,"reason":"valid"}}}}"#
+			));
+	});
+	let get_ref = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/ref/heads/monochange/release/release");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{fallback}"}}}}"#));
+	});
+	let update_ref = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/git/refs/heads/monochange/release/release")
+			.json_body(json!({ "sha": verified, "force": true }));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{verified}"}}}}"#));
+	});
+
+	let result = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_ACTIONS", Some("true")),
+			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
+		],
+		|| {
+			maybe_replace_release_pull_request_commit_with_verified_github_commit(
+				&source,
+				&request,
+				fallback,
+				root,
+				&tracked_paths,
+			)
+		},
+	);
+
+	original_commit.assert();
+	parent_commit.assert();
+	blob_regular.assert();
+	blob_exec.assert();
+	blob_symlink.assert();
+	create_tree.assert();
+	create_commit.assert();
+	get_ref.assert();
+	update_ref.assert();
+	assert_eq!(result, Ok(verified.to_string()));
+}
+#[test]
+fn release_pull_request_commit_verification_uses_root_commit_without_parent() {
+	let server = MockServer::start();
+	let source = sample_source_with_verified_commits(Some(server.base_url()));
+	let request = sample_pull_request_request();
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	std::fs::write(root.join("file.txt"), "content").unwrap();
+	let tracked_paths = vec![PathBuf::from("file.txt")];
+
+	let fallback = "1111111111111111111111111111111111111111";
+	let verified = "9999999999999999999999999999999999999999";
+
+	let original_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path(format!("/repos/ifiokjr/monochange/git/commits/{fallback}"));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(
+				r#"{{"sha":"{fallback}","message":"chore(release): prepare release","tree":{{"sha":"tree123"}},"parents":[],"verification":{{"verified":false,"reason":"unsigned"}}}}"#
+			));
+	});
+	let blob = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/blobs")
+			.json_body(json!({"content": "content", "encoding": "utf-8"}));
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"blob1"}"#);
+	});
+	let create_tree = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/trees");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"new_tree"}"#);
+	});
+	let create_commit = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/commits")
+			.json_body(json!({
+				"message": "chore(release): prepare release",
+				"tree": "new_tree",
+				"parents": [],
+			}));
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(format!(
+				r#"{{"sha":"{verified}","message":"chore(release): prepare release","tree":{{"sha":"new_tree"}},"parents":[],"verification":{{"verified":true,"reason":"valid"}}}}"#
+			));
+	});
+	let get_ref = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/ref/heads/monochange/release/release");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{fallback}"}}}}"#));
+	});
+	let update_ref = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/git/refs/heads/monochange/release/release")
+			.json_body(json!({ "sha": verified, "force": true }));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(format!(r#"{{"object":{{"sha":"{verified}"}}}}"#));
+	});
+
+	let result = temp_env::with_vars(
+		[
+			("GITHUB_TOKEN", Some("token")),
+			("GITHUB_ACTIONS", Some("true")),
+			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
+		],
+		|| {
+			maybe_replace_release_pull_request_commit_with_verified_github_commit(
+				&source,
+				&request,
+				fallback,
+				root,
+				&tracked_paths,
+			)
+		},
+	);
+
+	original_commit.assert();
+	blob.assert();
+	create_tree.assert();
+	create_commit.assert();
+	get_ref.assert();
+	update_ref.assert();
+	assert_eq!(result, Ok(verified.to_string()));
+}
+
+#[test]
+fn build_release_pull_request_request_ignores_empty_sections() {
+	let github = SourceConfiguration {
+		provider: SourceProvider::GitHub,
+		host: None,
+		api_url: None,
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: ProviderReleaseSettings::default(),
+		pull_requests: ProviderMergeRequestSettings {
+			branch_prefix: "automation/release".to_string(),
+			base: "develop".to_string(),
+			title: "chore(release): prepare release".to_string(),
+			labels: vec!["release".to_string(), "automated".to_string()],
+			auto_merge: true,
+			..ProviderMergeRequestSettings::default()
+		},
+	};
+	let mut manifest = sample_manifest();
+	manifest
+		.changelogs
+		.first_mut()
+		.unwrap()
+		.notes
+		.sections
+		.push(ReleaseNotesSection {
+			title: "Empty".to_string(),
+			collapsed: false,
+			entries: vec![],
+		});
+
+	let request = build_release_pull_request_request(&github, &manifest);
+
+	assert!(!request.body.contains("### Empty"));
 }
 
 #[test]
@@ -1254,6 +1558,27 @@ fn publish_release_pull_request_falls_back_when_verified_commit_is_unavailable()
 			.header("content-type", "application/json")
 			.body("[]");
 	});
+	let parent_commit = server.mock(|when, then| {
+		when.method(GET)
+			.path("/repos/ifiokjr/monochange/git/commits/parent123");
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"parent123","message":"parent","tree":{"sha":"parent_tree"},"parents":[],"verification":{"verified":false}}"#);
+	});
+	let create_blob = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/blobs");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"blob123"}"#);
+	});
+	let create_tree = server.mock(|when, then| {
+		when.method(POST)
+			.path("/repos/ifiokjr/monochange/git/trees");
+		then.status(201)
+			.header("content-type", "application/json")
+			.body(r#"{"sha":"new_tree123"}"#);
+	});
 
 	let outcome = temp_env::with_vars(
 		[
@@ -1275,6 +1600,9 @@ fn publish_release_pull_request_falls_back_when_verified_commit_is_unavailable()
 
 	list_pull_requests.assert();
 	original_commit.assert();
+	parent_commit.assert();
+	create_blob.assert();
+	create_tree.assert();
 	create_commit.assert();
 	create_pull_request.assert();
 	add_labels.assert();
