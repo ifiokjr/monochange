@@ -171,17 +171,6 @@ jobs:
             --packages-dir packages
         shell: devenv shell -- bash -e {0}
 
-      - name: check publish readiness for batch
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
-        run: |
-          mc publish-readiness \
-            --from HEAD \
-            ${{ matrix.packages }} \
-            --output "$RUNNER_TEMP/publish-readiness.json" \
-            --format json
-        shell: devenv shell -- bash -e {0}
-
       - name: wait for rate-limit window
         if: matrix.wait_seconds > 0
         run: |
@@ -193,7 +182,6 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
           mc publish ${{ matrix.packages }} \
-            --readiness "$RUNNER_TEMP/publish-readiness.json" \
             --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
             --format json
         shell: devenv shell -- bash -e {0}

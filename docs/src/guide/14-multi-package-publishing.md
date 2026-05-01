@@ -26,7 +26,7 @@ A good default is:
 
 ## Choose the simplest publish pattern that matches the registry
 
-### Pattern 1: One post-merge publish job runs `mc publish-readiness` and `mc publish --readiness`
+### Pattern 1: One post-merge publish job runs `mc publish-readiness` and `mc publish`
 
 Use this when most packages can stay on monochange's built-in publishing path.
 
@@ -67,7 +67,7 @@ jobs:
       - name: publish packages
         run: |
           devenv shell -- mc publish-readiness --from HEAD --output .monochange/readiness.json
-          devenv shell -- mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json
+          devenv shell -- mc publish --output .monochange/publish-result.json
 ```
 
 This is the best fit when:
@@ -75,6 +75,40 @@ This is the best fit when:
 - multiple npm packages publish from the same workflow
 - multiple packages share the same built-in post-merge flow
 - you do not need package-specific tag triggers to satisfy the registry
+
+### Built-in publish order
+
+When one `mc publish` invocation contains multiple package publications, monochange publishes packages with no selected dependencies first, then publishes packages that depend on those packages, walking up the dependency tree until packages that depend on the most selected packages are published last.
+
+The order is computed like this:
+
+1. Build the selected publish requests from the prepared release or `HEAD` release state.
+2. Materialize the workspace dependency graph.
+3. Consider only dependencies where **both packages are part of the selected publish set**.
+4. Ignore development dependency edges.
+5. Topologically sort the publish requests so dependencies are emitted before dependents.
+
+For example, with this internal package graph:
+
+```text
+core        # no dependencies
+utils       # depends on core
+api         # depends on utils
+app         # depends on core, utils, api
+```
+
+monochange publishes in this order:
+
+```text
+core
+utils
+api
+app
+```
+
+If multiple packages are independent at the same depth, their order is deterministic by package id, registry, and version.
+
+A package with no selected dependencies is eligible first. A package is not published until all of its selected publish-relevant dependencies have been ordered before it. Dependencies outside the selected publish set do not block ordering. Development-only cycles are ignored. Runtime, build, peer, workspace, and unknown dependency cycles fail before publishing anything, with a cycle diagnostic.
 
 ## Pattern 2: Package-specific external workflows publish from tags
 
@@ -175,12 +209,12 @@ This pattern is especially useful when multiple packages live in the same ecosys
 
 ## Registry-specific recommendations
 
-| Registry  | Recommended multi-package pattern                                                                         | Why                                                                   |
-| --------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| npm       | one post-merge `mc publish-readiness` + `mc publish --readiness` job when possible                        | monochange can automate npm trusted-publishing setup on GitHub        |
-| crates.io | one job per crate when using external OIDC auth                                                           | trusted publishing is enrolled per crate and workflow context matters |
-| jsr       | built-in `mc publish-readiness` + `mc publish --readiness` is often fine, but keep setup package-specific | registry linking is still manual today                                |
-| pub.dev   | package-specific tags and often one workflow per package                                                  | automated publishing is tag-driven and package-specific               |
+| Registry  | Recommended multi-package pattern                                                             | Why                                                                   |
+| --------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| npm       | one post-merge `mc publish-readiness` + `mc publish` job when possible                        | monochange can automate npm trusted-publishing setup on GitHub        |
+| crates.io | one job per crate when using external OIDC auth                                               | trusted publishing is enrolled per crate and workflow context matters |
+| jsr       | built-in `mc publish-readiness` + `mc publish` is often fine, but keep setup package-specific | registry linking is still manual today                                |
+| pub.dev   | package-specific tags and often one workflow per package                                      | automated publishing is tag-driven and package-specific               |
 
 ## Keep config, tags, and workflows aligned
 
@@ -228,7 +262,7 @@ This is the right move when:
 3. register trusted publishing for each package at the registry
 4. prefer package-specific tags where a registry is tag-authorized
 5. run `mc publish --dry-run` after registry enrollment changes
-6. run `mc publish-readiness --from HEAD --output <path>` before real `mc publish --readiness <path>`
+6. optionally run `mc publish-readiness --from HEAD --output <path>` as a preflight before real `mc publish`
 7. keep the workflow filename and environment stable once a registry record is enrolled
 
 ## Common mistakes

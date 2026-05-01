@@ -805,10 +805,6 @@ pub(crate) fn execute_cli_command_with_options(
 					if !context.dry_run {
 						#[rustfmt::skip]
 						release_branch_policy::verify_release_ref_for_publish(root, configuration.source.as_ref(), "HEAD")?;
-						let readiness_path =
-							required_publish_readiness_artifact_path(&step_inputs)?;
-						#[rustfmt::skip]
-						publish_readiness::validate_publish_readiness_artifact(root, configuration, context.prepared_release.as_ref(), &selected_packages, &readiness_path)?;
 					}
 					#[rustfmt::skip]
 					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Publish, context.dry_run)?;
@@ -2156,20 +2152,10 @@ fn selected_package_ids(inputs: &BTreeMap<String, Vec<String>>) -> BTreeSet<Stri
 		.collect()
 }
 
-fn required_publish_readiness_artifact_path(
-	inputs: &BTreeMap<String, Vec<String>>,
-) -> MonochangeResult<PathBuf> {
-	optional_publish_readiness_artifact_path(inputs)?.ok_or_else(|| {
-		MonochangeError::Config(
-			"`PublishPackages` requires `--readiness <PATH>` when publishing; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
-		)
-	})
-}
-
-fn optional_publish_readiness_artifact_path(
+fn optional_publish_plan_readiness_artifact_path(
 	inputs: &BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<Option<PathBuf>> {
-	optional_path_input(inputs, "readiness", "PublishPackages")
+	optional_path_input(inputs, "readiness", "PlanPublishRateLimits")
 }
 
 fn optional_publish_resume_artifact_path(
@@ -2213,7 +2199,7 @@ fn publish_rate_limit_selected_package_ids(
 	mode: publish_rate_limits::PublishRateLimitMode,
 ) -> MonochangeResult<BTreeSet<String>> {
 	let selected_packages = selected_package_ids(inputs);
-	let Some(readiness_path) = optional_publish_readiness_artifact_path(inputs)? else {
+	let Some(readiness_path) = optional_publish_plan_readiness_artifact_path(inputs)? else {
 		return Ok(selected_packages);
 	};
 
@@ -5715,18 +5701,22 @@ path = "crates/core"
 	}
 
 	#[test]
-	fn required_publish_readiness_artifact_path_rejects_missing_and_blank_values() {
+	fn optional_publish_plan_readiness_artifact_path_trims_and_rejects_blank_values() {
+		let inputs = BTreeMap::from([(
+			"readiness".to_string(),
+			vec![" .monochange/readiness.json ".to_string()],
+		)]);
+		let path = optional_publish_plan_readiness_artifact_path(&inputs)
+			.unwrap_or_else(|error| panic!("readiness artifact path: {error}"));
+		assert_eq!(path, Some(PathBuf::from(".monochange/readiness.json")));
+
 		let missing = BTreeMap::new();
-		let missing_error = required_publish_readiness_artifact_path(&missing)
-			.expect_err("missing readiness artifact path should fail");
-		assert!(
-			missing_error
-				.to_string()
-				.contains("requires `--readiness <PATH>`")
-		);
+		let missing_path = optional_publish_plan_readiness_artifact_path(&missing)
+			.unwrap_or_else(|error| panic!("missing readiness artifact path: {error}"));
+		assert_eq!(missing_path, None);
 
 		let blank = BTreeMap::from([("readiness".to_string(), vec!["  ".to_string()])]);
-		let blank_error = required_publish_readiness_artifact_path(&blank)
+		let blank_error = optional_publish_plan_readiness_artifact_path(&blank)
 			.expect_err("blank readiness artifact path should fail");
 		assert!(blank_error.to_string().contains("mc publish-readiness"));
 	}
@@ -5761,17 +5751,5 @@ path = "crates/core"
 		let error = optional_publish_resume_artifact_path(&blank)
 			.expect_err("blank resume path should fail");
 		assert!(error.to_string().contains("blank `resume` path"));
-	}
-
-	#[test]
-	fn required_publish_readiness_artifact_path_returns_configured_path() {
-		let inputs = BTreeMap::from([(
-			"readiness".to_string(),
-			vec![".monochange/readiness.json".to_string()],
-		)]);
-		let path = required_publish_readiness_artifact_path(&inputs)
-			.unwrap_or_else(|error| panic!("readiness artifact path: {error}"));
-
-		assert_eq!(path, PathBuf::from(".monochange/readiness.json"));
 	}
 }

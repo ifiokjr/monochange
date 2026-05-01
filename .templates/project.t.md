@@ -99,9 +99,9 @@ These are the commands most repositories use after running `mc init`. With the n
 | Create a durable release commit  | `mc commit-release`                                         | You want a monochange-managed release commit with an embedded `ReleaseRecord`                            |
 | Open or update a release request | `mc release-pr`                                             | You want a long-lived release PR/MR branch updated from current release state                            |
 | Inspect a past release commit    | `mc release-record --from <ref>`                            | You need the durable release declaration from git history                                                |
-| Check package publish readiness  | `mc publish-readiness --from HEAD --output <path>`          | You need a validated readiness artifact before package publication                                       |
+| Check package publish readiness  | `mc publish-readiness --from HEAD --output <path>`          | You want a non-mutating preflight report before package publication                                      |
 | Plan ready package publishing    | `mc publish-plan --readiness <path>`                        | You want rate-limit batches that exclude non-ready package work                                          |
-| Publish packages to registries   | `mc publish --readiness <path> --output <path>`             | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
+| Publish packages to registries   | `mc publish --output <path>`                                | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
 | Bootstrap release packages       | `mc publish-bootstrap --from HEAD --output <path>`          | You need a release-record-scoped placeholder bootstrap artifact before rerunning readiness               |
 | Create post-merge release tags   | `mc tag-release --from HEAD`                                | You merged a monochange release commit and now need to create and push its declared tag set              |
 | Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
@@ -109,7 +109,7 @@ These are the commands most repositories use after running `mc init`. With the n
 
 <!-- {/projectCommandAutomationMatrix} -->
 
-`mc publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking when the readiness artifact still matches the current package set and publish input fingerprint. The artifact fingerprints `monochange.toml`, package manifests, lockfiles, and registry/tooling files, so rerun `mc publish-readiness` after those inputs change. `mc publish-plan --readiness <path>` validates the same artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check. If readiness shows missing first-time registry packages, run `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json`, then rerun readiness before real publishing. Python packages support built-in PyPI publishing with `uv build` and `uv publish`. Go packages publish by creating VCS tags (`v1.2.3` for root modules, `path/v1.2.3` for submodules) and checking visibility through the Go module proxy. Keep `mode = "external"` for private registries or custom publication flows.
+`mc publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking in readiness reports. The artifact fingerprints `monochange.toml`, package manifests, lockfiles, and registry/tooling files, so rerun `mc publish-readiness` after those inputs change. `mc publish-plan --readiness <path>` validates the artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check. `mc publish` publishes directly from prepared release or `HEAD` release state and does not require the readiness artifact. If readiness shows missing first-time registry packages, run `mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json`, then rerun readiness before real publishing. Python packages support built-in PyPI publishing with `uv build` and `uv publish`. Go packages publish by creating VCS tags (`v1.2.3` for root modules, `path/v1.2.3` for submodules) and checking visibility through the Go module proxy. Keep `mode = "external"` for private registries or custom publication flows.
 
 <!-- {@projectCapabilityMatrix} -->
 
@@ -167,7 +167,7 @@ mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
 mc publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
-mc publish --readiness .monochange/readiness.json --output .monochange/publish-result.json
+mc publish --output .monochange/publish-result.json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc release
 ```

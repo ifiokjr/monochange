@@ -7,6 +7,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
+use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -20,6 +21,7 @@ use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
+use monochange_core::materialize_dependency_edges;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use serde::Deserialize;
@@ -639,8 +641,131 @@ pub(crate) fn build_release_requests(
 		});
 	}
 
-	requests.sort_by(|left, right| left.package_id.cmp(&right.package_id));
-	Ok(requests)
+	order_release_requests_by_publish_dependencies(packages, requests)
+}
+
+fn order_release_requests_by_publish_dependencies(
+	packages: &[PackageRecord],
+	mut requests: Vec<PublishRequest>,
+) -> MonochangeResult<Vec<PublishRequest>> {
+	requests.sort_by(|left, right| {
+		left.package_id
+			.cmp(&right.package_id)
+			.then_with(|| left.registry.to_string().cmp(&right.registry.to_string()))
+			.then_with(|| left.version.cmp(&right.version))
+	});
+
+	let mut requests_by_package = BTreeMap::<String, Vec<PublishRequest>>::new();
+	for request in requests {
+		requests_by_package
+			.entry(request.package_id.clone())
+			.or_default()
+			.push(request);
+	}
+
+	let request_ids = requests_by_package.keys().cloned().collect::<BTreeSet<_>>();
+	let config_ids_by_record_id = config_ids_by_package_record_id(packages);
+	let mut dependencies_by_package = request_ids
+		.iter()
+		.map(|package_id| (package_id.clone(), BTreeSet::<String>::new()))
+		.collect::<BTreeMap<_, _>>();
+	let mut dependents_by_package = BTreeMap::<String, BTreeSet<String>>::new();
+
+	for edge in materialize_dependency_edges(packages) {
+		if !publish_dependency_kind_is_ordering_relevant(edge.dependency_kind) {
+			continue;
+		}
+		let from_package_id = &config_ids_by_record_id[&edge.from_package_id];
+		let to_package_id = &config_ids_by_record_id[&edge.to_package_id];
+		if !request_ids.contains(from_package_id) || !request_ids.contains(to_package_id) {
+			continue;
+		}
+
+		dependencies_by_package
+			.entry(from_package_id.clone())
+			.or_default()
+			.insert(to_package_id.clone());
+		dependents_by_package
+			.entry(to_package_id.clone())
+			.or_default()
+			.insert(from_package_id.clone());
+	}
+
+	let mut ready = dependencies_by_package
+		.iter()
+		.filter(|&(_package_id, dependencies)| dependencies.is_empty())
+		.map(|(package_id, _dependencies)| package_id.clone())
+		.collect::<BTreeSet<_>>();
+	let mut ordered_package_ids = Vec::with_capacity(dependencies_by_package.len());
+
+	while let Some(package_id) = ready.iter().next().cloned() {
+		ready.remove(&package_id);
+		ordered_package_ids.push(package_id.clone());
+		dependencies_by_package.remove(&package_id);
+
+		let Some(dependents) = dependents_by_package.get(&package_id).cloned() else {
+			continue;
+		};
+		for dependent_package_id in dependents {
+			let dependencies = dependencies_by_package
+				.get_mut(&dependent_package_id)
+				.expect(
+					"dependent package must remain pending until its dependencies are published",
+				);
+			dependencies.remove(&package_id);
+			if dependencies.is_empty() {
+				ready.insert(dependent_package_id);
+			}
+		}
+	}
+
+	if !dependencies_by_package.is_empty() {
+		return Err(MonochangeError::Config(format!(
+			"cyclic publish dependencies detected among package publications: {}",
+			render_publish_dependency_cycle(&dependencies_by_package)
+		)));
+	}
+
+	let mut ordered_requests = Vec::new();
+	for package_id in ordered_package_ids {
+		let mut package_requests = requests_by_package
+			.remove(&package_id)
+			.expect("ordered package ids must come from publish requests");
+		ordered_requests.append(&mut package_requests);
+	}
+
+	Ok(ordered_requests)
+}
+
+fn publish_dependency_kind_is_ordering_relevant(kind: DependencyKind) -> bool {
+	!matches!(kind, DependencyKind::Development)
+}
+
+fn config_ids_by_package_record_id(packages: &[PackageRecord]) -> BTreeMap<String, String> {
+	packages
+		.iter()
+		.map(|package| {
+			let config_id = package
+				.metadata
+				.get("config_id")
+				.map_or(package.name.as_str(), String::as_str);
+			(package.id.clone(), config_id.to_string())
+		})
+		.collect()
+}
+
+fn render_publish_dependency_cycle(
+	dependencies_by_package: &BTreeMap<String, BTreeSet<String>>,
+) -> String {
+	let cycle_edges = dependencies_by_package
+		.iter()
+		.flat_map(|(package_id, dependencies)| {
+			dependencies
+				.iter()
+				.map(move |dependency_id| format!("{package_id} -> {dependency_id}"))
+		})
+		.collect::<Vec<_>>();
+	cycle_edges.join(", ")
 }
 
 pub(crate) fn filter_pending_publish_requests(
@@ -4342,6 +4467,183 @@ jobs:
 				.to_string()
 				.contains("failed to write placeholder mod.ts")
 		);
+	}
+
+	fn sample_npm_package_with_dependencies(
+		id: &str,
+		name: &str,
+		declared_dependencies: Vec<monochange_core::PackageDependency>,
+	) -> PackageRecord {
+		PackageRecord {
+			id: format!("npm:packages/{id}/package.json"),
+			name: name.to_string(),
+			ecosystem: Ecosystem::Npm,
+			manifest_path: PathBuf::from(format!("/workspace/packages/{id}/package.json")),
+			workspace_root: PathBuf::from("/workspace"),
+			current_version: Some(Version::parse("1.0.0").expect("version")),
+			publish_state: PublishState::Public,
+			version_group_id: None,
+			metadata: BTreeMap::from([
+				("config_id".to_string(), id.to_string()),
+				("manager".to_string(), "pnpm".to_string()),
+			]),
+			declared_dependencies,
+		}
+	}
+
+	fn sample_npm_dependency(
+		name: &str,
+		kind: DependencyKind,
+	) -> monochange_core::PackageDependency {
+		monochange_core::PackageDependency {
+			name: name.to_string(),
+			kind,
+			version_constraint: Some("workspace:*".to_string()),
+			optional: false,
+		}
+	}
+
+	fn sample_npm_publication(package: &str) -> PackagePublicationTarget {
+		PackagePublicationTarget {
+			package: package.to_string(),
+			ecosystem: Ecosystem::Npm,
+			registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+			version: "1.2.3".to_string(),
+			mode: PublishMode::Builtin,
+			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
+		}
+	}
+
+	#[test]
+	fn build_release_requests_orders_publish_relevant_dependencies_before_dependents() {
+		let configuration = sample_configuration(&[
+			("app", monochange_core::PackageType::Npm, true),
+			("core", monochange_core::PackageType::Npm, true),
+			("utils", monochange_core::PackageType::Npm, true),
+		]);
+		let packages = vec![
+			sample_npm_package_with_dependencies(
+				"app",
+				"app",
+				vec![
+					sample_npm_dependency("core", DependencyKind::Runtime),
+					sample_npm_dependency("utils", DependencyKind::Build),
+				],
+			),
+			sample_npm_package_with_dependencies(
+				"utils",
+				"utils",
+				vec![sample_npm_dependency("core", DependencyKind::Peer)],
+			),
+			sample_npm_package_with_dependencies("core", "core", Vec::new()),
+		];
+		let publications = vec![
+			sample_npm_publication("app"),
+			sample_npm_publication("utils"),
+			sample_npm_publication("core"),
+		];
+
+		let requests =
+			build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
+				.expect("requests");
+		let ordered_package_ids = requests
+			.iter()
+			.map(|request| request.package_id.as_str())
+			.collect::<Vec<_>>();
+
+		assert_eq!(ordered_package_ids, vec!["core", "utils", "app"]);
+	}
+
+	#[test]
+	fn build_release_requests_ignores_dependencies_outside_selected_publications() {
+		let configuration = sample_configuration(&[
+			("app", monochange_core::PackageType::Npm, true),
+			("core", monochange_core::PackageType::Npm, true),
+		]);
+		let packages = vec![
+			sample_npm_package_with_dependencies(
+				"app",
+				"app",
+				vec![sample_npm_dependency("core", DependencyKind::Runtime)],
+			),
+			sample_npm_package_with_dependencies("core", "core", Vec::new()),
+		];
+		let publications = vec![sample_npm_publication("app")];
+
+		let requests =
+			build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
+				.expect("dependency outside publication set should not block publishing");
+
+		assert_eq!(requests.len(), 1);
+		assert_eq!(requests[0].package_id, "app");
+	}
+
+	#[test]
+	fn build_release_requests_detects_publish_relevant_dependency_cycles() {
+		let configuration = sample_configuration(&[
+			("core", monochange_core::PackageType::Npm, true),
+			("utils", monochange_core::PackageType::Npm, true),
+		]);
+		let packages = vec![
+			sample_npm_package_with_dependencies(
+				"core",
+				"core",
+				vec![sample_npm_dependency("utils", DependencyKind::Runtime)],
+			),
+			sample_npm_package_with_dependencies(
+				"utils",
+				"utils",
+				vec![sample_npm_dependency("core", DependencyKind::Workspace)],
+			),
+		];
+		let publications = vec![
+			sample_npm_publication("core"),
+			sample_npm_publication("utils"),
+		];
+
+		let error =
+			build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
+				.expect_err("publish-relevant dependency cycles should fail");
+		let message = error.to_string();
+
+		assert!(message.contains("cyclic publish dependencies"));
+		assert!(message.contains("core -> utils"));
+		assert!(message.contains("utils -> core"));
+	}
+
+	#[test]
+	fn build_release_requests_ignores_development_dependency_cycles() {
+		let configuration = sample_configuration(&[
+			("core", monochange_core::PackageType::Npm, true),
+			("utils", monochange_core::PackageType::Npm, true),
+		]);
+		let packages = vec![
+			sample_npm_package_with_dependencies(
+				"core",
+				"core",
+				vec![sample_npm_dependency("utils", DependencyKind::Development)],
+			),
+			sample_npm_package_with_dependencies(
+				"utils",
+				"utils",
+				vec![sample_npm_dependency("core", DependencyKind::Development)],
+			),
+		];
+		let publications = vec![
+			sample_npm_publication("utils"),
+			sample_npm_publication("core"),
+		];
+
+		let requests =
+			build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
+				.expect("development-only dependency cycles should not fail");
+		let ordered_package_ids = requests
+			.iter()
+			.map(|request| request.package_id.as_str())
+			.collect::<Vec<_>>();
+
+		assert_eq!(ordered_package_ids, vec!["core", "utils"]);
 	}
 
 	#[test]
