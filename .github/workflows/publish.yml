@@ -201,7 +201,18 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
-            --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
-            --format json
+          if [ "${{ matrix.registry }}" = "npm" ]; then
+            # Nix glibc 2.42's libdl.so.2 requires GLIBC_ABI_DT_X86_64_PLT which
+            # the runner's glibc 2.39 does not provide. Clear the Nix library-path
+            # overrides so pnpm (and its node shebang) use only the system
+            # dynamic linker and system glibc.
+            env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u NIX_LD -u NIX_LD_LIBRARY_PATH \
+              "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
+                --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
+                --format json
+          else
+            "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
+              --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
+              --format json
+          fi
         shell: devenv shell -- bash -e {0}
