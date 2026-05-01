@@ -1,5 +1,5 @@
 ---
-main: patch
+main: none
 ---
 
 # Resolve git identity from token for release PR commits
