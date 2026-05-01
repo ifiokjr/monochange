@@ -201,7 +201,8 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
+          .github/scripts/without-nix-env.sh \
+            "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
             --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
             --format json
         shell: devenv shell -- bash -e {0}
