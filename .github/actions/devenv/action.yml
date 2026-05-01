@@ -88,13 +88,10 @@ runs:
       shell: bash
       if: inputs.activate == 'true'
       run: |
-        # Dump the devenv environment into KEY=VALUE format.
-        # Skip PATH, empty lines, and Nix-specific vars that would
-        # break host binaries (e.g. /usr/bin/env) when child
-        # processes inherit LD_LIBRARY_PATH from a Nix glibc.
+        # Dump the devenv environment into KEY=VALUE format
         devenv shell -- env | while IFS= read -r line; do
+          # Skip PATH and empty lines; write the rest to GITHUB_ENV
           [[ "$line" =~ ^PATH= ]] && continue
-          [[ "$line" =~ ^(LD_LIBRARY_PATH|LD_PRELOAD|LD_AUDIT|NIX_LD|NIX_LD_LIBRARY_PATH|NIX_CFLAGS_COMPILE|NIX_LDFLAGS)= ]] && continue
           [[ -z "$line" ]] && continue
           echo "$line" >> "$GITHUB_ENV"
         done

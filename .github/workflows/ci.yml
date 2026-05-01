@@ -23,29 +23,35 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: lint clippy
         run: lint:clippy
+        shell: devenv shell -- bash -e {0}
 
       - name: lint formatting
         run: lint:format
+        shell: devenv shell -- bash -e {0}
 
       - name: check architecture boundaries
         run: lint:architecture
+        shell: devenv shell -- bash -e {0}
 
       - name: check documentation sync
         run: docs:check
+        shell: devenv shell -- bash -e {0}
 
       - name: lint js
-        run: node node_modules/oxlint/bin/oxlint .
+        run: .github/scripts/without-nix-env.sh node node_modules/oxlint/bin/oxlint .
+        shell: devenv shell -- bash -e {0}
 
       - name: cargo deny
         run: deny:check
+        shell: devenv shell -- bash -e {0}
 
       - name: manifest lint
         run: lint:monochange
+        shell: devenv shell -- bash -e {0}
 
   test:
     timeout-minutes: 60
@@ -57,14 +63,15 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run cargo tests
         run: test:cargo:expensive
+        shell: devenv shell -- bash -e {0}
 
       - name: run doc tests
         run: test:docs
+        shell: devenv shell -- bash -e {0}
 
   build:
     timeout-minutes: 60
@@ -76,11 +83,11 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build
         run: build:all
+        shell: devenv shell -- bash -e {0}
 
       - name: detect current release commit
         id: release_record
@@ -92,17 +99,21 @@ jobs:
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi
+        shell: devenv shell -- bash -e {0}
 
       - name: check publish builds
         if: steps.release_record.outputs.is_release_commit != 'true'
         run: publish:check
+        shell: devenv shell -- bash -e {0}
 
       - name: skip publish build check on release commit
         if: steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is a release commit; skipping publish:check."
+        shell: devenv shell -- bash -e {0}
 
       - name: build book
         run: build:book
+        shell: devenv shell -- bash -e {0}
 
   coverage:
     timeout-minutes: 60
@@ -121,13 +132,13 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run coverage
         env:
           CARGO_BUILD_JOBS: 1
         run: coverage:all
+        shell: devenv shell -- bash -e {0}
 
       - name: verify 100% patch coverage
         id: verify-patch-coverage
@@ -137,6 +148,7 @@ jobs:
           MONOCHANGE_PATCH_COVERAGE_BASE: ${{ github.event.pull_request.base.sha }}
           MONOCHANGE_PATCH_COVERAGE_HEAD: ${{ github.sha }}
         run: coverage:patch
+        shell: devenv shell -- bash -e {0}
 
       - name: prepare codecov flag reports
         id: prepare-codecov-flags
@@ -146,6 +158,7 @@ jobs:
             --lcov target/coverage/lcov.info \
             --out-dir target/coverage/flags \
             --github-output "$GITHUB_OUTPUT"
+        shell: devenv shell -- bash -e {0}
 
       - name: upload codecov flag reports artifact
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -170,6 +183,7 @@ jobs:
       - name: fail when patch coverage is below target
         if: github.event_name == 'pull_request' && steps.verify-patch-coverage.outcome == 'failure'
         run: exit 1
+        shell: devenv shell -- bash -e {0}
 
   coverage-flags:
     timeout-minutes: 30
@@ -218,7 +232,6 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run criterion benchmarks
@@ -232,6 +245,7 @@ jobs:
           tail -10 /tmp/bench-output.txt
           echo "--- filtered results ---"
           cat target/benchmark-results.txt
+        shell: devenv shell -- bash -e {0}
 
       - name: upload benchmark results
         if: always()
@@ -258,11 +272,11 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build PR binary
         run: cargo build --release --bin mc && cp target/release/mc /tmp/mc-pr
+        shell: devenv shell -- bash -e {0}
 
       - name: build main binary
         run: |
@@ -271,6 +285,7 @@ jobs:
           cargo build --release --bin mc && cp target/release/mc /tmp/mc-main
           git checkout -
           git stash pop || true
+        shell: devenv shell -- bash -e {0}
 
       - name: run CLI benchmarks
         id: bench
@@ -287,6 +302,7 @@ jobs:
             echo "ENDOFBENCH"
             echo "violations=$(cat /tmp/benchmark-violations.txt)"
           } >> "$GITHUB_OUTPUT"
+        shell: devenv shell -- bash -e {0}
 
       - name: comment benchmark results on PR
         if: always() && steps.bench.outcome == 'success'
@@ -302,6 +318,7 @@ jobs:
             echo "benchmark phase budget regressions detected: ${{ steps.bench.outputs.violations }}"
             exit 1
           fi
+        shell: devenv shell -- bash -e {0}
 
   release-pr-manual-merge-blocker:
     if: github.event_name == 'pull_request'
@@ -336,7 +353,6 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: configure git
@@ -350,9 +366,11 @@ jobs:
           user_name="$(echo "$user_info" | jq -r '.name // .login')"
           git config user.name "$user_name"
           git config user.email "${user_id}+${user_login}@users.noreply.github.com"
+        shell: devenv shell -- bash -e {0}
 
       - name: refresh tags from origin
         run: git fetch --force --tags origin
+        shell: devenv shell -- bash -e {0}
 
       - name: detect current release commit
         id: release_record
@@ -364,12 +382,15 @@ jobs:
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi
+        shell: devenv shell -- bash -e {0}
 
       - name: refresh release pull request
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+          GITHUB_COMMIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mc --log-level=debug release-pr
+        shell: devenv shell -- bash -e {0}
 
       - name: skip refresh on merged release commit
         if: steps.release_record.outputs.is_release_commit == 'true'
@@ -394,13 +415,13 @@ jobs:
       - name: setup
         uses: ./.github/actions/devenv
         with:
-          activate: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: detect release commit and create tags
         id: tag_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: devenv shell -- bash -e {0}
         run: |
           set -euo pipefail
 
@@ -418,12 +439,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mc publish-release --from-ref="HEAD" --draft --format json | tee /tmp/publish-release.json
+        shell: devenv shell -- bash -e {0}
 
       - name: comment on released issues
         if: steps.tag_release.outputs.is_release_commit == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mc comment-released-issues --from-ref="HEAD" --auto-close-issues
+        shell: devenv shell -- bash -e {0}
 
       - name: trigger release workflow
         if: steps.tag_release.outputs.is_release_commit == 'true'
