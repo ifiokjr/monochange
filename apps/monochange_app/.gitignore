@@ -1,0 +1,15 @@
+# Build output
+target/
+pkg/
+dist/
+
+# Node
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

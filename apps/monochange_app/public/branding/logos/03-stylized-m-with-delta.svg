@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#0c8ee7"/>
+    </linearGradient>
+  </defs>
+  <!-- Stylized 'M' letterform -->
+  <path d="M40 180 L65 100 L85 140 L105 80 L120 120 L140 80 L155 140 L175 100 L200 180" 
+        stroke="url(#g3)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Delta symbol accent -->
+  <path d="M160 50 L180 70 L140 70 Z" fill="url(#g3)" opacity="0.6"/>
+  <!-- Version dot -->
+  <circle cx="200" cy="55" r="5" fill="url(#g3)"/>
+</svg>

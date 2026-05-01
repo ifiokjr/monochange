@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="g2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0c8ee7"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <!-- Trunk -->
+  <line x1="120" y1="200" x2="120" y2="140" stroke="url(#g2)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Branches -->
+  <line x1="120" y1="140" x2="80" y2="100" stroke="url(#g2)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="120" y1="140" x2="160" y2="100" stroke="url(#g2)" stroke-width="5" stroke-linecap="round"/>
+  <!-- Sub-branches -->
+  <line x1="80" y1="100" x2="55" y2="70" stroke="url(#g2)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="80" y1="100" x2="90" y2="55" stroke="url(#g2)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="160" y1="100" x2="145" y2="55" stroke="url(#g2)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="160" y1="100" x2="185" y2="70" stroke="url(#g2)" stroke-width="4" stroke-linecap="round"/>
+  <!-- Merge arrow back to trunk -->
+  <path d="M55 70 Q85 55 120 60" stroke="url(#g2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 4"/>
+  <!-- Nodes at ends -->
+  <circle cx="55" cy="70" r="6" fill="#0c8ee7"/>
+  <circle cx="90" cy="55" r="6" fill="#059669"/>
+  <circle cx="145" cy="55" r="6" fill="#059669"/>
+  <circle cx="185" cy="70" r="6" fill="#0c8ee7"/>
+  <!-- Root -->
+  <circle cx="120" cy="200" r="8" fill="url(#g2)"/>
+</svg>
