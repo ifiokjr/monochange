@@ -48,6 +48,8 @@ pub struct CargoLintSuite;
 struct CargoLintFile {
 	document: DocumentMut,
 	workspace_package_names: Arc<BTreeSet<String>>,
+	#[allow(dead_code)]
+	workspace_package_publishable: Arc<BTreeMap<String, bool>>,
 }
 
 impl LintSuite for CargoLintSuite {
@@ -139,6 +141,18 @@ impl LintSuite for CargoLintSuite {
 				.map(|package| package.name.clone())
 				.collect::<BTreeSet<_>>(),
 		);
+		let workspace_package_publishable = Arc::new(
+			discovery
+				.packages
+				.iter()
+				.map(|package| {
+					(
+						package.name.clone(),
+						!matches!(package.publish_state, PublishState::Private),
+					)
+				})
+				.collect::<BTreeMap<_, _>>(),
+		);
 
 		discovery
 			.packages
@@ -190,6 +204,7 @@ impl LintSuite for CargoLintSuite {
 					Box::new(CargoLintFile {
 						document,
 						workspace_package_names: Arc::clone(&workspace_package_names),
+						workspace_package_publishable: Arc::clone(&workspace_package_publishable),
 					}),
 				))
 			})
@@ -456,6 +471,65 @@ impl LintRuleRunner for InternalDependencyWorkspaceRule {
 }
 
 monochange_linting::declare_lint_rule! {
+	PublishableDependencyRule,
+	id: "cargo/publishable-dependencies",
+	name: "Publishable dependencies",
+	description: "Requires publishable Cargo packages to avoid dependencies on unpublished workspace packages",
+	category: LintCategory::Correctness,
+	maturity: LintMaturity::Stable,
+	autofixable: false,
+	options: vec![],
+}
+
+impl LintRuleRunner for PublishableDependencyRule {
+	fn rule(&self) -> &LintRule {
+		&self.rule
+	}
+
+	fn run(&self, ctx: &LintContext<'_>, config: &LintRuleConfig) -> Vec<LintResult> {
+		if !config.severity().is_enabled() || ctx.metadata.publishable != Some(true) {
+			return Vec::new();
+		}
+		let Some(file) = cargo_file(ctx) else {
+			return Vec::new();
+		};
+		let mut results = Vec::new();
+
+		for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+			let Some(item) = section_item(&file.document, section) else {
+				continue;
+			};
+			let Some(table) = item.as_table() else {
+				continue;
+			};
+
+			for (dep_name, value) in table {
+				if file
+					.workspace_package_publishable
+					.get(dep_name)
+					.copied()
+					.unwrap_or(true)
+				{
+					continue;
+				}
+				let span = value.span().map(|span| (span.start, span.end));
+				let location = location_from_span(ctx.manifest_path, ctx.contents, span);
+				results.push(LintResult::new(
+					self.rule.id.clone(),
+					location,
+					format!(
+						"publishable Cargo package depends on unpublished workspace package `{dep_name}` in [{section}]"
+					),
+					config.severity(),
+				));
+			}
+		}
+
+		results
+	}
+}
+
+monochange_linting::declare_lint_rule! {
 	RequiredPackageFieldsRule,
 	id: "cargo/required-package-fields",
 	name: "Required package fields",
@@ -662,6 +736,10 @@ mod tests {
 					"internal_dep".to_string(),
 					"serde".to_string(),
 				])),
+				workspace_package_publishable: Arc::new(BTreeMap::from([
+					("internal_dep".to_string(), false),
+					("serde".to_string(), true),
+				])),
 			}),
 		)
 	}
@@ -752,6 +830,111 @@ internal_dep = { path = "../internal_dep", version = "0.1.0" }
 				.first()
 				.and_then(|result| result.fix.as_ref())
 				.is_some()
+		);
+	}
+
+	#[test]
+	fn publishable_dependency_rule_reports_unpublished_workspace_deps() {
+		let target = cargo_target(
+			r#"[package]
+name = "example"
+version = "0.1.0"
+
+[dev-dependencies]
+internal_dep = { workspace = true }
+serde = { workspace = true }
+"#,
+			true,
+			true,
+		);
+		let ctx = LintContext {
+			workspace_root: &target.workspace_root,
+			manifest_path: &target.manifest_path,
+			contents: &target.contents,
+			metadata: &target.metadata,
+			parsed: target.parsed.as_ref(),
+		};
+		let results = PublishableDependencyRule::new().run(&ctx, &config());
+		assert_eq!(results.len(), 1);
+		assert!(
+			results
+				.first()
+				.expect("expected lint result")
+				.message
+				.contains("unpublished workspace package `internal_dep`")
+		);
+	}
+
+	#[test]
+	fn publishable_dependency_rule_skips_private_packages() {
+		let target = cargo_target(
+			r#"[package]
+name = "example"
+version = "0.1.0"
+
+[dev-dependencies]
+internal_dep = { workspace = true }
+"#,
+			true,
+			false,
+		);
+		let ctx = LintContext {
+			workspace_root: &target.workspace_root,
+			manifest_path: &target.manifest_path,
+			contents: &target.contents,
+			metadata: &target.metadata,
+			parsed: target.parsed.as_ref(),
+		};
+		let results = PublishableDependencyRule::new().run(&ctx, &config());
+		assert!(results.is_empty());
+	}
+
+	#[test]
+	fn publishable_dependency_rule_skips_unparsed_targets_and_non_table_sections() {
+		let target = cargo_target(
+			r#"dependencies = "not a table"
+
+[package]
+name = "example"
+version = "0.1.0"
+"#,
+			true,
+			true,
+		);
+		let non_cargo_parsed = "not a Cargo lint file";
+		let ctx = LintContext {
+			workspace_root: &target.workspace_root,
+			manifest_path: &target.manifest_path,
+			contents: &target.contents,
+			metadata: &target.metadata,
+			parsed: &non_cargo_parsed,
+		};
+		assert!(
+			PublishableDependencyRule::new()
+				.run(&ctx, &config())
+				.is_empty()
+		);
+
+		let ctx = LintContext {
+			workspace_root: &target.workspace_root,
+			manifest_path: &target.manifest_path,
+			contents: &target.contents,
+			metadata: &target.metadata,
+			parsed: target.parsed.as_ref(),
+		};
+		assert!(
+			PublishableDependencyRule::new()
+				.run(&ctx, &config())
+				.is_empty()
+		);
+	}
+
+	#[test]
+	fn publishable_dependency_rule_metadata_is_exposed() {
+		let rule = PublishableDependencyRule::new();
+		assert_eq!(
+			LintRuleRunner::rule(&rule).id,
+			"cargo/publishable-dependencies"
 		);
 	}
 
