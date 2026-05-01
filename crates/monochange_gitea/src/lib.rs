@@ -353,7 +353,11 @@ pub fn build_release_requests(
 				target_id: target.id.clone(),
 				target_kind: target.kind,
 				tag_name: target.tag_name.clone(),
-				name: target.rendered_title.clone(),
+				name: if target.rendered_title.is_empty() {
+					target.tag_name.clone()
+				} else {
+					target.rendered_title.clone()
+				},
 				body: release_body(source, manifest, target),
 				draft: source.releases.draft,
 				prerelease: source.releases.prerelease,
