@@ -104,6 +104,12 @@ pub(crate) struct PackagePublishOutcome {
 	pub message: String,
 	pub placeholder: bool,
 	pub trusted_publishing: TrustedPublishingOutcome,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub command: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub stdout: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub stderr: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -999,6 +1005,9 @@ fn execute_publish_requests(
 				message: "package opted out of built-in publishing".to_string(),
 				placeholder: mode == PackagePublishRunMode::Placeholder,
 				trusted_publishing: disabled_trust_outcome(),
+				command: None,
+				stdout: None,
+				stderr: None,
 			});
 			continue;
 		}
@@ -1017,6 +1026,9 @@ fn execute_publish_requests(
 				),
 				placeholder: mode == PackagePublishRunMode::Placeholder,
 				trusted_publishing: trust_outcome_for_skip(request, source, root, env_map),
+				command: None,
+				stdout: None,
+				stderr: None,
 			});
 			continue;
 		}
@@ -1039,6 +1051,9 @@ fn execute_publish_requests(
 					message,
 					placeholder: mode == PackagePublishRunMode::Placeholder,
 					trusted_publishing: planned_trust_outcome(request, source, root, env_map),
+					command: None,
+					stdout: None,
+					stderr: None,
 				});
 				continue;
 			}
@@ -1064,6 +1079,9 @@ fn execute_publish_requests(
 				message: planned_publish_message(mode, request),
 				placeholder: mode == PackagePublishRunMode::Placeholder,
 				trusted_publishing: planned_trust_outcome(request, source, root, env_map),
+				command: None,
+				stdout: None,
+				stderr: None,
 			});
 			continue;
 		}
@@ -1081,7 +1099,7 @@ fn execute_publish_requests(
 			}
 		};
 		if !output.success {
-			outcomes.push(failed_publish_outcome(
+			let mut outcome = failed_publish_outcome(
 				mode,
 				request,
 				format!(
@@ -1089,7 +1107,11 @@ fn execute_publish_requests(
 					render_command(&publish_command),
 					render_command_error(&output)
 				),
-			));
+			);
+			outcome.command = Some(render_command(&publish_command));
+			outcome.stdout = non_empty_output(output.stdout);
+			outcome.stderr = non_empty_output(output.stderr);
+			outcomes.push(outcome);
 			break;
 		}
 
@@ -1113,6 +1135,9 @@ fn execute_publish_requests(
 			),
 			placeholder: mode == PackagePublishRunMode::Placeholder,
 			trusted_publishing,
+			command: Some(render_command(&publish_command)),
+			stdout: non_empty_output(output.stdout),
+			stderr: non_empty_output(output.stderr),
 		});
 	}
 
@@ -1137,6 +1162,9 @@ fn failed_publish_outcome(
 		message,
 		placeholder: mode == PackagePublishRunMode::Placeholder,
 		trusted_publishing: disabled_trust_outcome(),
+		command: None,
+		stdout: None,
+		stderr: None,
 	}
 }
 
@@ -2682,6 +2710,10 @@ fn render_command_error(output: &CommandOutput) -> String {
 	}
 }
 
+fn non_empty_output(output: String) -> Option<String> {
+	(!output.is_empty()).then_some(output)
+}
+
 #[cfg(test)]
 #[allow(clippy::disallowed_methods, clippy::cloned_ref_to_slice_refs)]
 mod tests {
@@ -2778,6 +2810,9 @@ mod tests {
 			message: format!("{status:?}"),
 			placeholder: false,
 			trusted_publishing: disabled_trust_outcome(),
+			command: None,
+			stdout: None,
+			stderr: None,
 		}
 	}
 

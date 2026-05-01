@@ -49,6 +49,7 @@ None. `PlaceholderPublish` does not require a previous `PrepareRelease` step.
 
 - in dry-run mode, plans and previews placeholder publish operations without touching registries
 - in normal mode, publishes `0.0.0` placeholder versions for missing packages
+- reports only packages that need action by default; pass `--show-all` to include already-published and skipped packages
 - contributes `publish.*` and `publish_rate_limits.*` template context to the command result
 
 ## Example
@@ -68,6 +69,11 @@ default = "text"
 [[cli.placeholder-publish.inputs]]
 name = "package"
 type = "string_list"
+
+[[cli.placeholder-publish.inputs]]
+name = "show-all"
+type = "boolean"
+help_text = "Show already-published and skipped placeholder packages instead of only packages that need action"
 
 [[cli.placeholder-publish.steps]]
 name = "publish placeholder packages"

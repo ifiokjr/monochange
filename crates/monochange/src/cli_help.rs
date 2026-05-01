@@ -1001,7 +1001,8 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			summary: "Publish placeholder versions for missing registry packages",
 			description: "Packages that have never been published to their target registry (crates.io, \
 				npm, pub.dev, JSR) need an initial placeholder version before automated \
-				publishing can work. This command publishes those placeholders.",
+				publishing can work. This command publishes those placeholders and reports \
+				only packages that need action unless --show-all is set.",
 			usage: "mc placeholder-publish [OPTIONS]",
 			options: &[
 				(
@@ -1013,6 +1014,11 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 					"--package",
 					"<PACKAGE>",
 					"Restrict to specific package ids (repeatable)",
+				),
+				(
+					"--show-all",
+					"",
+					"Include already-published and skipped packages in the report",
 				),
 				("--dry-run", "", "Preview without publishing"),
 			],
