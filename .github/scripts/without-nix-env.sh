@@ -5,6 +5,6 @@
 set -euo pipefail
 
 exec env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT \
-  -u NIX_LD -u NIX_LD_LIBRARY_PATH \
-  -u NIX_CFLAGS_COMPILE -u NIX_LDFLAGS \
-  "$@"
+	-u NIX_LD -u NIX_LD_LIBRARY_PATH \
+	-u NIX_CFLAGS_COMPILE -u NIX_LDFLAGS \
+	"$@"
