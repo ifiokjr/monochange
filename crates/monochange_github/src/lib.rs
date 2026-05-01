@@ -1200,9 +1200,10 @@ fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
 
 	let runtime = github_runtime().map_err(|error| error.to_string())?;
 	runtime.block_on(async {
-		let client = github_client_from_env(source).map_err(|error| error.to_string())?;
+		let commit_client =
+			github_commit_client_from_env(source).map_err(|error| error.to_string())?;
 		let verified_commit = create_verified_github_commit_for_release_pull_request(
-			&client,
+			&commit_client,
 			request,
 			fallback_commit,
 			root,
@@ -1210,7 +1211,7 @@ fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
 		)
 		.await?;
 		update_github_branch_ref_to_verified_commit(
-			&client,
+			&commit_client,
 			request,
 			fallback_commit,
 			&verified_commit,
@@ -1749,6 +1750,23 @@ fn github_client_from_env(source: &SourceConfiguration) -> MonochangeResult<Octo
 		.map_err(|_| {
 			MonochangeError::Config(
 				"set `GITHUB_TOKEN` (or `GH_TOKEN`) before running GitHub automation".to_string(),
+			)
+		})?;
+	let env_api_url = env::var("GITHUB_API_URL").ok();
+	let api_url = source.api_url.as_deref().or(env_api_url.as_deref());
+	build_github_client(&token, api_url)
+}
+
+/// Client specifically for Git Database API operations that create blobs, trees,
+/// commits, and update refs. In GitHub Actions, this must use `GITHUB_TOKEN`
+/// (not a PAT) for GitHub to auto-sign commits with the web-flow GPG key.
+fn github_commit_client_from_env(source: &SourceConfiguration) -> MonochangeResult<Octocrab> {
+	let token = env::var("GITHUB_COMMIT_TOKEN")
+		.or_else(|_| env::var("GITHUB_TOKEN"))
+		.map_err(|_| {
+			MonochangeError::Config(
+				"set `GITHUB_COMMIT_TOKEN` (or `GITHUB_TOKEN`) for GitHub commit verification"
+					.to_string(),
 			)
 		})?;
 	let env_api_url = env::var("GITHUB_API_URL").ok();
