@@ -341,6 +341,39 @@ struct GitHubGitRefObject {
 	sha: String,
 }
 
+#[derive(Debug, Serialize)]
+struct GitHubCreateBlobPayload {
+	content: String,
+	encoding: &'static str,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubCreateBlobResponse {
+	sha: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubCreateTreePayload<'a> {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	base_tree: Option<&'a str>,
+	tree: Vec<GitHubCreateTreeEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct GitHubCreateTreeEntry {
+	path: String,
+	mode: &'static str,
+	#[serde(rename = "type")]
+	entry_type: &'static str,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	sha: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubCreateTreeResponse {
+	sha: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct GitHubExistingPullRequestLabel {
 	name: String,
@@ -1127,6 +1160,8 @@ pub fn publish_release_pull_request(
 			source,
 			request,
 			&head_commit,
+			root,
+			tracked_paths,
 		)
 		.unwrap_or_else(|warning| {
 			tracing::warn!(%warning, commit = %head_commit, "falling back to regular release pull request commit");
@@ -1152,6 +1187,8 @@ fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
 	source: &SourceConfiguration,
 	request: &GitHubPullRequestRequest,
 	fallback_commit: &str,
+	root: &Path,
+	tracked_paths: &[PathBuf],
 ) -> GitHubVerifiedCommitAttempt {
 	if !github_actions_release_commit_verification_enabled(source) {
 		return Ok(fallback_commit.to_string());
@@ -1164,6 +1201,8 @@ fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
 			&client,
 			request,
 			fallback_commit,
+			root,
+			tracked_paths,
 		)
 		.await?;
 		update_github_branch_ref_to_verified_commit(
@@ -1192,6 +1231,8 @@ async fn create_verified_github_commit_for_release_pull_request(
 	client: &Octocrab,
 	request: &GitHubPullRequestRequest,
 	fallback_commit: &str,
+	root: &Path,
+	tracked_paths: &[PathBuf],
 ) -> GitHubVerifiedCommitAttempt {
 	let commit_path = format!(
 		"/repos/{}/{}/git/commits/{}",
@@ -1200,19 +1241,107 @@ async fn create_verified_github_commit_for_release_pull_request(
 	let original: GitHubGitCommitResponse = get_json(client, &commit_path)
 		.await
 		.map_err(|error| error.to_string())?;
-	let payload = GitHubCreateCommitPayload {
+
+	// Get the first parent's tree SHA to use as base_tree
+	let base_tree = match original.parents.first() {
+		Some(parent) => {
+			let parent_path = format!(
+				"/repos/{}/{}/git/commits/{}",
+				request.owner, request.repo, parent.sha
+			);
+			let parent_commit: GitHubGitCommitResponse = get_json(client, &parent_path)
+				.await
+				.map_err(|error| error.to_string())?;
+			Some(parent_commit.tree.sha)
+		}
+		None => None,
+	};
+
+	use std::os::unix::fs::PermissionsExt;
+
+	let mut tree_entries = Vec::with_capacity(tracked_paths.len());
+	for path in tracked_paths {
+		let absolute_path = root.join(path);
+		let relative_path = path.to_string_lossy().to_string();
+
+		if !absolute_path.exists() {
+			// File was deleted
+			tree_entries.push(GitHubCreateTreeEntry {
+				path: relative_path,
+				mode: "100644",
+				entry_type: "blob",
+				sha: None,
+			});
+			continue;
+		}
+
+		let metadata = std::fs::symlink_metadata(&absolute_path)
+			.map_err(|e| format!("failed to read metadata for {}: {}", path.display(), e))?;
+
+		if metadata.is_dir() {
+			// Directories are handled implicitly by their children
+			continue;
+		}
+
+		let (content, mode) = if metadata.is_symlink() {
+			let target = std::fs::read_link(&absolute_path)
+				.map_err(|e| format!("failed to read symlink {}: {}", path.display(), e))?;
+			let content = target.to_string_lossy().to_string();
+			(content, "120000")
+		} else {
+			let content = std::fs::read_to_string(&absolute_path)
+				.map_err(|e| format!("failed to read file {}: {}", path.display(), e))?;
+			let mode = if metadata.permissions().mode() & 0o100 != 0 {
+				"100755"
+			} else {
+				"100644"
+			};
+			(content, mode)
+		};
+
+		let blob_payload = GitHubCreateBlobPayload {
+			content,
+			encoding: "utf-8",
+		};
+		let blob_path = format!("/repos/{}/{}/git/blobs", request.owner, request.repo);
+		let blob: GitHubCreateBlobResponse = post_json(client, &blob_path, &blob_payload)
+			.await
+			.map_err(|error| error.to_string())?;
+
+		tree_entries.push(GitHubCreateTreeEntry {
+			path: relative_path,
+			mode,
+			entry_type: "blob",
+			sha: Some(blob.sha),
+		});
+	}
+
+	// Create tree
+	let tree_sha = if tree_entries.is_empty() {
+		// No changes — reuse base tree
+		base_tree.ok_or_else(|| "no base tree available for empty commit".to_string())?
+	} else {
+		let tree_payload = GitHubCreateTreePayload {
+			base_tree: base_tree.as_deref(),
+			tree: tree_entries,
+		};
+		let tree_path = format!("/repos/{}/{}/git/trees", request.owner, request.repo);
+		let tree: GitHubCreateTreeResponse = post_json(client, &tree_path, &tree_payload)
+			.await
+			.map_err(|error| error.to_string())?;
+		tree.sha
+	};
+
+	let commit_payload = GitHubCreateCommitPayload {
 		message: original.message,
-		tree: original.tree.sha,
-		parents: original
-			.parents
-			.into_iter()
-			.map(|parent| parent.sha)
-			.collect(),
+		tree: tree_sha,
+		parents: original.parents.into_iter().map(|p| p.sha).collect(),
 	};
 	let create_path = format!("/repos/{}/{}/git/commits", request.owner, request.repo);
-	let commit: GitHubGitCommitResponse = post_json(client, &create_path, &payload)
+	let commit: GitHubGitCommitResponse = post_json(client, &create_path, &commit_payload)
 		.await
 		.map_err(|error| error.to_string())?;
+
 	if commit.verification.verified {
 		tracing::info!(
 			commit = %commit.sha,
@@ -1221,6 +1350,7 @@ async fn create_verified_github_commit_for_release_pull_request(
 		);
 		return Ok(commit.sha);
 	}
+
 	Err(format!(
 		"GitHub Git Database API created commit {} without verification ({})",
 		commit.sha,
@@ -1913,7 +2043,7 @@ fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 					continue;
 				}
 				lines.push(String::new());
-				lines.push(format!("#### {}", section.title));
+				lines.push(format!("### {}", section.title));
 				lines.push(String::new());
 				push_body_entries(&mut lines, &section.entries);
 			}

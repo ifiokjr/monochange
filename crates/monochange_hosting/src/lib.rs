@@ -169,7 +169,7 @@ pub fn release_pull_request_body(manifest: &ReleaseManifest) -> String {
 					continue;
 				}
 				lines.push(String::new());
-				lines.push(format!("#### {}", section.title));
+				lines.push(format!("### {}", section.title));
 				lines.push(String::new());
 				push_body_entries(&mut lines, &section.entries);
 			}
@@ -1030,6 +1030,50 @@ mod tests {
 		post_ok.assert();
 		put_ok.assert();
 		patch_ok.assert();
+	}
+
+	#[test]
+	fn release_pull_request_body_skips_empty_sections() {
+		let mut manifest = sample_manifest();
+		manifest.release_targets = vec![ReleaseManifestTarget {
+			id: "sdk".to_string(),
+			kind: ReleaseOwnerKind::Group,
+			version: "1.2.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v1.2.0".to_string(),
+			members: vec![],
+			rendered_title: "title".to_string(),
+			rendered_changelog_title: "changelog".to_string(),
+		}];
+		manifest.changelogs = vec![ReleaseManifestChangelog {
+			owner_id: "sdk".to_string(),
+			owner_kind: ReleaseOwnerKind::Group,
+			path: PathBuf::from("changelog.md"),
+			format: monochange_core::ChangelogFormat::Monochange,
+			notes: ReleaseNotesDocument {
+				title: "1.2.0".to_string(),
+				summary: vec!["Grouped release.".to_string()],
+				sections: vec![
+					ReleaseNotesSection {
+						title: "Features".to_string(),
+						collapsed: false,
+						entries: vec!["- add publishing".to_string()],
+					},
+					ReleaseNotesSection {
+						title: "Empty".to_string(),
+						collapsed: false,
+						entries: vec![],
+					},
+				],
+			},
+			rendered: String::new(),
+		}];
+
+		let body = release_pull_request_body(&manifest);
+		assert!(!body.contains("### Empty"), "body:\n{body}");
+		assert!(body.contains("### Features"), "body:\n{body}");
 	}
 }
 

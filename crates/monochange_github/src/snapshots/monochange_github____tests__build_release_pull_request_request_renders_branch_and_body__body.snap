@@ -1,11 +1,11 @@
 ---
-source: crates/monochange_gitlab/src/__tests.rs
-assertion_line: 86
+source: crates/monochange_github/src/__tests.rs
+assertion_line: 556
 expression: request.body
 ---
 ## Prepared release
 
-- command: `Release PR!`
+- command: `release`
 - group `sdk` -> `v1.2.0`
 
 ## Release notes
@@ -16,7 +16,7 @@ Grouped release for `sdk`.
 
 ### Features
 
-- add gitlab publishing
+- add github publishing
 
 ## Changed files
 
