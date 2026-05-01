@@ -873,6 +873,7 @@ help_text = "Publish placeholder package versions for missing registry packages"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 	{ name = "package", type = "string_list" },
+	{ name = "show-all", type = "boolean", help_text = "Show already-published and skipped placeholder packages instead of only packages that need action" },
 ]
 steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
 

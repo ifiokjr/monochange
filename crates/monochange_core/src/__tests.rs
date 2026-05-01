@@ -1377,6 +1377,10 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		placeholder.expected_input_kind("package"),
 		Some(CliInputKind::StringList)
 	);
+	assert_eq!(
+		placeholder.expected_input_kind("show-all"),
+		Some(CliInputKind::Boolean)
+	);
 	assert_eq!(placeholder.expected_input_kind("readiness"), None);
 
 	let plan = CliStepDefinition::PlanPublishRateLimits {

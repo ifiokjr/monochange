@@ -5005,6 +5005,9 @@ fn template_context_exposes_publish_namespace() {
 					),
 					message: "would configure trusted publishing".to_string(),
 				},
+				command: None,
+				stdout: None,
+				stderr: None,
 			}],
 		}),
 		rate_limit_report: Some(monochange_core::PublishRateLimitReport {

@@ -754,6 +754,9 @@ mod tests {
 				setup_url: None,
 				message: "trusted publishing disabled".to_string(),
 			},
+			command: None,
+			stdout: None,
+			stderr: None,
 		}
 	}
 

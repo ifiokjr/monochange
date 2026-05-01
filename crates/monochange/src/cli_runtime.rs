@@ -785,6 +785,7 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::PlaceholderPublish { .. } => {
 					let selected_packages = selected_package_ids(&step_inputs);
+					let show_all_packages = boolean_step_input(&step_inputs, "show-all");
 					#[rustfmt::skip]
 					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Placeholder, context.dry_run)?;
 					if !context.dry_run {
@@ -793,7 +794,8 @@ pub(crate) fn execute_cli_command_with_options(
 					}
 					#[rustfmt::skip]
 					let report = package_publish::run_placeholder_publish(root, configuration, &selected_packages, context.dry_run)?;
-					context.package_publish_report = Some(report);
+					context.package_publish_report =
+						Some(filter_placeholder_publish_report(report, show_all_packages));
 					context.rate_limit_report = Some(rate_limit_report);
 					output = None;
 					Ok(())
@@ -2152,6 +2154,39 @@ fn selected_package_ids(inputs: &BTreeMap<String, Vec<String>>) -> BTreeSet<Stri
 		.collect()
 }
 
+fn boolean_step_input(step_inputs: &BTreeMap<String, Vec<String>>, name: &str) -> bool {
+	step_inputs
+		.get(name)
+		.is_some_and(|values| values.iter().any(|value| value == "true"))
+}
+
+fn filter_placeholder_publish_report(
+	mut report: package_publish::PackagePublishReport,
+	show_all_packages: bool,
+) -> package_publish::PackagePublishReport {
+	if show_all_packages || report.mode != package_publish::PackagePublishRunMode::Placeholder {
+		return report;
+	}
+
+	report.packages.retain(|package| {
+		if report.dry_run {
+			matches!(
+				package.status,
+				package_publish::PackagePublishStatus::Planned
+					| package_publish::PackagePublishStatus::Blocked
+					| package_publish::PackagePublishStatus::Failed
+			)
+		} else {
+			matches!(
+				package.status,
+				package_publish::PackagePublishStatus::Published
+					| package_publish::PackagePublishStatus::Failed
+			)
+		}
+	});
+	report
+}
+
 fn optional_publish_plan_readiness_artifact_path(
 	inputs: &BTreeMap<String, Vec<String>>,
 ) -> MonochangeResult<Option<PathBuf>> {
@@ -2353,6 +2388,7 @@ fn render_package_publish_report(report: &package_publish::PackagePublishReport)
 		lines.push(format!("  ecosystem: {}", package.ecosystem));
 		lines.push(format!("  placeholder: {}", yes_no(package.placeholder)));
 		lines.push(format!("  publish: {}", package.message));
+		append_package_publish_command_output_lines(&mut lines, package, "  ");
 		lines.push(format!(
 			"  trusted publishing: {}",
 			trusted_publishing_status_label(package.trusted_publishing.status)
@@ -2377,6 +2413,54 @@ fn render_package_publish_report(report: &package_publish::PackagePublishReport)
 	}
 
 	lines
+}
+
+fn append_package_publish_command_output_lines(
+	lines: &mut Vec<String>,
+	package: &package_publish::PackagePublishOutcome,
+	indent: &str,
+) {
+	if let Some(command) = &package.command {
+		lines.push(format!("{indent}command: {command}"));
+	}
+	append_labeled_multiline_block(lines, "stdout", package.stdout.as_deref(), indent);
+	append_labeled_multiline_block(lines, "stderr", package.stderr.as_deref(), indent);
+}
+
+fn append_labeled_multiline_block(
+	lines: &mut Vec<String>,
+	label: &str,
+	value: Option<&str>,
+	indent: &str,
+) {
+	let Some(value) = value else {
+		return;
+	};
+	lines.push(format!("{indent}{label}:"));
+	for output_line in value.lines() {
+		lines.push(format!("{indent}  │ {output_line}"));
+	}
+}
+
+fn append_package_publish_command_output_markdown_lines(
+	lines: &mut Vec<String>,
+	package: &package_publish::PackagePublishOutcome,
+) {
+	if let Some(command) = &package.command {
+		lines.push(format!("- **Command:** `{command}`"));
+	}
+	append_markdown_output_block(lines, "stdout", package.stdout.as_deref());
+	append_markdown_output_block(lines, "stderr", package.stderr.as_deref());
+}
+
+fn append_markdown_output_block(lines: &mut Vec<String>, label: &str, value: Option<&str>) {
+	let Some(value) = value else {
+		return;
+	};
+	lines.push(format!("- **{label}:**"));
+	lines.push("  ```text".to_string());
+	lines.extend(value.lines().map(|line| format!("  {line}")));
+	lines.push("  ```".to_string());
 }
 
 fn render_package_publish_report_markdown(
@@ -2414,6 +2498,7 @@ fn render_package_publish_report_markdown(
 			yes_no(package.placeholder)
 		));
 		lines.push(format!("- **Publish:** {}", package.message));
+		append_package_publish_command_output_markdown_lines(&mut lines, package);
 		lines.push(format!(
 			"- **Trusted publishing:** {}",
 			trusted_publishing_status_label(package.trusted_publishing.status)
@@ -3816,6 +3901,9 @@ mod tests {
 				setup_url: Some("https://docs.npmjs.com/cli/v11/commands/npm-trust".to_string()),
 				message: "trusted publishing already configured".to_string(),
 			},
+			command: None,
+			stdout: None,
+			stderr: None,
 		}
 	}
 
@@ -4252,6 +4340,9 @@ path = "crates/core"
 					setup_url: None,
 					message: "trusted publishing already configured".to_string(),
 				},
+				command: None,
+				stdout: None,
+				stderr: None,
 			}],
 		});
 		context.command_logs = vec!["ran npm trust".to_string()];
@@ -4268,6 +4359,90 @@ path = "crates/core"
 		assert!(markdown.contains("**Trusted publishing:** configured"));
 		assert!(markdown.contains("**Workflow:** `publish.yml`"));
 		assert!(markdown.contains("## Commands"));
+	}
+
+	#[test]
+	fn filter_placeholder_publish_report_hides_completed_dry_run_packages_by_default() {
+		let report = package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Placeholder,
+			dry_run: true,
+			packages: vec![
+				sample_package_publish_outcome(
+					package_publish::PackagePublishStatus::Planned,
+					package_publish::TrustedPublishingStatus::Planned,
+				),
+				sample_package_publish_outcome(
+					package_publish::PackagePublishStatus::Blocked,
+					package_publish::TrustedPublishingStatus::Planned,
+				),
+				sample_package_publish_outcome(
+					package_publish::PackagePublishStatus::SkippedExisting,
+					package_publish::TrustedPublishingStatus::Configured,
+				),
+				sample_package_publish_outcome(
+					package_publish::PackagePublishStatus::SkippedExternal,
+					package_publish::TrustedPublishingStatus::Disabled,
+				),
+			],
+		};
+
+		let filtered = filter_placeholder_publish_report(report.clone(), false);
+		let statuses = filtered
+			.packages
+			.iter()
+			.map(|package| package.status)
+			.collect::<Vec<_>>();
+
+		assert_eq!(
+			statuses,
+			vec![
+				package_publish::PackagePublishStatus::Planned,
+				package_publish::PackagePublishStatus::Blocked,
+			]
+		);
+		assert_eq!(
+			filter_placeholder_publish_report(report, true)
+				.packages
+				.len(),
+			4
+		);
+	}
+
+	#[test]
+	fn filter_placeholder_publish_report_hides_unchanged_real_run_packages_by_default() {
+		let report = package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Placeholder,
+			dry_run: false,
+			packages: vec![
+				sample_package_publish_outcome(
+					package_publish::PackagePublishStatus::Published,
+					package_publish::TrustedPublishingStatus::Configured,
+				),
+				sample_package_publish_outcome(
+					package_publish::PackagePublishStatus::Failed,
+					package_publish::TrustedPublishingStatus::Disabled,
+				),
+				sample_package_publish_outcome(
+					package_publish::PackagePublishStatus::SkippedExisting,
+					package_publish::TrustedPublishingStatus::Configured,
+				),
+			],
+		};
+
+		let filtered = filter_placeholder_publish_report(report, false);
+		let statuses = filtered
+			.packages
+			.iter()
+			.map(|package| package.status)
+			.collect::<Vec<_>>();
+
+		assert_eq!(
+			statuses,
+			vec![
+				package_publish::PackagePublishStatus::Published,
+				package_publish::PackagePublishStatus::Failed,
+			]
+		);
 	}
 
 	#[test]
@@ -4312,6 +4487,32 @@ path = "crates/core"
 	}
 
 	#[test]
+	fn render_package_publish_reports_include_command_output_blocks() {
+		let mut outcome = sample_package_publish_outcome(
+			package_publish::PackagePublishStatus::Published,
+			package_publish::TrustedPublishingStatus::Disabled,
+		);
+		outcome.command = Some("npm publish --access public".to_string());
+		outcome.stdout = Some("published\nwith provenance".to_string());
+		outcome.stderr = Some("npm notice package".to_string());
+		let report = package_publish::PackagePublishReport {
+			mode: package_publish::PackagePublishRunMode::Placeholder,
+			dry_run: false,
+			packages: vec![outcome],
+		};
+
+		let text = render_package_publish_report(&report).join("\n");
+		assert!(text.contains("command: npm publish --access public"));
+		assert!(text.contains("stdout:\n    │ published\n    │ with provenance"));
+		assert!(text.contains("stderr:\n    │ npm notice package"));
+
+		let markdown = render_package_publish_report_markdown(&report, false).join("\n");
+		assert!(markdown.contains("**Command:** `npm publish --access public`"));
+		assert!(markdown.contains("**stdout:**\n  ```text\n  published\n  with provenance\n  ```"));
+		assert!(markdown.contains("**stderr:**\n  ```text\n  npm notice package\n  ```"));
+	}
+
+	#[test]
 	fn render_package_publish_reports_include_manual_registry_guidance() {
 		let report = package_publish::PackagePublishReport {
 			mode: package_publish::PackagePublishRunMode::Release,
@@ -4334,6 +4535,9 @@ path = "crates/core"
 						"configure trusted publishing manually for `pkg` before the next built-in release publish"
 							.to_string(),
 				},
+				command: None,
+				stdout: None,
+				stderr: None,
 			}],
 		};
 
@@ -4449,6 +4653,9 @@ path = "crates/core"
 					message: "configure trusted publishing manually after the placeholder release"
 						.to_string(),
 				},
+				command: None,
+				stdout: None,
+				stderr: None,
 			}],
 		});
 

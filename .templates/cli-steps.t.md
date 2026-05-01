@@ -428,6 +428,11 @@ default = "text"
 name = "package"
 type = "string_list"
 
+[[cli.placeholder-publish.inputs]]
+name = "show-all"
+type = "boolean"
+help_text = "Show already-published and skipped placeholder packages instead of only packages that need action"
+
 [[cli.placeholder-publish.steps]]
 name = "publish placeholder packages"
 type = "PlaceholderPublish"
