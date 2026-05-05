@@ -25,7 +25,7 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - `crates/monochange_config/src/lib.rs`
 - `crates/monochange/src/versioned_files.rs`
 - `crates/monochange/src/workspace_ops.rs`
-- `crates/monochange/src/monochange.init.toml`
+- `crates/monochange/src/monochange.toml.template`
 - `.templates/**`
 - `docs/src/**`
 - `fixtures/tests/python/**`

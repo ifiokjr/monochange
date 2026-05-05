@@ -27,7 +27,7 @@
 - `crates/monochange_core/src/__tests.rs`
 - `crates/monochange/src/changelog.rs` tests
 - `monochange.toml`
-- `crates/monochange/src/monochange.init.toml`
+- `crates/monochange/src/monochange.toml.template`
 
 ## Plan
 

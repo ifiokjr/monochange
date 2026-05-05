@@ -410,7 +410,7 @@ in
     "fix:js" = {
       exec = ''
         set -euo pipefail
-        pnpm oxfmt --write .
+        pnpm oxfmt --write '**/*.{js,mjs,ts,mts}'
       '';
       description = "Format all JS/TS files with oxfmt.";
       binary = "bash";

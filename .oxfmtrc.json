@@ -1,11 +1,22 @@
 {
 	"$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxfmt/configuration_schema.json",
-	"singleQuote": true,
+	"singleQuote": false,
+	"printWidth": 100,
+	"useTabs": true,
+	"tabWidth": 2,
 	"ignorePatterns": [
 		"dist/**",
 		"coverage/**",
 		"node_modules/**",
 		"pnpm-lock.yaml",
-		"fixtures/**"
+		"fixtures/**",
+		"**/*.{cjs,cts,jsx,tsx}",
+		"**/*.{json,jsonc,json5}",
+		"**/*.{md,mdx,markdown}",
+		"**/*.{yml,yaml}",
+		"**/*.{html,htm}",
+		"**/*.{css,scss,sass,less}",
+		"**/*.{graphql,gql}",
+		"**/*.{vue,astro,handlebars,hbs}"
 	]
 }

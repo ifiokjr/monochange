@@ -196,7 +196,7 @@ ChangelogSettings {
 - Update `plan_released_issue_comments` to include all issue relationships and set `close` state appropriately
 - Update `comment_released_issues_with_client` to PATCH issue state to `"closed"` when `plan.close` is `true`
 - Add dedicated composite actions: `publish-release` and `comment-released-issues`
-- Add `publish-release` and `comment-released-issues` CLI step definitions to `monochange.init.toml`
+- Add `publish-release` and `comment-released-issues` CLI step definitions to `monochange.toml.template`
 
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #282](https://github.com/monochange/monochange/pull/282) _Introduced in:_ [`014491d`](https://github.com/monochange/monochange/commit/014491ddb0de1a562bd0ca6552bba9646baf7f42) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 

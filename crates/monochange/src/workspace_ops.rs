@@ -484,10 +484,10 @@ fn render_toml_string(value: &str) -> String {
 /// The minijinja template for `mc init`, loaded at compile time.
 ///
 /// SYNC: when configuration options are added, removed, or changed in
-/// `monochange_core` or `monochange_config`, update `monochange.init.toml`
+/// `monochange_core` or `monochange_config`, update `monochange.toml.template`
 /// to document the new options.  See the `product-rules.md` agent rule
 /// "keep init template in sync".
-const INIT_TEMPLATE: &str = include_str!("monochange.init.toml");
+const INIT_TEMPLATE: &str = include_str!("monochange.toml.template");
 
 /// Render a fully annotated `monochange.toml` from the init template with
 /// discovered packages injected as context.

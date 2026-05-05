@@ -1,5 +1,5 @@
 {#
-  monochange.init.toml -- minijinja template for mc init
+  monochange.toml.template -- minijinja template for mc init
 
   Compiled into the binary via include_str! and rendered at runtime with
   context from package discovery.  Edit this file directly when config
@@ -786,9 +786,9 @@ ignored_paths = []
 #                     diagnostics. Useful for long workflows with several steps
 #                     of the same kind.
 #   when            — optional condition controlling whether this step runs (e.g.
-#{% raw -%}
+{% raw -%}
 #                     "{{ inputs.enabled }}", "{{ inputs.debug and not inputs.skip }}")
-#{% endraw -%}
+{% endraw -%}
 #                     If the expression resolves to false, the step is skipped.
 #   inputs          — optional map of step-local input overrides. Values can be
 #                     strings, booleans, or string arrays.

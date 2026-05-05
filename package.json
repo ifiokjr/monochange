@@ -9,8 +9,8 @@
 	},
 	"scripts": {
 		"check": "tsgo -config tsconfig.json",
-		"fmt": "oxfmt --write .",
-		"fmt:check": "oxfmt --check .",
+		"fmt": "oxfmt --write \"**/*.{js,mjs,ts,mts}\"",
+		"fmt:check": "oxfmt --check \"**/*.{js,mjs,ts,mts}\"",
 		"lint": "oxlint --type-aware .",
 		"lint:syntax": "oxlint .",
 		"build": "tsdown"
