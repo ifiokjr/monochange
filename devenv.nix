@@ -19,6 +19,7 @@ in
       custom.mdt
       custom.pnpm
       dprint
+      gh
       git
       gitleaks
       hyperfine
