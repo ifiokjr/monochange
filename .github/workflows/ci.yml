@@ -42,7 +42,7 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: lint js
-        run: .github/scripts/without-nix-env.sh node node_modules/oxlint/bin/oxlint .
+        run: pnpm oxlint .
         shell: devenv shell -- bash -e {0}
 
       - name: cargo deny
@@ -154,7 +154,7 @@ jobs:
         id: prepare-codecov-flags
         if: always()
         run: |
-          node scripts/prepare-codecov-flags.mjs \
+          pnpm node scripts/prepare-codecov-flags.mjs \
             --lcov target/coverage/lcov.info \
             --out-dir target/coverage/flags \
             --github-output "$GITHUB_OUTPUT"

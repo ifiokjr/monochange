@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import test, { afterEach, describe } from "node:test";
+import { afterEach, describe, test } from "vitest";
 import {
 	_resetSpawnSync,
 	_setSpawnSync,

@@ -79,10 +79,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
         run: |
-          node scripts/npm/build-packages.mjs \
+          pnpm node scripts/npm/build-packages.mjs \
             --release-tag "$RELEASE_TAG" \
             --assets-dir "$RUNNER_TEMP/release-assets"
-          node scripts/npm/populate-packages.mjs \
+          pnpm node scripts/npm/populate-packages.mjs \
             --packages-dir packages
         shell: devenv shell -- bash -e {0}
 
@@ -184,10 +184,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          node scripts/npm/build-packages.mjs \
+          pnpm node scripts/npm/build-packages.mjs \
             --release-tag "$RELEASE_TAG" \
             --assets-dir "$RUNNER_TEMP/release-assets"
-          node scripts/npm/populate-packages.mjs \
+          pnpm node scripts/npm/populate-packages.mjs \
             --packages-dir packages
         shell: devenv shell -- bash -e {0}
 

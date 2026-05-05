@@ -19,6 +19,7 @@ in
       custom.mdt
       custom.pnpm
       dprint
+      git
       gitleaks
       hyperfine
       mdbook
@@ -85,6 +86,14 @@ in
         cargo run --quiet --release --package monochange --bin mc -- "$@"
       '';
       description = "The release build of the `monochange` executable";
+      binary = "bash";
+    };
+    "pnpm" = {
+      exec = ''
+        set -euo pipefail
+        strip:env ${pkgs.pnpm}/bin/pnpm "$@"
+      '';
+      description = "a wrapper for the pnpm executable";
       binary = "bash";
     };
     "install:all" = {
@@ -198,9 +207,9 @@ in
     "test:node" = {
       exec = ''
         set -euo pipefail
-        node --test npm/tests/*.test.mjs scripts/npm/tests/*.test.mjs
+        pnpm vitest run --exclude 'worktrees/**' npm/tests/*.test.mjs scripts/npm/tests/*.test.mjs
       '';
-      description = "Run npm helper, launcher, and repository utility tests with the built-in Node test runner.";
+      description = "Run npm helper, launcher, and repository utility tests with Vitest.";
       binary = "bash";
     };
     "test:agent-evals" = {
@@ -233,7 +242,7 @@ in
           coverage:all
         fi
 
-        node scripts/check-patch-coverage.mjs \
+        pnpm node scripts/check-patch-coverage.mjs \
           --repo-root "$DEVENV_ROOT" \
           --lcov target/coverage/lcov.info \
           --base "$base_ref" \
@@ -348,7 +357,7 @@ in
     "lint:architecture" = {
       exec = ''
         set -euo pipefail
-        node scripts/check-architecture-boundaries.mjs
+        pnpm node scripts/check-architecture-boundaries.mjs
       '';
       description = "Check that provider and ecosystem dispatch stays inside the documented allowlist.";
       binary = "bash";
@@ -418,7 +427,7 @@ in
       exec = ''
         set -euo pipefail
         mdt check
-        node scripts/check-agent-surface.mjs
+        pnpm node scripts/check-agent-surface.mjs
       '';
       description = "Check that shared documentation blocks are synchronized and agent-facing docs stay aligned with the repo surface.";
       binary = "bash";
@@ -448,23 +457,18 @@ in
       description = "Update insta snapshots.";
       binary = "bash";
     };
-    "setup:helix" = {
+    "strip:env" = {
       exec = ''
         set -euo pipefail
-        rm -rf .helix
-        cp -r setup/editors/helix .helix
+
+        exec env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT \
+        	-u NIX_LD -u NIX_LD_LIBRARY_PATH \
+        	-u NIX_CFLAGS_COMPILE -u NIX_LDFLAGS \
+        	"$@"
       '';
-      description = "Setup Helix editor configuration.";
+      description = "Strip environment variables";
       binary = "bash";
     };
-    "setup:vscode" = {
-      exec = ''
-        set -euo pipefail
-        rm -rf .vscode
-        cp -r ./setup/editors/vscode .vscode
-      '';
-      description = "Setup VS Code workspace configuration.";
-      binary = "bash";
-    };
+
   };
 }

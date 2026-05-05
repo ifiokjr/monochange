@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import test, { afterEach, describe } from "node:test";
+import { afterEach, describe, test } from "vitest";
 import {
 	_resetSpawnSync,
 	_setSpawnSync,

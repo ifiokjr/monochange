@@ -36,3 +36,4 @@ CLAUDE.md
 /mutants.out/
 /mutants.out.old/
 *.bak
+worktrees/
