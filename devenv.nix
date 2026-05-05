@@ -26,6 +26,7 @@ in
       nixfmt
       rustup
       shfmt
+      unzip
     ]
     ++ lib.optionals stdenv.isDarwin [
       coreutils
