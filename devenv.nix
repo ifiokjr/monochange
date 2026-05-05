@@ -24,6 +24,7 @@ in
       hyperfine
       mdbook
       nixfmt
+      python3
       rustup
       shfmt
       unzip

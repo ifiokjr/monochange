@@ -1,6 +1,6 @@
 clean:
   enabled: true
-  keep: ["HOME", "USER", "SHELL", "TERM", "CI"]
+  keep: ["CI", "GITHUB_ENV", "GITHUB_OUTPUT", "HOME", "SHELL", "TERM", "USER"]
 inputs:
   git-hooks:
     url: github:cachix/git-hooks.nix
