@@ -357,7 +357,7 @@ jobs:
 
       - name: configure git
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           user_info="$(gh api user --jq '{id: .id, login: .login, name: .name}')"
@@ -387,7 +387,7 @@ jobs:
       - name: refresh release pull request
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN  }}
           GITHUB_COMMIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mc --log-level=debug release-pr
         shell: devenv shell -- bash -e {0}
