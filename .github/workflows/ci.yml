@@ -355,10 +355,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          user_info="$(gh api user --jq '{id: .id, login: .login, name: .name}')"
-          user_id="$(echo "$user_info" | jq -r '.id')"
-          user_login="$(echo "$user_info" | jq -r '.login')"
-          user_name="$(echo "$user_info" | jq -r '.name // .login')"
+          if user_info="$(gh api user --jq '{id: .id, login: .login, name: .name}')"; then
+            user_id="$(echo "$user_info" | jq -r '.id')"
+            user_login="$(echo "$user_info" | jq -r '.login')"
+            user_name="$(echo "$user_info" | jq -r '.name // .login')"
+          else
+            user_id="41898282"
+            user_login="github-actions[bot]"
+            user_name="github-actions[bot]"
+          fi
+
           git config user.name "$user_name"
           git config user.email "${user_id}+${user_login}@users.noreply.github.com"
         shell: devenv shell -- bash -e {0}
