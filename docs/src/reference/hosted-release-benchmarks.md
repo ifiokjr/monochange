@@ -45,7 +45,7 @@ Build the `main` and PR binaries first, then run the benchmark script against a 
 ```bash
 gh repo clone ifiokjr/monochange-release-benchmark-fixture /tmp/monochange-release-benchmark-fixture
 
-.github/scripts/benchmark_cli.sh run-fixture \
+pnpm node scripts/benchmark-cli.mjs run-fixture \
   --main-bin /tmp/mc-main \
   --pr-bin /tmp/mc-pr \
   --fixture-dir /tmp/monochange-release-benchmark-fixture \

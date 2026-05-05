@@ -24,6 +24,7 @@ in
       hyperfine
       mdbook
       nixfmt
+      python3
       rustup
       shfmt
       unzip
@@ -208,7 +209,7 @@ in
     "test:node" = {
       exec = ''
         set -euo pipefail
-        pnpm vitest run --exclude 'worktrees/**' npm/tests/*.test.mjs scripts/npm/tests/*.test.mjs
+        pnpm vitest run --exclude 'worktrees/**' scripts/npm/tests/*.test.mjs
       '';
       description = "Run npm helper, launcher, and repository utility tests with Vitest.";
       binary = "bash";
@@ -412,6 +413,7 @@ in
       exec = ''
         set -euo pipefail
         pnpm oxfmt --write '**/*.{js,mjs,ts,mts}'
+        pnpm oxlint --type-aware --fix .
       '';
       description = "Format all JS/TS files with oxfmt.";
       binary = "bash";

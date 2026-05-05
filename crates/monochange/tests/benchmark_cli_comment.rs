@@ -25,9 +25,10 @@ fn benchmark_cli_comment_renderer_matches_snapshot() {
 	let fixture = fixture_path("monochange/benchmark-cli-comment");
 	let output_dir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let output_path = output_dir.path().join("comment.md");
-	let script_path = repo_root().join(".github/scripts/benchmark_cli.sh");
+	let script_path = repo_root().join("scripts/benchmark-cli.mjs");
 
-	let output = Command::new("bash")
+	let output = Command::new("pnpm")
+		.arg("node")
 		.arg(&script_path)
 		.arg("render-fixture")
 		.arg("--fixture-dir")
