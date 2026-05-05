@@ -9,5 +9,5 @@
 		"target": "ES2024"
 	},
 	"exclude": ["dist", "fixtures", "node_modules", "target"],
-	"include": ["npm/tests/**/*.mjs", "scripts/**/*.mjs"]
+	"include": ["scripts/**/*.mjs", ".github/scripts/**/*.mjs"]
 }

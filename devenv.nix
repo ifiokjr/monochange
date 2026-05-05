@@ -208,7 +208,7 @@ in
     "test:node" = {
       exec = ''
         set -euo pipefail
-        pnpm vitest run --exclude 'worktrees/**' npm/tests/*.test.mjs scripts/npm/tests/*.test.mjs
+        pnpm vitest run --exclude 'worktrees/**' scripts/npm/tests/*.test.mjs
       '';
       description = "Run npm helper, launcher, and repository utility tests with Vitest.";
       binary = "bash";

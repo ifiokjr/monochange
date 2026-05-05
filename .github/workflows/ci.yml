@@ -290,7 +290,7 @@ jobs:
       - name: run CLI benchmarks
         id: bench
         run: |
-          .github/scripts/benchmark_cli.sh run \
+          pnpm node scripts/benchmark-cli.mjs run \
             --main-bin /tmp/mc-main \
             --pr-bin /tmp/mc-pr \
             --output /tmp/benchmark-comment.md \

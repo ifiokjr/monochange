@@ -288,8 +288,9 @@ EOF
 	write_executable(&fake_pr, fake_pr_script);
 	write_executable(&fake_hyperfine, fake_hyperfine_script);
 
-	let benchmark_script = repo_root().join(".github/scripts/benchmark_cli.sh");
-	let output = Command::new("bash")
+	let benchmark_script = repo_root().join("scripts/benchmark-cli.mjs");
+	let output = Command::new("pnpm")
+		.arg("node")
 		.arg(&benchmark_script)
 		.arg("run-fixture")
 		.arg("--main-bin")
