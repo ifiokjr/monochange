@@ -52,4 +52,5 @@ jobs:
             args+=(--label "$label")
           done
 
-          devenv shell -- mc "${args[@]}"
+          mc "${args[@]}"
+        shell: devenv shell -- bash -e {0}

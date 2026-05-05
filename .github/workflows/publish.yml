@@ -74,6 +74,7 @@ jobs:
             --pattern "monochange-*-${RELEASE_TAG}.tar.gz" \
             --pattern "monochange-*-${RELEASE_TAG}.zip" \
             --dir "$RUNNER_TEMP/release-assets"
+        shell: devenv shell -- bash -e {0}
 
       - name: populate cli npm packages with release binaries
         env:

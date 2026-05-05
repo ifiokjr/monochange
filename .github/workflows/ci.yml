@@ -135,19 +135,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run coverage
-        env:
-          CARGO_BUILD_JOBS: 1
-        run: coverage:all
+        run: CARGO_BUILD_JOBS=1 coverage:all
         shell: devenv shell -- bash -e {0}
 
       - name: verify 100% patch coverage
         id: verify-patch-coverage
         if: github.event_name == 'pull_request'
         continue-on-error: true
-        env:
-          MONOCHANGE_PATCH_COVERAGE_BASE: ${{ github.event.pull_request.base.sha }}
-          MONOCHANGE_PATCH_COVERAGE_HEAD: ${{ github.sha }}
-        run: coverage:patch
+        run: MONOCHANGE_PATCH_COVERAGE_BASE=${{ github.event.pull_request.base.sha }} MONOCHANGE_PATCH_COVERAGE_HEAD=${{ github.sha }} coverage:patch
         shell: devenv shell -- bash -e {0}
 
       - name: prepare codecov flag reports
