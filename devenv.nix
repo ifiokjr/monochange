@@ -413,6 +413,7 @@ in
       exec = ''
         set -euo pipefail
         pnpm oxfmt --write '**/*.{js,mjs,ts,mts}'
+        pnpm oxlint --type-aware --fix .
       '';
       description = "Format all JS/TS files with oxfmt.";
       binary = "bash";

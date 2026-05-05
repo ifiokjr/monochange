@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -226,7 +226,7 @@ function summarizeProgressEvents(eventsPath, outputPath) {
 		}
 	}
 	const phases = [...phaseTotals]
-		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+		.toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
 		.map(([label, durationMs]) => ({ label, durationMs }));
 	writeFileSync(outputPath, `${JSON.stringify({ stepTotalMs, phases }, null, 2)}\n`);
 }
@@ -236,6 +236,33 @@ function unavailableSummary(path) {
 		path,
 		`${JSON.stringify({ available: false, stepTotalMs: null, phases: [] }, null, 2)}\n`,
 	);
+}
+
+function phaseMap(summary) {
+	return summary.available === false
+		? new Map()
+		: new Map(
+				(summary.phases ?? []).map((phase) => [phase.label, Number.parseInt(phase.durationMs, 10)]),
+			);
+}
+
+function statusLabel(mainMs, prMs, budgetMs) {
+	if (prMs == null) return "unavailable";
+	if (budgetMs != null && prMs > budgetMs) return "over budget";
+	if (mainMs == null) return budgetMs != null ? "budget only" : "pr only";
+	if (prMs > mainMs) return "regressed";
+	if (prMs < mainMs) return "improved";
+	return "flat";
+}
+
+function formatMs(value) {
+	return value == null ? "n/a" : String(Number.parseInt(value, 10));
+}
+
+function delta(prMs, mainMs) {
+	if (prMs == null || mainMs == null) return "n/a";
+	const value = prMs - mainMs;
+	return `${value >= 0 ? "+" : ""}${value}`;
 }
 
 function renderPhaseMarkdown(
@@ -258,32 +285,6 @@ function renderPhaseMarkdown(
 			pr: JSON.parse(readText(releasePrPath)),
 		},
 	};
-	const phaseMap = (summary) =>
-		summary.available === false
-			? new Map()
-			: new Map(
-					(summary.phases ?? []).map((phase) => [
-						phase.label,
-						Number.parseInt(phase.durationMs, 10),
-					]),
-				);
-	const statusLabel = (mainMs, prMs, budgetMs) =>
-		prMs == null
-			? "unavailable"
-			: budgetMs != null && prMs > budgetMs
-				? "over budget"
-				: mainMs == null
-					? budgetMs != null
-						? "budget only"
-						: "pr only"
-					: prMs > mainMs
-						? "regressed"
-						: prMs < mainMs
-							? "improved"
-							: "flat";
-	const formatMs = (value) => (value == null ? "n/a" : String(Number.parseInt(value, 10)));
-	const delta = (prMs, mainMs) =>
-		prMs == null || mainMs == null ? "n/a" : `${prMs - mainMs >= 0 ? "+" : ""}${prMs - mainMs}`;
 	const sections = ["#### Phase timings", ""];
 	let violations = 0;
 	for (const commandLabel of PHASE_COMMAND_LABELS) {
@@ -301,7 +302,7 @@ function renderPhaseMarkdown(
 				pr.stepTotalMs == null ? null : Number.parseInt(pr.stepTotalMs, 10),
 			],
 		];
-		const labels = [...new Set([...mainPhases.keys(), ...prPhases.keys()])].sort(
+		const labels = [...new Set([...mainPhases.keys(), ...prPhases.keys()])].toSorted(
 			(a, b) =>
 				Math.max(prPhases.get(b) ?? 0, mainPhases.get(b) ?? 0) -
 					Math.max(prPhases.get(a) ?? 0, mainPhases.get(a) ?? 0) || a.localeCompare(b),
