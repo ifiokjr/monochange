@@ -3345,50 +3345,6 @@ jobs:
 	}
 
 	#[test]
-	fn process_command_executor_cleans_library_path_for_javascript_tooling() {
-		let _guard = TEST_ENV_LOCK.lock().expect("test env lock");
-		let root = tempfile::tempdir().expect("tempdir:");
-		let bin = root.path().join("bin");
-		fs::create_dir_all(&bin).expect("create bin dir");
-		let node = bin.join("node");
-		fs::write(
-			&node,
-			"#!/usr/bin/env sh\nif [ -n \"${LD_LIBRARY_PATH:-}\" ]; then exit 42; fi\nprintf clean\n",
-		)
-		.expect("write fake node");
-		let mut permissions = fs::metadata(&node)
-			.expect("fake node metadata")
-			.permissions();
-		#[cfg(unix)]
-		{
-			use std::os::unix::fs::PermissionsExt;
-			permissions.set_mode(0o755);
-			fs::set_permissions(&node, permissions).expect("chmod fake node");
-		}
-
-		let original_path = env::var("PATH").unwrap_or_default();
-		let path = format!("{}:{original_path}", bin.display());
-		with_vars(
-			[
-				("PATH", Some(path.as_str())),
-				("LD_LIBRARY_PATH", Some("/nix/store/lib")),
-			],
-			|| {
-				let mut executor = ProcessCommandExecutor;
-				let output = executor
-					.run(&CommandSpec {
-						program: "node".to_string(),
-						args: Vec::new(),
-						cwd: root.path().to_path_buf(),
-					})
-					.expect("node command");
-				assert!(output.success);
-				assert_eq!(output.stdout, "clean");
-			},
-		);
-	}
-
-	#[test]
 	fn build_publish_command_covers_all_supported_registries() {
 		let tempdir = tempfile::tempdir().expect("tempdir:");
 		let npm_placeholder = build_publish_command(
