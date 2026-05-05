@@ -50,6 +50,7 @@ jobs:
           head-branch-prefix: monochange/release/
           required-failing-check: release-pr-manual-merge-blocker
           require-actor-push-permission: "true"
+          require-green-checks: "false"
           comment: ${{ inputs.comment }}
 
       - name: fast-forward release PR from /merge comment
@@ -61,4 +62,5 @@ jobs:
           head-branch-prefix: monochange/release/
           required-failing-check: release-pr-manual-merge-blocker
           require-actor-push-permission: "true"
+          require-green-checks: "false"
           comment: always
