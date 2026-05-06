@@ -93,14 +93,6 @@ in
       description = "The release build of the `monochange` executable";
       binary = "bash";
     };
-    "pnpm" = {
-      exec = ''
-        set -euo pipefail
-        strip:env ${pkgs.pnpm}/bin/pnpm "$@"
-      '';
-      description = "a wrapper for the pnpm executable";
-      binary = "bash";
-    };
     "install:all" = {
       exec = ''
         set -euo pipefail
@@ -463,18 +455,5 @@ in
       description = "Update insta snapshots.";
       binary = "bash";
     };
-    "strip:env" = {
-      exec = ''
-        set -euo pipefail
-
-        exec env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT \
-        	-u NIX_LD -u NIX_LD_LIBRARY_PATH \
-        	-u NIX_CFLAGS_COMPILE -u NIX_LDFLAGS \
-        	"$@"
-      '';
-      description = "Strip environment variables";
-      binary = "bash";
-    };
-
   };
 }

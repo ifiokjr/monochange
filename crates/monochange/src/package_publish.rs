@@ -1782,6 +1782,10 @@ fn build_npm_release_publish_command(request: &PublishRequest) -> CommandSpec {
 }
 
 fn npm_publish_program(request: &PublishRequest) -> &'static str {
+	if request.trusted_publishing.enabled {
+		return "npm";
+	}
+
 	if uses_pnpm_publish_manager(request) {
 		"pnpm"
 	} else {
@@ -3383,6 +3387,22 @@ jobs:
 		let pnpm =
 			build_publish_command(&pnpm_request, PackagePublishRunMode::Release, None, false);
 		assert_eq!(pnpm.program, "pnpm");
+		let trusted_pnpm_request = PublishRequest {
+			trusted_publishing: TrustedPublishingSettings {
+				enabled: true,
+				repository: None,
+				workflow: None,
+				environment: None,
+			},
+			..pnpm_request
+		};
+		let trusted_pnpm = build_publish_command(
+			&trusted_pnpm_request,
+			PackagePublishRunMode::Release,
+			None,
+			false,
+		);
+		assert_eq!(trusted_pnpm.program, "npm");
 		let cargo_placeholder = build_publish_command(
 			&sample_request(RegistryKind::CratesIo),
 			PackagePublishRunMode::Placeholder,
