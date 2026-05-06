@@ -4790,6 +4790,35 @@ fn repair_release_command_dry_run_reports_text_output() {
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn repair_release_command_emits_retarget_progress_statuses() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	write_blank_monochange_config(root);
+	create_release_record_history(root);
+
+	let output = temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("json"), || {
+		run_with_args_in_dir(
+			"mc",
+			[
+				OsString::from("mc"),
+				OsString::from("step:retarget-release"),
+				OsString::from("--from"),
+				OsString::from("v1.2.3"),
+				OsString::from("--target"),
+				OsString::from("HEAD"),
+				OsString::from("--sync-provider=false"),
+				OsString::from("--dry-run"),
+			],
+			root,
+		)
+	})
+	.unwrap_or_else(|error| panic!("repair-release output: {error}"));
+
+	assert!(output.contains("repair release:"));
+	assert!(output.contains("status: dry-run"));
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn repair_release_command_reports_json_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();

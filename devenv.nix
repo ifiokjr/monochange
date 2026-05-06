@@ -30,6 +30,7 @@ in
       rustup
       shfmt
       unzip
+      zip
     ]
     ++ lib.optionals stdenv.isDarwin [
       coreutils
