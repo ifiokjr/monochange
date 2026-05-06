@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="g10a" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c8ee7"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="g10b" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#0c8ee7"/>
+    </linearGradient>
+  </defs>
+  <!-- Two interlocking puzzle-like shapes -->
+  <!-- Left shape: abstract package box -->
+  <path d="M40 70 L40 170 Q40 190 60 190 L100 190 L100 120 L80 120 L80 70 L60 70 Q40 70 40 90 Z" 
+        fill="url(#g10a)" opacity="0.12" stroke="url(#g10a)" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Right shape: changeset/document -->
+  <path d="M200 70 L200 170 Q200 190 180 190 L140 190 L140 120 L160 120 L160 70 L180 70 Q200 70 200 90 Z" 
+        fill="url(#g10b)" opacity="0.12" stroke="url(#g10b)" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Connecting bridge -->
+  <path d="M100 155 L140 155" stroke="url(#g10a)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Change indicator (the "delta") -->
+  <path d="M120 50 L135 80 L105 80 Z" fill="#7c3aed" opacity="0.8"/>
+  <!-- Small dots representing changes -->
+  <circle cx="95" cy="85" r="3" fill="#0c8ee7"/>
+  <circle cx="145" cy="85" r="3" fill="#059669"/>
+  <circle cx="120" cy="95" r="3" fill="#7c3aed"/>
+</svg>

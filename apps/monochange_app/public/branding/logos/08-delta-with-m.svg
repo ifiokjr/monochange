@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="g8" x1="0" y1="0.5" x2="1" y2="0.5">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="50%" stop-color="#0c8ee7"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <!-- Large delta triangle -->
+  <path d="M120 30 L210 210 L30 210 Z" stroke="url(#g8)" stroke-width="6" fill="url(#g8)" fill-opacity="0.08"/>
+  <!-- Horizontal version line -->
+  <line x1="55" y1="185" x2="185" y2="185" stroke="url(#g8)" stroke-width="4" stroke-linecap="round"/>
+  <!-- Package dots along the line -->
+  <circle cx="70" cy="185" r="5" fill="#7c3aed"/>
+  <circle cx="100" cy="185" r="5" fill="#0c8ee7"/>
+  <circle cx="140" cy="185" r="5" fill="#0c8ee7"/>
+  <circle cx="170" cy="185" r="5" fill="#059669"/>
+  <!-- 'M' inside delta -->
+  <text x="120" y="115" text-anchor="middle" font-family="Inter, sans-serif" font-weight="900" font-size="52" fill="url(#g8)" opacity="0.9">m</text>
+</svg>

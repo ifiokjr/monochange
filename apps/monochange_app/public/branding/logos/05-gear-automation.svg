@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="g5" x1="0.2" y1="0.2" x2="0.8" y2="0.8">
+      <stop offset="0%" stop-color="#0891b2"/>
+      <stop offset="100%" stop-color="#0c8ee7"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer gear ring -->
+  <circle cx="120" cy="120" r="85" stroke="url(#g5)" stroke-width="4" fill="none"/>
+  <!-- Gear teeth -->
+  <g stroke="url(#g5)" stroke-width="6" stroke-linecap="round">
+    <line x1="120" y1="35" x2="120" y2="45"/>
+    <line x1="180" y1="60" x2="175" y2="68"/>
+    <line x1="205" y1="120" x2="195" y2="120"/>
+    <line x1="180" y1="180" x2="175" y2="172"/>
+    <line x1="120" y1="205" x2="120" y2="195"/>
+    <line x1="60" y1="180" x2="65" y2="172"/>
+    <line x1="35" y1="120" x2="45" y2="120"/>
+    <line x1="60" y1="60" x2="65" y2="68"/>
+  </g>
+  <!-- Inner hub -->
+  <circle cx="120" cy="120" r="30" fill="url(#g5)" opacity="0.15"/>
+  <!-- Hub nodes -->
+  <circle cx="120" cy="106" r="5" fill="#0c8ee7"/>
+  <circle cx="132" cy="120" r="5" fill="#0891b2"/>
+  <circle cx="120" cy="134" r="5" fill="#0c8ee7"/>
+  <circle cx="108" cy="120" r="5" fill="#0891b2"/>
+  <!-- Connecting spokes -->
+  <line x1="120" y1="90" x2="120" y2="101" stroke="url(#g5)" stroke-width="3"/>
+  <line x1="150" y1="120" x2="137" y2="120" stroke="url(#g5)" stroke-width="3"/>
+  <line x1="120" y1="150" x2="120" y2="139" stroke="url(#g5)" stroke-width="3"/>
+  <line x1="90" y1="120" x2="103" y2="120" stroke="url(#g5)" stroke-width="3"/>
+</svg>

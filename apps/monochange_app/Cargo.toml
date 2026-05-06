@@ -1,0 +1,126 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Ifiok Jr. <ifiokotung@gmail.com>"]
+license = "Unlicense"
+repository = "https://github.com/monochange/monochange"
+
+[workspace.dependencies]
+# Leptos v0.8
+leptos = { version = "0.8" }
+leptos_axum = "0.8"
+leptos_meta = "0.8"
+leptos_router = "0.8"
+
+# Server functions
+server_fn = "0.8"
+
+# Utilities
+leptos-use = "0.16"
+
+# Testing
+rstest = "0.26"
+
+# Server
+axum = { version = "0.8", features = ["tokio"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "signal", "macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
+
+# Database
+welds = { version = "0.4", features = ["postgres", "migrations"] }
+welds-connections = "0.4"
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP client
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+
+# Templating
+minijinja = "2"
+
+# Error handling
+thiserror = "2"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = "2"
+
+# Auth
+jsonwebtoken = "10"
+argon2 = "0.5"
+
+# Cookies
+axum-extra = { version = "0.10", features = ["cookie"] }
+time = "0.3"
+
+# WASM
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "Storage", "MediaQueryList"] }
+console_error_panic_hook = "0.1"
+console_log = "1"
+log = "0.4"
+
+# monochange crates (path deps from parent workspace)
+monochange_core = { path = "../../crates/monochange_core" }
+monochange_github = { path = "../../crates/monochange_github" }
+monochange_hosting = { path = "../../crates/monochange_hosting" }
+
+# cargo-leptos metadata
+[workspace.metadata.leptos]
+name = "monochange_app"
+bin-name = "monochange_app"
+bin-package = "monochange_app"
+lib-name = "monochange_app"
+lib-package = "monochange_app"
+bin-repository = "https://github.com/monochange/monochange"
+site-root = "crates/monochange_app"
+site-pkg-dir = "pkg"
+assets-dir = "public"
+style-file = "style/output.css"
+site-addr = "0.0.0.0:3000"
+reload-port = 3001
+env = "DEV"
+# Tailwind CSS integration
+tailwind = true
+tailwind-input-file = "style/input.css"
+tailwind-config-file = "tailwind.config.js"
+# Enable WASM code splitting on #[lazy_route] boundaries
+split = true
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unstable_features = "deny"
+
+[workspace.lints.clippy]
+complexity = { level = "warn", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+too_many_lines = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

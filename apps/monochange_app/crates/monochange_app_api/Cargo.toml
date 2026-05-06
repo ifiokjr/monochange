@@ -1,0 +1,34 @@
+[package]
+name = "monochange_app_api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+sqlx = { workspace = true }
+reqwest = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+jsonwebtoken = { workspace = true }
+axum-extra = { workspace = true }
+
+# monochange
+monochange_core = { workspace = true }
+monochange_github = { workspace = true }
+
+# local
+monochange_app_db = { path = "../monochange_app_db" }
+
+[dev-dependencies]
+rstest = { workspace = true }
