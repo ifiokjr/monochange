@@ -49,7 +49,6 @@ jobs:
           base-branch: main
           head-branch-prefix: monochange/release/
           required-failing-check: release-pr-manual-merge-blocker
-          require-actor-push-permission: "true"
           require-green-checks: "false"
           comment: ${{ inputs.comment }}
 
@@ -61,6 +60,5 @@ jobs:
           base-branch: main
           head-branch-prefix: monochange/release/
           required-failing-check: release-pr-manual-merge-blocker
-          require-actor-push-permission: "true"
           require-green-checks: "false"
           comment: always
