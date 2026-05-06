@@ -455,9 +455,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag="$(jq -r '.groupVersion.tag // empty' /tmp/tag-report.json)"
+          tag="$(jq -r '.tags.main // empty' /tmp/tag-report.json)"
           if [ -z "$tag" ]; then
-            echo "No tag found in tag-report.json, skipping release trigger"
+            echo "No main group tag found in tag-report.json, skipping release trigger"
             exit 0
           fi
           echo "Triggering release workflow for tag $tag"

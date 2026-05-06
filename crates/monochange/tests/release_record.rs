@@ -263,6 +263,51 @@ fn tag_release_command_rejects_descendant_refs_that_are_not_release_commits() {
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+fn tag_release_command_json_snapshots_entire_report() {
+	let mut settings = snapshot_settings();
+	settings.set_snapshot_suffix(current_test_name());
+	let _guard = settings.bind_to_scope();
+
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	configure_origin_remote(repo);
+	let mut release_record = sample_release_record();
+	release_record.release_targets.push(ReleaseRecordTarget {
+		id: "cli".to_string(),
+		kind: ReleaseOwnerKind::Package,
+		version: "2.0.0".to_string(),
+		version_format: VersionFormat::Namespaced,
+		tag: true,
+		release: true,
+		tag_name: "cli/v2.0.0".to_string(),
+		members: Vec::new(),
+	});
+	commit_release_record(repo, &release_record);
+	git(repo, &["push", "-u", "origin", "HEAD:main"]);
+
+	let output = tag_release_output(
+		repo,
+		&[
+			"--from",
+			"HEAD",
+			"--dry-run",
+			"--push=false",
+			"--format",
+			"json",
+		],
+	);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let parsed: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+		panic!("json: {error}\n{}", String::from_utf8_lossy(&output.stdout))
+	});
+	assert_json_snapshot!(parsed);
+}
+
+#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn tag_release_command_dry_run_reports_planned_tags_without_creating_them() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());

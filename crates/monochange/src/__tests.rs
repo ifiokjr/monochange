@@ -10586,6 +10586,8 @@ fn render_release_tag_report_supports_text_and_json_formats() {
 	assert!(json.contains("\"recordCommit\": "));
 	assert!(json.contains("\"push\": false"));
 	assert!(json.contains("\"status\": \"dry_run\""));
+	assert!(json.contains("\"tags\": {"));
+	assert!(json.contains("\"sdk\": \"v1.2.3\""));
 	assert!(json.contains(&release_commit[..7]));
 }
 
@@ -10603,6 +10605,7 @@ fn create_release_tags_creates_and_pushes_tags_in_process() {
 		.unwrap_or_else(|error| panic!("create release tags: {error}"));
 	assert_eq!(report.status, "completed");
 	assert_eq!(report.tag_results.len(), 1);
+	assert_eq!(report.tags.get("sdk").map(String::as_str), Some("v1.2.3"));
 	assert_eq!(
 		report.tag_results[0].operation,
 		crate::release_record::ReleaseTagOperation::Created
