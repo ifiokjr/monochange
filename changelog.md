@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
+
+Grouped release for `main`.
+
+Changed members: @monochange/cli, @monochange/cli-darwin-arm64, @monochange/cli-darwin-x64, @monochange/cli-linux-arm64-gnu, @monochange/cli-linux-arm64-musl, @monochange/cli-linux-x64-gnu, @monochange/cli-linux-x64-musl, @monochange/cli-win32-arm64-msvc, @monochange/cli-win32-x64-msvc, @monochange/skill, monochange, monochange_analysis, monochange_cargo, monochange_config, monochange_core, monochange_dart, monochange_deno, monochange_ecmascript, monochange_gitea, monochange_github, monochange_gitlab, monochange_go, monochange_graph, monochange_hosting, monochange_lint, monochange_lint_testing, monochange_linting, monochange_npm, monochange_python, monochange_semver, monochange_telemetry, monochange_test_helpers
+
+### Fixed
+
+> [!NOTE]
+> _main_
+
+#### Preserve publish batch dependency order
+
+Carry prior packages into later publish-plan batches so dependency-ordered publish requests remain available when registry rate limits split a release into multiple jobs.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a)
+
+> [!NOTE]
+> _main_
+
+#### Use npm for trusted npm publishing
+
+Route trusted npm publishes through the npm CLI even in pnpm-managed workspaces so npm's OIDC trusted publishing flow can exchange the GitHub Actions identity for a short-lived publish credential. The release workflow also relies on devenv environment cleaning directly instead of the removed `strip:env` wrapper.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #388](https://github.com/monochange/monochange/pull/388) _Introduced in:_ [`72773bc`](https://github.com/monochange/monochange/commit/72773bc438167b55c26bb7c3f5dd9d7a21c99084)
+
 ## [0.3.3](https://github.com/monochange/monochange/releases/tag/v0.3.3) (2026-05-06)
 
 Grouped release for `main`.
