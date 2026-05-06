@@ -1,25 +1,32 @@
 ---
 source: crates/monochange/tests/release_record.rs
-assertion_line: 200
+assertion_line: 307
 expression: parsed
 ---
 {
   "distance": 0,
-  "dryRun": false,
+  "dryRun": true,
   "from": "HEAD",
-  "push": true,
+  "push": false,
   "recordCommit": "[SHA]",
   "resolvedFromCommit": "[SHA]",
-  "status": "completed",
+  "status": "dry_run",
   "tagResults": [
     {
       "existingCommit": null,
-      "operation": "created",
+      "operation": "planned",
+      "tagName": "cli/v2.0.0",
+      "targetCommit": "[SHA]"
+    },
+    {
+      "existingCommit": null,
+      "operation": "planned",
       "tagName": "v1.2.3",
       "targetCommit": "[SHA]"
     }
   ],
   "tags": {
+    "cli": "cli/v2.0.0",
     "sdk": "v1.2.3"
   }
 }

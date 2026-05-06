@@ -148,6 +148,45 @@ monochange can promote one prepared release into several source-provider automat
 
 <!-- {/projectGitHubAutomationOverview} -->
 
+#### Tag-release JSON for follow-up workflows
+
+<!-- {=projectTagReleaseJsonTagsMap} -->
+
+When a post-merge workflow needs to trigger follow-up release work, prefer `mc tag-release --from HEAD --format json` and read the release tag by package or group id from the top-level `tags` object:
+
+```json
+{
+	"tags": {
+		"main": "v1.2.3",
+		"sdk": "sdk/v1.2.3"
+	}
+}
+```
+
+`name/version` examples such as `sdk/v1.2.3` correspond to a tag template like `{{ name }}/v{{ version }}`.
+
+The `tags` object is intentionally flat because package ids and group ids share the same monochange namespace. A workspace cannot have both a package and a group with the same id, so workflows do not need separate `tags.packages` and `tags.groups` branches or prefixed lookup keys. This makes automation stable and explicit: use `.tags.<id>` for the package or group whose release should drive the next step.
+
+A package or group might not be released in a particular release commit. Handle that by checking whether `tags` has an entry for the id you care about. If there is no tag attached to that id, you can assume that release did not include that package or group and skip that follow-up workflow.
+
+For example, a repository with `[group.main]` can trigger a downstream GitHub release workflow from the main group tag with:
+
+```bash
+mc tag-release --from HEAD --format json >/tmp/tag-report.json
+tag="$(jq -r '.tags.main // empty' /tmp/tag-report.json)"
+
+if [ -z "$tag" ]; then
+  echo "No main group tag found in tag-report.json, skipping release trigger"
+  exit 0
+fi
+
+gh workflow run release.yml --ref "$tag" -f tag="$tag"
+```
+
+Avoid indexing `tagResults[0]` for workflow control. `tagResults` remains the audit log of tag operations, while `tags` is the stable id-addressable map for automation.
+
+<!-- {/projectTagReleaseJsonTagsMap} -->
+
 ### Assistant setup and MCP
 
 Assistant tooling is optional.

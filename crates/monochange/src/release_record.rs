@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use monochange_core::MonochangeError;
@@ -340,6 +341,7 @@ pub(crate) struct ReleaseTagReport {
 	pub push: bool,
 	pub dry_run: bool,
 	pub tag_results: Vec<ReleaseTagResult>,
+	pub tags: BTreeMap<String, String>,
 	pub status: String,
 }
 
@@ -435,6 +437,8 @@ pub(crate) fn create_release_tags(
 		}
 	}
 
+	let tags = release_tag_map(discovery);
+
 	let status = if dry_run {
 		"dry_run"
 	} else if tag_results.is_empty() {
@@ -456,8 +460,19 @@ pub(crate) fn create_release_tags(
 		push,
 		dry_run,
 		tag_results,
+		tags,
 		status: status.to_string(),
 	})
+}
+
+fn release_tag_map(discovery: &ReleaseRecordDiscovery) -> BTreeMap<String, String> {
+	discovery
+		.record
+		.release_targets
+		.iter()
+		.filter(|target| target.tag)
+		.map(|target| (target.id.clone(), target.tag_name.clone()))
+		.collect()
 }
 
 pub(crate) fn text_release_tag_report(report: &ReleaseTagReport) -> String {
