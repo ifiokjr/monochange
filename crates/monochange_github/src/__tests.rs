@@ -54,6 +54,45 @@ fn must_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
 }
 
 #[test]
+fn git_blob_mode_uses_regular_file_mode() {
+	let directory = must_ok(tempdir(), "create temporary directory");
+	let file_path = directory.path().join("regular.txt");
+	must_ok(std::fs::write(&file_path, "content"), "write regular file");
+	let metadata = must_ok(std::fs::metadata(&file_path), "read regular file metadata");
+
+	assert_eq!(git_blob_mode(&metadata), "100644");
+}
+
+#[cfg(unix)]
+#[test]
+fn git_blob_mode_detects_executable_files() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let directory = must_ok(tempdir(), "create temporary directory");
+	let file_path = directory.path().join("script.sh");
+	must_ok(
+		std::fs::write(&file_path, "#!/usr/bin/env bash\n"),
+		"write executable file",
+	);
+	let mut permissions = must_ok(
+		std::fs::metadata(&file_path),
+		"read executable file metadata",
+	)
+	.permissions();
+	permissions.set_mode(0o755);
+	must_ok(
+		std::fs::set_permissions(&file_path, permissions),
+		"mark file executable",
+	);
+	let metadata = must_ok(
+		std::fs::metadata(&file_path),
+		"read executable file metadata",
+	);
+
+	assert_eq!(git_blob_mode(&metadata), "100755");
+}
+
+#[test]
 fn must_ok_panics_on_errors() {
 	assert!(std::panic::catch_unwind(|| must_ok::<(), _>(Err("boom"), "context")).is_err());
 }
