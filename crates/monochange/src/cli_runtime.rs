@@ -979,12 +979,47 @@ pub(crate) fn execute_cli_command_with_options(
 					let force = parse_boolean_step_input(&step_inputs, "force")?.unwrap_or(false);
 					let sync_provider =
 						parse_boolean_step_input(&step_inputs, "sync_provider")?.unwrap_or(true);
+					if show_progress {
+						progress.step_status(
+							step_index,
+							step,
+							&format!("locating release record for {from}"),
+						);
+					}
+					let phase_started_at = Instant::now();
 					let discovery = discover_release_record(root, &from)?;
+					step_phase_timings.push(StepPhaseTiming {
+						label: "locate release record".to_string(),
+						duration: phase_started_at.elapsed(),
+					});
+					if show_progress {
+						progress.step_status(
+							step_index,
+							step,
+							&format!(
+								"resolving source provider for {}",
+								discovery.resolved_commit
+							),
+						);
+					}
+					let phase_started_at = Instant::now();
 					let source = inferred_retarget_source_configuration(
 						configuration.source.as_ref(),
 						&discovery,
 						sync_provider,
 					);
+					step_phase_timings.push(StepPhaseTiming {
+						label: "resolve source provider".to_string(),
+						duration: phase_started_at.elapsed(),
+					});
+					if show_progress {
+						progress.step_status(
+							step_index,
+							step,
+							&format!("planning retarget to {target}"),
+						);
+					}
+					let phase_started_at = Instant::now();
 					let plan = plan_release_retarget(
 						root,
 						&discovery,
@@ -994,7 +1029,23 @@ pub(crate) fn execute_cli_command_with_options(
 						context.dry_run,
 						source.as_ref(),
 					)?;
+					step_phase_timings.push(StepPhaseTiming {
+						label: "plan retarget".to_string(),
+						duration: phase_started_at.elapsed(),
+					});
+					if show_progress {
+						progress.step_status(
+							step_index,
+							step,
+							"applying git ref and provider updates",
+						);
+					}
+					let phase_started_at = Instant::now();
 					let result = execute_release_retarget(root, source.as_ref(), &plan)?;
+					step_phase_timings.push(StepPhaseTiming {
+						label: "apply retarget".to_string(),
+						duration: phase_started_at.elapsed(),
+					});
 					context.retarget_report = Some(build_retarget_release_report(
 						&from,
 						&target,

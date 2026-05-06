@@ -277,6 +277,39 @@ impl CliProgressReporter {
 		self.print_line(&line);
 	}
 
+	pub(crate) fn step_status(
+		&mut self,
+		step_index: usize,
+		step: &CliStepDefinition,
+		status: &str,
+	) {
+		if !self.enabled {
+			return;
+		}
+		if self.render_mode == ProgressRenderMode::Json {
+			let mut payload = serde_json::Map::new();
+			payload.insert(
+				"status".to_string(),
+				serde_json::Value::String(status.to_string()),
+			);
+			self.emit_step_event("step_status", step_index, step, payload);
+			return;
+		}
+		let message = format!(
+			"{} — {}",
+			self.step_message(step_index, step),
+			self.paint(status, Style::Detail),
+		);
+		if self.animate {
+			self.start_spinner(message);
+		} else {
+			self.print_line(&format!(
+				"{} {message}",
+				self.paint(self.symbols.step_start, Style::Accent),
+			));
+		}
+	}
+
 	pub(crate) fn step_finished(
 		&mut self,
 		step_index: usize,
@@ -768,6 +801,27 @@ mod tests {
 
 		reporter.step_skipped(0, &step, Some("{{ false }}"));
 		reporter.step_failed(1, &step, Duration::from_millis(25), "boom");
+	}
+
+	#[test]
+	fn progress_reporter_updates_step_status_in_human_json_and_animated_modes() {
+		let step = named_command_step("retarget release");
+		let mut disabled = progress_reporter(false, false);
+		disabled.step_status(0, &step, "locating release record");
+
+		let mut human = progress_reporter(true, false);
+		human.step_status(0, &step, "planning retarget");
+
+		let mut json = progress_reporter(true, false);
+		json.render_mode = ProgressRenderMode::Json;
+		json.step_status(0, &step, "applying git ref and provider updates");
+		assert_eq!(json.event_sequence, 1);
+
+		let mut animated = progress_reporter(true, true);
+		animated.animate = true;
+		animated.step_status(0, &step, "syncing provider metadata");
+		assert!(animated.active_spinner.is_some());
+		animated.stop_spinner();
 	}
 
 	#[test]
