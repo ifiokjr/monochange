@@ -9,6 +9,7 @@
 - Build: `build:all`
 - Quality/typecheck: `lint:all`
 - Validation: `mc validate`
+- New integration tests must live in `crates/monochange_integration_tests`, use file fixtures instead of dynamically generated fixtures, and use Insta snapshots for integration output assertions.
 
 ## Naming convention
 

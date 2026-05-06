@@ -1,0 +1,73 @@
+---
+source: crates/monochange_integration_tests/tests/publish_plan_order.rs
+expression: publish_rate_limits
+---
+{
+  "batches": [
+    {
+      "batchIndex": 1,
+      "operation": "publish",
+      "packages": [
+        "crate_00",
+        "crate_01",
+        "crate_02",
+        "crate_03",
+        "crate_04",
+        "crate_05",
+        "crate_06",
+        "crate_07",
+        "crate_08",
+        "crate_09"
+      ],
+      "recommendedWaitSeconds": null,
+      "registry": "crates_io",
+      "totalBatches": 2
+    },
+    {
+      "batchIndex": 2,
+      "operation": "publish",
+      "packages": [
+        "crate_00",
+        "crate_01",
+        "crate_02",
+        "crate_03",
+        "crate_04",
+        "crate_05",
+        "crate_06",
+        "crate_07",
+        "crate_08",
+        "crate_09",
+        "crate_10",
+        "crate_11"
+      ],
+      "recommendedWaitSeconds": 60,
+      "registry": "crates_io",
+      "totalBatches": 2
+    }
+  ],
+  "dryRun": true,
+  "warnings": [
+    "12 crates_io publish operations need 2 batches under the current 60s window"
+  ],
+  "windows": [
+    {
+      "batchesRequired": 2,
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source_code",
+          "notes": "upload endpoint rate limiting in server implementation",
+          "title": "crates.io application source",
+          "url": "https://github.com/rust-lang/crates.io"
+        }
+      ],
+      "fitsSingleWindow": false,
+      "limit": 10,
+      "notes": "crates.io source enforces 10 uploads per minute for existing crates",
+      "operation": "publish",
+      "pending": 12,
+      "registry": "crates_io",
+      "windowSeconds": 60
+    }
+  ]
+}
