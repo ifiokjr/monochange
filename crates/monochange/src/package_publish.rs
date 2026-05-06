@@ -4589,6 +4589,51 @@ jobs:
 	}
 
 	#[test]
+	fn build_release_requests_orders_large_interdependent_package_set_before_batching() {
+		let package_ids = (1..=50)
+			.map(|index| format!("pkg-{index:02}"))
+			.collect::<Vec<_>>();
+		let definitions = package_ids
+			.iter()
+			.map(|package_id| (package_id.as_str(), monochange_core::PackageType::Npm, true))
+			.collect::<Vec<_>>();
+		let configuration = sample_configuration(&definitions);
+		let packages = package_ids
+			.iter()
+			.enumerate()
+			.rev()
+			.map(|(index, package_id)| {
+				let dependencies = (0..index)
+					.rev()
+					.take(3)
+					.map(|dependency_index| {
+						sample_npm_dependency(
+							&package_ids[dependency_index],
+							DependencyKind::Runtime,
+						)
+					})
+					.collect::<Vec<_>>();
+				sample_npm_package_with_dependencies(package_id, package_id, dependencies)
+			})
+			.collect::<Vec<_>>();
+		let publications = package_ids
+			.iter()
+			.rev()
+			.map(|package_id| sample_npm_publication(package_id))
+			.collect::<Vec<_>>();
+
+		let requests =
+			build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
+				.expect("requests");
+		let ordered_package_ids = requests
+			.iter()
+			.map(|request| request.package_id.as_str())
+			.collect::<Vec<_>>();
+
+		assert_eq!(ordered_package_ids, package_ids);
+	}
+
+	#[test]
 	fn build_release_requests_ignores_dependencies_outside_selected_publications() {
 		let configuration = sample_configuration(&[
 			("app", monochange_core::PackageType::Npm, true),

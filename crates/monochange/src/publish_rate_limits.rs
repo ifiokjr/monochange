@@ -270,14 +270,16 @@ fn plan_batches(
 	requests
 		.chunks(chunk_size)
 		.enumerate()
-		.map(|(index, chunk)| {
+		.map(|(index, _chunk)| {
+			let included_requests = requests
+				.iter()
+				.take(((index + 1) * chunk_size).min(requests.len()));
 			PublishRateLimitBatch {
 				registry: policy.registry,
 				operation: policy.operation,
 				batch_index: index + 1,
 				total_batches,
-				packages: chunk
-					.iter()
+				packages: included_requests
 					.map(|request| request.package_id.clone())
 					.collect(),
 				recommended_wait_seconds: if index == 0 {
@@ -968,6 +970,33 @@ mod tests {
 			report.batches[0].packages,
 			vec!["docs".to_string(), "web".to_string()]
 		);
+	}
+
+	#[test]
+	fn plan_publish_rate_limits_preserves_large_dependency_chain_across_limited_batches() {
+		let package_ids = (1..=50)
+			.map(|index| format!("crate-{index:02}"))
+			.collect::<Vec<_>>();
+		let requests = package_ids
+			.iter()
+			.map(|package_id| {
+				sample_publish_request(
+					package_id,
+					monochange_core::Ecosystem::Cargo,
+					RegistryKind::CratesIo,
+					PublishMode::Builtin,
+				)
+			})
+			.collect::<Vec<_>>();
+
+		let report =
+			plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
+
+		assert_eq!(report.batches.len(), 5);
+		for (batch_index, batch) in report.batches.iter().enumerate() {
+			let expected_prefix_len = (batch_index + 1) * 10;
+			assert_eq!(batch.packages, package_ids[..expected_prefix_len]);
+		}
 	}
 
 	#[test]
