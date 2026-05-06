@@ -39,6 +39,7 @@ in
   enterShell = ''
     set -euo pipefail
     eval "$(pnpm-activate-env)"
+    export PATH="$DEVENV_PROFILE/bin:$PATH"
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
@@ -99,6 +100,27 @@ in
         strip:env ${pkgs.pnpm}/bin/pnpm "$@"
       '';
       description = "a wrapper for the pnpm executable";
+      binary = "bash";
+    };
+    "npm" = {
+      exec = ''
+        set -euo pipefail
+
+        profile_bin="$DEVENV_PROFILE/bin"
+        old_path="$PATH"
+        PATH="$(printf '%s' "$PATH" | awk -v profile_bin="$profile_bin" '
+          BEGIN { RS = ":"; ORS = "" }
+          $0 != profile_bin {
+            if (seen++) printf ":"
+            printf "%s", $0
+          }
+        ')"
+        real_npm="$(command -v npm)"
+        PATH="$old_path"
+
+        "$DEVENV_PROFILE/bin/strip:env" "$real_npm" "$@"
+      '';
+      description = "a wrapper for the npm executable";
       binary = "bash";
     };
     "install:all" = {
