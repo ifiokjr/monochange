@@ -1,6 +1,6 @@
 {
 	"name": "@monochange/skill",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "Skill for monochange adoption, release planning, and publishing guidance",
 	"keywords": [
 		"agent",

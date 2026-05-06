@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.3.3](https://github.com/monochange/monochange/releases/tag/v0.3.3) (2026-05-06)
+
+Grouped release for `main`.
+
+Changed members: @monochange/cli, @monochange/cli-darwin-arm64, @monochange/cli-darwin-x64, @monochange/cli-linux-arm64-gnu, @monochange/cli-linux-arm64-musl, @monochange/cli-linux-x64-gnu, @monochange/cli-linux-x64-musl, @monochange/cli-win32-arm64-msvc, @monochange/cli-win32-x64-msvc, @monochange/skill, monochange, monochange_analysis, monochange_cargo, monochange_config, monochange_core, monochange_dart, monochange_deno, monochange_ecmascript, monochange_gitea, monochange_github, monochange_gitlab, monochange_go, monochange_graph, monochange_hosting, monochange_lint, monochange_lint_testing, monochange_linting, monochange_npm, monochange_python, monochange_semver, monochange_telemetry, monochange_test_helpers
+
+### Fixed
+
+> [!NOTE]
+> _main_
+
+#### preserve GitHub OIDC environment variables in devenv
+
+The development environment's `devenv.yaml` now keeps the GitHub Actions and OIDC identity variables that monochange needs to detect trusted publishing when running inside `devenv shell`. Previously, `strip: env` removed these variables and caused built-in publishing to fail with "No supported CI provider identity was detected."
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #386](https://github.com/monochange/monochange/pull/386) _Introduced in:_ [`fd1a798`](https://github.com/monochange/monochange/commit/fd1a798e57234fc465c33537077ec6acf0a47db8)
+
 ## [0.3.2](https://github.com/monochange/monochange/releases/tag/v0.3.2) (2026-05-06)
 
 Grouped release for `main`.

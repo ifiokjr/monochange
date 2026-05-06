@@ -1,6 +1,6 @@
 {
 	"name": "@monochange/cli-win32-arm64-msvc",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "Prebuilt monochange binary for Windows arm64",
 	"homepage": "https://github.com/monochange/monochange",
 	"bugs": {
