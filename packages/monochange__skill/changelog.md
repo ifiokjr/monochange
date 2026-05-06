@@ -41,6 +41,12 @@ For complete feature details, architecture overview, and usage examples, see the
 
 > _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/monochange/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
 
+## [0.3.2](https://github.com/monochange/monochange/releases/tag/v0.3.2) (2026-05-06)
+
+### Changed
+
+- No package-specific changes were recorded; `@monochange/skill` was updated to 0.3.2 as part of group `main`.
+
 ## [0.3.1](https://github.com/monochange/monochange/releases/tag/v0.3.1) (2026-05-05)
 
 ### Fixed

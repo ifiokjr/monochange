@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.3.2](https://github.com/monochange/monochange/releases/tag/v0.3.2) (2026-05-06)
+
+### Fixed
+
+#### Support verified release commits on Windows
+
+Verified release pull-request commits now build on Windows by avoiding Unix-only file permission APIs outside Unix targets. On Unix platforms, executable files still retain executable Git blob modes; on Windows, regular file blobs use the portable 100644 mode so the GitHub release workflow can compile across macOS, Linux, and Windows.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #380](https://github.com/monochange/monochange/pull/380) _Introduced in:_ [`6e951e6`](https://github.com/monochange/monochange/commit/6e951e612624a8d1298af212ac87e72fee63697e)
+
 ## [0.3.1](https://github.com/monochange/monochange/releases/tag/v0.3.1) (2026-05-05)
 
 ### Fixed

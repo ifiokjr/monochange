@@ -86,6 +86,12 @@ Also adds `lints` field to `EcosystemSettings` for per-ecosystem lint configurat
 
 - No package-specific changes were recorded; `monochange_test_helpers` was updated to 0.0.3.
 
+## [0.3.2](https://github.com/monochange/monochange/releases/tag/v0.3.2) (2026-05-06)
+
+### Changed
+
+- No package-specific changes were recorded; `monochange_test_helpers` was updated to 0.3.2 as part of group `main`.
+
 ## [0.3.1](https://github.com/monochange/monochange/releases/tag/v0.3.1) (2026-05-05)
 
 ### Added

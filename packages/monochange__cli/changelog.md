@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.3.2](https://github.com/monochange/monochange/releases/tag/v0.3.2) (2026-05-06)
+
+### Added
+
+#### Make tag-release JSON addressable by release target id
+
+`mc tag-release --format json` now includes a flat `tags` object keyed by package or group id, so automation can select the exact release tag it needs without depending on array order or old single-group fields.
+
+Before, workflows had to rely on paths that were either unavailable for this command or too implicit for multi-target releases:
+
+```bash
+tag="$(jq -r '.groupVersion.tag // empty' /tmp/tag-report.json)"
+# or, less explicit:
+tag="$(jq -r '.tagResults[0].tagName // empty' /tmp/tag-report.json)"
+```
+
+After, workflows can read the package or group id directly. For a workspace with `[group.main]`:
+
+```bash
+tag="$(jq -r '.tags.main // empty' /tmp/tag-report.json)"
+```
+
+Example output:
+
+```json
+{
+	"status": "completed",
+	"tagResults": [
+		{
+			"operation": "created",
+			"tagName": "v1.2.3"
+		}
+	],
+	"tags": {
+		"main": "v1.2.3"
+	}
+}
+```
+
+The map is intentionally flat because package ids and group ids share one namespace in monochange configuration, so there is no ambiguity between `.tags.main` as a package id and `.tags.main` as a group id.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #377](https://github.com/monochange/monochange/pull/377) _Introduced in:_ [`e79b03d`](https://github.com/monochange/monochange/commit/e79b03d065688c79ad39e7b4a626834447cb551d)
+
 ## [0.3.1](https://github.com/monochange/monochange/releases/tag/v0.3.1) (2026-05-05)
 
 ### Fixed

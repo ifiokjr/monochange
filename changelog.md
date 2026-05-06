@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.3.2](https://github.com/monochange/monochange/releases/tag/v0.3.2) (2026-05-06)
+
+Grouped release for `main`.
+
+Changed members: @monochange/cli, monochange, monochange_github
+
+Synchronized members: @monochange/cli-darwin-arm64, @monochange/cli-darwin-x64, @monochange/cli-linux-arm64-gnu, @monochange/cli-linux-arm64-musl, @monochange/cli-linux-x64-gnu, @monochange/cli-linux-x64-musl, @monochange/cli-win32-arm64-msvc, @monochange/cli-win32-x64-msvc, @monochange/skill, monochange_analysis, monochange_cargo, monochange_config, monochange_core, monochange_dart, monochange_deno, monochange_ecmascript, monochange_gitea, monochange_gitlab, monochange_go, monochange_graph, monochange_hosting, monochange_lint, monochange_lint_testing, monochange_linting, monochange_npm, monochange_python, monochange_semver, monochange_telemetry, monochange_test_helpers
+
+### Fixed
+
+> [!NOTE]
+> _monochange_
+
+#### Show retarget release progress
+
+`mc repair-release` now updates progress while retargeting a release so long-running provider and git ref updates show the active sub-step instead of a static spinner.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #378](https://github.com/monochange/monochange/pull/378) _Introduced in:_ [`0c381ee`](https://github.com/monochange/monochange/commit/0c381ee4ae199ab02243e455b04002f42bc19305)
+
 ## [0.3.1](https://github.com/monochange/monochange/releases/tag/v0.3.1) (2026-05-05)
 
 Grouped release for `main`.
