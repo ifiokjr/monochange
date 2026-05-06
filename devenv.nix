@@ -23,6 +23,7 @@ in
       git
       gitleaks
       hyperfine
+      jq
       mdbook
       nixfmt
       python3

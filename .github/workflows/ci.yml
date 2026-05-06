@@ -352,7 +352,7 @@ jobs:
 
       - name: configure git
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
         run: |
           set -euo pipefail
           if user_info="$(gh api user --jq '{id: .id, login: .login, name: .name}')"; then
@@ -389,7 +389,7 @@ jobs:
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN  }}
-          GITHUB_COMMIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_COMMIT_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
         run: mc --log-level=debug release-pr
         shell: devenv shell -- bash -e {0}
 
@@ -445,7 +445,7 @@ jobs:
       - name: comment on released issues
         if: steps.tag_release.outputs.is_release_commit == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
         run: mc comment-released-issues --from-ref="HEAD" --auto-close-issues
         shell: devenv shell -- bash -e {0}
 

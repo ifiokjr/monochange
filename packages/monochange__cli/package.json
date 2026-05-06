@@ -1,6 +1,6 @@
 {
 	"name": "@monochange/cli",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "CLI for cross-ecosystem monorepo release planning with monochange",
 	"keywords": [
 		"changesets",

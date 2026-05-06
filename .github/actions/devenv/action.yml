@@ -7,7 +7,7 @@ inputs:
   cache-version:
     description: The version of the cache to use.
     required: false
-    default: "v1"
+    default: "v2"
   activate:
     description: Whether to activate the devenv environment for the entire job.
     required: false
