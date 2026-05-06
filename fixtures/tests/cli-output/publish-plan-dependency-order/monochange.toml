@@ -1,0 +1,60 @@
+[defaults]
+package_type = "cargo"
+changelog = false
+
+[cli.plan-release-publish]
+inputs = [
+	{ name = "format", type = "choice", choices = ["json"], default = "json" },
+]
+steps = [
+	{ name = "prepare release", type = "PrepareRelease" },
+	{ name = "plan publish rate limits", type = "PlanPublishRateLimits" },
+]
+
+[package.crate_00]
+path = "crates/crate_00"
+publish.rate_limits.enforce = true
+
+[package.crate_01]
+path = "crates/crate_01"
+publish.rate_limits.enforce = true
+
+[package.crate_02]
+path = "crates/crate_02"
+publish.rate_limits.enforce = true
+
+[package.crate_03]
+path = "crates/crate_03"
+publish.rate_limits.enforce = true
+
+[package.crate_04]
+path = "crates/crate_04"
+publish.rate_limits.enforce = true
+
+[package.crate_05]
+path = "crates/crate_05"
+publish.rate_limits.enforce = true
+
+[package.crate_06]
+path = "crates/crate_06"
+publish.rate_limits.enforce = true
+
+[package.crate_07]
+path = "crates/crate_07"
+publish.rate_limits.enforce = true
+
+[package.crate_08]
+path = "crates/crate_08"
+publish.rate_limits.enforce = true
+
+[package.crate_09]
+path = "crates/crate_09"
+publish.rate_limits.enforce = true
+
+[package.crate_10]
+path = "crates/crate_10"
+publish.rate_limits.enforce = true
+
+[package.crate_11]
+path = "crates/crate_11"
+publish.rate_limits.enforce = true

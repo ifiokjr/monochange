@@ -8,6 +8,9 @@ repository.workspace = true
 description = "Internal integration tests for monochange crates"
 
 [dev-dependencies]
+insta = { workspace = true }
+insta-cmd = { workspace = true }
 monochange_core = { workspace = true }
 monochange_test_helpers = { workspace = true }
+serde_json = { workspace = true }
 tempfile = { workspace = true, default-features = true }
