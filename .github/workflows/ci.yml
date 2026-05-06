@@ -344,6 +344,7 @@ jobs:
       - name: block direct merge of release branches
         uses: monochange/actions/fail-when@v0
         with:
+          github-token: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
           should-fail: ${{ startsWith(github.head_ref, 'monochange/release/') }}
           reason: Release branches must be merged via the /merge comment workflow.
           fail-comment: |
