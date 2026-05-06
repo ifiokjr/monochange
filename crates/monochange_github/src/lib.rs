@@ -1262,8 +1262,6 @@ async fn create_verified_github_commit_for_release_pull_request(
 		None => None,
 	};
 
-	use std::os::unix::fs::PermissionsExt;
-
 	let mut tree_entries = Vec::with_capacity(tracked_paths.len());
 	for path in tracked_paths {
 		let absolute_path = root.join(path);
@@ -1296,11 +1294,7 @@ async fn create_verified_github_commit_for_release_pull_request(
 		} else {
 			let content = std::fs::read_to_string(&absolute_path)
 				.map_err(|e| format!("failed to read file {}: {}", path.display(), e))?;
-			let mode = if metadata.permissions().mode() & 0o100 != 0 {
-				"100755"
-			} else {
-				"100644"
-			};
+			let mode = git_blob_mode(&metadata);
 			(content, mode)
 		};
 
@@ -2101,6 +2095,22 @@ fn push_body_entries(lines: &mut Vec<String>, entries: &[String]) {
 			lines.push(format!("- {trimmed}"));
 		}
 	}
+}
+
+#[cfg(unix)]
+fn git_blob_mode(metadata: &std::fs::Metadata) -> &'static str {
+	use std::os::unix::fs::PermissionsExt;
+
+	if metadata.permissions().mode() & 0o100 != 0 {
+		"100755"
+	} else {
+		"100644"
+	}
+}
+
+#[cfg(not(unix))]
+fn git_blob_mode(_metadata: &std::fs::Metadata) -> &'static str {
+	"100644"
 }
 
 fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifestTarget) -> String {

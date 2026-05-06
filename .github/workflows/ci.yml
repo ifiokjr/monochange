@@ -75,21 +75,39 @@ jobs:
 
   build:
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
 
-      - name: setup
+      - name: setup devenv
+        if: runner.os != 'Windows'
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: setup rust
+        if: runner.os == 'Windows'
+        uses: dtolnay/rust-toolchain@stable
+
       - name: build
+        if: runner.os != 'Windows'
         run: build:all
         shell: devenv shell -- bash -e {0}
 
+      - name: build on windows
+        if: runner.os == 'Windows'
+        run: cargo build --workspace --all-features --locked
+
       - name: detect current release commit
+        if: runner.os != 'Windows'
         id: release_record
         run: |
           set -euo pipefail
@@ -102,16 +120,17 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: check publish builds
-        if: steps.release_record.outputs.is_release_commit != 'true'
+        if: runner.os != 'Windows' && steps.release_record.outputs.is_release_commit != 'true'
         run: publish:check
         shell: devenv shell -- bash -e {0}
 
       - name: skip publish build check on release commit
-        if: steps.release_record.outputs.is_release_commit == 'true'
+        if: runner.os != 'Windows' && steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is a release commit; skipping publish:check."
         shell: devenv shell -- bash -e {0}
 
       - name: build book
+        if: runner.os != 'Windows'
         run: build:book
         shell: devenv shell -- bash -e {0}
 
