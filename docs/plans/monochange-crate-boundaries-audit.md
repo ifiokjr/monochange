@@ -4,7 +4,8 @@
 
 The top-level `monochange` crate is currently much more than a thin CLI/composition layer. It has about 56k lines under `crates/monochange/src`, compared with 1k-5k lines in most ecosystem and provider crates. The largest modules are:
 
-- `crates/monochange/src/package_publish.rs` (~7k lines)
+- `crates/monochange/src/package_publish.rs` (~6.6k lines, down from ~7k)
+- `crates/monochange_publish/src/lib.rs` (~1.1k lines, extracted in #397)
 - `crates/monochange/src/cli_runtime.rs` (~6k lines)
 - `crates/monochange/src/workspace_ops.rs` (~3.3k lines)
 - `crates/monochange/src/changelog.rs` (~3k lines)
@@ -85,7 +86,28 @@ Provider-specific trust context should move to provider crates:
 - `monochange_github`: resolve GitHub Actions workflow/job/environment trust context and verify trusted publishing identity prerequisites
 - `monochange_gitlab`/`monochange_gitea`: future provider-specific trust context or explicit unsupported capability responses
 
-`monochange_publish` should depend on traits such as:
+**Phase 1 (completed in #397):** `monochange_publish` now exists and owns:
+
+- Data models: `PublishRequest`, `PackagePublishReport`, `PackagePublishOutcome`, `TrustedPublishingOutcome`, `TrustedPublishingStatus`
+- Command builders: `build_publish_command` with per-ecosystem dispatch (npm, pnpm, Cargo, Dart, JSR, Python, Go)
+- Go helpers: `go_module_path`, `go_proxy_version`, `go_module_tag_name`
+- Trust/capability: `detect_trusted_publishing_identity`, `TrustedPublishingIdentity`, `RegistryTrustCapabilities`, `ProviderRegistryTrustCapability`, `trusted_publishing_capability_message*`
+- CI providers: `CiProviderKind`
+
+**Phase 2: Remaining leakages from `monochange` into `monochange_publish`**
+
+| Still in `monochange/src/package_publish.rs`                  | Target                                    |
+| ------------------------------------------------------------- | ----------------------------------------- |
+| `RegistryEndpoints` + `registry_client()`                     | `monochange_publish`                      |
+| `package_can_be_published()` (registry HTTP existence checks) | `monochange_publish`                      |
+| `CommandExecutor` trait + `ProcessCommandExecutor`            | `monochange_publish` or `monochange_core` |
+| Resume/artifact read/write/merge                              | `monochange_publish`                      |
+| `cargo_publish_readiness_blockers`                            | `monochange_cargo`                        |
+| Dependency ordering of publish requests                       | `monochange_publish`                      |
+
+**Phase 3: Introduce `PublishAdapter` trait**
+
+Each ecosystem crate should implement a registry-agnostic trait so `monochange_publish` stops hardcoding match arms:
 
 ```rust
 trait PublishAdapter {
@@ -117,8 +139,8 @@ The top-level `monochange` crate should only register adapters and call `monocha
 
 **Migration order**
 
-1. Move pure publish report/resume/rate-limit/readiness types into `monochange_publish` while still calling old internal helpers.
-2. Extract command construction per ecosystem into existing ecosystem crates.
+1. Move `RegistryEndpoints`, `registry_client`, resume/artifact logic, and `CommandExecutor` into `monochange_publish`.
+2. Extract command construction per ecosystem into existing ecosystem crates via `PublishAdapter`.
 3. Extract registry existence checks per ecosystem.
 4. Extract placeholder manifest generation per ecosystem.
 5. Extract GitHub trust context into `monochange_github`.
