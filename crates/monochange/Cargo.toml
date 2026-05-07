@@ -53,6 +53,7 @@ monochange_go = { workspace = true, optional = true }
 monochange_graph = { workspace = true }
 monochange_lint = { workspace = true }
 monochange_npm = { workspace = true, optional = true }
+monochange_publish = { workspace = true }
 monochange_python = { workspace = true, optional = true }
 monochange_semver = { workspace = true }
 monochange_telemetry = { workspace = true }

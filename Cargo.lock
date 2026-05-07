@@ -2050,6 +2050,7 @@ dependencies = [
  "monochange_graph",
  "monochange_lint",
  "monochange_npm",
+ "monochange_publish",
  "monochange_python",
  "monochange_semver",
  "monochange_telemetry",
@@ -2413,6 +2414,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "monochange_publish"
+version = "0.4.0"
+dependencies = [
+ "monochange_core",
+ "serde",
+]
+
+[[package]]
 name = "monochange_python"
 version = "0.4.0"
 dependencies = [
@@ -2433,7 +2442,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_schema"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "insta",
  "serde",
