@@ -1,6 +1,5 @@
 ---
-"monochange": patch
-"monochange_publish": patch
+"main": patch
 ---
 
 # Extract publish support into a dedicated crate
