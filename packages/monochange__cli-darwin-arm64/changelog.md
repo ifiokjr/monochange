@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-07)
+
+### Changed
+
+- No package-specific changes were recorded; `@monochange/cli-darwin-arm64` was updated to 0.4.0 as part of group `main`.
+
 ## [0.3.5](https://github.com/monochange/monochange/releases/tag/v0.3.5) (2026-05-07)
 
 ### Fixed
