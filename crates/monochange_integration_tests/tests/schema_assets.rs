@@ -250,10 +250,10 @@ fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(
 	let paths = schema_asset_paths()?;
 
 	assert_eq!(schema_crate_version(&paths)?, "0.0.0");
-	assert_eq!(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT, "0.1");
+	assert_eq!(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT, "0.0");
 	assert_eq!(
 		monochange_schema::current_schema_version()?,
-		monochange_schema::SchemaVersion::new(0, 1)
+		monochange_schema::SchemaVersion::new(0, 0)
 	);
 
 	Ok(())
@@ -300,7 +300,7 @@ fn release_record_migration_outcomes_match_snapshot() {
 		),
 		(
 			"old_version_without_migration_edge",
-			sample_release_record_with("0.0", monochange_schema::release_record::KIND),
+			sample_release_record_with("0.1", monochange_schema::release_record::KIND),
 		),
 		(
 			"future_version",
