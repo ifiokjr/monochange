@@ -465,7 +465,7 @@ comment_on_failure = true
 
 # Additional non-package root-level paths that should also trigger changeset
 # requirements when changed. Package directories are included automatically.
-changed_paths = ["Cargo.toml", "Cargo.lock", "codecov.yml"]
+changed_paths = ["codecov.yml"]
 
 # Files that should not trigger changeset requirements.
 ignored_paths = [

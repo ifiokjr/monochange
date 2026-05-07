@@ -112,6 +112,17 @@ pub fn affected_packages(
 			continue;
 		}
 
+		if path_matches_any_global_pattern(path, &verify.changed_paths) {
+			matched_paths.push(path.clone());
+			affected_package_ids.extend(
+				configuration
+					.packages
+					.iter()
+					.map(|package| package.id.clone()),
+			);
+			continue;
+		}
+
 		let mut matched_any_package = false;
 		let mut ignored_by_package = false;
 		for package in &configuration.packages {
@@ -653,7 +664,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("read monochange.toml: {error}"));
 		config = config.replace(
 			"comment_on_failure = true",
-			"comment_on_failure = true\nchanged_paths = [\"Cargo.toml\"]\nignored_paths = [\"docs/**\"]",
+			"comment_on_failure = true\nchanged_paths = [\"infra/**\"]\nignored_paths = [\"docs/**\"]",
 		);
 		config = config.replace(
 			"path = \"crates/core\"\nignored_paths",
@@ -667,10 +678,7 @@ mod tests {
 			&[
 				"docs/readme.md".to_string(),
 				"crates/core/CHANGELOG.md".to_string(),
-				"README.md".to_string(),
-				"Cargo.toml".to_string(),
-				"Cargo.lock".to_string(),
-				"crates/core/src/lib.rs".to_string(),
+				"infra/config.yml".to_string(),
 			],
 			&Vec::new(),
 		)
@@ -686,10 +694,7 @@ mod tests {
 		);
 		assert_eq!(
 			evaluation.matched_paths,
-			vec![
-				"Cargo.lock".to_string(),
-				"crates/core/src/lib.rs".to_string()
-			]
+			vec!["infra/config.yml".to_string()]
 		);
 		assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
 	}
