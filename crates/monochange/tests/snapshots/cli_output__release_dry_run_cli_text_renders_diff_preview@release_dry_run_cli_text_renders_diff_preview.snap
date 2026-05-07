@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 413
 info:
   program: mc
   args:
@@ -49,16 +50,12 @@ file diffs:
 
 --- a/changelog.md
 +++ b/changelog.md
-@@ -1 +1,16 @@
+@@ -1 +1,12 @@
  # Changelog
 +
 +## 1.1.0 ([DATE])
 +
 +Grouped release for `sdk`.
-+
-+Changed members: core
-+
-+Synchronized members: app
 +
 +### Minor
 +

@@ -531,8 +531,8 @@ fn release_cli_writes_group_changelog_and_skips_packages_without_changelogs() {
 		.unwrap_or_else(|error| panic!("group versioned file: {error}"));
 
 	assert!(root_changelog.contains("Grouped release for `sdk`."));
-	assert!(root_changelog.contains("Changed members: core"));
-	assert!(root_changelog.contains("Synchronized members: app"));
+	assert!(!root_changelog.contains("Changed members:"));
+	assert!(!root_changelog.contains("Synchronized members:"));
 	assert!(core_changelog.contains("## 1.1.0"));
 	assert!(core_changelog.contains("add feature"));
 	assert!(!tempdir.path().join("crates/app/CHANGELOG.md").exists());

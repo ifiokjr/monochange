@@ -109,7 +109,7 @@ fn release_filters_group_changelog_entries_to_selected_member_packages() {
 
 	assert!(core_changelog.contains("#### add cli feature"));
 	assert!(app_changelog.contains("#### document internal sync work"));
-	assert!(group_changelog.contains("Changed members: core, app"));
+	assert!(!group_changelog.contains("Changed members:"));
 	assert!(group_changelog.contains("> [!NOTE]"));
 	assert!(group_changelog.contains("> *core*"));
 	assert!(group_changelog.contains("#### add cli feature"));
@@ -134,8 +134,8 @@ fn release_renders_group_fallback_when_member_notes_are_filtered_out() {
 	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(group_changelog.contains("Changed members: core"));
-	assert!(group_changelog.contains("Synchronized members: app"));
+	assert!(!group_changelog.contains("Changed members:"));
+	assert!(!group_changelog.contains("Synchronized members:"));
 	assert!(group_changelog.contains("No group-facing notes were recorded for this release."));
 	assert!(!group_changelog.contains("- **core**: add hidden internal change"));
 }
@@ -387,7 +387,7 @@ fn release_excludes_allowlisted_group_notes_when_a_changeset_targets_disallowed_
 	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(group_changelog.contains("Changed members: core, app"));
+	assert!(!group_changelog.contains("Changed members:"));
 	assert!(group_changelog.contains("No group-facing notes were recorded for this release."));
 	assert!(!group_changelog.contains("add shared release note"));
 }

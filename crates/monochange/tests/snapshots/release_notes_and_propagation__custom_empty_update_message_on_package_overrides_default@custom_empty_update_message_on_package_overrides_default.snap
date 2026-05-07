@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/release_notes_and_propagation.rs
+assertion_line: 111
 expression: changelog
 ---
 # Changelog
@@ -11,8 +12,6 @@ This changelog is managed by [monochange](https://github.com/monochange/monochan
 ## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.
-
-Changed members: core, app
 
 ### Changed
 
