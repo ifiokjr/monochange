@@ -4,8 +4,6 @@ use std::env;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
-#[cfg(test)]
-use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
 use monochange_core::DependencyKind;
@@ -14,8 +12,6 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackagePublicationTarget;
 use monochange_core::PackageRecord;
-#[cfg(test)]
-use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishState;
@@ -33,12 +29,6 @@ pub(crate) use monochange_publish::PublishRequest;
 use monochange_publish::TrustedPublishingIdentity;
 pub(crate) use monochange_publish::TrustedPublishingOutcome;
 pub(crate) use monochange_publish::TrustedPublishingStatus;
-#[cfg(test)]
-use monochange_publish::append_publish_dry_run_args;
-#[cfg(test)]
-use monochange_publish::build_npm_placeholder_publish_command;
-#[cfg(test)]
-use monochange_publish::build_npm_release_publish_command;
 use monochange_publish::build_publish_command;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::go_module_path;
@@ -62,16 +52,6 @@ use crate::discover_workspace;
 const PLACEHOLDER_VERSION: &str = "0.0.0";
 const GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN: &str = "ACTIONS_ID_TOKEN_REQUEST_TOKEN";
 const GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL: &str = "ACTIONS_ID_TOKEN_REQUEST_URL";
-#[cfg(test)]
-const NPM_TRUST_DOCS_URL: &str = "https://docs.npmjs.com/cli/v11/commands/npm-trust";
-#[cfg(test)]
-const CRATES_TRUST_DOCS_URL: &str = "https://crates.io/docs/trusted-publishing";
-#[cfg(test)]
-const DART_TRUST_DOCS_URL: &str = "https://dart.dev/tools/pub/automated-publishing";
-#[cfg(test)]
-const JSR_TRUST_DOCS_URL: &str = "https://jsr.io/docs/publishing-packages";
-#[cfg(test)]
-const PYPI_TRUST_DOCS_URL: &str = "https://docs.pypi.org/trusted-publishers/";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct GitHubTrustContext {
@@ -2353,23 +2333,6 @@ fn manual_setup_url(request: &PublishRequest) -> String {
 	}
 }
 
-#[cfg(test)]
-fn trust_docs_url(registry: RegistryKind) -> &'static str {
-	(if registry == RegistryKind::CratesIo {
-		CRATES_TRUST_DOCS_URL
-	} else if registry == RegistryKind::PubDev {
-		DART_TRUST_DOCS_URL
-	} else if registry == RegistryKind::Jsr {
-		JSR_TRUST_DOCS_URL
-	} else if registry == RegistryKind::Pypi {
-		PYPI_TRUST_DOCS_URL
-	} else if registry == RegistryKind::GoProxy {
-		"https://go.dev/ref/mod#publishing"
-	} else {
-		NPM_TRUST_DOCS_URL
-	}) as _
-}
-
 fn render_command(spec: &CommandSpec) -> String {
 	std::iter::once(spec.program.as_str())
 		.chain(spec.args.iter().map(String::as_str))
@@ -2394,20 +2357,47 @@ fn non_empty_output(output: String) -> Option<String> {
 mod tests {
 	use std::collections::BTreeSet;
 	use std::collections::VecDeque;
+	use std::path::PathBuf;
 
 	use httpmock::Method::GET;
 	use httpmock::MockServer;
 	use monochange_core::PackageRecord;
+	use monochange_core::PublishAttestationSettings;
 	use monochange_core::PublishRegistry;
 	use monochange_core::ReleaseRecord;
 	use monochange_core::SourceProvider;
 	use monochange_core::render_release_record_block;
+	use monochange_publish::append_publish_dry_run_args;
+	use monochange_publish::build_npm_placeholder_publish_command;
+	use monochange_publish::build_npm_release_publish_command;
 	use monochange_test_helpers::git;
 	use semver::Version;
 	use temp_env::with_vars;
 
 	use super::*;
 	use crate::TEST_ENV_LOCK;
+
+	const NPM_TRUST_DOCS_URL: &str = "https://docs.npmjs.com/cli/v11/commands/npm-trust";
+	const CRATES_TRUST_DOCS_URL: &str = "https://crates.io/docs/trusted-publishing";
+	const DART_TRUST_DOCS_URL: &str = "https://dart.dev/tools/pub/automated-publishing";
+	const JSR_TRUST_DOCS_URL: &str = "https://jsr.io/docs/publishing-packages";
+	const PYPI_TRUST_DOCS_URL: &str = "https://docs.pypi.org/trusted-publishers/";
+
+	fn trust_docs_url(registry: RegistryKind) -> &'static str {
+		(if registry == RegistryKind::CratesIo {
+			CRATES_TRUST_DOCS_URL
+		} else if registry == RegistryKind::PubDev {
+			DART_TRUST_DOCS_URL
+		} else if registry == RegistryKind::Jsr {
+			JSR_TRUST_DOCS_URL
+		} else if registry == RegistryKind::Pypi {
+			PYPI_TRUST_DOCS_URL
+		} else if registry == RegistryKind::GoProxy {
+			"https://go.dev/ref/mod#publishing"
+		} else {
+			NPM_TRUST_DOCS_URL
+		}) as _
+	}
 
 	struct FakeExecutor {
 		outputs: VecDeque<CommandOutput>,

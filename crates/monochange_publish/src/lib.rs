@@ -631,14 +631,6 @@ pub fn provider_registry_trust_capability(
 	}
 }
 
-#[cfg(test)]
-pub fn builtin_provider_registry_trust_capability(
-	registry: RegistryKind,
-	provider: CiProviderKind,
-) -> ProviderRegistryTrustCapability {
-	provider_registry_trust_capability(&PublishRegistry::Builtin(registry), provider)
-}
-
 pub fn trusted_publishing_capability_message_for_builtin(
 	registry: RegistryKind,
 	env_map: &BTreeMap<String, String>,
@@ -790,6 +782,13 @@ fn circle_project_slug(env_map: &BTreeMap<String, String>) -> Option<String> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	fn builtin_provider_registry_trust_capability(
+		registry: RegistryKind,
+		provider: CiProviderKind,
+	) -> ProviderRegistryTrustCapability {
+		provider_registry_trust_capability(&PublishRegistry::Builtin(registry), provider)
+	}
 
 	#[test]
 	fn detects_github_actions_identity_from_workflow_ref() {
