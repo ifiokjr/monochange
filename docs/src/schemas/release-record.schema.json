@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monochange.github.io/monochange/schemas/release-record.schema.json",
+  "title": "monochange release record",
+  "description": "Durable commit-embedded release record schema for monochange artifact version 0.1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "kind",
+    "createdAt",
+    "command",
+    "releaseTargets",
+    "releasedPackages",
+    "changedFiles"
+  ],
+  "properties": {
+    "v": {
+      "type": "string",
+      "const": "0.1",
+      "description": "Public durable artifact schema version. Older CLIs reject missing, future, or non-current versions."
+    },
+    "kind": {
+      "type": "string",
+      "const": "monochange.releaseRecord"
+    },
+    "createdAt": { "type": "string" },
+    "command": { "type": "string" },
+    "version": { "type": ["string", "null"] },
+    "groupVersion": { "type": ["string", "null"] },
+    "releaseTargets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/releaseTarget" }
+    },
+    "releasedPackages": { "$ref": "#/$defs/stringArray" },
+    "changedFiles": { "$ref": "#/$defs/stringArray" },
+    "packagePublications": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/packagePublication" }
+    },
+    "updatedChangelogs": { "$ref": "#/$defs/stringArray" },
+    "deletedChangesets": { "$ref": "#/$defs/stringArray" },
+    "changesets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/preparedChangeset" }
+    },
+    "changelogs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/changelog" }
+    },
+    "provider": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/provider" }
+      ]
+    }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "bumpSeverity": {
+      "type": "string",
+      "enum": ["none", "patch", "minor", "major"]
+    },
+    "releaseOwnerKind": {
+      "type": "string",
+      "enum": ["package", "group"]
+    },
+    "changesetTargetKind": {
+      "type": "string",
+      "enum": ["package", "group"]
+    },
+    "versionFormat": {
+      "type": "string",
+      "enum": ["namespaced", "primary"]
+    },
+    "sourceProvider": {
+      "type": "string",
+      "enum": ["github", "gitlab", "gitea"]
+    },
+    "ecosystem": {
+      "type": "string",
+      "enum": ["cargo", "npm", "deno", "dart", "python", "go"]
+    },
+    "publishMode": {
+      "type": "string",
+      "enum": ["builtin", "external"]
+    },
+    "registry": {
+      "type": "string"
+    },
+    "changelogFormat": {
+      "type": "string",
+      "enum": ["monochange", "keep_a_changelog"]
+    },
+    "releaseTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "version", "versionFormat", "tag", "release", "tagName"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "$ref": "#/$defs/releaseOwnerKind" },
+        "version": { "type": "string" },
+        "versionFormat": { "$ref": "#/$defs/versionFormat" },
+        "tag": { "type": "boolean" },
+        "release": { "type": "boolean" },
+        "tagName": { "type": "string" },
+        "members": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "owner", "repo"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/sourceProvider" },
+        "owner": { "type": "string" },
+        "repo": { "type": "string" },
+        "host": { "type": ["string", "null"] }
+      }
+    },
+    "packagePublication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package", "ecosystem", "version"],
+      "properties": {
+        "package": { "type": "string" },
+        "ecosystem": { "$ref": "#/$defs/ecosystem" },
+        "registry": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/registry" }
+          ]
+        },
+        "version": { "type": "string" },
+        "mode": { "$ref": "#/$defs/publishMode" },
+        "trustedPublishing": { "$ref": "#/$defs/trustedPublishing" },
+        "attestations": { "$ref": "#/$defs/publishAttestations" }
+      }
+    },
+    "trustedPublishing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "repository": { "type": ["string", "null"] },
+        "workflow": { "type": ["string", "null"] },
+        "environment": { "type": ["string", "null"] }
+      }
+    },
+    "publishAttestations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requireRegistryProvenance": { "type": "boolean" }
+      }
+    },
+    "preparedChangeset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "targets"],
+      "properties": {
+        "path": { "type": "string" },
+        "summary": { "type": ["string", "null"] },
+        "details": { "type": ["string", "null"] },
+        "targets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/preparedChangesetTarget" }
+        },
+        "context": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "object", "additionalProperties": true }
+          ]
+        }
+      }
+    },
+    "preparedChangesetTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "origin"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "$ref": "#/$defs/changesetTargetKind" },
+        "bump": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/bumpSeverity" }
+          ]
+        },
+        "origin": { "type": "string" },
+        "evidenceRefs": { "$ref": "#/$defs/stringArray" },
+        "changeType": { "type": ["string", "null"] },
+        "causedBy": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "changelog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ownerId", "ownerKind", "path", "format", "notes", "rendered"],
+      "properties": {
+        "ownerId": { "type": "string" },
+        "ownerKind": { "$ref": "#/$defs/releaseOwnerKind" },
+        "path": { "type": "string" },
+        "format": { "$ref": "#/$defs/changelogFormat" },
+        "notes": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "rendered": { "type": "string" }
+      }
+    }
+  }
+}

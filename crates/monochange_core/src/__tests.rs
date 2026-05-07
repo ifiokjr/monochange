@@ -1886,6 +1886,72 @@ fn release_record_block_roundtrips_with_reserved_markers() {
 }
 
 #[test]
+fn render_release_record_block_writes_current_schema_v_header() {
+	let record = sample_release_record();
+	let rendered = crate::render_release_record_block(&record)
+		.unwrap_or_else(|error| panic!("render release record: {error}"));
+
+	assert!(rendered.contains("\"v\": \"0.1\""));
+	assert!(!rendered.contains("\"schemaVersion\""));
+}
+
+#[test]
+fn parse_release_record_block_accepts_current_schema_v_header() {
+	let current = format!(
+		r#"{RELEASE_RECORD_HEADING}
+
+{RELEASE_RECORD_START_MARKER}
+```json
+{{
+  "v": "0.1",
+  "kind": "{RELEASE_RECORD_KIND}",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}
+```
+{RELEASE_RECORD_END_MARKER}"#
+	);
+
+	let parsed = crate::parse_release_record_block(&current)
+		.unwrap_or_else(|error| panic!("parse current release record: {error}"));
+
+	assert_eq!(parsed.schema_version, RELEASE_RECORD_SCHEMA_VERSION);
+	assert_eq!(parsed.kind, RELEASE_RECORD_KIND);
+}
+
+#[test]
+fn parse_release_record_block_rejects_future_schema_v_header() {
+	let future = format!(
+		r#"{RELEASE_RECORD_HEADING}
+
+{RELEASE_RECORD_START_MARKER}
+```json
+{{
+  "v": "9.0",
+  "kind": "{RELEASE_RECORD_KIND}",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}
+```
+{RELEASE_RECORD_END_MARKER}"#
+	);
+
+	let error = crate::parse_release_record_block(&future)
+		.err()
+		.unwrap_or_else(|| panic!("expected future schema error"));
+	assert!(matches!(
+		error,
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "9.0"
+	));
+}
+
+#[test]
 fn parse_release_record_block_returns_not_found_without_markers() {
 	let error = crate::parse_release_record_block("chore(release): prepare release")
 		.err()
@@ -1938,7 +2004,7 @@ fn parse_release_record_block_rejects_unsupported_kind() {
 {start}
 ```json
 {{
-  "schemaVersion": 1,
+  "v": "0.1",
   "kind": "monochange.otherRecord",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -1970,7 +2036,7 @@ fn parse_release_record_block_rejects_unsupported_schema_version() {
 {start}
 ```json
 {{
-  "schemaVersion": 2,
+  "v": "0.2",
   "kind": "{kind}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -1986,7 +2052,7 @@ fn parse_release_record_block_rejects_unsupported_schema_version() {
 		.unwrap_or_else(|| panic!("expected unsupported schema error"));
 	assert!(matches!(
 		error,
-		ReleaseRecordError::UnsupportedSchemaVersion(2)
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "0.2"
 	));
 }
 
@@ -1995,7 +2061,6 @@ fn parse_release_record_block_ignores_unknown_fields() {
 	let heading = RELEASE_RECORD_HEADING;
 	let start = RELEASE_RECORD_START_MARKER;
 	let end = RELEASE_RECORD_END_MARKER;
-	let schema = RELEASE_RECORD_SCHEMA_VERSION;
 	let kind = RELEASE_RECORD_KIND;
 	let with_unknown = format!(
 		r#"{heading}
@@ -2003,7 +2068,7 @@ fn parse_release_record_block_ignores_unknown_fields() {
 {start}
 ```json
 {{
-  "schemaVersion": {schema},
+  "v": "0.1",
   "kind": "{kind}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2113,7 +2178,7 @@ fn parse_release_record_block_rejects_missing_kind() {
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "schemaVersion": 1,
+  "v": "0.1",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
   "releaseTargets": [],

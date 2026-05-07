@@ -2184,6 +2184,7 @@ version = "0.3.5"
 dependencies = [
  "ignore",
  "insta",
+ "monochange_schema",
  "proptest",
  "reqwest",
  "rstest",
@@ -2352,9 +2353,11 @@ dependencies = [
  "insta",
  "insta-cmd",
  "monochange_core",
+ "monochange_schema",
  "monochange_test_helpers",
  "serde_json",
  "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -2426,6 +2429,16 @@ dependencies = [
  "toml_edit",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "monochange_schema"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

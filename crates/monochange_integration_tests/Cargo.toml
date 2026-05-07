@@ -11,6 +11,8 @@ description = "Internal integration tests for monochange crates"
 insta = { workspace = true }
 insta-cmd = { workspace = true }
 monochange_core = { workspace = true }
+monochange_schema = { workspace = true }
 monochange_test_helpers = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true, default-features = true }
+toml = { workspace = true, features = ["parse", "serde"] }

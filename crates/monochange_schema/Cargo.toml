@@ -1,0 +1,24 @@
+[package]
+name = "monochange_schema"
+version = "0.1.0"
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_schema"
+edition = { workspace = true }
+include = ["src/**/*.rs", "schemas/**/*.json", "Cargo.toml", "readme.md"]
+keywords = ["changelog", "migrations", "monorepo", "releases", "schema"]
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Durable JSON schemas and migration metadata for monochange artifacts"
+
+[dependencies]
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }
+
+[dev-dependencies]
+insta = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

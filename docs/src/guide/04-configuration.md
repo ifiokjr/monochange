@@ -2,6 +2,18 @@
 
 Repository configuration lives in `monochange.toml`.
 
+## JSON Schema
+
+A JSON Schema for editor support is published with the book at <https://monochange.github.io/monochange/schemas/monochange.schema.json>.
+
+Schema-aware TOML editors such as Taplo can opt in with a comment directive at the top of `monochange.toml`:
+
+```toml
+#:schema https://monochange.github.io/monochange/schemas/monochange.schema.json
+```
+
+The same file is also available from GitHub raw content at <https://raw.githubusercontent.com/monochange/monochange/main/docs/src/schemas/monochange.schema.json>.
+
 ## Defaults
 
 <!-- {=configurationDefaultsSnippet} -->
