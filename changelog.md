@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-07)
+
+Grouped release for `main`.
+
+### Changed
+
+- No package-specific changes were recorded; group `main` was updated to 0.5.1.
+
 ## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-07)
 
 Grouped release for `main`.
