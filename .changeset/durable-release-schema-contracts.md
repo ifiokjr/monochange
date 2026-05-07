@@ -1,14 +1,7 @@
 ---
-monochange:
-  bump: major
-  type: major
-monochange_core:
-  bump: major
-  type: major
-monochange_schema:
-  bump: none
-  type: none
-  caused_by: ["monochange"]
+monochange: major
+monochange_core: major
+monochange_schema: major
 ---
 
 # Publish durable release schema contracts
@@ -19,9 +12,9 @@ Usage: editors can use the hosted configuration schema once GitHub Pages publish
 
 ```json
 {
-  "v": "0.1",
-  "kind": "monochange.releaseRecord"
+	"v": "0.1",
+	"kind": "monochange.releaseRecord"
 }
 ```
 
-The `monochange_schema` package remains independently versioned at `0.1.0`; this changeset covers the new crate without forcing a patch bump for its first public schema release.
+The `monochange_schema` package remains independently versioned from the main release group. Its crate version starts at `0.0.0` on this branch, while this major changeset gives release planning the explicit signal to publish the first crate release without changing the durable public schema version `0.1`.

@@ -151,7 +151,7 @@ in
     "build:all" = {
       exec = ''
         set -euo pipefail
-        if [ -z "$CI" ]; then
+        if [ -z "''${CI:-}" ]; then
           echo "Building project locally"
           cargo build --workspace --all-features
         else
@@ -284,6 +284,7 @@ in
         set -euo pipefail
         fix:clippy
         docs:update
+        schema:update
         fix:monochange
         fix:format
         fix:js
@@ -294,9 +295,26 @@ in
     "fix:format" = {
       exec = ''
         set -euo pipefail
-        dprint fmt --config "$DEVENV_ROOT/dprint.json"
+        repo_root="$(git rev-parse --show-toplevel)"
+        dprint fmt --config "$repo_root/dprint.json"
       '';
       description = "Format files with dprint.";
+      binary = "bash";
+    };
+    "schema:update" = {
+      exec = ''
+        set -euo pipefail
+        scripts/schema-assets.sh update
+      '';
+      description = "Regenerate committed JSON Schema assets.";
+      binary = "bash";
+    };
+    "schema:check" = {
+      exec = ''
+        set -euo pipefail
+        scripts/schema-assets.sh check
+      '';
+      description = "Check committed JSON Schema assets are up to date.";
       binary = "bash";
     };
     "fix:clippy" = {
@@ -342,6 +360,7 @@ in
       exec = ''
         set -euo pipefail
         lint:clippy
+        schema:check
         lint:format
         lint:architecture
         lint:root-git-config

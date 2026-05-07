@@ -1,0 +1,32 @@
+---
+source: crates/monochange_integration_tests/tests/schema_assets.rs
+expression: inventory
+---
+{
+  "configuration": {
+    "additionalProperties": false,
+    "dynamicTables": [
+      "package",
+      "group",
+      "cli"
+    ],
+    "schemaId": "https://monochange.github.io/monochange/schemas/monochange.schema.json"
+  },
+  "currentSchemaVersion": "0.1",
+  "migrationChangelog": [],
+  "releaseRecord": {
+    "additionalProperties": false,
+    "kind": "monochange.releaseRecord",
+    "required": [
+      "v",
+      "kind",
+      "createdAt",
+      "command",
+      "releaseTargets",
+      "releasedPackages",
+      "changedFiles"
+    ],
+    "schemaId": "https://monochange.github.io/monochange/schemas/release-record.schema.json"
+  },
+  "schemaCrateVersion": "0.0.0"
+}

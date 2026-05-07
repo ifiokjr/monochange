@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://monochange.github.io/monochange/schemas/monochange.schema.json",
+	"$id": "https://monochange.github.io/monochange/schemas/monochange.v0.1.schema.json",
 	"title": "monochange configuration",
 	"description": "JSON Schema for monochange.toml workspace configuration files.",
 	"type": "object",

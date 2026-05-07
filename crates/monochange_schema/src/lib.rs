@@ -8,12 +8,11 @@ use serde::Serializer;
 use serde_json::Value;
 use thiserror::Error;
 
-/// Current durable schema version text derived from this crate's major/minor.
-pub const CURRENT_SCHEMA_VERSION_TEXT: &str = concat!(
-	env!("CARGO_PKG_VERSION_MAJOR"),
-	".",
-	env!("CARGO_PKG_VERSION_MINOR")
-);
+/// Current durable public schema version text.
+///
+/// The crate starts at `0.0.0` so the first release can be planned explicitly,
+/// while durable artifacts already use the first public wire schema `0.1`.
+pub const CURRENT_SCHEMA_VERSION_TEXT: &str = "0.1";
 
 /// A durable schema version written as `major.minor`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -171,7 +170,7 @@ pub enum SchemaError {
 		/// Parse failure.
 		source: SchemaVersionParseError,
 	},
-	/// Package-derived current schema version could not be parsed.
+	/// Configured current schema version could not be parsed.
 	#[error("current schema version `{version}` is invalid: {source}")]
 	InvalidCurrentVersion {
 		/// Invalid current schema version text.
@@ -375,6 +374,7 @@ mod tests {
 	use crate::CURRENT_SCHEMA_VERSION_TEXT;
 	use crate::SchemaError;
 	use crate::SchemaVersion;
+	use crate::SchemaVersionParseError;
 	use crate::current_schema_version;
 	use crate::migration_changelog;
 	use crate::release_record;
@@ -393,14 +393,43 @@ mod tests {
 	}
 
 	#[test]
-	fn current_schema_version_uses_crate_major_minor() {
+	fn package_version_parser_reports_component_errors() {
+		assert!(matches!(
+			SchemaVersion::from_package_version(""),
+			Err(SchemaVersionParseError::MissingMinor)
+		));
+		assert!(matches!(
+			SchemaVersion::from_package_version("1"),
+			Err(SchemaVersionParseError::MissingMinor)
+		));
+		assert!(matches!(
+			SchemaVersion::from_package_version("x.2.3"),
+			Err(SchemaVersionParseError::InvalidMajor(major)) if major == "x"
+		));
+		assert!(matches!(
+			SchemaVersion::from_package_version(".2.3"),
+			Err(SchemaVersionParseError::InvalidMajor(major)) if major.is_empty()
+		));
+		assert!(matches!(
+			SchemaVersion::from_package_version("1.x.3"),
+			Err(SchemaVersionParseError::InvalidMinor(minor)) if minor == "x"
+		));
+		assert!(matches!(
+			SchemaVersion::from_package_version("1."),
+			Err(SchemaVersionParseError::InvalidMinor(minor)) if minor.is_empty()
+		));
+	}
+
+	#[test]
+	fn current_schema_version_is_independent_from_crate_version() {
+		assert_eq!(env!("CARGO_PKG_VERSION"), "0.0.0");
 		assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, "0.1");
 		let current = current_schema_version()
 			.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
 		assert_eq!(current, SchemaVersion::new(0, 1));
 		let from_package = SchemaVersion::from_package_version(env!("CARGO_PKG_VERSION"))
 			.unwrap_or_else(|error| panic!("parse package version: {error}"));
-		assert_eq!(from_package, current);
+		assert_eq!(from_package, SchemaVersion::new(0, 0));
 	}
 
 	#[test]
@@ -437,6 +466,26 @@ mod tests {
 			rendered.get("schemaVersion").is_none(),
 			"internal schemaVersion must not leak into durable records"
 		);
+	}
+
+	#[test]
+	fn release_record_render_current_value_rejects_non_object_or_missing_kind() {
+		let not_object = release_record::render_current_value(json!([]))
+			.err()
+			.unwrap_or_else(|| panic!("expected non-object error"));
+		assert!(matches!(not_object, SchemaError::NotObject));
+
+		let missing_kind = release_record::render_current_value(json!({
+			"schemaVersion": 1,
+			"createdAt": "2026-04-06T12:00:00Z",
+			"command": "release-pr",
+			"releaseTargets": [],
+			"releasedPackages": [],
+			"changedFiles": []
+		}))
+		.err()
+		.unwrap_or_else(|| panic!("expected missing-kind error"));
+		assert!(matches!(missing_kind, SchemaError::MissingKind));
 	}
 
 	#[test]

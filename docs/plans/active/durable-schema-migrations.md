@@ -19,7 +19,7 @@ Those artifacts currently mix internal Rust struct layout with serialized wire s
 - Newer unsupported schema versions must hard-fail all commands that try to consume them.
 - The version field should be named `v`.
 - `v` is a string in `major.minor` form, e.g. `"0.1"` or `"8.2"`; patch versions are intentionally excluded.
-- The current `v` value is derived from the `major.minor` version of a new `monochange_schema` crate.
+- The current `v` value is owned by `monochange_schema` and intentionally decoupled from the crate package version.
 - `0.1` is the first public schema version. There is no backward-compatibility obligation for unreleased `schemaVersion` artifacts.
 - After `0.1`, older compatible no-op transitions still need explicit migration entries.
 - JSON Schema files should be generated and committed.
@@ -39,13 +39,13 @@ By “machine-readable migration changelog”, I mean a structured registry that
 
 ```json
 {
-  "artifact": "monochange.releaseRecord",
-  "from": "0.1",
-  "to": "0.2",
-  "operation": "rename_field",
-  "path": "/targets/*/changelogPath",
-  "replacement": "/targets/*/changelog/path",
-  "noop": false
+	"artifact": "monochange.releaseRecord",
+	"from": "0.1",
+	"to": "0.2",
+	"operation": "rename_field",
+	"path": "/targets/*/changelogPath",
+	"replacement": "/targets/*/changelog/path",
+	"noop": false
 }
 ```
 
@@ -53,12 +53,12 @@ For no-op compatibility releases:
 
 ```json
 {
-  "artifact": "monochange.publishReadiness",
-  "from": "0.2",
-  "to": "0.3",
-  "operation": "noop",
-  "reason": "schema crate minor release did not change this artifact",
-  "noop": true
+	"artifact": "monochange.publishReadiness",
+	"from": "0.2",
+	"to": "0.3",
+	"operation": "noop",
+	"reason": "schema crate minor release did not change this artifact",
+	"noop": true
 }
 ```
 
@@ -139,7 +139,7 @@ Recommended crate responsibilities:
 
 - own durable artifact DTOs and their serde wire shape
 - own `kind` constants
-- own current `v` derivation from `env!("CARGO_PKG_VERSION")`
+- own the current public `v` constant independently from `env!("CARGO_PKG_VERSION")`
 - parse and validate `major.minor` schema versions
 - reject missing `v` headers for the first public schema
 - migrate raw `serde_json::Value` to the current version
@@ -158,7 +158,7 @@ Recommended package setup:
 - add it to Cargo workspace members through existing `crates/*`
 - add `[package.monochange_schema] path = "crates/monochange_schema"` to `monochange.toml`
 - do **not** add `monochange_schema` to `[group.main].packages`
-- give `crates/monochange_schema/Cargo.toml` its own explicit `version = "0.1.0"` instead of `version.workspace = true`
+- give `crates/monochange_schema/Cargo.toml` its own explicit `version = "0.0.0"` instead of `version.workspace = true`, then let the changeset publish the first crate release
 - configure independent tags/releases for the schema crate, likely namespaced tags such as `monochange_schema/v0.1.0`
 
 Dependency direction options:
@@ -173,11 +173,7 @@ The cleaner long-term boundary is: `monochange_schema` owns durable wire types; 
 Current schema version:
 
 ```rust
-pub const CURRENT_SCHEMA_VERSION_TEXT: &str = concat!(
-    env!("CARGO_PKG_VERSION_MAJOR"),
-    ".",
-    env!("CARGO_PKG_VERSION_MINOR"),
-);
+pub const CURRENT_SCHEMA_VERSION_TEXT: &str = "0.1";
 
 pub fn current_schema_version() -> Result<SchemaVersion, SchemaVersionParseError>;
 ```
@@ -188,9 +184,9 @@ Rules:
 
 - write only `v`, never `schemaVersion`, for new artifacts
 - `v` must match `^\d+\.\d+$`
-- `0.1.0` crate version writes `"0.1"`
-- `0.1.1` crate version still writes `"0.1"`
-- `0.2.0` crate version writes `"0.2"`
+- `0.0.0` development crate version still writes the first public durable schema version `"0.1"`
+- crate patch releases do not change `v`
+- future durable breaking changes update `CURRENT_SCHEMA_VERSION_TEXT` explicitly and add migration changelog entries
 - exact current `major.minor`: deserialize current DTO
 - older `major.minor` after `0.1`: run every migration edge to current, including no-op edges
 - newer `major.minor`: hard-fail with “unsupported schema version; upgrade monochange” guidance
@@ -204,10 +200,13 @@ Proposed API shape:
 pub fn parse_artifact<T: DurableArtifact>(value: serde_json::Value) -> Result<T, SchemaError>;
 
 pub trait DurableArtifact: Sized {
-    const KIND: &'static str;
-    fn current_version() -> SchemaVersion;
-    fn migrate(value: serde_json::Value, from: SchemaVersion) -> Result<serde_json::Value, SchemaError>;
-    fn deserialize_current(value: serde_json::Value) -> Result<Self, SchemaError>;
+	const KIND: &'static str;
+	fn current_version() -> SchemaVersion;
+	fn migrate(
+		value: serde_json::Value,
+		from: SchemaVersion,
+	) -> Result<serde_json::Value, SchemaError>;
+	fn deserialize_current(value: serde_json::Value) -> Result<Self, SchemaError>;
 }
 ```
 
@@ -237,23 +236,24 @@ Each module should expose:
 
 ## JSON Schema files
 
-Commit generated schemas under a stable path, for example:
+Commit generated schemas under stable paths. The implementation uses source templates plus Rust wire constants and writes both moving aliases and versioned copies:
 
 ```text
-schemas/monochange.releaseRecord/0.1.schema.json
-schemas/monochange.publishReadiness/0.1.schema.json
-schemas/monochange.publishBootstrap/0.1.schema.json
-schemas/monochange.preparedRelease/0.1.schema.json
-schemas/monochange.packagePublish/0.1.schema.json
+crates/monochange_schema/schemas/release-record.schema.json
+docs/src/schemas/release-record.schema.json
+docs/src/schemas/release-record.v0.1.schema.json
+docs/src/schemas/monochange.schema.json
+docs/src/schemas/monochange.v0.1.schema.json
 ```
 
-Generation should be deterministic and checked by tests. Prefer a command such as:
+Generation is deterministic and checked by tests plus devenv scripts:
 
 ```text
-cargo run -p monochange_schema --bin generate-schemas
+schema:update
+schema:check
 ```
 
-or a documented devenv script if the repository wants all task commands exposed that way.
+`fix:all` runs `schema:update`; `lint:all` runs `schema:check`.
 
 ## Implementation checklist
 
