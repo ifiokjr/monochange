@@ -245,6 +245,9 @@ path = "crates/monochange_cargo"
 [package.monochange_npm]
 path = "crates/monochange_npm"
 
+[package.monochange_publish]
+path = "crates/monochange_publish"
+
 [package.monochange_config]
 path = "crates/monochange_config"
 
@@ -416,6 +419,7 @@ packages = [
 	"monochange_lint_testing",
 	"monochange_linting",
 	"monochange_npm",
+	"monochange_publish",
 	"monochange_python",
 	"monochange_semver",
 	"monochange_telemetry",

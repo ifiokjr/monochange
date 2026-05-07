@@ -1,13 +1,368 @@
 use std::collections::BTreeMap;
+use std::env;
+use std::path::Path;
+use std::path::PathBuf;
 
+use monochange_core::Ecosystem;
+use monochange_core::PublishAttestationSettings;
+use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
+use monochange_core::TrustedPublishingSettings;
 use serde::Deserialize;
 use serde::Serialize;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PackagePublishRunMode {
+	Placeholder,
+	Release,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PackagePublishStatus {
+	Planned,
+	Published,
+	SkippedExisting,
+	SkippedExternal,
+	Blocked,
+	Failed,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustedPublishingStatus {
+	Disabled,
+	Planned,
+	Configured,
+	ManualActionRequired,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustedPublishingOutcome {
+	pub status: TrustedPublishingStatus,
+	pub repository: Option<String>,
+	pub workflow: Option<String>,
+	pub environment: Option<String>,
+	pub setup_url: Option<String>,
+	pub message: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackagePublishOutcome {
+	pub package: String,
+	pub ecosystem: Ecosystem,
+	pub registry: String,
+	pub version: String,
+	pub status: PackagePublishStatus,
+	pub message: String,
+	pub placeholder: bool,
+	pub trusted_publishing: TrustedPublishingOutcome,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub command: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub stdout: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub stderr: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackagePublishReport {
+	pub mode: PackagePublishRunMode,
+	pub dry_run: bool,
+	pub packages: Vec<PackagePublishOutcome>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PublishRequest {
+	pub package_id: String,
+	pub package_name: String,
+	pub ecosystem: Ecosystem,
+	pub manifest_path: PathBuf,
+	pub package_root: PathBuf,
+	pub registry: RegistryKind,
+	pub package_manager: Option<String>,
+	pub package_metadata: BTreeMap<String, String>,
+	pub mode: PublishMode,
+	pub version: String,
+	pub placeholder: bool,
+	pub trusted_publishing: TrustedPublishingSettings,
+	pub attestations: PublishAttestationSettings,
+	pub placeholder_readme: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct CommandSpec {
+	pub program: String,
+	pub args: Vec<String>,
+	pub cwd: PathBuf,
+}
+
+pub fn build_publish_command(
+	request: &PublishRequest,
+	mode: PackagePublishRunMode,
+	placeholder_dir: Option<&Path>,
+	dry_run: bool,
+) -> CommandSpec {
+	let mut command = None;
+	let is_jsr_release =
+		request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Release;
+	let placeholder_path = placeholder_dir;
+	if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Placeholder {
+		command = Some(build_npm_placeholder_publish_command(
+			request,
+			placeholder_path.expect("placeholder directory must exist"),
+		));
+	} else if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Release {
+		command = Some(build_npm_release_publish_command(request));
+	} else if request.registry == RegistryKind::CratesIo
+		&& mode == PackagePublishRunMode::Placeholder
+	{
+		command = Some(build_cargo_placeholder_publish_command(
+			request,
+			placeholder_path.expect("placeholder directory must exist"),
+		));
+	} else if request.registry == RegistryKind::CratesIo && mode == PackagePublishRunMode::Release {
+		command = Some(build_cargo_release_publish_command(request));
+	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Placeholder
+	{
+		command = Some(build_dart_publish_command(
+			request,
+			placeholder_path.expect("placeholder directory must exist"),
+		));
+	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Release {
+		command = Some(build_dart_publish_command(request, &request.package_root));
+	} else if request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Placeholder {
+		command = Some(build_jsr_publish_command(
+			placeholder_path.expect("placeholder directory must exist"),
+		));
+	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Placeholder {
+		command = Some(build_python_publish_command(
+			request,
+			placeholder_path.expect("placeholder directory must exist"),
+		));
+	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Release {
+		command = Some(build_python_publish_command(request, &request.package_root));
+	} else if request.registry == RegistryKind::GoProxy {
+		command = Some(build_go_publish_command(request));
+	}
+	if is_jsr_release {
+		command = Some(build_jsr_publish_command(&request.package_root));
+	}
+
+	let mut command = command.expect("unsupported built-in publish registry");
+	append_publish_dry_run_args(&mut command.args, request.registry, dry_run);
+	command
+}
+
+pub fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, dry_run: bool) {
+	if !dry_run {
+		return;
+	}
+
+	if registry == RegistryKind::Pypi || registry == RegistryKind::GoProxy {
+		return;
+	}
+
+	if registry == RegistryKind::PubDev {
+		args.retain(|arg| arg != "--force");
+		args.push("--dry-run".to_string());
+		return;
+	}
+
+	args.push("--dry-run".to_string());
+}
+
+pub fn build_npm_placeholder_publish_command(
+	request: &PublishRequest,
+	placeholder_path: &Path,
+) -> CommandSpec {
+	CommandSpec {
+		program: npm_publish_program(request).to_string(),
+		args: vec![
+			"publish".to_string(),
+			placeholder_path.display().to_string(),
+			"--access".to_string(),
+			"public".to_string(),
+		],
+		cwd: request.package_root.clone(),
+	}
+}
+
+pub fn build_npm_release_publish_command(request: &PublishRequest) -> CommandSpec {
+	let mut args = vec![
+		"publish".to_string(),
+		"--access".to_string(),
+		"public".to_string(),
+	];
+	if request.attestations.require_registry_provenance {
+		args.push("--provenance".to_string());
+	}
+	CommandSpec {
+		program: npm_publish_program(request).to_string(),
+		args,
+		cwd: request.package_root.clone(),
+	}
+}
+
+fn npm_publish_program(request: &PublishRequest) -> &'static str {
+	if request.trusted_publishing.enabled {
+		return "npm";
+	}
+
+	if uses_pnpm_publish_manager(request) {
+		"pnpm"
+	} else {
+		"npm"
+	}
+}
+
+pub fn uses_pnpm_publish_manager(request: &PublishRequest) -> bool {
+	request.registry == RegistryKind::Npm && request.package_manager.as_deref() == Some("pnpm")
+}
+
+fn build_cargo_placeholder_publish_command(
+	request: &PublishRequest,
+	placeholder_path: &Path,
+) -> CommandSpec {
+	CommandSpec {
+		program: "cargo".to_string(),
+		args: vec![
+			"publish".to_string(),
+			"--allow-dirty".to_string(),
+			"--manifest-path".to_string(),
+			placeholder_path.join("Cargo.toml").display().to_string(),
+		],
+		cwd: request.package_root.clone(),
+	}
+}
+
+fn build_cargo_release_publish_command(request: &PublishRequest) -> CommandSpec {
+	CommandSpec {
+		program: "cargo".to_string(),
+		args: vec![
+			"publish".to_string(),
+			"--locked".to_string(),
+			"--manifest-path".to_string(),
+			request.manifest_path.display().to_string(),
+		],
+		cwd: request.package_root.clone(),
+	}
+}
+
+fn build_dart_publish_command(request: &PublishRequest, cwd: &Path) -> CommandSpec {
+	let program = if request.ecosystem == Ecosystem::Flutter {
+		"flutter"
+	} else {
+		"dart"
+	};
+	CommandSpec {
+		program: program.to_string(),
+		args: vec![
+			"pub".to_string(),
+			"publish".to_string(),
+			"--force".to_string(),
+		],
+		cwd: cwd.to_path_buf(),
+	}
+}
+
+fn build_jsr_publish_command(cwd: &Path) -> CommandSpec {
+	CommandSpec {
+		program: "deno".to_string(),
+		args: vec!["publish".to_string()],
+		cwd: cwd.to_path_buf(),
+	}
+}
+
+fn build_python_publish_command(request: &PublishRequest, cwd: &Path) -> CommandSpec {
+	let trusted_publishing = if request.trusted_publishing.enabled {
+		"always"
+	} else {
+		"never"
+	};
+	let script = format!(
+		"uv build --out-dir dist && uv publish --trusted-publishing {trusted_publishing} dist/*"
+	);
+	CommandSpec {
+		program: "sh".to_string(),
+		args: vec!["-c".to_string(), script],
+		cwd: cwd.to_path_buf(),
+	}
+}
+
+fn build_go_publish_command(request: &PublishRequest) -> CommandSpec {
+	CommandSpec {
+		program: "git".to_string(),
+		args: vec!["tag".to_string(), go_module_tag_name(request)],
+		cwd: request.package_root.clone(),
+	}
+}
+
+fn go_module_tag_name(request: &PublishRequest) -> String {
+	let version = go_proxy_version(&request.version);
+	let root = request
+		.package_metadata
+		.get("relative_path")
+		.cloned()
+		.unwrap_or_else(|| fallback_go_tag_prefix(request));
+	let root = root.trim_matches('/');
+	if root.is_empty() || root == "." {
+		return version;
+	}
+	format!("{root}/{version}")
+}
+
+fn fallback_go_tag_prefix(request: &PublishRequest) -> String {
+	env::current_dir()
+		.ok()
+		.and_then(|root| {
+			request
+				.package_root
+				.strip_prefix(root)
+				.ok()
+				.map(Path::to_path_buf)
+		})
+		.unwrap_or_else(|| request.package_root.clone())
+		.to_string_lossy()
+		.to_string()
+}
+
+pub fn go_module_path(request: &PublishRequest) -> &str {
+	request
+		.package_metadata
+		.get("module_path")
+		.map_or(request.package_name.as_str(), String::as_str)
+}
+
+pub fn go_proxy_version(version: &str) -> String {
+	if version.starts_with('v') {
+		version.to_string()
+	} else {
+		format!("v{version}")
+	}
+}
+
+pub fn go_proxy_module_path(module: &str) -> String {
+	let mut escaped = String::with_capacity(module.len());
+	for character in module.chars() {
+		if character.is_ascii_uppercase() {
+			escaped.push('!');
+			escaped.push(character.to_ascii_lowercase());
+		} else {
+			escaped.push(character);
+		}
+	}
+	escaped
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum CiProviderKind {
+pub enum CiProviderKind {
 	GitHubActions,
 	GitLabCi,
 	CircleCi,
@@ -16,7 +371,7 @@ pub(crate) enum CiProviderKind {
 }
 
 impl CiProviderKind {
-	pub(crate) fn label(self) -> &'static str {
+	pub fn label(self) -> &'static str {
 		match self {
 			Self::GitHubActions => "GitHub Actions",
 			Self::GitLabCi => "GitLab CI/CD",
@@ -29,7 +384,7 @@ impl CiProviderKind {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "provider", rename_all = "snake_case")]
-pub(crate) enum TrustedPublishingIdentity {
+pub enum TrustedPublishingIdentity {
 	GitHubActions {
 		repository: Option<String>,
 		workflow: Option<String>,
@@ -62,7 +417,7 @@ pub(crate) enum TrustedPublishingIdentity {
 }
 
 impl TrustedPublishingIdentity {
-	pub(crate) fn provider(&self) -> CiProviderKind {
+	pub fn provider(&self) -> CiProviderKind {
 		match self {
 			Self::GitHubActions { .. } => CiProviderKind::GitHubActions,
 			Self::GitLabCi { .. } => CiProviderKind::GitLabCi,
@@ -72,7 +427,7 @@ impl TrustedPublishingIdentity {
 		}
 	}
 
-	pub(crate) fn is_verifiable_by_env(&self) -> bool {
+	pub fn is_verifiable_by_env(&self) -> bool {
 		match self {
 			Self::GitHubActions {
 				repository,
@@ -106,15 +461,15 @@ impl TrustedPublishingIdentity {
 	clippy::struct_excessive_bools,
 	reason = "capability matrix reports independent registry booleans"
 )]
-pub(crate) struct RegistryTrustCapabilities {
-	pub(crate) registry: String,
-	pub(crate) trusted_publishing: bool,
-	pub(crate) supported_providers: Vec<CiProviderKind>,
-	pub(crate) registry_setup_verifiable: bool,
-	pub(crate) registry_setup_automation: bool,
-	pub(crate) registry_native_provenance: bool,
-	pub(crate) setup_url: Option<String>,
-	pub(crate) notes: Vec<String>,
+pub struct RegistryTrustCapabilities {
+	pub registry: String,
+	pub trusted_publishing: bool,
+	pub supported_providers: Vec<CiProviderKind>,
+	pub registry_setup_verifiable: bool,
+	pub registry_setup_automation: bool,
+	pub registry_native_provenance: bool,
+	pub setup_url: Option<String>,
+	pub notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -123,18 +478,18 @@ pub(crate) struct RegistryTrustCapabilities {
 	clippy::struct_excessive_bools,
 	reason = "capability matrix reports independent provider/registry booleans"
 )]
-pub(crate) struct ProviderRegistryTrustCapability {
-	pub(crate) registry: String,
-	pub(crate) provider: CiProviderKind,
-	pub(crate) trusted_publishing: bool,
-	pub(crate) ci_identity_verifiable: bool,
-	pub(crate) registry_setup_verifiable: bool,
-	pub(crate) registry_setup_automation: bool,
-	pub(crate) registry_native_provenance: bool,
-	pub(crate) notes: Vec<String>,
+pub struct ProviderRegistryTrustCapability {
+	pub registry: String,
+	pub provider: CiProviderKind,
+	pub trusted_publishing: bool,
+	pub ci_identity_verifiable: bool,
+	pub registry_setup_verifiable: bool,
+	pub registry_setup_automation: bool,
+	pub registry_native_provenance: bool,
+	pub notes: Vec<String>,
 }
 
-pub(crate) fn detect_trusted_publishing_identity(
+pub fn detect_trusted_publishing_identity(
 	env_map: &BTreeMap<String, String>,
 ) -> TrustedPublishingIdentity {
 	if env_is_true(env_map, "GITHUB_ACTIONS") || env_map.contains_key("GITHUB_WORKFLOW_REF") {
@@ -194,7 +549,7 @@ pub(crate) fn detect_trusted_publishing_identity(
 	}
 }
 
-pub(crate) fn registry_trust_capabilities(registry: &PublishRegistry) -> RegistryTrustCapabilities {
+pub fn registry_trust_capabilities(registry: &PublishRegistry) -> RegistryTrustCapabilities {
 	match registry {
 		PublishRegistry::Builtin(registry) => builtin_registry_trust_capabilities(*registry),
 		PublishRegistry::Custom(name) => {
@@ -215,9 +570,7 @@ pub(crate) fn registry_trust_capabilities(registry: &PublishRegistry) -> Registr
 	}
 }
 
-pub(crate) fn builtin_registry_trust_capabilities(
-	registry: RegistryKind,
-) -> RegistryTrustCapabilities {
+pub fn builtin_registry_trust_capabilities(registry: RegistryKind) -> RegistryTrustCapabilities {
 	let providers = supported_providers_for_registry(registry);
 	RegistryTrustCapabilities {
 		registry: registry.to_string(),
@@ -234,7 +587,7 @@ pub(crate) fn builtin_registry_trust_capabilities(
 	}
 }
 
-pub(crate) fn provider_registry_trust_capability(
+pub fn provider_registry_trust_capability(
 	registry: &PublishRegistry,
 	provider: CiProviderKind,
 ) -> ProviderRegistryTrustCapability {
@@ -279,14 +632,14 @@ pub(crate) fn provider_registry_trust_capability(
 }
 
 #[cfg(test)]
-pub(crate) fn builtin_provider_registry_trust_capability(
+pub fn builtin_provider_registry_trust_capability(
 	registry: RegistryKind,
 	provider: CiProviderKind,
 ) -> ProviderRegistryTrustCapability {
 	provider_registry_trust_capability(&PublishRegistry::Builtin(registry), provider)
 }
 
-pub(crate) fn trusted_publishing_capability_message_for_builtin(
+pub fn trusted_publishing_capability_message_for_builtin(
 	registry: RegistryKind,
 	env_map: &BTreeMap<String, String>,
 ) -> String {
@@ -294,7 +647,7 @@ pub(crate) fn trusted_publishing_capability_message_for_builtin(
 	trusted_publishing_capability_message(&PublishRegistry::Builtin(registry), &identity)
 }
 
-pub(crate) fn trusted_publishing_capability_message(
+pub fn trusted_publishing_capability_message(
 	registry: &PublishRegistry,
 	identity: &TrustedPublishingIdentity,
 ) -> String {

@@ -1,0 +1,20 @@
+[package]
+name = "monochange_publish"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_publish"
+edition = { workspace = true }
+include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+keywords = ["publish", "trusted-publishing", "releases", "monorepo"]
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Publishing support and trusted-publishing capabilities for monochange"
+
+[dependencies]
+monochange_core = { workspace = true }
+serde = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

@@ -2050,6 +2050,7 @@ dependencies = [
  "monochange_graph",
  "monochange_lint",
  "monochange_npm",
+ "monochange_publish",
  "monochange_python",
  "monochange_semver",
  "monochange_telemetry",
@@ -2410,6 +2411,14 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "monochange_publish"
+version = "0.3.4"
+dependencies = [
+ "monochange_core",
+ "serde",
 ]
 
 [[package]]

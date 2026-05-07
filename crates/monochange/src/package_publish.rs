@@ -4,6 +4,7 @@ use std::env;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
+#[cfg(test)]
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
@@ -13,6 +14,7 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackagePublicationTarget;
 use monochange_core::PackageRecord;
+#[cfg(test)]
 use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
@@ -22,10 +24,31 @@ use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::materialize_dependency_edges;
+use monochange_publish::CommandSpec;
+pub(crate) use monochange_publish::PackagePublishOutcome;
+pub(crate) use monochange_publish::PackagePublishReport;
+pub(crate) use monochange_publish::PackagePublishRunMode;
+pub(crate) use monochange_publish::PackagePublishStatus;
+pub(crate) use monochange_publish::PublishRequest;
+use monochange_publish::TrustedPublishingIdentity;
+pub(crate) use monochange_publish::TrustedPublishingOutcome;
+pub(crate) use monochange_publish::TrustedPublishingStatus;
+#[cfg(test)]
+use monochange_publish::append_publish_dry_run_args;
+#[cfg(test)]
+use monochange_publish::build_npm_placeholder_publish_command;
+#[cfg(test)]
+use monochange_publish::build_npm_release_publish_command;
+use monochange_publish::build_publish_command;
+use monochange_publish::detect_trusted_publishing_identity;
+use monochange_publish::go_module_path;
+use monochange_publish::go_proxy_module_path;
+use monochange_publish::go_proxy_version;
+use monochange_publish::provider_registry_trust_capability;
+use monochange_publish::trusted_publishing_capability_message;
+use monochange_publish::trusted_publishing_capability_message_for_builtin;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
-use serde::Deserialize;
-use serde::Serialize;
 use serde_json::Value as JsonValue;
 use serde_yaml_ng::Value as YamlValue;
 use tempfile::TempDir;
@@ -35,11 +58,6 @@ use urlencoding::encode;
 use crate::PreparedRelease;
 use crate::discover_release_record;
 use crate::discover_workspace;
-use crate::trust_capabilities::TrustedPublishingIdentity;
-use crate::trust_capabilities::detect_trusted_publishing_identity;
-use crate::trust_capabilities::provider_registry_trust_capability;
-use crate::trust_capabilities::trusted_publishing_capability_message;
-use crate::trust_capabilities::trusted_publishing_capability_message_for_builtin;
 
 const PLACEHOLDER_VERSION: &str = "0.0.0";
 const GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN: &str = "ACTIONS_ID_TOKEN_REQUEST_TOKEN";
@@ -55,101 +73,11 @@ const JSR_TRUST_DOCS_URL: &str = "https://jsr.io/docs/publishing-packages";
 #[cfg(test)]
 const PYPI_TRUST_DOCS_URL: &str = "https://docs.pypi.org/trusted-publishers/";
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum PackagePublishRunMode {
-	Placeholder,
-	Release,
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum PackagePublishStatus {
-	Planned,
-	Published,
-	SkippedExisting,
-	SkippedExternal,
-	Blocked,
-	Failed,
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum TrustedPublishingStatus {
-	Disabled,
-	Planned,
-	Configured,
-	ManualActionRequired,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TrustedPublishingOutcome {
-	pub status: TrustedPublishingStatus,
-	pub repository: Option<String>,
-	pub workflow: Option<String>,
-	pub environment: Option<String>,
-	pub setup_url: Option<String>,
-	pub message: String,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct PackagePublishOutcome {
-	pub package: String,
-	pub ecosystem: Ecosystem,
-	pub registry: String,
-	pub version: String,
-	pub status: PackagePublishStatus,
-	pub message: String,
-	pub placeholder: bool,
-	pub trusted_publishing: TrustedPublishingOutcome,
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub command: Option<String>,
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub stdout: Option<String>,
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub stderr: Option<String>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct PackagePublishReport {
-	pub mode: PackagePublishRunMode,
-	pub dry_run: bool,
-	pub packages: Vec<PackagePublishOutcome>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct PublishRequest {
-	pub(crate) package_id: String,
-	pub(crate) package_name: String,
-	pub(crate) ecosystem: Ecosystem,
-	pub(crate) manifest_path: PathBuf,
-	pub(crate) package_root: PathBuf,
-	pub(crate) registry: RegistryKind,
-	pub(crate) package_manager: Option<String>,
-	pub(crate) package_metadata: BTreeMap<String, String>,
-	pub(crate) mode: PublishMode,
-	pub(crate) version: String,
-	pub(crate) placeholder: bool,
-	pub(crate) trusted_publishing: TrustedPublishingSettings,
-	pub(crate) attestations: PublishAttestationSettings,
-	pub(crate) placeholder_readme: String,
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct GitHubTrustContext {
 	repository: String,
 	workflow: String,
 	environment: Option<String>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct CommandSpec {
-	program: String,
-	args: Vec<String>,
-	cwd: PathBuf,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -1059,8 +987,12 @@ fn execute_publish_requests(
 		} else {
 			None
 		};
-		let publish_command =
-			build_publish_command(request, mode, placeholder_dir.as_ref(), dry_run);
+		let publish_command = build_publish_command(
+			request,
+			mode,
+			placeholder_dir.as_ref().map(TempDir::path),
+			dry_run,
+		);
 
 		if dry_run {
 			outcomes.push(PackagePublishOutcome {
@@ -1672,260 +1604,6 @@ fn json_value_contains(value: &JsonValue, needle: &str) -> bool {
 		JsonValue::Object(map) => map.values().any(|value| json_value_contains(value, needle)),
 		_ => false,
 	}
-}
-
-fn build_publish_command(
-	request: &PublishRequest,
-	mode: PackagePublishRunMode,
-	placeholder_dir: Option<&TempDir>,
-	dry_run: bool,
-) -> CommandSpec {
-	let mut command = None;
-	let is_jsr_release =
-		request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Release;
-	let placeholder_path = placeholder_dir.map(TempDir::path);
-	if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_npm_placeholder_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Release {
-		command = Some(build_npm_release_publish_command(request));
-	} else if request.registry == RegistryKind::CratesIo
-		&& mode == PackagePublishRunMode::Placeholder
-	{
-		command = Some(build_cargo_placeholder_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::CratesIo && mode == PackagePublishRunMode::Release {
-		command = Some(build_cargo_release_publish_command(request));
-	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Placeholder
-	{
-		command = Some(build_dart_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Release {
-		command = Some(build_dart_publish_command(request, &request.package_root));
-	} else if request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_jsr_publish_command(
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_python_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Release {
-		command = Some(build_python_publish_command(request, &request.package_root));
-	} else if request.registry == RegistryKind::GoProxy {
-		command = Some(build_go_publish_command(request));
-	}
-	if is_jsr_release {
-		command = Some(build_jsr_publish_command(&request.package_root));
-	}
-
-	let mut command = command.expect("unsupported built-in publish registry");
-	append_publish_dry_run_args(&mut command.args, request.registry, dry_run);
-	command
-}
-
-fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, dry_run: bool) {
-	if !dry_run {
-		return;
-	}
-
-	if registry == RegistryKind::Pypi || registry == RegistryKind::GoProxy {
-		return;
-	}
-
-	if registry == RegistryKind::PubDev {
-		args.retain(|arg| arg != "--force");
-		args.push("--dry-run".to_string());
-		return;
-	}
-
-	args.push("--dry-run".to_string());
-}
-
-fn build_npm_placeholder_publish_command(
-	request: &PublishRequest,
-	placeholder_path: &Path,
-) -> CommandSpec {
-	CommandSpec {
-		program: npm_publish_program(request).to_string(),
-		args: vec![
-			"publish".to_string(),
-			placeholder_path.display().to_string(),
-			"--access".to_string(),
-			"public".to_string(),
-		],
-		cwd: request.package_root.clone(),
-	}
-}
-
-fn build_npm_release_publish_command(request: &PublishRequest) -> CommandSpec {
-	let mut args = vec![
-		"publish".to_string(),
-		"--access".to_string(),
-		"public".to_string(),
-	];
-	if request.attestations.require_registry_provenance {
-		args.push("--provenance".to_string());
-	}
-	CommandSpec {
-		program: npm_publish_program(request).to_string(),
-		args,
-		cwd: request.package_root.clone(),
-	}
-}
-
-fn npm_publish_program(request: &PublishRequest) -> &'static str {
-	if request.trusted_publishing.enabled {
-		return "npm";
-	}
-
-	if uses_pnpm_publish_manager(request) {
-		"pnpm"
-	} else {
-		"npm"
-	}
-}
-
-fn build_cargo_placeholder_publish_command(
-	request: &PublishRequest,
-	placeholder_path: &Path,
-) -> CommandSpec {
-	CommandSpec {
-		program: "cargo".to_string(),
-		args: vec![
-			"publish".to_string(),
-			"--allow-dirty".to_string(),
-			"--manifest-path".to_string(),
-			placeholder_path.join("Cargo.toml").display().to_string(),
-		],
-		cwd: request.package_root.clone(),
-	}
-}
-
-fn build_cargo_release_publish_command(request: &PublishRequest) -> CommandSpec {
-	CommandSpec {
-		program: "cargo".to_string(),
-		args: vec![
-			"publish".to_string(),
-			"--locked".to_string(),
-			"--manifest-path".to_string(),
-			request.manifest_path.display().to_string(),
-		],
-		cwd: request.package_root.clone(),
-	}
-}
-
-fn build_dart_publish_command(request: &PublishRequest, cwd: &Path) -> CommandSpec {
-	let program = if request.ecosystem == Ecosystem::Flutter {
-		"flutter"
-	} else {
-		"dart"
-	};
-	CommandSpec {
-		program: program.to_string(),
-		args: vec![
-			"pub".to_string(),
-			"publish".to_string(),
-			"--force".to_string(),
-		],
-		cwd: cwd.to_path_buf(),
-	}
-}
-
-fn build_jsr_publish_command(cwd: &Path) -> CommandSpec {
-	CommandSpec {
-		program: "deno".to_string(),
-		args: vec!["publish".to_string()],
-		cwd: cwd.to_path_buf(),
-	}
-}
-
-fn build_python_publish_command(request: &PublishRequest, cwd: &Path) -> CommandSpec {
-	let trusted_publishing = if request.trusted_publishing.enabled {
-		"always"
-	} else {
-		"never"
-	};
-	let script = format!(
-		"uv build --out-dir dist && uv publish --trusted-publishing {trusted_publishing} dist/*"
-	);
-	CommandSpec {
-		program: "sh".to_string(),
-		args: vec!["-c".to_string(), script],
-		cwd: cwd.to_path_buf(),
-	}
-}
-
-fn build_go_publish_command(request: &PublishRequest) -> CommandSpec {
-	CommandSpec {
-		program: "git".to_string(),
-		args: vec!["tag".to_string(), go_module_tag_name(request)],
-		cwd: request.package_root.clone(),
-	}
-}
-
-fn go_module_tag_name(request: &PublishRequest) -> String {
-	let version = go_proxy_version(&request.version);
-	let root = request
-		.package_metadata
-		.get("relative_path")
-		.cloned()
-		.unwrap_or_else(|| fallback_go_tag_prefix(request));
-	let root = root.trim_matches('/');
-	if root.is_empty() || root == "." {
-		return version;
-	}
-	format!("{root}/{version}")
-}
-
-fn fallback_go_tag_prefix(request: &PublishRequest) -> String {
-	env::current_dir()
-		.ok()
-		.and_then(|root| {
-			request
-				.package_root
-				.strip_prefix(root)
-				.ok()
-				.map(Path::to_path_buf)
-		})
-		.unwrap_or_else(|| request.package_root.clone())
-		.to_string_lossy()
-		.to_string()
-}
-
-fn go_module_path(request: &PublishRequest) -> &str {
-	request
-		.package_metadata
-		.get("module_path")
-		.map_or(request.package_name.as_str(), String::as_str)
-}
-
-fn go_proxy_version(version: &str) -> String {
-	if version.starts_with('v') {
-		version.to_string()
-	} else {
-		format!("v{version}")
-	}
-}
-
-fn go_proxy_module_path(module: &str) -> String {
-	let mut escaped = String::with_capacity(module.len());
-	for character in module.chars() {
-		if character.is_ascii_uppercase() {
-			escaped.push('!');
-			escaped.push(character.to_ascii_lowercase());
-		} else {
-			escaped.push(character);
-		}
-	}
-	escaped
 }
 
 fn build_placeholder_directory(
@@ -3354,7 +3032,7 @@ jobs:
 		let npm_placeholder = build_publish_command(
 			&sample_request(RegistryKind::Npm),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			false,
 		);
 		assert_eq!(
@@ -3380,7 +3058,7 @@ jobs:
 		let pnpm_placeholder = build_publish_command(
 			&pnpm_request,
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			false,
 		);
 		assert_eq!(pnpm_placeholder.program, "pnpm");
@@ -3406,7 +3084,7 @@ jobs:
 		let cargo_placeholder = build_publish_command(
 			&sample_request(RegistryKind::CratesIo),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			false,
 		);
 		assert_eq!(cargo_placeholder.program, "cargo");
@@ -3432,7 +3110,7 @@ jobs:
 		let dart_placeholder = build_publish_command(
 			&sample_request(RegistryKind::PubDev),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			false,
 		);
 		assert_eq!(dart_placeholder.cwd, tempdir.path());
@@ -3449,7 +3127,7 @@ jobs:
 		let jsr = build_publish_command(
 			&sample_request(RegistryKind::Jsr),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			false,
 		);
 		assert_eq!(jsr.program, "deno");
@@ -3464,7 +3142,7 @@ jobs:
 		let pypi_placeholder = build_publish_command(
 			&sample_request(RegistryKind::Pypi),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			false,
 		);
 		assert_eq!(pypi_placeholder.program, "sh");
@@ -3601,7 +3279,7 @@ jobs:
 		let npm = build_publish_command(
 			&sample_request(RegistryKind::Npm),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			true,
 		);
 		assert_eq!(npm.args.last(), Some(&"--dry-run".to_string()));
@@ -3609,7 +3287,7 @@ jobs:
 		let cargo = build_publish_command(
 			&sample_request(RegistryKind::CratesIo),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			true,
 		);
 		assert_eq!(cargo.args.last(), Some(&"--dry-run".to_string()));
@@ -3617,7 +3295,7 @@ jobs:
 		let dart = build_publish_command(
 			&sample_request(RegistryKind::PubDev),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			true,
 		);
 		assert!(dart.args.contains(&"--dry-run".to_string()));
@@ -3626,7 +3304,7 @@ jobs:
 		let jsr = build_publish_command(
 			&sample_request(RegistryKind::Jsr),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			true,
 		);
 		assert_eq!(jsr.args.last(), Some(&"--dry-run".to_string()));
@@ -3634,7 +3312,7 @@ jobs:
 		let pypi = build_publish_command(
 			&sample_request(RegistryKind::Pypi),
 			PackagePublishRunMode::Placeholder,
-			Some(&tempdir),
+			Some(tempdir.path()),
 			true,
 		);
 		assert!(!render_command(&pypi).contains("--dry-run"));
