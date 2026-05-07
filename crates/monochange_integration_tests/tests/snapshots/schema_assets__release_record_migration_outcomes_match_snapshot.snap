@@ -1,0 +1,56 @@
+---
+source: crates/monochange_integration_tests/tests/schema_assets.rs
+expression: outcomes
+---
+[
+  {
+    "scenario": "current",
+    "status": "ok",
+    "v": "0.1"
+  },
+  {
+    "error": "artifact is not a JSON object",
+    "scenario": "not_object",
+    "status": "error"
+  },
+  {
+    "error": "artifact is missing required `kind`",
+    "scenario": "missing_kind",
+    "status": "error"
+  },
+  {
+    "error": "artifact uses unsupported kind `monochange.otherRecord`; expected `monochange.releaseRecord`",
+    "scenario": "wrong_kind",
+    "status": "error"
+  },
+  {
+    "error": "artifact is missing required schema version field `v`",
+    "scenario": "missing_version",
+    "status": "error"
+  },
+  {
+    "error": "artifact is missing required schema version field `v`",
+    "scenario": "pre_public_schema_version_field",
+    "status": "error"
+  },
+  {
+    "error": "artifact schema version field `v` must be a string",
+    "scenario": "non_string_version",
+    "status": "error"
+  },
+  {
+    "error": "artifact uses invalid schema version `0.1.0`: expected exactly major.minor",
+    "scenario": "invalid_version_text",
+    "status": "error"
+  },
+  {
+    "error": "artifact uses unsupported schema version `0.0`; current supported version is `0.1`",
+    "scenario": "old_version_without_migration_edge",
+    "status": "error"
+  },
+  {
+    "error": "artifact uses unsupported schema version `0.2`; current supported version is `0.1`",
+    "scenario": "future_version",
+    "status": "error"
+  }
+]

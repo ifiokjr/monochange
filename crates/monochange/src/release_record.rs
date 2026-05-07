@@ -85,6 +85,13 @@ pub fn discover_release_record(
 					version
 				)));
 			}
+			Err(monochange_core::ReleaseRecordError::UnsupportedSchemaVersionValue(version)) => {
+				return Err(MonochangeError::Discovery(format!(
+					"release record in commit {} uses unsupported schema version {}; upgrade monochange to read this record",
+					crate::short_commit_sha(&commit),
+					version
+				)));
+			}
 			Err(error) => {
 				return Err(MonochangeError::Discovery(format!(
 					"found a malformed monochange release record in commit {}: {}",

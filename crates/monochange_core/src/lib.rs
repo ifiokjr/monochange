@@ -3172,18 +3172,39 @@ pub enum ReleaseRecordError {
 	MissingJsonBlock,
 	#[error("release record is missing required `kind`")]
 	MissingKind,
-	#[error("release record is missing required `schemaVersion`")]
+	#[error("release record is missing required `v`")]
 	MissingSchemaVersion,
 	#[error("release record uses unsupported kind `{0}`")]
 	UnsupportedKind(String),
-	#[error("release record uses unsupported schemaVersion {0}")]
+	#[error("release record uses unsupported internal schemaVersion {0}")]
 	UnsupportedSchemaVersion(u64),
+	#[error("release record uses unsupported schema version `{0}`")]
+	UnsupportedSchemaVersionValue(String),
+	#[error("release record schema error: {0}")]
+	Schema(String),
 	#[error("release record json error: {0}")]
 	InvalidJson(#[from] serde_json::Error),
 }
 
 /// Result type used by release-record parsing and rendering helpers.
 pub type ReleaseRecordResult<T> = Result<T, ReleaseRecordError>;
+
+fn release_record_schema_error_to_error(
+	error: monochange_schema::SchemaError,
+) -> ReleaseRecordError {
+	match error {
+		monochange_schema::SchemaError::MissingKind => ReleaseRecordError::MissingKind,
+		monochange_schema::SchemaError::UnsupportedKind { actual, .. } => {
+			ReleaseRecordError::UnsupportedKind(actual)
+		}
+		monochange_schema::SchemaError::MissingVersion => ReleaseRecordError::MissingSchemaVersion,
+		monochange_schema::SchemaError::UnsupportedVersion { actual, .. }
+		| monochange_schema::SchemaError::InvalidVersion {
+			version: actual, ..
+		} => ReleaseRecordError::UnsupportedSchemaVersionValue(actual),
+		other => ReleaseRecordError::Schema(other.to_string()),
+	}
+}
 
 /// Render a `ReleaseRecord` into the reserved commit-message block format.
 #[must_use = "the rendered record result must be checked"]
@@ -3196,7 +3217,10 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 			record.schema_version,
 		));
 	}
-	let json = serde_json::to_string_pretty(record)?;
+	let raw = serde_json::to_value(record)?;
+	let current = monochange_schema::release_record::render_current_value(raw)
+		.map_err(release_record_schema_error_to_error)?;
+	let json = serde_json::to_string_pretty(&current)?;
 	Ok(format!(
 		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_START_MARKER}\n```json\n{json}\n```\n{RELEASE_RECORD_END_MARKER}"
 	))
@@ -3242,14 +3266,17 @@ pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<R
 	if kind != RELEASE_RECORD_KIND {
 		return Err(ReleaseRecordError::UnsupportedKind(kind.to_string()));
 	}
-	let schema_version = raw
-		.get("schemaVersion")
-		.and_then(serde_json::Value::as_u64)
-		.ok_or(ReleaseRecordError::MissingSchemaVersion)?;
-	if schema_version != RELEASE_RECORD_SCHEMA_VERSION {
-		return Err(ReleaseRecordError::UnsupportedSchemaVersion(schema_version));
-	}
-	serde_json::from_value(raw).map_err(ReleaseRecordError::InvalidJson)
+	let mut current = monochange_schema::release_record::migrate_value(raw)
+		.map_err(release_record_schema_error_to_error)?;
+	let object = current
+		.as_object_mut()
+		.expect("release record schema migration returns an object");
+	object.remove("v");
+	object.insert(
+		"schemaVersion".to_string(),
+		serde_json::Value::from(RELEASE_RECORD_SCHEMA_VERSION),
+	);
+	serde_json::from_value(current).map_err(ReleaseRecordError::InvalidJson)
 }
 
 fn extract_release_record_json(block_contents: &str) -> ReleaseRecordResult<String> {

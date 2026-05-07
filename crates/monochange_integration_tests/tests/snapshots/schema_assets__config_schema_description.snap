@@ -1,0 +1,5 @@
+---
+source: crates/monochange_integration_tests/tests/schema_assets.rs
+expression: "json_str(&config_schema, \"/description\")?"
+---
+JSON Schema for monochange.toml workspace configuration files.

@@ -1,0 +1,13 @@
+---
+source: crates/monochange_integration_tests/tests/schema_assets.rs
+expression: "json_array(&release_schema, \"/required\")?"
+---
+[
+  "v",
+  "kind",
+  "createdAt",
+  "command",
+  "releaseTargets",
+  "releasedPackages",
+  "changedFiles"
+]

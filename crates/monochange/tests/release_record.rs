@@ -151,7 +151,7 @@ fn release_record_command_reports_unsupported_schema_version() {
 <!-- monochange:release-record:start -->
 ```json
 {
-  "schemaVersion": 2,
+  "v": "0.2",
   "kind": "monochange.releaseRecord",
   "createdAt": "2026-04-07T08:00:00Z",
   "command": "release-pr",
