@@ -12,7 +12,8 @@ esac
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 schema_source="$repo_root/crates/monochange_schema/src/lib.rs"
-version="$(sed -n 's/^pub const CURRENT_SCHEMA_VERSION_TEXT: &str = "\([^"]*\)";$/\1/p' "$schema_source")"
+version_toml="$(grep '^version = ' "$repo_root/crates/monochange_schema/Cargo.toml" | head -1 | sed 's/.*"\([^"]*\)".*/\1/')"
+version="$(echo "$version_toml" | sed 's/\.[0-9]*$//')"
 kind="$(sed -n 's/^[[:space:]]*pub const KIND: &str = "\([^"]*\)";$/\1/p' "$schema_source")"
 
 if [[ -z "$version" ]]; then

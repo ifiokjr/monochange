@@ -1891,7 +1891,7 @@ fn render_release_record_block_writes_current_schema_v_header() {
 	let rendered = crate::render_release_record_block(&record)
 		.unwrap_or_else(|error| panic!("render release record: {error}"));
 
-	assert!(rendered.contains("\"v\": \"0.1\""));
+	assert!(rendered.contains("\"v\": \"0.0\""));
 	assert!(!rendered.contains("\"schemaVersion\""));
 }
 
@@ -1903,7 +1903,7 @@ fn parse_release_record_block_accepts_current_schema_v_header() {
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "v": "0.1",
+  "v": "0.0",
   "kind": "{RELEASE_RECORD_KIND}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2004,7 +2004,7 @@ fn parse_release_record_block_rejects_unsupported_kind() {
 {start}
 ```json
 {{
-  "v": "0.1",
+  "v": "0.0",
   "kind": "monochange.otherRecord",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2068,7 +2068,7 @@ fn parse_release_record_block_ignores_unknown_fields() {
 {start}
 ```json
 {{
-  "v": "0.1",
+  "v": "0.0",
   "kind": "{kind}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2178,7 +2178,7 @@ fn parse_release_record_block_rejects_missing_kind() {
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "v": "0.1",
+  "v": "0.0",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
   "releaseTargets": [],

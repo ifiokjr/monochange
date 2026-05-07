@@ -8,11 +8,8 @@ use serde::Serializer;
 use serde_json::Value;
 use thiserror::Error;
 
-/// Current durable public schema version text.
-///
-/// The crate starts at `0.0.0` so the first release can be planned explicitly,
-/// while durable artifacts already use the first public wire schema `0.1`.
-pub const CURRENT_SCHEMA_VERSION_TEXT: &str = "0.1";
+// Current durable public schema version text. Derived automatically from the crate package version (`major.minor`).
+include!(concat!(env!("OUT_DIR"), "/schema_version.rs"));
 
 /// A durable schema version written as `major.minor`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -106,7 +103,8 @@ pub fn current_schema_version() -> Result<SchemaVersion, SchemaVersionParseError
 }
 
 fn current_schema_version_for_error() -> SchemaVersion {
-	SchemaVersion::new(0, 1)
+	SchemaVersion::from_str(CURRENT_SCHEMA_VERSION_TEXT)
+		.unwrap_or_else(|error| panic!("current schema version text is valid: {error}"))
 }
 
 /// Errors while parsing `major.minor` schema versions.
@@ -255,7 +253,7 @@ pub mod release_record {
 
 	/// Validate a release-record JSON value against the current durable wire shape.
 	///
-	/// `0.1` is the first supported public schema version. Values without `v` or
+	/// `0.0` is the first supported public schema version. Values without `v` or
 	/// with any non-current `v` fail instead of taking a migration path.
 	pub fn migrate_value(mut value: Value) -> Result<Value, SchemaError> {
 		let object = object_mut(&mut value)?;
@@ -281,7 +279,7 @@ pub mod migration_changelog {
 
 	/// All known durable migration changelog entries.
 	///
-	/// `0.1` is the first public schema version, so the initial changelog is
+	/// `0.0` is the first public schema version, so the initial changelog is
 	/// intentionally empty. Future breaking changes add explicit edges here.
 	pub const ENTRIES: &[MigrationChangelogEntry] = &[];
 
@@ -416,22 +414,22 @@ mod tests {
 	#[test]
 	fn current_schema_version_is_independent_from_crate_version() {
 		assert_eq!(env!("CARGO_PKG_VERSION"), "0.0.0");
-		assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, "0.1");
+		assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, "0.0");
 		let current = current_schema_version()
 			.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
-		assert_eq!(current, SchemaVersion::new(0, 1));
+		assert_eq!(current, SchemaVersion::new(0, 0));
 		let from_package = SchemaVersion::from_package_version(env!("CARGO_PKG_VERSION"))
 			.unwrap_or_else(|error| panic!("parse package version: {error}"));
 		assert_eq!(from_package, SchemaVersion::new(0, 0));
 		let serialized = serde_json::to_value(current)
 			.unwrap_or_else(|error| panic!("serialize schema version: {error}"));
-		assert_eq!(serialized, json!("0.1"));
+		assert_eq!(serialized, json!("0.0"));
 	}
 
 	#[test]
 	fn release_record_accepts_current_schema_version() {
 		let migrated = release_record::migrate_value(json!({
-			"v": "0.1",
+			"v": "0.0",
 			"kind": release_record::KIND,
 			"createdAt": "2026-04-06T12:00:00Z",
 			"command": "release-pr",
@@ -441,7 +439,7 @@ mod tests {
 		}))
 		.unwrap_or_else(|error| panic!("validate release record: {error}"));
 
-		assert_eq!(migrated.get("v"), Some(&json!("0.1")));
+		assert_eq!(migrated.get("v"), Some(&json!("0.0")));
 	}
 
 	#[test]
@@ -537,7 +535,7 @@ mod tests {
 	#[test]
 	fn release_record_rejects_old_version_without_migration_edge() {
 		let error = release_record::migrate_value(json!({
-			"v": "0.0",
+			"v": "0.9",
 			"kind": release_record::KIND,
 			"createdAt": "2026-04-06T12:00:00Z",
 			"command": "release-pr",
@@ -549,14 +547,14 @@ mod tests {
 		.unwrap_or_else(|| panic!("expected unsupported old version error"));
 		assert!(matches!(
 			error,
-			SchemaError::UnsupportedVersion { actual, .. } if actual == "0.0"
+			SchemaError::UnsupportedVersion { actual, .. } if actual == "0.9"
 		));
 	}
 
 	#[test]
 	fn release_record_rejects_unsupported_kind() {
 		let error = release_record::migrate_value(json!({
-			"v": "0.1",
+			"v": "0.0",
 			"kind": "monochange.otherRecord",
 			"createdAt": "2026-04-06T12:00:00Z",
 			"command": "release-pr",
