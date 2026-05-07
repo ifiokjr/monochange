@@ -364,22 +364,22 @@ mod tests {
 
 		let events = read_events(&path);
 		assert_eq!(events.len(), 1);
-		let event = &events[0];
-		assert_eq!(event["body"]["string_value"], "command_run");
-		assert_eq!(event["resource"]["service.name"], "monochange");
-		assert_eq!(event["scope"]["name"], TELEMETRY_SCOPE_NAME);
-		assert_eq!(event["scope"]["version"], TELEMETRY_SCOPE_VERSION);
-		assert_eq!(event["severity_text"], "INFO");
-		assert!(event["time_unix_nano"].as_u64().is_some());
-		assert_eq!(event["attributes"]["command_name"], "validate");
-		assert_eq!(event["attributes"]["command_source"], "configured");
-		assert_eq!(event["attributes"]["dry_run"], false);
-		assert_eq!(event["attributes"]["show_diff"], false);
-		assert_eq!(event["attributes"]["progress_format"], "auto");
-		assert_eq!(event["attributes"]["step_count"], 1);
-		assert_eq!(event["attributes"]["duration_ms"], 42);
-		assert_eq!(event["attributes"]["outcome"], "success");
-		assert!(event["attributes"]["error_kind"].is_null());
+		let event = event_at(&events, 0);
+		assert_eq!(json_str(event, "/body/string_value"), "command_run");
+		assert_eq!(json_str(event, "/resource/service.name"), "monochange");
+		assert_eq!(json_str(event, "/scope/name"), TELEMETRY_SCOPE_NAME);
+		assert_eq!(json_str(event, "/scope/version"), TELEMETRY_SCOPE_VERSION);
+		assert_eq!(json_str(event, "/severity_text"), "INFO");
+		assert!(json_value(event, "/time_unix_nano").as_u64().is_some());
+		assert_eq!(json_str(event, "/attributes/command_name"), "validate");
+		assert_eq!(json_str(event, "/attributes/command_source"), "configured");
+		assert!(!json_bool(event, "/attributes/dry_run"));
+		assert!(!json_bool(event, "/attributes/show_diff"));
+		assert_eq!(json_str(event, "/attributes/progress_format"), "auto");
+		assert_eq!(json_u64(event, "/attributes/step_count"), 1);
+		assert_eq!(json_u64(event, "/attributes/duration_ms"), 42);
+		assert_eq!(json_str(event, "/attributes/outcome"), "success");
+		assert!(json_value(event, "/attributes/error_kind").is_null());
 	}
 
 	#[test]
@@ -417,15 +417,15 @@ mod tests {
 
 		let events = read_events(&state_home.join("monochange").join("telemetry.jsonl"));
 		assert_eq!(events.len(), 1);
-		let event = &events[0];
-		assert_eq!(event["body"]["string_value"], "command_step");
-		assert_eq!(event["attributes"]["command_name"], "step:validate");
-		assert_eq!(event["attributes"]["step_index"], 3);
-		assert_eq!(event["attributes"]["step_kind"], "Validate");
-		assert_eq!(event["attributes"]["skipped"], true);
-		assert_eq!(event["attributes"]["duration_ms"], 7);
-		assert_eq!(event["attributes"]["outcome"], "skipped");
-		assert_eq!(event["attributes"]["error_kind"], "config_error");
+		let event = event_at(&events, 0);
+		assert_eq!(json_str(event, "/body/string_value"), "command_step");
+		assert_eq!(json_str(event, "/attributes/command_name"), "step:validate");
+		assert_eq!(json_u64(event, "/attributes/step_index"), 3);
+		assert_eq!(json_str(event, "/attributes/step_kind"), "Validate");
+		assert!(json_bool(event, "/attributes/skipped"));
+		assert_eq!(json_u64(event, "/attributes/duration_ms"), 7);
+		assert_eq!(json_str(event, "/attributes/outcome"), "skipped");
+		assert_eq!(json_str(event, "/attributes/error_kind"), "config_error");
 		assert!(!event.to_string().contains("/tmp/repo"));
 	}
 
@@ -597,6 +597,47 @@ mod tests {
 			outcome: TelemetryOutcome::Success,
 			error: None,
 		}
+	}
+
+	fn event_at(events: &[serde_json::Value], index: usize) -> &serde_json::Value {
+		events
+			.get(index)
+			.unwrap_or_else(|| panic!("missing telemetry event {index}"))
+	}
+
+	fn json_value<'event>(
+		event: &'event serde_json::Value,
+		pointer: &str,
+	) -> &'event serde_json::Value {
+		event
+			.pointer(pointer)
+			.unwrap_or_else(|| panic!("missing json pointer {pointer} in {event}"))
+	}
+
+	fn json_str<'event>(event: &'event serde_json::Value, pointer: &str) -> &'event str {
+		json_value(event, pointer)
+			.as_str()
+			.unwrap_or_else(|| panic!("json pointer {pointer} is not a string in {event}"))
+	}
+
+	fn json_bool(event: &serde_json::Value, pointer: &str) -> bool {
+		json_value(event, pointer)
+			.as_bool()
+			.unwrap_or_else(|| panic!("json pointer {pointer} is not a bool in {event}"))
+	}
+
+	#[test]
+	#[should_panic(expected = "is not an unsigned integer")]
+	fn json_u64_reports_type_mismatches() {
+		let event = serde_json::json!({ "value": "not a number" });
+
+		let _ = json_u64(&event, "/value");
+	}
+
+	fn json_u64(event: &serde_json::Value, pointer: &str) -> u64 {
+		json_value(event, pointer).as_u64().unwrap_or_else(|| {
+			panic!("json pointer {pointer} is not an unsigned integer in {event}")
+		})
 	}
 
 	fn read_events(path: &Path) -> Vec<serde_json::Value> {

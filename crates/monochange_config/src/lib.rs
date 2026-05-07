@@ -3247,6 +3247,7 @@ fn source_capabilities(provider: SourceProvider) -> monochange_core::SourceCapab
 		SourceProvider::GitHub => monochange_github::source_capabilities(),
 		SourceProvider::GitLab => monochange_gitlab::source_capabilities(),
 		SourceProvider::Gitea => monochange_gitea::source_capabilities(),
+		SourceProvider::Forgejo => monochange_forgejo::source_capabilities(),
 	}
 }
 
@@ -3672,6 +3673,7 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 		SourceProvider::GitHub => monochange_github::validate_source_configuration(source),
 		SourceProvider::GitLab => monochange_gitlab::validate_source_configuration(source),
 		SourceProvider::Gitea => monochange_gitea::validate_source_configuration(source),
+		SourceProvider::Forgejo => monochange_forgejo::validate_source_configuration(source),
 	}
 }
 

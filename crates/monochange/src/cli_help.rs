@@ -220,7 +220,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			description: "Scans the workspace for supported package manifests (Cargo.toml, package.json, \
 				deno.json, pubspec.yaml) and generates a monochange.toml configuration file with \
 				discovered packages, version groups, and default CLI commands.\n\n\
-				Use --provider to scaffold source-control integration (GitHub, GitLab, Gitea) \
+				Use --provider to scaffold source-control integration (GitHub, GitLab, Gitea, Forgejo) \
 				with release automation CLI commands.",
 			usage: "mc init [OPTIONS]",
 			options: &[
@@ -560,7 +560,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			name: "release-pr",
 			summary: "Open or update a hosted release pull request",
 			description: "Opens (or updates an existing) pull request on the configured source host \
-				(GitHub, GitLab, Gitea) with the prepared release changes. Requires [source] \
+				(GitHub, GitLab, Gitea, Forgejo) with the prepared release changes. Requires [source] \
 				configuration in monochange.toml.",
 			usage: "mc release-pr [OPTIONS]",
 			options: &[

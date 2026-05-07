@@ -2045,6 +2045,7 @@ dependencies = [
  "monochange_core",
  "monochange_dart",
  "monochange_deno",
+ "monochange_forgejo",
  "monochange_gitea",
  "monochange_github",
  "monochange_gitlab",
@@ -2160,6 +2161,7 @@ dependencies = [
  "monochange_core",
  "monochange_dart",
  "monochange_deno",
+ "monochange_forgejo",
  "monochange_gitea",
  "monochange_github",
  "monochange_gitlab",
@@ -2247,6 +2249,26 @@ dependencies = [
  "oxc_ast",
  "oxc_parser",
  "oxc_span",
+]
+
+[[package]]
+name = "monochange_forgejo"
+version = "0.3.4"
+dependencies = [
+ "etest",
+ "httpmock",
+ "insta",
+ "monochange_core",
+ "monochange_hosting",
+ "monochange_test_helpers",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "urlencoding",
 ]
 
 [[package]]
@@ -2355,7 +2377,9 @@ version = "0.0.0"
 dependencies = [
  "insta",
  "insta-cmd",
+ "monochange_config",
  "monochange_core",
+ "monochange_forgejo",
  "monochange_schema",
  "monochange_test_helpers",
  "serde_json",

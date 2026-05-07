@@ -241,7 +241,14 @@ pub(crate) fn tag_url_for_provider(source: &SourceConfiguration, tag_name: &str)
 		SourceProvider::GitLab => gitlab_provider::tag_url(source, tag_name),
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::tag_url(source, tag_name),
-		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		#[cfg(feature = "forgejo")]
+		SourceProvider::Forgejo => forgejo_provider::tag_url(source, tag_name),
+		#[cfg(not(any(
+			feature = "github",
+			feature = "gitlab",
+			feature = "gitea",
+			feature = "forgejo"
+		)))]
 		_ => String::new(),
 	}
 }
@@ -259,7 +266,14 @@ pub(crate) fn compare_url_for_provider(
 		SourceProvider::GitLab => gitlab_provider::compare_url(source, previous_tag, current_tag),
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::compare_url(source, previous_tag, current_tag),
-		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		#[cfg(feature = "forgejo")]
+		SourceProvider::Forgejo => forgejo_provider::compare_url(source, previous_tag, current_tag),
+		#[cfg(not(any(
+			feature = "github",
+			feature = "gitlab",
+			feature = "gitea",
+			feature = "forgejo"
+		)))]
 		_ => String::new(),
 	}
 }
@@ -1200,7 +1214,14 @@ pub(crate) fn build_source_release_requests(
 		SourceProvider::GitLab => gitlab_provider::build_release_requests(source, manifest),
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::build_release_requests(source, manifest),
-		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		#[cfg(feature = "forgejo")]
+		SourceProvider::Forgejo => forgejo_provider::build_release_requests(source, manifest),
+		#[cfg(not(any(
+			feature = "github",
+			feature = "gitlab",
+			feature = "gitea",
+			feature = "forgejo"
+		)))]
 		_ => Vec::new(),
 	}
 }
@@ -1216,7 +1237,14 @@ pub(crate) fn build_source_change_request(
 		SourceProvider::GitLab => gitlab_provider::build_release_pull_request_request(source, manifest),
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::build_release_pull_request_request(source, manifest),
-		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		#[cfg(feature = "forgejo")]
+		SourceProvider::Forgejo => forgejo_provider::build_release_pull_request_request(source, manifest),
+		#[cfg(not(any(
+			feature = "github",
+			feature = "gitlab",
+			feature = "gitea",
+			feature = "forgejo"
+		)))]
 		_ => {
 			unreachable!(
 				"a hosting provider feature must be enabled to build source change requests"
@@ -1238,7 +1266,14 @@ pub(crate) fn publish_source_release_requests(
 		SourceProvider::GitLab => gitlab_provider::publish_release_requests(source, requests),
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => gitea_provider::publish_release_requests(source, requests),
-		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		#[cfg(feature = "forgejo")]
+		SourceProvider::Forgejo => forgejo_provider::publish_release_requests(source, requests),
+		#[cfg(not(any(
+			feature = "github",
+			feature = "gitlab",
+			feature = "gitea",
+			feature = "forgejo"
+		)))]
 		_ => Ok(Vec::new()),
 	}
 }
@@ -1281,7 +1316,22 @@ pub(crate) fn publish_source_change_request(
 				no_verify,
 			)
 		}
-		#[cfg(not(any(feature = "github", feature = "gitlab", feature = "gitea")))]
+		#[cfg(feature = "forgejo")]
+		SourceProvider::Forgejo => {
+			forgejo_provider::publish_release_pull_request(
+				source,
+				root,
+				request,
+				tracked_paths,
+				no_verify,
+			)
+		}
+		#[cfg(not(any(
+			feature = "github",
+			feature = "gitlab",
+			feature = "gitea",
+			feature = "forgejo"
+		)))]
 		_ => {
 			Err(MonochangeError::Config(
 				"no hosting provider feature enabled".to_string(),

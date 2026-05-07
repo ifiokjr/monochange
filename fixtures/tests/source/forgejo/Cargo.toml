@@ -1,0 +1,9 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+workflow-core = { path = "./crates/core", version = "1.0.0" }

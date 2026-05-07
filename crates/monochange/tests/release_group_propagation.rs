@@ -1,3 +1,5 @@
+#![allow(clippy::indexing_slicing)]
+
 use serde_json::Value;
 
 mod test_support;

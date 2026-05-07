@@ -20,6 +20,7 @@ monochange_cargo = { workspace = true }
 monochange_core = { workspace = true }
 monochange_dart = { workspace = true }
 monochange_deno = { workspace = true }
+monochange_forgejo = { workspace = true }
 monochange_gitea = { workspace = true }
 monochange_github = { workspace = true }
 monochange_gitlab = { workspace = true }

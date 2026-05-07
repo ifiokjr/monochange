@@ -45,11 +45,42 @@ fn public_api_writes_sanitized_command_and_step_jsonl_events() {
 
 	let events = read_jsonl_events(&telemetry_file);
 	assert_eq!(events.len(), 2);
-	assert_eq!(events[0]["body"]["string_value"], "command_step");
-	assert_eq!(events[0]["attributes"]["error_kind"], "config_error");
-	assert_eq!(events[1]["body"]["string_value"], "command_run");
-	assert_eq!(events[1]["attributes"]["dry_run"], true);
-	assert_eq!(events[1]["attributes"]["progress_format"], "auto");
+	let step_event = events
+		.first()
+		.unwrap_or_else(|| panic!("missing step telemetry event"));
+	let command_event = events
+		.get(1)
+		.unwrap_or_else(|| panic!("missing command telemetry event"));
+	assert_eq!(
+		step_event
+			.pointer("/body/string_value")
+			.and_then(Value::as_str),
+		Some("command_step")
+	);
+	assert_eq!(
+		step_event
+			.pointer("/attributes/error_kind")
+			.and_then(Value::as_str),
+		Some("config_error")
+	);
+	assert_eq!(
+		command_event
+			.pointer("/body/string_value")
+			.and_then(Value::as_str),
+		Some("command_run")
+	);
+	assert_eq!(
+		command_event
+			.pointer("/attributes/dry_run")
+			.and_then(Value::as_bool),
+		Some(true)
+	);
+	assert_eq!(
+		command_event
+			.pointer("/attributes/progress_format")
+			.and_then(Value::as_str),
+		Some("auto")
+	);
 
 	let rendered =
 		serde_json::to_string(&events).unwrap_or_else(|error| panic!("render json: {error}"));

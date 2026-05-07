@@ -2118,7 +2118,9 @@ mod workspace_ops_tests {
 		SourceConfiguration {
 			provider,
 			host: match provider {
-				SourceProvider::Gitea => Some("https://codeberg.org".to_string()),
+				SourceProvider::Gitea | SourceProvider::Forgejo => {
+					Some("https://codeberg.org".to_string())
+				}
 				SourceProvider::GitHub | SourceProvider::GitLab => None,
 			},
 			api_url: None,

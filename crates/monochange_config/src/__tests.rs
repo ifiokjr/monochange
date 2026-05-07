@@ -3535,6 +3535,8 @@ fn load_workspace_configuration_rejects_open_release_pull_request_without_source
 
 #[test]
 fn load_workspace_configuration_rejects_comment_released_issues_for_unsupported_provider() {
+	assert!(!crate::source_capabilities(SourceProvider::Forgejo).released_issue_comments);
+
 	let root_gitlab = fixture_path("config/rejects-comment-unsupported");
 	let error = load_workspace_configuration(&root_gitlab)
 		.err()

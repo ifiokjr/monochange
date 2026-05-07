@@ -1489,8 +1489,18 @@ fn hosting_provider_kind_as_str_and_display_cover_all_variants() {
 	assert_eq!(HostingProviderKind::GitHub.as_str(), "github");
 	assert_eq!(HostingProviderKind::GitLab.as_str(), "gitlab");
 	assert_eq!(HostingProviderKind::Gitea.as_str(), "gitea");
+	assert_eq!(HostingProviderKind::Forgejo.as_str(), "forgejo");
 	assert_eq!(HostingProviderKind::Bitbucket.as_str(), "bitbucket");
-	assert_eq!(HostingProviderKind::Gitea.to_string(), "gitea");
+	assert_eq!(HostingProviderKind::Forgejo.to_string(), "forgejo");
+}
+
+#[test]
+fn source_provider_as_str_and_display_cover_all_variants() {
+	assert_eq!(SourceProvider::GitHub.as_str(), "github");
+	assert_eq!(SourceProvider::GitLab.as_str(), "gitlab");
+	assert_eq!(SourceProvider::Gitea.as_str(), "gitea");
+	assert_eq!(SourceProvider::Forgejo.as_str(), "forgejo");
+	assert_eq!(SourceProvider::Forgejo.to_string(), "forgejo");
 }
 
 #[test]

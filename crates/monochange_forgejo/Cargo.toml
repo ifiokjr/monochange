@@ -1,0 +1,34 @@
+[package]
+name = "monochange_forgejo"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_forgejo"
+edition = { workspace = true }
+include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+keywords = ["forgejo", "releases", "versioning", "monorepo"]
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Forgejo release payload rendering and publishing for monochange"
+
+[dependencies]
+monochange_core = { workspace = true }
+monochange_hosting = { workspace = true }
+reqwest = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+tokio = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
+urlencoding = { workspace = true, default-features = true }
+
+[dev-dependencies]
+etest = { workspace = true, default-features = true }
+httpmock = { workspace = true, default-features = true }
+insta = { workspace = true, default-features = true }
+monochange_test_helpers = { workspace = true }
+temp-env = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

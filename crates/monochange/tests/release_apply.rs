@@ -1,3 +1,5 @@
+#![allow(clippy::indexing_slicing)]
+
 use std::fs;
 
 use serde_json::Value;

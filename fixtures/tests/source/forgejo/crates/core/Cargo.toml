@@ -1,0 +1,7 @@
+[package]
+name = "workflow-core"
+version = { workspace = true }
+edition = "2021"
+description = "Fixture package for forgejo provider integration tests"
+license = "MIT"
+repository = "https://codeberg.org/org/monochange"

@@ -10,7 +10,9 @@ description = "Internal integration tests for monochange crates"
 [dev-dependencies]
 insta = { workspace = true, features = ["redactions"] }
 insta-cmd = { workspace = true }
+monochange_config = { workspace = true }
 monochange_core = { workspace = true }
+monochange_forgejo = { workspace = true }
 monochange_schema = { workspace = true }
 monochange_test_helpers = { workspace = true }
 serde_json = { workspace = true }
