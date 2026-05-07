@@ -29,6 +29,7 @@ in
       python3
       rustup
       shfmt
+      taplo
       unzip
       zip
     ]
