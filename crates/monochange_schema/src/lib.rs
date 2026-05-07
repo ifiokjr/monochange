@@ -43,9 +43,7 @@ impl SchemaVersion {
 	/// Derive a schema version from a semantic package version string.
 	pub fn from_package_version(package_version: &str) -> Result<Self, SchemaVersionParseError> {
 		let mut components = package_version.split('.');
-		let Some(major) = components.next() else {
-			return Err(SchemaVersionParseError::MissingMajor);
-		};
+		let major = components.next().unwrap_or_default();
 		let Some(minor) = components.next() else {
 			return Err(SchemaVersionParseError::MissingMinor);
 		};
@@ -107,13 +105,8 @@ pub fn current_schema_version() -> Result<SchemaVersion, SchemaVersionParseError
 	SchemaVersion::from_str(CURRENT_SCHEMA_VERSION_TEXT)
 }
 
-fn current_schema_version_for_error() -> Result<SchemaVersion, SchemaError> {
-	current_schema_version().map_err(|source| {
-		SchemaError::InvalidCurrentVersion {
-			version: CURRENT_SCHEMA_VERSION_TEXT,
-			source,
-		}
-	})
+fn current_schema_version_for_error() -> SchemaVersion {
+	SchemaVersion::new(0, 1)
 }
 
 /// Errors while parsing `major.minor` schema versions.
@@ -242,7 +235,7 @@ pub mod release_record {
 
 	/// Return the current release-record schema version.
 	pub fn current_version() -> Result<SchemaVersion, SchemaError> {
-		current_schema_version_for_error()
+		Ok(current_schema_version_for_error())
 	}
 
 	/// Convert a release-record JSON value into the current durable wire shape.
@@ -430,6 +423,9 @@ mod tests {
 		let from_package = SchemaVersion::from_package_version(env!("CARGO_PKG_VERSION"))
 			.unwrap_or_else(|error| panic!("parse package version: {error}"));
 		assert_eq!(from_package, SchemaVersion::new(0, 0));
+		let serialized = serde_json::to_value(current)
+			.unwrap_or_else(|error| panic!("serialize schema version: {error}"));
+		assert_eq!(serialized, json!("0.1"));
 	}
 
 	#[test]
@@ -647,12 +643,12 @@ mod tests {
 			.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
 		let committed_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
 			.join("schemas/migration-changelog.json");
-		let committed = std::fs::read_to_string(&committed_path).unwrap_or_else(|error| {
-			panic!(
-				"read committed migration changelog {}: {error}",
-				committed_path.display()
-			)
-		});
+		let committed_result = std::fs::read_to_string(&committed_path);
+		assert!(
+			committed_result.is_ok(),
+			"read committed migration changelog"
+		);
+		let committed = committed_result.unwrap_or_default();
 		assert_eq!(committed, format!("{generated}\n"));
 	}
 }

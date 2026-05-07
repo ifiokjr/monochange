@@ -2219,6 +2219,61 @@ fn parse_release_record_block_rejects_missing_schema_version() {
 }
 
 #[test]
+fn release_record_schema_errors_map_to_core_errors() {
+	let missing_kind =
+		crate::release_record_schema_error_to_error(monochange_schema::SchemaError::MissingKind);
+	assert!(matches!(missing_kind, ReleaseRecordError::MissingKind));
+
+	let unsupported_kind = crate::release_record_schema_error_to_error(
+		monochange_schema::SchemaError::UnsupportedKind {
+			expected: monochange_schema::release_record::KIND,
+			actual: "other.record".to_string(),
+		},
+	);
+	assert!(matches!(
+		unsupported_kind,
+		ReleaseRecordError::UnsupportedKind(kind) if kind == "other.record"
+	));
+
+	let missing_version =
+		crate::release_record_schema_error_to_error(monochange_schema::SchemaError::MissingVersion);
+	assert!(matches!(
+		missing_version,
+		ReleaseRecordError::MissingSchemaVersion
+	));
+
+	let unsupported_version = crate::release_record_schema_error_to_error(
+		monochange_schema::SchemaError::UnsupportedVersion {
+			actual: "0.2".to_string(),
+			current: monochange_schema::SchemaVersion::new(0, 1),
+		},
+	);
+	assert!(matches!(
+		unsupported_version,
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "0.2"
+	));
+
+	let invalid_version = crate::release_record_schema_error_to_error(
+		monochange_schema::SchemaError::InvalidVersion {
+			version: "soon".to_string(),
+			source: monochange_schema::SchemaVersionParseError::MissingSeparator,
+		},
+	);
+	assert!(matches!(
+		invalid_version,
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "soon"
+	));
+
+	let fallback = crate::release_record_schema_error_to_error(
+		monochange_schema::SchemaError::InvalidCurrentVersion {
+			version: "bad",
+			source: monochange_schema::SchemaVersionParseError::MissingSeparator,
+		},
+	);
+	assert!(matches!(fallback, ReleaseRecordError::Schema(message) if message.contains("bad")));
+}
+
+#[test]
 fn parse_release_record_block_rejects_end_marker_before_start_marker() {
 	let malformed = format!(
 		"{RELEASE_RECORD_HEADING}\n\n{RELEASE_RECORD_END_MARKER}\n{RELEASE_RECORD_START_MARKER}\n```json\n{{}}\n```"

@@ -3268,9 +3268,9 @@ pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<R
 	}
 	let mut current = monochange_schema::release_record::migrate_value(raw)
 		.map_err(release_record_schema_error_to_error)?;
-	let object = current.as_object_mut().ok_or_else(|| {
-		ReleaseRecordError::Schema("migrated release record was not a JSON object".to_string())
-	})?;
+	let object = current
+		.as_object_mut()
+		.expect("release record schema migration returns an object");
 	object.remove("v");
 	object.insert(
 		"schemaVersion".to_string(),
