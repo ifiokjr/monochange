@@ -188,8 +188,6 @@ pub(crate) fn build_changelog_updates(
 			context.packages,
 			&planned_version.to_string(),
 		);
-		let changed_members =
-			group_changed_members(planned_group, &release_note_changes, context.packages);
 		let changelog_title = context
 			.release_targets
 			.iter()
@@ -201,7 +199,7 @@ pub(crate) fn build_changelog_updates(
 		let document = build_release_notes_document(
 			&planned_group.group_id,
 			&changelog_title,
-			group_release_summary(&planned_group.group_id, &member_ids, &changed_members),
+			group_release_summary(&planned_group.group_id),
 			&context.configuration.changelog,
 			&changes,
 		);
@@ -1010,58 +1008,8 @@ fn aggregate_group_release_note_changes(changes: Vec<ReleaseNoteChange>) -> Vec<
 	aggregated
 }
 
-fn group_changed_members(
-	planned_group: &monochange_core::PlannedVersionGroup,
-	release_note_changes: &BTreeMap<String, Vec<ReleaseNoteChange>>,
-	packages: &[PackageRecord],
-) -> BTreeSet<String> {
-	planned_group
-		.members
-		.iter()
-		.filter(|member_id| {
-			release_note_changes
-				.get(*member_id)
-				.is_some_and(|changes| !changes.is_empty())
-		})
-		.filter_map(|member_id| {
-			packages
-				.iter()
-				.find(|package| package.id == *member_id)
-				.map(config_package_id)
-		})
-		.collect()
-}
-
-fn group_release_summary(
-	group_name: &str,
-	members: &[String],
-	changed_members: &BTreeSet<String>,
-) -> Vec<String> {
-	let mut summary = vec![format!("Grouped release for `{group_name}`.")];
-	if members.is_empty() {
-		return summary;
-	}
-	if changed_members.is_empty() {
-		summary.push(format!("Members: {}", members.join(", ")));
-		return summary;
-	}
-	let changed = members
-		.iter()
-		.filter(|member| changed_members.contains(member.as_str()))
-		.cloned()
-		.collect::<Vec<_>>();
-	let synchronized = members
-		.iter()
-		.filter(|member| !changed_members.contains(member.as_str()))
-		.cloned()
-		.collect::<Vec<_>>();
-	if !changed.is_empty() {
-		summary.push(format!("Changed members: {}", changed.join(", ")));
-	}
-	if !synchronized.is_empty() {
-		summary.push(format!("Synchronized members: {}", synchronized.join(", ")));
-	}
-	summary
+fn group_release_summary(group_name: &str) -> Vec<String> {
+	vec![format!("Grouped release for `{group_name}`.")]
 }
 
 fn build_release_notes_document(
@@ -2362,40 +2310,8 @@ mod tests {
 		);
 
 		assert_eq!(
-			group_release_summary("sdk", &[], &BTreeSet::new()),
+			group_release_summary("sdk"),
 			vec!["Grouped release for `sdk`.".to_string()]
-		);
-		assert_eq!(
-			group_release_summary(
-				"sdk",
-				&["pkg-a".to_string(), "pkg-b".to_string()],
-				&BTreeSet::new(),
-			),
-			vec![
-				"Grouped release for `sdk`.".to_string(),
-				"Members: pkg-a, pkg-b".to_string()
-			]
-		);
-		assert_eq!(
-			group_release_summary(
-				"sdk",
-				&["pkg-a".to_string(), "pkg-b".to_string()],
-				&BTreeSet::from(["pkg-a".to_string()]),
-			),
-			vec![
-				"Grouped release for `sdk`.".to_string(),
-				"Changed members: pkg-a".to_string(),
-				"Synchronized members: pkg-b".to_string()
-			]
-		);
-
-		assert_eq!(
-			group_changed_members(
-				&group,
-				&BTreeMap::from([(package_a.id.clone(), vec![direct_change])]),
-				&[package_a.clone(), package_b.clone()],
-			),
-			BTreeSet::from(["pkg-a".to_string()])
 		);
 		assert_eq!(
 			render_group_filtered_update_message("sdk"),

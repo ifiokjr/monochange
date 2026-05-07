@@ -24,16 +24,14 @@ expression: json
           }
         ],
         "summary": [
-          "Grouped release for `sdk`.",
-          "Changed members: core",
-          "Synchronized members: app"
+          "Grouped release for `sdk`."
         ],
         "title": "1.1.0 ([DATE])"
       },
       "ownerId": "sdk",
       "ownerKind": "group",
       "path": "changelog.md",
-      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Features\n\n- **core**: add core feature"
+      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\n### Features\n\n- **core**: add core feature"
     },
     {
       "format": "monochange",

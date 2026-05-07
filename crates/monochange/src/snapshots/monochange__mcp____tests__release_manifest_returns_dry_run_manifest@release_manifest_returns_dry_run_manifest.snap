@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/src/mcp.rs
+assertion_line: 1437
 expression: content_text(&result)
 ---
 {
@@ -29,16 +30,14 @@ expression: content_text(&result)
             }
           ],
           "summary": [
-            "Grouped release for `sdk`.",
-            "Changed members: core",
-            "Synchronized members: app"
+            "Grouped release for `sdk`."
           ],
           "title": "1.1.0 ([DATE])"
         },
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add release command"
+        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add release command"
       },
       {
         "format": "monochange",

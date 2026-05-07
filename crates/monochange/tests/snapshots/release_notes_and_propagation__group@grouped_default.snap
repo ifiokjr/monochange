@@ -9,10 +9,6 @@ expression: group_changelog
 
 Grouped release for `sdk`.
 
-Changed members: core
-
-Synchronized members: app
-
 ### Minor
 
 > [!NOTE]

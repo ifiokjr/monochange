@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 431
 info:
   program: mc
   args:
@@ -23,7 +24,7 @@ exit_code: 0
       "path": "Cargo.toml"
     },
     {
-      "diff": "--- a/changelog.md\n+++ b/changelog.md\n@@ -1 +1,16 @@\n # Changelog\n+\n+## 1.1.0 ([DATE])\n+\n+Grouped release for `sdk`.\n+\n+Changed members: core\n+\n+Synchronized members: app\n+\n+### Minor\n+\n+> [!NOTE]\n+> *core*\n+\n+#### add feature",
+      "diff": "--- a/changelog.md\n+++ b/changelog.md\n@@ -1 +1,12 @@\n # Changelog\n+\n+## 1.1.0 ([DATE])\n+\n+Grouped release for `sdk`.\n+\n+### Minor\n+\n+> [!NOTE]\n+> *core*\n+\n+#### add feature",
       "path": "changelog.md"
     },
     {
@@ -59,16 +60,14 @@ exit_code: 0
             }
           ],
           "summary": [
-            "Grouped release for `sdk`.",
-            "Changed members: core",
-            "Synchronized members: app"
+            "Grouped release for `sdk`."
           ],
           "title": "1.1.0 ([DATE])"
         },
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
+        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
       },
       {
         "format": "monochange",

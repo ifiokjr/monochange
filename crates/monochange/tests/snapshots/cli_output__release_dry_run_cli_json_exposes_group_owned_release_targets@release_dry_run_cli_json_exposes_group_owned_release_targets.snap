@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 334
 info:
   program: mc
   args:
@@ -58,9 +59,7 @@ exit_code: 0
       "notes": {
         "title": "1.1.0 ([DATE])",
         "summary": [
-          "Grouped release for `sdk`.",
-          "Changed members: core",
-          "Synchronized members: app"
+          "Grouped release for `sdk`."
         ],
         "sections": [
           {
@@ -72,7 +71,7 @@ exit_code: 0
           }
         ]
       },
-      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\nChanged members: core\n\nSynchronized members: app\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
+      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
     },
     {
       "ownerId": "core",
