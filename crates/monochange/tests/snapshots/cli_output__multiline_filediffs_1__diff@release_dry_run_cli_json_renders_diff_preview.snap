@@ -1,0 +1,19 @@
+---
+source: crates/monochange/tests/cli_output.rs
+expression: contents
+---
+--- a/changelog.md
++++ b/changelog.md
+@@ -1 +1,12 @@
+ # Changelog
++
++## 1.1.0 ([DATE])
++
++Grouped release for `sdk`.
++
++### Minor
++
++> [!NOTE]
++> *core*
++
++#### add feature

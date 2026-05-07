@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/pre_stable_versioning.rs
-assertion_line: 41
 expression: "String::from_utf8_lossy(&output.stdout)"
 ---
 command `release` completed (dry-run)

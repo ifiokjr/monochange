@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/release_notes_and_propagation.rs
-assertion_line: 50
 expression: app_changelog
 ---
 # Changelog

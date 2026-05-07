@@ -1,0 +1,22 @@
+---
+source: crates/monochange/tests/cli_step_input_overrides.rs
+expression: contents
+---
+## Prepared release
+
+- command: `release-pr`
+- package `core` -> `core/v1.1.0`
+
+## Release notes
+
+### core 1.1.0
+
+### Minor
+
+#### add github fixture coverage
+
+## Changed files
+
+- Cargo.toml
+- crates/core/CHANGELOG.md
+- crates/core/Cargo.toml

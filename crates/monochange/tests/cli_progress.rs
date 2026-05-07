@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use insta::assert_json_snapshot;
 use insta::assert_snapshot;
 use regex::Regex;
 use serde_json::Value;
 
 mod test_support;
 use test_support::TtyAction;
+use test_support::assert_readable_json_snapshot;
 use test_support::current_test_name;
 use test_support::monochange_command;
 use test_support::run_in_tty;
@@ -296,7 +296,7 @@ fn json_progress_emits_structured_events_for_machine_consumers() {
 
 	let stderr = String::from_utf8(output.stderr)
 		.unwrap_or_else(|error| panic!("json stderr utf8: {error}"));
-	assert_json_snapshot!(normalized_progress_events(&stderr));
+	assert_readable_json_snapshot!(normalized_progress_events(&stderr));
 }
 
 #[test]

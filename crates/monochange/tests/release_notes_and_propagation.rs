@@ -1,11 +1,11 @@
 use std::fs;
 
-use insta::assert_json_snapshot;
 use insta::assert_snapshot;
 use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::current_test_name;
 use test_support::monochange_command;
 use test_support::setup_scenario_workspace;
@@ -84,7 +84,7 @@ fn ungrouped_transitive_bump_with_parent_bump_minor_escalates_dependent_version(
 		.find(|decision| decision["package"].as_str() == Some("cargo:crates/app/Cargo.toml"))
 		.unwrap_or_else(|| panic!("expected app decision"));
 
-	assert_json_snapshot!(app_decision);
+	assert_readable_json_snapshot!(app_decision);
 }
 
 #[test]

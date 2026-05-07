@@ -1,6 +1,5 @@
 ---
 source: crates/monochange_github/src/__tests.rs
-assertion_line: 556
 expression: request.body
 ---
 ## Prepared release

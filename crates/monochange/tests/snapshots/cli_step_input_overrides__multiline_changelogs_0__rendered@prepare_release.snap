@@ -1,0 +1,14 @@
+---
+source: crates/monochange/tests/cli_step_input_overrides.rs
+expression: contents
+---
+## 1.1.0 ([DATE])
+
+Grouped release for `sdk`.
+
+### Minor
+
+> [!NOTE]
+> *core*
+
+#### add core feature

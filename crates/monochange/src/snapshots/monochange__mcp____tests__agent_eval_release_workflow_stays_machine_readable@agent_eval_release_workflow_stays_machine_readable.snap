@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/src/mcp.rs
-expression: "serde_json::to_string_pretty(&eval).unwrap_or_else(|error|\n{ panic!(\"serialize agent eval snapshot: {error}\") })"
+expression: redacted
 ---
 {
   "diagnostics": {

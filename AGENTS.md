@@ -10,6 +10,8 @@
 - Quality/typecheck: `lint:all`
 - Validation: `mc validate`
 - New integration tests must live in `crates/monochange_integration_tests`, use file fixtures instead of dynamically generated fixtures, and use Insta snapshots for integration output assertions.
+- Snapshot readability: JSON snapshots must not embed multiline strings with escaped `\n` sequences. Redact multiline JSON fields as `"[multiline text]"` and add separate string snapshots for the multiline contents.
+- Snapshot relevance: `test:cargo` and CI reject unreferenced `.snap` files. Use `snapshot:update` to regenerate snapshots and delete unreferenced snapshot files.
 
 ## Naming convention
 

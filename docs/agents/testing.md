@@ -27,6 +27,8 @@
 - For Rust tests, prefer built-in snapshot generation via `insta::assert_snapshot!`, `insta::assert_json_snapshot!`, or `insta_cmd::assert_cmd_snapshot!` instead of maintaining parallel hand-authored `expected` files.
 - Treat `String::contains(...)` assertions on rendered output as a code smell. When the output matters enough to assert, snapshot the full rendered value instead of checking a few substrings.
 - Prefer **insta redactions** over **insta filters** when stabilizing dynamic output. Redactions preserve the structural assertion while replacing environment-, time-, or input-dependent fields with stable placeholders.
+- Keep JSON snapshots readable: do not leave multiline string fields embedded as escaped `\n` sequences inside snapshotted JSON objects. Redact the JSON field (for example, `"[multiline text]"`) and add a separate string snapshot for the multiline contents.
+- Keep checked-in snapshots relevant. `test:cargo` and CI reject unreferenced `.snap` files; use `snapshot:update` to regenerate snapshots and delete unreferenced snapshot files.
 - Use filters only when the snapshot target is effectively unstructured text and selector-based redactions are not practical.
 - When using `rstest`, give each parametrized case a stable snapshot suffix so every case gets its own external snapshot file.
 - If a test can be expressed as “copy scenario workspace, run command, snapshot the output”, prefer that pattern over large in-test `assert_eq!` trees.

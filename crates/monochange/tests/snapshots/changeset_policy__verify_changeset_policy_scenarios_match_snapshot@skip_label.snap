@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/changeset_policy.rs
-expression: json
+expression: redacted
 ---
 {
   "affectedPackageIds": [

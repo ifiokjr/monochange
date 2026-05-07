@@ -1,12 +1,12 @@
 use std::ffi::OsString;
 use std::path::Path;
 
-use insta::assert_json_snapshot;
 use monochange_test_helpers::git;
 use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::copy_directory;
 use test_support::current_test_name;
 use test_support::fixture_path;
@@ -108,7 +108,7 @@ fn affected_scenarios_match_snapshot(#[case] fixture: &str, #[case] args: &[&str
 	let _guard = settings.bind_to_scope();
 
 	let output = run_affected_json(&fixture_path(fixture), args);
-	assert_json_snapshot!(output);
+	assert_readable_json_snapshot!(output);
 }
 
 #[test]
@@ -172,7 +172,7 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 	copy_directory(&fixture_path("affected/since-changed-source"), root);
 
 	let json = run_affected_json(root, &["--from", "HEAD"]);
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -193,7 +193,7 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 	copy_directory(&fixture_path("affected/since-changed-with-changeset"), root);
 
 	let json = run_affected_json(root, &["--from", "HEAD"]);
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]

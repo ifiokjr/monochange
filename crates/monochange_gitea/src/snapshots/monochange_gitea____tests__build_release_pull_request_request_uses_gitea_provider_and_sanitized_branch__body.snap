@@ -1,6 +1,5 @@
 ---
 source: crates/monochange_gitea/src/__tests.rs
-assertion_line: 85
 expression: request.body
 ---
 ## Prepared release

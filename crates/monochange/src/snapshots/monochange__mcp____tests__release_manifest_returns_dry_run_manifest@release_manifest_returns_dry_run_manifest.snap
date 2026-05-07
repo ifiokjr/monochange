@@ -1,7 +1,6 @@
 ---
 source: crates/monochange/src/mcp.rs
-assertion_line: 1437
-expression: content_text(&result)
+expression: redacted
 ---
 {
   "action": "release_manifest",
@@ -24,7 +23,7 @@ expression: content_text(&result)
             {
               "collapsed": false,
               "entries": [
-                "> [!NOTE]\n> *core*\n\n#### add release command"
+                "[multiline text]"
               ],
               "title": "Minor"
             }
@@ -37,7 +36,7 @@ expression: content_text(&result)
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add release command"
+        "rendered": "[multiline text]"
       },
       {
         "format": "monochange",
@@ -57,7 +56,7 @@ expression: content_text(&result)
         "ownerId": "app",
         "ownerKind": "package",
         "path": "crates/app/changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\n### Changed\n\n- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`."
+        "rendered": "[multiline text]"
       },
       {
         "format": "monochange",
@@ -77,7 +76,7 @@ expression: content_text(&result)
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/changelog.md",
-        "rendered": "## 1.1.0 ([DATE])\n\n### Minor\n\n#### add release command"
+        "rendered": "[multiline text]"
       }
     ],
     "changesets": [

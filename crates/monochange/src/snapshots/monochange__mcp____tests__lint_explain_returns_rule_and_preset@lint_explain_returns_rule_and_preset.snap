@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/src/mcp.rs
-expression: "serde_json::to_string_pretty(&combined).unwrap_or_else(|error|\n{ panic!(\"serialize combined lint explanation snapshot: {error}\") })"
+expression: redacted
 ---
 {
   "preset": {

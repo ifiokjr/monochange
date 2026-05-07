@@ -48,6 +48,73 @@ use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 
+#[allow(unused_macro_rules)]
+macro_rules! assert_readable_json_snapshot {
+	($value:expr) => {{
+		let (redacted, multiline_fields) = redact_multiline_strings(&$value);
+		insta::assert_json_snapshot!(redacted);
+		for (path, contents) in multiline_fields {
+			insta::assert_snapshot!(format!("multiline_{}", snapshot_path_slug(&path)), contents);
+		}
+	}};
+	($name:expr, $value:expr) => {{
+		let (redacted, multiline_fields) = redact_multiline_strings(&$value);
+		insta::assert_json_snapshot!($name, redacted);
+		for (path, contents) in multiline_fields {
+			insta::assert_snapshot!(
+				format!("{}_multiline_{}", $name, snapshot_path_slug(&path)),
+				contents
+			);
+		}
+	}};
+}
+
+fn redact_multiline_strings(
+	value: &serde_json::Value,
+) -> (serde_json::Value, Vec<(String, String)>) {
+	let mut redacted = value.clone();
+	let mut multiline_fields = Vec::new();
+	redact_multiline_strings_at(&mut redacted, "$", &mut multiline_fields);
+	(redacted, multiline_fields)
+}
+
+fn snapshot_path_slug(path: &str) -> String {
+	path.chars()
+		.map(|character| {
+			match character {
+				'a'..='z' | 'A'..='Z' | '0'..='9' => character.to_ascii_lowercase(),
+				_ => '_',
+			}
+		})
+		.collect::<String>()
+		.trim_matches('_')
+		.to_owned()
+}
+
+fn redact_multiline_strings_at(
+	value: &mut serde_json::Value,
+	path: &str,
+	multiline_fields: &mut Vec<(String, String)>,
+) {
+	match value {
+		serde_json::Value::String(contents) if contents.contains('\n') => {
+			multiline_fields.push((path.to_owned(), contents.clone()));
+			*contents = "[multiline text]".to_owned();
+		}
+		serde_json::Value::Array(items) => {
+			for (index, item) in items.iter_mut().enumerate() {
+				redact_multiline_strings_at(item, &format!("{path}[{index}]"), multiline_fields);
+			}
+		}
+		serde_json::Value::Object(fields) => {
+			for (key, field) in fields {
+				redact_multiline_strings_at(field, &format!("{path}.{key}"), multiline_fields);
+			}
+		}
+		_ => {}
+	}
+}
+
 fn fixture_path(relative: &str) -> PathBuf {
 	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
 }
@@ -745,7 +812,7 @@ fn subagents_command_supports_dry_run_json_output() {
 	let value: serde_json::Value =
 		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
 
-	insta::assert_json_snapshot!(value);
+	assert_readable_json_snapshot!("subagents_dry_run", value);
 }
 
 #[test]
@@ -769,7 +836,7 @@ fn subagents_command_supports_no_mcp_dry_run_json_output() {
 	let value: serde_json::Value =
 		serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"));
 
-	insta::assert_json_snapshot!(value);
+	assert_readable_json_snapshot!("subagents_no_mcp_dry_run", value);
 }
 
 #[test]
@@ -821,7 +888,7 @@ fn subagents_command_writes_expected_files_and_reports_skips_on_repeat_runs() {
 	let repeat_value: serde_json::Value = serde_json::from_str(&repeat_output)
 		.unwrap_or_else(|error| panic!("parse repeat json: {error}"));
 
-	insta::assert_json_snapshot!("subagents_repeat_dry_run", repeat_value);
+	assert_readable_json_snapshot!("subagents_repeat_dry_run", repeat_value);
 }
 
 #[test]

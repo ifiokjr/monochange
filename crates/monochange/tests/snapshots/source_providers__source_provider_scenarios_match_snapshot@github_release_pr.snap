@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/source_providers.rs
-expression: json
+expression: redacted
 ---
 {
   "issueComments": [],
@@ -29,7 +29,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Minor\n\n#### add github fixture coverage"
+        "rendered": "[multiline text]"
       }
     ],
     "changesets": [
@@ -130,9 +130,9 @@ expression: json
   "releaseRequest": {
     "autoMerge": true,
     "baseBranch": "main",
-    "body": "## Prepared release\n\n- command: `release-pr`\n- package `core` -> `core/v1.1.0`\n\n## Release notes\n\n### core 1.1.0\n\n### Minor\n\n#### add github fixture coverage\n\n## Changed files\n\n- Cargo.toml\n- crates/core/CHANGELOG.md\n- crates/core/Cargo.toml",
+    "body": "[multiline text]",
     "commitMessage": {
-      "body": "Prepare release.\n\n- release targets: core (1.1.0)\n- released packages: workflow-core\n- updated changelogs: crates/core/CHANGELOG.md\n\n## monochange Release Record\n\n<!-- monochange:release-record:start -->\n```json\n{\n  \"changedFiles\": [\n    \"Cargo.toml\",\n    \"crates/core/CHANGELOG.md\",\n    \"crates/core/Cargo.toml\"\n  ],\n  \"changelogs\": [\n    {\n      \"format\": \"monochange\",\n      \"notes\": {\n        \"sections\": [\n          {\n            \"collapsed\": false,\n            \"entries\": [\n              \"#### add github fixture coverage\"\n            ],\n            \"title\": \"Minor\"\n          }\n        ],\n        \"summary\": [],\n        \"title\": \"core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\"\n      },\n      \"ownerId\": \"core\",\n      \"ownerKind\": \"package\",\n      \"path\": \"crates/core/CHANGELOG.md\",\n      \"rendered\": \"## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\\n\\n### Minor\\n\\n#### add github fixture coverage\"\n    }\n  ],\n  \"changesets\": [\n    {\n      \"context\": {\n        \"capabilities\": {\n          \"actorProfiles\": true,\n          \"commitWebUrls\": true,\n          \"issueComments\": true,\n          \"relatedIssues\": true,\n          \"reviewRequestLookup\": true\n        },\n        \"host\": \"github.com\",\n        \"introduced\": null,\n        \"lastUpdated\": null,\n        \"provider\": \"github\",\n        \"relatedIssues\": []\n      },\n      \"details\": null,\n      \"path\": \".changeset/feature.md\",\n      \"summary\": \"add github fixture coverage\",\n      \"targets\": [\n        {\n          \"bump\": \"minor\",\n          \"changeType\": \"minor\",\n          \"evidenceRefs\": [],\n          \"id\": \"core\",\n          \"kind\": \"package\",\n          \"origin\": \"direct-change\"\n        }\n      ]\n    }\n  ],\n  \"command\": \"release-pr\",\n  \"createdAt\": \"[DATETIME]Z\",\n  \"deletedChangesets\": [],\n  \"groupVersion\": null,\n  \"kind\": \"monochange.releaseRecord\",\n  \"packagePublications\": [\n    {\n      \"ecosystem\": \"cargo\",\n      \"mode\": \"builtin\",\n      \"package\": \"core\",\n      \"registry\": \"crates_io\",\n      \"trustedPublishing\": {\n        \"enabled\": true,\n        \"environment\": null,\n        \"repository\": null,\n        \"workflow\": null\n      },\n      \"version\": \"1.1.0\"\n    }\n  ],\n  \"provider\": {\n    \"host\": null,\n    \"kind\": \"github\",\n    \"owner\": \"ifiokjr\",\n    \"repo\": \"monochange\"\n  },\n  \"releaseTargets\": [\n    {\n      \"id\": \"core\",\n      \"kind\": \"package\",\n      \"members\": [\n        \"core\"\n      ],\n      \"release\": true,\n      \"tag\": true,\n      \"tagName\": \"core/v1.1.0\",\n      \"version\": \"1.1.0\",\n      \"versionFormat\": \"namespaced\"\n    }\n  ],\n  \"releasedPackages\": [\n    \"workflow-core\"\n  ],\n  \"updatedChangelogs\": [\n    \"crates/core/CHANGELOG.md\"\n  ],\n  \"v\": \"0.0\",\n  \"version\": \"1.1.0\"\n}\n```\n<!-- monochange:release-record:end -->",
+      "body": "[multiline text]",
       "subject": "chore(release): prepare release"
     },
     "headBranch": "monochange/release/release-pr",

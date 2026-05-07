@@ -1,0 +1,7 @@
+---
+source: crates/monochange/tests/github_releases.rs
+expression: contents
+---
+#### rotate signing keys (core patch)
+
+Roll the signing key before the release window closes.

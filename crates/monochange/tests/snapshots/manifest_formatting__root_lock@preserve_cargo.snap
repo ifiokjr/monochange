@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/manifest_formatting.rs
-assertion_line: 42
 expression: root_lock
 ---
 version = 4

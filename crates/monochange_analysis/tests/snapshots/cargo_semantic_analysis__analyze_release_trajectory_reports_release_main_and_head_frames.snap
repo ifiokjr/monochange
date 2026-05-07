@@ -1,6 +1,5 @@
 ---
 source: crates/monochange_analysis/tests/cargo_semantic_analysis.rs
-assertion_line: 116
 expression: analysis
 ---
 {

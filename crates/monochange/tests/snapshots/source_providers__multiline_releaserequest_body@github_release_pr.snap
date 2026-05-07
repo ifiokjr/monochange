@@ -1,0 +1,22 @@
+---
+source: crates/monochange/tests/source_providers.rs
+expression: contents
+---
+## Prepared release
+
+- command: `release-pr`
+- package `core` -> `core/v1.1.0`
+
+## Release notes
+
+### core 1.1.0
+
+### Minor
+
+#### add github fixture coverage
+
+## Changed files
+
+- Cargo.toml
+- crates/core/CHANGELOG.md
+- crates/core/Cargo.toml

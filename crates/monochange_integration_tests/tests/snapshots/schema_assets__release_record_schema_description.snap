@@ -1,6 +1,5 @@
 ---
 source: crates/monochange_integration_tests/tests/schema_assets.rs
-assertion_line: 231
 expression: "json_str(&release_schema, \"/description\")?"
 ---
 Durable commit-embedded release record schema for monochange artifact version 0.0.

@@ -3,7 +3,7 @@ source: crates/monochange/tests/cli_main_binary.rs
 info:
   program: monochange
   args:
-    - discover
+    - "step:discover"
     - "--format=json"
   env:
     NO_COLOR: "1"

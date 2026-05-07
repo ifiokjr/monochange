@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/source_providers.rs
-expression: json
+expression: redacted
 ---
 {
   "issueComments": [],
@@ -29,7 +29,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Minor\n\n#### add github fixture coverage"
+        "rendered": "[multiline text]"
       }
     ],
     "changesets": [

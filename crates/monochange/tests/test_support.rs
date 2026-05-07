@@ -18,6 +18,140 @@ use portable_pty::native_pty_system;
 use serde_json::Map;
 use serde_json::Value;
 
+#[allow(unused_macros, unused_macro_rules)]
+macro_rules! assert_readable_json_snapshot {
+	($value:expr) => {{
+		let value = serde_json::to_value(&$value)
+			.unwrap_or_else(|error| panic!("serialize readable json snapshot: {error}"));
+		let (redacted, multiline_fields) = $crate::test_support::redact_multiline_strings(&value);
+		insta::assert_json_snapshot!(redacted);
+		for (path, contents) in multiline_fields {
+			insta::assert_snapshot!(
+				format!(
+					"multiline_{}",
+					$crate::test_support::snapshot_path_slug(&path)
+				),
+				contents
+			);
+		}
+	}};
+	($name:expr, $value:expr) => {{
+		let value = serde_json::to_value(&$value)
+			.unwrap_or_else(|error| panic!("serialize readable json snapshot: {error}"));
+		let (redacted, multiline_fields) = $crate::test_support::redact_multiline_strings(&value);
+		insta::assert_json_snapshot!($name, redacted);
+		for (path, contents) in multiline_fields {
+			insta::assert_snapshot!(
+				format!(
+					"{}_multiline_{}",
+					$name,
+					$crate::test_support::snapshot_path_slug(&path)
+				),
+				contents
+			);
+		}
+	}};
+}
+
+#[allow(unused_imports)]
+pub(crate) use assert_readable_json_snapshot;
+
+#[allow(dead_code)]
+pub fn redact_multiline_strings(value: &Value) -> (Value, Vec<(String, String)>) {
+	let mut redacted = value.clone();
+	let mut multiline_fields = Vec::new();
+	redact_multiline_strings_at(&mut redacted, "$", &mut multiline_fields);
+	(redacted, multiline_fields)
+}
+
+#[allow(dead_code)]
+pub fn snapshot_path_slug(path: &str) -> String {
+	path.chars()
+		.map(|character| {
+			match character {
+				'a'..='z' | 'A'..='Z' | '0'..='9' => character.to_ascii_lowercase(),
+				_ => '_',
+			}
+		})
+		.collect::<String>()
+		.trim_matches('_')
+		.to_owned()
+}
+
+fn readable_multiline_snapshot_contents(
+	path: &str,
+	contents: &str,
+	multiline_fields: &mut Vec<(String, String)>,
+) -> String {
+	let mut readable = String::new();
+	let mut remaining = contents;
+	let mut code_block_index = 0;
+
+	while let Some(start) = remaining.find("```json\n") {
+		let (before, after_start) = remaining.split_at(start);
+		let after_start = &after_start["```json\n".len()..];
+		let Some(end) = after_start.find("\n```") else {
+			break;
+		};
+
+		let (json_text, after_json) = after_start.split_at(end);
+		let Ok(json_value) = serde_json::from_str::<Value>(json_text) else {
+			break;
+		};
+
+		let (redacted_json, nested_fields) = redact_multiline_strings(&json_value);
+		for (nested_path, nested_contents) in nested_fields {
+			multiline_fields.push((
+				format!("{path}.jsonBlocks[{code_block_index}]{nested_path}"),
+				nested_contents,
+			));
+		}
+
+		readable.push_str(before);
+		readable.push_str("```json\n");
+		readable.push_str(
+			&serde_json::to_string_pretty(&redacted_json)
+				.unwrap_or_else(|error| panic!("serialize redacted json code block: {error}")),
+		);
+		readable.push_str("\n```");
+		remaining = &after_json["\n```".len()..];
+		code_block_index += 1;
+	}
+
+	if readable.is_empty() {
+		contents.to_owned()
+	} else {
+		readable.push_str(remaining);
+		readable
+	}
+}
+
+fn redact_multiline_strings_at(
+	value: &mut Value,
+	path: &str,
+	multiline_fields: &mut Vec<(String, String)>,
+) {
+	match value {
+		Value::String(contents) if contents.contains('\n') => {
+			let snapshot_contents =
+				readable_multiline_snapshot_contents(path, contents, multiline_fields);
+			multiline_fields.push((path.to_owned(), snapshot_contents));
+			"[multiline text]".clone_into(contents);
+		}
+		Value::Array(items) => {
+			for (index, item) in items.iter_mut().enumerate() {
+				redact_multiline_strings_at(item, &format!("{path}[{index}]"), multiline_fields);
+			}
+		}
+		Value::Object(fields) => {
+			for (key, field) in fields {
+				redact_multiline_strings_at(field, &format!("{path}.{key}"), multiline_fields);
+			}
+		}
+		_ => {}
+	}
+}
+
 #[allow(dead_code)]
 pub fn fixture_path(relative: &str) -> std::path::PathBuf {
 	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)

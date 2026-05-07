@@ -1,0 +1,29 @@
+---
+source: crates/monochange/tests/release_pull_requests.rs
+expression: contents
+---
+## Prepared release
+
+- command: `release-pr`
+- group `sdk` -> `v1.1.0`
+
+## Release notes
+
+### sdk 1.1.0
+
+Grouped release for `sdk`.
+
+### Minor
+
+> [!NOTE]
+> *core*
+
+#### add feature
+
+## Changed files
+
+- Cargo.toml
+- changelog.md
+- crates/app/Cargo.toml
+- crates/core/CHANGELOG.md
+- crates/core/Cargo.toml

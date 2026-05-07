@@ -1,7 +1,7 @@
-use insta::assert_json_snapshot;
 use rstest::rstest;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::current_test_name;
 use test_support::run_json_command;
 use test_support::setup_scenario_workspace;
@@ -23,7 +23,7 @@ fn source_provider_scenarios_match_snapshot(
 
 	let tempdir = setup_scenario_workspace(scenario_relative);
 	let json = run_json_command(tempdir.path(), command, Some("2026-04-06"));
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }
 
 #[rstest]
@@ -37,5 +37,5 @@ fn source_provider_diagnostics_match_snapshot(#[case] scenario_relative: &str) {
 
 	let tempdir = setup_scenario_workspace(scenario_relative);
 	let json = run_json_command(tempdir.path(), "diagnostics", Some("2026-04-06"));
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }

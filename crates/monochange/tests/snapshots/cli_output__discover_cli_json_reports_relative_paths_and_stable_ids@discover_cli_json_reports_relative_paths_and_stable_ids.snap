@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 41
 info:
   program: mc
   args:
@@ -9,6 +8,7 @@ info:
     - json
   env:
     NO_COLOR: "1"
+    RUST_LOG: ""
 ---
 success: true
 exit_code: 0

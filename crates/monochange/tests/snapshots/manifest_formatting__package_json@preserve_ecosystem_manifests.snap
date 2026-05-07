@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/manifest_formatting.rs
-assertion_line: 74
 expression: package_json
 ---
 {

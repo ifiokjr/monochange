@@ -1,0 +1,5 @@
+---
+source: crates/monochange/tests/cli_progress.rs
+expression: contents
+---
+stderr line

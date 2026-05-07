@@ -1,34 +1,8 @@
 ---
 source: crates/monochange/tests/cli_output.rs
-assertion_line: 492
-expression: manifest
+expression: redacted
 ---
 {
-  "command": "release",
-  "dryRun": true,
-  "version": "1.1.0",
-  "groupVersion": "1.1.0",
-  "releaseTargets": [
-    {
-      "id": "sdk",
-      "kind": "group",
-      "version": "1.1.0",
-      "tag": true,
-      "release": true,
-      "versionFormat": "primary",
-      "tagName": "v1.1.0",
-      "members": [
-        "core",
-        "app"
-      ],
-      "renderedTitle": "1.1.0 ([DATE])",
-      "renderedChangelogTitle": "1.1.0 ([DATE])"
-    }
-  ],
-  "releasedPackages": [
-    "workflow-app",
-    "workflow-core"
-  ],
   "changedFiles": [
     "Cargo.toml",
     "changelog.md",
@@ -39,133 +13,136 @@ expression: manifest
   ],
   "changelogs": [
     {
-      "ownerId": "sdk",
-      "ownerKind": "group",
-      "path": "changelog.md",
       "format": "monochange",
       "notes": {
-        "title": "1.1.0 ([DATE])",
+        "sections": [
+          {
+            "collapsed": false,
+            "entries": [
+              "[multiline text]"
+            ],
+            "title": "Minor"
+          }
+        ],
         "summary": [
           "Grouped release for `sdk`."
         ],
-        "sections": [
-          {
-            "title": "Minor",
-            "collapsed": false,
-            "entries": [
-              "> [!NOTE]\n> *core*\n\n#### add feature"
-            ]
-          }
-        ]
+        "title": "1.1.0 ([DATE])"
       },
-      "rendered": "## 1.1.0 ([DATE])\n\nGrouped release for `sdk`.\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
+      "ownerId": "sdk",
+      "ownerKind": "group",
+      "path": "changelog.md",
+      "rendered": "[multiline text]"
     },
     {
-      "ownerId": "core",
-      "ownerKind": "package",
-      "path": "crates/core/CHANGELOG.md",
       "format": "monochange",
       "notes": {
-        "title": "1.1.0 ([DATE])",
-        "summary": [],
         "sections": [
           {
-            "title": "Minor",
             "collapsed": false,
             "entries": [
               "#### add feature"
-            ]
+            ],
+            "title": "Minor"
           }
-        ]
+        ],
+        "summary": [],
+        "title": "1.1.0 ([DATE])"
       },
-      "rendered": "## 1.1.0 ([DATE])\n\n### Minor\n\n#### add feature"
-    }
-  ],
-  "packagePublications": [
-    {
-      "package": "app",
-      "ecosystem": "cargo",
-      "registry": "crates_io",
-      "version": "1.1.0",
-      "mode": "builtin",
-      "trustedPublishing": {
-        "enabled": true,
-        "repository": null,
-        "workflow": null,
-        "environment": null
-      }
-    },
-    {
-      "package": "core",
-      "ecosystem": "cargo",
-      "registry": "crates_io",
-      "version": "1.1.0",
-      "mode": "builtin",
-      "trustedPublishing": {
-        "enabled": true,
-        "repository": null,
-        "workflow": null,
-        "environment": null
-      }
+      "ownerId": "core",
+      "ownerKind": "package",
+      "path": "crates/core/CHANGELOG.md",
+      "rendered": "[multiline text]"
     }
   ],
   "changesets": [
     {
-      "path": ".changeset/feature.md",
-      "summary": "add feature",
-      "details": null,
-      "targets": [
-        {
-          "id": "core",
-          "kind": "package",
-          "bump": "minor",
-          "origin": "direct-change",
-          "evidenceRefs": [],
-          "changeType": "minor"
-        }
-      ],
       "context": {
-        "provider": "generic_git",
-        "host": null,
         "capabilities": {
-          "commitWebUrls": false,
           "actorProfiles": false,
-          "reviewRequestLookup": false,
+          "commitWebUrls": false,
+          "issueComments": false,
           "relatedIssues": false,
-          "issueComments": false
+          "reviewRequestLookup": false
         },
+        "host": null,
         "introduced": null,
         "lastUpdated": null,
+        "provider": "generic_git",
         "relatedIssues": []
-      }
+      },
+      "details": null,
+      "path": ".changeset/feature.md",
+      "summary": "add feature",
+      "targets": [
+        {
+          "bump": "minor",
+          "changeType": "minor",
+          "evidenceRefs": [],
+          "id": "core",
+          "kind": "package",
+          "origin": "direct-change"
+        }
+      ]
     }
   ],
+  "command": "release",
   "deletedChangesets": [],
+  "dryRun": true,
+  "groupVersion": "1.1.0",
+  "packagePublications": [
+    {
+      "ecosystem": "cargo",
+      "mode": "builtin",
+      "package": "app",
+      "registry": "crates_io",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.1.0"
+    },
+    {
+      "ecosystem": "cargo",
+      "mode": "builtin",
+      "package": "core",
+      "registry": "crates_io",
+      "trustedPublishing": {
+        "enabled": true,
+        "environment": null,
+        "repository": null,
+        "workflow": null
+      },
+      "version": "1.1.0"
+    }
+  ],
   "plan": {
-    "workspaceRoot": ".",
+    "compatibilityEvidence": [],
     "decisions": [
       {
-        "package": "cargo:crates/app/Cargo.toml",
         "bump": "minor",
-        "trigger": "version-group-synchronization",
+        "package": "cargo:crates/app/Cargo.toml",
         "plannedVersion": "1.1.0",
         "reasons": [
           "depends on `cargo:crates/core/Cargo.toml`",
           "shares version group `sdk`"
         ],
+        "trigger": "version-group-synchronization",
         "upstreamSources": [
           "cargo:crates/core/Cargo.toml"
         ]
       },
       {
-        "package": "cargo:crates/core/Cargo.toml",
         "bump": "minor",
-        "trigger": "direct-change",
+        "package": "cargo:crates/core/Cargo.toml",
         "plannedVersion": "1.1.0",
         "reasons": [
           "add feature",
           "shares version group `sdk`"
         ],
+        "trigger": "direct-change",
         "upstreamSources": [
           "cargo:crates/core/Cargo.toml"
         ]
@@ -173,17 +150,39 @@ expression: manifest
     ],
     "groups": [
       {
+        "bump": "minor",
         "id": "sdk",
-        "plannedVersion": "1.1.0",
         "members": [
           "cargo:crates/core/Cargo.toml",
           "cargo:crates/app/Cargo.toml"
         ],
-        "bump": "minor"
+        "plannedVersion": "1.1.0"
       }
     ],
-    "warnings": [],
     "unresolvedItems": [],
-    "compatibilityEvidence": []
-  }
+    "warnings": [],
+    "workspaceRoot": "."
+  },
+  "releaseTargets": [
+    {
+      "id": "sdk",
+      "kind": "group",
+      "members": [
+        "core",
+        "app"
+      ],
+      "release": true,
+      "renderedChangelogTitle": "1.1.0 ([DATE])",
+      "renderedTitle": "1.1.0 ([DATE])",
+      "tag": true,
+      "tagName": "v1.1.0",
+      "version": "1.1.0",
+      "versionFormat": "primary"
+    }
+  ],
+  "releasedPackages": [
+    "workflow-app",
+    "workflow-core"
+  ],
+  "version": "1.1.0"
 }

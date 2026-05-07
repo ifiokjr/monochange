@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/pre_stable_versioning.rs
-expression: json
+expression: redacted
 ---
 {
   "changedFiles": [

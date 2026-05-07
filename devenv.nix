@@ -211,17 +211,17 @@ in
     "test:cargo" = {
       exec = ''
         set -euo pipefail
-        cargo bin cargo-nextest run --workspace --all-features --no-tests pass
+        cargo insta test --workspace --all-features --test-runner nextest --unreferenced=reject
       '';
-      description = "Run cargo tests with nextest.";
+      description = "Run cargo tests with nextest and reject unreferenced snapshots.";
       binary = "bash";
     };
     "test:cargo:expensive" = {
       exec = ''
         set -euo pipefail
-        MONOCHANGE_EXPENSIVE_TESTS=1 cargo bin cargo-nextest run --workspace --all-features --no-tests pass
+        MONOCHANGE_EXPENSIVE_TESTS=1 cargo insta test --workspace --all-features --test-runner nextest --unreferenced=reject
       '';
-      description = "Run cargo tests with the CI-only large-fixture cases enabled.";
+      description = "Run cargo tests with CI-only large-fixture cases enabled and reject unreferenced snapshots.";
       binary = "bash";
     };
     "test:docs" = {
@@ -496,13 +496,20 @@ in
       description = "Review insta snapshots.";
       binary = "bash";
     };
+    "snapshot:check" = {
+      exec = ''
+        set -euo pipefail
+        cargo insta test --workspace --all-features --test-runner nextest --unreferenced=reject
+      '';
+      description = "Check insta snapshots and fail on unreferenced snapshot files.";
+      binary = "bash";
+    };
     "snapshot:update" = {
       exec = ''
         set -euo pipefail
-        cargo bin cargo-nextest run --workspace --all-features --no-tests pass
-        cargo insta accept
+        cargo insta test --workspace --all-features --test-runner nextest --force-update-snapshots --unreferenced=delete
       '';
-      description = "Update insta snapshots.";
+      description = "Update insta snapshots and delete unreferenced snapshot files.";
       binary = "bash";
     };
     "strip:env" = {
