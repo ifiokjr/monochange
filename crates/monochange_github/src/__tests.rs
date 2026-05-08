@@ -57,8 +57,8 @@ fn must_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
 fn git_blob_mode_uses_regular_file_mode() {
 	let directory = must_ok(tempdir(), "create temporary directory");
 	let file_path = directory.path().join("regular.txt");
-	must_ok(std::fs::write(&file_path, "content"), "write regular file");
-	let metadata = must_ok(std::fs::metadata(&file_path), "read regular file metadata");
+	must_ok(fs::write(&file_path, "content"), "write regular file");
+	let metadata = must_ok(fs::metadata(&file_path), "read regular file metadata");
 
 	assert_eq!(git_blob_mode(&metadata), "100644");
 }
@@ -71,23 +71,17 @@ fn git_blob_mode_detects_executable_files() {
 	let directory = must_ok(tempdir(), "create temporary directory");
 	let file_path = directory.path().join("script.sh");
 	must_ok(
-		std::fs::write(&file_path, "#!/usr/bin/env bash\n"),
+		fs::write(&file_path, "#!/usr/bin/env bash\n"),
 		"write executable file",
 	);
-	let mut permissions = must_ok(
-		std::fs::metadata(&file_path),
-		"read executable file metadata",
-	)
-	.permissions();
+	let mut permissions =
+		must_ok(fs::metadata(&file_path), "read executable file metadata").permissions();
 	permissions.set_mode(0o755);
 	must_ok(
-		std::fs::set_permissions(&file_path, permissions),
+		fs::set_permissions(&file_path, permissions),
 		"mark file executable",
 	);
-	let metadata = must_ok(
-		std::fs::metadata(&file_path),
-		"read executable file metadata",
-	);
+	let metadata = must_ok(fs::metadata(&file_path), "read executable file metadata");
 
 	assert_eq!(git_blob_mode(&metadata), "100755");
 }
@@ -1251,18 +1245,18 @@ fn release_pull_request_commit_verification_creates_blobs_for_varied_file_types(
 	let root = tempdir.path();
 
 	// Create a directory (should be skipped)
-	std::fs::create_dir(root.join("skipped_dir")).unwrap();
+	fs::create_dir(root.join("skipped_dir")).unwrap();
 
 	// Create a regular file
-	std::fs::write(root.join("regular.txt"), "hello").unwrap();
+	fs::write(root.join("regular.txt"), "hello").unwrap();
 
 	// Create an executable file
 	let exec_path = root.join("exec.sh");
-	std::fs::write(&exec_path, "#!/bin/bash").unwrap();
+	fs::write(&exec_path, "#!/bin/bash").unwrap();
 	use std::os::unix::fs::PermissionsExt;
-	let mut perms = std::fs::metadata(&exec_path).unwrap().permissions();
+	let mut perms = fs::metadata(&exec_path).unwrap().permissions();
 	perms.set_mode(perms.mode() | 0o111);
-	std::fs::set_permissions(&exec_path, perms).unwrap();
+	fs::set_permissions(&exec_path, perms).unwrap();
 
 	// Create a symlink
 	std::os::unix::fs::symlink("regular.txt", root.join("link")).unwrap();
@@ -1393,7 +1387,7 @@ fn release_pull_request_commit_verification_uses_root_commit_without_parent() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
-	std::fs::write(root.join("file.txt"), "content").unwrap();
+	fs::write(root.join("file.txt"), "content").unwrap();
 	let tracked_paths = vec![PathBuf::from("file.txt")];
 
 	let fallback = "1111111111111111111111111111111111111111";
@@ -1944,7 +1938,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
-	std::fs::write(repo.join("release.txt"), "before\n")
+	fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
@@ -1955,7 +1949,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	);
 	git(&repo, &["push", "-u", "origin", "main"]);
 	must_ok(
-		std::fs::write(repo.join("release.txt"), "after\n"),
+		fs::write(repo.join("release.txt"), "after\n"),
 		"update release file",
 	);
 
@@ -2003,21 +1997,21 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	must_ok(
-		std::fs::write(repo.join(".gitignore"), ".monochange/\n"),
+		fs::write(repo.join(".gitignore"), ".monochange/\n"),
 		"write gitignore",
 	);
 	must_ok(
-		std::fs::write(repo.join("release.txt"), "before\n"),
+		fs::write(repo.join("release.txt"), "before\n"),
 		"write release file",
 	);
 	git(&repo, &["add", "."]);
 	git(&repo, &["commit", "-m", "initial"]);
 	must_ok(
-		std::fs::create_dir_all(repo.join(".monochange")),
+		fs::create_dir_all(repo.join(".monochange")),
 		"create monochange dir",
 	);
 	must_ok(
-		std::fs::write(repo.join(".monochange/release-manifest.json"), "{}\n"),
+		fs::write(repo.join(".monochange/release-manifest.json"), "{}\n"),
 		"write manifest",
 	);
 
@@ -2057,9 +2051,9 @@ fn git_path_is_tracked_reports_command_failures() {
 fn git_path_is_tracked_reports_inspection_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path().join("repo");
-	must_ok(std::fs::create_dir_all(&repo), "create repo dir");
+	must_ok(fs::create_dir_all(&repo), "create repo dir");
 	must_ok(
-		std::fs::write(repo.join("release.txt"), "release\n"),
+		fs::write(repo.join("release.txt"), "release\n"),
 		"write release file",
 	);
 
@@ -2079,7 +2073,7 @@ fn git_path_is_ignored_reports_false_for_unignored_paths() {
 	let repo = tempdir.path().join("repo");
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	must_ok(
-		std::fs::write(repo.join("release.txt"), "release\n"),
+		fs::write(repo.join("release.txt"), "release\n"),
 		"write release file",
 	);
 
@@ -2093,9 +2087,9 @@ fn git_path_is_ignored_reports_false_for_unignored_paths() {
 fn git_path_is_ignored_reports_inspection_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let repo = tempdir.path().join("repo");
-	must_ok(std::fs::create_dir_all(&repo), "create repo dir");
+	must_ok(fs::create_dir_all(&repo), "create repo dir");
 	must_ok(
-		std::fs::write(repo.join("release.txt"), "release\n"),
+		fs::write(repo.join("release.txt"), "release\n"),
 		"write release file",
 	);
 
@@ -2149,14 +2143,14 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	let hooks_dir = repo.join(".git/hooks");
-	std::fs::write(hooks_dir.join("pre-commit"), "#!/bin/sh\nexit 1\n")
+	fs::write(hooks_dir.join("pre-commit"), "#!/bin/sh\nexit 1\n")
 		.unwrap_or_else(|error| panic!("write hook: {error}"));
-	std::fs::set_permissions(
+	fs::set_permissions(
 		hooks_dir.join("pre-commit"),
 		std::os::unix::fs::PermissionsExt::from_mode(0o755),
 	)
 	.unwrap_or_else(|error| panic!("chmod hook: {error}"));
-	std::fs::write(repo.join("release.txt"), "initial\n")
+	fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
 	let error = git_commit_paths(
@@ -2183,7 +2177,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
-	std::fs::write(repo.join("release.txt"), "initial\n")
+	fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
@@ -2817,7 +2811,7 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	git(&repo, &["config", "commit.gpgsign", "false"]);
-	std::fs::write(repo.join("release.txt"), "before\n")
+	fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
@@ -2826,7 +2820,7 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 		&["remote", "add", "origin", bare.to_string_lossy().as_ref()],
 	);
 	git(&repo, &["push", "-u", "origin", "main"]);
-	std::fs::write(repo.join("release.txt"), "after\n")
+	fs::write(repo.join("release.txt"), "after\n")
 		.unwrap_or_else(|error| panic!("update release file: {error}"));
 	(tempdir, repo)
 }

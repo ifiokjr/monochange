@@ -14,10 +14,12 @@ description = "GitHub release payload rendering and publishing for monochange"
 
 [dependencies]
 monochange_core = { workspace = true }
+monochange_publish = { workspace = true }
 octocrab = { workspace = true, default-features = false }
 regex = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
+serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true, default-features = true }
 tokio = { workspace = true, default-features = true }
 tracing = { workspace = true, default-features = true }
