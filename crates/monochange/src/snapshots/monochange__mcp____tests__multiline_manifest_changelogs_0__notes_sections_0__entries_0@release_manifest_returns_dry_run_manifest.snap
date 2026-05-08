@@ -1,0 +1,8 @@
+---
+source: crates/monochange/src/mcp.rs
+expression: contents
+---
+> [!NOTE]
+> *core*
+
+#### add release command

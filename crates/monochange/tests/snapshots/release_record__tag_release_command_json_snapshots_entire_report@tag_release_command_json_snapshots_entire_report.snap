@@ -1,7 +1,6 @@
 ---
 source: crates/monochange/tests/release_record.rs
-assertion_line: 307
-expression: parsed
+expression: redacted
 ---
 {
   "distance": 0,

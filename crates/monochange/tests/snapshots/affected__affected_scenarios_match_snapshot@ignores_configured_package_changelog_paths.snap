@@ -1,7 +1,6 @@
 ---
 source: crates/monochange/tests/affected.rs
-assertion_line: 111
-expression: output
+expression: redacted
 ---
 {
   "affectedPackageIds": [],

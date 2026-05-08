@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/release_group_propagation.rs
-expression: json
+expression: redacted
 ---
 {
   "changedFiles": [

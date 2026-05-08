@@ -1,7 +1,6 @@
 ---
 source: crates/monochange/tests/cli_progress.rs
-assertion_line: 354
-expression: normalized_progress_events(&stderr)
+expression: redacted
 ---
 [
   {
@@ -113,7 +112,7 @@ expression: normalized_progress_events(&stderr)
     "stepKind": "Command",
     "stepName": "stream summary",
     "stream": "stderr",
-    "text": "stderr line\n",
+    "text": "[multiline text]",
     "totalSteps": 2
   },
   {
@@ -126,7 +125,7 @@ expression: normalized_progress_events(&stderr)
     "stepKind": "Command",
     "stepName": "stream summary",
     "stream": "stdout",
-    "text": "stdout line\n",
+    "text": "[multiline text]",
     "totalSteps": 2
   },
   {

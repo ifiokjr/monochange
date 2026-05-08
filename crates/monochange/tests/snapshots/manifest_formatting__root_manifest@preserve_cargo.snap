@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/manifest_formatting.rs
-assertion_line: 41
 expression: root_manifest
 ---
 [workspace]

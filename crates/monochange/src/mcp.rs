@@ -964,6 +964,69 @@ mod __tests {
 	use super::json_result;
 	use super::resolve_root;
 
+	macro_rules! assert_readable_json_snapshot {
+		($value:expr) => {{
+			let (redacted, multiline_fields) = redact_multiline_strings(&$value);
+			insta::assert_json_snapshot!(redacted);
+			for (path, contents) in multiline_fields {
+				insta::assert_snapshot!(
+					format!("multiline_{}", snapshot_path_slug(&path)),
+					contents
+				);
+			}
+		}};
+	}
+
+	fn redact_multiline_strings(
+		value: &serde_json::Value,
+	) -> (serde_json::Value, Vec<(String, String)>) {
+		let mut redacted = value.clone();
+		let mut multiline_fields = Vec::new();
+		redact_multiline_strings_at(&mut redacted, "$", &mut multiline_fields);
+		(redacted, multiline_fields)
+	}
+
+	fn snapshot_path_slug(path: &str) -> String {
+		path.chars()
+			.map(|character| {
+				match character {
+					'a'..='z' | 'A'..='Z' | '0'..='9' => character.to_ascii_lowercase(),
+					_ => '_',
+				}
+			})
+			.collect::<String>()
+			.trim_matches('_')
+			.to_owned()
+	}
+
+	fn redact_multiline_strings_at(
+		value: &mut serde_json::Value,
+		path: &str,
+		multiline_fields: &mut Vec<(String, String)>,
+	) {
+		match value {
+			serde_json::Value::String(contents) if contents.contains('\n') => {
+				multiline_fields.push((path.to_owned(), contents.clone()));
+				*contents = "[multiline text]".to_owned();
+			}
+			serde_json::Value::Array(items) => {
+				for (index, item) in items.iter_mut().enumerate() {
+					redact_multiline_strings_at(
+						item,
+						&format!("{path}[{index}]"),
+						multiline_fields,
+					);
+				}
+			}
+			serde_json::Value::Object(fields) => {
+				for (key, field) in fields {
+					redact_multiline_strings_at(field, &format!("{path}.{key}"), multiline_fields);
+				}
+			}
+			_ => {}
+		}
+	}
+
 	fn setup_fixture(relative: &str) -> tempfile::TempDir {
 		monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
 	}
@@ -1434,7 +1497,9 @@ mod __tests {
 			.await
 			.unwrap_or_else(|error| panic!("release manifest: {error}"));
 
-		assert_snapshot!(content_text(&result));
+		let value = serde_json::from_str::<serde_json::Value>(&content_text(&result))
+			.unwrap_or_else(|error| panic!("parse release manifest result: {error}"));
+		assert_readable_json_snapshot!(value);
 	}
 
 	#[tokio::test]
@@ -1487,7 +1552,9 @@ mod __tests {
 			.await
 			.unwrap_or_else(|error| panic!("affected: {error}"));
 
-		assert_snapshot!(content_text(&result));
+		let value = serde_json::from_str::<serde_json::Value>(&content_text(&result))
+			.unwrap_or_else(|error| panic!("parse affected result: {error}"));
+		assert_readable_json_snapshot!(value);
 	}
 
 	#[tokio::test]
@@ -1570,11 +1637,7 @@ mod __tests {
 				.unwrap_or_else(|error| panic!("parse preset result: {error}")),
 		});
 
-		assert_snapshot!(
-			serde_json::to_string_pretty(&combined).unwrap_or_else(|error| {
-				panic!("serialize combined lint explanation snapshot: {error}")
-			})
-		);
+		assert_readable_json_snapshot!(combined);
 	}
 
 	#[tokio::test]
@@ -1630,10 +1693,7 @@ mod __tests {
 				.unwrap_or_else(|error| panic!("parse release manifest result: {error}")),
 		});
 
-		assert_snapshot!(
-			serde_json::to_string_pretty(&eval)
-				.unwrap_or_else(|error| { panic!("serialize agent eval snapshot: {error}") })
-		);
+		assert_readable_json_snapshot!(eval);
 	}
 
 	#[tokio::test]

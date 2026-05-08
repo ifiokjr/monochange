@@ -1,0 +1,8 @@
+---
+source: crates/monochange/tests/cli_output.rs
+expression: contents
+---
+> [!NOTE]
+> *core*
+
+#### add feature

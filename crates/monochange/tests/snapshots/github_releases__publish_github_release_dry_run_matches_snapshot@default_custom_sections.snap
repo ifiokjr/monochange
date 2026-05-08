@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/github_releases.rs
-expression: json
+expression: redacted
 ---
 {
   "issueComments": [],
@@ -18,7 +18,7 @@ expression: json
             {
               "collapsed": false,
               "entries": [
-                "#### rotate signing keys (core patch)\n\nRoll the signing key before the release window closes."
+                "[multiline text]"
               ],
               "title": "Security"
             }
@@ -29,7 +29,7 @@ expression: json
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "## core [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/core/v1.0.1) ([DATE])\n\n### Security\n\n#### rotate signing keys (core patch)\n\nRoll the signing key before the release window closes."
+        "rendered": "[multiline text]"
       }
     ],
     "changesets": [
@@ -130,7 +130,7 @@ expression: json
   "releaseRequest": null,
   "releases": [
     {
-      "body": "## core [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/core/v1.0.1) ([DATE])\n\n### Security\n\n#### rotate signing keys (core patch)\n\nRoll the signing key before the release window closes.",
+      "body": "[multiline text]",
       "draft": false,
       "generateReleaseNotes": false,
       "name": "core 1.0.1 ([DATE])",

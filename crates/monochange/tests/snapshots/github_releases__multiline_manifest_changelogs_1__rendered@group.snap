@@ -1,0 +1,9 @@
+---
+source: crates/monochange/tests/github_releases.rs
+expression: contents
+---
+## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])
+
+### Minor
+
+#### add feature

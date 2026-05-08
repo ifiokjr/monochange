@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::Path;
 
-use insta::assert_json_snapshot;
 use insta::assert_snapshot;
 use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::current_test_name;
 use test_support::monochange_command;
 use test_support::setup_scenario_workspace;
@@ -42,7 +42,7 @@ fn cli_step_override_json_scenarios_match_snapshot(#[case] fixture: &str, #[case
 
 	let tempdir = setup_scenario_workspace(fixture);
 	let json = run_json_command(tempdir.path(), command);
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }
 
 #[test]

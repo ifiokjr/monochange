@@ -1,7 +1,7 @@
-use insta::assert_json_snapshot;
 use serde_json::Value;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::run_json_command;
 use test_support::setup_scenario_workspace;
 use test_support::snapshot_settings;
@@ -14,7 +14,7 @@ fn grouped_member_changes_patch_dependents_outside_the_group() {
 
 	let tempdir = setup_scenario_workspace("integration/grouped-dependent-propagation");
 	let json: Value = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 
 	let decisions = json["plan"]["decisions"]
 		.as_array()

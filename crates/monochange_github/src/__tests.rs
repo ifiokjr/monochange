@@ -175,9 +175,16 @@ fn build_release_requests_uses_matching_monochange_changelog_bodies() {
 			"repository": request.repository,
 			"tag_name": request.tag_name,
 			"name": request.name,
-			"body": request.body,
+			"body": "[multiline text]",
 			"generate_release_notes": request.generate_release_notes,
 		})
+	);
+	assert_snapshot!(
+		"build_release_requests_uses_matching_monochange_changelog_bodies__request_body",
+		request
+			.body
+			.as_deref()
+			.unwrap_or_else(|| panic!("expected body"))
 	);
 }
 
@@ -611,7 +618,7 @@ fn build_release_pull_request_request_renders_branch_and_body() {
 			"commit_message": request.commit_message,
 			"labels": request.labels,
 			"auto_merge": request.auto_merge,
-			"body": request.body,
+			"body": "[multiline text]",
 		})
 	);
 	assert_snapshot!(

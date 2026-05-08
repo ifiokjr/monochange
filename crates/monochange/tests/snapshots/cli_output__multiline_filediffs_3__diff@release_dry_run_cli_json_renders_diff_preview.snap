@@ -1,0 +1,16 @@
+---
+source: crates/monochange/tests/cli_output.rs
+expression: contents
+---
+--- a/group.toml
++++ b/group.toml
+@@ -1,6 +1,6 @@
+ [workspace.package]
+-version = "1.0.0"
++version = "1.1.0"
+ 
+ [workspace.dependencies]
+-workflow-core = { version = "1.0.0" }
+-workflow-app = { version = "1.0.0" }
++workflow-core = { version = "1.1.0" }
++workflow-app = { version = "1.1.0" }

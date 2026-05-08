@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::Path;
 
-use insta::assert_json_snapshot;
 use insta::assert_snapshot;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleaseRecord;
@@ -16,6 +15,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::current_test_name;
 use test_support::fixture_path;
 use test_support::monochange_command;
@@ -43,7 +43,7 @@ fn release_record_command_reports_record_from_tag_as_json() {
 	let parsed: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
 		panic!("json: {error}\n{}", String::from_utf8_lossy(&output.stdout))
 	});
-	assert_json_snapshot!(parsed);
+	assert_readable_json_snapshot!(parsed);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -197,7 +197,7 @@ fn tag_release_command_creates_and_pushes_declared_tags() {
 	let parsed: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
 		panic!("json: {error}\n{}", String::from_utf8_lossy(&output.stdout))
 	});
-	assert_json_snapshot!(parsed);
+	assert_readable_json_snapshot!(parsed);
 	assert_eq!(
 		git_output_trimmed(repo, &["rev-parse", "refs/tags/v1.2.3^{commit}"]),
 		commit
@@ -304,7 +304,7 @@ fn tag_release_command_json_snapshots_entire_report() {
 	let parsed: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
 		panic!("json: {error}\n{}", String::from_utf8_lossy(&output.stdout))
 	});
-	assert_json_snapshot!(parsed);
+	assert_readable_json_snapshot!(parsed);
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]

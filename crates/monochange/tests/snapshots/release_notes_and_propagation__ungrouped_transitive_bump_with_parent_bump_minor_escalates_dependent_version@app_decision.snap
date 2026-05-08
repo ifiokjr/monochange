@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/release_notes_and_propagation.rs
-expression: app_decision
+expression: redacted
 ---
 {
   "bump": "minor",

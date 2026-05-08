@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/benchmark_cli_comment.rs
-assertion_line: 48
 expression: rendered
 ---
 ## Binary Benchmark: main vs PR

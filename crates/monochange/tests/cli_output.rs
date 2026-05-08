@@ -5,8 +5,10 @@ use httpmock::MockServer;
 use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
 use monochange_test_helpers::git::git;
+use serde_json::Value;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::copy_directory;
 use test_support::current_test_name;
 use test_support::fixture_path;
@@ -16,6 +18,26 @@ use test_support::snapshot_settings;
 
 fn release_cli_command() -> std::process::Command {
 	monochange_command(Some("2026-04-06"))
+}
+
+fn command_stdout_json(command: &mut std::process::Command, expect_success: bool) -> Value {
+	let output = command
+		.output()
+		.unwrap_or_else(|error| panic!("run command: {error}"));
+	assert_eq!(
+		output.status.success(),
+		expect_success,
+		"stdout:\n{}\nstderr:\n{}",
+		String::from_utf8_lossy(&output.stdout),
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(
+		output.stderr.is_empty(),
+		"stderr:\n{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	serde_json::from_slice(&output.stdout)
+		.unwrap_or_else(|error| panic!("parse stdout json: {error}"))
 }
 
 fn setup_analyze_cli_repo(first_release: bool) -> tempfile::TempDir {
@@ -331,14 +353,16 @@ fn release_dry_run_cli_json_exposes_group_owned_release_targets() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
-	assert_cmd_snapshot!(
+	let json = command_stdout_json(
 		release_cli_command()
 			.current_dir(tempdir.path())
 			.arg("release")
 			.arg("--dry-run")
 			.arg("--format")
-			.arg("json")
+			.arg("json"),
+		true,
 	);
+	assert_readable_json_snapshot!(json);
 }
 
 #[test]
@@ -428,15 +452,17 @@ fn release_dry_run_cli_json_renders_diff_preview() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
-	assert_cmd_snapshot!(
+	let json = command_stdout_json(
 		release_cli_command()
 			.current_dir(tempdir.path())
 			.arg("release")
 			.arg("--dry-run")
 			.arg("--diff")
 			.arg("--format")
-			.arg("json")
+			.arg("json"),
+		true,
 	);
+	assert_readable_json_snapshot!(json);
 }
 
 #[test]
@@ -446,15 +472,17 @@ fn verify_cli_json_reports_failure_comment() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-output/changeset-policy-no-changeset");
-	assert_cmd_snapshot!(
+	let json = command_stdout_json(
 		monochange_command(None)
 			.current_dir(tempdir.path())
 			.arg("affected")
 			.arg("--format")
 			.arg("json")
 			.arg("--changed-paths")
-			.arg("crates/core/src/lib.rs")
+			.arg("crates/core/src/lib.rs"),
+		true,
 	);
+	assert_readable_json_snapshot!(json);
 }
 
 #[test]
@@ -489,7 +517,9 @@ fn prepare_release_writes_manifest_json() {
 	let manifest_path = tempdir.path().join(".monochange/release-manifest.json");
 	let manifest = fs::read_to_string(&manifest_path)
 		.unwrap_or_else(|error| panic!("read manifest {}: {error}", manifest_path.display()));
-	assert_snapshot!("manifest", manifest);
+	let manifest_json: Value = serde_json::from_str(&manifest)
+		.unwrap_or_else(|error| panic!("parse manifest {}: {error}", manifest_path.display()));
+	assert_readable_json_snapshot!("manifest", manifest_json);
 }
 
 #[test]

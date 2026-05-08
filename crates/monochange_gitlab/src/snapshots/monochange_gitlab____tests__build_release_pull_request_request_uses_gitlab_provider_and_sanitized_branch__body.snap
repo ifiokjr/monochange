@@ -1,6 +1,5 @@
 ---
 source: crates/monochange_gitlab/src/__tests.rs
-assertion_line: 86
 expression: request.body
 ---
 ## Prepared release

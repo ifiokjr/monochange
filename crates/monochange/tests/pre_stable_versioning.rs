@@ -1,9 +1,9 @@
-use insta::assert_json_snapshot;
 use insta::assert_snapshot;
 use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::monochange_command;
 use test_support::run_json_command;
 use test_support::setup_scenario_workspace;
@@ -54,7 +54,7 @@ fn pre_stable_release_json_scenarios_match_snapshot(
 	let _guard = settings.bind_to_scope();
 	let tempdir = setup_scenario_workspace(fixture);
 	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }
 
 fn find_decision<'a>(json: &'a Value, package_name_fragment: &str) -> &'a Value {

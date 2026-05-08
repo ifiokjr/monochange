@@ -1,0 +1,20 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: redacted
+---
+{
+  "dry_run": true,
+  "files": [
+    {
+      "contents": "[multiline text]",
+      "description": "VS Code agent definition",
+      "operation": "create",
+      "path": ".github/agents/monochange-release-agent.agent.md"
+    }
+  ],
+  "notes": [],
+  "targets": [
+    "vscode",
+    "copilot"
+  ]
+}

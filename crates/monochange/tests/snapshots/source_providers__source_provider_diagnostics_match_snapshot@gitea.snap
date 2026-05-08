@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/source_providers.rs
-expression: json
+expression: redacted
 ---
 {
   "changesets": [

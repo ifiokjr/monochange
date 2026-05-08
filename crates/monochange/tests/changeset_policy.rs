@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use insta::assert_json_snapshot;
 use rstest::rstest;
 use serde_json::Value;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::current_test_name;
 use test_support::monochange_command;
 use test_support::setup_scenario_workspace;
@@ -69,7 +69,7 @@ fn verify_changeset_policy_scenarios_match_snapshot(
 
 	let tempdir = setup_scenario_workspace(scenario_relative);
 	let json = run_affected_json(tempdir.path(), args);
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }
 
 fn run_affected_json(root: &Path, args: &[&str]) -> Value {

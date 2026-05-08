@@ -1,0 +1,48 @@
+---
+source: crates/monochange/src/__tests.rs
+expression: redacted
+---
+{
+  "dry_run": true,
+  "files": [
+    {
+      "contents": "[multiline text]",
+      "description": "Claude subagent definition",
+      "operation": "create",
+      "path": ".claude/agents/monochange-release-agent.md"
+    },
+    {
+      "contents": "[multiline text]",
+      "description": "Claude MCP server configuration",
+      "operation": "create",
+      "path": ".mcp.json"
+    },
+    {
+      "contents": "[multiline text]",
+      "description": "Pi project agent definition",
+      "operation": "create",
+      "path": ".pi/agents/monochange-release-agent.md"
+    },
+    {
+      "contents": "[multiline text]",
+      "description": "Codex custom agent definition",
+      "operation": "create",
+      "path": ".codex/agents/monochange-release-agent.toml"
+    },
+    {
+      "contents": "[multiline text]",
+      "description": "Cursor workspace rule",
+      "operation": "create",
+      "path": ".cursor/rules/monochange.mdc"
+    }
+  ],
+  "notes": [
+    "Cursor generation currently emits a repo-local workspace rule instead of a native custom subagent manifest."
+  ],
+  "targets": [
+    "claude",
+    "pi",
+    "codex",
+    "cursor"
+  ]
+}

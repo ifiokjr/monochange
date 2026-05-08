@@ -1,7 +1,7 @@
-use insta::assert_json_snapshot;
 use rstest::rstest;
 
 mod test_support;
+use test_support::assert_readable_json_snapshot;
 use test_support::current_test_name;
 use test_support::run_json_command;
 use test_support::setup_scenario_workspace;
@@ -20,5 +20,5 @@ fn publish_github_release_dry_run_matches_snapshot(#[case] scenario: &str) {
 	let scenario_relative = format!("github-releases/{scenario}");
 	let tempdir = setup_scenario_workspace(&scenario_relative);
 	let json = run_json_command(tempdir.path(), "publish-release", Some("2026-04-06"));
-	assert_json_snapshot!(json);
+	assert_readable_json_snapshot!(json);
 }

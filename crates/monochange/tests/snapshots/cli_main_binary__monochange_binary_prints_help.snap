@@ -1,6 +1,5 @@
 ---
 source: crates/monochange/tests/cli_main_binary.rs
-assertion_line: 19
 info:
   program: monochange
   args:
