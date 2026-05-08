@@ -35,7 +35,11 @@ function walk(relativeDir) {
 			continue;
 		}
 
-		if (relativePath.includes("__tests") || relativePath.includes("/tests/")) {
+		if (
+			relativePath.includes("__tests") ||
+			relativePath.includes("/tests/") ||
+			relativePath.endsWith("_tests.rs")
+		) {
 			continue;
 		}
 

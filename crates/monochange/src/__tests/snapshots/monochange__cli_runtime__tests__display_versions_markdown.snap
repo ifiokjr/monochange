@@ -1,5 +1,6 @@
 ---
-source: crates/monochange/src/cli_runtime.rs
+source: crates/monochange/src/__tests/cli_runtime.rs
+assertion_line: 624
 expression: markdown
 ---
 ## Group versions

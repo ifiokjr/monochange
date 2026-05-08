@@ -78,6 +78,26 @@ describe("parseChangedLines", () => {
 
 		assert.equal(changedLinesByFile.size, 0);
 	});
+
+	test("ignores test-only Rust module paths", () => {
+		const changedLinesByFile = parseChangedLines(
+			[
+				"diff --git a/crates/monochange/src/__tests/analyze.rs b/crates/monochange/src/__tests/analyze.rs",
+				"--- /dev/null",
+				"+++ b/crates/monochange/src/__tests/analyze.rs",
+				"@@ -0,0 +1 @@",
+				"+#[test]",
+				"diff --git a/crates/monochange/src/lib.rs b/crates/monochange/src/lib.rs",
+				"--- a/crates/monochange/src/lib.rs",
+				"+++ b/crates/monochange/src/lib.rs",
+				"@@ -9,0 +10 @@",
+				"+pub fn covered() {}",
+			].join("\n"),
+			repoRoot,
+		);
+
+		assert.deepEqual([...changedLinesByFile.keys()], ["/repo/crates/monochange/src/lib.rs"]);
+	});
 });
 
 describe("computePatchCoverage", () => {
