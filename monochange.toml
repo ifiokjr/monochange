@@ -245,9 +245,6 @@ path = "crates/monochange_cargo"
 [package.monochange_npm]
 path = "crates/monochange_npm"
 
-[package.monochange_publish]
-path = "crates/monochange_publish"
-
 [package.monochange_config]
 path = "crates/monochange_config"
 
@@ -263,6 +260,9 @@ path = "crates/monochange_dart"
 [package.monochange_python]
 path = "crates/monochange_python"
 
+[package.monochange_publish]
+path = "crates/monochange_publish"
+
 [package.monochange_go]
 path = "crates/monochange_go"
 
@@ -271,6 +271,9 @@ path = "crates/monochange_graph"
 
 [package.monochange_schema]
 path = "crates/monochange_schema"
+versioned_files = [
+	{ path = "crates/monochange_schema/Cargo.toml", regex = 'version = "(?<version>\d+\.\d+\.\d+)"' },
+]
 
 [package.monochange_semver]
 path = "crates/monochange_semver"
