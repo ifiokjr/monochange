@@ -23,9 +23,15 @@ pub(crate) fn hosted_source_adapter(provider: SourceProvider) -> &'static dyn Ho
 		}
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => &monochange_gitea::HOSTED_SOURCE_ADAPTER,
+		#[cfg(feature = "forgejo")]
+		SourceProvider::Forgejo => &monochange_forgejo::HOSTED_SOURCE_ADAPTER,
 		#[cfg(not(feature = "gitea"))]
 		SourceProvider::Gitea => {
 			panic!("the `gitea` feature must be enabled to use Gitea as a source provider")
+		}
+		#[cfg(not(feature = "forgejo"))]
+		SourceProvider::Forgejo => {
+			panic!("the `forgejo` feature must be enabled to use Forgejo as a source provider")
 		}
 	}
 }

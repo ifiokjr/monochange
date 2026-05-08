@@ -1,3 +1,5 @@
+#![allow(clippy::indexing_slicing)]
+
 use std::path::Path;
 
 use insta::assert_snapshot;

@@ -54,7 +54,10 @@ fn publish_release_requests_reads_github_env_configuration() {
 			}],
 		)
 		.unwrap_or_else(|error| panic!("publish releases: {error}"));
-		assert_eq!(outcomes[0].operation, GitHubReleaseOperation::Created);
+		let outcome = outcomes
+			.first()
+			.unwrap_or_else(|| panic!("missing release outcome"));
+		assert_eq!(outcome.operation, GitHubReleaseOperation::Created);
 	});
 
 	release_lookup.assert();

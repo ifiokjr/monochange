@@ -1,0 +1,23 @@
+---
+source: crates/monochange_forgejo/src/__tests.rs
+assertion_line: 99
+expression: request.body
+---
+## Prepared release
+
+- command: `Release PR!`
+- group `sdk` -> `v1.2.0`
+
+## Release notes
+
+### sdk 1.2.0
+
+Grouped release for `sdk`.
+
+### Features
+
+- add forgejo publishing
+
+## Changed files
+
+- Cargo.toml

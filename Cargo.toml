@@ -73,6 +73,7 @@ monochange_core = { version = "0.3.4", path = "./crates/monochange_core" }
 monochange_dart = { version = "0.3.4", path = "./crates/monochange_dart" }
 monochange_deno = { version = "0.3.4", path = "./crates/monochange_deno" }
 monochange_ecmascript = { version = "0.3.4", path = "./crates/monochange_ecmascript" }
+monochange_forgejo = { version = "0.3.4", path = "./crates/monochange_forgejo" }
 monochange_gitea = { version = "0.3.4", path = "./crates/monochange_gitea" }
 monochange_github = { version = "0.3.4", path = "./crates/monochange_github" }
 monochange_gitlab = { version = "0.3.4", path = "./crates/monochange_gitlab" }
@@ -126,6 +127,7 @@ cast_precision_loss = "allow"
 cast_sign_loss = "allow"
 expl_impl_clone_on_copy = "allow"
 items_after_statements = "allow"
+indexing_slicing = "deny"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 module_name_repetitions = "allow"

@@ -1,3 +1,5 @@
+#![allow(clippy::indexing_slicing)]
+
 use insta::assert_snapshot;
 use rstest::rstest;
 use serde_json::Value;

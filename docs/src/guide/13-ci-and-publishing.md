@@ -61,8 +61,8 @@ Keeping those layers separate is important. Package publication and hosted-relea
 | Grouped/shared versioning                                                      | Built in                                                                                                       |
 | Dry-run release diff previews                                                  | Built in via `mc release --dry-run --diff`                                                                     |
 | Durable release history and post-merge tagging                                 | Built in via `ReleaseRecord`, `mc release-record`, `mc tag-release`, and `mc repair-release`                   |
-| Hosted provider releases                                                       | GitHub, GitLab, Gitea                                                                                          |
-| Hosted release requests                                                        | GitHub, GitLab, Gitea                                                                                          |
+| Hosted provider releases                                                       | GitHub, GitLab, Gitea, Forgejo                                                                                 |
+| Hosted release requests                                                        | GitHub, GitLab, Gitea, Forgejo                                                                                 |
 | Python release planning                                                        | Built in for discovery, version rewrites, dependency rewrites, lockfile command inference, and PyPI publishing |
 | Go release planning                                                            | Built in for `go.mod` discovery, dependency rewrites, `go mod tidy` inference, and Go proxy tag publishing     |
 | Built-in registry publishing                                                   | `crates.io`, `npm`, `jsr`, `pub.dev`, `pypi`, Go proxy tags; use external mode for custom registries           |

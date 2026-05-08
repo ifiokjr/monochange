@@ -287,6 +287,9 @@ path = "crates/monochange_gitlab"
 [package.monochange_gitea]
 path = "crates/monochange_gitea"
 
+[package.monochange_forgejo]
+path = "crates/monochange_forgejo"
+
 [package.monochange_hosting]
 path = "crates/monochange_hosting"
 
@@ -409,6 +412,7 @@ packages = [
 	"monochange_dart",
 	"monochange_deno",
 	"monochange_ecmascript",
+	"monochange_forgejo",
 	"monochange_gitea",
 	"monochange_github",
 	"monochange_gitlab",

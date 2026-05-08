@@ -43,6 +43,8 @@
 //! - expose JSON-first MCP tools for assistant workflows
 //! <!-- {/monochangeCrateDocs} -->
 
+#![allow(clippy::indexing_slicing)]
+
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
@@ -215,6 +217,8 @@ use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
 use monochange_core::render_release_notes;
 use monochange_core::render_release_record_block;
+#[cfg(feature = "forgejo")]
+use monochange_forgejo as forgejo_provider;
 #[cfg(feature = "gitea")]
 use monochange_gitea as gitea_provider;
 #[cfg(feature = "github")]

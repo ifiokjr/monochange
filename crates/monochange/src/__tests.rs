@@ -11309,6 +11309,62 @@ fn build_source_release_requests_and_change_request_cover_gitea_dispatch() {
 }
 
 #[test]
+fn build_source_release_requests_and_change_request_cover_forgejo_dispatch() {
+	let source = monochange_core::SourceConfiguration {
+		provider: monochange_core::SourceProvider::Forgejo,
+		host: Some("https://codeberg.org".to_string()),
+		api_url: Some("https://codeberg.org/api/v1".to_string()),
+		owner: "ifiokjr".to_string(),
+		repo: "monochange".to_string(),
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+	};
+	assert_eq!(
+		crate::hosted_sources::hosted_source_adapter(monochange_core::SourceProvider::Forgejo)
+			.provider(),
+		monochange_core::SourceProvider::Forgejo
+	);
+	assert_eq!(
+		crate::tag_url_for_provider(&source, "v1.2.3"),
+		"https://codeberg.org/ifiokjr/monochange/releases/tag/v1.2.3"
+	);
+	assert_eq!(
+		crate::compare_url_for_provider(&source, "v1.2.2", "v1.2.3"),
+		"https://codeberg.org/ifiokjr/monochange/compare/v1.2.2...v1.2.3"
+	);
+	let empty_publish = temp_env::with_var("FORGEJO_TOKEN", Some("token"), || {
+		crate::publish_source_release_requests(&source, &[])
+			.unwrap_or_else(|error| panic!("publish empty Forgejo releases: {error}"))
+	});
+	assert!(empty_publish.is_empty());
+
+	let manifest = sample_release_manifest_for_commit_message(true, true);
+	let requests = crate::build_source_release_requests(&source, &manifest);
+	assert_eq!(requests.len(), 1);
+	assert_eq!(
+		requests[0].provider,
+		monochange_core::SourceProvider::Forgejo
+	);
+	assert_eq!(requests[0].repository, "ifiokjr/monochange");
+	let request = crate::build_source_change_request(&source, &manifest);
+	assert_eq!(request.provider, monochange_core::SourceProvider::Forgejo);
+	assert_eq!(request.repository, "ifiokjr/monochange");
+	assert!(!request.commit_message.subject.is_empty());
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let publish_error = temp_env::with_var("FORGEJO_TOKEN", Some("invalid\n"), || {
+		crate::publish_source_change_request(&source, tempdir.path(), &request, &[], true)
+			.err()
+			.unwrap_or_else(|| panic!("expected invalid git repository error"))
+	});
+	assert!(
+		publish_error
+			.to_string()
+			.contains("prepare release pull request branch")
+	);
+}
+
+#[test]
 fn tracked_release_pull_request_paths_include_manifest_path_and_deduplicate() {
 	let manifest = sample_release_manifest_for_commit_message(false, true);
 	let context = CliContext {

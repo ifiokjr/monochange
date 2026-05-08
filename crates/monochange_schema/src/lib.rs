@@ -16,16 +16,18 @@ pub const CURRENT_SCHEMA_VERSION_TEXT: &str = extract_major_minor(env!("CARGO_PK
 
 const fn extract_major_minor(version: &str) -> &str {
 	let bytes = version.as_bytes();
+	let mut remaining = bytes;
 	let mut index = 0;
 	let mut dots = 0;
 
-	while index < bytes.len() {
-		if bytes[index] == b'.' {
+	while let Some((byte, rest)) = remaining.split_first() {
+		if *byte == b'.' {
 			dots += 1;
 			if dots == 2 {
 				break;
 			}
 		}
+		remaining = rest;
 		index += 1;
 	}
 

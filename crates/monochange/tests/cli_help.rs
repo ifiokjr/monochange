@@ -1,3 +1,5 @@
+#![allow(clippy::indexing_slicing)]
+
 //! Integration tests for `mc help` subcommand output.
 
 use insta_cmd::assert_cmd_snapshot;

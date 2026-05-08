@@ -2650,6 +2650,8 @@ pub enum HostingProviderKind {
 	GitLab,
 	#[serde(rename = "gitea")]
 	Gitea,
+	#[serde(rename = "forgejo")]
+	Forgejo,
 	#[serde(rename = "bitbucket")]
 	Bitbucket,
 }
@@ -2663,6 +2665,7 @@ impl HostingProviderKind {
 			Self::GitHub => "github",
 			Self::GitLab => "gitlab",
 			Self::Gitea => "gitea",
+			Self::Forgejo => "forgejo",
 			Self::Bitbucket => "bitbucket",
 		}
 	}
@@ -3508,6 +3511,8 @@ pub enum SourceProvider {
 	GitLab,
 	#[serde(rename = "gitea")]
 	Gitea,
+	#[serde(rename = "forgejo")]
+	Forgejo,
 }
 
 impl SourceProvider {
@@ -3518,6 +3523,7 @@ impl SourceProvider {
 			Self::GitHub => "github",
 			Self::GitLab => "gitlab",
 			Self::Gitea => "gitea",
+			Self::Forgejo => "forgejo",
 		}
 	}
 }

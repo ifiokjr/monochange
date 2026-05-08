@@ -422,7 +422,7 @@ Reach for this crate when you want to preview or publish GitLab releases and mer
 
 `monochange_hosting` packages the shared git and HTTP plumbing used by hosted source providers.
 
-Reach for this crate when you are implementing GitHub, Gitea, or GitLab release adapters and want one place for release-body rendering, change-request branch naming, JSON requests, and git branch orchestration.
+Reach for this crate when you are implementing GitHub, Gitea, Forgejo, or GitLab release adapters and want one place for release-body rendering, change-request branch naming, JSON requests, and git branch orchestration.
 
 ## Why use it?
 
