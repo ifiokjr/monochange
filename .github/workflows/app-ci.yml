@@ -24,9 +24,6 @@ jobs:
   unit-tests:
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/monochange_app
 
     services:
       postgres:
@@ -50,24 +47,23 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          activate: true
 
       - name: cargo test (unit)
         run: |
+          cd apps/monochange_app
           secretspec run --profile ci --provider env -- cargo test --workspace --lib
-        shell: bash
+        shell: devenv shell -- bash -e {0}
 
       - name: cargo test (integration)
         run: |
+          cd apps/monochange_app
           secretspec run --profile ci --provider env -- cargo test --workspace --test '*' --lib --bins
-        shell: bash
+        shell: devenv shell -- bash -e {0}
 
   check:
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/monochange_app
+
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -76,23 +72,23 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          activate: true
 
       - name: cargo check
-        run: cargo check --workspace
-        shell: bash
+        run: |
+          cd apps/monochange_app
+          cargo check --workspace
+        shell: devenv shell -- bash -e {0}
 
       - name: cargo leptos build (frontend-only)
-        run: cargo leptos build --frontend-only
-        shell: bash
+        run: |
+          cd apps/monochange_app
+          cargo leptos build --frontend-only
+        shell: devenv shell -- bash -e {0}
 
   e2e:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: [unit-tests, check]
-    defaults:
-      run:
-        working-directory: apps/monochange_app
 
     services:
       postgres:
@@ -116,24 +112,23 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          activate: true
 
       - name: install playwright browsers
-        run: npx playwright install chromium --with-deps
-        shell: bash
+        run: |
+          cd apps/monochange_app
+          npx playwright install chromium --with-deps
+        shell: devenv shell -- bash -e {0}
 
       - name: run end-to-end tests
         run: |
+          cd apps/monochange_app
           pnpm exec playwright test
-        shell: bash
+        shell: devenv shell -- bash -e {0}
 
   coverage:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: [unit-tests]
-    defaults:
-      run:
-        working-directory: apps/monochange_app
 
     services:
       postgres:
@@ -157,7 +152,6 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          activate: true
 
       - name: install cargo-llvm-cov
         uses: taiki-e/install-action@v2
@@ -166,8 +160,9 @@ jobs:
 
       - name: generate coverage
         run: |
+          cd apps/monochange_app
           secretspec run --profile ci --provider env -- cargo llvm-cov --workspace --lcov --output-path lcov.info
-        shell: bash
+        shell: devenv shell -- bash -e {0}
 
       - name: upload coverage to codecov
         uses: codecov/codecov-action@v5
