@@ -1901,19 +1901,23 @@ fn render_release_record_block_writes_current_schema_v_header() {
 	let rendered = crate::render_release_record_block(&record)
 		.unwrap_or_else(|error| panic!("render release record: {error}"));
 
-	assert!(rendered.contains("\"v\": \"0.0\""));
+	assert!(rendered.contains(&format!(
+		r#""v": "{}""#,
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
+	)));
 	assert!(!rendered.contains("\"schemaVersion\""));
 }
 
 #[test]
 fn parse_release_record_block_accepts_current_schema_v_header() {
+	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let current = format!(
 		r#"{RELEASE_RECORD_HEADING}
 
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "v": "0.0",
+  "v": "{schema_version}",
   "kind": "{RELEASE_RECORD_KIND}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2008,13 +2012,14 @@ fn parse_release_record_block_rejects_unsupported_kind() {
 	let heading = RELEASE_RECORD_HEADING;
 	let start = RELEASE_RECORD_START_MARKER;
 	let end = RELEASE_RECORD_END_MARKER;
+	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let invalid_kind = format!(
 		r#"{heading}
 
 {start}
 ```json
 {{
-  "v": "0.0",
+  "v": "{schema_version}",
   "kind": "monochange.otherRecord",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2072,13 +2077,14 @@ fn parse_release_record_block_ignores_unknown_fields() {
 	let start = RELEASE_RECORD_START_MARKER;
 	let end = RELEASE_RECORD_END_MARKER;
 	let kind = RELEASE_RECORD_KIND;
+	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let with_unknown = format!(
 		r#"{heading}
 
 {start}
 ```json
 {{
-  "v": "0.0",
+  "v": "{schema_version}",
   "kind": "{kind}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2182,13 +2188,14 @@ fn parse_release_record_block_rejects_missing_end_marker() {
 
 #[test]
 fn parse_release_record_block_rejects_missing_kind() {
+	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let missing_kind = format!(
 		r#"{RELEASE_RECORD_HEADING}
 
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "v": "0.0",
+  "v": "{schema_version}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
   "releaseTargets": [],
