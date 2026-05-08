@@ -17,8 +17,12 @@ use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
-use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
+use monochange_github::GitHubTrustContext;
+use monochange_github::format_manual_trust_context;
+use monochange_github::resolve_github_trust_context;
+use monochange_github::trust_list_contains_context;
+use monochange_github::verify_github_trust_context;
 use monochange_publish::CommandExecutor;
 use monochange_publish::CommandSpec;
 pub(crate) use monochange_publish::PackagePublishOutcome;
@@ -49,7 +53,6 @@ use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
 use reqwest::blocking::Client;
 use serde_json::Value as JsonValue;
-use serde_yaml_ng::Value as YamlValue;
 use tempfile::TempDir;
 use toml::Value as TomlValue;
 use urlencoding::encode;
@@ -59,15 +62,6 @@ use crate::discover_release_record;
 use crate::discover_workspace;
 
 const PLACEHOLDER_VERSION: &str = "0.0.0";
-const GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN: &str = "ACTIONS_ID_TOKEN_REQUEST_TOKEN";
-const GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL: &str = "ACTIONS_ID_TOKEN_REQUEST_URL";
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct GitHubTrustContext {
-	repository: String,
-	workflow: String,
-	environment: Option<String>,
-}
 
 pub(crate) fn run_placeholder_publish(
 	root: &Path,
@@ -735,87 +729,6 @@ fn is_forbidden_npm_token_env_key(key: &str) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn verify_github_trust_context(
-	request: &PublishRequest,
-	root: &Path,
-	env_map: &BTreeMap<String, String>,
-	expected: &GitHubTrustContext,
-	actual_repository: Option<&str>,
-	actual_workflow: Option<&str>,
-	actual_environment: Option<&str>,
-) -> MonochangeResult<()> {
-	let actual_repository = actual_repository.ok_or_else(|| {
-		trusted_publishing_identity_error(
-			request,
-			"GitHub Actions did not expose `GITHUB_REPOSITORY`".to_string(),
-		)
-	})?;
-	if actual_repository != expected.repository {
-		return Err(trusted_publishing_identity_error(
-			request,
-			format!(
-				"expected GitHub repository `{}`, but detected `{actual_repository}`",
-				expected.repository
-			),
-		));
-	}
-
-	let actual_workflow = actual_workflow.ok_or_else(|| {
-		trusted_publishing_identity_error(
-			request,
-			"GitHub Actions did not expose `GITHUB_WORKFLOW_REF` with a workflow filename"
-				.to_string(),
-		)
-	})?;
-	if actual_workflow != expected.workflow {
-		return Err(trusted_publishing_identity_error(
-			request,
-			format!(
-				"expected GitHub workflow `{}`, but detected `{actual_workflow}`",
-				expected.workflow
-			),
-		));
-	}
-
-	if let Some(expected_environment) = expected.environment.as_deref() {
-		let resolved_environment = actual_environment
-			.map(ToString::to_string)
-			.or_else(|| resolve_github_job_environment(root, actual_workflow, env_map));
-		if resolved_environment.as_deref() != Some(expected_environment) {
-			return Err(trusted_publishing_identity_error(
-				request,
-				format!(
-					"expected GitHub environment `{expected_environment}`, but detected `{}`",
-					resolved_environment.as_deref().unwrap_or("none")
-				),
-			));
-		}
-	}
-
-	if !env_map.contains_key(GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL)
-		|| !env_map.contains_key(GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN)
-	{
-		return Err(trusted_publishing_identity_error(
-			request,
-			format!(
-				"GitHub Actions did not expose `{GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL}` and `{GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN}`; grant `id-token: write` to the publish job"
-			),
-		));
-	}
-
-	Ok(())
-}
-
-fn trusted_publishing_identity_error(
-	request: &PublishRequest,
-	reason: impl std::fmt::Display,
-) -> MonochangeError {
-	MonochangeError::Config(format!(
-		"`{}` requires trusted publishing from the configured GitHub Actions OIDC identity, but the current context does not match: {reason}. Run `mc publish` from the configured CI workflow or set `publish.trusted_publishing = false` to opt out.",
-		request.package_id,
-	))
-}
-
 fn trust_outcome_for_skip(
 	request: &PublishRequest,
 	source: Option<&SourceConfiguration>,
@@ -983,111 +896,6 @@ fn build_npm_cli_command(request: &PublishRequest, args: Vec<String>) -> Command
 
 fn uses_pnpm_publish_manager(request: &PublishRequest) -> bool {
 	request.registry == RegistryKind::Npm && request.package_manager.as_deref() == Some("pnpm")
-}
-
-fn resolve_github_trust_context(
-	root: &Path,
-	source: Option<&SourceConfiguration>,
-	trust: &TrustedPublishingSettings,
-	env_map: &BTreeMap<String, String>,
-) -> MonochangeResult<GitHubTrustContext> {
-	let repository = trust
-		.repository
-		.clone()
-		.or_else(|| source.map(|source| format!("{}/{}", source.owner, source.repo)))
-		.or_else(|| env_map.get("GITHUB_REPOSITORY").cloned())
-		.ok_or_else(|| {
-			MonochangeError::Config(
-				"trusted publishing could not determine the GitHub repository; set `publish.trusted_publishing.repository`".to_string(),
-			)
-		})?;
-
-	let workflow = trust
-		.workflow
-		.clone()
-		.or_else(|| {
-			env_map
-				.get("GITHUB_WORKFLOW_REF")
-				.and_then(|value| parse_github_workflow_ref(value))
-		})
-		.ok_or_else(|| {
-			MonochangeError::Config(
-				"trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`".to_string(),
-			)
-		})?;
-
-	let environment = trust
-		.environment
-		.clone()
-		.or_else(|| resolve_github_job_environment(root, &workflow, env_map));
-
-	Ok(GitHubTrustContext {
-		repository,
-		workflow,
-		environment,
-	})
-}
-
-fn parse_github_workflow_ref(value: &str) -> Option<String> {
-	let (_, path_and_ref) = value.split_once('/')?;
-	let (_, path_and_ref) = path_and_ref.split_once('/')?;
-	let (_, path_and_ref) = path_and_ref.split_once('/')?;
-	let (workflow_path, _) = path_and_ref.split_once('@')?;
-	Path::new(workflow_path)
-		.file_name()
-		.and_then(|name| name.to_str())
-		.map(ToString::to_string)
-}
-
-fn resolve_github_job_environment(
-	root: &Path,
-	workflow: &str,
-	env_map: &BTreeMap<String, String>,
-) -> Option<String> {
-	let job_id = env_map.get("GITHUB_JOB")?;
-	let workflow_path = root.join(".github/workflows").join(workflow);
-	let contents = fs::read_to_string(workflow_path).ok()?;
-	let parsed = serde_yaml_ng::from_str::<YamlValue>(&contents).ok()?;
-	let jobs = parsed.get("jobs")?;
-	let job = jobs.get(job_id.as_str())?;
-	match job.get("environment") {
-		Some(YamlValue::String(environment)) => Some(environment.clone()),
-		Some(YamlValue::Mapping(mapping)) => {
-			mapping
-				.get(YamlValue::String("name".to_string()))
-				.and_then(YamlValue::as_str)
-				.map(ToString::to_string)
-		}
-		_ => None,
-	}
-}
-
-fn trust_list_contains_context(output: &str, context: &GitHubTrustContext) -> bool {
-	if let Ok(json) = serde_json::from_str::<JsonValue>(output) {
-		let mut required = vec![context.repository.as_str(), context.workflow.as_str()];
-		if let Some(environment) = &context.environment {
-			required.push(environment.as_str());
-		}
-		return required
-			.into_iter()
-			.all(|needle| json_value_contains(&json, needle));
-	}
-
-	output.contains(&context.repository)
-		&& output.contains(&context.workflow)
-		&& context
-			.environment
-			.as_deref()
-			.is_none_or(|environment| output.contains(environment))
-}
-
-fn json_value_contains(value: &JsonValue, needle: &str) -> bool {
-	match value {
-		JsonValue::String(text) => text.contains(needle),
-		JsonValue::Array(items) => items.iter().any(|item| json_value_contains(item, needle)),
-		JsonValue::Object(map) => map.values().any(|value| json_value_contains(value, needle)),
-		_ => false,
-	}
 }
 
 fn build_placeholder_directory(
@@ -1511,17 +1319,6 @@ fn manual_trust_outcome(
 	}
 }
 
-fn format_manual_trust_context(context: &GitHubTrustContext) -> String {
-	let mut parts = vec![
-		format!("repository `{}`", context.repository),
-		format!("workflow `{}`", context.workflow),
-	];
-	if let Some(environment) = &context.environment {
-		parts.push(format!("environment `{environment}`"));
-	}
-	parts.join(", ")
-}
-
 fn manual_setup_url(request: &PublishRequest) -> String {
 	if request.registry == RegistryKind::CratesIo {
 		format!("https://crates.io/crates/{}", encode(&request.package_name))
@@ -1566,7 +1363,13 @@ mod tests {
 	use monochange_core::PublishState;
 	use monochange_core::ReleaseRecord;
 	use monochange_core::SourceProvider;
+	use monochange_core::TrustedPublishingSettings;
 	use monochange_core::render_release_record_block;
+	use monochange_github::GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+	use monochange_github::GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL;
+	use monochange_github::json_value_contains;
+	use monochange_github::parse_github_workflow_ref;
+	use monochange_github::resolve_github_job_environment;
 	use monochange_publish::CommandExecutor;
 	use monochange_publish::CommandOutput;
 	use monochange_publish::append_publish_dry_run_args;

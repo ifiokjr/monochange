@@ -714,7 +714,7 @@ async fn enrich_changeset_context_with_client(
 			.unwrap_or_else(|error| {
 				#[rustfmt::skip]
 				tracing::warn!(commits = review_request_lookup_shas.len(), %error, "failed to batch load GitHub review requests; continuing with commit annotations only");
-				std::collections::BTreeMap::new()
+				BTreeMap::new()
 			});
 
 	for changeset in changesets.iter_mut() {
@@ -722,7 +722,7 @@ async fn enrich_changeset_context_with_client(
 			continue;
 		};
 
-		let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
+		let mut issues_by_id = BTreeMap::<String, HostedIssueRef>::new();
 
 		for revision in [&mut context.introduced, &mut context.last_updated] {
 			let Some(revision) = revision.as_mut() else {
@@ -776,9 +776,9 @@ async fn load_review_requests_for_commits_with_client(
 	client: &Octocrab,
 	source: &SourceConfiguration,
 	shas: &[String],
-) -> MonochangeResult<std::collections::BTreeMap<String, Option<GitHubRelatedReviewRequest>>> {
+) -> MonochangeResult<BTreeMap<String, Option<GitHubRelatedReviewRequest>>> {
 	if shas.is_empty() {
-		return Ok(std::collections::BTreeMap::new());
+		return Ok(BTreeMap::new());
 	}
 
 	#[rustfmt::skip]
@@ -802,7 +802,7 @@ async fn load_review_request_batch_with_client(
 	client: &Octocrab,
 	source: &SourceConfiguration,
 	shas: &[String],
-) -> MonochangeResult<std::collections::BTreeMap<String, Option<GitHubRelatedReviewRequest>>> {
+) -> MonochangeResult<BTreeMap<String, Option<GitHubRelatedReviewRequest>>> {
 	let query = build_review_request_batch_query(&source.owner, &source.repo, shas);
 
 	let response = client
@@ -825,8 +825,7 @@ async fn load_review_request_batch_with_client(
 			)
 		})?;
 
-	let mut review_requests_by_sha =
-		std::collections::BTreeMap::<String, Option<GitHubRelatedReviewRequest>>::new();
+	let mut review_requests_by_sha = BTreeMap::<String, Option<GitHubRelatedReviewRequest>>::new();
 
 	for (index, sha) in shas.iter().enumerate() {
 		let alias = format!("commit_{index}");
@@ -908,7 +907,7 @@ fn parse_review_request_from_graphql(
 			.or_else(|| Some(github_pull_request_url(source, number))),
 		author,
 	};
-	let mut issues_by_id = std::collections::BTreeMap::<String, HostedIssueRef>::new();
+	let mut issues_by_id = BTreeMap::<String, HostedIssueRef>::new();
 	for issue_number in body
 		.as_deref()
 		.map(extract_closing_issue_numbers)
@@ -1002,7 +1001,7 @@ pub fn plan_released_issue_comments(
 	}
 	let marker = release_comment_marker(&release_tags);
 	let body = release_issue_comment_body(&release_tags, &marker);
-	let mut plans_by_issue = std::collections::BTreeMap::<String, GitHubIssueCommentPlan>::new();
+	let mut plans_by_issue = BTreeMap::<String, GitHubIssueCommentPlan>::new();
 	for issue in manifest
 		.changesets
 		.iter()
@@ -1278,7 +1277,7 @@ async fn create_verified_github_commit_for_release_pull_request(
 			continue;
 		}
 
-		let metadata = std::fs::symlink_metadata(&absolute_path)
+		let metadata = fs::symlink_metadata(&absolute_path)
 			.map_err(|e| format!("failed to read metadata for {}: {}", path.display(), e))?;
 
 		if metadata.is_dir() {
@@ -1287,12 +1286,12 @@ async fn create_verified_github_commit_for_release_pull_request(
 		}
 
 		let (content, mode) = if metadata.is_symlink() {
-			let target = std::fs::read_link(&absolute_path)
+			let target = fs::read_link(&absolute_path)
 				.map_err(|e| format!("failed to read symlink {}: {}", path.display(), e))?;
 			let content = target.to_string_lossy().to_string();
 			(content, "120000")
 		} else {
-			let content = std::fs::read_to_string(&absolute_path)
+			let content = fs::read_to_string(&absolute_path)
 				.map_err(|e| format!("failed to read file {}: {}", path.display(), e))?;
 			let mode = git_blob_mode(&metadata);
 			(content, mode)
@@ -2098,7 +2097,7 @@ fn push_body_entries(lines: &mut Vec<String>, entries: &[String]) {
 }
 
 #[cfg(unix)]
-fn git_blob_mode(metadata: &std::fs::Metadata) -> &'static str {
+fn git_blob_mode(metadata: &fs::Metadata) -> &'static str {
 	use std::os::unix::fs::PermissionsExt;
 
 	if metadata.permissions().mode() & 0o100 != 0 {
@@ -2136,6 +2135,221 @@ fn minimal_release_body(manifest: &ReleaseManifest, target: &ReleaseManifestTarg
 		}
 	}
 	lines.join("\n")
+}
+
+use std::collections::BTreeMap;
+use std::fs;
+
+use monochange_core::TrustedPublishingSettings;
+use monochange_publish::PublishRequest;
+use serde_json::Value as JsonValue;
+use serde_yaml_ng::Value as YamlValue;
+
+pub const GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN: &str = "ACTIONS_ID_TOKEN_REQUEST_TOKEN";
+pub const GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL: &str = "ACTIONS_ID_TOKEN_REQUEST_URL";
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct GitHubTrustContext {
+	pub repository: String,
+	pub workflow: String,
+	pub environment: Option<String>,
+}
+
+pub fn verify_github_trust_context(
+	request: &PublishRequest,
+	root: &Path,
+	env_map: &BTreeMap<String, String>,
+	expected: &GitHubTrustContext,
+	actual_repository: Option<&str>,
+	actual_workflow: Option<&str>,
+	actual_environment: Option<&str>,
+) -> MonochangeResult<()> {
+	let actual_repository = actual_repository.ok_or_else(|| {
+		trusted_publishing_identity_error(
+			request,
+			"GitHub Actions did not expose `GITHUB_REPOSITORY`".to_string(),
+		)
+	})?;
+	if actual_repository != expected.repository {
+		return Err(trusted_publishing_identity_error(
+			request,
+			format!(
+				"expected GitHub repository `{}`, but detected `{actual_repository}`",
+				expected.repository
+			),
+		));
+	}
+
+	let actual_workflow = actual_workflow.ok_or_else(|| {
+		trusted_publishing_identity_error(
+			request,
+			"GitHub Actions did not expose `GITHUB_WORKFLOW_REF` with a workflow filename"
+				.to_string(),
+		)
+	})?;
+	if actual_workflow != expected.workflow {
+		return Err(trusted_publishing_identity_error(
+			request,
+			format!(
+				"expected GitHub workflow `{}`, but detected `{actual_workflow}`",
+				expected.workflow
+			),
+		));
+	}
+
+	if let Some(expected_environment) = expected.environment.as_deref() {
+		let resolved_environment = actual_environment
+			.map(ToString::to_string)
+			.or_else(|| resolve_github_job_environment(root, actual_workflow, env_map));
+		if resolved_environment.as_deref() != Some(expected_environment) {
+			return Err(trusted_publishing_identity_error(
+				request,
+				format!(
+					"expected GitHub environment `{expected_environment}`, but detected `{}`",
+					resolved_environment.as_deref().unwrap_or("none")
+				),
+			));
+		}
+	}
+
+	if !env_map.contains_key(GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL)
+		|| !env_map.contains_key(GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN)
+	{
+		return Err(trusted_publishing_identity_error(
+			request,
+			format!(
+				"GitHub Actions did not expose `{GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL}` and `{GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN}`; grant `id-token: write` to the publish job"
+			),
+		));
+	}
+
+	Ok(())
+}
+
+pub fn trusted_publishing_identity_error(
+	request: &PublishRequest,
+	reason: impl std::fmt::Display,
+) -> MonochangeError {
+	MonochangeError::Config(format!(
+		"`{}` requires trusted publishing from the configured GitHub Actions OIDC identity, but the current context does not match: {reason}. Run `mc publish` from the configured CI workflow or set `publish.trusted_publishing = false` to opt out.",
+		request.package_id,
+	))
+}
+
+pub fn resolve_github_trust_context(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	trust: &TrustedPublishingSettings,
+	env_map: &BTreeMap<String, String>,
+) -> MonochangeResult<GitHubTrustContext> {
+	let repository = trust
+		.repository
+		.clone()
+		.or_else(|| source.map(|source| format!("{}/{}", source.owner, source.repo)))
+		.or_else(|| env_map.get("GITHUB_REPOSITORY").cloned())
+		.ok_or_else(|| {
+			MonochangeError::Config(
+				"trusted publishing could not determine the GitHub repository; set `publish.trusted_publishing.repository`".to_string(),
+			)
+		})?;
+
+	let workflow = trust
+		.workflow
+		.clone()
+		.or_else(|| {
+			env_map
+				.get("GITHUB_WORKFLOW_REF")
+				.and_then(|value| parse_github_workflow_ref(value))
+		})
+		.ok_or_else(|| {
+			MonochangeError::Config(
+				"trusted publishing could not determine the GitHub workflow; set `publish.trusted_publishing.workflow`".to_string(),
+			)
+		})?;
+
+	let environment = trust
+		.environment
+		.clone()
+		.or_else(|| resolve_github_job_environment(root, &workflow, env_map));
+
+	Ok(GitHubTrustContext {
+		repository,
+		workflow,
+		environment,
+	})
+}
+
+pub fn parse_github_workflow_ref(value: &str) -> Option<String> {
+	let (_, path_and_ref) = value.split_once('/')?;
+	let (_, path_and_ref) = path_and_ref.split_once('/')?;
+	let (_, path_and_ref) = path_and_ref.split_once('/')?;
+	let (workflow_path, _) = path_and_ref.split_once('@')?;
+	Path::new(workflow_path)
+		.file_name()
+		.and_then(|name| name.to_str())
+		.map(ToString::to_string)
+}
+
+pub fn resolve_github_job_environment(
+	root: &Path,
+	workflow: &str,
+	env_map: &BTreeMap<String, String>,
+) -> Option<String> {
+	let job_id = env_map.get("GITHUB_JOB")?;
+	let workflow_path = root.join(".github/workflows").join(workflow);
+	let contents = fs::read_to_string(workflow_path).ok()?;
+	let parsed = serde_yaml_ng::from_str::<YamlValue>(&contents).ok()?;
+	let jobs = parsed.get("jobs")?;
+	let job = jobs.get(job_id.as_str())?;
+	match job.get("environment") {
+		Some(YamlValue::String(environment)) => Some(environment.clone()),
+		Some(YamlValue::Mapping(mapping)) => {
+			mapping
+				.get(YamlValue::String("name".to_string()))
+				.and_then(YamlValue::as_str)
+				.map(ToString::to_string)
+		}
+		_ => None,
+	}
+}
+
+pub fn trust_list_contains_context(output: &str, context: &GitHubTrustContext) -> bool {
+	if let Ok(json) = serde_json::from_str::<JsonValue>(output) {
+		let mut required = vec![context.repository.as_str(), context.workflow.as_str()];
+		if let Some(environment) = &context.environment {
+			required.push(environment.as_str());
+		}
+		return required
+			.into_iter()
+			.all(|needle| json_value_contains(&json, needle));
+	}
+
+	output.contains(&context.repository)
+		&& output.contains(&context.workflow)
+		&& context
+			.environment
+			.as_deref()
+			.is_none_or(|environment| output.contains(environment))
+}
+
+pub fn json_value_contains(value: &JsonValue, needle: &str) -> bool {
+	match value {
+		JsonValue::String(text) => text.contains(needle),
+		JsonValue::Array(items) => items.iter().any(|item| json_value_contains(item, needle)),
+		JsonValue::Object(map) => map.values().any(|value| json_value_contains(value, needle)),
+		_ => false,
+	}
+}
+
+pub fn format_manual_trust_context(context: &GitHubTrustContext) -> String {
+	let mut parts = vec![
+		format!("repository `{}`", context.repository),
+		format!("workflow `{}`", context.workflow),
+	];
+	if let Some(environment) = &context.environment {
+		parts.push(format!("environment `{environment}`"));
+	}
+	parts.join(", ")
 }
 
 #[cfg(test)]
