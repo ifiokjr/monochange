@@ -491,6 +491,8 @@ pub struct PreparedRelease {
 	pub updated_changelogs: Vec<PathBuf>,
 	pub deleted_changesets: Vec<PathBuf>,
 	pub dry_run: bool,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub release_record_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]

@@ -2977,6 +2977,8 @@ pub struct ReleaseManifest {
 	pub changesets: Vec<PreparedChangeset>,
 	#[serde(default)]
 	pub deleted_changesets: Vec<PathBuf>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub release_record_path: Option<PathBuf>,
 	pub plan: ReleaseManifestPlan,
 }
 

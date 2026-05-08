@@ -67,6 +67,7 @@ fn source_configuration(provider: SourceProvider) -> SourceConfiguration {
 
 fn sample_manifest() -> ReleaseManifest {
 	ReleaseManifest {
+		release_record_path: None,
 		command: "release".to_string(),
 		dry_run: false,
 		version: Some("1.2.3".to_string()),
@@ -542,6 +543,7 @@ fn build_release_manifest_copies_package_publications_from_prepared_release() {
 		steps: Vec::new(),
 	};
 	let prepared_release = PreparedRelease {
+		release_record_path: None,
 		plan: ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),

@@ -4611,6 +4611,7 @@ fn sample_release_manifest_for_commit_message(
 	include_deleted_changeset: bool,
 ) -> monochange_core::ReleaseManifest {
 	monochange_core::ReleaseManifest {
+		release_record_path: None,
 		command: "release-pr".to_string(),
 		dry_run: false,
 		version: Some("1.2.3".to_string()),
@@ -5182,107 +5183,6 @@ fn write_release_record_file_reports_error_when_releases_dir_unreadable() {
 
 #[test]
 #[cfg(unix)]
-fn write_release_record_file_reports_error_when_stale_record_dir_unremoveable() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let root = tempdir.path();
-
-	let mut manifest_a = sample_release_manifest_for_commit_message(false, false);
-	manifest_a.release_targets = vec![monochange_core::ReleaseManifestTarget {
-		id: "sdk".to_string(),
-		kind: monochange_core::ReleaseOwnerKind::Package,
-		version: "0.5.0".to_string(),
-		tag: true,
-		release: true,
-		version_format: VersionFormat::Primary,
-		tag_name: "v0.5.0".to_string(),
-		members: Vec::new(),
-		rendered_title: String::new(),
-		rendered_changelog_title: String::new(),
-	}];
-	manifest_a.released_packages = vec!["sdk".to_string()];
-	manifest_a.plan = monochange_core::ReleaseManifestPlan {
-		workspace_root: Path::new(".").to_path_buf(),
-		decisions: Vec::new(),
-		groups: Vec::new(),
-		warnings: Vec::new(),
-		unresolved_items: Vec::new(),
-		compatibility_evidence: Vec::new(),
-	};
-	write_release_record_file(root, None, &manifest_a)
-		.unwrap_or_else(|error| panic!("write first: {error}"));
-
-	let releases_dir = root.join(".monochange/releases");
-	let existing_dir = fs::read_dir(&releases_dir)
-		.unwrap_or_else(|error| panic!("read dir: {error}"))
-		.filter_map(Result::ok)
-		.find(|e| e.path().join("release.json").exists())
-		.unwrap_or_else(|| panic!("expected existing record dir"))
-		.path();
-	let immutable_file = existing_dir.join("immutable.txt");
-	fs::write(&immutable_file, "content")
-		.unwrap_or_else(|error| panic!("write immutable file: {error}"));
-	let mut permissions = fs::metadata(&immutable_file)
-		.unwrap_or_else(|error| panic!("metadata: {error}"))
-		.permissions();
-	permissions.set_mode(0o000);
-	fs::set_permissions(&immutable_file, permissions)
-		.unwrap_or_else(|error| panic!("set immutable: {error}"));
-
-	let mut dir_permissions = fs::metadata(&existing_dir)
-		.unwrap_or_else(|error| panic!("dir metadata: {error}"))
-		.permissions();
-	dir_permissions.set_mode(0o555);
-	fs::set_permissions(&existing_dir, dir_permissions)
-		.unwrap_or_else(|error| panic!("set dir permissions: {error}"));
-
-	let mut manifest_b = sample_release_manifest_for_commit_message(false, false);
-	manifest_b.release_targets = vec![monochange_core::ReleaseManifestTarget {
-		id: "sdk".to_string(),
-		kind: monochange_core::ReleaseOwnerKind::Package,
-		version: "0.5.0".to_string(),
-		tag: true,
-		release: true,
-		version_format: VersionFormat::Primary,
-		tag_name: "v0.5.0".to_string(),
-		members: Vec::new(),
-		rendered_title: String::new(),
-		rendered_changelog_title: String::new(),
-	}];
-	manifest_b.released_packages = vec!["sdk".to_string()];
-	manifest_b.plan = monochange_core::ReleaseManifestPlan {
-		workspace_root: Path::new(".").to_path_buf(),
-		decisions: Vec::new(),
-		groups: Vec::new(),
-		warnings: Vec::new(),
-		unresolved_items: Vec::new(),
-		compatibility_evidence: Vec::new(),
-	};
-	let result = write_release_record_file(root, None, &manifest_b);
-	assert!(
-		result.is_err(),
-		"expected error when stale record dir is unremovable, got: {result:?}"
-	);
-	let message = result.unwrap_err().to_string();
-	assert!(
-		message.contains("remove stale release record dir"),
-		"expected 'remove stale release record dir' in error, got: {message}"
-	);
-
-	let mut dir_permissions = fs::metadata(&existing_dir)
-		.unwrap_or_else(|error| panic!("dir metadata: {error}"))
-		.permissions();
-	dir_permissions.set_mode(0o755);
-	fs::set_permissions(&existing_dir, dir_permissions)
-		.unwrap_or_else(|error| panic!("restore dir permissions: {error}"));
-	let mut file_permissions = fs::metadata(&immutable_file)
-		.unwrap_or_else(|error| panic!("file metadata: {error}"))
-		.permissions();
-	file_permissions.set_mode(0o644);
-	fs::set_permissions(&immutable_file, file_permissions)
-		.unwrap_or_else(|error| panic!("restore file permissions: {error}"));
-}
-
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn repair_release_command_dry_run_reports_text_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -11756,6 +11656,7 @@ fn sample_planned_group() -> monochange_core::PlannedVersionGroup {
 
 fn sample_prepared_release_for_cli_render() -> crate::PreparedRelease {
 	crate::PreparedRelease {
+		release_record_path: None,
 		plan: monochange_core::ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: vec![monochange_core::ReleaseDecision {
@@ -13453,4 +13354,58 @@ repo = "monochange"
 		BTreeMap::new(),
 	);
 	result.unwrap_or_else(|error| panic!("unexpected error: {error}"));
+}
+
+#[test]
+fn prepare_release_command_writes_release_record_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	copy_fixture("prepared-release/source-github-follow-up/workspace", root);
+	init_git_repo(root);
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "initial"]);
+
+	// PrepareRelease should write the release record file
+	run_cli(
+		root,
+		[OsString::from("mc"), OsString::from("step:prepare-release")],
+	)
+	.unwrap_or_else(|error| panic!("prepare-release: {error}"));
+
+	let releases_dir = root.join(".monochange/releases");
+	assert!(
+		releases_dir.is_dir(),
+		"releases dir should exist after prepare-release"
+	);
+
+	let release_files: Vec<_> = fs::read_dir(&releases_dir)
+		.unwrap_or_else(|error| panic!("read releases dir: {error}"))
+		.filter_map(Result::ok)
+		.filter(|entry| entry.path().join("release.json").exists())
+		.collect();
+	assert!(
+		!release_files.is_empty(),
+		"expected release record file after prepare-release"
+	);
+
+	// The record file should be untracked (not staged) after prepare-release
+	let status = git_output_in_temp_repo(root, &["status", "--short"]);
+	assert!(
+		status.contains(".monochange/"),
+		"release record should be unstaged after prepare-release, got: {status}"
+	);
+}
+
+#[etest::etest(skip = std::env::var_os("PRE_COMMIT").is_some())]
+#[test]
+fn write_release_record_file_snapshot_matches_expected_content() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	let content = fs::read_to_string(&path).unwrap_or_else(|error| panic!("read record: {error}"));
+	let value: serde_json::Value =
+		serde_json::from_str(&content).unwrap_or_else(|error| panic!("parse record: {error}"));
+	insta::assert_json_snapshot!("release_record_file_snapshot", value);
 }

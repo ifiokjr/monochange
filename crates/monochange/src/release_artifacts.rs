@@ -969,6 +969,7 @@ pub(crate) fn build_release_manifest(
 		package_publications: prepared_release.package_publications.clone(),
 		changesets: prepared_release.changesets.clone(),
 		deleted_changesets: prepared_release.deleted_changesets.clone(),
+		release_record_path: prepared_release.release_record_path.clone(),
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: prepared_release
@@ -1071,6 +1072,7 @@ pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> Rele
 		package_publications: record.package_publications.clone(),
 		changesets: record.changesets.clone(),
 		deleted_changesets: record.deleted_changesets.clone(),
+		release_record_path: None,
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),
@@ -1401,67 +1403,99 @@ pub(crate) fn write_release_record_file(
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let record = build_release_record(source, manifest);
-	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
-	let hash = {
-		use std::collections::hash_map::DefaultHasher;
-		use std::hash::Hasher;
-		let mut hasher = DefaultHasher::new();
-		for target in &record.release_targets {
-			hasher.write(target.id.as_bytes());
-			hasher.write(target.version.as_bytes());
-		}
-		format!("{:016x}", hasher.finish())
-	};
-
-	// Deduplication: remove any existing release records that share a tag version
-	// with this new record. If a previous release record contains the same
-	// (package_id, version) pair, it is stale and should be replaced.
-	let new_tags: std::collections::HashSet<(&str, &str)> = record
-		.release_targets
-		.iter()
-		.map(|target| (target.id.as_str(), target.version.as_str()))
-		.collect();
-
-	let releases_dir = root.join(".monochange/releases");
-	if releases_dir.is_dir() {
-		for entry in fs::read_dir(&releases_dir)
-			.map_err(|error| MonochangeError::Io(format!("read releases dir: {error}")))?
-		{
-			let entry =
-				entry.map_err(|error| MonochangeError::Io(format!("read dir entry: {error}")))?;
-			let path = entry.path();
-			if !path.is_dir() {
-				continue;
-			}
-			let record_file = path.join("release.json");
-			if !record_file.is_file() {
-				continue;
-			}
-			let Ok(content) = fs::read_to_string(&record_file) else {
-				continue;
-			};
-			let Ok(existing) = serde_json::from_str::<ReleaseRecord>(&content) else {
-				continue;
-			};
-			let has_overlap = existing
-				.release_targets
-				.iter()
-				.any(|t| new_tags.contains(&(t.id.as_str(), t.version.as_str())));
-			if has_overlap {
-				fs::remove_dir_all(&path).map_err(|error| {
-					MonochangeError::Io(format!("remove stale release record dir: {error}"))
-				})?;
-			}
-		}
-	}
-
+	let hash = release_targets_hash(&record.release_targets);
 	let dir = root.join(".monochange/releases").join(&hash);
+	deduplicate_overlapping_release_records(root, &record.release_targets, &dir)?;
+	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 	fs::create_dir_all(&dir)
 		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
 	let path = dir.join("release.json");
 	fs::write(&path, json)
 		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
 	Ok(path)
+}
+
+/// Validate that the release record file expected for `manifest` still exists
+/// on disk after re-running deduplication. Called by `commit_release` to
+/// guard against stale or missing records between `prepare_release` and
+/// `commit_release`.
+pub(crate) fn validate_release_record_file(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<PathBuf> {
+	let record = build_release_record(source, manifest);
+	let hash = release_targets_hash(&record.release_targets);
+	let record_dir = root.join(".monochange/releases").join(&hash);
+	let path = record_dir.join("release.json");
+	deduplicate_overlapping_release_records(root, &record.release_targets, &record_dir)?;
+	if !path.is_file() {
+		return Err(MonochangeError::Io(format!(
+			"release record missing at {} — was it removed by deduplication or never written?",
+			path.display()
+		)));
+	}
+	Ok(path)
+}
+
+fn release_targets_hash(release_targets: &[ReleaseRecordTarget]) -> String {
+	use std::collections::hash_map::DefaultHasher;
+	use std::hash::Hasher;
+	let mut hasher = DefaultHasher::new();
+	for target in release_targets {
+		hasher.write(target.id.as_bytes());
+		hasher.write(target.version.as_bytes());
+	}
+	format!("{:016x}", hasher.finish())
+}
+
+fn deduplicate_overlapping_release_records(
+	root: &Path,
+	release_targets: &[ReleaseRecordTarget],
+	current_record_dir: &Path,
+) -> MonochangeResult<()> {
+	let new_tags: std::collections::HashSet<(&str, &str)> = release_targets
+		.iter()
+		.map(|target| (target.id.as_str(), target.version.as_str()))
+		.collect();
+
+	let releases_dir = root.join(".monochange/releases");
+	if !releases_dir.is_dir() {
+		return Ok(());
+	}
+	for entry in fs::read_dir(&releases_dir)
+		.map_err(|error| MonochangeError::Io(format!("read releases dir: {error}")))?
+	{
+		let entry =
+			entry.map_err(|error| MonochangeError::Io(format!("read dir entry: {error}")))?;
+		let path = entry.path();
+		if path == current_record_dir {
+			continue;
+		}
+		if !path.is_dir() {
+			continue;
+		}
+		let record_file = path.join("release.json");
+		if !record_file.is_file() {
+			continue;
+		}
+		let Ok(content) = fs::read_to_string(&record_file) else {
+			continue;
+		};
+		let Ok(existing) = serde_json::from_str::<ReleaseRecord>(&content) else {
+			continue;
+		};
+		let has_overlap = existing
+			.release_targets
+			.iter()
+			.any(|t| new_tags.contains(&(t.id.as_str(), t.version.as_str())));
+		if has_overlap {
+			fs::remove_dir_all(&path).map_err(|error| {
+				MonochangeError::Io(format!("remove stale release record dir: {error}"))
+			})?;
+		}
+	}
+	Ok(())
 }
 
 pub(crate) fn commit_release(
@@ -1473,7 +1507,7 @@ pub(crate) fn commit_release(
 ) -> MonochangeResult<CommitReleaseReport> {
 	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
 	let message = build_release_commit_message(source, manifest);
-	let release_record_path = write_release_record_file(root, source, manifest)?;
+	let release_record_path = validate_release_record_file(root, source, manifest)?;
 	let mut tracked_paths = tracked_paths;
 	tracked_paths.push(release_record_path);
 	if !context.dry_run {

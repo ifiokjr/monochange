@@ -144,6 +144,7 @@ fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 	let configuration = crate::load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("load config: {error}"));
 	let prepared_release = PreparedRelease {
+		release_record_path: None,
 		plan: monochange_core::ReleasePlan {
 			workspace_root: tempdir.path().to_path_buf(),
 			decisions: Vec::new(),
@@ -415,6 +416,7 @@ fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
 	let configuration = crate::load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("load config: {error}"));
 	let prepared_release = PreparedRelease {
+		release_record_path: None,
 		plan: monochange_core::ReleasePlan {
 			workspace_root: tempdir.path().to_path_buf(),
 			decisions: Vec::new(),
