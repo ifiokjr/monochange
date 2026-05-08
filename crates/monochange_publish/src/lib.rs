@@ -1030,8 +1030,12 @@ pub fn order_release_requests_by_publish_dependencies(
 		if !publish_dependency_kind_is_ordering_relevant(edge.dependency_kind) {
 			continue;
 		}
-		let from_package_id = &config_ids_by_record_id[&edge.from_package_id];
-		let to_package_id = &config_ids_by_record_id[&edge.to_package_id];
+		let Some(from_package_id) = config_ids_by_record_id.get(&edge.from_package_id) else {
+			continue;
+		};
+		let Some(to_package_id) = config_ids_by_record_id.get(&edge.to_package_id) else {
+			continue;
+		};
 		if !request_ids.contains(from_package_id) || !request_ids.contains(to_package_id) {
 			continue;
 		}

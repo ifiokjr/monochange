@@ -36,6 +36,7 @@
 pub mod analysis;
 pub mod lints;
 
+type TomlValue = Value;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
@@ -1098,6 +1099,162 @@ fn parse_severity(value: &str) -> BumpSeverity {
 		"patch" => BumpSeverity::Patch,
 		_ => BumpSeverity::None,
 	}
+}
+
+use monochange_core::RegistryKind;
+use monochange_publish::PublishRequest;
+
+pub fn cargo_publish_readiness_blockers(
+	root: &Path,
+	request: &PublishRequest,
+) -> MonochangeResult<Vec<String>> {
+	if request.ecosystem != Ecosystem::Cargo || request.registry != RegistryKind::CratesIo {
+		return Ok(Vec::new());
+	}
+
+	let contents = fs::read_to_string(&request.manifest_path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to read Cargo manifest {}: {error}",
+			request.manifest_path.display()
+		))
+	})?;
+	let parsed = toml::from_str::<TomlValue>(&contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {}: {error}",
+			request.manifest_path.display()
+		))
+	})?;
+	let Some(package) = parsed.get("package").and_then(TomlValue::as_table) else {
+		return Ok(vec!["Cargo manifest is missing [package]".to_string()]);
+	};
+	let workspace_package = read_workspace_package_table(root)?;
+	let mut blockers = Vec::new();
+
+	if package.get("publish").and_then(TomlValue::as_bool) == Some(false) {
+		blockers.push("package.publish is false".to_string());
+	}
+
+	if cargo_publish_array_excludes_crates_io(package) {
+		blockers.push("package.publish does not include crates-io".to_string());
+	}
+
+	if !cargo_string_field_is_present(package, workspace_package.as_ref(), "description") {
+		blockers.push("package.description is required for crates.io".to_string());
+	}
+
+	if !cargo_string_field_is_present(package, workspace_package.as_ref(), "license")
+		&& !cargo_string_field_is_present(package, workspace_package.as_ref(), "license-file")
+	{
+		blockers
+			.push("package.license or package.license-file is required for crates.io".to_string());
+	}
+
+	Ok(blockers)
+}
+
+pub fn cargo_publish_array_excludes_crates_io(package: &WorkspacePackageTable) -> bool {
+	let Some(publish) = package.get("publish") else {
+		return false;
+	};
+	let Some(registries) = publish.as_array() else {
+		return false;
+	};
+
+	!registries
+		.iter()
+		.filter_map(TomlValue::as_str)
+		.any(|registry| registry == "crates-io")
+}
+
+pub fn cargo_string_field_is_present(
+	package: &WorkspacePackageTable,
+	workspace_package: Option<&WorkspacePackageTable>,
+	field: &str,
+) -> bool {
+	if package
+		.get(field)
+		.and_then(TomlValue::as_str)
+		.is_some_and(|value| !value.trim().is_empty())
+	{
+		return true;
+	}
+
+	let inherits_workspace_field = package
+		.get(field)
+		.and_then(TomlValue::as_table)
+		.and_then(|table| table.get("workspace"))
+		.and_then(TomlValue::as_bool)
+		.unwrap_or(false);
+
+	if !inherits_workspace_field {
+		return false;
+	}
+
+	workspace_package
+		.and_then(|package| package.get(field))
+		.and_then(TomlValue::as_str)
+		.is_some_and(|value| !value.trim().is_empty())
+}
+
+pub fn publish_blocked_message(request: &PublishRequest, blockers: &[String]) -> String {
+	format!(
+		"{} {} is not ready to publish to {}: {}",
+		request.package_name,
+		request.version,
+		request.registry,
+		blockers.join("; ")
+	)
+}
+
+type WorkspacePackageTable = toml::map::Map<String, TomlValue>;
+
+pub fn read_workspace_package_table(
+	root: &Path,
+) -> MonochangeResult<Option<WorkspacePackageTable>> {
+	let workspace_manifest_path = root.join("Cargo.toml");
+	let Some(contents) = maybe_read_workspace_manifest_contents(&workspace_manifest_path)? else {
+		return Ok(None);
+	};
+	let parsed = parse_workspace_manifest_value(&workspace_manifest_path, &contents)?;
+	Ok(extract_workspace_package_table(&parsed))
+}
+
+pub fn maybe_read_workspace_manifest_contents(
+	workspace_manifest_path: &Path,
+) -> MonochangeResult<Option<String>> {
+	if !workspace_manifest_path.is_file() {
+		return Ok(None);
+	}
+
+	fs::read_to_string(workspace_manifest_path)
+		.map(Some)
+		.map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read Cargo manifest {}: {error}",
+				workspace_manifest_path.display()
+			))
+		})
+}
+
+pub fn parse_workspace_manifest_value(
+	workspace_manifest_path: &Path,
+	contents: &str,
+) -> MonochangeResult<TomlValue> {
+	toml::from_str::<TomlValue>(contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {}: {error}",
+			workspace_manifest_path.display()
+		))
+	})
+}
+
+pub fn extract_workspace_package_table(parsed: &TomlValue) -> Option<WorkspacePackageTable> {
+	parsed
+		.get("workspace")
+		.and_then(TomlValue::as_table)
+		.and_then(|workspace| workspace.get("package"))
+		.and_then(TomlValue::as_table)
+		.cloned()
 }
 
 #[cfg(test)]
