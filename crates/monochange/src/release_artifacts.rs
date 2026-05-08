@@ -1191,10 +1191,7 @@ pub(crate) fn render_release_commit_body(
 				.join(", ")
 		));
 	}
-	let release_record = build_release_record(source, manifest);
-	let release_record_block = render_release_record_block(&release_record)
-		.unwrap_or_else(|error| panic!("release record generation bug: {error}"));
-	format!("{}\n\n{}", lines.join("\n"), release_record_block)
+	lines.join("\n")
 }
 
 #[must_use = "the manifest render result must be checked"]
@@ -1398,6 +1395,34 @@ pub(crate) fn render_release_cli_command_json(
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
+pub(crate) fn write_release_record_file(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<PathBuf> {
+	let record = build_release_record(source, manifest);
+	let json = serde_json::to_string_pretty(&record).map_err(|error| {
+		MonochangeError::Discovery(format!("release record serialization: {error}"))
+	})?;
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = root.join(".monochange/releases").join(&hash);
+	std::fs::create_dir_all(&dir)
+		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
+	let path = dir.join("release.json");
+	std::fs::write(&path, json)
+		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
+	Ok(path)
+}
+
 pub(crate) fn commit_release(
 	root: &Path,
 	context: &CliContext,
@@ -1407,6 +1432,9 @@ pub(crate) fn commit_release(
 ) -> MonochangeResult<CommitReleaseReport> {
 	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
 	let message = build_release_commit_message(source, manifest);
+	let release_record_path = write_release_record_file(root, source, manifest)?;
+	let mut tracked_paths = tracked_paths;
+	tracked_paths.push(release_record_path);
 	if !context.dry_run {
 		git_stage_paths(root, &tracked_paths)?;
 		git_commit_paths(root, &message, no_verify)?;

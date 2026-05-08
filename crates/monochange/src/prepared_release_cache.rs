@@ -21,7 +21,7 @@ use crate::resolve_config_path;
 use crate::root_relative;
 
 const PREPARED_RELEASE_ARTIFACT_SCHEMA_VERSION: u32 = 1;
-const DEFAULT_PREPARED_RELEASE_CACHE_PATH: &str = ".monochange/prepared-release-cache.json";
+const DEFAULT_PREPARED_RELEASE_CACHE_PATH: &str = ".monochange/local/prepared-release-cache.json";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct LoadedPreparedReleaseExecution {
@@ -423,7 +423,10 @@ pub(crate) fn ensure_monochange_artifact_ignored(
 		})?;
 	}
 	let existing = fs::read_to_string(&exclude_path).unwrap_or_default();
-	if existing.lines().any(|line| line.trim() == ".monochange/") {
+	if existing
+		.lines()
+		.any(|line| line.trim() == ".monochange/local/")
+	{
 		return Ok(());
 	}
 
@@ -431,7 +434,7 @@ pub(crate) fn ensure_monochange_artifact_ignored(
 	if !updated.is_empty() && !updated.ends_with('\n') {
 		updated.push('\n');
 	}
-	updated.push_str(".monochange/\n");
+	updated.push_str(".monochange/local/\n");
 	fs::write(&exclude_path, updated).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to update git exclude file {}: {error}",
