@@ -1401,9 +1401,7 @@ pub(crate) fn write_release_record_file(
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let record = build_release_record(source, manifest);
-	let json = serde_json::to_string_pretty(&record).map_err(|error| {
-		MonochangeError::Discovery(format!("release record serialization: {error}"))
-	})?;
+	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 	let hash = {
 		use std::collections::hash_map::DefaultHasher;
 		use std::hash::Hasher;

@@ -144,6 +144,43 @@ fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 }
 
 #[etest::etest]
+fn release_record_command_skips_malformed_file_based_record_in_ancestry() {
+	let tempdir = setup_release_repo();
+	let repo = tempdir.path();
+	let release_record = sample_release_record();
+	let (record_commit, _) = commit_release_record(repo, &release_record);
+	let malformed_dir = repo.join(".monochange/releases/malformed-record");
+	fs::create_dir_all(&malformed_dir)
+		.unwrap_or_else(|error| panic!("create malformed record dir: {error}"));
+	fs::write(malformed_dir.join("release.json"), "{}")
+		.unwrap_or_else(|error| panic!("write malformed record: {error}"));
+	git(
+		repo,
+		&["add", ".monochange/releases/malformed-record/release.json"],
+	);
+	git(
+		repo,
+		&["commit", "-m", "chore: add malformed release record"],
+	);
+	commit_plain(repo, "fix: follow-up", "release-record/follow-up");
+
+	let output = release_record_output(repo, &["--from", "HEAD", "--format", "json"]);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let parsed: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+		panic!("json: {error}\n{}", String::from_utf8_lossy(&output.stdout))
+	});
+	assert_eq!(
+		parsed["recordCommit"].as_str(),
+		Some(record_commit.as_str()),
+		"expected malformed file-based release record to be skipped"
+	);
+}
+
+#[etest::etest]
 fn release_record_command_reports_unsupported_schema_version() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());

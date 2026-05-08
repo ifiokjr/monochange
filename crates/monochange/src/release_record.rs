@@ -72,13 +72,10 @@ pub fn discover_release_record(
 		if files.is_empty() {
 			continue;
 		}
-		let json_text = read_git_file_at_commit(
-			root,
-			&commit,
-			files
-				.first()
-				.unwrap_or_else(|| panic!("expected at least one release record file")),
-		)?;
+		let Some(record_path) = files.first() else {
+			continue;
+		};
+		let json_text = read_git_file_at_commit(root, &commit, record_path)?;
 		match parse_release_record_json(&json_text) {
 			Ok(record) => {
 				return Ok(ReleaseRecordDiscovery {

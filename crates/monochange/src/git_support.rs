@@ -159,18 +159,15 @@ pub(crate) fn find_release_record_files_at_commit(
 	.any(|line| line.starts_with("parent "));
 
 	if has_parent {
-		let output = run_git_capture(
-			root,
-			&[
-				"diff-tree",
-				"-m",
-				"--no-commit-id",
-				"--name-only",
-				"-r",
-				commit,
-			],
-			"failed to list files at commit",
-		)?;
+		let args = [
+			"diff-tree",
+			"-m",
+			"--no-commit-id",
+			"--name-only",
+			"-r",
+			commit,
+		];
+		let output = run_git_capture(root, &args, "failed to list files at commit")?;
 		Ok(output
 			.lines()
 			.filter(filter)
@@ -179,11 +176,8 @@ pub(crate) fn find_release_record_files_at_commit(
 			.into_iter()
 			.collect())
 	} else {
-		let output = run_git_capture(
-			root,
-			&["ls-tree", "-r", "--name-only", commit],
-			"failed to list files at commit",
-		)?;
+		let args = ["ls-tree", "-r", "--name-only", commit];
+		let output = run_git_capture(root, &args, "failed to list files at commit")?;
 		Ok(output.lines().filter(filter).map(str::to_string).collect())
 	}
 }
