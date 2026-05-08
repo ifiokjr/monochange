@@ -72,10 +72,8 @@ pub fn discover_release_record(
 		if files.is_empty() {
 			continue;
 		}
-		let Some(record_path) = files.first() else {
-			continue;
-		};
-		let json_text = read_git_file_at_commit(root, &commit, record_path)?;
+		let record_path = files.into_iter().next().unwrap_or_default();
+		let json_text = read_git_file_at_commit(root, &commit, &record_path)?;
 		match parse_release_record_json(&json_text) {
 			Ok(record) => {
 				return Ok(ReleaseRecordDiscovery {
@@ -101,12 +99,7 @@ pub fn discover_release_record(
 					version
 				)));
 			}
-			Err(error) => {
-				tracing::debug!(
-					commit = %crate::short_commit_sha(&commit),
-					"skipping malformed release record: {error}"
-				);
-			}
+			Err(_) => {}
 		}
 	}
 	Err(MonochangeError::Discovery(format!(
