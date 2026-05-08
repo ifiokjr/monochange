@@ -15,6 +15,7 @@ in
     [
       cargo-binstall
       cargo-run-bin
+      cargo-workspaces
       cacert
       custom.mdt
       custom.pnpm
