@@ -84,7 +84,6 @@ pub fn discover_release_record(
 					record,
 				});
 			}
-			Err(monochange_core::ReleaseRecordError::NotFound) => {}
 			Err(monochange_core::ReleaseRecordError::UnsupportedSchemaVersion(version)) => {
 				return Err(MonochangeError::Discovery(format!(
 					"release record in commit {} uses unsupported schemaVersion {}",
