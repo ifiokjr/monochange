@@ -105,6 +105,7 @@ expression: redacted
     "warnings": [],
     "workspaceRoot": "."
   },
+  "releaseRecordPath": "[ROOT]/.monochange/releases/[SHA]/release.json",
   "releaseTargets": [
     {
       "id": "app",

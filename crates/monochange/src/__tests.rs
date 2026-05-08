@@ -13407,5 +13407,7 @@ fn write_release_record_file_snapshot_matches_expected_content() {
 	let content = fs::read_to_string(&path).unwrap_or_else(|error| panic!("read record: {error}"));
 	let value: serde_json::Value =
 		serde_json::from_str(&content).unwrap_or_else(|error| panic!("parse record: {error}"));
+	let mut value = value;
+	value["createdAt"] = serde_json::Value::String("[timestamp]".to_string());
 	insta::assert_json_snapshot!("release_record_file_snapshot", value);
 }

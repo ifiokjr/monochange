@@ -448,6 +448,7 @@ mod tests {
 
 	fn sample_manifest() -> ReleaseManifest {
 		ReleaseManifest {
+			release_record_path: None,
 			command: "release".to_string(),
 			dry_run: false,
 			version: None,
@@ -601,6 +602,7 @@ mod tests {
 	#[test]
 	fn release_pull_request_body_includes_command_and_targets() {
 		let manifest = ReleaseManifest {
+			release_record_path: None,
 			command: "release".to_string(),
 			dry_run: false,
 			version: None,
@@ -649,6 +651,7 @@ mod tests {
 	#[test]
 	fn release_pull_request_body_lists_changed_files() {
 		let manifest = ReleaseManifest {
+			release_record_path: None,
 			command: "release".to_string(),
 			dry_run: false,
 			version: None,
@@ -722,6 +725,7 @@ mod tests {
 	#[test]
 	fn minimal_release_body_with_decision_reasons() {
 		let manifest = ReleaseManifest {
+			release_record_path: None,
 			command: "release".to_string(),
 			dry_run: false,
 			version: None,

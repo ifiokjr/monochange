@@ -9,7 +9,7 @@ expression: value
   "changelogs": [],
   "changesets": [],
   "command": "release-pr",
-  "createdAt": "2026-05-08T20:43:31Z",
+  "createdAt": "[timestamp]",
   "deletedChangesets": [],
   "groupVersion": "1.2.3",
   "kind": "monochange.releaseRecord",

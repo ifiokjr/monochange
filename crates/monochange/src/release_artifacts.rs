@@ -1405,11 +1405,19 @@ pub(crate) fn write_release_record_file(
 	let record = build_release_record(source, manifest);
 	let hash = release_targets_hash(&record.release_targets);
 	let dir = root.join(".monochange/releases").join(&hash);
+	let path = dir.join("release.json");
+
+	// If the record already exists, return it without overwriting so that
+	// subsequent PrepareRelease steps (for example during `mc release-pr`)
+	// do not produce a dirty working tree.
+	if path.is_file() {
+		return Ok(path);
+	}
+
 	deduplicate_overlapping_release_records(root, &record.release_targets, &dir)?;
 	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 	fs::create_dir_all(&dir)
 		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
-	let path = dir.join("release.json");
 	fs::write(&path, json)
 		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
 	Ok(path)
@@ -1429,7 +1437,15 @@ pub(crate) fn validate_release_record_file(
 	let record_dir = root.join(".monochange/releases").join(&hash);
 	let path = record_dir.join("release.json");
 	deduplicate_overlapping_release_records(root, &record.release_targets, &record_dir)?;
-	if !path.is_file() {
+	if path.is_file() {
+		let json = serde_json::to_string_pretty(&record).unwrap_or_default();
+		let existing = fs::read_to_string(&path)
+			.map_err(|error| MonochangeError::Io(format!("read release record: {error}")))?;
+		if existing != json {
+			fs::write(&path, json)
+				.map_err(|error| MonochangeError::Io(format!("update release record: {error}")))?;
+		}
+	} else {
 		return Err(MonochangeError::Io(format!(
 			"release record missing at {} — was it removed by deduplication or never written?",
 			path.display()

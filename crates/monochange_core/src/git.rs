@@ -85,7 +85,7 @@ pub fn git_checkout_branch_command(root: &Path, branch: &str) -> Command {
 #[must_use]
 pub fn git_stage_paths_command(root: &Path, tracked_paths: &[PathBuf]) -> Command {
 	let mut command = git_command(root);
-	command.arg("add").arg("-A").arg("--");
+	command.arg("add").arg("-A").arg("-f").arg("--");
 	for path in tracked_paths {
 		command.arg(path);
 	}
