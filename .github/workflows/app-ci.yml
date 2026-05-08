@@ -166,8 +166,11 @@ jobs:
 
       - name: generate coverage
         run: |
+          mv .cargo/config.toml .cargo/config.toml.bak
           cd apps/monochange_app
-          cargo --config 'alias.llvm-cov=[]' llvm-cov --workspace --lcov --output-path lcov.info
+          cargo llvm-cov --workspace --lcov --output-path lcov.info
+          cd ../..
+          mv .cargo/config.toml.bak .cargo/config.toml
         shell: devenv shell -- bash -e {0}
 
       - name: upload coverage to codecov
