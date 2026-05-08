@@ -122,7 +122,7 @@ jobs:
       - name: install playwright browsers
         run: |
           cd apps/monochange_app
-          npx playwright install chromium --with-deps
+          pnpm exec playwright install chromium --with-deps
         shell: devenv shell -- bash -e {0}
 
       - name: run end-to-end tests
