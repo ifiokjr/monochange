@@ -14,7 +14,10 @@ description = "Publishing support and trusted-publishing capabilities for monoch
 
 [dependencies]
 monochange_core = { workspace = true }
+reqwest = { workspace = true, features = ["blocking", "json"] }
 serde = { workspace = true, default-features = true }
+serde_json = { workspace = true }
+urlencoding = { workspace = true }
 
 [lints]
 workspace = true

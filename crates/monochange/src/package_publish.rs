@@ -14,7 +14,6 @@ use monochange_core::PackagePublicationTarget;
 use monochange_core::PackageRecord;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
-use monochange_core::PublishState;
 use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
@@ -26,18 +25,19 @@ pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
 pub(crate) use monochange_publish::PackagePublishStatus;
 pub(crate) use monochange_publish::PublishRequest;
+use monochange_publish::RegistryEndpoints;
 use monochange_publish::TrustedPublishingIdentity;
 pub(crate) use monochange_publish::TrustedPublishingOutcome;
 pub(crate) use monochange_publish::TrustedPublishingStatus;
 use monochange_publish::build_publish_command;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::go_module_path;
-use monochange_publish::go_proxy_module_path;
-use monochange_publish::go_proxy_version;
+use monochange_publish::package_can_be_published;
 use monochange_publish::provider_registry_trust_capability;
+use monochange_publish::registry_client;
+use monochange_publish::registry_version_exists;
 use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use serde_json::Value as JsonValue;
 use serde_yaml_ng::Value as YamlValue;
@@ -89,38 +89,6 @@ impl CommandExecutor for ProcessCommandExecutor {
 			stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
 			stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
 		})
-	}
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct RegistryEndpoints {
-	pub(crate) npm_registry: String,
-	pub(crate) crates_io_api: String,
-	pub(crate) crates_io_index: String,
-	pub(crate) pub_dev_api: String,
-	pub(crate) jsr_base: String,
-	pub(crate) pypi_api: String,
-	pub(crate) go_proxy: String,
-}
-
-impl RegistryEndpoints {
-	pub(crate) fn from_env() -> Self {
-		Self {
-			npm_registry: env::var("MONOCHANGE_NPM_REGISTRY_URL")
-				.unwrap_or_else(|_| "https://registry.npmjs.org".to_string()),
-			crates_io_api: env::var("MONOCHANGE_CRATES_IO_API_URL")
-				.unwrap_or_else(|_| "https://crates.io/api/v1".to_string()),
-			crates_io_index: env::var("MONOCHANGE_CRATES_IO_INDEX_URL")
-				.unwrap_or_else(|_| "https://index.crates.io".to_string()),
-			pub_dev_api: env::var("MONOCHANGE_PUB_DEV_API_URL")
-				.unwrap_or_else(|_| "https://pub.dev/api".to_string()),
-			jsr_base: env::var("MONOCHANGE_JSR_BASE_URL")
-				.unwrap_or_else(|_| "https://jsr.io".to_string()),
-			pypi_api: env::var("MONOCHANGE_PYPI_API_URL")
-				.unwrap_or_else(|_| "https://pypi.org/pypi".to_string()),
-			go_proxy: env::var("MONOCHANGE_GO_PROXY_URL")
-				.unwrap_or_else(|_| "https://proxy.golang.org".to_string()),
-		}
 	}
 }
 
@@ -213,8 +181,12 @@ fn run_publish_packages_with_publications_and_resume(
 	resume_path: Option<&Path>,
 ) -> MonochangeResult<PackagePublishReport> {
 	let discovery = discover_workspace(root)?;
-	#[rustfmt::skip]
-	let requests = build_release_requests(configuration, &discovery.packages, publication_targets, selected_packages)?;
+	let requests = build_release_requests(
+		configuration,
+		&discovery.packages,
+		publication_targets,
+		selected_packages,
+	)?;
 	let previous_report = resume_path.map(read_publish_report_artifact).transpose()?;
 	let (requests, resumed_outcomes) =
 		resume_publish_requests(&requests, previous_report.as_ref())?;
@@ -424,24 +396,6 @@ pub(crate) fn release_record_package_publications_from_prepared_or_head(
 
 fn current_env_map() -> BTreeMap<String, String> {
 	env::vars().collect()
-}
-
-fn registry_client() -> MonochangeResult<Client> {
-	Client::builder()
-		.user_agent(format!("monochange/{}", env!("CARGO_PKG_VERSION")))
-		.build()
-		.map_err(http_error("registry client build"))
-}
-
-fn package_can_be_published(
-	package_definition: &monochange_core::PackageDefinition,
-	package: &PackageRecord,
-) -> bool {
-	package_definition.publish.enabled
-		&& !matches!(
-			package.publish_state,
-			PublishState::Private | PublishState::Excluded
-		)
 }
 
 pub(crate) fn build_placeholder_requests(
@@ -678,34 +632,6 @@ fn render_publish_dependency_cycle(
 		})
 		.collect::<Vec<_>>();
 	cycle_edges.join(", ")
-}
-
-pub(crate) fn filter_pending_publish_requests(
-	requests: &[PublishRequest],
-) -> MonochangeResult<Vec<PublishRequest>> {
-	let client = registry_client()?;
-	let endpoints = RegistryEndpoints::from_env();
-	filter_pending_publish_requests_with_transport(requests, &client, &endpoints)
-}
-
-pub(crate) fn filter_pending_publish_requests_with_transport(
-	requests: &[PublishRequest],
-	client: &Client,
-	endpoints: &RegistryEndpoints,
-) -> MonochangeResult<Vec<PublishRequest>> {
-	let mut pending_requests = Vec::with_capacity(requests.len());
-
-	for request in requests {
-		if request.mode == PublishMode::External {
-			continue;
-		}
-		if registry_version_exists(client, endpoints, request)? {
-			continue;
-		}
-		pending_requests.push(request.clone());
-	}
-
-	Ok(pending_requests)
 }
 
 fn packages_by_config_id(packages: &[PackageRecord]) -> BTreeMap<&str, &PackageRecord> {
@@ -1993,250 +1919,6 @@ fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
 	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
 }
 
-fn registry_version_exists(
-	client: &Client,
-	endpoints: &RegistryEndpoints,
-	request: &PublishRequest,
-) -> MonochangeResult<bool> {
-	if request.registry == RegistryKind::Npm {
-		let url = format!(
-			"{}/{}",
-			endpoints.npm_registry.trim_end_matches('/'),
-			encode(&request.package_name)
-		);
-		let response = client
-			.get(url)
-			.send()
-			.map_err(http_error("npm registry lookup"))?;
-		if response.status() == StatusCode::NOT_FOUND {
-			return Ok(false);
-		}
-
-		let response = response
-			.error_for_status()
-			.map_err(http_error("npm registry lookup"))?;
-		let json = response
-			.json::<JsonValue>()
-			.map_err(http_error("npm registry decode"))?;
-		let exists = json
-			.get("versions")
-			.and_then(JsonValue::as_object)
-			.is_some_and(|versions| {
-				request.placeholder && !versions.is_empty()
-					|| versions.contains_key(&request.version)
-			});
-		return Ok(exists);
-	}
-
-	if request.registry == RegistryKind::CratesIo {
-		return crates_io_version_exists(client, endpoints, request);
-	}
-
-	if request.registry == RegistryKind::PubDev {
-		let url = format!(
-			"{}/packages/{}",
-			endpoints.pub_dev_api.trim_end_matches('/'),
-			encode(&request.package_name)
-		);
-		let response = client
-			.get(url)
-			.send()
-			.map_err(http_error("pub.dev lookup"))?;
-		if response.status() == StatusCode::NOT_FOUND {
-			return Ok(false);
-		}
-
-		let response = response
-			.error_for_status()
-			.map_err(http_error("pub.dev lookup"))?;
-		let json = response
-			.json::<JsonValue>()
-			.map_err(http_error("pub.dev decode"))?;
-		let exists = json
-			.get("versions")
-			.and_then(JsonValue::as_array)
-			.is_some_and(|versions| {
-				request.placeholder && !versions.is_empty()
-					|| versions.iter().any(|version| {
-						version.get("version").and_then(JsonValue::as_str)
-							== Some(request.version.as_str())
-					})
-			});
-		return Ok(exists);
-	}
-
-	if request.registry == RegistryKind::Pypi {
-		let url = format!(
-			"{}/{}/json",
-			endpoints.pypi_api.trim_end_matches('/'),
-			encode(&request.package_name)
-		);
-		let response = client.get(url).send().map_err(http_error("PyPI lookup"))?;
-		if response.status() == StatusCode::NOT_FOUND {
-			return Ok(false);
-		}
-		let response = response
-			.error_for_status()
-			.map_err(http_error("PyPI lookup"))?;
-		let json = response
-			.json::<JsonValue>()
-			.map_err(http_error("PyPI decode"))?;
-		let exists = json
-			.get("releases")
-			.and_then(JsonValue::as_object)
-			.is_some_and(|releases| {
-				request.placeholder && !releases.is_empty()
-					|| releases.contains_key(&request.version)
-			});
-		return Ok(exists);
-	}
-
-	if request.registry == RegistryKind::GoProxy {
-		let url = format!(
-			"{}/{}/@v/{}.info",
-			endpoints.go_proxy.trim_end_matches('/'),
-			go_proxy_module_path(go_module_path(request)),
-			go_proxy_version(&request.version)
-		);
-		let response = client
-			.get(url)
-			.send()
-			.map_err(http_error("Go proxy version lookup"))?;
-		if response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::GONE {
-			return Ok(false);
-		}
-		response
-			.error_for_status()
-			.map_err(http_error("Go proxy version lookup"))?;
-		return Ok(true);
-	}
-
-	let url = format!(
-		"{}/{}/meta.json",
-		endpoints.jsr_base.trim_end_matches('/'),
-		request.package_name
-	);
-	let response = client.get(url).send().map_err(http_error("jsr lookup"))?;
-	if response.status() == StatusCode::NOT_FOUND {
-		return Ok(false);
-	}
-
-	let response = response
-		.error_for_status()
-		.map_err(http_error("jsr lookup"))?;
-	let json = response
-		.json::<JsonValue>()
-		.map_err(http_error("jsr decode"))?;
-	let exists = json
-		.get("versions")
-		.and_then(JsonValue::as_object)
-		.is_some_and(|versions| {
-			request.placeholder && !versions.is_empty() || versions.contains_key(&request.version)
-		});
-	Ok(exists)
-}
-
-fn crates_io_version_exists(
-	client: &Client,
-	endpoints: &RegistryEndpoints,
-	request: &PublishRequest,
-) -> MonochangeResult<bool> {
-	let url = format!(
-		"{}/crates/{}",
-		endpoints.crates_io_api.trim_end_matches('/'),
-		encode(&request.package_name)
-	);
-	let response = client
-		.get(url)
-		.send()
-		.map_err(http_error("crates.io lookup"))?;
-	let status = response.status();
-
-	if status == StatusCode::NOT_FOUND {
-		return Ok(false);
-	}
-
-	if status.is_success() {
-		let json = response
-			.json::<JsonValue>()
-			.map_err(http_error("crates.io decode"))?;
-		let exists = json
-			.get("versions")
-			.and_then(JsonValue::as_array)
-			.is_some_and(|versions| {
-				request.placeholder && !versions.is_empty()
-					|| versions.iter().any(|version| {
-						version.get("num").and_then(JsonValue::as_str)
-							== Some(request.version.as_str())
-					})
-			});
-		return Ok(exists);
-	}
-
-	crates_io_index_version_exists(client, endpoints, request).map_err(|error| {
-		MonochangeError::Discovery(format!(
-			"crates.io lookup failed with http status {status}; crates.io index fallback failed: {error}"
-		))
-	})
-}
-
-fn crates_io_index_version_exists(
-	client: &Client,
-	endpoints: &RegistryEndpoints,
-	request: &PublishRequest,
-) -> MonochangeResult<bool> {
-	let url = format!(
-		"{}/{}",
-		endpoints.crates_io_index.trim_end_matches('/'),
-		crates_io_index_entry_path(&request.package_name)
-	);
-	let response = client
-		.get(url)
-		.send()
-		.map_err(http_error("crates.io index lookup"))?;
-
-	if response.status() == StatusCode::NOT_FOUND {
-		return Ok(false);
-	}
-
-	let response = response
-		.error_for_status()
-		.map_err(http_error("crates.io index lookup"))?;
-	let body = response
-		.text()
-		.map_err(http_error("crates.io index decode"))?;
-
-	for line in body.lines().filter(|line| !line.trim().is_empty()) {
-		let entry = serde_json::from_str::<JsonValue>(line).map_err(|error| {
-			MonochangeError::Discovery(format!("crates.io index decode failed: {error}"))
-		})?;
-		let Some(version) = entry.get("vers").and_then(JsonValue::as_str) else {
-			continue;
-		};
-
-		if request.placeholder || version == request.version {
-			return Ok(true);
-		}
-	}
-
-	Ok(false)
-}
-
-fn crates_io_index_entry_path(package_name: &str) -> String {
-	let normalized = package_name.to_ascii_lowercase();
-	match normalized.len() {
-		0 => String::new(),
-		1 => format!("1/{normalized}"),
-		2 => format!("2/{normalized}"),
-		3 => format!("3/{}/{normalized}", &normalized[..1]),
-		_ => format!("{}/{}/{}", &normalized[..2], &normalized[2..4], normalized),
-	}
-}
-
-fn http_error(context: &'static str) -> impl Fn(reqwest::Error) -> MonochangeError {
-	move |error| MonochangeError::Discovery(format!("{context} failed: {error}"))
-}
-
 fn disabled_trust_outcome() -> TrustedPublishingOutcome {
 	TrustedPublishingOutcome {
 		status: TrustedPublishingStatus::Disabled,
@@ -2364,12 +2046,16 @@ mod tests {
 	use monochange_core::PackageRecord;
 	use monochange_core::PublishAttestationSettings;
 	use monochange_core::PublishRegistry;
+	use monochange_core::PublishState;
 	use monochange_core::ReleaseRecord;
 	use monochange_core::SourceProvider;
 	use monochange_core::render_release_record_block;
 	use monochange_publish::append_publish_dry_run_args;
 	use monochange_publish::build_npm_placeholder_publish_command;
 	use monochange_publish::build_npm_release_publish_command;
+	use monochange_publish::crates_io_index_entry_path;
+	use monochange_publish::crates_io_index_version_exists;
+	use monochange_publish::filter_pending_publish_requests_with_transport;
 	use monochange_test_helpers::git;
 	use semver::Version;
 	use temp_env::with_vars;

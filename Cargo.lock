@@ -2420,7 +2420,10 @@ name = "monochange_publish"
 version = "0.3.4"
 dependencies = [
  "monochange_core",
+ "reqwest",
  "serde",
+ "serde_json",
+ "urlencoding",
 ]
 
 [[package]]
