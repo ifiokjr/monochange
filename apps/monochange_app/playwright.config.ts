@@ -35,7 +35,7 @@ export default defineConfig({
 	webServer: startLocalServer
 		? {
 				command: process.env.CI
-					? "cargo leptos serve"
+					? "$HOME/.cargo/bin/cargo-leptos serve"
 					: "bash -lc 'set -e; devenv processes list 2>/dev/null | grep -q \"^postgres[[:space:]]\" || devenv up -d postgres; exec devenv shell cargo leptos --manifest-path apps/monochange_app/crates/monochange_app/Cargo.toml serve'",
 				cwd: process.env.CI ? join(repoRoot, "apps/monochange_app") : repoRoot,
 				reuseExistingServer: !process.env.CI,
