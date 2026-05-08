@@ -1381,3 +1381,13 @@ fn rust_semver_provider_returns_none_for_non_cargo_packages() {
 		None::<CompatibilityAssessment>
 	);
 }
+
+#[test]
+fn default_dependency_version_prefix_is_correct() {
+	assert_eq!(super::default_dependency_version_prefix(), "");
+}
+
+#[test]
+fn default_dependency_fields_are_non_empty() {
+	assert!(!super::default_dependency_fields().is_empty());
+}

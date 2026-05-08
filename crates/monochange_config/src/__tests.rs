@@ -4506,28 +4506,6 @@ fn raw_changelog_config_resolves_package_and_group_paths() {
 }
 
 #[test]
-fn configured_version_field_helpers_cover_custom_and_default_cases() {
-	let custom_fields = vec![
-		"package.metadata.release.version".to_string(),
-		"version".to_string(),
-	];
-
-	assert_eq!(
-		crate::configured_cargo_version_fields(Some(&custom_fields)),
-		vec!["package.metadata.release.version", "version"]
-	);
-	assert_eq!(
-		crate::configured_cargo_version_fields(None),
-		vec!["package.version", "workspace.package.version", "version"]
-	);
-	assert_eq!(
-		crate::configured_primary_version_field(Some(&custom_fields)),
-		"package.metadata.release.version"
-	);
-	assert_eq!(crate::configured_primary_version_field(None), "version");
-}
-
-#[test]
 fn validate_ecosystem_version_readable_reports_missing_json_and_yaml_string_fields() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();

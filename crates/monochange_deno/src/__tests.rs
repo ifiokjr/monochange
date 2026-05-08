@@ -152,3 +152,13 @@ fn default_lockfile_commands_do_not_infer_a_deno_command() {
 	);
 	assert!(default_lockfile_commands(&package).is_empty());
 }
+
+#[test]
+fn default_dependency_version_prefix_is_correct() {
+	assert_eq!(super::default_dependency_version_prefix(), "^");
+}
+
+#[test]
+fn default_dependency_fields_are_non_empty() {
+	assert!(!super::default_dependency_fields().is_empty());
+}

@@ -4992,101 +4992,40 @@ fn validate_ecosystem_version_readable(
 	owner_kind: &str,
 	owner_id: &str,
 ) -> MonochangeResult<()> {
-	let contents = fs::read_to_string(full_path).map_err(|error| {
-		MonochangeError::Io(format!("failed to read `{display_path}`: {error}"))
-	})?;
-
-	match ecosystem_type {
+	let result = match ecosystem_type {
 		EcosystemType::Cargo => {
-			let doc: toml::Value = toml::from_str(&contents).map_err(|error| {
-				MonochangeError::Config(format!(
-					"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid TOML: {error}"
-				))
-			})?;
-			let field_paths = configured_cargo_version_fields(fields);
-
-			if !field_paths
-				.iter()
-				.any(|field_path| toml_string_field_exists(&doc, field_path))
-			{
-				return Err(MonochangeError::Config(format!(
-					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a readable version field (checked: {})",
-					field_paths.join(", ")
-				)));
-			}
+			monochange_cargo::validate_versioned_file(full_path, display_path, fields)
 		}
-		EcosystemType::Npm | EcosystemType::Deno => {
-			let json: serde_json::Value = serde_json::from_str(&contents).map_err(|error| {
-				MonochangeError::Config(format!(
-					"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid JSON: {error}"
-				))
-			})?;
-			let field_name = configured_primary_version_field(fields);
-
-			if json
-				.get(field_name)
-				.and_then(|value| value.as_str())
-				.is_none()
-			{
-				return Err(MonochangeError::Config(format!(
-					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `{field_name}` string field"
-				)));
-			}
+		EcosystemType::Npm => {
+			monochange_npm::validate_versioned_file(full_path, display_path, fields)
+		}
+		EcosystemType::Deno => {
+			monochange_deno::validate_versioned_file(full_path, display_path, fields)
 		}
 		EcosystemType::Dart => {
-			let yaml: serde_yaml_ng::Value =
-				serde_yaml_ng::from_str(&contents).map_err(|error| {
-					MonochangeError::Config(format!(
-						"{owner_kind} `{owner_id}` versioned file `{display_path}` is not valid YAML: {error}"
-					))
-				})?;
-
-			if yaml
-				.get("version")
-				.and_then(|value| value.as_str())
-				.is_none()
-			{
-				return Err(MonochangeError::Config(format!(
-					"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `version` string field"
-				)));
-			}
+			monochange_dart::validate_versioned_file(full_path, display_path, fields)
+		}
+		EcosystemType::Python => {
+			monochange_python::validate_versioned_file(full_path, display_path, fields)
+		}
+		EcosystemType::Go => {
+			monochange_go::validate_versioned_file(full_path, display_path, fields)
 		}
 		_ => {
 			return Err(MonochangeError::Config(format!(
 				"{owner_kind} `{owner_id}` versioned file `{display_path}` is not supported for the configured ecosystem"
 			)));
 		}
-	}
+	};
 
-	Ok(())
-}
-
-fn configured_cargo_version_fields(fields: Option<&[String]>) -> Vec<&str> {
-	match fields {
-		Some(fields) if !fields.is_empty() => fields.iter().map(String::as_str).collect(),
-		_ => vec!["package.version", "workspace.package.version", "version"],
-	}
-}
-
-fn toml_string_field_exists(value: &toml::Value, field_path: &str) -> bool {
-	let mut current = value;
-
-	for part in field_path.split('.') {
-		let Some(next) = current.get(part) else {
-			return false;
-		};
-
-		current = next;
-	}
-
-	current.is_str()
-}
-
-fn configured_primary_version_field(fields: Option<&[String]>) -> &str {
-	match fields {
-		Some(fields) if !fields.is_empty() => fields.first().map_or("version", String::as_str),
-		_ => "version",
-	}
+	result.map_err(|error| {
+		match error {
+			MonochangeError::Config(msg) => {
+				MonochangeError::Config(format!("{owner_kind} `{owner_id}` {msg}"))
+			}
+			other => other,
+		}
+	})
 }
 
 fn validate_changeset_targets(

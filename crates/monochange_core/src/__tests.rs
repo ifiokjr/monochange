@@ -235,16 +235,22 @@ fn publish_mode_and_registry_kind_display_canonical_names() {
 fn go_package_type_and_ecosystem_defaults_are_canonical() {
 	assert_eq!(PackageType::Go.as_str(), "go");
 	assert_eq!(Ecosystem::Go.as_str(), "go");
-	assert_eq!(EcosystemType::Go.default_prefix(), "");
-	assert_eq!(EcosystemType::Go.default_fields(), ["require"]);
+	#[allow(deprecated)]
+	{
+		assert_eq!(EcosystemType::Go.default_prefix(), "");
+		assert_eq!(EcosystemType::Go.default_fields(), ["require"]);
+	}
 }
 
 #[test]
 fn python_package_type_and_ecosystem_defaults_are_canonical() {
 	assert_eq!(PackageType::Python.as_str(), "python");
 	assert_eq!(Ecosystem::Python.as_str(), "python");
-	assert_eq!(EcosystemType::Python.default_prefix(), ">=");
-	assert_eq!(EcosystemType::Python.default_fields(), ["dependencies"]);
+	#[allow(deprecated)]
+	{
+		assert_eq!(EcosystemType::Python.default_prefix(), ">=");
+		assert_eq!(EcosystemType::Python.default_fields(), ["dependencies"]);
+	}
 }
 
 #[test]

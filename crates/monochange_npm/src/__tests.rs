@@ -897,3 +897,13 @@ fn update_bun_lock_and_binary_skip_unusable_replacements() {
 	);
 	assert_eq!(binary, b"core@1.0.0\0same@2.0.0\0empty@\0");
 }
+
+#[test]
+fn default_dependency_version_prefix_is_correct() {
+	assert_eq!(super::default_dependency_version_prefix(), "^");
+}
+
+#[test]
+fn default_dependency_fields_are_non_empty() {
+	assert!(!super::default_dependency_fields().is_empty());
+}

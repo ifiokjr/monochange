@@ -8143,7 +8143,7 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 	};
 	assert_eq!(
 		crate::resolve_versioned_prefix(&fallback, &context),
-		monochange_core::EcosystemType::Deno.default_prefix()
+		monochange_deno::default_dependency_version_prefix()
 	);
 
 	let python = monochange_core::VersionedFileDefinition {
@@ -8155,12 +8155,9 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 		regex: None,
 	};
 	assert_eq!(crate::resolve_versioned_prefix(&python, &context), "~=");
+	assert_eq!(monochange_python::default_dependency_version_prefix(), ">=");
 	assert_eq!(
-		monochange_core::EcosystemType::Python.default_prefix(),
-		">="
-	);
-	assert_eq!(
-		monochange_core::EcosystemType::Python.default_fields(),
+		monochange_python::default_dependency_fields(),
 		["dependencies"]
 	);
 }

@@ -596,3 +596,13 @@ fn update_go_mod_text_handles_retract_directive() {
 	assert!(result.contains("retract v0.1.0"));
 	assert!(result.contains("require github.com/example/shared v2.0.0"));
 }
+
+#[test]
+fn default_dependency_version_prefix_is_correct() {
+	assert_eq!(super::default_dependency_version_prefix(), "");
+}
+
+#[test]
+fn default_dependency_fields_are_non_empty() {
+	assert!(!super::default_dependency_fields().is_empty());
+}

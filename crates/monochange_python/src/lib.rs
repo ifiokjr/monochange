@@ -641,5 +641,28 @@ fn should_descend(entry: &DirEntry) -> bool {
 	)
 }
 
+/// Return the default dependency-version prefix for this ecosystem.
+/// Validate that a Python versioned file contains a readable version field.
+///
+/// Currently returns `Ok(())` because Python ecosystem files (pyproject.toml)
+/// are not validated at the config layer.
+pub fn validate_versioned_file(
+	_full_path: &Path,
+	_display_path: &str,
+	_custom_fields: Option<&[String]>,
+) -> MonochangeResult<()> {
+	Ok(())
+}
+
+#[must_use]
+pub fn default_dependency_version_prefix() -> &'static str {
+	">="
+}
+
+/// Return the manifest fields that usually contain dependency versions.
+#[must_use]
+pub fn default_dependency_fields() -> &'static [&'static str] {
+	&["dependencies"]
+}
 #[cfg(test)]
 mod __tests;
