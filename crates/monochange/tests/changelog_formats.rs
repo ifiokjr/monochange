@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 use std::fs;
 
 use insta::assert_snapshot;

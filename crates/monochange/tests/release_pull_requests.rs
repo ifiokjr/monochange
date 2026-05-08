@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 use rstest::rstest;
 
 mod test_support;

@@ -129,8 +129,8 @@ fn evaluate_path(value: &Value, path: &str) -> Vec<Value> {
 	let mut current = vec![value.clone()];
 	let chars = path.chars().collect::<Vec<_>>();
 	let mut index = 1;
-	while index < chars.len() {
-		match chars[index] {
+	while let Some(character) = chars.get(index).copied() {
+		match character {
 			'.' => index += 1,
 			'[' if chars.get(index + 1) == Some(&']') => {
 				current = current
@@ -145,17 +145,16 @@ fn evaluate_path(value: &Value, path: &str) -> Vec<Value> {
 				index += 2;
 			}
 			'[' => {
-				let Some(end) = chars[index..]
-					.iter()
-					.position(|character| *character == ']')
+				let Some(end) = chars
+					.get(index..)
+					.and_then(|remaining| remaining.iter().position(|character| *character == ']'))
 				else {
 					return Vec::new();
 				};
 				let end = index + end;
-				let Ok(array_index) = chars[index + 1..end]
-					.iter()
-					.collect::<String>()
-					.parse::<usize>()
+				let Some(array_index) = chars
+					.get(index + 1..end)
+					.and_then(|range| range.iter().collect::<String>().parse::<usize>().ok())
 				else {
 					return Vec::new();
 				};
@@ -172,13 +171,20 @@ fn evaluate_path(value: &Value, path: &str) -> Vec<Value> {
 			}
 			_ => {
 				let start = index;
-				while index < chars.len() && is_field_character(chars[index]) {
+				while chars
+					.get(index)
+					.is_some_and(|character| is_field_character(*character))
+				{
 					index += 1;
 				}
 				if start == index {
 					return Vec::new();
 				}
-				let field = chars[start..index].iter().collect::<String>();
+				let field = chars
+					.iter()
+					.skip(start)
+					.take(index - start)
+					.collect::<String>();
 				current = current
 					.into_iter()
 					.filter_map(|candidate| {
@@ -256,9 +262,11 @@ fn split_top_level_and(expression: &str) -> Vec<&str> {
 			'(' | '[' => depth += 1,
 			')' | ']' => depth = depth.saturating_sub(1),
 			'a' if depth == 0 && expression[index..].starts_with("and") => {
-				let before = index == 0 || bytes[index - 1].is_ascii_whitespace();
+				let before =
+					index == 0 || bytes.get(index - 1).is_some_and(u8::is_ascii_whitespace);
 				let after_index = index + 3;
-				let after = after_index >= bytes.len() || bytes[after_index].is_ascii_whitespace();
+				let after = after_index >= bytes.len()
+					|| bytes.get(after_index).is_some_and(u8::is_ascii_whitespace);
 				if before && after {
 					parts.push(&expression[start..index]);
 					start = after_index;

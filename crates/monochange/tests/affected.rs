@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 use std::ffi::OsString;
 use std::path::Path;
 
@@ -156,7 +154,7 @@ fn affected_with_verify_flag_exits_zero_when_covered() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn affected_since_flag_detects_changes_from_git_revision() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -177,7 +175,7 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 	assert_readable_json_snapshot!(json);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn affected_since_flag_detects_changeset_added_after_revision() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -198,7 +196,7 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 	assert_readable_json_snapshot!(json);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();

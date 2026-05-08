@@ -139,10 +139,11 @@ pub(crate) fn plan_publish_rate_limits_for_requests(
 	let mut batches = Vec::new();
 
 	for (registry, requests) in requests_by_registry {
-		let policy = &policies[&registry];
-		let window = plan_window(policy, requests.len());
-		batches.extend(plan_batches(policy, &requests));
-		windows.push(window);
+		if let Some(policy) = policies.get(&registry) {
+			let window = plan_window(policy, requests.len());
+			batches.extend(plan_batches(policy, &requests));
+			windows.push(window);
+		}
 	}
 
 	windows.sort_by(|left, right| {

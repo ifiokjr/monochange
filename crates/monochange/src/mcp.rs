@@ -113,25 +113,21 @@ fn parse_frame(frame_str: &str) -> monochange_analysis::ChangeFrame {
 	}
 
 	// Try parsing as branch range: "main...feature"
-	if frame_str.contains("...") {
-		let parts: Vec<&str> = frame_str.split("...").collect();
-		if parts.len() == 2 {
-			return ChangeFrame::BranchRange {
-				base: parts[0].to_string(),
-				head: parts[1].to_string(),
-			};
-		}
+	if let Some((base, head)) = frame_str.split_once("...") {
+		return ChangeFrame::BranchRange {
+			base: base.to_string(),
+			head: head.to_string(),
+		};
 	}
 
 	// Try parsing as PR format: "pr:target,source"
-	if let Some(stripped) = frame_str.strip_prefix("pr:") {
-		let parts: Vec<&str> = stripped.split(',').collect();
-		if parts.len() == 2 {
-			return ChangeFrame::PullRequest {
-				target: parts[0].to_string(),
-				pr_branch: parts[1].to_string(),
-			};
-		}
+	if let Some(stripped) = frame_str.strip_prefix("pr:")
+		&& let Some((target, pr_branch)) = stripped.split_once(',')
+	{
+		return ChangeFrame::PullRequest {
+			target: target.to_string(),
+			pr_branch: pr_branch.to_string(),
+		};
 	}
 
 	// Default to working directory
@@ -962,6 +958,7 @@ mod __tests {
 	use super::PathParam;
 	use super::json_error_result;
 	use super::json_result;
+	use super::parse_frame;
 	use super::resolve_root;
 
 	macro_rules! assert_readable_json_snapshot {
@@ -1040,6 +1037,25 @@ mod __tests {
 
 	fn fixture_path(relative: &str) -> PathBuf {
 		monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
+	}
+
+	#[test]
+	fn parse_frame_supports_named_range_and_pull_request_inputs() {
+		assert_eq!(parse_frame("working"), ChangeFrame::WorkingDirectory);
+		assert_eq!(
+			parse_frame("main...feature/indexing"),
+			ChangeFrame::BranchRange {
+				base: "main".to_string(),
+				head: "feature/indexing".to_string(),
+			}
+		);
+		assert_eq!(
+			parse_frame("pr:main,fix/indexing"),
+			ChangeFrame::PullRequest {
+				target: "main".to_string(),
+				pr_branch: "fix/indexing".to_string(),
+			}
+		);
 	}
 
 	fn setup_analysis_workspace() -> tempfile::TempDir {
