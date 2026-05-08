@@ -1997,7 +1997,7 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
 	must_ok(
-		fs::write(repo.join(".gitignore"), ".monochange/\n"),
+		fs::write(repo.join(".gitignore"), ".monochange/local/\n"),
 		"write gitignore",
 	);
 	must_ok(
@@ -2007,11 +2007,11 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	git(&repo, &["add", "."]);
 	git(&repo, &["commit", "-m", "initial"]);
 	must_ok(
-		fs::create_dir_all(repo.join(".monochange")),
-		"create monochange dir",
+		fs::create_dir_all(repo.join(".monochange/local")),
+		"create monochange local dir",
 	);
 	must_ok(
-		fs::write(repo.join(".monochange/release-manifest.json"), "{}\n"),
+		fs::write(repo.join(".monochange/local/release-manifest.json"), "{}\n"),
 		"write manifest",
 	);
 
@@ -2019,7 +2019,7 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 		git_stage_paths(
 			&repo,
 			&[
-				PathBuf::from(".monochange/release-manifest.json"),
+				PathBuf::from(".monochange/local/release-manifest.json"),
 				PathBuf::from(".changeset/missing.md"),
 			],
 		),

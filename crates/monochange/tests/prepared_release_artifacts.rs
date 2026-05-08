@@ -87,7 +87,7 @@ fn command_args(args: &[&str]) -> Vec<OsString> {
 fn explicit_prepared_release_artifact_drives_follow_up_release_pr() {
 	let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
 	let root = tempdir.path();
-	let artifact_path = root.join(".monochange/custom-prepared-release.json");
+	let artifact_path = root.join(".monochange/local/custom-prepared-release.json");
 	let artifact = artifact_path.display().to_string();
 	init_git_repo(root);
 
@@ -138,7 +138,7 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 	run_cli(root, command_args(&["release", "--format", "json"]))
 		.unwrap_or_else(|error| panic!("release output: {error}"));
 	assert!(
-		root.join(".monochange/prepared-release-cache.json")
+		root.join(".monochange/local/prepared-release-cache.json")
 			.is_file()
 	);
 	assert!(root.join(".monochange/release-manifest.json").is_file());
@@ -177,7 +177,7 @@ fn commit_release_can_reuse_saved_prepared_release_without_prepare_step() {
 	run_cli(root, command_args(&["release", "--format", "json"]))
 		.unwrap_or_else(|error| panic!("release output: {error}"));
 	assert!(
-		root.join(".monochange/prepared-release-cache.json")
+		root.join(".monochange/local/prepared-release-cache.json")
 			.is_file()
 	);
 
@@ -219,7 +219,7 @@ fn commit_release_succeeds_when_manifest_is_gitignored() {
 fn prepared_release_artifact_rejects_workspace_content_drift() {
 	let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
 	let root = tempdir.path();
-	let artifact_path = root.join(".monochange/custom-prepared-release.json");
+	let artifact_path = root.join(".monochange/local/custom-prepared-release.json");
 	let artifact = artifact_path.display().to_string();
 	init_git_repo(root);
 
