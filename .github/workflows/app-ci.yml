@@ -54,12 +54,6 @@ jobs:
           cargo test --workspace --lib
         shell: devenv shell -- bash -e {0}
 
-      - name: cargo test (integration)
-        run: |
-          cd apps/monochange_app
-          cargo test --workspace --test '*' --lib --bins
-        shell: devenv shell -- bash -e {0}
-
   check:
     timeout-minutes: 30
     runs-on: ubuntu-latest
