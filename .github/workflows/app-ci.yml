@@ -104,6 +104,12 @@ jobs:
         ports:
           - 5432:5432
 
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/monochange_test
+      JWT_SECRET: ci-test-jwt-secret-key-123
+      GITHUB_CLIENT_ID: ci-test-client-id
+      GITHUB_CLIENT_SECRET: ci-test-client-secret
+
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
