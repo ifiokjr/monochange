@@ -39,7 +39,7 @@ export default defineConfig({
 					: "bash -lc 'set -e; devenv processes list 2>/dev/null | grep -q \"^postgres[[:space:]]\" || devenv up -d postgres; exec devenv shell cargo leptos --manifest-path apps/monochange_app/crates/monochange_app/Cargo.toml serve'",
 				cwd: process.env.CI ? join(repoRoot, "apps/monochange_app") : repoRoot,
 				reuseExistingServer: !process.env.CI,
-				timeout: 120_000,
+				timeout: 300_000,
 				url: baseURL,
 			}
 		: undefined,
