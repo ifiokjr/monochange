@@ -8,8 +8,29 @@ use serde::Serializer;
 use serde_json::Value;
 use thiserror::Error;
 
-// Current durable public schema version text. Derived automatically from the crate package version (`major.minor`).
-include!(concat!(env!("OUT_DIR"), "/schema_version.rs"));
+/// Current durable public schema version text.
+///
+/// This derives from the Cargo package version by stripping the patch component
+/// at compile time.
+pub const CURRENT_SCHEMA_VERSION_TEXT: &str = extract_major_minor(env!("CARGO_PKG_VERSION"));
+
+const fn extract_major_minor(version: &str) -> &str {
+	let bytes = version.as_bytes();
+	let mut index = 0;
+	let mut dots = 0;
+
+	while index < bytes.len() {
+		if bytes[index] == b'.' {
+			dots += 1;
+			if dots == 2 {
+				break;
+			}
+		}
+		index += 1;
+	}
+
+	version.split_at(index).0
+}
 
 /// A durable schema version written as `major.minor`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -39,11 +60,18 @@ impl SchemaVersion {
 
 	/// Derive a schema version from a semantic package version string.
 	pub fn from_package_version(package_version: &str) -> Result<Self, SchemaVersionParseError> {
-		let mut components = package_version.split('.');
-		let major = components.next().unwrap_or_default();
-		let Some(minor) = components.next() else {
-			return Err(SchemaVersionParseError::MissingMinor);
-		};
+		let (major, remainder) = package_version
+			.split_once('.')
+			.ok_or(SchemaVersionParseError::MissingMinor)?;
+		let (minor, patch) = remainder
+			.split_once('.')
+			.ok_or(SchemaVersionParseError::MissingPatch)?;
+		if patch.is_empty()
+			|| patch.contains('.')
+			|| !patch.chars().all(|character| character.is_ascii_digit())
+		{
+			return Err(SchemaVersionParseError::InvalidPatch(patch.to_string()));
+		}
 		let major = parse_component(major, SchemaVersionParseError::InvalidMajor)?;
 		let minor = parse_component(minor, SchemaVersionParseError::InvalidMinor)?;
 		Ok(Self { major, minor })
@@ -103,8 +131,7 @@ pub fn current_schema_version() -> Result<SchemaVersion, SchemaVersionParseError
 }
 
 fn current_schema_version_for_error() -> SchemaVersion {
-	SchemaVersion::from_str(CURRENT_SCHEMA_VERSION_TEXT)
-		.unwrap_or_else(|error| panic!("current schema version text is valid: {error}"))
+	current_schema_version().unwrap_or_else(|_| SchemaVersion::new(0, 0))
 }
 
 /// Errors while parsing `major.minor` schema versions.
@@ -119,6 +146,9 @@ pub enum SchemaVersionParseError {
 	/// Package version text did not contain a minor component.
 	#[error("missing minor component")]
 	MissingMinor,
+	/// Package version text did not contain a patch component.
+	#[error("missing patch component")]
+	MissingPatch,
 	/// Version text had more than major/minor components.
 	#[error("expected exactly major.minor")]
 	TooManyComponents,
@@ -128,6 +158,9 @@ pub enum SchemaVersionParseError {
 	/// Minor component was not a non-negative integer.
 	#[error("invalid minor component `{0}`")]
 	InvalidMinor(String),
+	/// Patch component was not a non-negative integer.
+	#[error("invalid patch component `{0}`")]
+	InvalidPatch(String),
 }
 
 /// Durable artifact migration error.
@@ -367,6 +400,7 @@ mod tests {
 	use crate::SchemaVersion;
 	use crate::SchemaVersionParseError;
 	use crate::current_schema_version;
+	use crate::extract_major_minor;
 	use crate::migration_changelog;
 	use crate::release_record;
 
@@ -406,13 +440,23 @@ mod tests {
 			Err(SchemaVersionParseError::InvalidMinor(minor)) if minor == "x"
 		));
 		assert!(matches!(
+			SchemaVersion::from_package_version("1.2.x"),
+			Err(SchemaVersionParseError::InvalidPatch(patch)) if patch == "x"
+		));
+		assert!(matches!(
 			SchemaVersion::from_package_version("1."),
-			Err(SchemaVersionParseError::InvalidMinor(minor)) if minor.is_empty()
+			Err(SchemaVersionParseError::MissingPatch)
 		));
 	}
 
 	#[test]
-	fn current_schema_version_is_independent_from_crate_version() {
+	fn extract_major_minor_strips_patch_at_runtime() {
+		assert_eq!(extract_major_minor("1.42.3"), "1.42");
+		assert_eq!(extract_major_minor("1.42"), "1.42");
+	}
+
+	#[test]
+	fn current_schema_version_strips_patch_from_package_version() {
 		assert_eq!(env!("CARGO_PKG_VERSION"), "0.0.0");
 		assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, "0.0");
 		let current = current_schema_version()
@@ -535,7 +579,7 @@ mod tests {
 	#[test]
 	fn release_record_rejects_old_version_without_migration_edge() {
 		let error = release_record::migrate_value(json!({
-			"v": "0.9",
+			"v": "9.0",
 			"kind": release_record::KIND,
 			"createdAt": "2026-04-06T12:00:00Z",
 			"command": "release-pr",
@@ -544,17 +588,17 @@ mod tests {
 			"changedFiles": []
 		}))
 		.err()
-		.unwrap_or_else(|| panic!("expected unsupported old version error"));
+		.unwrap_or_else(|| panic!("expected unsupported version error"));
 		assert!(matches!(
 			error,
-			SchemaError::UnsupportedVersion { actual, .. } if actual == "0.9"
+			SchemaError::UnsupportedVersion { actual, .. } if actual == "9.0"
 		));
 	}
 
 	#[test]
 	fn release_record_rejects_unsupported_kind() {
 		let error = release_record::migrate_value(json!({
-			"v": "0.0",
+			"v": "0.1",
 			"kind": "monochange.otherRecord",
 			"createdAt": "2026-04-06T12:00:00Z",
 			"command": "release-pr",
