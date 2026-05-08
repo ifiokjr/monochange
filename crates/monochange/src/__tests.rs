@@ -1039,7 +1039,7 @@ fn publish_readiness_dispatches_from_release_record_and_writes_artifact() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	create_release_record_commit(root);
-	let output_path = root.join(".monochange/readiness.json");
+	let output_path = root.join(".monochange/local/readiness.json");
 	let output = run_cli(
 		root,
 		[
@@ -1073,7 +1073,7 @@ fn publish_bootstrap_dispatches_from_release_record_and_writes_artifact() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	create_release_record_commit(root);
-	let output_path = root.join(".monochange/bootstrap-result.json");
+	let output_path = root.join(".monochange/local/bootstrap-result.json");
 	let output = run_cli(
 		root,
 		[
@@ -5788,7 +5788,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 
-	let manifest_path = root.join(".monochange/release-manifest.json");
+	let manifest_path = root.join(".monochange/local/release-manifest.json");
 	let prepare_release = CliCommandDefinition {
 		name: "release".to_string(),
 		help_text: None,
@@ -5808,7 +5808,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
 	.unwrap_or_else(|error| panic!("prepare release: {error}"));
-	assert!(render_output.contains("release manifest: .monochange/release-manifest.json"));
+	assert!(render_output.contains("release manifest: .monochange/local/release-manifest.json"));
 	let manifest_contents =
 		fs::read_to_string(&manifest_path).unwrap_or_else(|error| panic!("read manifest: {error}"));
 	assert!(manifest_contents.contains("\"releaseTargets\""));
@@ -7282,14 +7282,14 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 		.unwrap_or_else(|error| panic!("write Cargo.toml: {error}"));
 	fs::create_dir_all(root.join(".monochange"))
 		.unwrap_or_else(|error| panic!("create .monochange: {error}"));
-	fs::write(root.join(".monochange/release-manifest.json"), "{}\n")
+	fs::write(root.join(".monochange/local/release-manifest.json"), "{}\n")
 		.unwrap_or_else(|error| panic!("write manifest: {error}"));
 
 	crate::git_stage_paths(
 		root,
 		&[
 			PathBuf::from("Cargo.toml"),
-			PathBuf::from(".monochange/release-manifest.json"),
+			PathBuf::from(".monochange/local/release-manifest.json"),
 			PathBuf::from(".changeset/001-release-foundation.md"),
 		],
 	)

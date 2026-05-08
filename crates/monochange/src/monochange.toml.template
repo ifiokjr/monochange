@@ -767,7 +767,7 @@ ignored_paths = []
 #   DisplayVersions       — display planned package and group versions
 #   CreateChangeFile      — create a .changeset/*.md file
 #   PrepareRelease        — compute release plan, update versions, changelogs,
-#                           and refresh .monochange/release-manifest.json
+#                           and refresh .monochange/local/release-manifest.json
 #   CommitRelease         — create a local release commit (requires PrepareRelease)
 #   PublishRelease        — create provider releases (requires PrepareRelease)
 #   PlaceholderPublish    — publish placeholder package versions

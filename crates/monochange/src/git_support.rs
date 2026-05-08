@@ -452,7 +452,7 @@ mod tests {
 	fn git_stage_paths_returns_ok_when_all_paths_are_non_stageable() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path();
-		fs::write(root.join(".gitignore"), ".monochange/\n")
+		fs::write(root.join(".gitignore"), ".monochange/local/\n")
 			.unwrap_or_else(|error| panic!("write .gitignore: {error}"));
 		fs::write(root.join("tracked.txt"), "tracked\n")
 			.unwrap_or_else(|error| panic!("write tracked file: {error}"));
@@ -461,13 +461,13 @@ mod tests {
 		git(root, &["commit", "-m", "initial"]);
 		fs::create_dir_all(root.join(".monochange"))
 			.unwrap_or_else(|error| panic!("create .monochange: {error}"));
-		fs::write(root.join(".monochange/release-manifest.json"), "{}\n")
+		fs::write(root.join(".monochange/local/release-manifest.json"), "{}\n")
 			.unwrap_or_else(|error| panic!("write release manifest: {error}"));
 
 		git_stage_paths(
 			root,
 			&[
-				PathBuf::from(".monochange/release-manifest.json"),
+				PathBuf::from(".monochange/local/release-manifest.json"),
 				PathBuf::from(".changeset/missing.md"),
 			],
 		)

@@ -474,7 +474,7 @@ pub(crate) fn build_publish_readiness_subcommand() -> Command {
 			r"Examples:
   mc publish-readiness --from HEAD
   mc publish-readiness --from v1.2.3 --package core --format json
-  mc publish-readiness --from HEAD --output .monochange/readiness.json
+  mc publish-readiness --from HEAD --output .monochange/local/readiness.json
 
 Readiness notes:
   - Uses the release record at the supplied ref to select package versions.
@@ -517,7 +517,7 @@ pub(crate) fn build_publish_bootstrap_subcommand() -> Command {
 		.after_help(
 			r"Examples:
   mc publish-bootstrap --from HEAD --dry-run
-  mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
+  mc publish-bootstrap --from HEAD --output .monochange/local/bootstrap-result.json
   mc publish-bootstrap --from HEAD --package core --format json
 
 Bootstrap notes:
