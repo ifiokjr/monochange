@@ -4,7 +4,7 @@
 
 ## Workspace essentials
 
-- Tooling: use `cargo` in the `devenv` shell; repository task commands are exposed as `devenv` scripts. Use `direnv allow` to auto-populate `PATH` with devenv scripts, or prefix commands with `devenv shell` (e.g. `devenv shell fix:all`).
+- Tooling: use `cargo` in the `devenv` shell; repository task commands are exposed as `devenv` scripts. Enter the `devenv shell` before running repo commands (e.g. `devenv shell fix:all`). See https://devenv.sh/blog/2026/05/07/devenv-21-nix-with-zsh-fish-and-nushell-via-libghostty/#__tabbed_1_4
 - Fix all warnings: `fix:all`
 - Build: `build:all`
 - Quality/typecheck: `lint:all`
