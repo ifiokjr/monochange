@@ -817,9 +817,9 @@ pub(crate) fn execute_cli_command_with_options(
 					#[rustfmt::skip]
 					let report = package_publish::run_publish_packages_with_resume(root, configuration, context.prepared_release.as_ref(), &selected_packages, context.dry_run, resume_path.as_deref())?;
 					if let Some(output_path) = output_path.as_deref() {
-						package_publish::write_publish_report_artifact(output_path, &report)?;
+						monochange_publish::write_publish_report_artifact(output_path, &report)?;
 					}
-					package_publish::ensure_publish_report_succeeded(&report)?;
+					monochange_publish::ensure_publish_report_succeeded(&report)?;
 					context.package_publish_report = Some(report);
 					context.rate_limit_report = Some(rate_limit_report);
 					output = None;
