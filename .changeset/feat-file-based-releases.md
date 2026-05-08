@@ -4,7 +4,7 @@ monochange_core: minor
 monochange_github: patch
 ---
 
-**feat: file-based release records**
+# File-based release records
 
 Store release records as committed JSON files under `.monochange/releases/` instead of embedding them in commit message bodies.
 
