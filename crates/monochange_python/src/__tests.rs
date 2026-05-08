@@ -7,6 +7,7 @@ use monochange_core::Ecosystem;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use semver::Version;
+use tempfile::tempdir;
 
 use crate::PythonAdapter;
 use crate::PythonVersionedFileKind;
@@ -559,7 +560,7 @@ fn update_dependency_specifier_handles_name_only_spec() {
 #[test]
 fn discover_lockfiles_falls_back_to_manifest_directory() {
 	use std::fs;
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let workspace_root = tempdir.path().to_path_buf();
 	let pkg_dir = workspace_root.join("packages/mylib");
 	fs::create_dir_all(&pkg_dir).unwrap();
@@ -746,7 +747,7 @@ fn extract_version_constraint_returns_none_for_no_constraint() {
 #[test]
 fn discover_python_packages_skips_venv_and_pycache_directories() {
 	use std::fs;
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
 	// Create a valid package at root
@@ -806,7 +807,7 @@ fn discover_python_packages_reports_io_error_for_unreadable_workspace_root() {
 #[test]
 fn expand_workspace_members_handles_glob_matching_pyproject_files() {
 	use std::fs;
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
 	// Create workspace root with glob pattern that matches pyproject.toml directly
@@ -831,7 +832,7 @@ fn expand_workspace_members_handles_glob_matching_pyproject_files() {
 
 #[test]
 fn default_lockfile_commands_handles_uv_poetry_and_unknown_lockfiles() {
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	fs::write(
 		root.join("pyproject.toml"),
@@ -894,7 +895,7 @@ fn update_versioned_file_text_returns_early_without_project_dependencies() {
 
 #[test]
 fn private_workspace_helpers_cover_error_and_match_branches() {
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let manifest_path = root.join("pyproject.toml");
 	let packages = root.join("packages");
@@ -943,7 +944,7 @@ fn private_workspace_helpers_cover_error_and_match_branches() {
 
 #[test]
 fn private_package_parser_covers_error_and_dependency_value_branches() {
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let missing_error = crate::parse_python_package(&root.join("missing.toml"), root)
 		.err()
@@ -1118,4 +1119,30 @@ dependencies = [
 	assert!(result.contains("my-core>=2.0.0"));
 	// Environment markers should be stripped from the constraint
 	assert!(result.contains("numpy"));
+}
+
+#[test]
+fn default_dependency_version_prefix_is_correct() {
+	assert_eq!(super::default_dependency_version_prefix(), ">=");
+}
+
+#[test]
+fn default_dependency_fields_are_non_empty() {
+	assert!(!super::default_dependency_fields().is_empty());
+}
+
+#[test]
+fn validate_versioned_file_returns_ok_for_any_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("pyproject.toml");
+	fs::write(&path, "[tool.poetry]\nversion = \"1.0.0\"\n")
+		.unwrap_or_else(|error| panic!("write: {error}"));
+	assert!(super::validate_versioned_file(&path, "pyproject.toml", None).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_returns_ok_for_missing_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("missing.toml");
+	assert!(super::validate_versioned_file(&path, "missing.toml", None).is_ok());
 }

@@ -993,5 +993,51 @@ fn find_all_package_json(root: &Path) -> Vec<PathBuf> {
 		.collect()
 }
 
+/// Return the default dependency-version prefix for this ecosystem.
+/// Validate that an npm/deno versioned file contains a readable version field.
+pub fn validate_versioned_file(
+	full_path: &Path,
+	display_path: &str,
+	custom_fields: Option<&[String]>,
+) -> MonochangeResult<()> {
+	let contents = fs::read_to_string(full_path).map_err(|error| {
+		MonochangeError::Config(format!(
+			"versioned file `{display_path}` is not readable: {error}"
+		))
+	})?;
+	let json: Value = serde_json::from_str(&contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"versioned file `{display_path}` is not valid JSON: {error}"
+		))
+	})?;
+
+	let field_name = match custom_fields {
+		Some(fields) if !fields.is_empty() => fields.first().map_or("version", String::as_str),
+		_ => "version",
+	};
+
+	if json
+		.get(field_name)
+		.and_then(|value| value.as_str())
+		.is_none()
+	{
+		return Err(MonochangeError::Config(format!(
+			"versioned file `{display_path}` does not contain a `{field_name}` string field"
+		)));
+	}
+
+	Ok(())
+}
+
+#[must_use]
+pub fn default_dependency_version_prefix() -> &'static str {
+	"^"
+}
+
+/// Return the manifest fields that usually contain dependency versions.
+#[must_use]
+pub fn default_dependency_fields() -> &'static [&'static str] {
+	&["dependencies", "devDependencies", "peerDependencies"]
+}
 #[cfg(test)]
 mod __tests;

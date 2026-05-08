@@ -541,7 +541,16 @@ pub enum EcosystemType {
 
 impl EcosystemType {
 	/// Return the default dependency-version prefix for this ecosystem.
+	///
+	/// # Deprecation
+	///
+	/// Prefer the ecosystem crate's `default_dependency_version_prefix()`
+	/// to keep ecosystem knowledge out of core.
 	#[must_use]
+	#[deprecated(
+		since = "0.3.5",
+		note = "Use the ecosystem crate's `default_dependency_version_prefix()` instead"
+	)]
 	pub fn default_prefix(self) -> &'static str {
 		match self {
 			Self::Cargo | Self::Go => "",
@@ -551,7 +560,16 @@ impl EcosystemType {
 	}
 
 	/// Return the manifest fields that usually contain dependency versions.
+	///
+	/// # Deprecation
+	///
+	/// Prefer the ecosystem crate's `default_dependency_fields()`
+	/// to keep ecosystem knowledge out of core.
 	#[must_use]
+	#[deprecated(
+		since = "0.3.5",
+		note = "Use the ecosystem crate's `default_dependency_fields()` instead"
+	)]
 	pub fn default_fields(self) -> &'static [&'static str] {
 		match self {
 			Self::Cargo => &["dependencies", "dev-dependencies", "build-dependencies"],

@@ -4506,28 +4506,6 @@ fn raw_changelog_config_resolves_package_and_group_paths() {
 }
 
 #[test]
-fn configured_version_field_helpers_cover_custom_and_default_cases() {
-	let custom_fields = vec![
-		"package.metadata.release.version".to_string(),
-		"version".to_string(),
-	];
-
-	assert_eq!(
-		crate::configured_cargo_version_fields(Some(&custom_fields)),
-		vec!["package.metadata.release.version", "version"]
-	);
-	assert_eq!(
-		crate::configured_cargo_version_fields(None),
-		vec!["package.version", "workspace.package.version", "version"]
-	);
-	assert_eq!(
-		crate::configured_primary_version_field(Some(&custom_fields)),
-		"package.metadata.release.version"
-	);
-	assert_eq!(crate::configured_primary_version_field(None), "version");
-}
-
-#[test]
 fn validate_ecosystem_version_readable_reports_missing_json_and_yaml_string_fields() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -4570,6 +4548,49 @@ fn validate_ecosystem_version_readable_reports_missing_json_and_yaml_string_fiel
 			.to_string()
 			.contains("does not contain a `version` string field")
 	);
+
+	let deno_json = root.join("deno.json");
+	std::fs::write(&deno_json, "{\"name\":\"app\"}")
+		.unwrap_or_else(|error| panic!("write deno.json {}: {error}", deno_json.display()));
+	let deno_error = crate::validate_ecosystem_version_readable(
+		&deno_json,
+		"deno.json",
+		EcosystemType::Deno,
+		None,
+		"package",
+		"deno-app",
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing deno version field error"));
+	assert!(deno_error.to_string().contains(
+		"package `deno-app` versioned file `deno.json` does not contain a `version` string field"
+	));
+
+	let pyproject = root.join("pyproject.toml");
+	std::fs::write(&pyproject, "[project]\nname = \"app\"\n")
+		.unwrap_or_else(|error| panic!("write pyproject {}: {error}", pyproject.display()));
+	crate::validate_ecosystem_version_readable(
+		&pyproject,
+		"pyproject.toml",
+		EcosystemType::Python,
+		None,
+		"package",
+		"python-app",
+	)
+	.unwrap_or_else(|error| panic!("expected python validation to be a no-op: {error}"));
+
+	let go_mod = root.join("go.mod");
+	std::fs::write(&go_mod, "module example.com/app\n")
+		.unwrap_or_else(|error| panic!("write go.mod {}: {error}", go_mod.display()));
+	crate::validate_ecosystem_version_readable(
+		&go_mod,
+		"go.mod",
+		EcosystemType::Go,
+		None,
+		"package",
+		"go-app",
+	)
+	.unwrap_or_else(|error| panic!("expected go validation to be a no-op: {error}"));
 }
 
 #[test]
@@ -6051,6 +6072,18 @@ fn validate_versioned_files_content_warns_on_empty_glob() {
 		.unwrap_or_else(|error| panic!("expected Ok with warnings, got error: {error}"));
 	assert_eq!(warnings.len(), 1);
 	assert!(warnings.first().unwrap().contains("matches no files"));
+}
+
+#[test]
+fn validate_changeset_targets_reports_missing_file_read_errors() {
+	let root = fixture_path("changeset-target-metadata/render-workspace");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let missing_changeset = root.join(".changeset/missing.md");
+	let error = crate::validate_changeset_targets(&configuration, &missing_changeset)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing changeset read error"));
+	assert!(error.to_string().contains("failed to read"));
 }
 
 #[test]

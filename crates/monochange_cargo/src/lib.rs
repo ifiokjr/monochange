@@ -1257,5 +1257,58 @@ pub fn extract_workspace_package_table(parsed: &TomlValue) -> Option<WorkspacePa
 		.cloned()
 }
 
+/// Return the default dependency-version prefix for this ecosystem.
+/// Validate that a Cargo versioned file contains a readable version field.
+pub fn validate_versioned_file(
+	full_path: &Path,
+	display_path: &str,
+	custom_fields: Option<&[String]>,
+) -> MonochangeResult<()> {
+	let contents = fs::read_to_string(full_path).map_err(|error| {
+		MonochangeError::Config(format!(
+			"versioned file `{display_path}` is not readable: {error}"
+		))
+	})?;
+	let doc: Value = toml::from_str(&contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"versioned file `{display_path}` is not valid TOML: {error}"
+		))
+	})?;
+
+	let field_paths = match custom_fields {
+		Some(fields) if !fields.is_empty() => fields.iter().map(String::as_str).collect::<Vec<_>>(),
+		_ => vec!["package.version", "workspace.package.version", "version"],
+	};
+
+	if !field_paths.iter().any(|field_path| {
+		let mut current = &doc;
+		for part in field_path.split('.') {
+			let Some(next) = current.get(part) else {
+				return false;
+			};
+			current = next;
+		}
+		current.is_str()
+	}) {
+		return Err(MonochangeError::Config(format!(
+			"versioned file `{display_path}` does not contain a readable version field (checked: {})",
+			field_paths.join(", ")
+		)));
+	}
+
+	Ok(())
+}
+
+#[must_use]
+pub fn default_dependency_version_prefix() -> &'static str {
+	""
+}
+
+/// Return the manifest fields that usually contain dependency versions.
+#[must_use]
+pub fn default_dependency_fields() -> &'static [&'static str] {
+	&["dependencies", "dev-dependencies", "build-dependencies"]
+}
+
 #[cfg(test)]
 mod __tests;

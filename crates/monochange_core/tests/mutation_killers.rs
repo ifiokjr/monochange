@@ -74,6 +74,7 @@ fn package_type_as_str_returns_canonical_names() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn ecosystem_type_default_prefix_is_correct() {
 	assert_eq!(EcosystemType::Cargo.default_prefix(), "");
 	assert_eq!(EcosystemType::Npm.default_prefix(), "^");
@@ -82,6 +83,7 @@ fn ecosystem_type_default_prefix_is_correct() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn ecosystem_type_default_fields_are_non_empty_for_cargo() {
 	let fields = EcosystemType::Cargo.default_fields();
 	assert!(
@@ -95,6 +97,7 @@ fn ecosystem_type_default_fields_are_non_empty_for_cargo() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn ecosystem_type_default_fields_are_non_empty_for_npm() {
 	let fields = EcosystemType::Npm.default_fields();
 	assert!(

@@ -1381,3 +1381,92 @@ fn rust_semver_provider_returns_none_for_non_cargo_packages() {
 		None::<CompatibilityAssessment>
 	);
 }
+
+#[test]
+fn default_dependency_version_prefix_is_correct() {
+	assert_eq!(super::default_dependency_version_prefix(), "");
+}
+
+#[test]
+fn default_dependency_fields_are_non_empty() {
+	assert!(!super::default_dependency_fields().is_empty());
+}
+
+#[test]
+fn validate_versioned_file_accepts_valid_cargo_toml() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("Cargo.toml");
+	fs::write(
+		&path,
+		r#"[package]
+name = "test"
+version = "1.0.0"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write: {error}"));
+	assert!(super::validate_versioned_file(&path, "Cargo.toml", None).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_accepts_workspace_package_version() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("Cargo.toml");
+	fs::write(
+		&path,
+		r#"[workspace.package]
+version = "1.0.0"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write: {error}"));
+	assert!(super::validate_versioned_file(&path, "Cargo.toml", None).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_accepts_custom_fields() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("Cargo.toml");
+	fs::write(
+		&path,
+		r#"[workspace.metadata.bin.monochange]
+version = "1.0.0"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write: {error}"));
+	let custom_fields = vec!["workspace.metadata.bin.monochange.version".to_string()];
+	assert!(super::validate_versioned_file(&path, "Cargo.toml", Some(&custom_fields)).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_rejects_invalid_toml() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("Cargo.toml");
+	fs::write(&path, "not valid toml = [").unwrap_or_else(|error| panic!("write: {error}"));
+	let result = super::validate_versioned_file(&path, "Cargo.toml", None);
+	assert!(result.is_err());
+	assert!(result.unwrap_err().to_string().contains("not valid TOML"));
+}
+
+#[test]
+fn validate_versioned_file_rejects_missing_version() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("Cargo.toml");
+	fs::write(&path, "[package]\nname = \"test\"\n")
+		.unwrap_or_else(|error| panic!("write: {error}"));
+	let result = super::validate_versioned_file(&path, "Cargo.toml", None);
+	assert!(result.is_err());
+	assert!(
+		result
+			.unwrap_err()
+			.to_string()
+			.contains("does not contain a readable version field")
+	);
+}
+
+#[test]
+fn validate_versioned_file_rejects_missing_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("missing.toml");
+	let result = super::validate_versioned_file(&path, "missing.toml", None);
+	assert!(result.is_err());
+	assert!(result.unwrap_err().to_string().contains("not readable"));
+}

@@ -622,6 +622,47 @@ fn yaml_string(mapping: &Mapping, key: &str) -> Option<String> {
 		.map(ToString::to_string)
 }
 
+/// Return the default dependency-version prefix for this ecosystem.
+/// Validate that a Dart versioned file contains a readable version field.
+pub fn validate_versioned_file(
+	full_path: &Path,
+	display_path: &str,
+	_custom_fields: Option<&[String]>,
+) -> MonochangeResult<()> {
+	let contents = fs::read_to_string(full_path).map_err(|error| {
+		MonochangeError::Config(format!(
+			"versioned file `{display_path}` is not readable: {error}"
+		))
+	})?;
+	let yaml: Value = serde_yaml_ng::from_str(&contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"versioned file `{display_path}` is not valid YAML: {error}"
+		))
+	})?;
+
+	if yaml
+		.get("version")
+		.and_then(|value| value.as_str())
+		.is_none()
+	{
+		return Err(MonochangeError::Config(format!(
+			"versioned file `{display_path}` does not contain a `version` string field"
+		)));
+	}
+
+	Ok(())
+}
+
+#[must_use]
+pub fn default_dependency_version_prefix() -> &'static str {
+	"^"
+}
+
+/// Return the manifest fields that usually contain dependency versions.
+#[must_use]
+pub fn default_dependency_fields() -> &'static [&'static str] {
+	&["dependencies", "dev_dependencies"]
+}
 #[cfg(test)]
 fn yaml_bool(mapping: &Mapping, key: &str) -> Option<bool> {
 	mapping

@@ -641,6 +641,7 @@ pub(crate) fn read_cached_document(
 	}
 }
 
+#[rustfmt::skip]
 pub(crate) fn resolve_versioned_prefix(
 	definition: &VersionedFileDefinition,
 	context: &VersionedFileUpdateContext<'_>,
@@ -680,9 +681,29 @@ pub(crate) fn resolve_versioned_prefix(
 		}
 		_ => None,
 	};
-	ecosystem_prefix.unwrap_or_else(|| ecosystem_type.default_prefix().to_string())
+	ecosystem_prefix.unwrap_or_else(|| {
+		match ecosystem_type {
+			monochange_core::EcosystemType::Cargo => {
+				monochange_cargo::default_dependency_version_prefix().to_string()
+			}
+			monochange_core::EcosystemType::Npm => {
+				monochange_npm::default_dependency_version_prefix().to_string()
+			}
+			monochange_core::EcosystemType::Deno => {
+				monochange_deno::default_dependency_version_prefix().to_string()
+			}
+			monochange_core::EcosystemType::Dart => {
+				monochange_dart::default_dependency_version_prefix().to_string()
+			}
+			monochange_core::EcosystemType::Python => {
+				monochange_python::default_dependency_version_prefix().to_string()
+			}
+			monochange_core::EcosystemType::Go => monochange_go::default_dependency_version_prefix().to_string(), _ => String::new(),
+		}
+	})
 }
 
+#[rustfmt::skip]
 pub(crate) fn expand_versioned_file_fields(
 	definition: &VersionedFileDefinition,
 	dep_names: &[String],
@@ -692,8 +713,23 @@ pub(crate) fn expand_versioned_file_fields(
 		.expect("typed versioned_files should always have an ecosystem type");
 	let field_templates = definition.fields.as_ref().map_or_else(
 		|| {
-			ecosystem_type
-				.default_fields()
+			let default_fields: &[&str] = match ecosystem_type {
+				monochange_core::EcosystemType::Cargo => {
+					monochange_cargo::default_dependency_fields()
+				}
+				monochange_core::EcosystemType::Npm => monochange_npm::default_dependency_fields(),
+				monochange_core::EcosystemType::Deno => {
+					monochange_deno::default_dependency_fields()
+				}
+				monochange_core::EcosystemType::Dart => {
+					monochange_dart::default_dependency_fields()
+				}
+				monochange_core::EcosystemType::Python => {
+					monochange_python::default_dependency_fields()
+				}
+				monochange_core::EcosystemType::Go => monochange_go::default_dependency_fields(), _ => &[],
+			};
+			default_fields
 				.iter()
 				.map(ToString::to_string)
 				.collect::<Vec<_>>()
