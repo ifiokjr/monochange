@@ -14,6 +14,7 @@ use monochange_core::RegistryKind;
 use monochange_core::RegistryRateLimitPolicy;
 use monochange_core::RegistryRateLimitWindowPlan;
 use monochange_core::WorkspaceConfiguration;
+use monochange_publish::filter_pending_publish_requests;
 
 use crate::PreparedRelease;
 use crate::discover_workspace;
@@ -59,8 +60,17 @@ pub(crate) fn plan_publish_rate_limits(
 ) -> MonochangeResult<PublishRateLimitReport> {
 	let discovery = discover_workspace(root)?;
 	let packages = &discovery.packages;
-	#[rustfmt::skip]
-	let requests = if mode == PublishRateLimitMode::Placeholder { build_placeholder_plan_requests(root, configuration, packages, selected_packages)? } else { build_release_plan_requests(root, configuration, prepared_release, packages, selected_packages)? };
+	let requests = if mode == PublishRateLimitMode::Placeholder {
+		build_placeholder_plan_requests(root, configuration, packages, selected_packages)?
+	} else {
+		build_release_plan_requests(
+			root,
+			configuration,
+			prepared_release,
+			packages,
+			selected_packages,
+		)?
+	};
 	Ok(plan_publish_rate_limits_for_requests(
 		&requests,
 		mode.operation(),
@@ -74,23 +84,13 @@ fn build_placeholder_plan_requests(
 	packages: &[monochange_core::PackageRecord],
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
-	#[rustfmt::skip]
-	let requests = package_publish::build_placeholder_requests(root, configuration, packages, selected_packages)?;
-	package_publish::filter_pending_publish_requests(&requests)
-}
-
-#[cfg(test)]
-fn build_placeholder_plan_requests_with_transport(
-	root: &Path,
-	configuration: &WorkspaceConfiguration,
-	packages: &[monochange_core::PackageRecord],
-	selected_packages: &BTreeSet<String>,
-	client: &reqwest::blocking::Client,
-	endpoints: &package_publish::RegistryEndpoints,
-) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
-	#[rustfmt::skip]
-	let requests = package_publish::build_placeholder_requests(root, configuration, packages, selected_packages)?;
-	package_publish::filter_pending_publish_requests_with_transport(&requests, client, endpoints)
+	let requests = package_publish::build_placeholder_requests(
+		root,
+		configuration,
+		packages,
+		selected_packages,
+	)?;
+	filter_pending_publish_requests(&requests)
 }
 
 fn build_release_plan_requests(
@@ -100,28 +100,17 @@ fn build_release_plan_requests(
 	packages: &[monochange_core::PackageRecord],
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
-	#[rustfmt::skip]
-	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	#[rustfmt::skip]
-	let requests = package_publish::build_release_requests(configuration, packages, &publications, selected_packages)?;
-	package_publish::filter_pending_publish_requests(&requests)
-}
-
-#[cfg(test)]
-fn build_release_plan_requests_with_transport(
-	root: &Path,
-	configuration: &WorkspaceConfiguration,
-	prepared_release: Option<&PreparedRelease>,
-	packages: &[monochange_core::PackageRecord],
-	selected_packages: &BTreeSet<String>,
-	client: &reqwest::blocking::Client,
-	endpoints: &package_publish::RegistryEndpoints,
-) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
-	#[rustfmt::skip]
-	let publications = package_publish::release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
-	#[rustfmt::skip]
-	let requests = package_publish::build_release_requests(configuration, packages, &publications, selected_packages)?;
-	package_publish::filter_pending_publish_requests_with_transport(&requests, client, endpoints)
+	let publications = package_publish::release_record_package_publications_from_prepared_or_head(
+		root,
+		prepared_release,
+	)?;
+	let requests = package_publish::build_release_requests(
+		configuration,
+		packages,
+		&publications,
+		selected_packages,
+	)?;
+	filter_pending_publish_requests(&requests)
 }
 
 pub(crate) fn plan_publish_rate_limits_for_requests(
@@ -401,6 +390,49 @@ fn registry_policies() -> Vec<RegistryRateLimitPolicy> {
 
 #[cfg(test)]
 mod tests {
+	use monochange_publish::RegistryEndpoints;
+	use monochange_publish::filter_pending_publish_requests_with_transport;
+
+	fn build_placeholder_plan_requests_with_transport(
+		root: &Path,
+		configuration: &WorkspaceConfiguration,
+		packages: &[monochange_core::PackageRecord],
+		selected_packages: &BTreeSet<String>,
+		client: &reqwest::blocking::Client,
+		endpoints: &RegistryEndpoints,
+	) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
+		let requests = package_publish::build_placeholder_requests(
+			root,
+			configuration,
+			packages,
+			selected_packages,
+		)?;
+		filter_pending_publish_requests_with_transport(&requests, client, endpoints)
+	}
+
+	fn build_release_plan_requests_with_transport(
+		root: &Path,
+		configuration: &WorkspaceConfiguration,
+		prepared_release: Option<&PreparedRelease>,
+		packages: &[monochange_core::PackageRecord],
+		selected_packages: &BTreeSet<String>,
+		client: &reqwest::blocking::Client,
+		endpoints: &RegistryEndpoints,
+	) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
+		let publications =
+			package_publish::release_record_package_publications_from_prepared_or_head(
+				root,
+				prepared_release,
+			)?;
+		let requests = package_publish::build_release_requests(
+			configuration,
+			packages,
+			&publications,
+			selected_packages,
+		)?;
+		filter_pending_publish_requests_with_transport(&requests, client, endpoints)
+	}
+
 	use std::fs;
 
 	use httpmock::Method::GET;
@@ -573,7 +605,7 @@ mod tests {
 		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
-		let endpoints = package_publish::RegistryEndpoints {
+		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
 			crates_io_api: server.base_url(),
 			crates_io_index: server.base_url(),
@@ -845,7 +877,7 @@ mod tests {
 		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
-		let endpoints = package_publish::RegistryEndpoints {
+		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
 			crates_io_api: server.base_url(),
 			crates_io_index: server.base_url(),
@@ -916,7 +948,7 @@ mod tests {
 		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
-		let endpoints = package_publish::RegistryEndpoints {
+		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
 			crates_io_api: server.base_url(),
 			crates_io_index: server.base_url(),
@@ -1025,7 +1057,7 @@ mod tests {
 		let client = reqwest::blocking::Client::builder()
 			.build()
 			.unwrap_or_else(|error| panic!("http client: {error}"));
-		let endpoints = package_publish::RegistryEndpoints {
+		let endpoints = RegistryEndpoints {
 			npm_registry: server.base_url(),
 			crates_io_api: server.base_url(),
 			crates_io_index: server.base_url(),
