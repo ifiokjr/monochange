@@ -43,7 +43,7 @@ in
     export PATH="$DEVENV_PROFILE/bin:$PATH"
   '';
 
-  # disable dotenv since it breaks the variable interpolation supported by `direnv`
+  # disable dotenv since it interferes with variable interpolation in the shell
   dotenv.disableHint = true;
 
   git-hooks = {
