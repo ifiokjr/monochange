@@ -1,34 +1,31 @@
 [package]
 name = "monochange_app_api"
 version.workspace = true
-edition.workspace = true
 authors.workspace = true
+edition.workspace = true
 license.workspace = true
+publish = false
 repository.workspace = true
+description = "Authentication and session API for the monochange web app"
 
 [dependencies]
 axum = { workspace = true }
+axum-extra = { workspace = true }
+chrono = { workspace = true }
+jsonwebtoken = { workspace = true }
+monochange_app_db = { workspace = true }
+monochange_core = { workspace = true }
+monochange_github = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
-sqlx = { workspace = true }
-reqwest = { workspace = true }
-chrono = { workspace = true }
-uuid = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
-jsonwebtoken = { workspace = true }
-axum-extra = { workspace = true }
-
-# monochange
-monochange_core = { workspace = true }
-monochange_github = { workspace = true }
-
-# local
-monochange_app_db = { path = "../monochange_app_db" }
-
+uuid = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }

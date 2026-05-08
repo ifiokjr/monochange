@@ -1,21 +1,22 @@
 //! Feedback server functions.
 
 use leptos::server;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedbackSubmission {
-    pub email: Option<String>,
-    pub feedback: String,
-    pub category: Option<String>,
+	pub email: Option<String>,
+	pub feedback: String,
+	pub category: Option<String>,
 }
 
 #[server]
 pub async fn submit_feedback(
-    repo_slug: String,
-    form_slug: String,
-    submission: FeedbackSubmission,
+	repo_slug: String,
+	form_slug: String,
+	submission: FeedbackSubmission,
 ) -> Result<(), server_fn::ServerFnError> {
-    let _ = (repo_slug, form_slug, submission);
-    Ok(())
+	let _ = (repo_slug, form_slug, submission);
+	Ok(())
 }

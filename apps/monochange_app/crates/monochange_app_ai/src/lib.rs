@@ -6,7 +6,7 @@
 //! - Changelog polishing
 //! - Feedback categorization and triage
 
-pub mod client;
-pub mod changeset;
 pub mod changelog;
+pub mod changeset;
+pub mod client;
 pub mod scoping;

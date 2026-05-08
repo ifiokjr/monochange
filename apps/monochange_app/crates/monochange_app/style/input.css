@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@source "../src/**/*.rs";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-brand-50: #f0f7ff;
   --color-brand-100: #e0effe;
@@ -22,6 +26,14 @@
 }
 
 @layer base {
+  html {
+    transition: color 0.3s ease, background-color 0.3s ease;
+    scroll-behavior: smooth;
+  }
+
+  html.dark { color-scheme: dark; }
+  html.light { color-scheme: light; }
+
   body {
     @apply bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
     -webkit-font-smoothing: antialiased;
@@ -37,6 +49,7 @@
   .animate-in {
     animation: fade-in 0.3s ease-out;
   }
+
   .slide-in-from-top-2 {
     --tw-enter-translate-y: -0.5rem;
   }
@@ -69,35 +82,7 @@
   }
 }
 
-/* Smooth theme transition */
-html {
-  transition: color 0.3s ease, background-color 0.3s ease;
-}
-
-html.dark {
-  color-scheme: dark;
-}
-
-html.light {
-  color-scheme: light;
-}
-
-/* Smooth scroll */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
-}
-::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-gray-300 dark:bg-gray-700;
-}
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400 dark:bg-gray-600;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { @apply bg-transparent; }
+::-webkit-scrollbar-thumb { @apply rounded-full bg-gray-300 dark:bg-gray-700; }
+::-webkit-scrollbar-thumb:hover { @apply bg-gray-400 dark:bg-gray-600; }

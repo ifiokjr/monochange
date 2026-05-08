@@ -4,8 +4,8 @@ resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
-edition = "2024"
 authors = ["Ifiok Jr. <ifiokotung@gmail.com>"]
+edition = "2024"
 license = "Unlicense"
 repository = "https://github.com/monochange/monochange"
 
@@ -27,14 +27,14 @@ rstest = "0.26"
 
 # Server
 axum = { version = "0.8", features = ["tokio"] }
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "signal", "macros"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "signal", "macros", "time"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
 
 # Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
 welds = { version = "0.4", features = ["postgres", "migrations"] }
 welds-connections = "0.4"
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -51,25 +51,32 @@ thiserror = "2"
 
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
 
 # Auth
-jsonwebtoken = "10"
 argon2 = "0.5"
+async-trait = "0.1"
+jsonwebtoken = "10"
 
 # Cookies
 axum-extra = { version = "0.10", features = ["cookie"] }
 time = "0.3"
 
 # WASM
-wasm-bindgen = "0.2"
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "Storage", "MediaQueryList"] }
 console_error_panic_hook = "0.1"
 console_log = "1"
 log = "0.4"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "Storage", "MediaQueryList"] }
+
+# monochange app crates
+monochange_app_ai = { path = "crates/monochange_app_ai" }
+monochange_app_api = { path = "crates/monochange_app_api" }
+monochange_app_automation = { path = "crates/monochange_app_automation" }
+monochange_app_db = { path = "crates/monochange_app_db" }
 
 # monochange crates (path deps from parent workspace)
 monochange_core = { path = "../../crates/monochange_core" }
@@ -94,7 +101,6 @@ env = "DEV"
 # Tailwind CSS integration
 tailwind = true
 tailwind-input-file = "style/input.css"
-tailwind-config-file = "tailwind.config.js"
 # Enable WASM code splitting on #[lazy_route] boundaries
 split = true
 

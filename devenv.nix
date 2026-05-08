@@ -28,6 +28,7 @@ in
       pnpm_10
       nodejs_24
       python3
+      postgresql_17
       rustup
       shfmt
       taplo
@@ -41,9 +42,20 @@ in
   enterShell = ''
     set -euo pipefail
     export PATH="$DEVENV_PROFILE/bin:$PATH"
+    if [ -n "''${PGHOST:-}" ]; then
+      export DATABASE_URL="postgresql:///monochange_dev?host=$PGHOST"
+    else
+      export DATABASE_URL="postgresql://localhost:5432/monochange_dev"
+    fi
   '';
 
-  # disable dotenv since it interferes with variable interpolation in the shell
+  # PostgreSQL for local development
+  services.postgres = {
+    enable = true;
+    initialDatabases = [ { name = "monochange_dev"; } ];
+  };
+
+  # disable dotenv since it breaks the variable interpolation supported by `direnv`
   dotenv.disableHint = true;
 
   git-hooks = {
@@ -79,6 +91,18 @@ in
   };
 
   scripts = {
+    "tailwindcss" = {
+      exec = ''
+        set -euo pipefail
+        app_tailwind="$DEVENV_ROOT/apps/monochange_app/node_modules/.bin/tailwindcss"
+        if [ -x "$app_tailwind" ]; then
+          exec "$app_tailwind" "$@"
+        fi
+        exec pnpm --dir "$DEVENV_ROOT/apps/monochange_app" exec tailwindcss "$@"
+      '';
+      description = "Run the monochange app Tailwind CSS CLI.";
+      binary = "bash";
+    };
     "monochange" = {
       exec = ''
         set -euo pipefail
