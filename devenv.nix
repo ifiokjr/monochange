@@ -15,7 +15,6 @@ in
     [
       cargo-binstall
       cargo-run-bin
-      cargo-workspaces
       cacert
       custom.mdt
       custom.pnpm
@@ -175,26 +174,7 @@ in
     "publish:check" = {
       exec = ''
         set -euo pipefail
-
-        lockfile_backup="$(mktemp)"
-        cp Cargo.lock "$lockfile_backup"
-        restore_lockfile() {
-          cp "$lockfile_backup" Cargo.lock
-          rm -f "$lockfile_backup"
-        }
-        trap restore_lockfile EXIT
-
-        cargo workspaces publish --from-git --allow-dirty --yes --dry-run
-        cp "$lockfile_backup" Cargo.lock
-
-        cargo metadata --format-version 1 --filter-platform x86_64-unknown-linux-gnu >/dev/null
-
-        if ! cmp -s Cargo.lock "$lockfile_backup"; then
-          echo "Cargo.lock is missing Linux-specific resolution. Run:" >&2
-          echo "  cargo metadata --format-version 1 --filter-platform x86_64-unknown-linux-gnu >/dev/null" >&2
-          echo "and commit the resulting Cargo.lock changes." >&2
-          exit 1
-        fi
+        mc publish --dry-run
       '';
       description = "Check that publication is valid for this project";
       binary = "bash";
