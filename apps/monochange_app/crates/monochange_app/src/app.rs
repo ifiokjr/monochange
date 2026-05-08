@@ -64,6 +64,7 @@ pub fn App() -> impl IntoView {
 				}>
 					<Route path=path!("/") view=HomePage />
 					<Route path=path!("/dashboard") view=DashboardPage />
+					<Route path=path!("/login") view=LoginPage />
 					<Route path=path!("/auth/callback") view=AuthCallbackPage />
 				</Routes>
 			</main>
