@@ -76,13 +76,22 @@ function ensureLineSet(changedLinesByFile, filePath) {
 	return changedLinesByFile.get(filePath);
 }
 
+function isTestOnlyPath(filePath) {
+	return (
+		filePath.includes("/__tests/") ||
+		filePath.endsWith("/__tests.rs") ||
+		filePath.endsWith("_tests.rs")
+	);
+}
+
 export function parseChangedLines(text, repoRoot = process.cwd()) {
 	const changedLinesByFile = new Map();
 	let currentFile = null;
 
 	for (const line of text.split(/\r?\n/u)) {
 		if (line.startsWith("+++ ")) {
-			currentFile = normalizePath(line.slice(4).trim(), repoRoot);
+			const normalizedPath = normalizePath(line.slice(4).trim(), repoRoot);
+			currentFile = normalizedPath && !isTestOnlyPath(normalizedPath) ? normalizedPath : null;
 			continue;
 		}
 
@@ -190,6 +199,7 @@ export function verifyPatchCoverage({ lcovText, diffText, repoRoot, target = 100
 function run(command, args, options = {}) {
 	const result = spawnSync(command, args, {
 		encoding: "utf8",
+		maxBuffer: 100 * 1024 * 1024,
 		...options,
 	});
 
