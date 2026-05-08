@@ -691,6 +691,7 @@ fn setup_release_repo() -> TempDir {
 	let tempdir = setup_fixture("release-record/base-repo");
 	let repo = tempdir.path();
 	git(repo, &["init"]);
+	git(repo, &["branch", "-M", "main"]);
 	git(repo, &["config", "user.name", "monochange Tests"]);
 	git(repo, &["config", "user.email", "monochange@example.com"]);
 	git(repo, &["config", "commit.gpgsign", "false"]);
