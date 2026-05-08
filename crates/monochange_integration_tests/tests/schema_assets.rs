@@ -215,7 +215,9 @@ fn schema_asset_inventory_matches_snapshot() -> Result<(), Box<dyn Error>> {
 		"migrationChangelog": changelog,
 	});
 
-	assert_json_snapshot!(inventory);
+	assert_json_snapshot!(inventory, {
+		".schemaCrateVersion" => "[schema crate version]"
+	});
 
 	Ok(())
 }
@@ -249,7 +251,16 @@ fn release_record_schema_multiline_fields_are_snapshot_individually() -> Result<
 fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 
-	assert_eq!(schema_crate_version(&paths)?, "0.0.0");
+	// Read the actual crate version from the Cargo.toml so the test doesn't break on every release bump.
+	let manifest = std::fs::read_to_string(&paths.schema_crate_manifest)?;
+	let parsed = toml::from_str::<toml::Value>(&manifest)?;
+	let expected_version = parsed
+		.get("package")
+		.and_then(|package| package.get("version"))
+		.and_then(toml::Value::as_str)
+		.unwrap_or_default();
+
+	assert_eq!(schema_crate_version(&paths)?, expected_version);
 	assert_eq!(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT, "0.0");
 	assert_eq!(
 		monochange_schema::current_schema_version()?,

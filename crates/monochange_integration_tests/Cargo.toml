@@ -8,7 +8,7 @@ repository.workspace = true
 description = "Internal integration tests for monochange crates"
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, features = ["redactions"] }
 insta-cmd = { workspace = true }
 monochange_core = { workspace = true }
 monochange_schema = { workspace = true }
