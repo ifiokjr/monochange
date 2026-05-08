@@ -22,6 +22,7 @@ use monochange_github::format_manual_trust_context;
 use monochange_github::resolve_github_trust_context;
 use monochange_github::trust_list_contains_context;
 use monochange_github::verify_github_trust_context;
+use monochange_go::write_go_placeholder_manifest;
 use monochange_npm::build_npm_trust_command;
 use monochange_npm::build_npm_trust_list_command;
 use monochange_npm::render_npm_trust_command;
@@ -893,18 +894,6 @@ fn build_placeholder_directory(
 	manifest_result.expect("unsupported built-in publish registry")?;
 
 	Ok(tempdir)
-}
-
-fn write_go_placeholder_manifest(dir: &Path, request: &PublishRequest) -> MonochangeResult<()> {
-	let contents = format!(
-		"module {}
-
-go 1.22
-",
-		go_module_path(request)
-	);
-	fs::write(dir.join("go.mod"), contents)
-		.map_err(|error| MonochangeError::Io(format!("failed to write go.mod: {error}")))
 }
 
 fn write_cargo_placeholder_manifest(

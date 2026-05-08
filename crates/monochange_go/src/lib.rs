@@ -46,6 +46,8 @@ use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
 use monochange_core::normalize_path;
+use monochange_publish::PublishRequest;
+use monochange_publish::go_module_path;
 use semver::Version;
 use walkdir::DirEntry;
 use walkdir::WalkDir;
@@ -113,6 +115,18 @@ pub fn default_lockfile_commands(package: &PackageRecord) -> Vec<LockfileCommand
 		cwd: manifest_dir,
 		shell: ShellConfig::None,
 	}]
+}
+
+pub fn write_go_placeholder_manifest(dir: &Path, request: &PublishRequest) -> MonochangeResult<()> {
+	let contents = format!(
+		"module {}
+
+go 1.22
+",
+		go_module_path(request)
+	);
+	fs::write(dir.join("go.mod"), contents)
+		.map_err(|error| MonochangeError::Io(format!("failed to write go.mod: {error}")))
 }
 
 /// Update a `go.mod` file's require directives for cross-module dependencies.
