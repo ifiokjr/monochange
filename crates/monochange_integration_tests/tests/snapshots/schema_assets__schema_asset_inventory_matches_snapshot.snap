@@ -28,5 +28,5 @@ expression: inventory
     ],
     "schemaId": "https://monochange.github.io/monochange/schemas/release-record.schema.json"
   },
-  "schemaCrateVersion": "0.0.0"
+  "schemaCrateVersion": "[schema crate version]"
 }
