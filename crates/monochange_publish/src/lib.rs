@@ -110,6 +110,54 @@ pub struct CommandSpec {
 	pub cwd: PathBuf,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct CommandOutput {
+	pub success: bool,
+	pub stdout: String,
+	pub stderr: String,
+}
+
+pub trait CommandExecutor {
+	fn run(&mut self, spec: &CommandSpec) -> MonochangeResult<CommandOutput>;
+}
+
+pub struct ProcessCommandExecutor;
+
+impl CommandExecutor for ProcessCommandExecutor {
+	fn run(&mut self, spec: &CommandSpec) -> MonochangeResult<CommandOutput> {
+		use std::process::Command;
+		let mut command = Command::new(&spec.program);
+		command.args(&spec.args).current_dir(&spec.cwd);
+		let output = command.output().map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to run `{}` in {}: {error}",
+				render_command(spec),
+				spec.cwd.display()
+			))
+		})?;
+		Ok(CommandOutput {
+			success: output.status.success(),
+			stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
+			stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+		})
+	}
+}
+
+pub fn render_command(spec: &CommandSpec) -> String {
+	std::iter::once(spec.program.as_str())
+		.chain(spec.args.iter().map(String::as_str))
+		.collect::<Vec<_>>()
+		.join(" ")
+}
+
+pub fn render_command_error(output: &CommandOutput) -> String {
+	if output.stderr.is_empty() {
+		"command failed".to_string()
+	} else {
+		output.stderr.clone()
+	}
+}
+
 pub fn build_publish_command(
 	request: &PublishRequest,
 	mode: PackagePublishRunMode,

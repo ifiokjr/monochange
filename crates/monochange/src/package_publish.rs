@@ -4,7 +4,6 @@ use std::env;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
-use std::process::Command as ProcessCommand;
 
 use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
@@ -19,11 +18,13 @@ use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::materialize_dependency_edges;
+use monochange_publish::CommandExecutor;
 use monochange_publish::CommandSpec;
 pub(crate) use monochange_publish::PackagePublishOutcome;
 pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
 pub(crate) use monochange_publish::PackagePublishStatus;
+use monochange_publish::ProcessCommandExecutor;
 pub(crate) use monochange_publish::PublishRequest;
 use monochange_publish::RegistryEndpoints;
 use monochange_publish::TrustedPublishingIdentity;
@@ -36,6 +37,8 @@ use monochange_publish::package_can_be_published;
 use monochange_publish::provider_registry_trust_capability;
 use monochange_publish::registry_client;
 use monochange_publish::registry_version_exists;
+use monochange_publish::render_command;
+use monochange_publish::render_command_error;
 use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
 use reqwest::blocking::Client;
@@ -58,38 +61,6 @@ struct GitHubTrustContext {
 	repository: String,
 	workflow: String,
 	environment: Option<String>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct CommandOutput {
-	success: bool,
-	stdout: String,
-	stderr: String,
-}
-
-trait CommandExecutor {
-	fn run(&mut self, spec: &CommandSpec) -> MonochangeResult<CommandOutput>;
-}
-
-struct ProcessCommandExecutor;
-
-impl CommandExecutor for ProcessCommandExecutor {
-	fn run(&mut self, spec: &CommandSpec) -> MonochangeResult<CommandOutput> {
-		let mut command = ProcessCommand::new(&spec.program);
-		command.args(&spec.args).current_dir(&spec.cwd);
-		let output = command.output().map_err(|error| {
-			MonochangeError::Io(format!(
-				"failed to run `{}` in {}: {error}",
-				render_command(spec),
-				spec.cwd.display()
-			))
-		})?;
-		Ok(CommandOutput {
-			success: output.status.success(),
-			stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-			stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-		})
-	}
 }
 
 pub(crate) fn run_placeholder_publish(
@@ -2015,21 +1986,6 @@ fn manual_setup_url(request: &PublishRequest) -> String {
 	}
 }
 
-fn render_command(spec: &CommandSpec) -> String {
-	std::iter::once(spec.program.as_str())
-		.chain(spec.args.iter().map(String::as_str))
-		.collect::<Vec<_>>()
-		.join(" ")
-}
-
-fn render_command_error(output: &CommandOutput) -> String {
-	if output.stderr.is_empty() {
-		"command failed".to_string()
-	} else {
-		output.stderr.clone()
-	}
-}
-
 fn non_empty_output(output: String) -> Option<String> {
 	(!output.is_empty()).then_some(output)
 }
@@ -2050,12 +2006,16 @@ mod tests {
 	use monochange_core::ReleaseRecord;
 	use monochange_core::SourceProvider;
 	use monochange_core::render_release_record_block;
+	use monochange_publish::CommandExecutor;
+	use monochange_publish::CommandOutput;
 	use monochange_publish::append_publish_dry_run_args;
 	use monochange_publish::build_npm_placeholder_publish_command;
 	use monochange_publish::build_npm_release_publish_command;
 	use monochange_publish::crates_io_index_entry_path;
 	use monochange_publish::crates_io_index_version_exists;
 	use monochange_publish::filter_pending_publish_requests_with_transport;
+	use monochange_publish::render_command;
+	use monochange_publish::render_command_error;
 	use monochange_test_helpers::git;
 	use semver::Version;
 	use temp_env::with_vars;
