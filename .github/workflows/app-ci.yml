@@ -73,6 +73,12 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: install cargo-leptos
+        run: |
+          cd apps/monochange_app
+          [ -f ~/.cargo/bin/cargo-leptos ] || cargo install cargo-leptos@0.3.6
+        shell: devenv shell -- bash -e {0}
+
       - name: cargo check
         run: |
           cd apps/monochange_app
@@ -112,6 +118,12 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: install cargo-leptos
+        run: |
+          cd apps/monochange_app
+          [ -f ~/.cargo/bin/cargo-leptos ] || cargo install cargo-leptos@0.3.6
+        shell: devenv shell -- bash -e {0}
 
       - name: install playwright browsers
         run: |
