@@ -48,3 +48,4 @@ inputs:
     overlays:
       - default
 allow_unfree: true
+require_version: ">=2.1"
