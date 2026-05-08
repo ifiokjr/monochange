@@ -43,10 +43,12 @@ in
     set -euo pipefail
     export PATH="$DEVENV_PROFILE/bin:$PATH"
     export PATH="$HOME/.cargo/bin:$PATH"
-    if [ -n "''${PGHOST:-}" ]; then
-      export DATABASE_URL="postgresql:///monochange_dev?host=$PGHOST"
-    else
-      export DATABASE_URL="postgresql://localhost:5432/monochange_dev"
+    if [ -z "''${DATABASE_URL:-}" ]; then
+      if [ -n "''${PGHOST:-}" ]; then
+        export DATABASE_URL="postgresql:///monochange_dev?host=$PGHOST"
+      else
+        export DATABASE_URL="postgresql://localhost:5432/monochange_dev"
+      fi
     fi
   '';
 
