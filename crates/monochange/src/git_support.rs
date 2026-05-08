@@ -161,10 +161,23 @@ pub(crate) fn find_release_record_files_at_commit(
 	if has_parent {
 		let output = run_git_capture(
 			root,
-			&["diff-tree", "--no-commit-id", "--name-only", "-r", commit],
+			&[
+				"diff-tree",
+				"-m",
+				"--no-commit-id",
+				"--name-only",
+				"-r",
+				commit,
+			],
 			"failed to list files at commit",
 		)?;
-		Ok(output.lines().filter(filter).map(str::to_string).collect())
+		Ok(output
+			.lines()
+			.filter(filter)
+			.map(str::to_string)
+			.collect::<std::collections::HashSet<_>>()
+			.into_iter()
+			.collect())
 	} else {
 		let output = run_git_capture(
 			root,

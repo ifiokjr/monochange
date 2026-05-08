@@ -1364,7 +1364,6 @@ mod tests {
 	use monochange_core::ReleaseRecord;
 	use monochange_core::SourceProvider;
 	use monochange_core::TrustedPublishingSettings;
-	use monochange_core::render_release_record_block;
 	use monochange_github::GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN;
 	use monochange_github::GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL;
 	use monochange_github::json_value_contains;

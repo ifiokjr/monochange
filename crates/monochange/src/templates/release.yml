@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^\.monochange/releases/.*/release\.json$'; then
+          if git diff-tree -m --no-commit-id --name-only -r HEAD | grep -q '^\.monochange/releases/.*/release\.json$'; then
             echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"

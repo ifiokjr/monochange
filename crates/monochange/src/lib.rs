@@ -917,12 +917,17 @@ where
 				.get_one::<String>("from")
 				.map(String::as_str)
 				.ok_or_else(|| MonochangeError::Config("missing release-record ref".to_string()))?;
-			let format = release_record_matches
-				.get_one::<String>("format")
-				.map_or(Ok(OutputFormat::Markdown), |value| {
-					parse_output_format(value)
-				})?;
-			render_release_record_discovery(root, from, format)
+			if release_record_matches.get_flag("sha") {
+				let discovery = discover_release_record(root, from)?;
+				Ok(discovery.record_commit)
+			} else {
+				let format = release_record_matches
+					.get_one::<String>("format")
+					.map_or(Ok(OutputFormat::Markdown), |value| {
+						parse_output_format(value)
+					})?;
+				render_release_record_discovery(root, from, format)
+			}
 		}
 		Some(("publish-readiness", publish_readiness_matches)) => {
 			let configuration = configuration?;

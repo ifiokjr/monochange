@@ -1414,6 +1414,49 @@ pub(crate) fn write_release_record_file(
 		}
 		format!("{:016x}", hasher.finish())
 	};
+
+	// Deduplication: remove any existing release records that share a tag version
+	// with this new record. If a previous release record contains the same
+	// (package_id, version) pair, it is stale and should be replaced.
+	let new_tags: std::collections::HashSet<(&str, &str)> = record
+		.release_targets
+		.iter()
+		.map(|target| (target.id.as_str(), target.version.as_str()))
+		.collect();
+
+	let releases_dir = root.join(".monochange/releases");
+	if releases_dir.is_dir() {
+		for entry in fs::read_dir(&releases_dir)
+			.map_err(|error| MonochangeError::Io(format!("read releases dir: {error}")))?
+		{
+			let entry =
+				entry.map_err(|error| MonochangeError::Io(format!("read dir entry: {error}")))?;
+			let path = entry.path();
+			if !path.is_dir() {
+				continue;
+			}
+			let record_file = path.join("release.json");
+			if !record_file.is_file() {
+				continue;
+			}
+			let Ok(content) = fs::read_to_string(&record_file) else {
+				continue;
+			};
+			let Ok(existing) = serde_json::from_str::<ReleaseRecord>(&content) else {
+				continue;
+			};
+			let has_overlap = existing
+				.release_targets
+				.iter()
+				.any(|t| new_tags.contains(&(t.id.as_str(), t.version.as_str())));
+			if has_overlap {
+				fs::remove_dir_all(&path).map_err(|error| {
+					MonochangeError::Io(format!("remove stale release record dir: {error}"))
+				})?;
+			}
+		}
+	}
+
 	let dir = root.join(".monochange/releases").join(&hash);
 	fs::create_dir_all(&dir)
 		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;

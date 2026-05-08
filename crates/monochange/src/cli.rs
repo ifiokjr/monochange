@@ -347,6 +347,12 @@ Use `--no-mcp` to skip MCP config files for targets that support repo-local MCP 
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
 		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
+		.arg(
 			Arg::new("no-mcp")
 				.long("no-mcp")
 				.help("Skip repo-local MCP config files for supported targets")
@@ -434,6 +440,12 @@ Audit notes:
 						.help("Output format")
 						.default_value("text")
 						.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 				),
 		)
 }
@@ -464,6 +476,12 @@ Inspection notes:
 				.help("Output format")
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 		)
 }
 
@@ -508,6 +526,12 @@ Readiness notes:
 				.help("Output format")
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 		)
 }
 
@@ -561,6 +585,12 @@ Bootstrap notes:
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_tag_release_subcommand() -> Command {
@@ -608,6 +638,12 @@ Tagging notes:
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_check_subcommand() -> Command {
@@ -648,6 +684,12 @@ pub(crate) fn build_check_subcommand() -> Command {
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_validate_subcommand() -> Command {
@@ -673,6 +715,12 @@ Runs the Validate step directly without requiring a configuration entry.",
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_lint_subcommand() -> Command {
@@ -689,6 +737,12 @@ pub(crate) fn build_lint_subcommand() -> Command {
 						.help("Output format")
 						.default_value("markdown")
 						.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 				),
 		)
 		.subcommand(
@@ -705,6 +759,12 @@ pub(crate) fn build_lint_subcommand() -> Command {
 						.help("Output format")
 						.default_value("markdown")
 						.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 				),
 		)
 		.subcommand(
