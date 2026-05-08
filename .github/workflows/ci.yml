@@ -334,24 +334,6 @@ jobs:
           fi
         shell: devenv shell -- bash -e {0}
 
-  release-pr-manual-merge-blocker:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      pull-requests: read
-    steps:
-      - name: block direct merge of release branches
-        uses: monochange/actions/fail-when@v0
-        with:
-          github-token: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
-          should-fail: ${{ startsWith(github.head_ref, 'monochange/release/') }}
-          reason: Release branches must be merged via the /merge comment workflow.
-          fail-comment: |
-            This check fails intentionally so GitHub's normal merge button cannot be used for release PRs.
-
-            After every required check is green, run the `release-pr-merge` workflow manually. Maintainers can also post the exact merge command in a PR comment, but automated comments intentionally avoid spelling it out so they cannot trigger the merge workflow.
-
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
     timeout-minutes: 20

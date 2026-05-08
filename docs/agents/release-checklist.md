@@ -31,7 +31,7 @@ New crates that do not yet exist on their target registry must be placeholder-pu
 ## 4. CI workflow flow verification
 
 ```text
-push to main → ci.yml (release-pr) → manual merge → release-pr-merge.yml
+push to main → ci.yml (release-pr) → merge release PR
   → push to main → ci.yml (release-post-merge: tag + draft release)
   → tag push → release.yml (cross-compile, upload assets, draft release)
   → publish.yml (build npm packages, plan batches, publish cargo batches)
@@ -60,7 +60,7 @@ npm packages are handled differently from cargo crates. Platform-specific npm pa
 
 - [ ] The `publisher` GitHub environment should require approval **only** for jobs that actually publish (the `publish.yml` publish job).
 - [ ] The `ci.yml` `release-pr` job should **not** use the `publisher` environment. It only creates a PR and does not publish anything.
-- [ ] Verify the `release-pr-merge.yml` workflow's `RELEASE_PR_MERGE_TOKEN` secret is available outside the `publisher` environment (it uses `secrets.RELEASE_PR_MERGE_TOKEN` directly, not through an environment).
+- [ ] Verify the `release-pr` job in `ci.yml` has permissions to create and update pull requests (`pull-requests: write`).
 
 ## 8. Changeset and version validation
 
