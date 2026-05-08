@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_step_input_overrides.rs
+assertion_line: 47
 expression: contents
 ---
 Prepare release.
