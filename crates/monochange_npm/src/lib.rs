@@ -56,9 +56,15 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::RegistryKind;
 use monochange_core::ShellConfig;
+use monochange_core::SourceConfiguration;
 use monochange_core::normalize_path;
 use monochange_core::relative_to_root;
+use monochange_github::GitHubTrustContext;
+use monochange_publish::CommandSpec;
+use monochange_publish::PublishRequest;
+use monochange_publish::render_command;
 use semver::Version;
 use serde_json::Value;
 use serde_yaml_ng::Value as YamlValue;
@@ -991,6 +997,105 @@ fn find_all_package_json(root: &Path) -> Vec<PathBuf> {
 		.map(DirEntry::into_path)
 		.map(|path| normalize_path(&path))
 		.collect()
+}
+
+pub fn write_npm_placeholder_manifest(
+	dir: &Path,
+	request: &PublishRequest,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<()> {
+	let mut manifest = serde_json::Map::new();
+	manifest.insert(
+		"name".to_string(),
+		Value::String(request.package_name.clone()),
+	);
+	manifest.insert(
+		"version".to_string(),
+		Value::String(request.version.clone()),
+	);
+	manifest.insert(
+		"description".to_string(),
+		Value::String(format!("Placeholder package for {}", request.package_name)),
+	);
+	if let Some(source) = source {
+		manifest.insert(
+			"repository".to_string(),
+			Value::String(format!(
+				"https://github.com/{}/{}",
+				source.owner, source.repo
+			)),
+		);
+	}
+	fs::write(
+		dir.join("package.json"),
+		Value::Object(manifest).to_string(),
+	)
+	.map_err(|error| {
+		MonochangeError::Io(format!("failed to write placeholder package.json: {error}"))
+	})
+}
+
+pub fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
+	build_npm_cli_command(
+		request,
+		vec![
+			"trust".to_string(),
+			"list".to_string(),
+			request.package_name.clone(),
+			"--json".to_string(),
+		],
+	)
+}
+
+pub fn build_npm_trust_command(
+	request: &PublishRequest,
+	context: &GitHubTrustContext,
+) -> CommandSpec {
+	let mut args = vec![
+		"trust".to_string(),
+		"github".to_string(),
+		request.package_name.clone(),
+		"--file".to_string(),
+		context.workflow.clone(),
+		"--repo".to_string(),
+		context.repository.clone(),
+		"--yes".to_string(),
+	];
+	append_npm_trust_environment_arg(&mut args, context.environment.as_ref());
+	build_npm_cli_command(request, args)
+}
+
+pub fn render_npm_trust_command(request: &PublishRequest, context: &GitHubTrustContext) -> String {
+	render_command(&build_npm_trust_command(request, context))
+}
+
+pub fn append_npm_trust_environment_arg(args: &mut Vec<String>, environment: Option<&String>) {
+	let Some(environment) = environment else {
+		return;
+	};
+	args.extend(["--env".to_string(), environment.clone()]);
+}
+
+fn build_npm_cli_command(request: &PublishRequest, args: Vec<String>) -> CommandSpec {
+	if uses_pnpm_publish_manager(request) {
+		let mut wrapped_args = vec!["exec".to_string(), "npm".to_string()];
+		wrapped_args.extend(args);
+		return CommandSpec {
+			program: "pnpm".to_string(),
+			args: wrapped_args,
+			cwd: request.package_root.clone(),
+		};
+	}
+
+	CommandSpec {
+		program: "npm".to_string(),
+		args,
+		cwd: request.package_root.clone(),
+	}
+}
+
+fn uses_pnpm_publish_manager(request: &PublishRequest) -> bool {
+	request.registry == RegistryKind::Npm && request.package_manager.as_deref() == Some("pnpm")
 }
 
 /// Return the default dependency-version prefix for this ecosystem.

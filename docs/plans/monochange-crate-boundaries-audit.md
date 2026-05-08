@@ -4,13 +4,13 @@
 
 The top-level `monochange` crate is currently much more than a thin CLI/composition layer. It has about 56k lines under `crates/monochange/src`, compared with 1k-5k lines in most ecosystem and provider crates. The largest modules are:
 
-- `crates/monochange/src/package_publish.rs` (~6.6k lines, down from ~7k)
-- `crates/monochange_publish/src/lib.rs` (~1.1k lines, extracted in #397)
+- `crates/monochange/src/package_publish.rs` (~5.7k lines, down from ~7k)
+- `crates/monochange_publish/src/lib.rs` (~1.7k lines, extracted in #397 and expanded through Phase 2)
 - `crates/monochange/src/cli_runtime.rs` (~6k lines)
 - `crates/monochange/src/workspace_ops.rs` (~3.3k lines)
-- `crates/monochange/src/changelog.rs` (~3k lines)
-- `crates/monochange/src/release_artifacts.rs` (~2.2k lines)
-- `crates/monochange/src/release_record.rs`, `publish_readiness.rs`, `publish_rate_limits.rs`, `versioned_files.rs`, `changesets.rs`, `changeset_policy.rs`
+- `crates/monochange/src/changelog.rs` (~2.9k lines)
+- `crates/monochange/src/release_artifacts.rs` (~2.3k lines)
+- `crates/monochange/src/__tests.rs` (~13.4k lines), `release_record.rs` (~570 lines), `publish_readiness.rs`, `publish_rate_limits.rs`, `versioned_files.rs`, `changesets.rs`, `changeset_policy.rs`
 
 The top-level crate depends on every ecosystem crate and every provider crate. That is acceptable for final composition, but it is also where many ecosystem-specific and provider-specific decisions are implemented. The result is that logic that should be owned by `monochange_npm`, `monochange_cargo`, `monochange_github`, etc. is mixed into `monochange`.
 
@@ -54,12 +54,11 @@ Provider and ecosystem crates should not depend on `monochange`; service crates 
 
 Examples of ecosystem/provider leakage in the top-level crate:
 
-- npm trusted publishing command construction and `npm token` environment rejection in `package_publish.rs`
-- Cargo manifest metadata checks and Cargo placeholder manifest generation in `package_publish.rs`
+- `npm token` environment rejection still lives in `package_publish.rs`; npm trusted-publishing command construction and npm placeholder manifest generation are moving into `monochange_npm`
+- Cargo placeholder manifest generation in `package_publish.rs` (Cargo publish readiness blockers now live in `monochange_cargo`)
 - Dart, JSR, Python, Go placeholder manifest generation in `package_publish.rs`
-- registry-specific version existence checks for npm, crates.io, JSR, PyPI, and Go proxy in `package_publish.rs`
-- GitHub workflow/environment trust context resolution in `package_publish.rs`
-- trusted publishing capability matrix in `trust_capabilities.rs`
+- top-level orchestration that still hardcodes ecosystem/provider trust setup instead of calling publish/provider adapters
+- trusted publishing capability matrix now lives in `monochange_publish`, while GitHub workflow/environment trust context now lives in `monochange_github`
 
 **Recommendation**
 
@@ -96,14 +95,17 @@ Provider-specific trust context should move to provider crates:
 
 **Phase 2: Remaining leakages from `monochange` into `monochange_publish`**
 
-| Still in `monochange/src/package_publish.rs`                  | Target                                    |
-| ------------------------------------------------------------- | ----------------------------------------- |
-| `RegistryEndpoints` + `registry_client()`                     | `monochange_publish`                      |
-| `package_can_be_published()` (registry HTTP existence checks) | `monochange_publish`                      |
-| `CommandExecutor` trait + `ProcessCommandExecutor`            | `monochange_publish` or `monochange_core` |
-| Resume/artifact read/write/merge                              | `monochange_publish`                      |
-| `cargo_publish_readiness_blockers`                            | `monochange_cargo`                        |
-| Dependency ordering of publish requests                       | `monochange_publish`                      |
+| Still in `monochange/src/package_publish.rs`                  | Target               | Status       |
+| ------------------------------------------------------------- | -------------------- | ------------ |
+| `RegistryEndpoints` + `registry_client()`                     | `monochange_publish` | Done in #404 |
+| `package_can_be_published()` (registry HTTP existence checks) | `monochange_publish` | Done in #404 |
+| `CommandExecutor` trait + `ProcessCommandExecutor`            | `monochange_publish` | Done in #409 |
+| Resume/artifact read/write/merge                              | `monochange_publish` | Done in #412 |
+| Dependency ordering of publish requests                       | `monochange_publish` | Done in #412 |
+| `cargo_publish_readiness_blockers`                            | `monochange_cargo`   | Done in #413 |
+| GitHub trust context resolution and verification              | `monochange_github`  | Done in #417 |
+| npm trusted-publishing command helpers                        | `monochange_npm`     | In #419      |
+| npm placeholder manifest generation                           | `monochange_npm`     | In #419      |
 
 **Phase 3: Introduce `PublishAdapter` trait**
 
@@ -139,12 +141,13 @@ The top-level `monochange` crate should only register adapters and call `monocha
 
 **Migration order**
 
-1. Move `RegistryEndpoints`, `registry_client`, resume/artifact logic, and `CommandExecutor` into `monochange_publish`.
-2. Extract command construction per ecosystem into existing ecosystem crates via `PublishAdapter`.
-3. Extract registry existence checks per ecosystem.
-4. Extract placeholder manifest generation per ecosystem.
-5. Extract GitHub trust context into `monochange_github`.
-6. Delete top-level ecosystem/provider match arms from `package_publish.rs` and reduce it to CLI glue or remove it entirely.
+1. Move `RegistryEndpoints`, `registry_client`, resume/artifact logic, dependency ordering, and `CommandExecutor` into `monochange_publish`. ✅
+2. Extract Cargo readiness blockers into `monochange_cargo`. ✅
+3. Extract GitHub trust context into `monochange_github`. ✅
+4. Move npm trusted-publishing command helpers and npm placeholder manifest generation into `monochange_npm`.
+5. Extract remaining placeholder manifest generation per ecosystem.
+6. Extract registry existence checks per ecosystem or route them through publish adapters.
+7. Delete top-level ecosystem/provider match arms from `package_publish.rs` and reduce it to CLI glue or remove it entirely.
 
 ### 2. Move workspace discovery/planning orchestration out of `monochange`
 
@@ -481,3 +484,23 @@ Started the publish split with a low-risk boundary extraction:
 - Kept `crates/monochange/src/package_publish.rs` as the current orchestration implementation, but it now imports/re-exports the publish domain models and command builders from `monochange_publish`.
 
 This keeps existing callers stable while establishing the crate that later registry checks, readiness, rate-limit, and resume logic can move into incrementally.
+
+### 2026-05-08: Phase 2 publish boundary progress
+
+Continued reducing `crates/monochange/src/package_publish.rs` after the initial `monochange_publish` split:
+
+- #404 moved registry endpoint/client infrastructure and registry publishability checks into `monochange_publish`.
+- #409 moved `CommandExecutor`, `ProcessCommandExecutor`, and command rendering helpers into `monochange_publish`.
+- #412 moved publish resume/report artifact handling and publish dependency ordering into `monochange_publish`.
+- #413 moved Cargo publish readiness blockers and Cargo workspace manifest helpers into `monochange_cargo`.
+- #417 moved GitHub trust context resolution, workflow/job/environment parsing, trust-list matching, and GitHub identity verification into `monochange_github`.
+
+Current `package_publish.rs` is about 5.7k lines. #419 moves npm trusted-publishing command construction (`build_npm_trust_list_command`, `build_npm_trust_command`, `render_npm_trust_command`, `append_npm_trust_environment_arg`, and shared npm CLI wrapping) plus npm placeholder `package.json` generation into `monochange_npm`, while keeping the current top-level trusted-publishing and placeholder orchestration in `monochange` until adapter traits exist.
+
+### 2026-05-08: file-based release record changes
+
+#408 added file-based release record history and deduplication helpers. This reinforces the release-boundary recommendation: `release_artifacts.rs`, `release_record.rs`, and the very large `crates/monochange/src/__tests.rs` now contain more release-record filesystem/history behavior that should eventually move into a focused `monochange_release` or release-record service crate rather than remaining in the app crate.
+
+### 2026-05-08: ecosystem constants and validation moved down
+
+The latest `origin/main` moved ecosystem constants and versioned-file validation out of `monochange_core` and delegated them to ecosystem crates. That change reinforces the same boundary direction as the publish work: ecosystem-owned file formats and validation should stay in `monochange_cargo`, `monochange_npm`, `monochange_dart`, `monochange_deno`, `monochange_python`, and `monochange_go`, while the top-level crate should compose those crates rather than reimplementing their rules.

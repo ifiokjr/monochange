@@ -18,13 +18,15 @@ use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::WorkspaceConfiguration;
-use monochange_github::GitHubTrustContext;
 use monochange_github::format_manual_trust_context;
 use monochange_github::resolve_github_trust_context;
 use monochange_github::trust_list_contains_context;
 use monochange_github::verify_github_trust_context;
+use monochange_npm::build_npm_trust_command;
+use monochange_npm::build_npm_trust_list_command;
+use monochange_npm::render_npm_trust_command;
+use monochange_npm::write_npm_placeholder_manifest;
 use monochange_publish::CommandExecutor;
-use monochange_publish::CommandSpec;
 pub(crate) use monochange_publish::PackagePublishOutcome;
 pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
@@ -838,66 +840,6 @@ fn configure_npm_trusted_publishing(
 	})
 }
 
-fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
-	build_npm_cli_command(
-		request,
-		vec![
-			"trust".to_string(),
-			"list".to_string(),
-			request.package_name.clone(),
-			"--json".to_string(),
-		],
-	)
-}
-
-fn build_npm_trust_command(request: &PublishRequest, context: &GitHubTrustContext) -> CommandSpec {
-	let mut args = vec![
-		"trust".to_string(),
-		"github".to_string(),
-		request.package_name.clone(),
-		"--file".to_string(),
-		context.workflow.clone(),
-		"--repo".to_string(),
-		context.repository.clone(),
-		"--yes".to_string(),
-	];
-	append_npm_trust_environment_arg(&mut args, context.environment.as_ref());
-	build_npm_cli_command(request, args)
-}
-
-fn render_npm_trust_command(request: &PublishRequest, context: &GitHubTrustContext) -> String {
-	render_command(&build_npm_trust_command(request, context))
-}
-
-fn append_npm_trust_environment_arg(args: &mut Vec<String>, environment: Option<&String>) {
-	let Some(environment) = environment else {
-		return;
-	};
-	args.extend(["--env".to_string(), environment.clone()]);
-}
-
-fn build_npm_cli_command(request: &PublishRequest, args: Vec<String>) -> CommandSpec {
-	if uses_pnpm_publish_manager(request) {
-		let mut wrapped_args = vec!["exec".to_string(), "npm".to_string()];
-		wrapped_args.extend(args);
-		return CommandSpec {
-			program: "pnpm".to_string(),
-			args: wrapped_args,
-			cwd: request.package_root.clone(),
-		};
-	}
-
-	CommandSpec {
-		program: "npm".to_string(),
-		args,
-		cwd: request.package_root.clone(),
-	}
-}
-
-fn uses_pnpm_publish_manager(request: &PublishRequest) -> bool {
-	request.registry == RegistryKind::Npm && request.package_manager.as_deref() == Some("pnpm")
-}
-
 fn build_placeholder_directory(
 	root: &Path,
 	request: &PublishRequest,
@@ -963,42 +905,6 @@ go 1.22
 	);
 	fs::write(dir.join("go.mod"), contents)
 		.map_err(|error| MonochangeError::Io(format!("failed to write go.mod: {error}")))
-}
-
-fn write_npm_placeholder_manifest(
-	dir: &Path,
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-) -> MonochangeResult<()> {
-	let mut manifest = serde_json::Map::new();
-	manifest.insert(
-		"name".to_string(),
-		JsonValue::String(request.package_name.clone()),
-	);
-	manifest.insert(
-		"version".to_string(),
-		JsonValue::String(request.version.clone()),
-	);
-	manifest.insert(
-		"description".to_string(),
-		JsonValue::String(format!("Placeholder package for {}", request.package_name)),
-	);
-	if let Some(source) = source {
-		manifest.insert(
-			"repository".to_string(),
-			JsonValue::String(format!(
-				"https://github.com/{}/{}",
-				source.owner, source.repo
-			)),
-		);
-	}
-	fs::write(
-		dir.join("package.json"),
-		JsonValue::Object(manifest).to_string(),
-	)
-	.map_err(|error| {
-		MonochangeError::Io(format!("failed to write placeholder package.json: {error}"))
-	})
 }
 
 fn write_cargo_placeholder_manifest(
@@ -1366,11 +1272,14 @@ mod tests {
 	use monochange_core::TrustedPublishingSettings;
 	use monochange_github::GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN;
 	use monochange_github::GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL;
+	use monochange_github::GitHubTrustContext;
 	use monochange_github::json_value_contains;
 	use monochange_github::parse_github_workflow_ref;
 	use monochange_github::resolve_github_job_environment;
+	use monochange_npm::append_npm_trust_environment_arg;
 	use monochange_publish::CommandExecutor;
 	use monochange_publish::CommandOutput;
+	use monochange_publish::CommandSpec;
 	use monochange_publish::append_publish_dry_run_args;
 	use monochange_publish::build_npm_placeholder_publish_command;
 	use monochange_publish::build_npm_release_publish_command;
