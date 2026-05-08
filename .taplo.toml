@@ -30,3 +30,11 @@ reorder_arrays = false
 reorder_inline_tables = false
 reorder_keys = false
 trailing_newline = true
+allowed_blank_lines = 1
+
+[[rule]]
+include = ["**/Cargo.toml"]
+keys = ["dependencies", "dev-dependencies", "build-dependencies", "workspace.metadata.bin"]
+
+[rule.formatting]
+reorder_keys = true
