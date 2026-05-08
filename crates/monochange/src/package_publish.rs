@@ -5,7 +5,6 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
-use monochange_core::DependencyKind;
 use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -17,7 +16,6 @@ use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
-use monochange_core::materialize_dependency_edges;
 use monochange_publish::CommandExecutor;
 use monochange_publish::CommandSpec;
 pub(crate) use monochange_publish::PackagePublishOutcome;
@@ -33,12 +31,17 @@ pub(crate) use monochange_publish::TrustedPublishingStatus;
 use monochange_publish::build_publish_command;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::go_module_path;
+use monochange_publish::merge_publish_resume_report;
+use monochange_publish::order_release_requests_by_publish_dependencies;
 use monochange_publish::package_can_be_published;
+use monochange_publish::packages_by_config_id;
 use monochange_publish::provider_registry_trust_capability;
+use monochange_publish::read_publish_report_artifact;
 use monochange_publish::registry_client;
 use monochange_publish::registry_version_exists;
 use monochange_publish::render_command;
 use monochange_publish::render_command_error;
+use monochange_publish::resume_publish_requests;
 use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
 use reqwest::blocking::Client;
@@ -193,166 +196,6 @@ fn execute_release_publish_requests(
 	)
 }
 
-pub(crate) fn read_publish_report_artifact(path: &Path) -> MonochangeResult<PackagePublishReport> {
-	let body = fs::read_to_string(path).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to read package publish resume artifact {}: {error}",
-			path.display()
-		))
-	})?;
-	serde_json::from_str(&body).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to parse package publish resume artifact {}: {error}",
-			path.display()
-		))
-	})
-}
-
-pub(crate) fn write_publish_report_artifact(
-	path: &Path,
-	report: &PackagePublishReport,
-) -> MonochangeResult<()> {
-	path.parent()
-		.filter(|parent| !parent.as_os_str().is_empty())
-		.map(create_publish_report_directory)
-		.transpose()?;
-	let body = serde_json::to_string_pretty(report).map_err(publish_report_json_error)?;
-	fs::write(path, format!("{body}\n")).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to write package publish output {}: {error}",
-			path.display()
-		))
-	})
-}
-
-pub(crate) fn ensure_publish_report_succeeded(
-	report: &PackagePublishReport,
-) -> MonochangeResult<()> {
-	let Some(failed) = report
-		.packages
-		.iter()
-		.find(|outcome| outcome.status == PackagePublishStatus::Failed)
-	else {
-		return Ok(());
-	};
-
-	Err(MonochangeError::Discovery(format!(
-		"package publish failed for {} {}: {}",
-		failed.package, failed.version, failed.message
-	)))
-}
-
-fn create_publish_report_directory(parent: &Path) -> MonochangeResult<()> {
-	fs::create_dir_all(parent).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to create package publish output directory {}: {error}",
-			parent.display()
-		))
-	})
-}
-
-fn publish_report_json_error(error: impl std::fmt::Display) -> MonochangeError {
-	MonochangeError::Config(format!(
-		"failed to serialize package publish report: {error}"
-	))
-}
-
-type PublishResumeKey = (String, String, String);
-
-fn resume_publish_requests(
-	requests: &[PublishRequest],
-	previous_report: Option<&PackagePublishReport>,
-) -> MonochangeResult<(Vec<PublishRequest>, Vec<PackagePublishOutcome>)> {
-	let Some(previous_report) = previous_report else {
-		return Ok((requests.to_vec(), Vec::new()));
-	};
-	validate_resume_report(previous_report)?;
-
-	let request_keys = requests
-		.iter()
-		.map(publish_request_resume_key)
-		.collect::<BTreeSet<_>>();
-	let completed_keys = previous_report
-		.packages
-		.iter()
-		.filter(|outcome| package_publish_status_is_resumable_complete(outcome.status))
-		.map(package_publish_outcome_resume_key)
-		.collect::<BTreeSet<_>>();
-	let resumed_outcomes = previous_report
-		.packages
-		.iter()
-		.filter(|outcome| {
-			request_keys.contains(&package_publish_outcome_resume_key(outcome))
-				&& package_publish_status_is_resumable_complete(outcome.status)
-		})
-		.cloned()
-		.collect::<Vec<_>>();
-	let pending_requests = requests
-		.iter()
-		.filter(|request| !completed_keys.contains(&publish_request_resume_key(request)))
-		.cloned()
-		.collect::<Vec<_>>();
-
-	Ok((pending_requests, resumed_outcomes))
-}
-
-fn validate_resume_report(report: &PackagePublishReport) -> MonochangeResult<()> {
-	if report.mode != PackagePublishRunMode::Release {
-		return Err(MonochangeError::Config(
-			"package publish resume artifact must come from `mc publish`".to_string(),
-		));
-	}
-	if report.dry_run {
-		return Err(MonochangeError::Config(
-			"package publish resume artifact must come from a real publish run".to_string(),
-		));
-	}
-	Ok(())
-}
-
-fn publish_request_resume_key(request: &PublishRequest) -> PublishResumeKey {
-	(
-		request.package_id.clone(),
-		request.registry.to_string(),
-		request.version.clone(),
-	)
-}
-
-fn package_publish_outcome_resume_key(outcome: &PackagePublishOutcome) -> PublishResumeKey {
-	(
-		outcome.package.clone(),
-		outcome.registry.clone(),
-		outcome.version.clone(),
-	)
-}
-
-fn package_publish_status_is_resumable_complete(status: PackagePublishStatus) -> bool {
-	matches!(
-		status,
-		PackagePublishStatus::Published
-			| PackagePublishStatus::SkippedExisting
-			| PackagePublishStatus::SkippedExternal
-	)
-}
-
-fn merge_publish_resume_report(
-	mode: PackagePublishRunMode,
-	dry_run: bool,
-	mut resumed_outcomes: Vec<PackagePublishOutcome>,
-	mut current_report: PackagePublishReport,
-) -> PackagePublishReport {
-	if resumed_outcomes.is_empty() {
-		return current_report;
-	}
-
-	resumed_outcomes.append(&mut current_report.packages);
-	PackagePublishReport {
-		mode,
-		dry_run,
-		packages: resumed_outcomes,
-	}
-}
-
 pub(crate) fn release_record_package_publications_from_prepared_or_head(
 	root: &Path,
 	prepared_release: Option<&PreparedRelease>,
@@ -479,143 +322,6 @@ pub(crate) fn build_release_requests(
 	}
 
 	order_release_requests_by_publish_dependencies(packages, requests)
-}
-
-fn order_release_requests_by_publish_dependencies(
-	packages: &[PackageRecord],
-	mut requests: Vec<PublishRequest>,
-) -> MonochangeResult<Vec<PublishRequest>> {
-	requests.sort_by(|left, right| {
-		left.package_id
-			.cmp(&right.package_id)
-			.then_with(|| left.registry.to_string().cmp(&right.registry.to_string()))
-			.then_with(|| left.version.cmp(&right.version))
-	});
-
-	let mut requests_by_package = BTreeMap::<String, Vec<PublishRequest>>::new();
-	for request in requests {
-		requests_by_package
-			.entry(request.package_id.clone())
-			.or_default()
-			.push(request);
-	}
-
-	let request_ids = requests_by_package.keys().cloned().collect::<BTreeSet<_>>();
-	let config_ids_by_record_id = config_ids_by_package_record_id(packages);
-	let mut dependencies_by_package = request_ids
-		.iter()
-		.map(|package_id| (package_id.clone(), BTreeSet::<String>::new()))
-		.collect::<BTreeMap<_, _>>();
-	let mut dependents_by_package = BTreeMap::<String, BTreeSet<String>>::new();
-
-	for edge in materialize_dependency_edges(packages) {
-		if !publish_dependency_kind_is_ordering_relevant(edge.dependency_kind) {
-			continue;
-		}
-		let from_package_id = &config_ids_by_record_id[&edge.from_package_id];
-		let to_package_id = &config_ids_by_record_id[&edge.to_package_id];
-		if !request_ids.contains(from_package_id) || !request_ids.contains(to_package_id) {
-			continue;
-		}
-
-		dependencies_by_package
-			.entry(from_package_id.clone())
-			.or_default()
-			.insert(to_package_id.clone());
-		dependents_by_package
-			.entry(to_package_id.clone())
-			.or_default()
-			.insert(from_package_id.clone());
-	}
-
-	let mut ready = dependencies_by_package
-		.iter()
-		.filter(|&(_package_id, dependencies)| dependencies.is_empty())
-		.map(|(package_id, _dependencies)| package_id.clone())
-		.collect::<BTreeSet<_>>();
-	let mut ordered_package_ids = Vec::with_capacity(dependencies_by_package.len());
-
-	while let Some(package_id) = ready.iter().next().cloned() {
-		ready.remove(&package_id);
-		ordered_package_ids.push(package_id.clone());
-		dependencies_by_package.remove(&package_id);
-
-		let Some(dependents) = dependents_by_package.get(&package_id).cloned() else {
-			continue;
-		};
-		for dependent_package_id in dependents {
-			let dependencies = dependencies_by_package
-				.get_mut(&dependent_package_id)
-				.expect(
-					"dependent package must remain pending until its dependencies are published",
-				);
-			dependencies.remove(&package_id);
-			if dependencies.is_empty() {
-				ready.insert(dependent_package_id);
-			}
-		}
-	}
-
-	if !dependencies_by_package.is_empty() {
-		return Err(MonochangeError::Config(format!(
-			"cyclic publish dependencies detected among package publications: {}",
-			render_publish_dependency_cycle(&dependencies_by_package)
-		)));
-	}
-
-	let mut ordered_requests = Vec::new();
-	for package_id in ordered_package_ids {
-		let mut package_requests = requests_by_package
-			.remove(&package_id)
-			.expect("ordered package ids must come from publish requests");
-		ordered_requests.append(&mut package_requests);
-	}
-
-	Ok(ordered_requests)
-}
-
-fn publish_dependency_kind_is_ordering_relevant(kind: DependencyKind) -> bool {
-	!matches!(kind, DependencyKind::Development)
-}
-
-fn config_ids_by_package_record_id(packages: &[PackageRecord]) -> BTreeMap<String, String> {
-	packages
-		.iter()
-		.map(|package| {
-			let config_id = package
-				.metadata
-				.get("config_id")
-				.map_or(package.name.as_str(), String::as_str);
-			(package.id.clone(), config_id.to_string())
-		})
-		.collect()
-}
-
-fn render_publish_dependency_cycle(
-	dependencies_by_package: &BTreeMap<String, BTreeSet<String>>,
-) -> String {
-	let cycle_edges = dependencies_by_package
-		.iter()
-		.flat_map(|(package_id, dependencies)| {
-			dependencies
-				.iter()
-				.map(move |dependency_id| format!("{package_id} -> {dependency_id}"))
-		})
-		.collect::<Vec<_>>();
-	cycle_edges.join(", ")
-}
-
-fn packages_by_config_id(packages: &[PackageRecord]) -> BTreeMap<&str, &PackageRecord> {
-	packages
-		.iter()
-		.map(|package| {
-			let config_id = package
-				.metadata
-				.get("config_id")
-				.map_or(package.name.as_str(), String::as_str);
-			(config_id, package)
-		})
-		.collect()
 }
 
 fn cargo_publish_readiness_blockers(
@@ -1993,12 +1699,14 @@ fn non_empty_output(output: String) -> Option<String> {
 #[cfg(test)]
 #[allow(clippy::disallowed_methods, clippy::cloned_ref_to_slice_refs)]
 mod tests {
+
 	use std::collections::BTreeSet;
 	use std::collections::VecDeque;
 	use std::path::PathBuf;
 
 	use httpmock::Method::GET;
 	use httpmock::MockServer;
+	use monochange_core::DependencyKind;
 	use monochange_core::PackageRecord;
 	use monochange_core::PublishAttestationSettings;
 	use monochange_core::PublishRegistry;
@@ -2013,9 +1721,12 @@ mod tests {
 	use monochange_publish::build_npm_release_publish_command;
 	use monochange_publish::crates_io_index_entry_path;
 	use monochange_publish::crates_io_index_version_exists;
+	use monochange_publish::ensure_publish_report_succeeded;
 	use monochange_publish::filter_pending_publish_requests_with_transport;
+	use monochange_publish::publish_report_json_error;
 	use monochange_publish::render_command;
 	use monochange_publish::render_command_error;
+	use monochange_publish::write_publish_report_artifact;
 	use monochange_test_helpers::git;
 	use semver::Version;
 	use temp_env::with_vars;
