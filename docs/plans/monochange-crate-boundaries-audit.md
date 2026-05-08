@@ -145,7 +145,7 @@ The top-level `monochange` crate should only register adapters and call `monocha
 2. Extract Cargo readiness blockers into `monochange_cargo`. ✅
 3. Extract GitHub trust context into `monochange_github`. ✅
 4. Move npm trusted-publishing command helpers and npm placeholder manifest generation into `monochange_npm`.
-5. Extract remaining placeholder manifest generation per ecosystem.
+5. Extract remaining placeholder manifest generation per ecosystem, starting with Go proxy placeholders in `monochange_go`.
 6. Extract registry existence checks per ecosystem or route them through publish adapters.
 7. Delete top-level ecosystem/provider match arms from `package_publish.rs` and reduce it to CLI glue or remove it entirely.
 
@@ -504,3 +504,7 @@ Current `package_publish.rs` is about 5.7k lines. #419 moves npm trusted-publish
 ### 2026-05-08: ecosystem constants and validation moved down
 
 The latest `origin/main` moved ecosystem constants and versioned-file validation out of `monochange_core` and delegated them to ecosystem crates. That change reinforces the same boundary direction as the publish work: ecosystem-owned file formats and validation should stay in `monochange_cargo`, `monochange_npm`, `monochange_dart`, `monochange_deno`, `monochange_python`, and `monochange_go`, while the top-level crate should compose those crates rather than reimplementing their rules.
+
+### 2026-05-08: Go placeholder boundary follow-up
+
+After the npm helper extraction, the next focused follow-up moves Go placeholder `go.mod` generation into `monochange_go`. This keeps Go module bootstrap formatting with the Go ecosystem adapter while `package_publish.rs` still owns the temporary-directory orchestration until `PublishAdapter` exists.

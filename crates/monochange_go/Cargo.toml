@@ -15,6 +15,7 @@ description = "Go ecosystem adapter for monochange — discovers Go modules and 
 [dependencies]
 glob = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
+monochange_publish = { workspace = true }
 regex = { workspace = true, default-features = true }
 semver = { workspace = true, default-features = true }
 tracing = { workspace = true, default-features = true }
