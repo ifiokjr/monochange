@@ -271,9 +271,6 @@ path = "crates/monochange_graph"
 
 [package.monochange_schema]
 path = "crates/monochange_schema"
-versioned_files = [
-	{ path = "crates/monochange_schema/Cargo.toml", regex = 'version = "(?<version>\d+\.\d+\.\d+)"' },
-]
 
 [package.monochange_semver]
 path = "crates/monochange_semver"
