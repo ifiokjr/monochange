@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/source_providers.rs
-expression: redacted
+expression: json
 ---
 {
   "issueComments": [],
@@ -29,7 +29,7 @@ expression: redacted
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "[multiline text]"
+        "rendered": "## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])\n\n### Minor\n\n#### add github fixture coverage"
       }
     ],
     "changesets": [
@@ -130,9 +130,9 @@ expression: redacted
   "releaseRequest": {
     "autoMerge": true,
     "baseBranch": "main",
-    "body": "[multiline text]",
+    "body": "## Prepared release\n\n- command: `release-pr`\n- package `core` -> `core/v1.1.0`\n\n## Release notes\n\n### core 1.1.0\n\n### Minor\n\n#### add github fixture coverage\n\n## Changed files\n\n- Cargo.toml\n- crates/core/CHANGELOG.md\n- crates/core/Cargo.toml",
     "commitMessage": {
-      "body": "[multiline text]",
+      "body": "Prepare release.\n\n- release targets: core (1.1.0)\n- released packages: workflow-core\n- updated changelogs: crates/core/CHANGELOG.md",
       "subject": "chore(release): prepare release"
     },
     "headBranch": "monochange/release/release-pr",

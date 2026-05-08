@@ -146,20 +146,36 @@ pub(crate) fn find_release_record_files_at_commit(
 	root: &Path,
 	commit: &str,
 ) -> MonochangeResult<Vec<String>> {
-	let output = run_git_capture(
-		root,
-		&["ls-tree", "-r", "--name-only", commit],
-		"failed to list files at commit",
-	)?;
 	let prefix = ".monochange/releases/";
 	let suffix = "/release.json";
-	Ok(output
-		.lines()
-		.filter(|line| line.starts_with(prefix) && line.ends_with(suffix))
-		.map(str::to_string)
-		.collect())
+	let filter = |line: &&str| line.starts_with(prefix) && line.ends_with(suffix);
+
+	let has_parent = run_git_capture(
+		root,
+		&["cat-file", "-p", commit],
+		"failed to inspect commit",
+	)?
+	.lines()
+	.any(|line| line.starts_with("parent "));
+
+	if has_parent {
+		let output = run_git_capture(
+			root,
+			&["diff-tree", "--no-commit-id", "--name-only", "-r", commit],
+			"failed to list files at commit",
+		)?;
+		Ok(output.lines().filter(filter).map(str::to_string).collect())
+	} else {
+		let output = run_git_capture(
+			root,
+			&["ls-tree", "-r", "--name-only", commit],
+			"failed to list files at commit",
+		)?;
+		Ok(output.lines().filter(filter).map(str::to_string).collect())
+	}
 }
 
+#[allow(dead_code)]
 #[must_use = "the commit message result must be checked"]
 pub(crate) fn read_git_commit_message(root: &Path, commit: &str) -> MonochangeResult<String> {
 	run_git_capture(
@@ -459,7 +475,7 @@ mod tests {
 		init_git_repo(root);
 		git(root, &["add", "."]);
 		git(root, &["commit", "-m", "initial"]);
-		fs::create_dir_all(root.join(".monochange"))
+		fs::create_dir_all(root.join(".monochange/local"))
 			.unwrap_or_else(|error| panic!("create .monochange: {error}"));
 		fs::write(root.join(".monochange/local/release-manifest.json"), "{}\n")
 			.unwrap_or_else(|error| panic!("write release manifest: {error}"));

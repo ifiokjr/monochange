@@ -5684,7 +5684,8 @@ path = "crates/core"
 		let mut prepared_release = sample_prepared_release();
 		prepared_release.changed_files = vec![PathBuf::from("Cargo.toml")];
 		context.prepared_release = Some(prepared_release);
-		context.release_manifest_path = Some(PathBuf::from(".monochange/local/prepared-release.json"));
+		context.release_manifest_path =
+			Some(PathBuf::from(".monochange/local/prepared-release.json"));
 		context.release_results = vec!["published core".to_string()];
 
 		let rendered = render_cli_command_result(&cli_command, &context);
@@ -5970,7 +5971,10 @@ path = "crates/core"
 		)]);
 		let path = optional_publish_plan_readiness_artifact_path(&inputs)
 			.unwrap_or_else(|error| panic!("readiness artifact path: {error}"));
-		assert_eq!(path, Some(PathBuf::from(".monochange/local/readiness.json")));
+		assert_eq!(
+			path,
+			Some(PathBuf::from(".monochange/local/readiness.json"))
+		);
 
 		let missing = BTreeMap::new();
 		let missing_path = optional_publish_plan_readiness_artifact_path(&missing)

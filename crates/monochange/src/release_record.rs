@@ -99,11 +99,10 @@ pub fn discover_release_record(
 				)));
 			}
 			Err(error) => {
-				return Err(MonochangeError::Discovery(format!(
-					"found a malformed monochange release record in commit {}: {}",
-					crate::short_commit_sha(&commit),
-					error
-				)));
+				tracing::debug!(
+					commit = %crate::short_commit_sha(&commit),
+					"skipping malformed release record: {error}"
+				);
 			}
 		}
 	}

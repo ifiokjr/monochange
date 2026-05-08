@@ -3232,8 +3232,19 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 /// Parse a `ReleaseRecord` from a full commit message body.
 #[must_use = "the parsed record result must be checked"]
 pub fn parse_release_record_json(json_text: &str) -> ReleaseRecordResult<ReleaseRecord> {
-	let raw = serde_json::from_str::<serde_json::Value>(json_text)
+	let mut raw = serde_json::from_str::<serde_json::Value>(json_text)
 		.map_err(ReleaseRecordError::InvalidJson)?;
+	// Normalize schemaVersion -> v for migration compatibility
+	if let Some(object) = raw.as_object_mut()
+		&& !object.contains_key("v")
+		&& object.contains_key("schemaVersion")
+	{
+		object.insert(
+			"v".to_string(),
+			serde_json::Value::String(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT.to_string()),
+		);
+		object.remove("schemaVersion");
+	}
 	let kind = raw
 		.get("kind")
 		.and_then(serde_json::Value::as_str)

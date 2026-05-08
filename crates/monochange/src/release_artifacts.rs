@@ -1147,7 +1147,7 @@ pub(crate) fn build_release_commit_message(
 }
 
 pub(crate) fn render_release_commit_body(
-	source: Option<&SourceConfiguration>,
+	_source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
 ) -> String {
 	let mut lines = vec!["Prepare release.".to_string()];
@@ -1415,10 +1415,10 @@ pub(crate) fn write_release_record_file(
 		format!("{:016x}", hasher.finish())
 	};
 	let dir = root.join(".monochange/releases").join(&hash);
-	std::fs::create_dir_all(&dir)
+	fs::create_dir_all(&dir)
 		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
 	let path = dir.join("release.json");
-	std::fs::write(&path, json)
+	fs::write(&path, json)
 		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
 	Ok(path)
 }

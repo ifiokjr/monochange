@@ -214,7 +214,6 @@ use monochange_core::VersionedFileDefinition;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
 use monochange_core::render_release_notes;
-use monochange_core::render_release_record_block;
 #[cfg(feature = "forgejo")]
 use monochange_forgejo as forgejo_provider;
 #[cfg(feature = "gitea")]

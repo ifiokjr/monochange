@@ -1665,19 +1665,26 @@ mod tests {
 			changelogs: Vec::new(),
 			provider: None,
 		};
-		let block = render_release_record_block(&record).expect("render release record");
+		let json = serde_json::to_string_pretty(&record).expect("serialize release record");
+		let hash = {
+			use std::collections::hash_map::DefaultHasher;
+			use std::hash::Hasher;
+			let mut hasher = DefaultHasher::new();
+			for target in &record.release_targets {
+				hasher.write(target.id.as_bytes());
+				hasher.write(target.version.as_bytes());
+			}
+			format!("{:016x}", hasher.finish())
+		};
+		let dir = root.join(".monochange/releases").join(&hash);
+		fs::create_dir_all(&dir).expect("create release record dir");
+		let record_path = dir.join("release.json");
+		fs::write(&record_path, &json).expect("write release record");
 		fs::write(root.join("tracked.txt"), "release\n").expect("write tracked release file");
-		git(root, &["add", "tracked.txt"]);
+		git(root, &["add", "."]);
 		git(
 			root,
-			[
-				"commit",
-				"--message",
-				"chore(release): prepare release",
-				"--message",
-				block.as_str(),
-			]
-			.as_slice(),
+			&["commit", "--message", "chore(release): prepare release"],
 		);
 	}
 

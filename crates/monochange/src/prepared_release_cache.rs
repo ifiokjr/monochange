@@ -565,7 +565,7 @@ mod tests {
 	fn git_status_snapshot_sorts_results_and_excludes_artifact_path() {
 		let tempdir = setup_prepared_release_repo();
 		let root = tempdir.path();
-		fs::create_dir_all(root.join(".monochange"))
+		fs::create_dir_all(root.join(".monochange/local"))
 			.unwrap_or_else(|error| panic!("mkdir .monochange: {error}"));
 		fs::write(root.join(".monochange/local/cache.json"), "{}")
 			.unwrap_or_else(|error| panic!("write cache: {error}"));

@@ -141,7 +141,10 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 		root.join(".monochange/local/prepared-release-cache.json")
 			.is_file()
 	);
-	assert!(root.join(".monochange/release-manifest.json").is_file());
+	assert!(
+		root.join(".monochange/local/release-manifest.json")
+			.is_file()
+	);
 	let git_exclude = fs::read_to_string(root.join(".git/info/exclude"))
 		.unwrap_or_else(|error| panic!("read git exclude: {error}"));
 	assert!(git_exclude.contains(".monochange/"));
@@ -201,7 +204,10 @@ fn commit_release_succeeds_when_manifest_is_gitignored() {
 
 	run_cli(root, command_args(&["release", "--format", "json"]))
 		.unwrap_or_else(|error| panic!("release output: {error}"));
-	assert!(root.join(".monochange/release-manifest.json").is_file());
+	assert!(
+		root.join(".monochange/local/release-manifest.json")
+			.is_file()
+	);
 
 	run_cli(
 		root,

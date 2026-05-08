@@ -1,6 +1,6 @@
 ---
 source: crates/monochange/tests/release_pull_requests.rs
-expression: redacted
+expression: json
 ---
 {
   "issueComments": [],
@@ -20,7 +20,7 @@ expression: redacted
             {
               "collapsed": false,
               "entries": [
-                "[multiline text]"
+                "> [!NOTE]\n> *core*\n\n#### add feature"
               ],
               "title": "Minor"
             }
@@ -33,7 +33,7 @@ expression: redacted
         "ownerId": "sdk",
         "ownerKind": "group",
         "path": "changelog.md",
-        "rendered": "[multiline text]"
+        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\nGrouped release for `sdk`.\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature"
       },
       {
         "format": "monochange",
@@ -53,7 +53,7 @@ expression: redacted
         "ownerId": "core",
         "ownerKind": "package",
         "path": "crates/core/CHANGELOG.md",
-        "rendered": "[multiline text]"
+        "rendered": "## [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/v1.1.0) ([DATE])\n\n### Minor\n\n#### add feature"
       }
     ],
     "changesets": [
@@ -193,9 +193,9 @@ expression: redacted
   "releaseRequest": {
     "autoMerge": false,
     "baseBranch": "main",
-    "body": "[multiline text]",
+    "body": "## Prepared release\n\n- command: `release-pr`\n- group `sdk` -> `v1.1.0`\n\n## Release notes\n\n### sdk 1.1.0\n\nGrouped release for `sdk`.\n\n### Minor\n\n> [!NOTE]\n> *core*\n\n#### add feature\n\n## Changed files\n\n- Cargo.toml\n- changelog.md\n- crates/app/Cargo.toml\n- crates/core/CHANGELOG.md\n- crates/core/Cargo.toml",
     "commitMessage": {
-      "body": "[multiline text]",
+      "body": "Prepare release.\n\n- release targets: sdk (1.1.0)\n- released packages: workflow-app, workflow-core\n- updated changelogs: changelog.md, crates/core/CHANGELOG.md",
       "subject": "chore(release): prepare release"
     },
     "headBranch": "monochange/release/release-pr",

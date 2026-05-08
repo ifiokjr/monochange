@@ -514,7 +514,9 @@ fn prepare_release_writes_manifest_json() {
 			.arg("--dry-run")
 	);
 
-	let manifest_path = tempdir.path().join(".monochange/release-manifest.json");
+	let manifest_path = tempdir
+		.path()
+		.join(".monochange/local/release-manifest.json");
 	let manifest = fs::read_to_string(&manifest_path)
 		.unwrap_or_else(|error| panic!("read manifest {}: {error}", manifest_path.display()));
 	let manifest_json: Value = serde_json::from_str(&manifest)

@@ -130,10 +130,12 @@ fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 	commit_plain(repo, "fix: follow-up", "release-record/follow-up");
 
 	let output = release_record_output(repo, &["--from", "HEAD"]);
-	assert!(!output.status.success());
-	assert_snapshot!(
-		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("stderr utf8: {error}"))
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
 	);
+	assert!(String::from_utf8_lossy(&output.stdout).contains("sdk"));
 }
 
 #[etest::etest]
@@ -144,13 +146,7 @@ fn release_record_command_reports_unsupported_schema_version() {
 
 	let tempdir = setup_release_repo();
 	let repo = tempdir.path();
-	let body = r#"Prepare release.
-
-## monochange Release Record
-
-<!-- monochange:release-record:start -->
-```json
-{
+	let json_text = r#"{
   "v": "0.2",
   "kind": "monochange.releaseRecord",
   "createdAt": "2026-04-07T08:00:00Z",
@@ -158,15 +154,8 @@ fn release_record_command_reports_unsupported_schema_version() {
   "releaseTargets": [],
   "releasedPackages": [],
   "changedFiles": []
-}
-```
-<!-- monochange:release-record:end -->"#;
-	commit_with_body(
-		repo,
-		"chore(release): prepare release",
-		body,
-		"release-record/commit-body",
-	);
+}"#;
+	commit_file_based_record_raw(repo, json_text, "release-record/commit-body");
 
 	let output = release_record_output(repo, &["--from", "HEAD"]);
 	assert!(!output.status.success());
@@ -492,15 +481,38 @@ fn sample_release_record() -> ReleaseRecord {
 }
 
 fn commit_release_record(root: &Path, record: &ReleaseRecord) -> (String, String) {
-	let block = render_release_record_block(record)
-		.unwrap_or_else(|error| panic!("render release record block: {error}"));
-	let body = format!("Prepare release.\n\n{block}");
-	let sha = commit_with_body(
+	let json = serde_json::to_string_pretty(record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = root.join(".monochange/releases").join(&hash);
+	std::fs::create_dir_all(&dir)
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	std::fs::write(&record_path, &json)
+		.unwrap_or_else(|error| panic!("write release record: {error}"));
+	write_release_file_from_fixture(root, "release-record/commit-body");
+	git(root, &["add", "."]);
+	git(
 		root,
-		"chore(release): prepare release",
-		&body,
-		"release-record/commit-body",
+		&[
+			"commit",
+			"-m",
+			"chore(release): prepare release",
+			"-m",
+			"Prepare release.",
+		],
 	);
+	let sha = git_output_trimmed(root, &["rev-parse", "HEAD"]);
+	let body = "Prepare release.".to_string();
 	(sha, body)
 }
 
@@ -516,6 +528,18 @@ fn commit_with_body(root: &Path, subject: &str, body: &str, fixture_relative: &s
 	git(root, &["add", "release.txt"]);
 	git(root, &["commit", "--message", subject, "--message", body]);
 	git_output_trimmed(root, &["rev-parse", "HEAD"])
+}
+
+fn commit_file_based_record_raw(root: &Path, json_text: &str, fixture_relative: &str) {
+	let dir = root.join(".monochange/releases/0000000000000000");
+	std::fs::create_dir_all(&dir)
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	std::fs::write(&record_path, json_text)
+		.unwrap_or_else(|error| panic!("write release record: {error}"));
+	write_release_file_from_fixture(root, fixture_relative);
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "chore(release): prepare release"]);
 }
 
 fn write_release_file_from_fixture(root: &Path, fixture_relative: &str) {

@@ -4529,8 +4529,6 @@ fn build_release_commit_message_includes_release_record_body() {
 	assert!(body.contains("- released packages: monochange, monochange_core"));
 	assert!(body.contains("- updated changelogs: crates/monochange/CHANGELOG.md"));
 	assert!(body.contains("- deleted changesets: .changeset/feature.md"));
-	assert!(body.contains("## monochange Release Record"));
-	assert!(body.contains("\"command\": \"release-pr\""));
 }
 
 #[test]
@@ -4554,7 +4552,7 @@ fn build_release_commit_message_uses_default_title_without_source() {
 		commit_message
 			.body
 			.as_deref()
-			.is_some_and(|body| body.contains("## monochange Release Record"))
+			.is_some_and(|body| body.contains("Prepare release."))
 	);
 }
 
@@ -4782,11 +4780,18 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 	assert!(output.contains("## Release commit"));
 	assert!(output.contains("- **Status:** completed"));
 	assert_eq!(commit_subject, "chore(release): prepare release");
-	assert!(commit_body.contains("## monochange Release Record"));
-	assert!(commit_body.contains("\"command\": \"step:commit-release\""));
 	assert!(
 		status.is_empty(),
 		"expected clean working tree, got: {status}"
+	);
+	let release_files: Vec<_> = std::fs::read_dir(root.join(".monochange/releases"))
+		.unwrap_or_else(|error| panic!("read releases dir: {error}"))
+		.filter_map(|entry| entry.ok())
+		.filter(|entry| entry.path().join("release.json").exists())
+		.collect();
+	assert!(
+		!release_files.is_empty(),
+		"expected at least one release record file in .monochange/releases/"
 	);
 }
 
@@ -4933,19 +4938,25 @@ fn repair_release_command_rejects_non_descendant_targets_without_force() {
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git_in_temp_repo(root, &["add", "release.txt"]);
-	let release_record =
-		monochange_core::render_release_record_block(&sample_release_record_for_retarget())
-			.unwrap_or_else(|error| panic!("render release record: {error}"));
-	git_in_temp_repo(
-		root,
-		&[
-			"commit",
-			"-m",
-			"chore(release): prepare release",
-			"-m",
-			release_record.as_str(),
-		],
-	);
+	let record = sample_release_record_for_retarget();
+	let json = serde_json::to_string_pretty(&record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = root.join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	fs::write(&record_path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "chore(release): prepare release"]);
 	git_in_temp_repo(root, &["tag", "v1.2.3"]);
 	fs::write(root.join("release.txt"), "follow-up\n")
 		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
@@ -7280,7 +7291,7 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	cargo_toml.push_str("\n# staged release update\n");
 	fs::write(root.join("Cargo.toml"), cargo_toml)
 		.unwrap_or_else(|error| panic!("write Cargo.toml: {error}"));
-	fs::create_dir_all(root.join(".monochange"))
+	fs::create_dir_all(root.join(".monochange/local"))
 		.unwrap_or_else(|error| panic!("create .monochange: {error}"));
 	fs::write(root.join(".monochange/local/release-manifest.json"), "{}\n")
 		.unwrap_or_else(|error| panic!("write manifest: {error}"));
@@ -9476,18 +9487,24 @@ fn create_release_record_commit_from_record(
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git_in_temp_repo(root, &["add", "monochange.toml", "release.txt"]);
-	let release_record = monochange_core::render_release_record_block(record)
-		.unwrap_or_else(|error| panic!("render release record: {error}"));
-	git_in_temp_repo(
-		root,
-		&[
-			"commit",
-			"-m",
-			"chore(release): prepare release",
-			"-m",
-			release_record.as_str(),
-		],
-	);
+	let json = serde_json::to_string_pretty(record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = root.join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let path = dir.join("release.json");
+	fs::write(&path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "chore(release): prepare release"]);
 	git_output_in_temp_repo(root, &["rev-parse", "HEAD"])
 }
 
@@ -12745,22 +12762,32 @@ branches = ["release/*"]
 		changelogs: Vec::new(),
 		provider: None,
 	};
-	let block = monochange_core::render_release_record_block(&record)
-		.unwrap_or_else(|error| panic!("render release record: {error}"));
-	fs::write(tempdir.path().join("release.txt"), block.clone())
+	let json = serde_json::to_string_pretty(&record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = tempdir.path().join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	fs::write(&record_path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	fs::write(tempdir.path().join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args(["add", "release.txt"])
+		.args(["add", "."])
 		.output()
-		.unwrap_or_else(|error| panic!("git add release: {error}"));
+		.unwrap_or_else(|error| panic!("git add: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args([
-			"commit",
-			"-m",
-			&format!("chore(release): prepare release\n\n{block}"),
-		])
+		.args(["commit", "-m", "chore(release): prepare release"])
 		.output()
 		.unwrap_or_else(|error| panic!("git commit release: {error}"));
 
@@ -12879,22 +12906,32 @@ repo = "monochange"
 		changelogs: Vec::new(),
 		provider: None,
 	};
-	let block = monochange_core::render_release_record_block(&record)
-		.unwrap_or_else(|error| panic!("render release record: {error}"));
-	fs::write(tempdir.path().join("release.txt"), block.clone())
+	let json = serde_json::to_string_pretty(&record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = tempdir.path().join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	fs::write(&record_path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	fs::write(tempdir.path().join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args(["add", "release.txt"])
+		.args(["add", "."])
 		.output()
-		.unwrap_or_else(|error| panic!("git add release: {error}"));
+		.unwrap_or_else(|error| panic!("git add: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args([
-			"commit",
-			"-m",
-			&format!("chore(release): prepare release\n\n{block}"),
-		])
+		.args(["commit", "-m", "chore(release): prepare release"])
 		.output()
 		.unwrap_or_else(|error| panic!("git commit release: {error}"));
 
