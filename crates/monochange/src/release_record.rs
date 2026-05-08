@@ -12,19 +12,20 @@ use monochange_core::RetargetResult;
 use monochange_core::RetargetTagResult;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
-use monochange_core::parse_release_record_block;
+use monochange_core::parse_release_record_json;
 use monochange_core::release_record_release_tag_names;
 use monochange_core::release_record_tag_names;
 use serde::Serialize;
 
 use crate::OutputFormat;
 use crate::git_support::create_git_tag;
+use crate::git_support::find_release_record_files_at_commit;
 use crate::git_support::first_parent_commits;
 use crate::git_support::git_is_ancestor;
 use crate::git_support::move_git_tag;
 use crate::git_support::push_git_tags;
 use crate::git_support::push_git_tags_without_force;
-use crate::git_support::read_git_commit_message;
+use crate::git_support::read_git_file_at_commit;
 use crate::git_support::resolve_git_commit_ref;
 use crate::git_support::resolve_git_tag_commit;
 use crate::hosted_sources;
@@ -50,7 +51,8 @@ pub(crate) fn render_release_record_discovery(
 /// Discover the durable release record associated with a tag or commit-ish.
 ///
 /// The lookup resolves `from`, walks first-parent ancestry, and returns the
-/// first embedded monochange release record it finds together with discovery
+/// first commit that contains `.monochange/releases/<hash>/release.json` files.
+/// It reads the first such file and returns it together with discovery
 /// metadata such as the resolved commit and ancestry distance.
 pub fn discover_release_record(
 	root: &Path,
@@ -64,10 +66,14 @@ pub fn discover_release_record(
 		tracing::trace!(
 			commit = &commit[..7],
 			distance,
-			"scanning for release record"
+			"scanning for release record files"
 		);
-		let message = read_git_commit_message(root, &commit)?;
-		match parse_release_record_block(&message) {
+		let files = find_release_record_files_at_commit(root, &commit)?;
+		if files.is_empty() {
+			continue;
+		}
+		let json_text = read_git_file_at_commit(root, &commit, &files[0])?;
+		match parse_release_record_json(&json_text) {
 			Ok(record) => {
 				return Ok(ReleaseRecordDiscovery {
 					input_ref: from.to_string(),

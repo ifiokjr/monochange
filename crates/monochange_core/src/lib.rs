@@ -3231,6 +3231,29 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 
 /// Parse a `ReleaseRecord` from a full commit message body.
 #[must_use = "the parsed record result must be checked"]
+pub fn parse_release_record_json(json_text: &str) -> ReleaseRecordResult<ReleaseRecord> {
+	let raw = serde_json::from_str::<serde_json::Value>(json_text)
+		.map_err(ReleaseRecordError::InvalidJson)?;
+	let kind = raw
+		.get("kind")
+		.and_then(serde_json::Value::as_str)
+		.ok_or(ReleaseRecordError::MissingKind)?;
+	if kind != RELEASE_RECORD_KIND {
+		return Err(ReleaseRecordError::UnsupportedKind(kind.to_string()));
+	}
+	let mut current = monochange_schema::release_record::migrate_value(raw)
+		.map_err(release_record_schema_error_to_error)?;
+	let object = current
+		.as_object_mut()
+		.expect("release record schema migration returns an object");
+	object.remove("v");
+	object.insert(
+		"schemaVersion".to_string(),
+		serde_json::Value::from(RELEASE_RECORD_SCHEMA_VERSION),
+	);
+	serde_json::from_value(current).map_err(ReleaseRecordError::InvalidJson)
+}
+
 pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<ReleaseRecord> {
 	let start_matches = commit_message
 		.match_indices(RELEASE_RECORD_START_MARKER)

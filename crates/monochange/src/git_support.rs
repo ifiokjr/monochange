@@ -130,6 +130,36 @@ pub(crate) fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResul
 		.collect())
 }
 
+pub(crate) fn read_git_file_at_commit(
+	root: &Path,
+	commit: &str,
+	path: &str,
+) -> MonochangeResult<String> {
+	run_git_capture(
+		root,
+		&["show", &format!("{commit}:{path}")],
+		&format!("failed to read `{path}` at commit `{commit}`"),
+	)
+}
+
+pub(crate) fn find_release_record_files_at_commit(
+	root: &Path,
+	commit: &str,
+) -> MonochangeResult<Vec<String>> {
+	let output = run_git_capture(
+		root,
+		&["ls-tree", "-r", "--name-only", commit],
+		"failed to list files at commit",
+	)?;
+	let prefix = ".monochange/releases/";
+	let suffix = "/release.json";
+	Ok(output
+		.lines()
+		.filter(|line| line.starts_with(prefix) && line.ends_with(suffix))
+		.map(str::to_string)
+		.collect())
+}
+
 #[must_use = "the commit message result must be checked"]
 pub(crate) fn read_git_commit_message(root: &Path, commit: &str) -> MonochangeResult<String> {
 	run_git_capture(
