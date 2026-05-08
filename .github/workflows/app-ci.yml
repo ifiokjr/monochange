@@ -70,7 +70,7 @@ jobs:
       - name: install cargo-leptos
         run: |
           cd apps/monochange_app
-          [ -f ~/.cargo/bin/cargo-leptos ] || cargo binstall cargo-leptos@0.3.6 -y
+          cargo binstall cargo-leptos@0.3.6 -y --force
         shell: devenv shell -- bash -e {0}
 
       - name: cargo check
@@ -116,7 +116,7 @@ jobs:
       - name: install cargo-leptos
         run: |
           cd apps/monochange_app
-          [ -f ~/.cargo/bin/cargo-leptos ] || cargo binstall cargo-leptos@0.3.6 -y
+          cargo binstall cargo-leptos@0.3.6 -y --force
         shell: devenv shell -- bash -e {0}
 
       - name: install playwright browsers
