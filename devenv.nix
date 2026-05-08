@@ -42,6 +42,7 @@ in
   enterShell = ''
     set -euo pipefail
     export PATH="$DEVENV_PROFILE/bin:$PATH"
+    export PATH="$HOME/.cargo/bin:$PATH"
     if [ -n "''${PGHOST:-}" ]; then
       export DATABASE_URL="postgresql:///monochange_dev?host=$PGHOST"
     else

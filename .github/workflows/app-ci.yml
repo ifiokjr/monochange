@@ -167,7 +167,7 @@ jobs:
       - name: generate coverage
         run: |
           cd apps/monochange_app
-          cargo llvm-cov --workspace --lcov --output-path lcov.info
+          cargo --config 'alias.llvm-cov=[]' llvm-cov --workspace --lcov --output-path lcov.info
         shell: devenv shell -- bash -e {0}
 
       - name: upload coverage to codecov
