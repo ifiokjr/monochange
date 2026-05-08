@@ -2040,6 +2040,29 @@ fn parse_release_record_block_rejects_unsupported_kind() {
 }
 
 #[test]
+fn parse_release_record_json_rejects_unsupported_kind() {
+	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
+	let invalid_kind = format!(
+		r#"{{
+  "v": "{schema_version}",
+  "kind": "monochange.otherRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}"#
+	);
+	let error = crate::parse_release_record_json(&invalid_kind)
+		.err()
+		.unwrap_or_else(|| panic!("expected unsupported kind error"));
+	assert!(matches!(
+		error,
+		ReleaseRecordError::UnsupportedKind(kind) if kind == "monochange.otherRecord"
+	));
+}
+
+#[test]
 fn parse_release_record_block_rejects_unsupported_schema_version() {
 	let heading = RELEASE_RECORD_HEADING;
 	let start = RELEASE_RECORD_START_MARKER;

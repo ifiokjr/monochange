@@ -1147,7 +1147,7 @@ pub(crate) fn build_release_commit_message(
 }
 
 pub(crate) fn render_release_commit_body(
-	source: Option<&SourceConfiguration>,
+	_source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
 ) -> String {
 	let mut lines = vec!["Prepare release.".to_string()];
@@ -1191,10 +1191,7 @@ pub(crate) fn render_release_commit_body(
 				.join(", ")
 		));
 	}
-	let release_record = build_release_record(source, manifest);
-	let release_record_block = render_release_record_block(&release_record)
-		.unwrap_or_else(|error| panic!("release record generation bug: {error}"));
-	format!("{}\n\n{}", lines.join("\n"), release_record_block)
+	lines.join("\n")
 }
 
 #[must_use = "the manifest render result must be checked"]
@@ -1398,6 +1395,75 @@ pub(crate) fn render_release_cli_command_json(
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
 }
 
+pub(crate) fn write_release_record_file(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<PathBuf> {
+	let record = build_release_record(source, manifest);
+	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+
+	// Deduplication: remove any existing release records that share a tag version
+	// with this new record. If a previous release record contains the same
+	// (package_id, version) pair, it is stale and should be replaced.
+	let new_tags: std::collections::HashSet<(&str, &str)> = record
+		.release_targets
+		.iter()
+		.map(|target| (target.id.as_str(), target.version.as_str()))
+		.collect();
+
+	let releases_dir = root.join(".monochange/releases");
+	if releases_dir.is_dir() {
+		for entry in fs::read_dir(&releases_dir)
+			.map_err(|error| MonochangeError::Io(format!("read releases dir: {error}")))?
+		{
+			let entry =
+				entry.map_err(|error| MonochangeError::Io(format!("read dir entry: {error}")))?;
+			let path = entry.path();
+			if !path.is_dir() {
+				continue;
+			}
+			let record_file = path.join("release.json");
+			if !record_file.is_file() {
+				continue;
+			}
+			let Ok(content) = fs::read_to_string(&record_file) else {
+				continue;
+			};
+			let Ok(existing) = serde_json::from_str::<ReleaseRecord>(&content) else {
+				continue;
+			};
+			let has_overlap = existing
+				.release_targets
+				.iter()
+				.any(|t| new_tags.contains(&(t.id.as_str(), t.version.as_str())));
+			if has_overlap {
+				fs::remove_dir_all(&path).map_err(|error| {
+					MonochangeError::Io(format!("remove stale release record dir: {error}"))
+				})?;
+			}
+		}
+	}
+
+	let dir = root.join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir)
+		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
+	let path = dir.join("release.json");
+	fs::write(&path, json)
+		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
+	Ok(path)
+}
+
 pub(crate) fn commit_release(
 	root: &Path,
 	context: &CliContext,
@@ -1407,6 +1473,9 @@ pub(crate) fn commit_release(
 ) -> MonochangeResult<CommitReleaseReport> {
 	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
 	let message = build_release_commit_message(source, manifest);
+	let release_record_path = write_release_record_file(root, source, manifest)?;
+	let mut tracked_paths = tracked_paths;
+	tracked_paths.push(release_record_path);
 	if !context.dry_run {
 		git_stage_paths(root, &tracked_paths)?;
 		git_commit_paths(root, &message, no_verify)?;

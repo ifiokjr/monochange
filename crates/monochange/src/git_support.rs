@@ -130,6 +130,59 @@ pub(crate) fn first_parent_commits(root: &Path, commit: &str) -> MonochangeResul
 		.collect())
 }
 
+pub(crate) fn read_git_file_at_commit(
+	root: &Path,
+	commit: &str,
+	path: &str,
+) -> MonochangeResult<String> {
+	run_git_capture(
+		root,
+		&["show", &format!("{commit}:{path}")],
+		&format!("failed to read `{path}` at commit `{commit}`"),
+	)
+}
+
+pub(crate) fn find_release_record_files_at_commit(
+	root: &Path,
+	commit: &str,
+) -> MonochangeResult<Vec<String>> {
+	let prefix = ".monochange/releases/";
+	let suffix = "/release.json";
+	let filter = |line: &&str| line.starts_with(prefix) && line.ends_with(suffix);
+
+	let has_parent = run_git_capture(
+		root,
+		&["cat-file", "-p", commit],
+		"failed to inspect commit",
+	)?
+	.lines()
+	.any(|line| line.starts_with("parent "));
+
+	if has_parent {
+		let args = [
+			"diff-tree",
+			"-m",
+			"--no-commit-id",
+			"--name-only",
+			"-r",
+			commit,
+		];
+		let output = run_git_capture(root, &args, "failed to list files at commit")?;
+		Ok(output
+			.lines()
+			.filter(filter)
+			.map(str::to_string)
+			.collect::<std::collections::HashSet<_>>()
+			.into_iter()
+			.collect())
+	} else {
+		let args = ["ls-tree", "-r", "--name-only", commit];
+		let output = run_git_capture(root, &args, "failed to list files at commit")?;
+		Ok(output.lines().filter(filter).map(str::to_string).collect())
+	}
+}
+
+#[allow(dead_code)]
 #[must_use = "the commit message result must be checked"]
 pub(crate) fn read_git_commit_message(root: &Path, commit: &str) -> MonochangeResult<String> {
 	run_git_capture(
@@ -422,22 +475,22 @@ mod tests {
 	fn git_stage_paths_returns_ok_when_all_paths_are_non_stageable() {
 		let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path();
-		fs::write(root.join(".gitignore"), ".monochange/\n")
+		fs::write(root.join(".gitignore"), ".monochange/local/\n")
 			.unwrap_or_else(|error| panic!("write .gitignore: {error}"));
 		fs::write(root.join("tracked.txt"), "tracked\n")
 			.unwrap_or_else(|error| panic!("write tracked file: {error}"));
 		init_git_repo(root);
 		git(root, &["add", "."]);
 		git(root, &["commit", "-m", "initial"]);
-		fs::create_dir_all(root.join(".monochange"))
+		fs::create_dir_all(root.join(".monochange/local"))
 			.unwrap_or_else(|error| panic!("create .monochange: {error}"));
-		fs::write(root.join(".monochange/release-manifest.json"), "{}\n")
+		fs::write(root.join(".monochange/local/release-manifest.json"), "{}\n")
 			.unwrap_or_else(|error| panic!("write release manifest: {error}"));
 
 		git_stage_paths(
 			root,
 			&[
-				PathBuf::from(".monochange/release-manifest.json"),
+				PathBuf::from(".monochange/local/release-manifest.json"),
 				PathBuf::from(".changeset/missing.md"),
 			],
 		)

@@ -49,15 +49,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-            resolved_commit="$(jq -r '.resolvedCommit' /tmp/release-record.json)"
-            record_commit="$(jq -r '.recordCommit' /tmp/release-record.json)"
-
-            if [ "$resolved_commit" = "$record_commit" ]; then
-              echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
-            fi
+          if git diff-tree -m --no-commit-id --name-only -r HEAD | grep -q '^\.monochange/releases/.*/release\.json$'; then
+            echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi

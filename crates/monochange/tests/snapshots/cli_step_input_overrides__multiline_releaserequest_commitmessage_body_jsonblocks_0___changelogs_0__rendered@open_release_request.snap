@@ -1,9 +1,0 @@
----
-source: crates/monochange/tests/cli_step_input_overrides.rs
-expression: contents
----
-## core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) ([DATE])
-
-### Minor
-
-#### add github fixture coverage

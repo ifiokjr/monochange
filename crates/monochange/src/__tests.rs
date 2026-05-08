@@ -44,6 +44,7 @@ use crate::parse_change_bump;
 use crate::plan_release;
 use crate::prepare_release_execution;
 use crate::release_artifacts::set_force_build_file_diff_previews_error;
+use crate::release_artifacts::write_release_record_file;
 use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
@@ -1039,7 +1040,7 @@ fn publish_readiness_dispatches_from_release_record_and_writes_artifact() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	create_release_record_commit(root);
-	let output_path = root.join(".monochange/readiness.json");
+	let output_path = root.join(".monochange/local/readiness.json");
 	let output = run_cli(
 		root,
 		[
@@ -1073,7 +1074,7 @@ fn publish_bootstrap_dispatches_from_release_record_and_writes_artifact() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	create_release_record_commit(root);
-	let output_path = root.join(".monochange/bootstrap-result.json");
+	let output_path = root.join(".monochange/local/bootstrap-result.json");
 	let output = run_cli(
 		root,
 		[
@@ -4529,8 +4530,6 @@ fn build_release_commit_message_includes_release_record_body() {
 	assert!(body.contains("- released packages: monochange, monochange_core"));
 	assert!(body.contains("- updated changelogs: crates/monochange/CHANGELOG.md"));
 	assert!(body.contains("- deleted changesets: .changeset/feature.md"));
-	assert!(body.contains("## monochange Release Record"));
-	assert!(body.contains("\"command\": \"release-pr\""));
 }
 
 #[test]
@@ -4554,7 +4553,7 @@ fn build_release_commit_message_uses_default_title_without_source() {
 		commit_message
 			.body
 			.as_deref()
-			.is_some_and(|body| body.contains("## monochange Release Record"))
+			.is_some_and(|body| body.contains("Prepare release."))
 	);
 }
 
@@ -4776,17 +4775,24 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 	)
 	.unwrap_or_else(|error| panic!("commit-release output: {error}"));
 	let commit_subject = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%s"]);
-	let commit_body = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%B"]);
+	let _commit_body = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%B"]);
 	let status = git_output_in_temp_repo(root, &["status", "--short"]);
 
 	assert!(output.contains("## Release commit"));
 	assert!(output.contains("- **Status:** completed"));
 	assert_eq!(commit_subject, "chore(release): prepare release");
-	assert!(commit_body.contains("## monochange Release Record"));
-	assert!(commit_body.contains("\"command\": \"step:commit-release\""));
 	assert!(
 		status.is_empty(),
 		"expected clean working tree, got: {status}"
+	);
+	let release_files: Vec<_> = fs::read_dir(root.join(".monochange/releases"))
+		.unwrap_or_else(|error| panic!("read releases dir: {error}"))
+		.filter_map(Result::ok)
+		.filter(|entry| entry.path().join("release.json").exists())
+		.collect();
+	assert!(
+		!release_files.is_empty(),
+		"expected at least one release record file in .monochange/releases/"
 	);
 }
 
@@ -4819,6 +4825,461 @@ fn commit_release_command_reports_json_output() {
 	// step:commit-release does not support --format, so dry-run returns
 	// plain text report.
 	assert!(output.contains("# `step:commit-release` (dry-run)"));
+}
+
+#[test]
+fn write_release_record_file_dedupes_existing_records_with_overlapping_tags() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	// Helper to build a minimal manifest with a single target
+	let manifest_for = |id: &str, version: &str| {
+		let mut manifest = sample_release_manifest_for_commit_message(false, false);
+		manifest.release_targets = vec![monochange_core::ReleaseManifestTarget {
+			id: id.to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Package,
+			version: version.to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: format!("v{version}"),
+			members: Vec::new(),
+			rendered_title: String::new(),
+			rendered_changelog_title: String::new(),
+		}];
+		manifest.released_packages = vec![id.to_string()];
+		manifest.plan = monochange_core::ReleaseManifestPlan {
+			workspace_root: Path::new(".").to_path_buf(),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+		manifest
+	};
+
+	// Write first record for "sdk" "0.5.0"
+	let first = manifest_for("sdk", "0.5.0");
+	let first_path = write_release_record_file(root, None, &first)
+		.unwrap_or_else(|error| panic!("write first record: {error}"));
+	assert!(first_path.exists());
+
+	// Write second record for "ui" "1.0.0"
+	let second = manifest_for("ui", "1.0.0");
+	let second_path = write_release_record_file(root, None, &second)
+		.unwrap_or_else(|error| panic!("write second record: {error}"));
+	assert!(second_path.exists());
+
+	// Both records should exist at this point
+	let releases_dir = root.join(".monochange/releases");
+	let count_before = fs::read_dir(&releases_dir)
+		.unwrap_or_else(|error| panic!("read releases dir: {error}"))
+		.filter_map(Result::ok)
+		.filter(|e| e.path().join("release.json").exists())
+		.count();
+	assert_eq!(
+		count_before, 2,
+		"expected two release record dirs before dedupe"
+	);
+
+	// Write third record that also targets "sdk" "0.5.0" (plus "other" "2.0.0")
+	let mut third = manifest_for("sdk", "0.5.0");
+	third
+		.release_targets
+		.push(monochange_core::ReleaseManifestTarget {
+			id: "other".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Package,
+			version: "2.0.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v2.0.0".to_string(),
+			members: Vec::new(),
+			rendered_title: String::new(),
+			rendered_changelog_title: String::new(),
+		});
+	third.released_packages.push("other".to_string());
+	let third_path = write_release_record_file(root, None, &third)
+		.unwrap_or_else(|error| panic!("write third record: {error}"));
+	assert!(third_path.exists());
+
+	// The first record (sdk 0.5.0 only) should have been removed because of tag overlap.
+	// The second record (ui 1.0.0) should remain.
+	let count_after = fs::read_dir(&releases_dir)
+		.unwrap_or_else(|error| panic!("read releases dir: {error}"))
+		.filter_map(Result::ok)
+		.filter(|e| e.path().join("release.json").exists())
+		.count();
+	assert_eq!(
+		count_after, 2,
+		"expected two release record dirs after dedupe (ui + new sdk/other)"
+	);
+	assert!(
+		!first_path.exists(),
+		"first record should be removed because sdk/0.5.0 overlaps"
+	);
+	assert!(
+		second_path.exists(),
+		"second record should remain because it has no overlapping tags"
+	);
+	assert!(third_path.exists(), "third record should exist");
+}
+
+#[test]
+fn write_release_record_file_skips_dedupe_when_releases_dir_missing() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	assert!(path.exists());
+	assert!(
+		root.join(".monochange/releases").is_dir(),
+		"releases dir should be created"
+	);
+}
+
+#[test]
+fn write_release_record_file_skips_non_dir_entries_in_releases_dir() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let releases_dir = root.join(".monochange/releases");
+	fs::create_dir_all(&releases_dir)
+		.unwrap_or_else(|error| panic!("create releases dir: {error}"));
+	fs::write(releases_dir.join("not-a-dir.txt"), "ignore me")
+		.unwrap_or_else(|error| panic!("write file: {error}"));
+
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	assert!(path.exists());
+}
+
+#[test]
+fn write_release_record_file_skips_dirs_without_release_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let releases_dir = root.join(".monochange/releases");
+	fs::create_dir_all(&releases_dir)
+		.unwrap_or_else(|error| panic!("create releases dir: {error}"));
+	fs::create_dir_all(releases_dir.join("empty-dir"))
+		.unwrap_or_else(|error| panic!("create empty dir: {error}"));
+
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	assert!(path.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn write_release_record_file_skips_unreadable_release_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let releases_dir = root.join(".monochange/releases");
+	let hash_dir = releases_dir.join("0000000000000000");
+	fs::create_dir_all(&hash_dir).unwrap_or_else(|error| panic!("create hash dir: {error}"));
+	let record_path = hash_dir.join("release.json");
+	fs::write(
+		&record_path,
+		r#"{"v":"0.1","kind":"monochange.releaseRecord"}"#,
+	)
+	.unwrap_or_else(|error| panic!("write record: {error}"));
+
+	// Make file unreadable
+	let mut permissions = fs::metadata(&record_path)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&record_path, permissions)
+		.unwrap_or_else(|error| panic!("set permissions: {error}"));
+
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	assert!(path.exists());
+
+	// Restore permissions so tempdir cleanup doesn't fail
+	let mut permissions = fs::metadata(&record_path)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o644);
+	fs::set_permissions(&record_path, permissions)
+		.unwrap_or_else(|error| panic!("restore permissions: {error}"));
+}
+
+#[test]
+fn write_release_record_file_skips_malformed_release_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let releases_dir = root.join(".monochange/releases");
+	let hash_dir = releases_dir.join("0000000000000000");
+	fs::create_dir_all(&hash_dir).unwrap_or_else(|error| panic!("create hash dir: {error}"));
+	fs::write(hash_dir.join("release.json"), "not valid json")
+		.unwrap_or_else(|error| panic!("write malformed record: {error}"));
+
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	assert!(path.exists());
+}
+
+#[test]
+fn write_release_record_file_dedupes_multiple_overlapping_records() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	let mut manifest_a = sample_release_manifest_for_commit_message(false, false);
+	manifest_a.release_targets = vec![monochange_core::ReleaseManifestTarget {
+		id: "sdk".to_string(),
+		kind: monochange_core::ReleaseOwnerKind::Package,
+		version: "0.5.0".to_string(),
+		tag: true,
+		release: true,
+		version_format: VersionFormat::Primary,
+		tag_name: "v0.5.0".to_string(),
+		members: Vec::new(),
+		rendered_title: String::new(),
+		rendered_changelog_title: String::new(),
+	}];
+	manifest_a.released_packages = vec!["sdk".to_string()];
+
+	let mut manifest_b = sample_release_manifest_for_commit_message(false, false);
+	manifest_b.release_targets = vec![monochange_core::ReleaseManifestTarget {
+		id: "ui".to_string(),
+		kind: monochange_core::ReleaseOwnerKind::Package,
+		version: "1.0.0".to_string(),
+		tag: true,
+		release: true,
+		version_format: VersionFormat::Primary,
+		tag_name: "v1.0.0".to_string(),
+		members: Vec::new(),
+		rendered_title: String::new(),
+		rendered_changelog_title: String::new(),
+	}];
+	manifest_b.released_packages = vec!["ui".to_string()];
+
+	let path_a = write_release_record_file(root, None, &manifest_a)
+		.unwrap_or_else(|error| panic!("write record a: {error}"));
+	let path_b = write_release_record_file(root, None, &manifest_b)
+		.unwrap_or_else(|error| panic!("write record b: {error}"));
+
+	// New record overlaps with both sdk 0.5.0 and ui 1.0.0
+	let mut manifest_c = sample_release_manifest_for_commit_message(false, false);
+	manifest_c.release_targets = vec![
+		monochange_core::ReleaseManifestTarget {
+			id: "sdk".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Package,
+			version: "0.5.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v0.5.0".to_string(),
+			members: Vec::new(),
+			rendered_title: String::new(),
+			rendered_changelog_title: String::new(),
+		},
+		monochange_core::ReleaseManifestTarget {
+			id: "ui".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Package,
+			version: "1.0.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v1.0.0".to_string(),
+			members: Vec::new(),
+			rendered_title: String::new(),
+			rendered_changelog_title: String::new(),
+		},
+	];
+	manifest_c.released_packages = vec!["sdk".to_string(), "ui".to_string()];
+	let path_c = write_release_record_file(root, None, &manifest_c)
+		.unwrap_or_else(|error| panic!("write record c: {error}"));
+
+	assert!(!path_a.exists(), "record a should be deduped");
+	assert!(!path_b.exists(), "record b should be deduped");
+	assert!(path_c.exists(), "record c should exist");
+}
+
+#[test]
+fn write_release_record_file_overwrites_exact_hash_match() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let first_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write first: {error}"));
+	let first_content =
+		fs::read_to_string(&first_path).unwrap_or_else(|error| panic!("read first: {error}"));
+	assert!(first_content.contains("1.2.3"));
+
+	// Write again with same targets; should reuse same hash dir and overwrite
+	let second_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write second: {error}"));
+	assert_eq!(first_path, second_path);
+	let second_content =
+		fs::read_to_string(&second_path).unwrap_or_else(|error| panic!("read second: {error}"));
+	assert_eq!(first_content, second_content);
+}
+
+#[test]
+fn find_release_record_files_at_commit_reports_git_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	// Not a git repo — calling git should error
+	let result = crate::git_support::find_release_record_files_at_commit(root, "HEAD");
+	assert!(
+		result.is_err(),
+		"expected error for non-git directory, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("failed to inspect commit"),
+		"expected 'failed to inspect commit' in error, got: {message}"
+	);
+}
+
+#[test]
+#[cfg(unix)]
+fn write_release_record_file_reports_error_when_releases_dir_unreadable() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let releases_dir = root.join(".monochange/releases");
+	let hash_dir = releases_dir.join("0000000000000000");
+	fs::create_dir_all(&hash_dir).unwrap_or_else(|error| panic!("create hash dir: {error}"));
+	fs::write(
+		hash_dir.join("release.json"),
+		r#"{"v":"0.1","kind":"monochange.releaseRecord"}"#,
+	)
+	.unwrap_or_else(|error| panic!("write record: {error}"));
+
+	let mut permissions = fs::metadata(&releases_dir)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&releases_dir, permissions)
+		.unwrap_or_else(|error| panic!("set permissions: {error}"));
+
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let result = write_release_record_file(root, None, &manifest);
+	assert!(
+		result.is_err(),
+		"expected error when releases dir is unreadable, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("read releases dir"),
+		"expected 'read releases dir' in error, got: {message}"
+	);
+
+	let mut permissions = fs::metadata(&releases_dir)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o755);
+	fs::set_permissions(&releases_dir, permissions)
+		.unwrap_or_else(|error| panic!("restore permissions: {error}"));
+}
+
+#[test]
+#[cfg(unix)]
+fn write_release_record_file_reports_error_when_stale_record_dir_unremoveable() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	let mut manifest_a = sample_release_manifest_for_commit_message(false, false);
+	manifest_a.release_targets = vec![monochange_core::ReleaseManifestTarget {
+		id: "sdk".to_string(),
+		kind: monochange_core::ReleaseOwnerKind::Package,
+		version: "0.5.0".to_string(),
+		tag: true,
+		release: true,
+		version_format: VersionFormat::Primary,
+		tag_name: "v0.5.0".to_string(),
+		members: Vec::new(),
+		rendered_title: String::new(),
+		rendered_changelog_title: String::new(),
+	}];
+	manifest_a.released_packages = vec!["sdk".to_string()];
+	manifest_a.plan = monochange_core::ReleaseManifestPlan {
+		workspace_root: Path::new(".").to_path_buf(),
+		decisions: Vec::new(),
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+	write_release_record_file(root, None, &manifest_a)
+		.unwrap_or_else(|error| panic!("write first: {error}"));
+
+	let releases_dir = root.join(".monochange/releases");
+	let existing_dir = fs::read_dir(&releases_dir)
+		.unwrap_or_else(|error| panic!("read dir: {error}"))
+		.filter_map(Result::ok)
+		.find(|e| e.path().join("release.json").exists())
+		.unwrap_or_else(|| panic!("expected existing record dir"))
+		.path();
+	let immutable_file = existing_dir.join("immutable.txt");
+	fs::write(&immutable_file, "content")
+		.unwrap_or_else(|error| panic!("write immutable file: {error}"));
+	let mut permissions = fs::metadata(&immutable_file)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&immutable_file, permissions)
+		.unwrap_or_else(|error| panic!("set immutable: {error}"));
+
+	let mut dir_permissions = fs::metadata(&existing_dir)
+		.unwrap_or_else(|error| panic!("dir metadata: {error}"))
+		.permissions();
+	dir_permissions.set_mode(0o555);
+	fs::set_permissions(&existing_dir, dir_permissions)
+		.unwrap_or_else(|error| panic!("set dir permissions: {error}"));
+
+	let mut manifest_b = sample_release_manifest_for_commit_message(false, false);
+	manifest_b.release_targets = vec![monochange_core::ReleaseManifestTarget {
+		id: "sdk".to_string(),
+		kind: monochange_core::ReleaseOwnerKind::Package,
+		version: "0.5.0".to_string(),
+		tag: true,
+		release: true,
+		version_format: VersionFormat::Primary,
+		tag_name: "v0.5.0".to_string(),
+		members: Vec::new(),
+		rendered_title: String::new(),
+		rendered_changelog_title: String::new(),
+	}];
+	manifest_b.released_packages = vec!["sdk".to_string()];
+	manifest_b.plan = monochange_core::ReleaseManifestPlan {
+		workspace_root: Path::new(".").to_path_buf(),
+		decisions: Vec::new(),
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+	let result = write_release_record_file(root, None, &manifest_b);
+	assert!(
+		result.is_err(),
+		"expected error when stale record dir is unremovable, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("remove stale release record dir"),
+		"expected 'remove stale release record dir' in error, got: {message}"
+	);
+
+	let mut dir_permissions = fs::metadata(&existing_dir)
+		.unwrap_or_else(|error| panic!("dir metadata: {error}"))
+		.permissions();
+	dir_permissions.set_mode(0o755);
+	fs::set_permissions(&existing_dir, dir_permissions)
+		.unwrap_or_else(|error| panic!("restore dir permissions: {error}"));
+	let mut file_permissions = fs::metadata(&immutable_file)
+		.unwrap_or_else(|error| panic!("file metadata: {error}"))
+		.permissions();
+	file_permissions.set_mode(0o644);
+	fs::set_permissions(&immutable_file, file_permissions)
+		.unwrap_or_else(|error| panic!("restore file permissions: {error}"));
 }
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
@@ -4933,19 +5394,25 @@ fn repair_release_command_rejects_non_descendant_targets_without_force() {
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git_in_temp_repo(root, &["add", "release.txt"]);
-	let release_record =
-		monochange_core::render_release_record_block(&sample_release_record_for_retarget())
-			.unwrap_or_else(|error| panic!("render release record: {error}"));
-	git_in_temp_repo(
-		root,
-		&[
-			"commit",
-			"-m",
-			"chore(release): prepare release",
-			"-m",
-			release_record.as_str(),
-		],
-	);
+	let record = sample_release_record_for_retarget();
+	let json = serde_json::to_string_pretty(&record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = root.join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	fs::write(&record_path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "chore(release): prepare release"]);
 	git_in_temp_repo(root, &["tag", "v1.2.3"]);
 	fs::write(root.join("release.txt"), "follow-up\n")
 		.unwrap_or_else(|error| panic!("write follow-up file: {error}"));
@@ -5788,7 +6255,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 	let configuration =
 		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 
-	let manifest_path = root.join(".monochange/release-manifest.json");
+	let manifest_path = root.join(".monochange/local/release-manifest.json");
 	let prepare_release = CliCommandDefinition {
 		name: "release".to_string(),
 		help_text: None,
@@ -5808,7 +6275,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
 	.unwrap_or_else(|error| panic!("prepare release: {error}"));
-	assert!(render_output.contains("release manifest: .monochange/release-manifest.json"));
+	assert!(render_output.contains("release manifest: .monochange/local/release-manifest.json"));
 	let manifest_contents =
 		fs::read_to_string(&manifest_path).unwrap_or_else(|error| panic!("read manifest: {error}"));
 	assert!(manifest_contents.contains("\"releaseTargets\""));
@@ -7280,16 +7747,16 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	cargo_toml.push_str("\n# staged release update\n");
 	fs::write(root.join("Cargo.toml"), cargo_toml)
 		.unwrap_or_else(|error| panic!("write Cargo.toml: {error}"));
-	fs::create_dir_all(root.join(".monochange"))
+	fs::create_dir_all(root.join(".monochange/local"))
 		.unwrap_or_else(|error| panic!("create .monochange: {error}"));
-	fs::write(root.join(".monochange/release-manifest.json"), "{}\n")
+	fs::write(root.join(".monochange/local/release-manifest.json"), "{}\n")
 		.unwrap_or_else(|error| panic!("write manifest: {error}"));
 
 	crate::git_stage_paths(
 		root,
 		&[
 			PathBuf::from("Cargo.toml"),
-			PathBuf::from(".monochange/release-manifest.json"),
+			PathBuf::from(".monochange/local/release-manifest.json"),
 			PathBuf::from(".changeset/001-release-foundation.md"),
 		],
 	)
@@ -9476,18 +9943,24 @@ fn create_release_record_commit_from_record(
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git_in_temp_repo(root, &["add", "monochange.toml", "release.txt"]);
-	let release_record = monochange_core::render_release_record_block(record)
-		.unwrap_or_else(|error| panic!("render release record: {error}"));
-	git_in_temp_repo(
-		root,
-		&[
-			"commit",
-			"-m",
-			"chore(release): prepare release",
-			"-m",
-			release_record.as_str(),
-		],
-	);
+	let json = serde_json::to_string_pretty(record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = root.join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let path = dir.join("release.json");
+	fs::write(&path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "chore(release): prepare release"]);
 	git_output_in_temp_repo(root, &["rev-parse", "HEAD"])
 }
 
@@ -10427,6 +10900,28 @@ fn build_release_record_subcommand_requires_from_and_supports_json_output() {
 	assert_eq!(
 		error.kind(),
 		clap::error::ErrorKind::MissingRequiredArgument
+	);
+}
+
+#[test]
+fn build_release_record_subcommand_accepts_sha_flag() {
+	let command = Command::new("mc").subcommand(crate::build_release_record_subcommand());
+	let matches = command
+		.clone()
+		.try_get_matches_from([
+			OsString::from("mc"),
+			OsString::from("release-record"),
+			OsString::from("--from"),
+			OsString::from("HEAD"),
+			OsString::from("--sha"),
+		])
+		.unwrap_or_else(|error| panic!("release-record --sha matches: {error}"));
+	let (_, subcommand_matches) = matches
+		.subcommand()
+		.unwrap_or_else(|| panic!("expected release-record subcommand"));
+	assert!(
+		subcommand_matches.get_flag("sha"),
+		"expected --sha to be parsed as a flag"
 	);
 }
 
@@ -12745,22 +13240,32 @@ branches = ["release/*"]
 		changelogs: Vec::new(),
 		provider: None,
 	};
-	let block = monochange_core::render_release_record_block(&record)
-		.unwrap_or_else(|error| panic!("render release record: {error}"));
-	fs::write(tempdir.path().join("release.txt"), block.clone())
+	let json = serde_json::to_string_pretty(&record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = tempdir.path().join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	fs::write(&record_path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	fs::write(tempdir.path().join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args(["add", "release.txt"])
+		.args(["add", "."])
 		.output()
-		.unwrap_or_else(|error| panic!("git add release: {error}"));
+		.unwrap_or_else(|error| panic!("git add: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args([
-			"commit",
-			"-m",
-			&format!("chore(release): prepare release\n\n{block}"),
-		])
+		.args(["commit", "-m", "chore(release): prepare release"])
 		.output()
 		.unwrap_or_else(|error| panic!("git commit release: {error}"));
 
@@ -12879,22 +13384,32 @@ repo = "monochange"
 		changelogs: Vec::new(),
 		provider: None,
 	};
-	let block = monochange_core::render_release_record_block(&record)
-		.unwrap_or_else(|error| panic!("render release record: {error}"));
-	fs::write(tempdir.path().join("release.txt"), block.clone())
+	let json = serde_json::to_string_pretty(&record)
+		.unwrap_or_else(|error| panic!("serialize release record: {error}"));
+	let hash = {
+		use std::collections::hash_map::DefaultHasher;
+		use std::hash::Hasher;
+		let mut hasher = DefaultHasher::new();
+		for target in &record.release_targets {
+			hasher.write(target.id.as_bytes());
+			hasher.write(target.version.as_bytes());
+		}
+		format!("{:016x}", hasher.finish())
+	};
+	let dir = tempdir.path().join(".monochange/releases").join(&hash);
+	fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	let record_path = dir.join("release.json");
+	fs::write(&record_path, &json).unwrap_or_else(|error| panic!("write release record: {error}"));
+	fs::write(tempdir.path().join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args(["add", "release.txt"])
+		.args(["add", "."])
 		.output()
-		.unwrap_or_else(|error| panic!("git add release: {error}"));
+		.unwrap_or_else(|error| panic!("git add: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args([
-			"commit",
-			"-m",
-			&format!("chore(release): prepare release\n\n{block}"),
-		])
+		.args(["commit", "-m", "chore(release): prepare release"])
 		.output()
 		.unwrap_or_else(|error| panic!("git commit release: {error}"));
 

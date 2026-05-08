@@ -27,7 +27,7 @@ exit_code: 0
 
 ## Release manifest
 
-- `.monochange/release-manifest.json`
+- `.monochange/local/release-manifest.json`
 
 ## Changed files
 

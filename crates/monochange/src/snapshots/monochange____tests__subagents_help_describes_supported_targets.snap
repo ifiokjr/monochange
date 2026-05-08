@@ -17,6 +17,7 @@ Options:
       --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
       --format <format>           Output format for the generated subagent plan [default: markdown] [possible values: text, json, markdown, md]
       --jq <EXPRESSION>           Filter JSON output with a jq-style expression, such as `.assets[].name`
+      --sha                       Output only the commit SHA of the discovered release record
       --no-mcp                    Skip repo-local MCP config files for supported targets
   -h, --help                      Print help
 

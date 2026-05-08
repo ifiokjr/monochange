@@ -923,7 +923,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				),
 				(
 					"Write a readiness artifact:",
-					"mc publish-readiness --from HEAD --output .monochange/readiness.json",
+					"mc publish-readiness --from HEAD --output .monochange/local/readiness.json",
 				),
 				(
 					"JSON for one package:",
@@ -978,7 +978,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				),
 				(
 					"Write a bootstrap result:",
-					"mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json",
+					"mc publish-bootstrap --from HEAD --output .monochange/local/bootstrap-result.json",
 				),
 				(
 					"JSON for one package:",

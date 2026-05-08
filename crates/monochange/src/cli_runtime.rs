@@ -288,7 +288,7 @@ pub(crate) fn template_value_to_input_values(value: &serde_json::Value) -> Vec<S
 	}
 }
 
-const DEFAULT_RELEASE_MANIFEST_PATH: &str = ".monochange/release-manifest.json";
+const DEFAULT_RELEASE_MANIFEST_PATH: &str = ".monochange/local/release-manifest.json";
 
 pub(crate) fn write_release_manifest_file(
 	root: &Path,
@@ -4186,7 +4186,7 @@ path = "crates/core"
 		let cli_command = default_cli_command("prepare-release");
 		let mut context = cli_context();
 		context.show_diff = true;
-		context.release_manifest_path = Some(PathBuf::from(".monochange/release.json"));
+		context.release_manifest_path = Some(PathBuf::from(".monochange/local/release.json"));
 		context.release_results = vec!["published v1.2.3".to_string()];
 		context.release_request_result = Some("opened release request".to_string());
 		context.issue_comment_results = vec!["commented on #42".to_string()];
@@ -4256,7 +4256,7 @@ path = "crates/core"
 		});
 
 		let text = render_cli_command_result(&cli_command, &context);
-		assert!(text.contains("release manifest: .monochange/release.json"));
+		assert!(text.contains("release manifest: .monochange/local/release.json"));
 		assert!(text.contains("releases:"));
 		assert!(text.contains("release request:"));
 		assert!(text.contains("issue comments:"));
@@ -5684,12 +5684,13 @@ path = "crates/core"
 		let mut prepared_release = sample_prepared_release();
 		prepared_release.changed_files = vec![PathBuf::from("Cargo.toml")];
 		context.prepared_release = Some(prepared_release);
-		context.release_manifest_path = Some(PathBuf::from(".monochange/prepared-release.json"));
+		context.release_manifest_path =
+			Some(PathBuf::from(".monochange/local/prepared-release.json"));
 		context.release_results = vec!["published core".to_string()];
 
 		let rendered = render_cli_command_result(&cli_command, &context);
 
-		assert!(rendered.contains("release manifest: .monochange/prepared-release.json"));
+		assert!(rendered.contains("release manifest: .monochange/local/prepared-release.json"));
 		assert!(rendered.contains("releases:"));
 		assert!(rendered.contains("- published core"));
 		assert!(rendered.contains("changed files:"));
@@ -5904,7 +5905,7 @@ path = "crates/core"
 		let configuration = sample_configuration(tempdir.path());
 		let inputs = BTreeMap::from([(
 			"readiness".to_string(),
-			vec![".monochange/readiness.json".to_string()],
+			vec![".monochange/local/readiness.json".to_string()],
 		)]);
 
 		let error = publish_rate_limit_selected_package_ids(
@@ -5966,11 +5967,14 @@ path = "crates/core"
 	fn optional_publish_plan_readiness_artifact_path_trims_and_rejects_blank_values() {
 		let inputs = BTreeMap::from([(
 			"readiness".to_string(),
-			vec![" .monochange/readiness.json ".to_string()],
+			vec![" .monochange/local/readiness.json ".to_string()],
 		)]);
 		let path = optional_publish_plan_readiness_artifact_path(&inputs)
 			.unwrap_or_else(|error| panic!("readiness artifact path: {error}"));
-		assert_eq!(path, Some(PathBuf::from(".monochange/readiness.json")));
+		assert_eq!(
+			path,
+			Some(PathBuf::from(".monochange/local/readiness.json"))
+		);
 
 		let missing = BTreeMap::new();
 		let missing_path = optional_publish_plan_readiness_artifact_path(&missing)
@@ -5988,11 +5992,11 @@ path = "crates/core"
 		let inputs = BTreeMap::from([
 			(
 				"resume".to_string(),
-				vec![" .monochange/previous-result.json ".to_string()],
+				vec![" .monochange/local/previous-result.json ".to_string()],
 			),
 			(
 				"output".to_string(),
-				vec![" .monochange/publish-result.json ".to_string()],
+				vec![" .monochange/local/publish-result.json ".to_string()],
 			),
 		]);
 
@@ -6002,11 +6006,11 @@ path = "crates/core"
 			.unwrap_or_else(|error| panic!("output path: {error}"));
 		assert_eq!(
 			resume,
-			Some(PathBuf::from(".monochange/previous-result.json"))
+			Some(PathBuf::from(".monochange/local/previous-result.json"))
 		);
 		assert_eq!(
 			output,
-			Some(PathBuf::from(".monochange/publish-result.json"))
+			Some(PathBuf::from(".monochange/local/publish-result.json"))
 		);
 
 		let blank = BTreeMap::from([("resume".to_string(), vec!["  ".to_string()])]);

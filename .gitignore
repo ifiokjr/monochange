@@ -8,7 +8,7 @@
 .devenv*
 .pre-commit-config.yaml
 devenv.local.nix
-.monochange/*
+.monochange/local/
 
 packages/monochange__cli-darwin-arm64/bin/
 packages/monochange__cli-darwin-x64/bin/

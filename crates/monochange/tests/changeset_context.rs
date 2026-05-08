@@ -43,7 +43,7 @@ fn prepare_release_records_git_changeset_context_and_renders_context_templates()
 		String::from_utf8_lossy(&output.stderr)
 	);
 
-	let manifest_path = root.join(".monochange/release-manifest.json");
+	let manifest_path = root.join(".monochange/local/release-manifest.json");
 	let manifest = fs_read_to_string(&manifest_path);
 	let parsed: Value =
 		serde_json::from_str(&manifest).unwrap_or_else(|error| panic!("manifest json: {error}"));

@@ -347,6 +347,12 @@ Use `--no-mcp` to skip MCP config files for targets that support repo-local MCP 
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
 		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
+		.arg(
 			Arg::new("no-mcp")
 				.long("no-mcp")
 				.help("Skip repo-local MCP config files for supported targets")
@@ -434,6 +440,12 @@ Audit notes:
 						.help("Output format")
 						.default_value("text")
 						.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 				),
 		)
 }
@@ -465,6 +477,12 @@ Inspection notes:
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_publish_readiness_subcommand() -> Command {
@@ -474,7 +492,7 @@ pub(crate) fn build_publish_readiness_subcommand() -> Command {
 			r"Examples:
   mc publish-readiness --from HEAD
   mc publish-readiness --from v1.2.3 --package core --format json
-  mc publish-readiness --from HEAD --output .monochange/readiness.json
+  mc publish-readiness --from HEAD --output .monochange/local/readiness.json
 
 Readiness notes:
   - Uses the release record at the supplied ref to select package versions.
@@ -509,6 +527,12 @@ Readiness notes:
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_publish_bootstrap_subcommand() -> Command {
@@ -517,7 +541,7 @@ pub(crate) fn build_publish_bootstrap_subcommand() -> Command {
 		.after_help(
 			r"Examples:
   mc publish-bootstrap --from HEAD --dry-run
-  mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
+  mc publish-bootstrap --from HEAD --output .monochange/local/bootstrap-result.json
   mc publish-bootstrap --from HEAD --package core --format json
 
 Bootstrap notes:
@@ -560,6 +584,12 @@ Bootstrap notes:
 				.help("Output format")
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 		)
 }
 
@@ -608,6 +638,12 @@ Tagging notes:
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_check_subcommand() -> Command {
@@ -648,6 +684,12 @@ pub(crate) fn build_check_subcommand() -> Command {
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_validate_subcommand() -> Command {
@@ -673,6 +715,12 @@ Runs the Validate step directly without requiring a configuration entry.",
 				.default_value("markdown")
 				.value_parser(["text", "json", "markdown", "md"]),
 		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
+		)
 }
 
 pub(crate) fn build_lint_subcommand() -> Command {
@@ -689,6 +737,12 @@ pub(crate) fn build_lint_subcommand() -> Command {
 						.help("Output format")
 						.default_value("markdown")
 						.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 				),
 		)
 		.subcommand(
@@ -705,6 +759,12 @@ pub(crate) fn build_lint_subcommand() -> Command {
 						.help("Output format")
 						.default_value("markdown")
 						.value_parser(["text", "json", "markdown", "md"]),
+		)
+		.arg(
+			Arg::new("sha")
+				.long("sha")
+				.help("Output only the commit SHA of the discovered release record")
+				.action(ArgAction::SetTrue),
 				),
 		)
 		.subcommand(

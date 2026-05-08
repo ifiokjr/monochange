@@ -1,9 +1,0 @@
----
-source: crates/monochange/tests/release_pull_requests.rs
-expression: contents
----
-## app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) ([DATE])
-
-### Changed
-
-- No package-specific changes were recorded; `workflow-app` was updated to 1.0.1.

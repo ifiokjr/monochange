@@ -21,7 +21,7 @@ use crate::resolve_config_path;
 use crate::root_relative;
 
 const PREPARED_RELEASE_ARTIFACT_SCHEMA_VERSION: u32 = 1;
-const DEFAULT_PREPARED_RELEASE_CACHE_PATH: &str = ".monochange/prepared-release-cache.json";
+const DEFAULT_PREPARED_RELEASE_CACHE_PATH: &str = ".monochange/local/prepared-release-cache.json";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct LoadedPreparedReleaseExecution {
@@ -423,7 +423,10 @@ pub(crate) fn ensure_monochange_artifact_ignored(
 		})?;
 	}
 	let existing = fs::read_to_string(&exclude_path).unwrap_or_default();
-	if existing.lines().any(|line| line.trim() == ".monochange/") {
+	if existing
+		.lines()
+		.any(|line| line.trim() == ".monochange/local/")
+	{
 		return Ok(());
 	}
 
@@ -431,7 +434,7 @@ pub(crate) fn ensure_monochange_artifact_ignored(
 	if !updated.is_empty() && !updated.ends_with('\n') {
 		updated.push('\n');
 	}
-	updated.push_str(".monochange/\n");
+	updated.push_str(".monochange/local/\n");
 	fs::write(&exclude_path, updated).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to update git exclude file {}: {error}",
@@ -506,7 +509,7 @@ mod tests {
 	}
 
 	fn explicit_artifact_path(root: &Path) -> PathBuf {
-		root.join(".monochange/unit-prepared-release.json")
+		root.join(".monochange/local/unit-prepared-release.json")
 	}
 
 	fn save_artifact(root: &Path, dry_run: bool, explicit_path: &Path) -> WorkspaceConfiguration {
@@ -531,14 +534,14 @@ mod tests {
 		let root = Path::new("/workspace");
 		assert_eq!(
 			default_prepared_release_cache_path(root),
-			root.join(".monochange/prepared-release-cache.json")
+			root.join(".monochange/local/prepared-release-cache.json")
 		);
 		assert_eq!(
 			resolve_prepared_release_artifact_path(
 				root,
-				Some(Path::new(".monochange/custom.json"))
+				Some(Path::new(".monochange/local/custom.json"))
 			),
-			root.join(".monochange/custom.json")
+			root.join(".monochange/local/custom.json")
 		);
 	}
 
@@ -562,14 +565,14 @@ mod tests {
 	fn git_status_snapshot_sorts_results_and_excludes_artifact_path() {
 		let tempdir = setup_prepared_release_repo();
 		let root = tempdir.path();
-		fs::create_dir_all(root.join(".monochange"))
+		fs::create_dir_all(root.join(".monochange/local"))
 			.unwrap_or_else(|error| panic!("mkdir .monochange: {error}"));
-		fs::write(root.join(".monochange/cache.json"), "{}")
+		fs::write(root.join(".monochange/local/cache.json"), "{}")
 			.unwrap_or_else(|error| panic!("write cache: {error}"));
 		fs::write(root.join("zzz.txt"), "z\n").unwrap_or_else(|error| panic!("write zzz: {error}"));
 		fs::write(root.join("aaa.txt"), "a\n").unwrap_or_else(|error| panic!("write aaa: {error}"));
 
-		let lines = git_status_snapshot(root, Some(&root.join(".monochange/cache.json")))
+		let lines = git_status_snapshot(root, Some(&root.join(".monochange/local/cache.json")))
 			.unwrap_or_else(|error| panic!("git status snapshot: {error}"));
 		assert_eq!(
 			lines,
@@ -917,7 +920,7 @@ mod tests {
 	fn ensure_monochange_artifact_ignored_updates_git_exclude_once() {
 		let tempdir = setup_prepared_release_repo();
 		let root = tempdir.path();
-		let artifact_path = root.join(".monochange/cache.json");
+		let artifact_path = root.join(".monochange/local/cache.json");
 
 		ensure_monochange_artifact_ignored(root, &artifact_path)
 			.unwrap_or_else(|error| panic!("ensure artifact ignored: {error}"));
@@ -930,7 +933,7 @@ mod tests {
 		assert_eq!(
 			exclude
 				.lines()
-				.filter(|line| *line == ".monochange/")
+				.filter(|line| *line == ".monochange/local/")
 				.count(),
 			1
 		);
@@ -962,7 +965,7 @@ mod tests {
 				.contains("failed to create prepared release artifact directory")
 		);
 
-		let artifact_dir = root.join(".monochange/write-error");
+		let artifact_dir = root.join(".monochange/local/write-error");
 		fs::create_dir_all(&artifact_dir)
 			.unwrap_or_else(|error| panic!("create artifact dir: {error}"));
 		let write_error = save_prepared_release_execution(
@@ -1008,7 +1011,7 @@ mod tests {
 			.unwrap_or_else(|| panic!("expected hash-object failure"));
 		assert!(hash_error.to_string().contains("failed to hash"));
 
-		ensure_monochange_artifact_ignored(root, &root.join(".monochange/cache.json"))
+		ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
 			.unwrap_or_else(|error| panic!("non-git artifact ignore should succeed: {error}"));
 	}
 
@@ -1034,7 +1037,7 @@ mod tests {
 		ensure_monochange_artifact_ignored(root, &artifact_path)
 			.unwrap_or_else(|error| panic!("ensure external artifact ignored: {error}"));
 		let exclude = fs::read_to_string(&exclude_path).unwrap_or_default();
-		assert!(!exclude.contains(".monochange/"));
+		assert!(!exclude.contains(".monochange/local/"));
 	}
 
 	#[test]
@@ -1045,12 +1048,12 @@ mod tests {
 		fs::write(&exclude_path, "*.log")
 			.unwrap_or_else(|error| panic!("seed git exclude file: {error}"));
 
-		ensure_monochange_artifact_ignored(root, &root.join(".monochange/cache.json"))
+		ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
 			.unwrap_or_else(|error| panic!("append monochange ignore rule: {error}"));
 
 		let exclude = fs::read_to_string(&exclude_path)
 			.unwrap_or_else(|error| panic!("read git exclude file: {error}"));
-		assert_eq!(exclude, "*.log\n.monochange/\n");
+		assert_eq!(exclude, "*.log\n.monochange/local/\n");
 	}
 
 	#[test]
@@ -1061,7 +1064,7 @@ mod tests {
 		};
 		let resolve_error = ensure_monochange_artifact_ignored(
 			&removed_root,
-			&removed_root.join(".monochange/cache.json"),
+			&removed_root.join(".monochange/local/cache.json"),
 		)
 		.err()
 		.unwrap_or_else(|| panic!("expected git exclude resolution error"));
@@ -1080,7 +1083,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("create blocking exclude dir: {error}"));
 
 		let write_error =
-			ensure_monochange_artifact_ignored(root, &root.join(".monochange/cache.json"))
+			ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
 				.err()
 				.unwrap_or_else(|| panic!("expected git exclude write error"));
 		assert!(
@@ -1114,7 +1117,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("write blocking git info file: {error}"));
 
 		let create_dir_error =
-			ensure_monochange_artifact_ignored(root, &root.join(".monochange/cache.json"))
+			ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
 				.err()
 				.unwrap_or_else(|| panic!("expected git exclude directory creation error"));
 		assert!(
