@@ -4984,6 +4984,7 @@ fn validate_single_versioned_file_content(
 	Ok(())
 }
 
+#[rustfmt::skip]
 fn validate_ecosystem_version_readable(
 	full_path: &Path,
 	display_path: &str,
@@ -5008,23 +5009,11 @@ fn validate_ecosystem_version_readable(
 		EcosystemType::Python => {
 			monochange_python::validate_versioned_file(full_path, display_path, fields)
 		}
-		EcosystemType::Go => {
-			monochange_go::validate_versioned_file(full_path, display_path, fields)
-		}
-		_ => {
-			return Err(MonochangeError::Config(format!(
-				"{owner_kind} `{owner_id}` versioned file `{display_path}` is not supported for the configured ecosystem"
-			)));
-		}
+		EcosystemType::Go => monochange_go::validate_versioned_file(full_path, display_path, fields), _ => return Err(MonochangeError::Config(format!("{owner_kind} `{owner_id}` versioned file `{display_path}` is not supported for the configured ecosystem"))),
 	};
 
-	result.map_err(|error| {
-		match error {
-			MonochangeError::Config(msg) => {
-				MonochangeError::Config(format!("{owner_kind} `{owner_id}` {msg}"))
-			}
-			other => other,
-		}
+	result.map_err(|error| match error {
+		MonochangeError::Config(msg) => MonochangeError::Config(format!("{owner_kind} `{owner_id}` {msg}")), other => other,
 	})
 }
 

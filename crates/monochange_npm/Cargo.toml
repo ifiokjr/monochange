@@ -32,6 +32,6 @@ monochange_lint_testing = { workspace = true }
 monochange_test_helpers = { workspace = true }
 rstest = { workspace = true, default-features = true }
 similar-asserts = { workspace = true, default-features = true }
-
+tempfile = { workspace = true, default-features = true }
 [lints]
 workspace = true

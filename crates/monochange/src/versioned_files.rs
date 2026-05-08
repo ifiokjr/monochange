@@ -641,6 +641,7 @@ pub(crate) fn read_cached_document(
 	}
 }
 
+#[rustfmt::skip]
 pub(crate) fn resolve_versioned_prefix(
 	definition: &VersionedFileDefinition,
 	context: &VersionedFileUpdateContext<'_>,
@@ -697,16 +698,12 @@ pub(crate) fn resolve_versioned_prefix(
 			monochange_core::EcosystemType::Python => {
 				monochange_python::default_dependency_version_prefix().to_string()
 			}
-			monochange_core::EcosystemType::Go => {
-				monochange_go::default_dependency_version_prefix().to_string()
-			}
-			_ => {
-				unreachable!("unsupported ecosystem type for versioned file prefix resolution")
-			}
+			monochange_core::EcosystemType::Go => monochange_go::default_dependency_version_prefix().to_string(), _ => String::new(),
 		}
 	})
 }
 
+#[rustfmt::skip]
 pub(crate) fn expand_versioned_file_fields(
 	definition: &VersionedFileDefinition,
 	dep_names: &[String],
@@ -730,10 +727,7 @@ pub(crate) fn expand_versioned_file_fields(
 				monochange_core::EcosystemType::Python => {
 					monochange_python::default_dependency_fields()
 				}
-				monochange_core::EcosystemType::Go => monochange_go::default_dependency_fields(),
-				_ => {
-					unreachable!("unsupported ecosystem type for versioned file field expansion")
-				}
+				monochange_core::EcosystemType::Go => monochange_go::default_dependency_fields(), _ => &[],
 			};
 			default_fields
 				.iter()

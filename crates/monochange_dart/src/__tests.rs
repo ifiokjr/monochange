@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::Path;
 
 use monochange_core::Ecosystem;
@@ -7,6 +8,7 @@ use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use semver::Version;
 use serde_yaml_ng::Value;
+use tempfile::tempdir;
 
 use crate::DartVersionedFileKind;
 use crate::adapter;
@@ -403,4 +405,46 @@ fn default_dependency_version_prefix_is_correct() {
 #[test]
 fn default_dependency_fields_are_non_empty() {
 	assert!(!super::default_dependency_fields().is_empty());
+}
+
+#[test]
+fn validate_versioned_file_accepts_valid_pubspec_yaml() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("pubspec.yaml");
+	fs::write(&path, "version: 1.0.0\n").unwrap_or_else(|error| panic!("write: {error}"));
+	assert!(super::validate_versioned_file(&path, "pubspec.yaml", None).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_rejects_invalid_yaml() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("pubspec.yaml");
+	fs::write(&path, "not valid yaml: [").unwrap_or_else(|error| panic!("write: {error}"));
+	let result = super::validate_versioned_file(&path, "pubspec.yaml", None);
+	assert!(result.is_err());
+	assert!(result.unwrap_err().to_string().contains("not valid YAML"));
+}
+
+#[test]
+fn validate_versioned_file_rejects_missing_version() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("pubspec.yaml");
+	fs::write(&path, "name: test\n").unwrap_or_else(|error| panic!("write: {error}"));
+	let result = super::validate_versioned_file(&path, "pubspec.yaml", None);
+	assert!(result.is_err());
+	assert!(
+		result
+			.unwrap_err()
+			.to_string()
+			.contains("does not contain a `version` string field")
+	);
+}
+
+#[test]
+fn validate_versioned_file_rejects_missing_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("missing.yaml");
+	let result = super::validate_versioned_file(&path, "missing.yaml", None);
+	assert!(result.is_err());
+	assert!(result.unwrap_err().to_string().contains("not readable"));
 }

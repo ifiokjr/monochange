@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::PathBuf;
 
 use monochange_core::DependencyKind;
@@ -7,6 +8,7 @@ use monochange_core::EcosystemAdapter;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use semver::Version;
+use tempfile::tempdir;
 
 use crate::GoAdapter;
 use crate::GoVersionedFileKind;
@@ -34,13 +36,13 @@ fn adapter_reports_go_ecosystem() {
 
 #[test]
 fn discover_go_modules_reports_warnings_for_unreadable_go_mod_files() {
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	#[cfg(unix)]
 	std::os::unix::fs::symlink(root.join("missing-go-mod"), root.join("go.mod"))
 		.unwrap_or_else(|error| panic!("symlink go.mod: {error}"));
 	#[cfg(not(unix))]
-	std::fs::write(root.join("go.mod"), [0xff, 0xfe])
+	fs::write(root.join("go.mod"), [0xff, 0xfe])
 		.unwrap_or_else(|error| panic!("write invalid go.mod: {error}"));
 
 	let discovery =
@@ -494,7 +496,7 @@ replace github.com/example/shared => ../shared
 #[test]
 fn discover_go_modules_skips_vendor_directory() {
 	use std::fs;
-	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
 	fs::write(
@@ -605,4 +607,19 @@ fn default_dependency_version_prefix_is_correct() {
 #[test]
 fn default_dependency_fields_are_non_empty() {
 	assert!(!super::default_dependency_fields().is_empty());
+}
+
+#[test]
+fn validate_versioned_file_returns_ok_for_any_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("go.mod");
+	fs::write(&path, "module example.com/test\n").unwrap_or_else(|error| panic!("write: {error}"));
+	assert!(super::validate_versioned_file(&path, "go.mod", None).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_returns_ok_for_missing_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("missing.mod");
+	assert!(super::validate_versioned_file(&path, "missing.mod", None).is_ok());
 }

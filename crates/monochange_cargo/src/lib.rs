@@ -1101,7 +1101,6 @@ fn parse_severity(value: &str) -> BumpSeverity {
 	}
 }
 
-
 use monochange_core::RegistryKind;
 use monochange_publish::PublishRequest;
 
@@ -1257,8 +1256,6 @@ pub fn extract_workspace_package_table(parsed: &TomlValue) -> Option<WorkspacePa
 		.and_then(TomlValue::as_table)
 		.cloned()
 }
-
-
 
 /// Return the default dependency-version prefix for this ecosystem.
 /// Validate that a Cargo versioned file contains a readable version field.

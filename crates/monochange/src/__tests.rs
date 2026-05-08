@@ -8155,6 +8155,16 @@ fn resolve_versioned_prefix_prefers_explicit_then_ecosystem_then_default() {
 		regex: None,
 	};
 	assert_eq!(crate::resolve_versioned_prefix(&python, &context), "~=");
+
+	let go = monochange_core::VersionedFileDefinition {
+		path: "packages/app/go.mod".to_string(),
+		ecosystem_type: Some(monochange_core::EcosystemType::Go),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	assert_eq!(crate::resolve_versioned_prefix(&go, &context), "");
 	assert_eq!(monochange_python::default_dependency_version_prefix(), ">=");
 	assert_eq!(
 		monochange_python::default_dependency_fields(),
@@ -8796,6 +8806,19 @@ fn expand_versioned_file_fields_supports_name_templates_and_passthrough_fields()
 			"workspace.dependencies.core.version".to_string(),
 			"workspace.version".to_string(),
 		]
+	);
+
+	let go = monochange_core::VersionedFileDefinition {
+		path: "go.mod".to_string(),
+		ecosystem_type: Some(monochange_core::EcosystemType::Go),
+		prefix: None,
+		fields: None,
+		name: None,
+		regex: None,
+	};
+	assert_eq!(
+		crate::versioned_files::expand_versioned_file_fields(&go, &["core".to_string()]),
+		vec!["require".to_string()]
 	);
 }
 

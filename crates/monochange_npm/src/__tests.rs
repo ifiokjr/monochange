@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -10,6 +11,7 @@ use monochange_core::materialize_dependency_edges;
 use semver::Version;
 use serde_json::json;
 use serde_yaml_ng::Value as YamlValue;
+use tempfile::tempdir;
 
 use crate::NpmVersionedFileKind;
 use crate::adapter;
@@ -906,4 +908,56 @@ fn default_dependency_version_prefix_is_correct() {
 #[test]
 fn default_dependency_fields_are_non_empty() {
 	assert!(!super::default_dependency_fields().is_empty());
+}
+
+#[test]
+fn validate_versioned_file_accepts_valid_package_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("package.json");
+	fs::write(&path, r#"{"version": "1.0.0"}"#).unwrap_or_else(|error| panic!("write: {error}"));
+	assert!(super::validate_versioned_file(&path, "package.json", None).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_accepts_custom_field() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("package.json");
+	fs::write(&path, r#"{"customVersion": "1.0.0"}"#)
+		.unwrap_or_else(|error| panic!("write: {error}"));
+	let custom_fields = vec!["customVersion".to_string()];
+	assert!(super::validate_versioned_file(&path, "package.json", Some(&custom_fields)).is_ok());
+}
+
+#[test]
+fn validate_versioned_file_rejects_invalid_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("package.json");
+	fs::write(&path, "not json").unwrap_or_else(|error| panic!("write: {error}"));
+	let result = super::validate_versioned_file(&path, "package.json", None);
+	assert!(result.is_err());
+	assert!(result.unwrap_err().to_string().contains("not valid JSON"));
+}
+
+#[test]
+fn validate_versioned_file_rejects_missing_version() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("package.json");
+	fs::write(&path, r#"{"name": "test"}"#).unwrap_or_else(|error| panic!("write: {error}"));
+	let result = super::validate_versioned_file(&path, "package.json", None);
+	assert!(result.is_err());
+	assert!(
+		result
+			.unwrap_err()
+			.to_string()
+			.contains("does not contain a `version` string field")
+	);
+}
+
+#[test]
+fn validate_versioned_file_rejects_missing_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let path = tempdir.path().join("missing.json");
+	let result = super::validate_versioned_file(&path, "missing.json", None);
+	assert!(result.is_err());
+	assert!(result.unwrap_err().to_string().contains("not readable"));
 }

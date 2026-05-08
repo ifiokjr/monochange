@@ -1,5 +1,6 @@
 ---
 monochange: minor
+monochange_cargo: minor
 monochange_config: minor
 monochange_core: minor
 monochange_dart: minor
