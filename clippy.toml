@@ -2,4 +2,6 @@ disallowed-methods = [
 	{ path = "std::result::Result::expect", reason = "hides errors; use `unwrap_or_else(|error| panic!(...))`" },
 ]
 
+allow-indexing-slicing-in-tests = true
 msrv = "1.90.0"
+suppress-restriction-lint-in-const = true

@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 use std::fs;
 use std::path::Path;
 
@@ -24,7 +22,7 @@ use test_support::monochange_command;
 use test_support::setup_fixture;
 use test_support::snapshot_settings;
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn release_record_command_reports_record_from_tag_as_json() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -48,7 +46,7 @@ fn release_record_command_reports_record_from_tag_as_json() {
 	assert_readable_json_snapshot!(parsed);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn release_record_command_walks_first_parent_ancestry_from_head() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -81,7 +79,7 @@ fn release_record_command_walks_first_parent_ancestry_from_head() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn release_record_command_reports_unresolved_refs() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -97,7 +95,7 @@ fn release_record_command_reports_unresolved_refs() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn release_record_command_reports_missing_record_in_history() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -113,7 +111,7 @@ fn release_record_command_reports_missing_record_in_history() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -138,7 +136,7 @@ fn release_record_command_fails_loudly_on_malformed_record_in_ancestry() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn release_record_command_reports_unsupported_schema_version() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -177,7 +175,7 @@ fn release_record_command_reports_unsupported_schema_version() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn tag_release_command_creates_and_pushes_declared_tags() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -213,7 +211,7 @@ fn tag_release_command_creates_and_pushes_declared_tags() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn tag_release_command_is_idempotent_when_tags_already_exist() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -244,7 +242,7 @@ fn tag_release_command_is_idempotent_when_tags_already_exist() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn tag_release_command_rejects_descendant_refs_that_are_not_release_commits() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -264,7 +262,7 @@ fn tag_release_command_rejects_descendant_refs_that_are_not_release_commits() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn tag_release_command_json_snapshots_entire_report() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -309,7 +307,7 @@ fn tag_release_command_json_snapshots_entire_report() {
 	assert_readable_json_snapshot!(parsed);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn tag_release_command_dry_run_reports_planned_tags_without_creating_them() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -341,7 +339,7 @@ fn tag_release_command_dry_run_reports_planned_tags_without_creating_them() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn tag_release_command_reports_when_no_tags_are_declared() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -371,7 +369,7 @@ fn tag_release_command_reports_when_no_tags_are_declared() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
+#[etest::etest]
 fn tag_release_command_rejects_existing_tags_that_point_elsewhere() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());

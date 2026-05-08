@@ -479,9 +479,10 @@ impl CliProgressReporter {
 		let spinner_frames = self.symbols.spinner_frames;
 		let handle = thread::spawn(move || {
 			thread::sleep(SPINNER_DELAY);
-			let mut frame_index = 0;
-			while !stop_flag.load(Ordering::Relaxed) {
-				let frame = spinner_frames[frame_index % spinner_frames.len()];
+			for frame in spinner_frames.iter().copied().cycle() {
+				if stop_flag.load(Ordering::Relaxed) {
+					break;
+				}
 				with_stderr_lock(&writer_lock, || {
 					eprint!(
 						"\r\u{1b}[2K{} {}",
@@ -492,7 +493,6 @@ impl CliProgressReporter {
 				});
 				rendered_flag.store(true, Ordering::Relaxed);
 				thread::sleep(SPINNER_TICK);
-				frame_index += 1;
 			}
 		});
 		self.active_spinner = Some(SpinnerState {
@@ -832,7 +832,7 @@ mod tests {
 
 		reporter.command_started();
 		reporter.step_started(0, &step);
-		thread::sleep(SPINNER_TICK + Duration::from_millis(20));
+		thread::sleep(SPINNER_DELAY + SPINNER_TICK + Duration::from_millis(20));
 		reporter.step_finished(
 			0,
 			&step,

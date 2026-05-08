@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 use insta::assert_snapshot;
 use rstest::rstest;
 use serde_json::Value;
@@ -60,13 +58,14 @@ fn pre_stable_release_json_scenarios_match_snapshot(
 }
 
 fn find_decision<'a>(json: &'a Value, package_name_fragment: &str) -> &'a Value {
-	json["plan"]["decisions"]
-		.as_array()
+	json.pointer("/plan/decisions")
+		.and_then(Value::as_array)
 		.unwrap_or_else(|| panic!("decisions array"))
 		.iter()
 		.find(|decision| {
-			decision["package"]
-				.as_str()
+			decision
+				.get("package")
+				.and_then(Value::as_str)
 				.is_some_and(|package| package.contains(package_name_fragment))
 		})
 		.unwrap_or_else(|| panic!("expected decision for {package_name_fragment}"))
@@ -78,14 +77,32 @@ fn pre_stable_major_bump_keeps_expected_decisions() {
 	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
 
 	let core_decision = find_decision(&json, "core");
-	assert_eq!(core_decision["bump"], "major");
-	assert_eq!(core_decision["plannedVersion"], "0.2.0");
-	assert_eq!(core_decision["trigger"], "direct-change");
+	assert_eq!(
+		core_decision.get("bump").and_then(Value::as_str),
+		Some("major")
+	);
+	assert_eq!(
+		core_decision.get("plannedVersion").and_then(Value::as_str),
+		Some("0.2.0")
+	);
+	assert_eq!(
+		core_decision.get("trigger").and_then(Value::as_str),
+		Some("direct-change")
+	);
 
 	let app_decision = find_decision(&json, "app");
-	assert_eq!(app_decision["bump"], "patch");
-	assert_eq!(app_decision["plannedVersion"], "0.1.1");
-	assert_eq!(app_decision["trigger"], "transitive-dependency");
+	assert_eq!(
+		app_decision.get("bump").and_then(Value::as_str),
+		Some("patch")
+	);
+	assert_eq!(
+		app_decision.get("plannedVersion").and_then(Value::as_str),
+		Some("0.1.1")
+	);
+	assert_eq!(
+		app_decision.get("trigger").and_then(Value::as_str),
+		Some("transitive-dependency")
+	);
 }
 
 #[test]
@@ -94,8 +111,14 @@ fn pre_stable_minor_bump_keeps_expected_decisions() {
 	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
 
 	let core_decision = find_decision(&json, "core");
-	assert_eq!(core_decision["bump"], "minor");
-	assert_eq!(core_decision["plannedVersion"], "0.1.1");
+	assert_eq!(
+		core_decision.get("bump").and_then(Value::as_str),
+		Some("minor")
+	);
+	assert_eq!(
+		core_decision.get("plannedVersion").and_then(Value::as_str),
+		Some("0.1.1")
+	);
 }
 
 #[test]
@@ -104,6 +127,12 @@ fn stable_major_bump_keeps_expected_decisions() {
 	let json = run_json_command(tempdir.path(), "release", Some("2026-04-06"));
 
 	let core_decision = find_decision(&json, "core");
-	assert_eq!(core_decision["bump"], "major");
-	assert_eq!(core_decision["plannedVersion"], "2.0.0");
+	assert_eq!(
+		core_decision.get("bump").and_then(Value::as_str),
+		Some("major")
+	);
+	assert_eq!(
+		core_decision.get("plannedVersion").and_then(Value::as_str),
+		Some("2.0.0")
+	);
 }

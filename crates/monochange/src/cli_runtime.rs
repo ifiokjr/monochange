@@ -698,7 +698,10 @@ pub(crate) fn execute_cli_command_with_options(
 					..
 				} => {
 					let build_file_diffs = context.show_diff
-						|| steps_reference_release_file_diffs(&cli_command.steps[step_index + 1..]);
+						|| cli_command
+							.steps
+							.get(step_index + 1..)
+							.is_some_and(steps_reference_release_file_diffs);
 					let prepared_execution = if let Some(loaded) =
 						maybe_load_prepared_release_execution(
 							root,
@@ -1278,12 +1281,13 @@ fn parse_template_as_boolean(value: &serde_json::Value, condition: &str) -> Mono
 		serde_json::Value::String(value) => parse_string_as_boolean(value, condition),
 		serde_json::Value::Null => Ok(false),
 		serde_json::Value::Array(values) => {
-			if values.len() == 1 {
-				parse_template_as_boolean(&values[0], condition)
-			} else {
-				Err(MonochangeError::Config(format!(
-					"`when` condition `{condition}` is not a scalar boolean value"
-				)))
+			match values.as_slice() {
+				[value] => parse_template_as_boolean(value, condition),
+				_ => {
+					Err(MonochangeError::Config(format!(
+						"`when` condition `{condition}` is not a scalar boolean value"
+					)))
+				}
 			}
 		}
 		serde_json::Value::Object(_) => {

@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 use std::path::Path;
 
 use rstest::rstest;

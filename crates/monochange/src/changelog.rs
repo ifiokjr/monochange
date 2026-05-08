@@ -988,11 +988,11 @@ fn aggregate_group_release_note_changes(changes: Vec<ReleaseNoteChange>) -> Vec<
 			context: change.context.clone(),
 		};
 		if let Some(index) = indexes.get(&key).copied() {
-			let entry = &mut aggregated[index];
-			if !entry
-				.package_labels
-				.iter()
-				.any(|label| label == &change.package_name)
+			if let Some(entry) = aggregated.get_mut(index)
+				&& !entry
+					.package_labels
+					.iter()
+					.any(|label| label == &change.package_name)
 			{
 				entry.package_labels.push(change.package_name.clone());
 				entry.package_name = entry.package_labels.join(", ");
@@ -1126,8 +1126,9 @@ fn format_group_labeled_entry(change: &ReleaseNoteChange, rendered: &str) -> Str
 	if change.package_labels.len() == 1
 		&& !rendered.contains('\n')
 		&& let Some(entry) = rendered.strip_prefix("- ")
+		&& let Some(package_label) = change.package_labels.first()
 	{
-		return format!("- **{}**: {}", change.package_labels[0], entry);
+		return format!("- **{package_label}**: {entry}");
 	}
 	let labels = change
 		.package_labels

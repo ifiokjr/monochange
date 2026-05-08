@@ -43,8 +43,6 @@
 //! - expose JSON-first MCP tools for assistant workflows
 //! <!-- {/monochangeCrateDocs} -->
 
-#![allow(clippy::indexing_slicing)]
-
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;

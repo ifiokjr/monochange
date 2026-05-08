@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 use std::path::Path;
 
 use insta::assert_snapshot;
@@ -60,18 +58,23 @@ fn normalized_progress_events(stderr: &str) -> Vec<Value> {
 	let mut normalized = Vec::with_capacity(events.len());
 	let mut index = 0;
 	while index < events.len() {
-		if events[index].get("event").and_then(Value::as_str) != Some("command_output") {
-			normalized.push(events[index].clone());
+		let Some(event) = events.get(index) else {
+			break;
+		};
+		if event.get("event").and_then(Value::as_str) != Some("command_output") {
+			normalized.push(event.clone());
 			index += 1;
 			continue;
 		}
 		let start = index;
-		while index < events.len()
-			&& events[index].get("event").and_then(Value::as_str) == Some("command_output")
-		{
+		while events.get(index).is_some_and(|event| {
+			event.get("event").and_then(Value::as_str) == Some("command_output")
+		}) {
 			index += 1;
 		}
-		let mut output_events = events[start..index].to_vec();
+		let mut output_events = events
+			.get(start..index)
+			.map_or_else(Vec::new, <[_]>::to_vec);
 		output_events.sort_by(|left, right| {
 			let left_key = (
 				left.get("stepIndex")
