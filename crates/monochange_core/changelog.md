@@ -4,49 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
-## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-07)
-
-### Changed
-
-- No package-specific changes were recorded; `monochange_core` was updated to 0.5.1 as part of group `main`.
-
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-07)
-
-### Changed
-
-- No package-specific changes were recorded; `monochange_core` was updated to 0.5.0 as part of group `main`.
-
-## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-07)
-
-### Breaking Change
-
-#### Publish durable release schema contracts
-
-Impact: release records now use the first public durable schema header, `v = "0.1"`, and monochange rejects missing, invalid, old, or future durable schema versions instead of reading unsafe historical shapes. The new `monochange_schema` crate owns schema version parsing, release-record wire validation, committed schema assets, and the initially empty machine-readable migration changelog.
-
-Usage: editors can use the hosted configuration schema once GitHub Pages publishes the docs, or the raw GitHub fallback immediately. Durable release records now embed the public version field instead of the internal Rust-only `schemaVersion` field:
-
-```json
-{
-	"v": "0.1",
-	"kind": "monochange.releaseRecord"
-}
-```
-
-The `monochange_schema` package remains independently versioned from the main release group. Its crate version starts at `0.0.0` on this branch, while this major changeset gives release planning the explicit signal to publish the first crate release without changing the durable public schema version `0.1`.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #396](https://github.com/monochange/monochange/pull/396) _Introduced in:_ [`563ef83`](https://github.com/monochange/monochange/commit/563ef83fa21260518ae60c972240e2f0562e9bc2)
-
-## [0.3.5](https://github.com/monochange/monochange/releases/tag/v0.3.5) (2026-05-07)
-
-### Fixed
-
-#### Remove grouped release member summaries
-
-Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae)
-
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 ### Fixed

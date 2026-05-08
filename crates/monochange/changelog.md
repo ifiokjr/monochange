@@ -4,68 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
-## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-07)
-
-### Changed
-
-- No package-specific changes were recorded; `monochange` was updated to 0.5.1 as part of group `main`.
-
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-07)
-
-### Fixed
-
-#### Extract publish support into a dedicated crate
-
-Move the publish support surface out of the top-level `monochange` crate and into the new `monochange_publish` crate. The extracted crate now owns the publish report/request models, trusted-publishing capability detection, provider/registry capability messages, and built-in publish command builders for npm, pnpm, Cargo, Dart, Flutter, JSR, PyPI, and Go proxy releases.
-
-This keeps `monochange` focused on orchestration while giving publish integrations a dedicated crate boundary for future registry checks, readiness logic, and provider-specific publishing workflows.
-
-```text
-monochange_publish owns reusable publish capabilities and command construction.
-monochange wires those capabilities into CLI workflows and release orchestration.
-```
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #397](https://github.com/monochange/monochange/pull/397) _Introduced in:_ [`fa78e4d`](https://github.com/monochange/monochange/commit/fa78e4db56fd3a6897896c6e1b1c62ea2d8e46b9)
-
-## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-07)
-
-### Breaking Change
-
-#### Publish durable release schema contracts
-
-Impact: release records now use the first public durable schema header, `v = "0.1"`, and monochange rejects missing, invalid, old, or future durable schema versions instead of reading unsafe historical shapes. The new `monochange_schema` crate owns schema version parsing, release-record wire validation, committed schema assets, and the initially empty machine-readable migration changelog.
-
-Usage: editors can use the hosted configuration schema once GitHub Pages publishes the docs, or the raw GitHub fallback immediately. Durable release records now embed the public version field instead of the internal Rust-only `schemaVersion` field:
-
-```json
-{
-	"v": "0.1",
-	"kind": "monochange.releaseRecord"
-}
-```
-
-The `monochange_schema` package remains independently versioned from the main release group. Its crate version starts at `0.0.0` on this branch, while this major changeset gives release planning the explicit signal to publish the first crate release without changing the durable public schema version `0.1`.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #396](https://github.com/monochange/monochange/pull/396) _Introduced in:_ [`563ef83`](https://github.com/monochange/monochange/commit/563ef83fa21260518ae60c972240e2f0562e9bc2)
-
-## [0.3.5](https://github.com/monochange/monochange/releases/tag/v0.3.5) (2026-05-07)
-
-### Fixed
-
-#### Preserve publish batch dependency order
-
-Carry prior packages into later publish-plan batches so dependency-ordered publish requests remain available when registry rate limits split a release into multiple jobs.
-
-This fixes publish plans for releases that are split by registry rate limits. Dependent packages now continue to see their earlier dependency-ordered predecessors in later publish jobs instead of publishing before required package versions are available.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a) _Last updated in:_ [`d81174d`](https://github.com/monochange/monochange/commit/d81174d6830e81c336322bb5d428be6545d3d2a1)
-
-#### Remove grouped release member summaries
-
-Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae)
-
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 ### Fixed

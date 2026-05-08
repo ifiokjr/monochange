@@ -41,34 +41,6 @@ For complete feature details, architecture overview, and usage examples, see the
 
 > _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/monochange/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
 
-## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-07)
-
-### Changed
-
-- No package-specific changes were recorded; `@monochange/skill` was updated to 0.5.1 as part of group `main`.
-
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-07)
-
-### Changed
-
-- No package-specific changes were recorded; `@monochange/skill` was updated to 0.5.0 as part of group `main`.
-
-## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-07)
-
-### Changed
-
-- No package-specific changes were recorded; `@monochange/skill` was updated to 0.4.0 as part of group `main`.
-
-## [0.3.5](https://github.com/monochange/monochange/releases/tag/v0.3.5) (2026-05-07)
-
-### Fixed
-
-#### Remove grouped release member summaries
-
-Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae)
-
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 ### Fixed

@@ -1820,9 +1820,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.98"
+version = "0.3.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67df7112613f8bfd9150013a0314e196f4800d3201ae742489d999db2f979f08"
+checksum = "a1840c94c045fbcf8ba2812c95db44499f7c64910a912551aaaa541decebcacf"
 dependencies = [
  "cfg-if",
  "futures-util",
@@ -2024,7 +2024,7 @@ dependencies = [
 
 [[package]]
 name = "monochange"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "anstyle",
  "chrono",
@@ -2082,7 +2082,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_analysis"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "insta",
  "monochange_cargo",
@@ -2103,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_book"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "doc-comment",
  "monochange",
@@ -2121,7 +2121,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_cargo"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "glob",
  "insta",
@@ -2148,7 +2148,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_config"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "doc-comment",
  "glob",
@@ -2181,7 +2181,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_core"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "ignore",
  "insta",
@@ -2200,7 +2200,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_dart"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "glob",
  "insta",
@@ -2220,7 +2220,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_deno"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "glob",
  "insta",
@@ -2238,7 +2238,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_ecmascript"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "monochange_core",
  "oxc_allocator",
@@ -2249,7 +2249,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitea"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "etest",
  "httpmock",
@@ -2268,7 +2268,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_github"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "etest",
  "httpmock",
@@ -2289,7 +2289,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitlab"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "etest",
  "httpmock",
@@ -2308,7 +2308,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_go"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "glob",
  "insta",
@@ -2325,7 +2325,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_graph"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_hosting"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "httpmock",
  "monochange_core",
@@ -2363,7 +2363,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_lint"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "glob",
  "ignore",
@@ -2376,7 +2376,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_lint_testing"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "monochange_core",
  "monochange_lint",
@@ -2385,14 +2385,14 @@ dependencies = [
 
 [[package]]
 name = "monochange_linting"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "monochange_core",
 ]
 
 [[package]]
 name = "monochange_npm"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "glob",
  "insta",
@@ -2415,7 +2415,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_publish"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "monochange_core",
  "serde",
@@ -2423,7 +2423,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_python"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "glob",
  "insta",
@@ -2442,7 +2442,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_schema"
-version = "0.0.1"
+version = "0.0.0"
 dependencies = [
  "insta",
  "serde",
@@ -2452,7 +2452,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_semver"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2464,7 +2464,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_telemetry"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "monochange_core",
  "reqwest",
@@ -2477,7 +2477,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_test_helpers"
-version = "0.5.1"
+version = "0.3.4"
 dependencies = [
  "insta",
  "monochange_core",
@@ -4798,9 +4798,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.121"
+version = "0.2.120"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49ace1d07c165b0864824eee619580c4689389afa9dc9ed3a4c75040d82e6790"
+checksum = "df52b6d9b87e0c74c9edfa1eb2d9bf85e5d63515474513aa50fa181b3c4f5db1"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -4811,9 +4811,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.71"
+version = "0.4.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96492d0d3ffba25305a7dc88720d250b1401d7edca02cc3bcd50633b424673b8"
+checksum = "af934872acec734c2d80e6617bbb5ff4f12b052dd8e6332b0817bce889516084"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -4821,9 +4821,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.121"
+version = "0.2.120"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e68e6f4afd367a562002c05637acb8578ff2dea1943df76afb9e83d177c8578"
+checksum = "78b1041f495fb322e64aca85f5756b2172e35cd459376e67f2a6c9dffcedb103"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -4831,9 +4831,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.121"
+version = "0.2.120"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d95a9ec35c64b2a7cb35d3fead40c4238d0940c86d107136999567a4703259f2"
+checksum = "9dcd0ff20416988a18ac686d4d4d0f6aae9ebf08a389ff5d29012b05af2a1b41"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -4844,9 +4844,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.121"
+version = "0.2.120"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4e0100b01e9f0d03189a92b96772a1fb998639d981193d7dbab487302513441"
+checksum = "49757b3c82ebf16c57d69365a142940b384176c24df52a087fb748e2085359ea"
 dependencies = [
  "unicode-ident",
 ]
@@ -4887,9 +4887,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.98"
+version = "0.3.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b572dff8bcf38bad0fa19729c89bb5748b2b9b1d8be70cf90df697e3a8f32aa"
+checksum = "2eadbac71025cd7b0834f20d1fe8472e8495821b4e9801eb0a60bd1f19827602"
 dependencies = [
  "js-sys",
  "wasm-bindgen",

@@ -4,56 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
-## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-07)
-
-Grouped release for `main`.
-
-### Changed
-
-- No package-specific changes were recorded; group `main` was updated to 0.5.1.
-
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-07)
-
-Grouped release for `main`.
-
-### Changed
-
-- No group-facing notes were recorded for this release. Member packages were updated as part of the synchronized group `main` version, but their changes are not configured for inclusion in this changelog.
-
-## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-07)
-
-Grouped release for `main`.
-
-### Changed
-
-- No group-facing notes were recorded for this release. Member packages were updated as part of the synchronized group `main` version, but their changes are not configured for inclusion in this changelog.
-
-## [0.3.5](https://github.com/monochange/monochange/releases/tag/v0.3.5) (2026-05-07)
-
-Grouped release for `main`.
-
-### Fixed
-
-> [!NOTE]
-> _main_
-
-#### Remove grouped release member summaries
-
-Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae)
-
-> [!NOTE]
-> _monochange_
-
-#### Preserve publish batch dependency order
-
-Carry prior packages into later publish-plan batches so dependency-ordered publish requests remain available when registry rate limits split a release into multiple jobs.
-
-This fixes publish plans for releases that are split by registry rate limits. Dependent packages now continue to see their earlier dependency-ordered predecessors in later publish jobs instead of publishing before required package versions are available.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a) _Last updated in:_ [`d81174d`](https://github.com/monochange/monochange/commit/d81174d6830e81c336322bb5d428be6545d3d2a1)
-
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 Grouped release for `main`.
