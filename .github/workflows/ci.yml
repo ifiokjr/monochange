@@ -350,7 +350,7 @@ jobs:
           fail-comment: |
             This check fails intentionally so GitHub's normal merge button cannot be used for release PRs.
 
-            After every required check is green, comment `/merge` on this PR or run the `release-pr-merge` workflow. That workflow fast-forwards the release branch and preserves monochange's release history invariants.
+            After every required check is green, run the `release-pr-merge` workflow manually. Maintainers can also post the exact merge command in a PR comment, but automated comments intentionally avoid spelling it out so they cannot trigger the merge workflow.
 
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
