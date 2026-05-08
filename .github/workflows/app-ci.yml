@@ -51,13 +51,13 @@ jobs:
       - name: cargo test (unit)
         run: |
           cd apps/monochange_app
-          secretspec run --profile ci --provider env -- cargo test --workspace --lib
+          cargo test --workspace --lib
         shell: devenv shell -- bash -e {0}
 
       - name: cargo test (integration)
         run: |
           cd apps/monochange_app
-          secretspec run --profile ci --provider env -- cargo test --workspace --test '*' --lib --bins
+          cargo test --workspace --test '*' --lib --bins
         shell: devenv shell -- bash -e {0}
 
   check:
@@ -161,7 +161,7 @@ jobs:
       - name: generate coverage
         run: |
           cd apps/monochange_app
-          secretspec run --profile ci --provider env -- cargo llvm-cov --workspace --lcov --output-path lcov.info
+          cargo llvm-cov --workspace --lcov --output-path lcov.info
         shell: devenv shell -- bash -e {0}
 
       - name: upload coverage to codecov
