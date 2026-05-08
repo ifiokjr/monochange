@@ -50,16 +50,17 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          activate: true
 
       - name: cargo test (unit)
         run: |
           secretspec run --profile ci --provider env -- cargo test --workspace --lib
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: cargo test (integration)
         run: |
           secretspec run --profile ci --provider env -- cargo test --workspace --test '*' --lib --bins
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
   check:
     timeout-minutes: 30
@@ -75,14 +76,15 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          activate: true
 
       - name: cargo check
         run: cargo check --workspace
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: cargo leptos build (frontend-only)
         run: cargo leptos build --frontend-only
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
   e2e:
     timeout-minutes: 30
@@ -114,15 +116,16 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          activate: true
 
       - name: install playwright browsers
         run: npx playwright install chromium --with-deps
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: run end-to-end tests
         run: |
-          secretspec run --profile ci --provider env -- cargo leptos end-to-end
-        shell: devenv shell -- bash -e {0}
+          pnpm exec playwright test
+        shell: bash
 
   coverage:
     timeout-minutes: 30
@@ -154,6 +157,7 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          activate: true
 
       - name: install cargo-llvm-cov
         uses: taiki-e/install-action@v2
@@ -163,7 +167,7 @@ jobs:
       - name: generate coverage
         run: |
           secretspec run --profile ci --provider env -- cargo llvm-cov --workspace --lcov --output-path lcov.info
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: upload coverage to codecov
         uses: codecov/codecov-action@v5
