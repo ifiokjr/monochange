@@ -165,7 +165,7 @@ Prepare release.
     "crates/app/CHANGELOG.md",
     "crates/core/CHANGELOG.md"
   ],
-  "v": "0.0",
+  "v": "[SCHEMA_VERSION]",
   "version": null
 }
 ```
