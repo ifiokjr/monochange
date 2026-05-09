@@ -56,7 +56,7 @@ Examples of ecosystem/provider leakage in the top-level crate:
 
 - `npm token` environment rejection still lives in `package_publish.rs`; npm trusted-publishing command construction and npm placeholder manifest generation are moving into `monochange_npm`
 - Cargo placeholder manifest generation in `package_publish.rs` (Cargo publish readiness blockers now live in `monochange_cargo`)
-- Cargo placeholder manifest generation in `package_publish.rs`
+- Dart, JSR, Python, Go placeholder manifest generation in `package_publish.rs`
 - top-level orchestration that still hardcodes ecosystem/provider trust setup instead of calling publish/provider adapters
 - trusted publishing capability matrix now lives in `monochange_publish`, while GitHub workflow/environment trust context now lives in `monochange_github`
 
@@ -524,3 +524,7 @@ After the JSR placeholder extraction, the next focused follow-up moves pub.dev p
 ### 2026-05-09: Python placeholder boundary follow-up
 
 After the Dart placeholder extraction, the next focused follow-up moves PyPI placeholder `pyproject.toml` and module scaffold generation into `monochange_python`. This keeps Python package scaffold rules with the Python ecosystem adapter while `package_publish.rs` still owns temporary-directory orchestration until `PublishAdapter` exists.
+
+### 2026-05-09: Cargo placeholder boundary follow-up
+
+After the Python placeholder extraction, the final focused follow-up moves crates.io placeholder `Cargo.toml` and `src/lib.rs` generation into `monochange_cargo`. This keeps Cargo crate scaffold rules with the Cargo ecosystem adapter while `package_publish.rs` still owns temporary-directory orchestration until `PublishAdapter` exists.
