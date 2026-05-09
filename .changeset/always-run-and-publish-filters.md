@@ -1,6 +1,8 @@
 ---
 monochange: minor
 monochange_core: minor
+monochange_config: minor
+monochange_schema: patch
 ---
 
 # Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`
