@@ -36,6 +36,7 @@ pub mod analysis;
 
 use std::collections::BTreeSet;
 use std::collections::HashSet;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -55,7 +56,9 @@ use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::SourceConfiguration;
 use monochange_core::normalize_path;
+use monochange_publish::PublishRequest;
 use semver::Version;
 use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value;
@@ -70,6 +73,25 @@ pub const PUBSPEC_FILE: &str = "pubspec.yaml";
 pub enum DartVersionedFileKind {
 	Manifest,
 	Lock,
+}
+
+pub fn write_dart_placeholder_manifest(
+	dir: &Path,
+	request: &PublishRequest,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<()> {
+	let repository =
+		source.map(|source| format!("https://github.com/{}/{}", source.owner, source.repo));
+	let mut rendered = format!(
+		"name: {}\nversion: {}\ndescription: Placeholder package published by monochange.\n",
+		request.package_name, request.version
+	);
+	if let Some(repository) = repository {
+		let _ = writeln!(rendered, "repository: {repository}");
+	}
+	fs::write(dir.join("pubspec.yaml"), rendered).map_err(|error| {
+		MonochangeError::Io(format!("failed to write placeholder pubspec.yaml: {error}"))
+	})
 }
 
 /// Classify a Dart or Flutter versioned file path.
