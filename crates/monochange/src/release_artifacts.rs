@@ -1405,8 +1405,7 @@ pub(crate) fn write_release_record_file(
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
-	let record = build_release_record(source, manifest);
-	let paths = ReleasePaths::from_record(root, &record);
+	let paths = ReleasePaths::from_manifest(root, manifest);
 
 	// If the record already exists, return it without overwriting so that
 	// subsequent PrepareRelease steps (for example during `mc release-pr`)
@@ -1415,6 +1414,7 @@ pub(crate) fn write_release_record_file(
 		return Ok(paths.absolute);
 	}
 
+	let record = build_release_record(source, manifest);
 	deduplicate_overlapping_release_records(
 		root,
 		&record.release_targets,
@@ -1498,26 +1498,86 @@ impl ReleasePaths {
 	///
 	/// This builds the intermediate `ReleaseRecord` internally, so prefer
 	/// `from_record` when the record is already available.
-	#[allow(dead_code)]
-	pub fn from_manifest(
-		root: &Path,
-		source: Option<&SourceConfiguration>,
-		manifest: &ReleaseManifest,
-	) -> Self {
-		let record = build_release_record(source, manifest);
-		Self::from_record(root, &record)
+	/// Compute paths directly from a `ReleaseManifest`.
+	///
+	/// Unlike `from_record`, this does **not** build the intermediate
+	/// `ReleaseRecord`. The hash is derived from `manifest.release_targets`
+	/// directly so callers can check file existence before doing expensive work.
+	pub fn from_manifest(root: &Path, manifest: &ReleaseManifest) -> Self {
+		let hash = release_targets_hash(&manifest.release_targets);
+		let relative = PathBuf::from(".monochange/releases")
+			.join(&hash)
+			.join("release.json");
+		let absolute = root.join(&relative);
+		Self {
+			hash,
+			relative,
+			absolute,
+		}
 	}
 }
 
-fn release_targets_hash(release_targets: &[ReleaseRecordTarget]) -> String {
+/// Identity-aware hash for a slice of release targets.
+///
+/// The hash is deterministic: targets are sorted by `(id, kind, version)`
+/// before hashing so that manifest order never affects the path.
+///
+/// Fields included in the hash: `id`, `kind`, `version`.
+/// Excluded: `tag`, `release`, `tag_name`, `version_format`, `members`.
+fn release_targets_hash<T: ReleaseTargetIdentity>(release_targets: &[T]) -> String {
 	use std::collections::hash_map::DefaultHasher;
 	use std::hash::Hasher;
 	let mut hasher = DefaultHasher::new();
-	for target in release_targets {
-		hasher.write(target.id.as_bytes());
-		hasher.write(target.version.as_bytes());
+	let mut sorted: Vec<&T> = release_targets.iter().collect();
+	sorted.sort_by(|a, b| {
+		a.id()
+			.cmp(b.id())
+			.then_with(|| a.kind().as_str().cmp(b.kind().as_str()))
+			.then_with(|| a.version().cmp(b.version()))
+	});
+	for target in sorted {
+		hasher.write(target.id().as_bytes());
+		hasher.write(target.kind().as_str().as_bytes());
+		hasher.write(target.version().as_bytes());
 	}
 	format!("{:016x}", hasher.finish())
+}
+
+/// Trait exposing the identity fields that participate in the release-target
+/// hash. Implemented for both `ReleaseManifestTarget` and `ReleaseRecordTarget`
+/// so that `release_targets_hash` can work with either slice type.
+trait ReleaseTargetIdentity {
+	fn id(&self) -> &str;
+	fn kind(&self) -> ReleaseOwnerKind;
+	fn version(&self) -> &str;
+}
+
+impl ReleaseTargetIdentity for ReleaseManifestTarget {
+	fn id(&self) -> &str {
+		&self.id
+	}
+
+	fn kind(&self) -> ReleaseOwnerKind {
+		self.kind
+	}
+
+	fn version(&self) -> &str {
+		&self.version
+	}
+}
+
+impl ReleaseTargetIdentity for ReleaseRecordTarget {
+	fn id(&self) -> &str {
+		&self.id
+	}
+
+	fn kind(&self) -> ReleaseOwnerKind {
+		self.kind
+	}
+
+	fn version(&self) -> &str {
+		&self.version
+	}
 }
 
 fn deduplicate_overlapping_release_records(

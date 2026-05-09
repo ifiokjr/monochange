@@ -736,7 +736,7 @@ fn release_paths_from_manifest_computes_hash_relative_and_absolute() {
 			compatibility_evidence: vec![],
 		},
 	};
-	let paths = ReleasePaths::from_manifest(&root, None, &manifest);
+	let paths = ReleasePaths::from_manifest(&root, &manifest);
 	assert!(!paths.hash.is_empty());
 	assert_eq!(
 		paths.relative,
@@ -782,7 +782,7 @@ fn release_paths_from_record_produces_same_hash_as_from_manifest() {
 			compatibility_evidence: vec![],
 		},
 	};
-	let from_manifest = ReleasePaths::from_manifest(&root, None, &manifest);
+	let from_manifest = ReleasePaths::from_manifest(&root, &manifest);
 	let record = build_release_record(None, &manifest);
 	let from_record = ReleasePaths::from_record(&root, &record);
 	assert_eq!(from_manifest.hash, from_record.hash);
