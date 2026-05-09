@@ -44,6 +44,7 @@ use crate::parse_change_bump;
 use crate::plan_release;
 use crate::prepare_release_execution;
 use crate::release_artifacts::set_force_build_file_diff_previews_error;
+use crate::release_artifacts::validate_release_record_file;
 use crate::release_artifacts::write_release_record_file;
 use crate::render_change_target_markdown;
 use crate::run_with_args;
@@ -5182,6 +5183,58 @@ fn write_release_record_file_reports_error_when_releases_dir_unreadable() {
 }
 
 #[test]
+fn validate_release_record_file_succeeds_when_record_exists_and_matches() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	let actual_path = validate_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("validate record: {error}"));
+	assert_eq!(expected_path, actual_path);
+}
+
+#[test]
+fn validate_release_record_file_rewrites_record_when_content_differs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	fs::write(
+		&expected_path,
+		r#"{"v":"0.1","kind":"monochange.releaseRecord"}"#,
+	)
+	.unwrap_or_else(|error| panic!("corrupt record: {error}"));
+	let actual_path = validate_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("validate record: {error}"));
+	assert_eq!(expected_path, actual_path);
+	let content =
+		fs::read_to_string(&actual_path).unwrap_or_else(|error| panic!("read rewritten: {error}"));
+	assert!(
+		!content.contains(r#""kind":"monochange.releaseRecord""#),
+		"record should have been rewritten, got: {content}"
+	);
+}
+
+#[test]
+fn validate_release_record_file_fails_when_record_is_missing() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let result = validate_release_record_file(root, None, &manifest);
+	assert!(
+		result.is_err(),
+		"expected error for missing record, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("release record missing"),
+		"expected 'release record missing' in error, got: {message}"
+	);
+}
+
+#[test]
 #[cfg(unix)]
 fn repair_release_command_dry_run_reports_text_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -7665,6 +7718,33 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	assert_eq!(
 		git_output_in_temp_repo(root, &["diff", "--cached", "--name-only"]),
 		"Cargo.toml"
+	);
+}
+
+#[test]
+fn git_stage_paths_stages_ignored_release_record_file() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(root.join(".gitignore"), ".monochange/\n")
+		.unwrap_or_else(|error| panic!("write .gitignore: {error}"));
+	git_in_temp_repo(root, &["add", "."]);
+	git_in_temp_repo(root, &["commit", "-m", "add gitignore"]);
+
+	fs::create_dir_all(root.join(".monochange/releases/abc123"))
+		.unwrap_or_else(|error| panic!("create releases dir: {error}"));
+	fs::write(root.join(".monochange/releases/abc123/release.json"), "{}")
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+
+	crate::git_stage_paths(
+		root,
+		&[PathBuf::from(".monochange/releases/abc123/release.json")],
+	)
+	.unwrap_or_else(|error| panic!("git stage paths: {error}"));
+
+	assert_eq!(
+		git_output_in_temp_repo(root, &["diff", "--cached", "--name-only"]),
+		".monochange/releases/abc123/release.json"
 	);
 }
 
