@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
+
+Grouped release for `main`.
+
+### Fixed
+
+> [!NOTE]
+> _main_
+
+#### Remove grouped release member summaries
+
+Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+> [!NOTE]
+> _monochange_
+
+#### Preserve publish batch dependency order
+
+Carry prior packages into later publish-plan batches so dependency-ordered publish requests remain available when registry rate limits split a release into multiple jobs.
+
+This fixes publish plans for releases that are split by registry rate limits. Dependent packages now continue to see their earlier dependency-ordered predecessors in later publish jobs instead of publishing before required package versions are available.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+> [!NOTE]
+> _monochange_
+
+#### Remove indexing/slicing lint allowances
+
+Remove crate-level `clippy::indexing_slicing` allowances and replace production indexing/slicing call sites with safe accessors.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #414](https://github.com/monochange/monochange/pull/414) _Introduced in:_ [`4d06f06`](https://github.com/monochange/monochange/commit/4d06f0695edb280b4dc7ab661cc69449674fe38e)
+
+### Testing
+
+> [!NOTE]
+> _monochange_
+
+#### Improve readability of multiline JSON snapshots
+
+Redact multiline string fields inside JSON snapshots and assert their contents separately so release-planning test snapshots remain readable without escaped newline sequences.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #398](https://github.com/monochange/monochange/pull/398) _Introduced in:_ [`458b671`](https://github.com/monochange/monochange/commit/458b671252f98a25628cd08a497792149370386d)
+
+> [!NOTE]
+> _monochange_
+
+#### Redact schema crate version in snapshot to survive release bumps
+
+Stop hardcoding `monochange_schema` crate version in integration test assertions. Use insta redaction for `schemaCrateVersion` in the schema asset inventory snapshot, and read the expected version from the crate's `Cargo.toml` at runtime.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #406](https://github.com/monochange/monochange/pull/406) _Introduced in:_ [`660d20a`](https://github.com/monochange/monochange/commit/660d20aebadae1096c3f4ddf1d24531c534ee5d4)
+
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 Grouped release for `main`.

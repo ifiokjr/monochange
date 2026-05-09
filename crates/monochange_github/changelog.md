@@ -4,6 +4,141 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
+
+### Added
+
+#### Move GitHub trust context into monochange_github
+
+Move GitHub-specific trust resolution functions out of `monochange::package_publish` and into the provider crate `monochange_github`.
+
+This includes:
+
+- `GitHubTrustContext` and its derive impls
+- `resolve_github_trust_context`
+- `verify_github_trust_context`
+- `trusted_publishing_identity_error`
+- `parse_github_workflow_ref`
+- `resolve_github_job_environment`
+- `trust_list_contains_context`
+- `json_value_contains`
+- `format_manual_trust_context`
+- `GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL` and `GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN`
+
+These functions are now behind the usual `monochange_github` feature flag and can be reused independently of the main publish pipeline.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #417](https://github.com/monochange/monochange/pull/417) _Introduced in:_ [`c3475b6`](https://github.com/monochange/monochange/commit/c3475b6fe46f5ecacd64b39ba473595cb56b5509)
+
+### Fixed
+
+#### File-based release records
+
+Store release records as committed JSON files under `.monochange/releases/` instead of embedding them in commit message bodies.
+
+##### Before
+
+Release records were embedded inside the commit message body between HTML comment markers:
+
+````markdown
+chore(release): prepare release
+
+## monochange Release Record
+
+<!-- monochange:release-record:start -->
+
+```json
+{
+	"schemaVersion": 1,
+	"kind": "monochange.releaseRecord",
+	"createdAt": "2026-05-08T08:00:00Z",
+	"command": "release-pr",
+	"releaseTargets": [
+		{
+			"id": "sdk",
+			"kind": "group",
+			"version": "1.2.3",
+			"tag": true,
+			"release": true
+		}
+	]
+}
+```
+````
+
+<!-- monochange:release-record:end -->
+
+```
+Discovery required parsing every commit message in first-parent ancestry with regex-based extraction.
+
+## After
+
+Release records are plain JSON files committed to the repository:
+```
+
+.monochange/ ├── local/ # gitignored — local artifacts │ ├── release-manifest.json │ └── prepared-release-cache.json └── releases/ └── <hash>/ # content-addressable directory └── release.json # the release record
+
+```
+The `<hash>` is derived from sorted `(package_id, version)` pairs via `DefaultHasher`. For a release targeting `sdk` at version `1.2.3` the hash might look like:
+```
+
+.monochange/releases/8f3e2a1b/c/release.json
+
+````
+(The exact hex value depends on the hasher state; it is always 16 hex characters.)
+
+## Deduplication
+
+When writing a new release record, any existing record that shares an overlapping `(package_id, version)` tag is automatically removed. This prevents stale records from accumulating when a release is retried or amended.
+
+## Discovery
+
+`mc release-record` now discovers files via `git diff-tree --no-commit-id --name-only -r` (falling back to `git ls-tree` for root commits) rather than parsing commit messages.
+
+## CI detection
+
+```bash
+git diff-tree --no-commit-id --name-only -r HEAD |
+  grep '^\.monochange/releases/.*/release\.json$'
+````
+
+## Breaking changes
+
+- `.monochange/*` is no longer fully gitignored; only `.monochange/local/` is ignored.
+- The `ReleaseRecord` JSON schema itself remains identical; only the storage location changes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #408](https://github.com/monochange/monochange/pull/408) _Introduced in:_ [`cd989c3`](https://github.com/monochange/monochange/commit/cd989c303a9722ca8240c44003f1ef4c96abc284)
+
+#### Move release record generation from commit_release to prepare_release
+
+The release record JSON is now written during the `PrepareRelease` CLI step instead of the `CommitRelease` step. This gives users a formatting preview and the opportunity to review or edit the record before it is committed.
+
+##### What changed
+
+- `ReleaseManifest` and `PreparedRelease` no longer store a `release_record_path` field. The path is derived on demand via the new `ReleasePaths` helper, which computes the hash, relative path, and absolute path from the manifest's `release_targets`.
+- A new `ReleasePaths` runtime helper provides `hash`, `relative`, and `absolute` paths for any release record. Steps that need the path can call `ReleasePaths::from_manifest` or `ReleasePaths::from_record` instead of reading a cached field.
+- The `PrepareRelease` step calls `write_release_record_file` to write the record to `.monochange/releases/<hash>/release.json`. The file is left unstaged for user review.
+- `commit_release` now validates the pre-written record with `validate_release_record_file` instead of generating it.
+- `deduplicate_overlapping_release_records` is now cached per-process to avoid redundant filesystem scans when both `write_release_record_file` and `validate_release_record_file` run in the same CLI invocation.
+- `git_stage_paths_command` adds `-f` so that ignored `.monochange/releases/` files can still be staged.
+- `release_path_requires_staging` explicitly allows `.monochange/releases/` paths even when gitignored.
+- `write_release_record_file` skips overwriting an existing record file so that subsequent `PrepareRelease` steps (for example during `mc release-pr`) do not dirty the working tree.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #421](https://github.com/monochange/monochange/pull/421) _Introduced in:_ [`46fb400`](https://github.com/monochange/monochange/commit/46fb40022d6275faa9f8e231764643665248b773) _Closed issues:_ [#418](https://github.com/monochange/monochange/issues/418)
+
+#### Remove grouped release member summaries
+
+Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+### Testing
+
+#### Normalize Rust unit test file layout
+
+Move Rust unit tests into colocated `__tests__/` directories and name each file after the module under test with a `_tests.rs` suffix.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #428](https://github.com/monochange/monochange/pull/428) _Introduced in:_ [`b61cc3e`](https://github.com/monochange/monochange/commit/b61cc3e66989fd83ffb16a31568d2f46d7075216)
+
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 ### Fixed
