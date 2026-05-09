@@ -1972,20 +1972,22 @@ fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	}
 }
 
-fn git_commit_paths(root: &Path, message: &CommitMessage, no_verify: bool) -> MonochangeResult<()> {
+async fn git_commit_paths(root: &Path, message: &CommitMessage, no_verify: bool) -> MonochangeResult<()> {
 	run_git_commit_message(
 		root,
 		message,
 		"commit release pull request changes",
 		no_verify,
 	)
+	.await
 }
 
-fn git_push_branch(root: &Path, branch: &str, no_verify: bool) -> MonochangeResult<()> {
+async fn git_push_branch(root: &Path, branch: &str, no_verify: bool) -> MonochangeResult<()> {
 	run_command(
 		git_push_branch_command(root, branch, no_verify),
 		"push release pull request branch",
 	)
+	.await
 }
 
 fn release_body(
