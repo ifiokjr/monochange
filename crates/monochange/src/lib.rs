@@ -530,7 +530,7 @@ const CHANGESET_DIR: &str = ".changeset";
 /// matching subcommand, and prints any non-empty stdout payload unless
 /// `--quiet` was requested.
 #[must_use = "the run result must be checked"]
-pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
+pub async fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
 
@@ -693,7 +693,7 @@ fn render_custom_command_argument_error(
 /// and command execution.
 #[doc(hidden)]
 #[allow(clippy::redundant_closure_for_method_calls)]
-pub fn run_with_args_in_dir<I>(
+pub async fn run_with_args_in_dir<I>(
 	bin_name: &'static str,
 	args: I,
 	root: &Path,
@@ -838,6 +838,7 @@ where
 		}
 		Some(("migrate", migrate_matches)) => run_migration_command(root, quiet, migrate_matches),
 		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server),
+
 		Some(("check", check_matches)) => {
 			if quiet {
 				return Ok(String::new());
@@ -864,12 +865,13 @@ where
 			}
 			lint::handle_lint_subcommand(root, lint_matches)
 		}
+
 		Some((cli_command_name, cli_command_matches)) if cli_command_name.starts_with("step:") => {
 			let configuration = configuration?;
 			let synthetic = synthetic_step_command_definition(cli_command_name)?;
 			let inputs = collect_cli_command_inputs(&synthetic, cli_command_matches);
 			let dry_run = quiet || cli_command_matches.get_flag("dry-run");
-			execute_cli_command(root, &configuration, &synthetic, dry_run, inputs)
+			execute_cli_command(root, &configuration, &synthetic, dry_run, inputs).await
 		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;
@@ -880,6 +882,7 @@ where
 				cli_command_matches,
 				quiet,
 			)
+			.await
 		}
 		None => Err(MonochangeError::Config("Usage: mc".to_string())),
 	}?;
