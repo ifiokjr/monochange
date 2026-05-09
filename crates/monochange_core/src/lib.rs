@@ -287,6 +287,35 @@ impl fmt::Display for Ecosystem {
 	}
 }
 
+impl std::str::FromStr for Ecosystem {
+	type Err = ();
+
+	fn from_str(string: &str) -> Result<Self, Self::Err> {
+		match string {
+			"cargo" => Ok(Self::Cargo),
+			"npm" => Ok(Self::Npm),
+			"deno" => Ok(Self::Deno),
+			"dart" => Ok(Self::Dart),
+			"flutter" => Ok(Self::Flutter),
+			"python" => Ok(Self::Python),
+			"go" => Ok(Self::Go),
+			_ => Err(()),
+		}
+	}
+}
+
+#[must_use]
+pub fn default_registry_kind_for_ecosystem(ecosystem: Ecosystem) -> Option<RegistryKind> {
+	match ecosystem {
+		Ecosystem::Cargo => Some(RegistryKind::CratesIo),
+		Ecosystem::Npm => Some(RegistryKind::Npm),
+		Ecosystem::Deno => Some(RegistryKind::Jsr),
+		Ecosystem::Dart | Ecosystem::Flutter => Some(RegistryKind::PubDev),
+		Ecosystem::Python => Some(RegistryKind::Pypi),
+		Ecosystem::Go => Some(RegistryKind::GoProxy),
+	}
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]

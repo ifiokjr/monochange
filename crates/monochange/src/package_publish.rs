@@ -340,19 +340,16 @@ fn resolve_registry_kind(
 }
 
 fn default_registry_kind_for_ecosystem(ecosystem: &str) -> MonochangeResult<RegistryKind> {
-	match ecosystem {
-		"cargo" => Ok(RegistryKind::CratesIo),
-		"npm" => Ok(RegistryKind::Npm),
-		"deno" => Ok(RegistryKind::Jsr),
-		"dart" | "flutter" => Ok(RegistryKind::PubDev),
-		"python" => Ok(RegistryKind::Pypi),
-		"go" => Ok(RegistryKind::GoProxy),
-		_ => {
-			Err(MonochangeError::Config(format!(
-				"built-in package publishing does not support ecosystem `{ecosystem}`"
-			)))
-		}
-	}
+	let parsed = ecosystem.parse::<Ecosystem>().map_err(|()| {
+		MonochangeError::Config(format!(
+			"built-in package publishing does not support ecosystem `{ecosystem}`"
+		))
+	})?;
+	monochange_core::default_registry_kind_for_ecosystem(parsed).ok_or_else(|| {
+		MonochangeError::Config(format!(
+			"built-in package publishing does not support ecosystem `{ecosystem}`"
+		))
+	})
 }
 
 fn resolve_placeholder_readme(
