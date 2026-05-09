@@ -5125,6 +5125,144 @@ fn write_release_record_file_overwrites_exact_hash_match() {
 }
 
 #[test]
+#[cfg(unix)]
+fn write_release_record_file_reports_error_when_dedupe_cannot_remove_stale_dir() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	// Write first record for "sdk" "0.5.0"
+	let first = {
+		let mut manifest = sample_release_manifest_for_commit_message(false, false);
+		manifest.release_targets = vec![monochange_core::ReleaseManifestTarget {
+			id: "sdk".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Package,
+			version: "0.5.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v0.5.0".to_string(),
+			members: Vec::new(),
+			rendered_title: String::new(),
+			rendered_changelog_title: String::new(),
+		}];
+		manifest.released_packages = vec!["sdk".to_string()];
+		manifest.plan = monochange_core::ReleaseManifestPlan {
+			workspace_root: Path::new(".").to_path_buf(),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+		manifest
+	};
+	let first_path = write_release_record_file(root, None, &first)
+		.unwrap_or_else(|error| panic!("write first: {error}"));
+	assert!(first_path.exists());
+
+	// Write second record for "ui" "1.0.0"
+	let second = {
+		let mut manifest = sample_release_manifest_for_commit_message(false, false);
+		manifest.release_targets = vec![monochange_core::ReleaseManifestTarget {
+			id: "ui".to_string(),
+			kind: monochange_core::ReleaseOwnerKind::Package,
+			version: "1.0.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v1.0.0".to_string(),
+			members: Vec::new(),
+			rendered_title: String::new(),
+			rendered_changelog_title: String::new(),
+		}];
+		manifest.released_packages = vec!["ui".to_string()];
+		manifest.plan = monochange_core::ReleaseManifestPlan {
+			workspace_root: Path::new(".").to_path_buf(),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+		manifest
+	};
+	let _second_path = write_release_record_file(root, None, &second)
+		.unwrap_or_else(|error| panic!("write second: {error}"));
+
+	// Remove write permission from the releases directory so dedupe cannot remove entries
+	let releases_dir = root.join(".monochange/releases");
+	let mut permissions = fs::metadata(&releases_dir)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	let original_mode = permissions.mode();
+	permissions.set_mode(0o500);
+	fs::set_permissions(&releases_dir, permissions)
+		.unwrap_or_else(|error| panic!("set permissions: {error}"));
+
+	// Write a third record that overlaps with first but has a different hash
+	// (because it also targets "ui").
+	let third = {
+		let mut manifest = sample_release_manifest_for_commit_message(false, false);
+		manifest.release_targets = vec![
+			monochange_core::ReleaseManifestTarget {
+				id: "sdk".to_string(),
+				kind: monochange_core::ReleaseOwnerKind::Package,
+				version: "0.5.0".to_string(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+				tag_name: "v0.5.0".to_string(),
+				members: Vec::new(),
+				rendered_title: String::new(),
+				rendered_changelog_title: String::new(),
+			},
+			monochange_core::ReleaseManifestTarget {
+				id: "ui".to_string(),
+				kind: monochange_core::ReleaseOwnerKind::Package,
+				version: "1.0.0".to_string(),
+				tag: true,
+				release: true,
+				version_format: VersionFormat::Primary,
+				tag_name: "v1.0.0".to_string(),
+				members: Vec::new(),
+				rendered_title: String::new(),
+				rendered_changelog_title: String::new(),
+			},
+		];
+		manifest.released_packages = vec!["sdk".to_string(), "ui".to_string()];
+		manifest.plan = monochange_core::ReleaseManifestPlan {
+			workspace_root: Path::new(".").to_path_buf(),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		};
+		manifest
+	};
+	let result = write_release_record_file(root, None, &third);
+	assert!(
+		result.is_err(),
+		"expected error when dedupe cannot remove stale dir, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("remove stale release record dir"),
+		"expected 'remove stale release record dir' in error, got: {message}"
+	);
+
+	// Restore permissions so tempdir clean-up succeeds
+	let mut permissions = fs::metadata(&releases_dir)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(original_mode);
+	fs::set_permissions(&releases_dir, permissions)
+		.unwrap_or_else(|error| panic!("restore permissions: {error}"));
+}
+
+#[test]
 fn find_release_record_files_at_commit_reports_git_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
