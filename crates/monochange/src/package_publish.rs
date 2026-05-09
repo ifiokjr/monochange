@@ -56,6 +56,7 @@ use monochange_publish::render_command_error;
 use monochange_publish::resume_publish_requests;
 use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
+use monochange_python::write_python_placeholder_manifest;
 use reqwest::blocking::Client;
 use tempfile::TempDir;
 use toml::Value as TomlValue;
@@ -1027,63 +1028,6 @@ fn resolve_cargo_placeholder_license_metadata(
 		.and_then(TomlValue::as_str)
 		.map(ToString::to_string);
 	Ok((workspace_license, workspace_license_file))
-}
-
-fn write_python_placeholder_manifest(
-	dir: &Path,
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-) -> MonochangeResult<()> {
-	let module_name = python_placeholder_module_name(&request.package_name);
-	let project_urls = source.map(|source| {
-		format!(
-			"\n[project.urls]\nRepository = \"https://github.com/{}/{}\"\n",
-			source.owner, source.repo
-		)
-	});
-	let pyproject = format!(
-		"[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[project]\nname = \"{}\"\nversion = \"{}\"\ndescription = \"Placeholder package for {}\"\nreadme = \"README.md\"\nrequires-python = \">=3.8\"\n{}\n[tool.hatch.build.targets.wheel]\npackages = [\"src/{}\"]\n",
-		request.package_name,
-		request.version,
-		request.package_name,
-		project_urls.unwrap_or_default(),
-		module_name,
-	);
-	fs::write(dir.join("pyproject.toml"), pyproject).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to write placeholder pyproject.toml: {error}"
-		))
-	})?;
-	let package_dir = dir.join("src").join(&module_name);
-	fs::create_dir_all(&package_dir).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to create placeholder Python package: {error}"
-		))
-	})?;
-	fs::write(
-		package_dir.join("__init__.py"),
-		"\"\"\"Placeholder package published by monochange.\"\"\"\n",
-	)
-	.map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to write placeholder Python package module: {error}"
-		))
-	})
-}
-
-fn python_placeholder_module_name(package_name: &str) -> String {
-	let mut module = String::new();
-	for character in package_name.chars() {
-		if character.is_ascii_alphanumeric() || character == '_' {
-			module.push(character.to_ascii_lowercase());
-		} else {
-			module.push('_');
-		}
-	}
-	if module.is_empty() || module.starts_with(|character: char| character.is_ascii_digit()) {
-		module.insert_str(0, "placeholder_");
-	}
-	module
 }
 
 fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
