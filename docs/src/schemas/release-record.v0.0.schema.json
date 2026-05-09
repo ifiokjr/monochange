@@ -17,7 +17,7 @@
 	"properties": {
 		"schemaVersion": {
 			"type": "string",
-			"const": "0.0",
+			"const": "0.1",
 			"description": "Public durable artifact schema version. Older CLIs reject missing, future, or non-current versions."
 		},
 		"kind": {
@@ -87,6 +87,9 @@
 					"$ref": "#/$defs/provider"
 				}
 			]
+		},
+		"v": {
+			"const": "0.0"
 		}
 	},
 	"$defs": {
