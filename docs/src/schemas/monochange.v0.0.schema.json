@@ -709,6 +709,9 @@
 					"items": {
 						"$ref": "#/$defs/cliStep"
 					}
+				},
+				"dry_run": {
+					"type": "boolean"
 				}
 			}
 		},

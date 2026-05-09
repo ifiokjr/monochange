@@ -2513,7 +2513,7 @@ impl CliStepDefinition {
 	}
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct CliCommandDefinition {
 	pub name: String,
 	#[serde(default)]
@@ -2522,6 +2522,10 @@ pub struct CliCommandDefinition {
 	pub inputs: Vec<CliInputDefinition>,
 	#[serde(default)]
 	pub steps: Vec<CliStepDefinition>,
+	/// When true, this command always runs in dry-run mode regardless of
+	/// whether `--dry-run` is passed on the CLI.
+	#[serde(default)]
+	pub dry_run: bool,
 }
 
 /// Render release notes in the selected changelog format.

@@ -51,3 +51,19 @@ Groups are resolved to their member packages before ecosystem filtering is appli
 - `release_branch_policy::verify_release_ref_for_publish`
 - `publish_rate_limits::enforce_publish_rate_limits`
 - writing the publish report artifact to disk
+
+## Per-command `dry_run` field
+
+CLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:
+
+```toml
+[cli.publish-check]
+help_text = "Validate the release and preview package publishing in dry-run mode"
+dry_run = true
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "PublishPackages", name = "publish packages dry run" },
+]
+```
+
+Running `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.

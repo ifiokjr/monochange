@@ -235,6 +235,7 @@ When provided, the generated config includes:\n\
 			help_text: Some(step_command_summary(&step)),
 			inputs: step.step_inputs_schema(),
 			steps: vec![step],
+			dry_run: false,
 		};
 		command = command.subcommand(build_cli_command_subcommand(&synthetic));
 	}

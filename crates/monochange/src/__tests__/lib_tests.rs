@@ -600,6 +600,7 @@ fn boolean_cli_inputs_support_explicit_false_values() {
 			short: None,
 		}],
 		steps: vec![],
+		dry_run: false,
 	};
 	let subcommand = crate::build_cli_command_subcommand(&cli_command);
 	let matches = Command::new("mc")
@@ -1562,6 +1563,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				)]),
 			},
 		],
+		dry_run: false,
 	}]);
 
 	assert!(rendered.contains("[cli.custom]"));
@@ -1923,6 +1925,7 @@ fn change_command_sources_type_choices_from_workspace_configuration() {
 			show_progress: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	}];
 	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
 	let change = cli
@@ -2001,6 +2004,7 @@ fn collect_cli_command_inputs_omits_default_bump_for_type_only_changes() {
 					help_text: step.name().map(ToString::to_string),
 					inputs: step.step_inputs_schema(),
 					steps: vec![step],
+					dry_run: false,
 				}
 			},
 		);
@@ -3331,6 +3335,7 @@ fn command_step_without_dry_run_override_reports_skipped_command() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let output = crate::execute_cli_command(
 		tempdir.path(),
@@ -3365,6 +3370,7 @@ fn command_step_rejects_unparseable_commands() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		tempdir.path(),
@@ -3404,6 +3410,7 @@ fn command_step_rejects_empty_commands() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		tempdir.path(),
@@ -3439,6 +3446,7 @@ fn command_step_reports_process_spawn_failures() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		tempdir.path(),
@@ -3478,6 +3486,7 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		tempdir.path(),
@@ -3516,6 +3525,7 @@ fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		tempdir.path(),
@@ -3540,6 +3550,7 @@ fn execute_cli_command_without_steps_reports_completion_status() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let output = crate::execute_cli_command(
 		tempdir.path(),
@@ -5884,6 +5895,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let context = CliContext {
 		root: PathBuf::from("."),
@@ -5922,6 +5934,7 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let context = CliContext {
 		root: PathBuf::from("."),
@@ -5965,6 +5978,7 @@ fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let context = CliContext {
 		root: PathBuf::from("."),
@@ -6012,6 +6026,7 @@ fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let context = CliContext {
 		root: PathBuf::from("."),
@@ -6080,6 +6095,7 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		tempdir.path(),
@@ -6169,6 +6185,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 			help_text: None,
 			inputs: Vec::new(),
 			steps: vec![step],
+			dry_run: false,
 		};
 		let error = crate::execute_cli_command(
 			tempdir.path(),
@@ -6216,6 +6233,7 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		&root,
@@ -6258,6 +6276,7 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 
 	let error =
@@ -6318,6 +6337,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 				},
 				step,
 			],
+			dry_run: false,
 		};
 		let error =
 			crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
@@ -6343,6 +6363,7 @@ fn execute_cli_command_change_step_requires_reason_input() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
 		&root,
@@ -6392,6 +6413,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 			inputs: BTreeMap::new(),
 			allow_empty_changesets: false,
 		}],
+		dry_run: false,
 	};
 	let render_output = crate::execute_cli_command(
 		root,
@@ -6425,6 +6447,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 	let publish_output = crate::execute_cli_command(
 		root,
@@ -6457,6 +6480,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 	let request_output = crate::execute_cli_command(
 		root,
@@ -6488,6 +6512,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 	let comments_output =
 		crate::execute_cli_command(root, &configuration, &issue_comments, true, BTreeMap::new())
@@ -6572,6 +6597,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
+				dry_run: false,
 			};
 			let placeholder_output = crate::execute_cli_command(
 				root,
@@ -6604,6 +6630,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 						inputs: BTreeMap::new(),
 					},
 				],
+				dry_run: false,
 			};
 			let publish_output = crate::execute_cli_command(
 				root,
@@ -6652,6 +6679,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
+				dry_run: false,
 			};
 			let placeholder_output = crate::execute_cli_command(
 				root,
@@ -6687,6 +6715,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 						inputs: BTreeMap::new(),
 					},
 				],
+				dry_run: false,
 			};
 			let publish_output = crate::execute_cli_command(
 				root,
@@ -6721,6 +6750,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
+				dry_run: false,
 			};
 			let publish_output = crate::execute_cli_command(
 				release_root,
@@ -6753,6 +6783,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
+				dry_run: false,
 			};
 			let plan_output = crate::execute_cli_command(
 				root,
@@ -7843,6 +7874,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 			no_verify: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let error = crate::execute_cli_command(
@@ -10487,6 +10519,7 @@ fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defau
 			inputs: BTreeMap::new(),
 			allow_empty_changesets: false,
 		}],
+		dry_run: false,
 	}];
 
 	let release = cli
@@ -10561,6 +10594,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 				short: None,
 			}],
 			steps: Vec::new(),
+			dry_run: false,
 		},
 		CliCommandDefinition {
 			name: "change-with-existing-choices".to_string(),
@@ -10575,6 +10609,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 				short: None,
 			}],
 			steps: Vec::new(),
+			dry_run: false,
 		},
 	];
 
@@ -10623,6 +10658,7 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 			short: None,
 		}],
 		steps: Vec::new(),
+		dry_run: false,
 	}];
 	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
 	assert_eq!(cli[0].inputs[0].choices, vec!["existing"]);
@@ -11121,6 +11157,7 @@ fn build_command_with_cli_registers_custom_subcommands_and_default_help_text() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	}];
 	let command = crate::build_command_with_cli("monochange", &cli);
 	assert!(command.clone().find_subcommand("custom").is_some());
@@ -11156,6 +11193,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 			help_text: None,
 			inputs: Vec::new(),
 			steps: Vec::new(),
+			dry_run: false,
 		})
 		.unwrap_or_else(|| panic!("expected after_help for {name}"));
 		assert!(after_help.contains(expected));
@@ -11166,6 +11204,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 			help_text: None,
 			inputs: Vec::new(),
 			steps: Vec::new(),
+			dry_run: false
 		})
 		.is_none()
 	);
@@ -11233,6 +11272,7 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 			},
 		],
 		steps: Vec::new(),
+		dry_run: false,
 	};
 
 	let command = Command::new("mc").subcommand(crate::build_cli_command_subcommand(&cli_command));
@@ -13470,6 +13510,7 @@ branches = ["release/*"]
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let result = crate::execute_cli_command(
 		tempdir.path(),
@@ -13615,6 +13656,7 @@ repo = "monochange"
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let result = crate::execute_cli_command(
 		tempdir.path(),
@@ -13738,4 +13780,48 @@ fn validate_release_record_file_reports_error_when_dedupe_cannot_read_releases_d
 	permissions.set_mode(original_mode);
 	fs::set_permissions(&releases_dir, permissions)
 		.unwrap_or_else(|error| panic!("restore permissions: {error}"));
+}
+
+#[test]
+fn cli_command_dry_run_field_runs_command_in_dry_run_without_flag() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let mut configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	configuration.cli.push(CliCommandDefinition {
+		name: "announce".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::Command {
+			show_progress: None,
+			name: Some("touch file".to_string()),
+			when: None,
+			always_run: false,
+			command: format!("touch {}", tempdir.path().join("ran.txt").display()),
+			dry_run_command: None,
+			shell: monochange_core::ShellConfig::Default,
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		}],
+		dry_run: true,
+	});
+	let matches = crate::build_command_with_cli("mc", &configuration.cli)
+		.try_get_matches_from(["mc", "announce"])
+		.unwrap_or_else(|error| panic!("matches: {error}"));
+	let announce_matches = matches
+		.subcommand_matches("announce")
+		.unwrap_or_else(|| panic!("expected announce subcommand matches"));
+	crate::execute_matches(
+		tempdir.path(),
+		&configuration,
+		"announce",
+		announce_matches,
+		false,
+	)
+	.unwrap_or_else(|error| panic!("execute_matches: {error}"));
+	assert!(
+		!tempdir.path().join("ran.txt").exists(),
+		"command with dry_run=true should run in dry-run mode and skip the step"
+	);
 }

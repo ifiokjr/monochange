@@ -381,7 +381,8 @@
 				"steps": {
 					"type": "array",
 					"items": { "$ref": "#/$defs/cliStep" }
-				}
+				},
+				"dry_run": { "type": "boolean" }
 			}
 		},
 		"cliInput": {

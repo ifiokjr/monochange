@@ -702,6 +702,7 @@ fn render_cli_command_results_include_package_publish_reports() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let mut context = cli_context();
 	context.package_publish_report = Some(package_publish::PackagePublishReport {
@@ -1013,6 +1014,7 @@ fn resolve_command_output_supports_package_publish_json_without_release_state() 
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let mut context = cli_context();
 	context.last_step_inputs = BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
@@ -1085,6 +1087,7 @@ fn resolve_command_output_supports_package_publish_text_and_markdown_without_rel
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let mut text_context = cli_context();
@@ -1134,6 +1137,7 @@ fn resolve_command_output_supports_publish_rate_limit_reports_without_release_st
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let mut context = cli_context();
@@ -1369,6 +1373,7 @@ fn run_cli_command_command_streams_output_when_progress_is_enabled() {
 		help_text: Some("release".to_string()),
 		inputs: Vec::new(),
 		steps: vec![step.clone()],
+		dry_run: false,
 	};
 	let mut progress = CliProgressReporter::new(&cli_command, false, false, ProgressFormat::Json);
 
@@ -1448,6 +1453,7 @@ fn drain_stream_events_collects_stdout_stderr_and_handles_closed_channels() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let mut progress = CliProgressReporter::new(&cli_command, false, false, ProgressFormat::Auto);
 	let step = CliStepDefinition::Command {
@@ -1517,6 +1523,7 @@ fn configured_config_step_uses_generic_completion_without_config_json() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let output = execute_cli_command_with_options(
@@ -1560,6 +1567,7 @@ fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
 				CliStepInputValue::String("{{".to_string()),
 			)]),
 		}],
+		dry_run: false,
 	};
 
 	temp_env::with_vars(
@@ -1621,6 +1629,7 @@ fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	temp_env::with_vars(
@@ -1682,6 +1691,7 @@ fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let configuration = monochange_core::WorkspaceConfiguration {
@@ -1765,6 +1775,7 @@ fn execute_cli_command_with_options_covers_final_artifact_save_call() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 
 	let output = execute_cli_command_with_options(
@@ -1811,6 +1822,7 @@ fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_rele
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 	save_prepared_release_execution(
 		&root,
@@ -1852,6 +1864,7 @@ fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_pl
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let error = execute_cli_command_with_options(
@@ -2475,6 +2488,7 @@ fn execute_cli_command_always_run_steps_continue_after_failure() {
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 
 	let result = execute_cli_command_with_options(
@@ -2536,6 +2550,7 @@ fn execute_cli_command_always_run_continue_after_resolve_step_inputs_failure() {
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 
 	let result = execute_cli_command_with_options(
@@ -2593,6 +2608,7 @@ fn execute_cli_command_always_run_continue_after_should_execute_failure() {
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 
 	let result = execute_cli_command_with_options(

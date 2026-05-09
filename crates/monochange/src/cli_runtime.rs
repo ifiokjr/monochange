@@ -70,7 +70,7 @@ pub(crate) fn execute_matches(
 	};
 
 	let inputs = collect_cli_command_inputs(&cli_command, cli_command_matches);
-	let dry_run = quiet || cli_command_matches.get_flag("dry-run");
+	let dry_run = quiet || cli_command.dry_run || cli_command_matches.get_flag("dry-run");
 	let show_diff =
 		command_supports_release_diff_preview(&cli_command) && cli_command_matches.get_flag("diff");
 	let progress_format = cli_command_matches

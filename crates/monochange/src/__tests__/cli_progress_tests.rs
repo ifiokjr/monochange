@@ -48,6 +48,7 @@ fn command_with_step(step: CliStepDefinition) -> CliCommandDefinition {
 		help_text: Some("release".to_string()),
 		inputs: Vec::new(),
 		steps: vec![step],
+		dry_run: false,
 	}
 }
 

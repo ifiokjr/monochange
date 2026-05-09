@@ -4252,6 +4252,7 @@ fn cli_command(name: &str, steps: Vec<CliStepDefinition>) -> CliCommandDefinitio
 		help_text: None,
 		inputs: Vec::new(),
 		steps,
+		dry_run: false,
 	}
 }
 
@@ -5065,6 +5066,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	}])
 	.err()
 	.unwrap_or_else(|| panic!("expected empty input name error"));
@@ -5084,6 +5086,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	}])
 	.err()
 	.unwrap_or_else(|| panic!("expected reserved input name error"));
@@ -5103,6 +5106,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	}])
 	.err()
 	.unwrap_or_else(|| panic!("expected empty choices error"));
@@ -6440,4 +6444,49 @@ proptest! {
 
 		prop_assert_eq!(crate::infer_bump_from_versions(&current, &explicit), BumpSeverity::Patch);
 	}
+}
+
+#[test]
+fn load_workspace_configuration_parses_dry_run_on_cli_command() {
+	let root = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		root.path().join("monochange.toml"),
+		br#"
+[defaults]
+package_type = "cargo"
+
+[package.core]
+path = "crates/core"
+
+[cli.publish-check]
+help_text = "Validate the release and preview package publishing in dry-run mode"
+dry_run = true
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "PublishPackages", name = "publish packages dry run" },
+]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+	std::fs::create_dir_all(root.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("create crates/core: {error}"));
+	std::fs::write(
+		root.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write Cargo.toml: {error}"));
+
+	let configuration = load_workspace_configuration(root.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let publish_check = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "publish-check")
+		.unwrap_or_else(|| panic!("expected publish-check command"));
+	assert!(publish_check.dry_run);
+	assert_eq!(
+		publish_check.help_text.as_deref(),
+		Some("Validate the release and preview package publishing in dry-run mode")
+	);
+	assert_eq!(publish_check.steps.len(), 2);
 }

@@ -301,6 +301,7 @@ pub(crate) fn synthetic_step_command_definition(
 		help_text: step.name().map(ToString::to_string),
 		inputs: step.step_inputs_schema(),
 		steps: vec![step],
+		dry_run: false,
 	})
 }
 
@@ -1043,6 +1044,7 @@ where
 					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
+				dry_run: false,
 			};
 			let inputs = collect_cli_command_inputs(&synthetic, validate_matches);
 			execute_cli_command(root, &configuration?, &synthetic, dry_run, inputs)
