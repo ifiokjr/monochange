@@ -4084,6 +4084,50 @@ pub trait EcosystemAdapter {
 
 /// Build dependency edges by matching declared dependency names to known packages.
 #[must_use]
+/// A registry of ecosystem adapters used to dispatch ecosystem-specific operations.
+///
+/// This replaces hardcoded match arms in workspace discovery, versioned-file validation,
+/// publish command construction, and lockfile command planning.
+#[derive(Default)]
+pub struct EcosystemRegistry {
+	adapters: Vec<Box<dyn EcosystemAdapter>>,
+}
+
+impl EcosystemRegistry {
+	#[must_use]
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	#[must_use]
+	pub fn with_adapter(mut self, adapter: Box<dyn EcosystemAdapter>) -> Self {
+		self.adapters.push(adapter);
+		self
+	}
+
+	pub fn push_adapter(&mut self, adapter: Box<dyn EcosystemAdapter>) {
+		self.adapters.push(adapter);
+	}
+
+	pub fn discover_all(&self, root: &Path) -> MonochangeResult<AdapterDiscovery> {
+		let mut packages = Vec::new();
+		let mut warnings = Vec::new();
+		for adapter in &self.adapters {
+			let mut result = adapter.discover(root)?;
+			packages.extend(result.packages.drain(..));
+			warnings.extend(result.warnings.drain(..));
+		}
+		Ok(AdapterDiscovery { packages, warnings })
+	}
+
+	pub fn adapter_for_ecosystem(&self, ecosystem: Ecosystem) -> Option<&dyn EcosystemAdapter> {
+		self.adapters
+			.iter()
+			.find(|a| a.ecosystem() == ecosystem)
+			.map(|a| a.as_ref())
+	}
+}
+
 pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<DependencyEdge> {
 	let mut package_ids_by_name = BTreeMap::<String, Vec<String>>::new();
 	for package in packages {

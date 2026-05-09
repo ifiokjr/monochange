@@ -9,6 +9,7 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 
 #[cfg(feature = "cargo")]
+use monochange_cargo::CargoAdapter;
 use monochange_cargo::discover_cargo_packages;
 #[cfg(feature = "cargo")]
 use monochange_cargo::load_configured_cargo_package;
@@ -21,6 +22,7 @@ use monochange_core::BumpSeverity;
 use monochange_core::CliCommandDefinition;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
+use monochange_core::EcosystemRegistry;
 use monochange_core::LockfileCommandDefinition;
 use monochange_core::LockfileCommandExecution;
 use monochange_core::MonochangeError;
@@ -31,20 +33,25 @@ use monochange_core::ReleasePlan;
 use monochange_core::SourceConfiguration;
 use monochange_core::default_cli_commands;
 #[cfg(feature = "dart")]
+use monochange_dart::DartAdapter;
 use monochange_dart::discover_dart_packages;
 #[cfg(feature = "dart")]
 use monochange_dart::load_configured_dart_package;
 #[cfg(feature = "deno")]
+use monochange_deno::DenoAdapter;
 use monochange_deno::discover_deno_packages;
 #[cfg(feature = "deno")]
 use monochange_deno::load_configured_deno_package;
 #[cfg(feature = "go")]
+use monochange_go::GoAdapter;
 use monochange_go::discover_go_modules;
 #[cfg(feature = "npm")]
+use monochange_npm::NpmAdapter;
 use monochange_npm::discover_npm_packages;
 #[cfg(feature = "npm")]
 use monochange_npm::load_configured_npm_package;
 #[cfg(feature = "python")]
+use monochange_python::PythonAdapter;
 use monochange_python::discover_python_packages;
 use serde_json::json;
 use typed_builder::TypedBuilder;
@@ -591,21 +598,26 @@ fn render_annotated_init_config(
 	Ok(collapsed.trim_start().to_string())
 }
 
-fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
-	let mut packages = Vec::new();
-
+fn build_ecosystem_registry() -> EcosystemRegistry {
+	let mut registry = EcosystemRegistry::new();
 	#[cfg(feature = "cargo")]
-	packages.extend(discover_cargo_packages(root)?.packages);
+	registry.push_adapter(Box::new(CargoAdapter));
 	#[cfg(feature = "npm")]
-	packages.extend(discover_npm_packages(root)?.packages);
+	registry.push_adapter(Box::new(NpmAdapter));
 	#[cfg(feature = "deno")]
-	packages.extend(discover_deno_packages(root)?.packages);
+	registry.push_adapter(Box::new(DenoAdapter));
 	#[cfg(feature = "dart")]
-	packages.extend(discover_dart_packages(root)?.packages);
+	registry.push_adapter(Box::new(DartAdapter));
 	#[cfg(feature = "python")]
-	packages.extend(discover_python_packages(root)?.packages);
+	registry.push_adapter(Box::new(PythonAdapter));
 	#[cfg(feature = "go")]
-	packages.extend(discover_go_modules(root)?.packages);
+	registry.push_adapter(Box::new(GoAdapter));
+	registry
+}
+
+fn discover_packages(root: &Path) -> MonochangeResult<Vec<PackageRecord>> {
+	let result = build_ecosystem_registry().discover_all(root)?;
+	let mut packages = result.packages;
 
 	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
