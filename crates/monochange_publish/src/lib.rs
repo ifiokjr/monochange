@@ -110,6 +110,69 @@ pub struct CommandSpec {
 	pub cwd: PathBuf,
 }
 
+/// Adapter for building ecosystem-specific publish commands.
+pub trait PublishAdapter {
+	fn registry_kind(&self) -> RegistryKind;
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec>;
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec>;
+}
+
+/// Registry of publish adapters used to dispatch publish command construction.
+#[derive(Default)]
+pub struct PublishCommandBuilder {
+	adapters: Vec<Box<dyn PublishAdapter>>,
+}
+
+impl PublishCommandBuilder {
+	#[must_use]
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	#[must_use]
+	pub fn with_adapter(mut self, adapter: Box<dyn PublishAdapter>) -> Self {
+		self.adapters.push(adapter);
+		self
+	}
+
+	pub fn push_adapter(&mut self, adapter: Box<dyn PublishAdapter>) {
+		self.adapters.push(adapter);
+	}
+
+	fn adapter_for_registry(&self, registry: RegistryKind) -> Option<&dyn PublishAdapter> {
+		self.adapters
+			.iter()
+			.find(|adapter| adapter.registry_kind() == registry)
+			.map(AsRef::as_ref)
+	}
+
+	pub fn build_publish_command(
+		&self,
+		request: &PublishRequest,
+		mode: PackagePublishRunMode,
+		placeholder_dir: Option<&Path>,
+		dry_run: bool,
+	) -> CommandSpec {
+		let adapter = self
+			.adapter_for_registry(request.registry)
+			.expect("unsupported built-in publish registry");
+		let mut command = match mode {
+			PackagePublishRunMode::Placeholder => {
+				let path = placeholder_dir.expect("placeholder directory must exist");
+				adapter.build_placeholder_command(request, path)
+			}
+			PackagePublishRunMode::Release => adapter.build_release_command(request),
+		}
+		.expect("unsupported publish mode for this registry");
+		append_publish_dry_run_args(&mut command.args, request.registry, dry_run);
+		command
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CommandOutput {
 	pub success: bool,
@@ -164,55 +227,143 @@ pub fn build_publish_command(
 	placeholder_dir: Option<&Path>,
 	dry_run: bool,
 ) -> CommandSpec {
-	let mut command = None;
-	let is_jsr_release =
-		request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Release;
-	let placeholder_path = placeholder_dir;
-	if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_npm_placeholder_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Release {
-		command = Some(build_npm_release_publish_command(request));
-	} else if request.registry == RegistryKind::CratesIo
-		&& mode == PackagePublishRunMode::Placeholder
-	{
-		command = Some(build_cargo_placeholder_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::CratesIo && mode == PackagePublishRunMode::Release {
-		command = Some(build_cargo_release_publish_command(request));
-	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Placeholder
-	{
-		command = Some(build_dart_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Release {
-		command = Some(build_dart_publish_command(request, &request.package_root));
-	} else if request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_jsr_publish_command(
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_python_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Release {
-		command = Some(build_python_publish_command(request, &request.package_root));
-	} else if request.registry == RegistryKind::GoProxy {
-		command = Some(build_go_publish_command(request));
-	}
-	if is_jsr_release {
-		command = Some(build_jsr_publish_command(&request.package_root));
+	build_publish_command_builder().build_publish_command(request, mode, placeholder_dir, dry_run)
+}
+
+fn build_publish_command_builder() -> PublishCommandBuilder {
+	PublishCommandBuilder::new()
+		.with_adapter(Box::new(NpmPublishAdapter))
+		.with_adapter(Box::new(CargoPublishAdapter))
+		.with_adapter(Box::new(DartPublishAdapter))
+		.with_adapter(Box::new(JsrPublishAdapter))
+		.with_adapter(Box::new(PythonPublishAdapter))
+		.with_adapter(Box::new(GoPublishAdapter))
+}
+
+struct NpmPublishAdapter;
+
+impl PublishAdapter for NpmPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::Npm
 	}
 
-	let mut command = command.expect("unsupported built-in publish registry");
-	append_publish_dry_run_args(&mut command.args, request.registry, dry_run);
-	command
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_npm_placeholder_publish_command(
+			request,
+			placeholder_path,
+		))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_npm_release_publish_command(request))
+	}
+}
+
+struct CargoPublishAdapter;
+
+impl PublishAdapter for CargoPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::CratesIo
+	}
+
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_cargo_placeholder_publish_command(
+			request,
+			placeholder_path,
+		))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_cargo_release_publish_command(request))
+	}
+}
+
+struct DartPublishAdapter;
+
+impl PublishAdapter for DartPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::PubDev
+	}
+
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_dart_publish_command(request, placeholder_path))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_dart_publish_command(request, &request.package_root))
+	}
+}
+
+struct JsrPublishAdapter;
+
+impl PublishAdapter for JsrPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::Jsr
+	}
+
+	fn build_placeholder_command(
+		&self,
+		_request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_jsr_publish_command(placeholder_path))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_jsr_publish_command(&request.package_root))
+	}
+}
+
+struct PythonPublishAdapter;
+
+impl PublishAdapter for PythonPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::Pypi
+	}
+
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_python_publish_command(request, placeholder_path))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_python_publish_command(request, &request.package_root))
+	}
+}
+
+struct GoPublishAdapter;
+
+impl PublishAdapter for GoPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::GoProxy
+	}
+
+	fn build_placeholder_command(
+		&self,
+		_request: &PublishRequest,
+		_placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		None
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_go_publish_command(request))
+	}
 }
 
 pub fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, dry_run: bool) {
