@@ -1134,7 +1134,7 @@ pub fn publish_release_requests(
 /// Commit, push, and publish the release pull request against GitHub.
 #[tracing::instrument(skip_all)]
 #[must_use = "the pull request result must be checked"]
-pub fn publish_release_pull_request(
+pub async fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
 	request: &GitHubPullRequestRequest,
@@ -1145,17 +1145,17 @@ pub fn publish_release_pull_request(
 	let lookup_request = request.clone();
 	let existing_pull_request =
 		thread::spawn(move || lookup_existing_pull_request(&lookup_source, &lookup_request));
-	git_checkout_branch(root, &request.head_branch)?;
-	git_stage_paths(root, tracked_paths)?;
-	git_commit_paths(root, &request.commit_message, no_verify)?;
-	let mut head_commit = git_head_commit(root)?;
+	git_checkout_branch(root, &request.head_branch).await?;
+	git_stage_paths(root, tracked_paths).await?;
+	git_commit_paths(root, &request.commit_message, no_verify).await?;
+	let mut head_commit = git_head_commit(root).await?;
 	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
 	let head_matches_existing = existing
 		.as_ref()
 		.and_then(|pull_request| pull_request.head.sha.as_deref())
 		== Some(head_commit.as_str());
 	if !head_matches_existing {
-		git_push_branch(root, &request.head_branch, no_verify)?;
+		git_push_branch(root, &request.head_branch, no_verify).await?;
 		// Commits created through GitHub's Git Database API from GitHub Actions can be
 		// marked verified by GitHub. Keep the pushed git commit as the fallback if the
 		// API commit cannot be created, verified, or moved onto the release branch.
@@ -1883,18 +1883,19 @@ fn join_existing_pull_request_lookup(
 	})?
 }
 
-fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
-	if matches!(git_current_branch(root).as_deref(), Ok(current) if current == branch) {
+async fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> {
+	if matches!(git_current_branch(root).await.as_deref(), Ok(current) if current == branch) {
 		return Ok(());
 	}
 	run_command(
 		git_checkout_branch_command(root, branch),
 		"prepare release pull request branch",
 	)
+	.await
 }
 
-fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
-	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths)?;
+async fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
+	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths).await?;
 	if stageable_paths.is_empty() {
 		return Ok(());
 	}
@@ -1902,35 +1903,37 @@ fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<(
 		git_stage_paths_command(root, &stageable_paths),
 		"stage release pull request files",
 	)
+	.await
 }
 
-fn resolve_stageable_release_paths(
+async fn resolve_stageable_release_paths(
 	root: &Path,
 	tracked_paths: &[PathBuf],
 ) -> MonochangeResult<Vec<PathBuf>> {
 	let mut stageable_paths = Vec::with_capacity(tracked_paths.len());
 	for path in tracked_paths {
-		if release_path_requires_staging(root, path)? {
+		if release_path_requires_staging(root, path).await? {
 			stageable_paths.push(path.clone());
 		}
 	}
 	Ok(stageable_paths)
 }
 
-fn release_path_requires_staging(root: &Path, path: &Path) -> MonochangeResult<bool> {
+async fn release_path_requires_staging(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	let absolute_path = root.join(path);
 	if absolute_path.exists() {
-		if git_path_is_tracked(root, path)? {
+		if git_path_is_tracked(root, path).await? {
 			return Ok(true);
 		}
-		return Ok(!git_path_is_ignored(root, path)?);
+		return Ok(!git_path_is_ignored(root, path).await?);
 	}
-	git_path_is_tracked(root, path)
+	git_path_is_tracked(root, path).await
 }
 
-fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
+async fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	let relative = path.to_string_lossy();
 	let output = git_command_output(root, &["ls-files", "--error-unmatch", "--", &relative])
+		.await
 		.map_err(|error| {
 			MonochangeError::Config(format!(
 				"failed to inspect tracked git path {}: {error}",
@@ -1950,10 +1953,12 @@ fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	}
 }
 
-fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
+async fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	let relative = path.to_string_lossy();
 	let output =
-		git_command_output(root, &["check-ignore", "-q", "--", &relative]).map_err(|error| {
+		git_command_output(root, &["check-ignore", "-q", "--", &relative])
+		.await
+		.map_err(|error| {
 			MonochangeError::Config(format!(
 				"failed to inspect ignored git path {}: {error}",
 				path.display()
