@@ -254,9 +254,65 @@ impl Ecosystem {
 	}
 }
 
+impl From<EcosystemType> for Ecosystem {
+	fn from(value: EcosystemType) -> Self {
+		match value {
+			EcosystemType::Cargo => Self::Cargo,
+			EcosystemType::Npm => Self::Npm,
+			EcosystemType::Deno => Self::Deno,
+			EcosystemType::Dart => Self::Dart,
+			EcosystemType::Python => Self::Python,
+			EcosystemType::Go => Self::Go,
+		}
+	}
+}
+
+impl From<PackageType> for Ecosystem {
+	fn from(value: PackageType) -> Self {
+		match value {
+			PackageType::Cargo => Self::Cargo,
+			PackageType::Npm => Self::Npm,
+			PackageType::Deno => Self::Deno,
+			PackageType::Dart => Self::Dart,
+			PackageType::Flutter => Self::Flutter,
+			PackageType::Python => Self::Python,
+			PackageType::Go => Self::Go,
+		}
+	}
+}
+
 impl fmt::Display for Ecosystem {
 	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
 		formatter.write_str(self.as_str())
+	}
+}
+
+impl std::str::FromStr for Ecosystem {
+	type Err = ();
+
+	fn from_str(string: &str) -> Result<Self, Self::Err> {
+		match string {
+			"cargo" => Ok(Self::Cargo),
+			"npm" => Ok(Self::Npm),
+			"deno" => Ok(Self::Deno),
+			"dart" => Ok(Self::Dart),
+			"flutter" => Ok(Self::Flutter),
+			"python" => Ok(Self::Python),
+			"go" => Ok(Self::Go),
+			_ => Err(()),
+		}
+	}
+}
+
+#[must_use]
+pub fn default_registry_kind_for_ecosystem(ecosystem: Ecosystem) -> Option<RegistryKind> {
+	match ecosystem {
+		Ecosystem::Cargo => Some(RegistryKind::CratesIo),
+		Ecosystem::Npm => Some(RegistryKind::Npm),
+		Ecosystem::Deno => Some(RegistryKind::Jsr),
+		Ecosystem::Dart | Ecosystem::Flutter => Some(RegistryKind::PubDev),
+		Ecosystem::Python => Some(RegistryKind::Pypi),
+		Ecosystem::Go => Some(RegistryKind::GoProxy),
 	}
 }
 
@@ -4080,10 +4136,103 @@ pub trait EcosystemAdapter {
 	fn ecosystem(&self) -> Ecosystem;
 
 	fn discover(&self, root: &Path) -> MonochangeResult<AdapterDiscovery>;
+
+	fn load_configured(
+		&self,
+		root: &Path,
+		package_path: &Path,
+	) -> MonochangeResult<Option<PackageRecord>>;
+
+	fn supported_versioned_file_kind(&self, path: &Path) -> bool;
+
+	fn validate_versioned_file(
+		&self,
+		full_path: &Path,
+		display_path: &str,
+		custom_fields: Option<&[String]>,
+	) -> MonochangeResult<()>;
 }
 
 /// Build dependency edges by matching declared dependency names to known packages.
 #[must_use]
+/// A registry of ecosystem adapters used to dispatch ecosystem-specific operations.
+///
+/// This replaces hardcoded match arms in workspace discovery, versioned-file validation,
+/// publish command construction, and lockfile command planning.
+#[derive(Default)]
+pub struct EcosystemRegistry {
+	adapters: Vec<Box<dyn EcosystemAdapter>>,
+}
+
+impl EcosystemRegistry {
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	pub fn with_adapter(mut self, adapter: Box<dyn EcosystemAdapter>) -> Self {
+		self.adapters.push(adapter);
+		self
+	}
+
+	pub fn push_adapter(&mut self, adapter: Box<dyn EcosystemAdapter>) {
+		self.adapters.push(adapter);
+	}
+
+	pub fn discover_all(&self, root: &Path) -> MonochangeResult<AdapterDiscovery> {
+		let mut packages = Vec::new();
+		let mut warnings = Vec::new();
+		for adapter in &self.adapters {
+			let mut result = adapter.discover(root)?;
+			packages.append(&mut result.packages);
+			warnings.append(&mut result.warnings);
+		}
+		Ok(AdapterDiscovery { packages, warnings })
+	}
+
+	pub fn adapter_for_ecosystem(&self, ecosystem: Ecosystem) -> Option<&dyn EcosystemAdapter> {
+		self.adapters
+			.iter()
+			.find(|a| a.ecosystem() == ecosystem)
+			.map(AsRef::as_ref)
+	}
+
+	pub fn load_configured(
+		&self,
+		root: &Path,
+		package_path: &Path,
+		ecosystem: Ecosystem,
+	) -> MonochangeResult<Option<PackageRecord>> {
+		match self.adapter_for_ecosystem(ecosystem) {
+			Some(adapter) => adapter.load_configured(root, package_path),
+			None => Ok(None),
+		}
+	}
+
+	pub fn supported_versioned_file_kind(&self, path: &Path, ecosystem: Ecosystem) -> bool {
+		self.adapter_for_ecosystem(ecosystem)
+			.is_some_and(|adapter| adapter.supported_versioned_file_kind(path))
+	}
+
+	pub fn validate_versioned_file(
+		&self,
+		full_path: &Path,
+		display_path: &str,
+		ecosystem: Ecosystem,
+		custom_fields: Option<&[String]>,
+	) -> MonochangeResult<()> {
+		match self.adapter_for_ecosystem(ecosystem) {
+			Some(adapter) => {
+				adapter.validate_versioned_file(full_path, display_path, custom_fields)
+			}
+			None => {
+				Err(MonochangeError::Config(format!(
+					"no adapter registered for ecosystem `{ecosystem}`"
+				)))
+			}
+		}
+	}
+}
+
 pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<DependencyEdge> {
 	let mut package_ids_by_name = BTreeMap::<String, Vec<String>>::new();
 	for package in packages {

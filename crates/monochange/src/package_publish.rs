@@ -34,12 +34,14 @@ pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
 pub(crate) use monochange_publish::PackagePublishStatus;
 use monochange_publish::ProcessCommandExecutor;
+use monochange_publish::PublishAdapter;
 pub(crate) use monochange_publish::PublishRequest;
 use monochange_publish::RegistryEndpoints;
 use monochange_publish::TrustedPublishingIdentity;
 pub(crate) use monochange_publish::TrustedPublishingOutcome;
 pub(crate) use monochange_publish::TrustedPublishingStatus;
 use monochange_publish::build_publish_command;
+use monochange_publish::build_publish_command_builder;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::go_module_path;
 use monochange_publish::merge_publish_resume_report;
@@ -340,19 +342,16 @@ fn resolve_registry_kind(
 }
 
 fn default_registry_kind_for_ecosystem(ecosystem: &str) -> MonochangeResult<RegistryKind> {
-	match ecosystem {
-		"cargo" => Ok(RegistryKind::CratesIo),
-		"npm" => Ok(RegistryKind::Npm),
-		"deno" => Ok(RegistryKind::Jsr),
-		"dart" | "flutter" => Ok(RegistryKind::PubDev),
-		"python" => Ok(RegistryKind::Pypi),
-		"go" => Ok(RegistryKind::GoProxy),
-		_ => {
-			Err(MonochangeError::Config(format!(
-				"built-in package publishing does not support ecosystem `{ecosystem}`"
-			)))
-		}
-	}
+	let parsed = ecosystem.parse::<Ecosystem>().map_err(|()| {
+		MonochangeError::Config(format!(
+			"built-in package publishing does not support ecosystem `{ecosystem}`"
+		))
+	})?;
+	monochange_core::default_registry_kind_for_ecosystem(parsed).ok_or_else(|| {
+		MonochangeError::Config(format!(
+			"built-in package publishing does not support ecosystem `{ecosystem}`"
+		))
+	})
 }
 
 fn resolve_placeholder_readme(
@@ -683,7 +682,10 @@ fn enforce_release_attestation_prerequisites(
 			identity.provider().label(),
 		)));
 	}
-	if !builtin_publish_command_supports_registry_provenance(request.registry) {
+	if !build_publish_command_builder()
+		.adapter_for_registry(request.registry)
+		.is_some_and(PublishAdapter::supports_provenance)
+	{
 		return Err(MonochangeError::Config(format!(
 			"`{}` cannot require registry-native package provenance for {} yet. {capability_message} The registry supports provenance, but monochange's current built-in publisher for this ecosystem does not expose a publish command that can require it; set `publish.attestations.require_registry_provenance = false` to opt out or use an external publisher that enforces its own attestation policy.",
 			request.package_id, request.registry,
@@ -691,10 +693,6 @@ fn enforce_release_attestation_prerequisites(
 	}
 
 	Ok(())
-}
-
-fn builtin_publish_command_supports_registry_provenance(registry: RegistryKind) -> bool {
-	matches!(registry, RegistryKind::Npm | RegistryKind::Jsr)
 }
 
 fn reject_npm_token_environment(

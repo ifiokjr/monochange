@@ -110,6 +110,86 @@ pub struct CommandSpec {
 	pub cwd: PathBuf,
 }
 
+/// Adapter for building ecosystem-specific publish commands.
+pub trait PublishAdapter {
+	fn registry_kind(&self) -> RegistryKind;
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec>;
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec>;
+	fn append_dry_run_args(&self, args: &mut Vec<String>) {
+		args.push("--dry-run".to_string());
+	}
+	fn supported_providers(&self) -> Vec<CiProviderKind> {
+		Vec::new()
+	}
+	fn registry_setup_url(&self) -> Option<&'static str> {
+		None
+	}
+	fn registry_notes(&self) -> Vec<String> {
+		vec!["unknown registry capabilities are treated as unsupported".to_string()]
+	}
+	fn supports_provenance(&self) -> bool {
+		false
+	}
+}
+
+/// Registry of publish adapters used to dispatch publish command construction.
+#[derive(Default)]
+pub struct PublishCommandBuilder {
+	adapters: Vec<Box<dyn PublishAdapter>>,
+}
+
+impl PublishCommandBuilder {
+	#[must_use]
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	#[must_use]
+	pub fn with_adapter(mut self, adapter: Box<dyn PublishAdapter>) -> Self {
+		self.adapters.push(adapter);
+		self
+	}
+
+	pub fn push_adapter(&mut self, adapter: Box<dyn PublishAdapter>) {
+		self.adapters.push(adapter);
+	}
+
+	pub fn adapter_for_registry(&self, registry: RegistryKind) -> Option<&dyn PublishAdapter> {
+		self.adapters
+			.iter()
+			.find(|adapter| adapter.registry_kind() == registry)
+			.map(AsRef::as_ref)
+	}
+
+	pub fn build_publish_command(
+		&self,
+		request: &PublishRequest,
+		mode: PackagePublishRunMode,
+		placeholder_dir: Option<&Path>,
+		dry_run: bool,
+	) -> CommandSpec {
+		let adapter = self
+			.adapter_for_registry(request.registry)
+			.expect("unsupported built-in publish registry");
+		let mut command = match mode {
+			PackagePublishRunMode::Placeholder => {
+				let path = placeholder_dir.expect("placeholder directory must exist");
+				adapter.build_placeholder_command(request, path)
+			}
+			PackagePublishRunMode::Release => adapter.build_release_command(request),
+		}
+		.expect("unsupported publish mode for this registry");
+		if dry_run {
+			adapter.append_dry_run_args(&mut command.args);
+		}
+		command
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CommandOutput {
 	pub success: bool,
@@ -164,55 +244,259 @@ pub fn build_publish_command(
 	placeholder_dir: Option<&Path>,
 	dry_run: bool,
 ) -> CommandSpec {
-	let mut command = None;
-	let is_jsr_release =
-		request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Release;
-	let placeholder_path = placeholder_dir;
-	if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_npm_placeholder_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Npm && mode == PackagePublishRunMode::Release {
-		command = Some(build_npm_release_publish_command(request));
-	} else if request.registry == RegistryKind::CratesIo
-		&& mode == PackagePublishRunMode::Placeholder
-	{
-		command = Some(build_cargo_placeholder_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::CratesIo && mode == PackagePublishRunMode::Release {
-		command = Some(build_cargo_release_publish_command(request));
-	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Placeholder
-	{
-		command = Some(build_dart_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::PubDev && mode == PackagePublishRunMode::Release {
-		command = Some(build_dart_publish_command(request, &request.package_root));
-	} else if request.registry == RegistryKind::Jsr && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_jsr_publish_command(
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Placeholder {
-		command = Some(build_python_publish_command(
-			request,
-			placeholder_path.expect("placeholder directory must exist"),
-		));
-	} else if request.registry == RegistryKind::Pypi && mode == PackagePublishRunMode::Release {
-		command = Some(build_python_publish_command(request, &request.package_root));
-	} else if request.registry == RegistryKind::GoProxy {
-		command = Some(build_go_publish_command(request));
-	}
-	if is_jsr_release {
-		command = Some(build_jsr_publish_command(&request.package_root));
+	build_publish_command_builder().build_publish_command(request, mode, placeholder_dir, dry_run)
+}
+
+pub fn build_publish_command_builder() -> PublishCommandBuilder {
+	PublishCommandBuilder::new()
+		.with_adapter(Box::new(NpmPublishAdapter))
+		.with_adapter(Box::new(CargoPublishAdapter))
+		.with_adapter(Box::new(DartPublishAdapter))
+		.with_adapter(Box::new(JsrPublishAdapter))
+		.with_adapter(Box::new(PythonPublishAdapter))
+		.with_adapter(Box::new(GoPublishAdapter))
+}
+
+struct NpmPublishAdapter;
+
+impl PublishAdapter for NpmPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::Npm
 	}
 
-	let mut command = command.expect("unsupported built-in publish registry");
-	append_publish_dry_run_args(&mut command.args, request.registry, dry_run);
-	command
+	fn supports_provenance(&self) -> bool {
+		true
+	}
+
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_npm_placeholder_publish_command(
+			request,
+			placeholder_path,
+		))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_npm_release_publish_command(request))
+	}
+
+	fn supported_providers(&self) -> Vec<CiProviderKind> {
+		vec![CiProviderKind::GitHubActions, CiProviderKind::GitLabCi]
+	}
+
+	fn registry_setup_url(&self) -> Option<&'static str> {
+		Some("https://docs.npmjs.com/trusted-publishers")
+	}
+
+	fn registry_notes(&self) -> Vec<String> {
+		[
+			"npm trusted publishing supports GitHub Actions and GitLab CI/CD".to_string(),
+			"monochange can verify and automate npm GitHub trusted-publisher setup with npm CLI trust commands".to_string(),
+		].to_vec()
+	}
+}
+
+struct CargoPublishAdapter;
+
+impl PublishAdapter for CargoPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::CratesIo
+	}
+
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_cargo_placeholder_publish_command(
+			request,
+			placeholder_path,
+		))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_cargo_release_publish_command(request))
+	}
+
+	fn supported_providers(&self) -> Vec<CiProviderKind> {
+		vec![CiProviderKind::GitHubActions]
+	}
+
+	fn registry_setup_url(&self) -> Option<&'static str> {
+		Some("https://crates.io/docs/trusted-publishing")
+	}
+
+	fn registry_notes(&self) -> Vec<String> {
+		[
+			"crates.io trusted publishing uses OIDC short-lived tokens".to_string(),
+			"monochange does not currently verify crates.io registry-side trusted-publisher setup"
+				.to_string(),
+		]
+		.to_vec()
+	}
+}
+
+struct DartPublishAdapter;
+
+impl PublishAdapter for DartPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::PubDev
+	}
+
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_dart_publish_command(request, placeholder_path))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_dart_publish_command(request, &request.package_root))
+	}
+
+	fn append_dry_run_args(&self, args: &mut Vec<String>) {
+		args.retain(|arg| arg != "--force");
+		args.push("--dry-run".to_string());
+	}
+
+	fn supported_providers(&self) -> Vec<CiProviderKind> {
+		vec![
+			CiProviderKind::GitHubActions,
+			CiProviderKind::GoogleCloudBuild,
+		]
+	}
+
+	fn registry_setup_url(&self) -> Option<&'static str> {
+		Some("https://dart.dev/tools/pub/automated-publishing")
+	}
+
+	fn registry_notes(&self) -> Vec<String> {
+		[
+			"pub.dev automated publishing uses configured OIDC publishers".to_string(),
+			"pub.dev registry-side publisher setup requires manual review".to_string(),
+		]
+		.to_vec()
+	}
+}
+
+struct JsrPublishAdapter;
+
+impl PublishAdapter for JsrPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::Jsr
+	}
+
+	fn supports_provenance(&self) -> bool {
+		true
+	}
+
+	fn build_placeholder_command(
+		&self,
+		_request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_jsr_publish_command(placeholder_path))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_jsr_publish_command(&request.package_root))
+	}
+
+	fn supported_providers(&self) -> Vec<CiProviderKind> {
+		vec![CiProviderKind::GitHubActions]
+	}
+
+	fn registry_setup_url(&self) -> Option<&'static str> {
+		Some("https://jsr.io/docs/publishing-packages")
+	}
+
+	fn registry_notes(&self) -> Vec<String> {
+		[
+			"JSR can publish from supported CI without long-lived tokens".to_string(),
+			"JSR package provenance is available, but monochange does not verify registry-side setup".to_string(),
+		].to_vec()
+	}
+}
+
+struct PythonPublishAdapter;
+
+impl PublishAdapter for PythonPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::Pypi
+	}
+
+	fn build_placeholder_command(
+		&self,
+		request: &PublishRequest,
+		placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		Some(build_python_publish_command(request, placeholder_path))
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_python_publish_command(request, &request.package_root))
+	}
+
+	fn append_dry_run_args(&self, _args: &mut Vec<String>) {}
+
+	fn supported_providers(&self) -> Vec<CiProviderKind> {
+		vec![
+			CiProviderKind::GitHubActions,
+			CiProviderKind::GitLabCi,
+			CiProviderKind::GoogleCloudBuild,
+		]
+	}
+
+	fn registry_setup_url(&self) -> Option<&'static str> {
+		Some("https://docs.pypi.org/trusted-publishers/")
+	}
+
+	fn registry_notes(&self) -> Vec<String> {
+		[
+			"PyPI Trusted Publishers support multiple CI identity providers".to_string(),
+			"PEP 740 digital attestations are separate from trusted-publisher authorization"
+				.to_string(),
+		]
+		.to_vec()
+	}
+}
+
+struct GoPublishAdapter;
+
+impl PublishAdapter for GoPublishAdapter {
+	fn registry_kind(&self) -> RegistryKind {
+		RegistryKind::GoProxy
+	}
+
+	fn build_placeholder_command(
+		&self,
+		_request: &PublishRequest,
+		_placeholder_path: &Path,
+	) -> Option<CommandSpec> {
+		None
+	}
+
+	fn build_release_command(&self, request: &PublishRequest) -> Option<CommandSpec> {
+		Some(build_go_publish_command(request))
+	}
+
+	fn append_dry_run_args(&self, _args: &mut Vec<String>) {}
+
+	fn supported_providers(&self) -> Vec<CiProviderKind> {
+		Vec::new()
+	}
+
+	fn registry_setup_url(&self) -> Option<&'static str> {
+		None
+	}
+
+	fn registry_notes(&self) -> Vec<String> {
+		["unknown registry capabilities are treated as unsupported".to_string()].to_vec()
+	}
 }
 
 pub fn append_publish_dry_run_args(args: &mut Vec<String>, registry: RegistryKind, dry_run: bool) {
@@ -747,61 +1031,24 @@ pub fn trusted_publishing_capability_message(
 }
 
 fn supported_providers_for_registry(registry: RegistryKind) -> Vec<CiProviderKind> {
-	match registry {
-		RegistryKind::Npm => vec![CiProviderKind::GitHubActions, CiProviderKind::GitLabCi],
-		RegistryKind::CratesIo | RegistryKind::Jsr => vec![CiProviderKind::GitHubActions],
-		RegistryKind::PubDev => {
-			vec![
-				CiProviderKind::GitHubActions,
-				CiProviderKind::GoogleCloudBuild,
-			]
-		}
-		RegistryKind::Pypi => {
-			vec![
-				CiProviderKind::GitHubActions,
-				CiProviderKind::GitLabCi,
-				CiProviderKind::GoogleCloudBuild,
-			]
-		}
-		_ => Vec::new(),
-	}
+	build_publish_command_builder()
+		.adapter_for_registry(registry)
+		.map_or_else(Vec::new, PublishAdapter::supported_providers)
 }
 
 fn registry_setup_url(registry: RegistryKind) -> Option<&'static str> {
-	match registry {
-		RegistryKind::Npm => Some("https://docs.npmjs.com/trusted-publishers"),
-		RegistryKind::CratesIo => Some("https://crates.io/docs/trusted-publishing"),
-		RegistryKind::Jsr => Some("https://jsr.io/docs/publishing-packages"),
-		RegistryKind::PubDev => Some("https://dart.dev/tools/pub/automated-publishing"),
-		RegistryKind::Pypi => Some("https://docs.pypi.org/trusted-publishers/"),
-		_ => None,
-	}
+	build_publish_command_builder()
+		.adapter_for_registry(registry)
+		.and_then(PublishAdapter::registry_setup_url)
 }
 
 fn registry_notes(registry: RegistryKind) -> Vec<String> {
-	match registry {
-		RegistryKind::Npm => vec![
-			"npm trusted publishing supports GitHub Actions and GitLab CI/CD".to_string(),
-			"monochange can verify and automate npm GitHub trusted-publisher setup with npm CLI trust commands".to_string(),
-		],
-		RegistryKind::CratesIo => vec![
-			"crates.io trusted publishing uses OIDC short-lived tokens".to_string(),
-			"monochange does not currently verify crates.io registry-side trusted-publisher setup".to_string(),
-		],
-		RegistryKind::Jsr => vec![
-			"JSR can publish from supported CI without long-lived tokens".to_string(),
-			"JSR package provenance is available, but monochange does not verify registry-side setup".to_string(),
-		],
-		RegistryKind::PubDev => vec![
-			"pub.dev automated publishing uses configured OIDC publishers".to_string(),
-			"pub.dev registry-side publisher setup requires manual review".to_string(),
-		],
-		RegistryKind::Pypi => vec![
-			"PyPI Trusted Publishers support multiple CI identity providers".to_string(),
-			"PEP 740 digital attestations are separate from trusted-publisher authorization".to_string(),
-		],
-		_ => vec!["unknown registry capabilities are treated as unsupported".to_string()],
-	}
+	build_publish_command_builder()
+		.adapter_for_registry(registry)
+		.map_or_else(
+			|| vec!["unknown registry capabilities are treated as unsupported".to_string()],
+			PublishAdapter::registry_notes,
+		)
 }
 
 fn provider_list(providers: &[CiProviderKind]) -> String {

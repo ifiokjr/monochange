@@ -427,6 +427,27 @@ impl EcosystemAdapter for DartAdapter {
 	fn discover(&self, root: &Path) -> MonochangeResult<AdapterDiscovery> {
 		discover_dart_packages(root)
 	}
+
+	fn load_configured(
+		&self,
+		root: &Path,
+		package_path: &Path,
+	) -> MonochangeResult<Option<PackageRecord>> {
+		load_configured_dart_package(root, package_path)
+	}
+
+	fn supported_versioned_file_kind(&self, path: &Path) -> bool {
+		supported_versioned_file_kind(path).is_some()
+	}
+
+	fn validate_versioned_file(
+		&self,
+		full_path: &Path,
+		display_path: &str,
+		custom_fields: Option<&[String]>,
+	) -> MonochangeResult<()> {
+		validate_versioned_file(full_path, display_path, custom_fields)
+	}
 }
 
 #[tracing::instrument(skip_all)]
