@@ -11,6 +11,11 @@ thread_local! {
 	static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
 }
 
+thread_local! {
+	static DEDUPLICATED_CACHE: std::cell::RefCell<std::collections::HashSet<(PathBuf, String)>> =
+		std::cell::RefCell::new(std::collections::HashSet::new());
+}
+
 pub(crate) fn build_release_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
@@ -1401,67 +1406,179 @@ pub(crate) fn write_release_record_file(
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let record = build_release_record(source, manifest);
-	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
-	let hash = {
-		use std::collections::hash_map::DefaultHasher;
-		use std::hash::Hasher;
-		let mut hasher = DefaultHasher::new();
-		for target in &record.release_targets {
-			hasher.write(target.id.as_bytes());
-			hasher.write(target.version.as_bytes());
-		}
-		format!("{:016x}", hasher.finish())
-	};
+	let paths = ReleasePaths::from_record(root, &record);
 
-	// Deduplication: remove any existing release records that share a tag version
-	// with this new record. If a previous release record contains the same
-	// (package_id, version) pair, it is stale and should be replaced.
-	let new_tags: std::collections::HashSet<(&str, &str)> = record
-		.release_targets
+	// If the record already exists, return it without overwriting so that
+	// subsequent PrepareRelease steps (for example during `mc release-pr`)
+	// do not produce a dirty working tree.
+	if paths.absolute.is_file() {
+		return Ok(paths.absolute);
+	}
+
+	deduplicate_overlapping_release_records(
+		root,
+		&record.release_targets,
+		paths.absolute.parent().unwrap_or(root),
+	)?;
+	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
+	fs::create_dir_all(paths.absolute.parent().unwrap_or(root))
+		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
+	fs::write(&paths.absolute, json)
+		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
+	Ok(paths.absolute)
+}
+
+/// Validate that the release record file expected for `manifest` still exists
+/// on disk after re-running deduplication. Called by `commit_release` to
+/// guard against stale or missing records between `prepare_release` and
+/// `commit_release`.
+pub(crate) fn validate_release_record_file(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+) -> MonochangeResult<PathBuf> {
+	let record = build_release_record(source, manifest);
+	let paths = ReleasePaths::from_record(root, &record);
+	deduplicate_overlapping_release_records(
+		root,
+		&record.release_targets,
+		paths.absolute.parent().unwrap_or(root),
+	)?;
+	if paths.absolute.is_file() {
+		let json = serde_json::to_string_pretty(&record).unwrap_or_default();
+		let existing = fs::read_to_string(&paths.absolute)
+			.map_err(|error| MonochangeError::Io(format!("read release record: {error}")))?;
+		if existing != json {
+			fs::write(&paths.absolute, json)
+				.map_err(|error| MonochangeError::Io(format!("update release record: {error}")))?;
+		}
+	} else {
+		return Err(MonochangeError::Io(format!(
+			"release record missing at {} — was it removed by deduplication or never written?",
+			paths.absolute.display()
+		)));
+	}
+	Ok(paths.absolute)
+}
+
+/// Derived filesystem paths for a release record.
+///
+/// The record path is a deterministic function of the manifest's
+/// `release_targets`. It is computed on demand rather than stored in the
+/// manifest so that the manifest remains portable and the path format can
+/// evolve without invalidating cached manifests.
+#[allow(dead_code)]
+pub(crate) struct ReleasePaths {
+	/// Hexadecimal hash derived from the release targets.
+	pub hash: String,
+	/// Path relative to the workspace root (`.monochange/releases/<hash>/release.json`).
+	pub relative: PathBuf,
+	/// Absolute path resolved against the workspace root.
+	pub absolute: PathBuf,
+}
+
+impl ReleasePaths {
+	/// Compute paths from an already-built `ReleaseRecord`.
+	///
+	/// Use this when you have the record in hand to avoid rebuilding it.
+	pub fn from_record(root: &Path, record: &ReleaseRecord) -> Self {
+		let hash = release_targets_hash(&record.release_targets);
+		let relative = PathBuf::from(".monochange/releases")
+			.join(&hash)
+			.join("release.json");
+		let absolute = root.join(&relative);
+		Self {
+			hash,
+			relative,
+			absolute,
+		}
+	}
+
+	/// Compute paths directly from a `ReleaseManifest`.
+	///
+	/// This builds the intermediate `ReleaseRecord` internally, so prefer
+	/// `from_record` when the record is already available.
+	#[allow(dead_code)]
+	pub fn from_manifest(
+		root: &Path,
+		source: Option<&SourceConfiguration>,
+		manifest: &ReleaseManifest,
+	) -> Self {
+		let record = build_release_record(source, manifest);
+		Self::from_record(root, &record)
+	}
+}
+
+fn release_targets_hash(release_targets: &[ReleaseRecordTarget]) -> String {
+	use std::collections::hash_map::DefaultHasher;
+	use std::hash::Hasher;
+	let mut hasher = DefaultHasher::new();
+	for target in release_targets {
+		hasher.write(target.id.as_bytes());
+		hasher.write(target.version.as_bytes());
+	}
+	format!("{:016x}", hasher.finish())
+}
+
+fn deduplicate_overlapping_release_records(
+	root: &Path,
+	release_targets: &[ReleaseRecordTarget],
+	current_record_dir: &Path,
+) -> MonochangeResult<()> {
+	let hash = release_targets_hash(release_targets);
+	let already_deduped = DEDUPLICATED_CACHE
+		.with(|cache| cache.borrow().contains(&(root.to_path_buf(), hash.clone())));
+	if already_deduped {
+		return Ok(());
+	}
+
+	let new_tags: std::collections::HashSet<(&str, &str)> = release_targets
 		.iter()
 		.map(|target| (target.id.as_str(), target.version.as_str()))
 		.collect();
 
 	let releases_dir = root.join(".monochange/releases");
-	if releases_dir.is_dir() {
-		for entry in fs::read_dir(&releases_dir)
-			.map_err(|error| MonochangeError::Io(format!("read releases dir: {error}")))?
-		{
-			let entry =
-				entry.map_err(|error| MonochangeError::Io(format!("read dir entry: {error}")))?;
-			let path = entry.path();
-			if !path.is_dir() {
-				continue;
-			}
-			let record_file = path.join("release.json");
-			if !record_file.is_file() {
-				continue;
-			}
-			let Ok(content) = fs::read_to_string(&record_file) else {
-				continue;
-			};
-			let Ok(existing) = serde_json::from_str::<ReleaseRecord>(&content) else {
-				continue;
-			};
-			let has_overlap = existing
-				.release_targets
-				.iter()
-				.any(|t| new_tags.contains(&(t.id.as_str(), t.version.as_str())));
-			if has_overlap {
-				fs::remove_dir_all(&path).map_err(|error| {
-					MonochangeError::Io(format!("remove stale release record dir: {error}"))
-				})?;
-			}
+	if !releases_dir.is_dir() {
+		return Ok(());
+	}
+	for entry in fs::read_dir(&releases_dir)
+		.map_err(|error| MonochangeError::Io(format!("read releases dir: {error}")))?
+	{
+		let entry =
+			entry.map_err(|error| MonochangeError::Io(format!("read dir entry: {error}")))?;
+		let path = entry.path();
+		if path == current_record_dir {
+			continue;
+		}
+		if !path.is_dir() {
+			continue;
+		}
+		let record_file = path.join("release.json");
+		if !record_file.is_file() {
+			continue;
+		}
+		let Ok(content) = fs::read_to_string(&record_file) else {
+			continue;
+		};
+		let Ok(existing) = serde_json::from_str::<ReleaseRecord>(&content) else {
+			continue;
+		};
+		let has_overlap = existing
+			.release_targets
+			.iter()
+			.any(|t| new_tags.contains(&(t.id.as_str(), t.version.as_str())));
+		if has_overlap {
+			fs::remove_dir_all(&path).map_err(|error| {
+				MonochangeError::Io(format!("remove stale release record dir: {error}"))
+			})?;
 		}
 	}
 
-	let dir = root.join(".monochange/releases").join(&hash);
-	fs::create_dir_all(&dir)
-		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
-	let path = dir.join("release.json");
-	fs::write(&path, json)
-		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
-	Ok(path)
+	DEDUPLICATED_CACHE.with(|cache| {
+		cache.borrow_mut().insert((root.to_path_buf(), hash));
+	});
+
+	Ok(())
 }
 
 pub(crate) fn commit_release(
@@ -1473,7 +1590,7 @@ pub(crate) fn commit_release(
 ) -> MonochangeResult<CommitReleaseReport> {
 	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
 	let message = build_release_commit_message(source, manifest);
-	let release_record_path = write_release_record_file(root, source, manifest)?;
+	let release_record_path = validate_release_record_file(root, source, manifest)?;
 	let mut tracked_paths = tracked_paths;
 	tracked_paths.push(release_record_path);
 	if !context.dry_run {

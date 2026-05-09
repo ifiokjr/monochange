@@ -732,6 +732,10 @@ pub(crate) fn execute_cli_command_with_options(
 						prepared_release,
 						&context.command_logs,
 					);
+					let _record_path =
+						write_release_record_file(root, configuration.source.as_ref(), &manifest)?;
+					let updated_prepared_release = context.prepared_release.take().unwrap();
+					context.prepared_release = Some(updated_prepared_release);
 					context.release_manifest_path =
 						Some(write_default_release_manifest_file(root, &manifest)?);
 					output = None;

@@ -700,3 +700,92 @@ fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 		publish_error.to_string().contains("git") || publish_error.to_string().contains("failed")
 	);
 }
+
+#[test]
+fn release_paths_from_manifest_computes_hash_relative_and_absolute() {
+	let root = PathBuf::from("/tmp/fake-root");
+	let manifest = ReleaseManifest {
+		command: "release".to_string(),
+		dry_run: false,
+		version: None,
+		group_version: None,
+		release_targets: vec![ReleaseManifestTarget {
+			id: "sdk".to_string(),
+			kind: ReleaseOwnerKind::Group,
+			version: "1.0.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v1.0.0".to_string(),
+			members: vec![],
+			rendered_title: "1.0.0".to_string(),
+			rendered_changelog_title: "[1.0.0]".to_string(),
+		}],
+		released_packages: vec![],
+		changed_files: vec![],
+		changelogs: vec![],
+		package_publications: vec![],
+		changesets: vec![],
+		deleted_changesets: vec![],
+		plan: ReleaseManifestPlan {
+			workspace_root: PathBuf::from("."),
+			decisions: vec![],
+			groups: vec![],
+			warnings: vec![],
+			unresolved_items: vec![],
+			compatibility_evidence: vec![],
+		},
+	};
+	let paths = ReleasePaths::from_manifest(&root, None, &manifest);
+	assert!(!paths.hash.is_empty());
+	assert_eq!(
+		paths.relative,
+		PathBuf::from(".monochange/releases")
+			.join(&paths.hash)
+			.join("release.json")
+	);
+	assert_eq!(paths.absolute, root.join(&paths.relative));
+}
+
+#[test]
+fn release_paths_from_record_produces_same_hash_as_from_manifest() {
+	let root = PathBuf::from("/tmp/fake-root");
+	let manifest = ReleaseManifest {
+		command: "release".to_string(),
+		dry_run: false,
+		version: None,
+		group_version: None,
+		release_targets: vec![ReleaseManifestTarget {
+			id: "sdk".to_string(),
+			kind: ReleaseOwnerKind::Group,
+			version: "1.0.0".to_string(),
+			tag: true,
+			release: true,
+			version_format: VersionFormat::Primary,
+			tag_name: "v1.0.0".to_string(),
+			members: vec![],
+			rendered_title: "1.0.0".to_string(),
+			rendered_changelog_title: "[1.0.0]".to_string(),
+		}],
+		released_packages: vec![],
+		changed_files: vec![],
+		changelogs: vec![],
+		package_publications: vec![],
+		changesets: vec![],
+		deleted_changesets: vec![],
+		plan: ReleaseManifestPlan {
+			workspace_root: PathBuf::from("."),
+			decisions: vec![],
+			groups: vec![],
+			warnings: vec![],
+			unresolved_items: vec![],
+			compatibility_evidence: vec![],
+		},
+	};
+	let from_manifest = ReleasePaths::from_manifest(&root, None, &manifest);
+	let record = build_release_record(None, &manifest);
+	let from_record = ReleasePaths::from_record(&root, &record);
+	assert_eq!(from_manifest.hash, from_record.hash);
+	assert_eq!(from_manifest.relative, from_record.relative);
+	assert_eq!(from_manifest.absolute, from_record.absolute);
+}

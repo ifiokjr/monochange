@@ -280,6 +280,15 @@ fn release_path_requires_staging(root: &Path, path: &Path) -> MonochangeResult<b
 		return Ok(true);
 	}
 
+	let relative = if path.is_absolute() {
+		path.strip_prefix(root).unwrap_or(path)
+	} else {
+		path
+	};
+	if relative.starts_with(".monochange/releases") {
+		return Ok(true);
+	}
+
 	Ok(!git_path_is_ignored(root, path)?)
 }
 
