@@ -2385,6 +2385,12 @@ fn parse_release_record_json_normalizes_integer_schema_version() {
 }
 
 #[test]
+fn parse_release_record_json_rejects_non_object() {
+	let error = crate::parse_release_record_json("[]").expect_err("expected error for non-object");
+	assert!(matches!(error, ReleaseRecordError::MissingKind));
+}
+
+#[test]
 fn parse_release_record_json_normalizes_legacy_v_field() {
 	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let kind = RELEASE_RECORD_KIND;
