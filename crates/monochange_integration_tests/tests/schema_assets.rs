@@ -261,10 +261,10 @@ fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(
 		.unwrap_or_default();
 
 	assert_eq!(schema_crate_version(&paths)?, expected_version);
-	assert_eq!(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT, "0.0");
+	assert_eq!(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT, "0.1");
 	assert_eq!(
 		monochange_schema::current_schema_version()?,
-		monochange_schema::SchemaVersion::new(0, 0)
+		monochange_schema::SchemaVersion::new(0, 1)
 	);
 
 	Ok(())

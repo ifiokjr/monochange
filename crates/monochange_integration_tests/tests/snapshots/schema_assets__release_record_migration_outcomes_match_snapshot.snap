@@ -5,7 +5,7 @@ expression: outcomes
 [
   {
     "scenario": "current",
-    "schemaVersion": "0.0",
+    "schemaVersion": "0.1",
     "status": "ok"
   },
   {
@@ -44,12 +44,12 @@ expression: outcomes
     "status": "error"
   },
   {
-    "error": "artifact uses unsupported schema version `0.1`; current supported version is `0.0`",
     "scenario": "old_version_without_migration_edge",
-    "status": "error"
+    "schemaVersion": "0.1",
+    "status": "ok"
   },
   {
-    "error": "artifact uses unsupported schema version `0.2`; current supported version is `0.0`",
+    "error": "artifact uses unsupported schema version `0.2`; current supported version is `0.1`",
     "scenario": "future_version",
     "status": "error"
   }
