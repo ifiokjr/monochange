@@ -11,8 +11,6 @@ use std::time::Instant;
 #[cfg(feature = "cargo")]
 use monochange_cargo::CargoAdapter;
 use monochange_cargo::discover_cargo_packages;
-#[cfg(feature = "cargo")]
-use monochange_cargo::load_configured_cargo_package;
 use monochange_config::apply_version_groups;
 use monochange_config::build_changeset_load_context;
 use monochange_config::load_change_signals;
@@ -35,22 +33,13 @@ use monochange_core::default_cli_commands;
 #[cfg(feature = "dart")]
 use monochange_dart::DartAdapter;
 use monochange_dart::discover_dart_packages;
-#[cfg(feature = "dart")]
-use monochange_dart::load_configured_dart_package;
-#[cfg(feature = "deno")]
 use monochange_deno::DenoAdapter;
 use monochange_deno::discover_deno_packages;
-#[cfg(feature = "deno")]
-use monochange_deno::load_configured_deno_package;
-#[cfg(feature = "go")]
 use monochange_go::GoAdapter;
 use monochange_go::discover_go_modules;
 #[cfg(feature = "npm")]
 use monochange_npm::NpmAdapter;
 use monochange_npm::discover_npm_packages;
-#[cfg(feature = "npm")]
-use monochange_npm::load_configured_npm_package;
-#[cfg(feature = "python")]
 use monochange_python::PythonAdapter;
 use monochange_python::discover_python_packages;
 use serde_json::json;
@@ -1018,54 +1007,16 @@ fn discover_release_workspace(
 	let mut packages = Vec::new();
 	for package_definition in &configuration.packages {
 		let path = root.join(&package_definition.path);
-		let package = match package_definition.package_type {
-			#[cfg(feature = "cargo")]
-			PackageType::Cargo => load_configured_cargo_package(root, &path)?,
-			#[cfg(not(feature = "cargo"))]
-			PackageType::Cargo => {
-				return Err(MonochangeError::Config(
-					"the `cargo` feature must be enabled to load Cargo packages".to_string(),
-				));
-			}
-			#[cfg(feature = "npm")]
-			PackageType::Npm => load_configured_npm_package(root, &path)?,
-			#[cfg(not(feature = "npm"))]
-			PackageType::Npm => {
-				return Err(MonochangeError::Config(
-					"the `npm` feature must be enabled to load npm packages".to_string(),
-				));
-			}
-			#[cfg(feature = "deno")]
-			PackageType::Deno => load_configured_deno_package(root, &path)?,
-			#[cfg(not(feature = "deno"))]
-			PackageType::Deno => {
-				return Err(MonochangeError::Config(
-					"the `deno` feature must be enabled to load Deno packages".to_string(),
-				));
-			}
-			#[cfg(feature = "dart")]
-			PackageType::Dart | PackageType::Flutter => load_configured_dart_package(root, &path)?,
-			#[cfg(not(feature = "dart"))]
-			PackageType::Dart | PackageType::Flutter => {
-				return Err(MonochangeError::Config(
-					"the `dart` feature must be enabled to load Dart packages".to_string(),
-				));
-			}
-			_ => {
-				return Err(MonochangeError::Config(format!(
-					"unsupported package type `{}` for `{}`",
-					package_definition.package_type.as_str(),
+		let registry = build_ecosystem_registry();
+		let package = registry
+			.load_configured(root, &path, package_definition.package_type.into())?
+			.ok_or_else(|| {
+				MonochangeError::Discovery(format!(
+					"configured package `{}` at {} could not be discovered",
 					package_definition.id,
-				)));
-			}
-		}
-		.ok_or_else(|| {
-			MonochangeError::Discovery(format!(
-				"configured package `{}` at {} could not be discovered",
-				package_definition.id,
-				package_definition.path.display()
-			))
-		})?;
+					package_definition.path.display()
+				))
+			})?;
 		packages.push(package);
 	}
 

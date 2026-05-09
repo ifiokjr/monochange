@@ -254,6 +254,33 @@ impl Ecosystem {
 	}
 }
 
+impl From<EcosystemType> for Ecosystem {
+	fn from(value: EcosystemType) -> Self {
+		match value {
+			EcosystemType::Cargo => Self::Cargo,
+			EcosystemType::Npm => Self::Npm,
+			EcosystemType::Deno => Self::Deno,
+			EcosystemType::Dart => Self::Dart,
+			EcosystemType::Python => Self::Python,
+			EcosystemType::Go => Self::Go,
+		}
+	}
+}
+
+impl From<PackageType> for Ecosystem {
+	fn from(value: PackageType) -> Self {
+		match value {
+			PackageType::Cargo => Self::Cargo,
+			PackageType::Npm => Self::Npm,
+			PackageType::Deno => Self::Deno,
+			PackageType::Dart => Self::Dart,
+			PackageType::Flutter => Self::Flutter,
+			PackageType::Python => Self::Python,
+			PackageType::Go => Self::Go,
+		}
+	}
+}
+
 impl fmt::Display for Ecosystem {
 	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
 		formatter.write_str(self.as_str())
@@ -4080,6 +4107,21 @@ pub trait EcosystemAdapter {
 	fn ecosystem(&self) -> Ecosystem;
 
 	fn discover(&self, root: &Path) -> MonochangeResult<AdapterDiscovery>;
+
+	fn load_configured(
+		&self,
+		root: &Path,
+		package_path: &Path,
+	) -> MonochangeResult<Option<PackageRecord>>;
+
+	fn supported_versioned_file_kind(&self, path: &Path) -> bool;
+
+	fn validate_versioned_file(
+		&self,
+		full_path: &Path,
+		display_path: &str,
+		custom_fields: Option<&[String]>,
+	) -> MonochangeResult<()>;
 }
 
 /// Build dependency edges by matching declared dependency names to known packages.
@@ -4094,12 +4136,10 @@ pub struct EcosystemRegistry {
 }
 
 impl EcosystemRegistry {
-	#[must_use]
 	pub fn new() -> Self {
 		Self::default()
 	}
 
-	#[must_use]
 	pub fn with_adapter(mut self, adapter: Box<dyn EcosystemAdapter>) -> Self {
 		self.adapters.push(adapter);
 		self
@@ -4114,8 +4154,8 @@ impl EcosystemRegistry {
 		let mut warnings = Vec::new();
 		for adapter in &self.adapters {
 			let mut result = adapter.discover(root)?;
-			packages.extend(result.packages.drain(..));
-			warnings.extend(result.warnings.drain(..));
+			packages.append(&mut result.packages);
+			warnings.append(&mut result.warnings);
 		}
 		Ok(AdapterDiscovery { packages, warnings })
 	}
@@ -4124,7 +4164,43 @@ impl EcosystemRegistry {
 		self.adapters
 			.iter()
 			.find(|a| a.ecosystem() == ecosystem)
-			.map(|a| a.as_ref())
+			.map(AsRef::as_ref)
+	}
+
+	pub fn load_configured(
+		&self,
+		root: &Path,
+		package_path: &Path,
+		ecosystem: Ecosystem,
+	) -> MonochangeResult<Option<PackageRecord>> {
+		match self.adapter_for_ecosystem(ecosystem) {
+			Some(adapter) => adapter.load_configured(root, package_path),
+			None => Ok(None),
+		}
+	}
+
+	pub fn supported_versioned_file_kind(&self, path: &Path, ecosystem: Ecosystem) -> bool {
+		self.adapter_for_ecosystem(ecosystem)
+			.is_some_and(|adapter| adapter.supported_versioned_file_kind(path))
+	}
+
+	pub fn validate_versioned_file(
+		&self,
+		full_path: &Path,
+		display_path: &str,
+		ecosystem: Ecosystem,
+		custom_fields: Option<&[String]>,
+	) -> MonochangeResult<()> {
+		match self.adapter_for_ecosystem(ecosystem) {
+			Some(adapter) => {
+				adapter.validate_versioned_file(full_path, display_path, custom_fields)
+			}
+			None => {
+				Err(MonochangeError::Config(format!(
+					"no adapter registered for ecosystem `{ecosystem}`"
+				)))
+			}
+		}
 	}
 }
 

@@ -70,6 +70,27 @@ impl EcosystemAdapter for GoAdapter {
 	fn discover(&self, root: &Path) -> MonochangeResult<AdapterDiscovery> {
 		discover_go_modules(root)
 	}
+
+	fn load_configured(
+		&self,
+		_root: &Path,
+		_package_path: &Path,
+	) -> MonochangeResult<Option<PackageRecord>> {
+		Ok(None)
+	}
+
+	fn supported_versioned_file_kind(&self, path: &Path) -> bool {
+		supported_versioned_file_kind(path).is_some()
+	}
+
+	fn validate_versioned_file(
+		&self,
+		full_path: &Path,
+		display_path: &str,
+		custom_fields: Option<&[String]>,
+	) -> MonochangeResult<()> {
+		validate_versioned_file(full_path, display_path, custom_fields)
+	}
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

@@ -100,6 +100,7 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 use monochange_core::Ecosystem;
+use monochange_core::EcosystemRegistry;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
 use monochange_core::GroupChangelogInclude;
@@ -3230,16 +3231,18 @@ fn path_uses_glob(path: &str) -> bool {
 	path.contains('*') || path.contains('?') || path.contains('[')
 }
 
+fn build_ecosystem_registry() -> EcosystemRegistry {
+	EcosystemRegistry::new()
+		.with_adapter(Box::new(monochange_cargo::CargoAdapter))
+		.with_adapter(Box::new(monochange_npm::NpmAdapter))
+		.with_adapter(Box::new(monochange_deno::DenoAdapter))
+		.with_adapter(Box::new(monochange_dart::DartAdapter))
+		.with_adapter(Box::new(monochange_python::PythonAdapter))
+		.with_adapter(Box::new(monochange_go::GoAdapter))
+}
+
 fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -> bool {
-	match ecosystem_type {
-		EcosystemType::Cargo => monochange_cargo::supported_versioned_file_kind(path).is_some(),
-		EcosystemType::Npm => monochange_npm::supported_versioned_file_kind(path).is_some(),
-		EcosystemType::Deno => monochange_deno::supported_versioned_file_kind(path).is_some(),
-		EcosystemType::Dart => monochange_dart::supported_versioned_file_kind(path).is_some(),
-		EcosystemType::Python => monochange_python::supported_versioned_file_kind(path).is_some(),
-		EcosystemType::Go => monochange_go::supported_versioned_file_kind(path).is_some(),
-		_ => false,
-	}
+	build_ecosystem_registry().supported_versioned_file_kind(path, ecosystem_type.into())
 }
 
 fn source_capabilities(provider: SourceProvider) -> monochange_core::SourceCapabilities {
@@ -4993,24 +4996,12 @@ fn validate_ecosystem_version_readable(
 	owner_kind: &str,
 	owner_id: &str,
 ) -> MonochangeResult<()> {
-	let result = match ecosystem_type {
-		EcosystemType::Cargo => {
-			monochange_cargo::validate_versioned_file(full_path, display_path, fields)
-		}
-		EcosystemType::Npm => {
-			monochange_npm::validate_versioned_file(full_path, display_path, fields)
-		}
-		EcosystemType::Deno => {
-			monochange_deno::validate_versioned_file(full_path, display_path, fields)
-		}
-		EcosystemType::Dart => {
-			monochange_dart::validate_versioned_file(full_path, display_path, fields)
-		}
-		EcosystemType::Python => {
-			monochange_python::validate_versioned_file(full_path, display_path, fields)
-		}
-		EcosystemType::Go => monochange_go::validate_versioned_file(full_path, display_path, fields), _ => return Err(MonochangeError::Config(format!("{owner_kind} `{owner_id}` versioned file `{display_path}` is not supported for the configured ecosystem"))),
-	};
+	let result = build_ecosystem_registry().validate_versioned_file(
+		full_path,
+		display_path,
+		ecosystem_type.into(),
+		fields,
+	);
 
 	result.map_err(|error| match error {
 		MonochangeError::Config(msg) => MonochangeError::Config(format!("{owner_kind} `{owner_id}` {msg}")), other => other,
