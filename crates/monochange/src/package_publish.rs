@@ -18,6 +18,7 @@ use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::WorkspaceConfiguration;
+use monochange_dart::write_dart_placeholder_manifest;
 use monochange_deno::write_jsr_placeholder_manifest;
 use monochange_github::format_manual_trust_context;
 use monochange_github::resolve_github_trust_context;
@@ -1026,25 +1027,6 @@ fn resolve_cargo_placeholder_license_metadata(
 		.and_then(TomlValue::as_str)
 		.map(ToString::to_string);
 	Ok((workspace_license, workspace_license_file))
-}
-
-fn write_dart_placeholder_manifest(
-	dir: &Path,
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-) -> MonochangeResult<()> {
-	let repository =
-		source.map(|source| format!("https://github.com/{}/{}", source.owner, source.repo));
-	let mut rendered = format!(
-		"name: {}\nversion: {}\ndescription: Placeholder package published by monochange.\n",
-		request.package_name, request.version
-	);
-	if let Some(repository) = repository {
-		let _ = writeln!(rendered, "repository: {repository}");
-	}
-	fs::write(dir.join("pubspec.yaml"), rendered).map_err(|error| {
-		MonochangeError::Io(format!("failed to write placeholder pubspec.yaml: {error}"))
-	})
 }
 
 fn write_python_placeholder_manifest(

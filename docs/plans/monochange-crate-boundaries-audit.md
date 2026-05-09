@@ -56,7 +56,7 @@ Examples of ecosystem/provider leakage in the top-level crate:
 
 - `npm token` environment rejection still lives in `package_publish.rs`; npm trusted-publishing command construction and npm placeholder manifest generation are moving into `monochange_npm`
 - Cargo placeholder manifest generation in `package_publish.rs` (Cargo publish readiness blockers now live in `monochange_cargo`)
-- Dart, JSR, Python, Go placeholder manifest generation in `package_publish.rs`
+- Cargo and Python placeholder manifest generation in `package_publish.rs`
 - top-level orchestration that still hardcodes ecosystem/provider trust setup instead of calling publish/provider adapters
 - trusted publishing capability matrix now lives in `monochange_publish`, while GitHub workflow/environment trust context now lives in `monochange_github`
 
@@ -105,7 +105,10 @@ Provider-specific trust context should move to provider crates:
 | `cargo_publish_readiness_blockers`                            | `monochange_cargo`   | Done in #413 |
 | GitHub trust context resolution and verification              | `monochange_github`  | Done in #417 |
 | npm trusted-publishing command helpers                        | `monochange_npm`     | In #419      |
-| npm placeholder manifest generation                           | `monochange_npm`     | In #419      |
+| npm placeholder manifest generation                           | `monochange_npm`     | Done in #419 |
+| Go placeholder manifest generation                            | `monochange_go`      | Done in #420 |
+| JSR/Deno placeholder manifest generation                      | `monochange_deno`    | In #423      |
+| Dart placeholder manifest generation                          | `monochange_dart`    | Next         |
 
 **Phase 3: Introduce `PublishAdapter` trait**
 
@@ -145,7 +148,7 @@ The top-level `monochange` crate should only register adapters and call `monocha
 2. Extract Cargo readiness blockers into `monochange_cargo`. ✅
 3. Extract GitHub trust context into `monochange_github`. ✅
 4. Move npm trusted-publishing command helpers and npm placeholder manifest generation into `monochange_npm`.
-5. Extract remaining placeholder manifest generation per ecosystem, continuing with JSR/Deno placeholders in `monochange_deno`.
+5. Extract remaining placeholder manifest generation per ecosystem, continuing with Dart placeholders in `monochange_dart`.
 6. Extract registry existence checks per ecosystem or route them through publish adapters.
 7. Delete top-level ecosystem/provider match arms from `package_publish.rs` and reduce it to CLI glue or remove it entirely.
 
@@ -512,3 +515,7 @@ After the npm helper extraction, the next focused follow-up moves Go placeholder
 ### 2026-05-09: JSR placeholder boundary follow-up
 
 After the npm and Go placeholder extractions, the next focused follow-up moves JSR placeholder `deno.json` and `mod.ts` generation into `monochange_deno`. This keeps Deno/JSR package scaffold rules with the Deno ecosystem adapter while `package_publish.rs` still owns temporary-directory orchestration until `PublishAdapter` exists.
+
+### 2026-05-09: Dart placeholder boundary follow-up
+
+After the JSR placeholder extraction, the next focused follow-up moves pub.dev placeholder `pubspec.yaml` generation into `monochange_dart`. This keeps Dart package scaffold rules with the Dart ecosystem adapter while `package_publish.rs` still owns temporary-directory orchestration until `PublishAdapter` exists.
