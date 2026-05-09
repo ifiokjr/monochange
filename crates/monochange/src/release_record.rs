@@ -122,24 +122,21 @@ pub async fn plan_release_retarget(
 
 	validate_retarget_provider(discovery, source)?;
 
-	let git_tag_updates = release_record_tag_names(&discovery.record)
-		.into_iter()
-		.map(|tag_name| {
-			let from_commit = resolve_git_tag_commit(root, &tag_name).await?;
-
-			Ok(RetargetTagResult {
-				tag_name,
-				operation: if from_commit == target_commit {
-					RetargetOperation::AlreadyUpToDate
-				} else {
-					RetargetOperation::Planned
-				},
-				from_commit,
-				to_commit: target_commit.clone(),
-				message: None,
-			})
-		})
-		.collect::<MonochangeResult<Vec<_>>>()?;
+	let mut git_tag_updates = Vec::new();
+	for tag_name in release_record_tag_names(&discovery.record) {
+		let from_commit = resolve_git_tag_commit(root, &tag_name).await?;
+		git_tag_updates.push(RetargetTagResult {
+			tag_name,
+			operation: if from_commit == target_commit {
+				RetargetOperation::AlreadyUpToDate
+			} else {
+				RetargetOperation::Planned
+			},
+			from_commit,
+			to_commit: target_commit.clone(),
+			message: None,
+		});
+	}
 	let provider = source.map(|configured| configured.provider).or_else(|| {
 		discovery
 			.record
@@ -380,25 +377,23 @@ pub(crate) async fn create_release_tags(
 		)));
 	}
 
-	let tag_results = release_record_tag_names(&discovery.record)
-		.into_iter()
-		.map(|tag_name| {
-			let existing_commit = resolve_git_tag_commit(root, &tag_name).await.ok();
-			let operation = if existing_commit.as_deref() == Some(discovery.record_commit.as_str())
-			{
-				ReleaseTagOperation::AlreadyUpToDate
-			} else {
-				ReleaseTagOperation::Planned
-			};
+	let mut tag_results = Vec::new();
+	for tag_name in release_record_tag_names(&discovery.record) {
+		let existing_commit = resolve_git_tag_commit(root, &tag_name).await.ok();
+		let operation = if existing_commit.as_deref() == Some(discovery.record_commit.as_str())
+		{
+			ReleaseTagOperation::AlreadyUpToDate
+		} else {
+			ReleaseTagOperation::Planned
+		};
 
-			Ok(ReleaseTagResult {
-				tag_name,
-				target_commit: discovery.record_commit.clone(),
-				existing_commit,
-				operation,
-			})
-		})
-		.collect::<MonochangeResult<Vec<_>>>()?;
+		tag_results.push(ReleaseTagResult {
+			tag_name,
+			target_commit: discovery.record_commit.clone(),
+			existing_commit,
+			operation,
+		});
+	}
 
 	for tag_result in &tag_results {
 		if let Some(existing_commit) = &tag_result.existing_commit
