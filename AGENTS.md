@@ -33,6 +33,19 @@
 - Never change `commit.gpgsign` in local, global, or workspace git config.
 - The only allowed exception is during `git rebase` workflows when a rebase continuation or amend step would otherwise block on hooks/editor behavior.
 
+## Agent authority limits
+
+These operations are **strictly prohibited** for the agent and must only be performed by a human maintainer:
+
+- **Never publish any package** to any registry (crates.io, npm, JSR, PyPI, pub.dev, etc.), whether via automated workflow, manual CLI command, or by using local credentials stored on the machine.
+- **Never merge a release PR** (e.g. PRs titled `chore(release): prepare release`). These are managed by the automated release workflow and must not be merged by the agent.
+- **Never push directly to `main`** or any protected branch. All changes must go through a pull request.
+- **Never trigger release or publish workflows** (`release.yml`, `publish.yml`, `docs-release.yml`, etc.) manually.
+- **Never use local credentials** (cargo tokens, npm tokens, GitHub tokens, OIDC tokens, etc.) to perform any registry-side operation.
+- **Never create, delete, or modify tags or releases** on GitHub.
+
+The agent must only write code, open and update pull requests, review code, run tests, and perform other development tasks. Release and publish operations are the sole responsibility of the human maintainer.
+
 ## Task-specific guidance
 
 - [Tooling and commands](docs/agents/tooling.md)
