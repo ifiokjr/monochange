@@ -18,6 +18,7 @@ use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::WorkspaceConfiguration;
+use monochange_deno::write_jsr_placeholder_manifest;
 use monochange_github::format_manual_trust_context;
 use monochange_github::resolve_github_trust_context;
 use monochange_github::trust_list_contains_context;
@@ -55,7 +56,6 @@ use monochange_publish::resume_publish_requests;
 use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
 use reqwest::blocking::Client;
-use serde_json::Value as JsonValue;
 use tempfile::TempDir;
 use toml::Value as TomlValue;
 use urlencoding::encode;
@@ -1047,49 +1047,6 @@ fn write_dart_placeholder_manifest(
 	})
 }
 
-fn write_jsr_placeholder_manifest(
-	dir: &Path,
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-) -> MonochangeResult<()> {
-	let mut manifest = serde_json::Map::new();
-	manifest.insert(
-		"name".to_string(),
-		JsonValue::String(request.package_name.clone()),
-	);
-	manifest.insert(
-		"version".to_string(),
-		JsonValue::String(request.version.clone()),
-	);
-	manifest.insert(
-		"exports".to_string(),
-		JsonValue::Object(
-			[(".".to_string(), JsonValue::String("./mod.ts".to_string()))]
-				.into_iter()
-				.collect(),
-		),
-	);
-	if let Some(source) = source {
-		manifest.insert(
-			"repository".to_string(),
-			JsonValue::String(format!(
-				"https://github.com/{}/{}",
-				source.owner, source.repo
-			)),
-		);
-	}
-	fs::write(
-		dir.join("deno.json"),
-		JsonValue::Object(manifest).to_string(),
-	)
-	.map_err(|error| {
-		MonochangeError::Io(format!("failed to write placeholder deno.json: {error}"))
-	})?;
-	fs::write(dir.join("mod.ts"), "export {};\n").map_err(|error| {
-		MonochangeError::Io(format!("failed to write placeholder mod.ts: {error}"))
-	})
-}
-
 fn write_python_placeholder_manifest(
 	dir: &Path,
 	request: &PublishRequest,
@@ -1282,6 +1239,7 @@ mod tests {
 	use monochange_publish::write_publish_report_artifact;
 	use monochange_test_helpers::git;
 	use semver::Version;
+	use serde_json::Value as JsonValue;
 	use temp_env::with_vars;
 
 	use super::*;
